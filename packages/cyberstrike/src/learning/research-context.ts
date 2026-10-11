@@ -33,6 +33,32 @@ export function requestResearchSignals(input: { method: string; path: string; co
   if (/^(post|put|patch|delete)$/i.test(method)) tags.push("business-logic")
   return [...new Set(tags)]
 }
+
+/** Map an observed signal tag to a broad research class; this selects advisory material only. */
+export function researchClassForSignalTags(input: string[]): string | undefined {
+  const tags = input.map((tag) => tag.trim().replace(/^target:/i, "").toLowerCase())
+  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization)$/.test(tag))
+  if (!classTag) return undefined
+  const aliases: Record<string, string> = {
+    bola: "idor",
+    "object-identifier": "idor",
+    "resource-identifier": "idor",
+    "authorization-boundary": "access-control",
+    "server-side-request": "ssrf",
+    "token-or-jwt": "jwt",
+    authz: "access-control",
+    authorization: "access-control",
+  }
+  const knownClasses = new Set([
+    "idor", "xss", "ssrf", "csrf", "sqli", "xxe", "ssti", "race-condition",
+    "open-redirect", "auth-bypass", "access-control", "business-logic", "prototype-pollution",
+    "deserialization", "request-smuggling", "cache-poisoning", "file-upload", "graphql",
+    "jwt", "command-injection", "path-traversal", "subdomain-takeover", "oauth", "web-cache",
+  ])
+  const normalized = aliases[classTag] ?? classTag
+  return knownClasses.has(normalized) ? normalized : undefined
+}
+
 export namespace ResearchContext {
   export function generate(sessionID: string): string | null {
     const projectID = Instance.project.id
@@ -139,27 +165,7 @@ export namespace ResearchContext {
       const tags = ((entry.tags as string[] | null) ?? [])
         .map((tag) => tag.trim().replace(/[^a-zA-Z0-9 ._-]/g, " ").slice(0, 48))
         .filter(Boolean)
-      const classTag = tags
-        .map((tag) => tag.replace(/^target:/i, "").toLowerCase())
-        .find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization)$/.test(tag))
-      const classAliases: Record<string, string> = {
-        bola: "idor",
-        "object-identifier": "idor",
-        "resource-identifier": "idor",
-        "authorization-boundary": "access-control",
-        "server-side-request": "ssrf",
-        "token-or-jwt": "jwt",
-        authz: "access-control",
-        authorization: "access-control",
-      }
-      const knownClasses = new Set([
-        "idor", "xss", "ssrf", "csrf", "sqli", "xxe", "ssti", "race-condition",
-        "open-redirect", "auth-bypass", "access-control", "business-logic", "prototype-pollution",
-        "deserialization", "request-smuggling", "cache-poisoning", "file-upload", "graphql",
-        "jwt", "command-injection", "path-traversal", "subdomain-takeover", "oauth", "web-cache",
-      ])
-      const normalizedClass = classTag ? (classAliases[classTag] ?? classTag) : undefined
-      const vulnerabilityClass = normalizedClass && knownClasses.has(normalizedClass) ? normalizedClass : undefined
+      const vulnerabilityClass = researchClassForSignalTags(tags)
       const cweTag = tags.find((tag) => /\bCWE-\d+\b/i.test(tag))
       const query = [vulnerabilityClass, cweTag, entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 6)].filter(Boolean).join(" ").slice(0, 260)
       const rows = ReportKnowledge.recommendations({

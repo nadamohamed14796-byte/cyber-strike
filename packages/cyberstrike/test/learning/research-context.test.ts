@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { Instance } from "../../src/project/instance"
-import { ResearchContext } from "../../src/learning/research-context"
+import { ResearchContext, researchClassForSignalTags } from "../../src/learning/research-context"
 import { tmpdir } from "../fixture/fixture"
 
 test("global research retrieval guidance is available even before target signals exist", async () => {
@@ -50,4 +50,11 @@ test("request-derived research signals cover JavaScript, auth, uploads, and URL-
     expect.arrayContaining(["server-side-request", "business-logic"]),
   )
   expect(requestResearchSignals({ method: "GET", path: "/assets/app.js", contentType: "application/javascript", status: 200 })).not.toContain("idor")
+})
+
+test("maps request patterns to broad research classes without treating them as findings", () => {
+  expect(researchClassForSignalTags(["object-identifier"])).toBe("idor")
+  expect(researchClassForSignalTags(["authorization-boundary"])).toBe("access-control")
+  expect(researchClassForSignalTags(["server-side-request"])).toBe("ssrf")
+  expect(researchClassForSignalTags(["javascript-client"])).toBeUndefined()
 })
