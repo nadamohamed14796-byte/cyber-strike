@@ -419,7 +419,7 @@ function pocSnippet(text: string) {
   // fragments from inline text instead of relying on preserved code-block newlines.
   const patterns = [
     // Keep commands and request fragments as untrusted reference snippets; never execute them.
-    /\bcurl\s+(?:-[a-zA-Z]+(?:\s+[^\s"'<>]+)?\s+)*https?:\/\/[^\s"'<>]{1,220}/gi,
+    /\bcurl\s+(?:-[a-zA-Z]+\s+)*https?:\/\/[^\s"'<>]{1,220}/gi,
     /\bhttp\s+(?:--[a-z0-9-]+(?:=[^\s]+)?\s+)*(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+https?:\/\/[^\s"'<>]{1,220}/gi,
     /\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/[^\s"'<>]{1,180}(?:\s+HTTP\/1\.[01])?/gi,
     /\bfetch\s*\([^)]{0,260}\)/gi,
