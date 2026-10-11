@@ -529,3 +529,17 @@ done
 - [ ] Sensitive data disclosure attempted (e.g., API keys, access tokens, passwords)
 - [ ] Multi-turn attacks attempted (crescendo, context exhaustion, role accumulation)
 - [ ] Findings documented
+## LLM Application Threat Model and Validation Matrix
+
+Map the complete flow: user input, retrieved documents, system/developer instructions, model, tools, authorization layer, and final output sink. Distinguish model behavior from application security controls.
+
+| Risk area | Test with harmless synthetic markers | Finding threshold |
+|---|---|---|
+| Direct/indirect prompt injection | untrusted instruction in user input or retrieved test document | crosses a trust boundary and causes an unauthorized action/data disclosure |
+| Retrieval isolation | documents owned by two test users/tenants | one identity receives another test user's protected marker |
+| Tool/function authorization | request a tool action disallowed to the current role | server/tool fails to enforce authorization |
+| Output handling | generated text reaches HTML, SQL, shell, or URL sink | downstream sink interprets output unsafely in a controlled test |
+| Secret handling | synthetic canary secret in test configuration | unauthorized disclosure of the canary only |
+| Resource consumption | small bounded input/output sequence | reproducible limit failure without load testing |
+
+A model following an adversarial instruction is not by itself proof of a vulnerability if the application safely contains it. Never solicit or export real secrets, use production customer data as a marker, or perform high-volume token-consumption tests. Report model/provider context when permitted, test prompt, trust boundary, tool call, expected policy, observed outcome, and sanitized evidence.
