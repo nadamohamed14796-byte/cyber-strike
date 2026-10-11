@@ -346,6 +346,37 @@ export namespace TargetMemory {
     )
   }
 
+  /**
+   * Verify that a URL's canonical HTTP(S) origin belongs to this target ID in
+   * the active project. Path differences are allowed; origin and ownership are not.
+   */
+  export function matchesWorkspaceOrigin(targetID: string, siteURL: string): boolean {
+    let suppliedOrigin: string
+    try {
+      const supplied = new URL(siteURL)
+      if ((supplied.protocol !== "http:" && supplied.protocol !== "https:") || supplied.username || supplied.password) return false
+      suppliedOrigin = supplied.origin
+    } catch {
+      return false
+    }
+
+    const projectID = Instance.project.id
+    const workspace = Database.use((db) =>
+      db
+        .select({ targetURL: TargetWorkspaceTable.target_url })
+        .from(TargetWorkspaceTable)
+        .where(and(eq(TargetWorkspaceTable.id, targetID), eq(TargetWorkspaceTable.project_id, projectID)))
+        .get(),
+    )
+    if (!workspace) return false
+    try {
+      const stored = new URL(workspace.targetURL)
+      return (stored.protocol === "http:" || stored.protocol === "https:") && stored.origin === suppliedOrigin
+    } catch {
+      return false
+    }
+  }
+
   export async function get(input: string): Promise<Workspace | null> {
     const normalized = normalizeTarget(input)
     const projectID = Instance.project.id
