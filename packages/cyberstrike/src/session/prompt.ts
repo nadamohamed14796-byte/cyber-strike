@@ -49,6 +49,7 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { Token } from "@/util/token"
 import { MethodologyContext } from "@/methodology/context"
+import { TargetMemory } from "@/target"
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
@@ -778,6 +779,10 @@ export namespace SessionPrompt {
       // (non-tester) gets the full routing view.
       const methodologyCtx = MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
       if (methodologyCtx) system.push(methodologyCtx)
+
+      // Inject only project-local target memory matching observed hosts/endpoints in this session.
+      const targetMemoryCtx = TargetMemory.contextForSession(Session.root(sessionID))
+      if (targetMemoryCtx) system.push(targetMemoryCtx)
 
       // Inject MCP tool availability info so the LLM knows to use tool_search
       const mcpLazyStats = LazyToolRegistry.stats()

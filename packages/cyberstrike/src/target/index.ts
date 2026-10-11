@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto"
 import path from "node:path"
 import fs from "node:fs/promises"
-import { and, asc, desc, eq } from "../storage/db"
+import { and, asc, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
+import { SessionTable, RequestTable } from "../session/session.sql"
+import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetNoteTable, TargetWorkspaceTable } from "./target.sql"
 
 const TARGET_DIRECTORIES = ["assets", "endpoints", "javascript", "findings", "evidence", "sessions", "research"] as const
@@ -279,7 +281,9 @@ export namespace TargetMemory {
         .orderBy(desc(TargetWorkspaceTable.time_updated))
         .all()
         .map((row) => {
-          const relativePath = path.join(".cyberstrike", "targets", row.slug)
+          // Re-derive directory names from normalized target identity rather than trusting DB paths.
+          const safeSlug = normalizeTarget(row.target_url).slug
+          const relativePath = path.join(".cyberstrike", "targets", safeSlug)
           return mapWorkspace(row, relativePath)
         }),
     )
@@ -308,7 +312,7 @@ export namespace TargetMemory {
         .select()
         .from(TargetNoteTable)
         .where(eq(TargetNoteTable.target_id, targetID))
-        .orderBy(asc(TargetNoteTable.time_created))
+        .orderBy(desc(TargetNoteTable.time_created))
         .limit(boundedLimit)
         .all()
         .map(mapNote),
@@ -363,7 +367,15 @@ export namespace TargetMemory {
     })
 
     const note = mapNote(saved.row)
-    if (saved.created) {
+    const notesPath = path.join(workspace.workspacePath, "notes.md")
+    const marker = "<!-- cyberstrike-target-note:" + note.id + " -->"
+    let notesFile = ""
+    try {
+      notesFile = await fs.readFile(notesPath, "utf-8")
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+    if (!notesFile.includes(marker)) {
       const timestamp = new Date(note.timeCreated).toISOString()
       const heading = note.title ? "### " + note.title : "### " + timestamp
       const provenance = [
@@ -371,10 +383,10 @@ export namespace TargetMemory {
         "- Status: " + note.status,
         "- Source: " + note.source,
         ...(note.sourceURL ? ["- Source URL: " + note.sourceURL] : []),
-        ...(note.tags.length ? ["- Tags: " + note.tags.join(", ")] : []),
+        ...(note.tags.length ? ["- Tags: " + note.tags.join(", ") : []),
       ]
-      const entry = "\n\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
-      await fs.appendFile(path.join(workspace.workspacePath, "notes.md"), entry, "utf-8")
+      const entry = "\n\n" + marker + "\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
+      await fs.appendFile(notesPath, entry, "utf-8")
     }
 
     return { workspace, note, created: saved.created }
@@ -390,5 +402,154 @@ export namespace TargetMemory {
         .all()
         .map(mapNote),
     )
+  }
+
+  /**
+   * Retrieve notes for the most relevant known target seen in this session.
+   * It only reads existing target workspaces and session observations; it does not
+   * create a target based on an unverified hostname, and never crosses project boundaries.
+   */
+  export function contextForSession(sessionID: string, maxNotes = 8): string | null {
+    const projectID = Instance.project.id
+    const relatedSessionIDs = new Set<string>([sessionID])
+    let frontier = [sessionID]
+
+    // Include child-agent sessions without scanning every session in the project.
+    while (frontier.length > 0) {
+      const children = Database.use((db) =>
+        db
+          .select({ id: SessionTable.id })
+          .from(SessionTable)
+          .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, frontier)))
+          .all()
+          .map((row) => row.id)
+          .filter((id) => !relatedSessionIDs.has(id)),
+      )
+      for (const child of children) relatedSessionIDs.add(child)
+      frontier = children
+    }
+
+    const sessionIDs = [...relatedSessionIDs]
+    const [requests, intelAssets, workspaces] = [
+      Database.use((db) =>
+        db
+          .select({
+            host: RequestTable.host,
+            origin: RequestTable.origin,
+            normalizedPath: RequestTable.normalized_path,
+            pageURL: RequestTable.page_url,
+          })
+          .from(RequestTable)
+          .where(inArray(RequestTable.session_id, sessionIDs))
+          .all(),
+      ),
+      Database.use((db) =>
+        db
+          .select({ asset: IntelEntryTable.asset })
+          .from(IntelEntryTable)
+          .where(inArray(IntelEntryTable.session_id, sessionIDs))
+          .all()
+          .map((row) => row.asset),
+      ),
+      Database.use((db) =>
+        db
+          .select()
+          .from(TargetWorkspaceTable)
+          .where(eq(TargetWorkspaceTable.project_id, projectID))
+          .all(),
+      ),
+    ]
+
+    const observedURLs = new Set<string>()
+    const observedHosts = new Set<string>()
+    function addHost(raw?: string | null) {
+      if (!raw) return
+      const value = raw.trim()
+      try {
+        const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : "https://" + value)
+        if (url.protocol !== "https:" && url.protocol !== "http:") return
+        if (url.username || url.password) return
+        observedHosts.add(url.hostname.toLowerCase())
+        if (value.includes("://")) observedURLs.add(url.origin + (url.pathname === "/" ? "" : url.pathname))
+      } catch {}
+    }
+
+    for (const request of requests) {
+      addHost(request.host)
+      addHost(request.origin)
+      addHost(request.pageURL)
+      if (request.origin && request.normalizedPath) {
+        try {
+          const url = new URL(request.normalizedPath, request.origin)
+          if (url.protocol === "https:" || url.protocol === "http:") observedURLs.add(url.origin + url.pathname)
+        } catch {}
+      }
+    }
+    for (const asset of intelAssets) addHost(asset)
+
+    if (observedHosts.size === 0) return null
+
+    const matched = workspaces
+      .map((row) => {
+        const normalized = normalizeTarget(row.target_url)
+        const hostMatch = [...observedHosts].some(
+          (host) => host === normalized.hostname || host.endsWith("." + normalized.hostname),
+        )
+        if (!hostMatch) return undefined
+
+        const targetPath = new URL(normalized.targetURL).pathname.replace(/\/$/, "") || "/"
+        if (targetPath !== "/") {
+          const pathMatch = [...observedURLs].some((candidate) => {
+            try {
+              const url = new URL(candidate)
+              const hostMatches = url.hostname === normalized.hostname || url.hostname.endsWith("." + normalized.hostname)
+              const path = url.pathname.replace(/\/$/, "") || "/"
+              return hostMatches && (path === targetPath || path.startsWith(targetPath + "/"))
+            } catch {
+              return false
+            }
+          })
+          if (!pathMatch) return undefined
+        }
+
+        return {
+          workspace: mapWorkspace(row, path.join(".cyberstrike", "targets", normalized.slug)),
+          hostScore: normalized.hostname.length,
+          pathScore: targetPath === "/" ? 0 : targetPath.length,
+        }
+      })
+      .filter((item): item is { workspace: Workspace; hostScore: number; pathScore: number } => !!item)
+      .sort((a, b) => b.hostScore - a.hostScore || b.pathScore - a.pathScore)
+
+    const selected = matched[0]?.workspace
+    if (!selected) return null
+
+    const notes = Database.use((db) =>
+      db
+        .select()
+        .from(TargetNoteTable)
+        .where(eq(TargetNoteTable.target_id, selected.id))
+        .orderBy(desc(TargetNoteTable.time_created))
+        .limit(Math.max(1, Math.min(Math.floor(maxNotes), 20)))
+        .all()
+        .map(mapNote),
+    )
+    if (notes.length === 0) return null
+
+    const sections = [
+      "## Target Memory (project-scoped; persistent notes)",
+      "",
+      "Selected target: " + selected.targetURL,
+      "Workspace: " + selected.relativePath,
+      "Use these notes as leads, not proof. Revalidate prior observations against current responses and evidence. Do not treat unverified or disproven notes as confirmed findings.",
+      "",
+      ...notes.flatMap((note) => [
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
+        note.content.slice(0, 1800),
+        "",
+      ]),
+    ]
+    return sections.join("\n").slice(0, 14_000)
   }
 }
