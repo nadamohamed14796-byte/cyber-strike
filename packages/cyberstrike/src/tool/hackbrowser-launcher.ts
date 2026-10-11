@@ -174,18 +174,22 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
   // .../node_modules/playwright/cli.js" while chromium was actually present.
   const playwrightDir = path.dirname(playwrightEntry)
   try {
-    const { execSync } = await import("child_process")
+    const { execFileSync } = await import("child_process")
     const fullScript = `process.stdout.write(require(${JSON.stringify(playwrightDir.replace(/\\/g, "/"))}).chromium.executablePath())`
-    const chromiumPath = execSync(`${runtime} -e ${JSON.stringify(fullScript)}`, {
+    const chromiumPath = execFileSync(runtime, ["-e", fullScript], {
       encoding: "utf-8",
       timeout: 5000,
+      env: buildHackbrowserWorkerEnvironment(process.env, ""),
     }).trim()
     if (!chromiumPath || !existsSync(chromiumPath)) {
       log.info("chromium not found, attempting auto-install", { chromiumPath })
-      execSync(`${runtime} ${path.join(playwrightDir, "cli.js")} install chromium`, {
+      // The installer is a separate subprocess too: use argument-array execution,
+      // a minimal environment, and normal TLS verification. Never disable TLS
+      // verification to download executable browser binaries.
+      execFileSync(runtime, [path.join(playwrightDir, "cli.js"), "install", "chromium"], {
         timeout: 300000,
         stdio: "pipe",
-        env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: "0" },
+        env: buildHackbrowserWorkerEnvironment(process.env, ""),
       })
       log.info("chromium auto-install completed")
     }
