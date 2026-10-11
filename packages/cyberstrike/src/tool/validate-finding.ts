@@ -3,7 +3,7 @@ import { Tool } from "./tool"
 import {
   FINDING_VALIDATION_CHECKS,
   FindingValidation,
-  type FindingValidationCheckInput,
+  type FindingValidationInputCheck,
 } from "../methodology/finding-validation"
 
 const CHECK_ID = z.enum([
@@ -48,7 +48,7 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
       const result = FindingValidation.record({
         sessionID: ctx.sessionID,
         vulnerabilityID: params.id,
-        checks: params.checks as FindingValidationCheckInput[],
+        checks: params.checks as FindingValidationInputCheck[],
       })
       return {
         title: "Finding validation: " + result.verdict,
