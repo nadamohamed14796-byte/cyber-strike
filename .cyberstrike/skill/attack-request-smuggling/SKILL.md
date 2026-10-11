@@ -165,6 +165,18 @@ curl --max-time 15 --connect-timeout 5 --http2 https://TARGET/ \
 - A timeout, 400/403 response, or connection close is not sufficient proof. Correlate front-end/back-end behavior and demonstrate a reproducible parsing discrepancy with a harmless marker.
 - Avoid high concurrency and stop immediately if unrelated responses appear, connections become unstable, or another user's request could be affected.
 - Treat cache poisoning and authorization impact as separate findings unless you independently demonstrate the chain. Link to `attack-cache-poison` only when a clean request receives a poisoned shared response.
+## Differential Validation and Safety Controls
+
+Request smuggling can desynchronize shared connections and affect other users. Use a dedicated test environment or an explicitly approved isolated endpoint; do not send ambiguous framing probes through shared production traffic without written authorization.
+
+1. Map the proxy/CDN and origin path, protocol versions, and whether HTTP/2 is translated to HTTP/1.1.
+2. Establish a normal-request baseline and record connection reuse, response order, and server behavior.
+3. Use a vendor-approved, non-destructive differential test against a dedicated connection. Change one framing variable at a time and avoid payloads that could contaminate a shared queue.
+4. Confirm the proxy and origin parse the same bytes differently; a timeout or one malformed-request error alone is inconclusive.
+5. Stop after minimal confirmation. Do not attempt to capture another user's request or poison shared responses as proof.
+
+Include the exact protocol path, sanitized raw request, front-end/back-end response behavior, connection isolation, and the smallest reproducible evidence. State whether the finding is CL.TE, TE.CL, TE.TE, HTTP/2 downgrade-related, or unconfirmed, and avoid claiming cross-user impact without direct authorized proof.
+
 ## References
 
 - [PortSwigger: Request Smuggling](https://portswigger.net/web-security/request-smuggling)
