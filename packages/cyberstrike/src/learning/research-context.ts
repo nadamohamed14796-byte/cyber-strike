@@ -10,6 +10,16 @@ import { ReportKnowledge } from "./report-knowledge"
  * Build a compact advisory briefing from the existing SQLite knowledge base.
  * External material is not a finding and must be independently reproduced against the target.
  */
+export function requestResearchSignals(input: { method: string; path: string; contentType?: string | null; status?: number | null }): string[] {
+  const requestPath = input.path.toLowerCase()
+  const contentType = (input.contentType ?? "").toLowerCase()
+  const tags = ["captured-request", input.method.toLowerCase()]
+  if (/\/api(?:\/|$)|graphql/.test(requestPath) || /json/.test(contentType)) tags.push("api-endpoint")
+  if (input.status === 401 || input.status === 403) tags.push("authorization-boundary")
+  if (/^(post|put|patch|delete)$/i.test(input.method)) tags.push("business-logic")
+  if (/\/(?:users?|accounts?|orders?|invoices?|documents?|files?)\/[^/]+/i.test(requestPath)) tags.push("object-identifier")
+  return [...new Set(tags)]
+}
 export namespace ResearchContext {
   export function generate(sessionID: string): string | null {
     const projectID = Instance.project.id
@@ -71,20 +81,11 @@ export namespace ResearchContext {
             .all(),
         )
       : []
-    const requestSignals = recentRequests.map((request) => {
-      const requestPath = request.normalizedPath.toLowerCase()
-      const contentType = (request.contentType ?? "").toLowerCase()
-      const tags = ["captured-request", request.method.toLowerCase()]
-      if (/\/api(?:\/|$)|graphql/.test(requestPath) || /json/.test(contentType)) tags.push("api-endpoint")
-      if (request.status === 401 || request.status === 403) tags.push("authorization-boundary")
-      if (/^(post|put|patch|delete)$/i.test(request.method)) tags.push("business-logic")
-      if (/\/(?:users?|accounts?|orders?|invoices?|documents?|files?)\/[^/]+/i.test(requestPath)) tags.push("object-identifier")
-      return {
-        title: [request.method, request.normalizedPath, request.contentType, request.status ? "status " + request.status : ""].filter(Boolean).join(" "),
-        type: "captured_request",
-        tags,
-      }
-    })
+    const requestSignals = recentRequests.map((request) => ({
+      title: [request.method, request.normalizedPath, request.contentType, request.status ? "status " + request.status : ""].filter(Boolean).join(" "),
+      type: "captured_request",
+      tags: requestResearchSignals({ method: request.method, path: request.normalizedPath, contentType: request.contentType, status: request.status }),
+    }))
     const functionSignals = webFunctions.map((fn) => {
       const objects = ((fn.objects as string[] | null) ?? []).slice(0, 6)
       const tags = ["web-function", fn.actionType, ...objects]

@@ -17,3 +17,14 @@ test("global research retrieval guidance is available even before target signals
     },
   })
 })
+
+test("request-derived global research signals are pattern-based and do not assert a vulnerability", async () => {
+  const { requestResearchSignals } = await import("../../src/learning/research-context")
+  expect(requestResearchSignals({ method: "GET", path: "/api/v2/orders/123", contentType: "application/json", status: 403 })).toEqual(
+    expect.arrayContaining(["api-endpoint", "authorization-boundary", "object-identifier"]),
+  )
+  expect(requestResearchSignals({ method: "POST", path: "/checkout", contentType: "application/json", status: 200 })).toEqual(
+    expect.arrayContaining(["api-endpoint", "business-logic"]),
+  )
+  expect(requestResearchSignals({ method: "GET", path: "/about", contentType: "text/html", status: 200 })).not.toContain("authorization-boundary")
+})
