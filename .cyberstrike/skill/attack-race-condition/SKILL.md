@@ -126,6 +126,21 @@ attack_script race_tester "https://TARGET/api/claim-bonus" \
 - Confirm a race only when the final state violates an invariant (for example, a one-time action succeeds twice), not merely because requests overlap or return different status codes.
 - Record request ordering, timestamps, correlation IDs, response bodies, and final test-record state. Repeat only enough to establish reproducibility.
 - Check idempotency keys, transaction boundaries, locks, and retry behavior. A client retry or duplicate response is not proof of a server-side race.
+## Concurrency Test Plan and Invariants
+
+Before testing, write down the business invariant that must remain true (for example, a one-time action can succeed once, inventory cannot become negative, or a quota cannot be exceeded). Use a test account and reversible test objects only.
+
+| Test | Baseline | Concurrent variant | Required proof |
+|---|---|---|---|
+| One-time action | submit once sequentially | two to five synchronized requests | duplicate success and violated invariant |
+| Balance/quota | perform a small allowed operation | bounded concurrent operations | server-side state inconsistent with the invariant |
+| Coupon/invitation | redeem once | repeat with a small concurrency window | duplicate redemption or duplicate privilege actually persisted |
+| Idempotency | repeat same request sequentially | repeat same idempotency key concurrently | duplicate side effect despite contract |
+
+Start with low concurrency, a short timeout, and a unique test object. Do not test payment capture, real inventory, or other irreversible operations unless explicitly approved. Stop immediately if unexpected side effects appear.
+
+Capture request IDs, timestamps, status codes, and the final authoritative state. A burst of successful HTTP responses is not enough; show the violated invariant and distinguish application-level race conditions from retry behavior or eventual consistency.
+
 ## References
 
 - [PortSwigger: Race Conditions](https://portswigger.net/web-security/race-conditions)
