@@ -48,12 +48,12 @@ function isStoredProfile(value: unknown): value is StoredProfile {
     (value.purpose !== "research" && value.purpose !== "target") ||
     typeof value.account !== "string" ||
     !value.account.trim() ||
-    value.account.length > 120 ||
-    /[\\r\\n\\0]/.test(value.account) ||
+    if (account.length > 120 || username.length > 320 || /[\r\n\0]/.test(account) || /[\r\n\0]/.test(username)) {
+    /[\r\n\0]/.test(value.account) ||
     typeof value.username !== "string" ||
     !value.username.trim() ||
     value.username.length > 320 ||
-    /[\\r\\n\\0]/.test(value.username) ||
+    /[\r\n\0]/.test(value.username) ||
     typeof value.createdAt !== "number" ||
     !Number.isSafeInteger(value.createdAt) ||
     typeof value.updatedAt !== "number" ||
@@ -179,7 +179,7 @@ export namespace AuthVault {
     const account = input.account.trim()
     const username = input.username.trim()
     if (!account || !username || !input.password) throw new Error("Account label, username/email, and password are required.")
-    if (account.length > 120 || username.length > 320 || /[\\r\\n\\0]/.test(account) || /[\\r\\n\\0]/.test(username)) {
+    if (account.length > 120 || username.length > 320 || /[\r\n\0]/.test(account) || /[\r\n\0]/.test(username)) {
       throw new Error("Account labels must be one line (maximum 120 characters) and usernames one line (maximum 320 characters).")
     }
     if (input.purpose === "target" && !input.targetID?.trim()) {
