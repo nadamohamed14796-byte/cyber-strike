@@ -115,7 +115,8 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
     // explicit "do NOT poll" + "use web_get_session_context when you
     // need them" prevents looped re-invocation.
     const output = [
-      `Hackbrowser crawl started for ${args.target}.`,\n      ...(savedLogin ? ["Saved login profile was supplied to the visible browser. Credentials are not included in this response."] : []),
+      `Hackbrowser crawl started for ${args.target}.`,
+      ...(savedLogin ? ["Saved login profile was supplied to the visible browser. Credentials are not included in this response."] : []),
       `Captures stream into this session as the crawl progresses (typically 30s–2min).`,
       ``,
       `Do NOT call this tool again to wait for results — it is already running.`,
