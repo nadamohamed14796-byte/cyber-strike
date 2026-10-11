@@ -1,7 +1,7 @@
 import z from "zod"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { AuthVault } from "../auth-vault"
+import { AuthVault, normalizeAuthOrigin } from "../auth-vault"
 import { GmailService } from "../gmail-service"
 import { TargetMemory } from "../target"
 import { Tool } from "./tool"
@@ -11,9 +11,10 @@ import { Tool } from "./tool"
  * workspace. Passwords remain only in AuthVault's encrypted local store.
  */
 async function syncTargetProfileIndex(siteURL: string, targetID: string): Promise<void> {
-  const workspace = await TargetMemory.get(siteURL)
-  if (!workspace || workspace.id !== targetID) {
-    throw new Error("Target account reference was not written: target_id must match the existing target workspace ID for this exact site URL.")
+  const origin = normalizeAuthOrigin(siteURL)
+  const workspace = TargetMemory.list().find((item) => item.id === targetID && normalizeAuthOrigin(item.targetURL) === origin)
+  if (!workspace) {
+    throw new Error("Target account reference was not written: target_id must identify an existing workspace with the same exact origin.")
   }
   const profiles = await AuthVault.list({ purpose: "target", targetID })
   const lines = [
@@ -73,9 +74,10 @@ export const AuthManagerTool = Tool.define("auth_manager", {
         return { title: "Missing account details", output: "Saving requires account and username.", metadata: { ok: false } }
       }
       if (params.purpose === "target") {
-        const workspace = await TargetMemory.get(params.site_url)
-        if (!workspace || workspace.id !== params.target_id) {
-          return { title: "Target workspace mismatch", output: "site_url must match an existing target workspace and target_id must equal its stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
+        const origin = normalizeAuthOrigin(params.site_url)
+        const workspace = TargetMemory.list().find((item) => item.id === params.target_id && normalizeAuthOrigin(item.targetURL) === origin)
+        if (!workspace) {
+          return { title: "Target workspace mismatch", output: "site_url must share the exact origin with an existing target workspace, and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
         }
       }
       if (params.purpose === "target") {
