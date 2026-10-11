@@ -28,5 +28,6 @@ Mailbox access requires an explicit permission request. The connector is read-on
 - Message bodies are limited to 12,000 characters.
 - OTP lookup only accepts messages from the exact website hostname or its subdomains. Third-party sender domains are ignored until a reviewed per-site allowlist exists.
 - Do not copy mailbox contents, OTPs, OAuth secrets, or personal data into global research knowledge or target notes.
-- CAPTCHA, passkeys, account recovery, and unsupported MFA still require a human.\n- The Gmail service is available to agents, but the encrypted website-password vault is not yet wired into Hackbrowser form autofill. Reading an OTP does not by itself complete a browser login or registration.
+- CAPTCHA, passkeys, account recovery, and unsupported MFA still require a human.
+- The Gmail service is available to agents, but the encrypted website-password vault is not yet wired into Hackbrowser form autofill. Reading an OTP does not by itself complete a browser login or registration.
 - Revoke/rotate the OAuth grant in Google Account security settings if the refresh token is exposed.
