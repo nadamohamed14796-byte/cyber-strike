@@ -75,3 +75,15 @@ test("target observation matching requires the target host and scoped path", () 
   expect(targetObservationMatches("https://app.example.com/portal", "https://unrelated.example.net/portal/api/users")).toBe(false)
   expect(targetObservationMatches("https://app.example.com", "https://api.app.example.com/v1/users")).toBe(true)
 })
+
+test("does not associate an existing target workspace with a session that has no observations", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const workspace = await TargetMemory.ensure("https://example.com")
+      expect(TargetMemory.isObservedInSession("ses_no_observations_test", workspace.targetURL)).toBe(false)
+      await Instance.dispose()
+    },
+  })
+})
