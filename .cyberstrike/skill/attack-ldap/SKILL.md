@@ -1,0 +1,102 @@
+---
+name: attack-ldap
+description: "Assess LDAP injection and directory-query authorization using controlled test identities and non-destructive query differentials."
+category: "identity"
+version: "1.0.0"
+author: "cyberstrike-official"
+tags:
+  - ldap
+  - injection
+  - directory-services
+  - authentication
+  - web
+tech_stack:
+  - ldap
+  - active-directory
+  - java
+  - php
+  - dotnet
+  - web
+cwe_ids:
+  - CWE-90
+chains_with:
+  - attack-auth-bypass
+  - attack-information-disclosure
+prerequisites: []
+severity_boost:
+  attack-auth-bypass: "LDAP filter manipulation may bypass authentication when a tester-owned identity is accepted without valid proof."
+---
+
+# LDAP Injection Assessment
+
+## Objective
+
+Determine whether untrusted input alters LDAP filter or distinguished-name structure, and whether the difference crosses an authentication or data-access boundary. Use a lab directory or authorized test OU with synthetic entries.
+
+## Testing Methodology
+
+### Phase 1: Identify directory-backed features
+
+Map login, employee search, group lookup, provisioning, autocomplete, and administrative queries. Review filter/DN construction. Do not enumerate a production directory without written permission.
+
+### Phase 2: Establish valid query baselines
+
+Use a test identity and synthetic directory entry. Record expected match/no-match results, role, and endpoint. Identify whether input should be a literal or filter fragment.
+
+### Phase 3: Probe escaping and syntax
+
+In lab/approved endpoint, use reserved-character and malformed-filter canaries one at a time. Compare a valid value with invalid value and review errors. Do not use wildcard search to dump entries or enumerate privileged groups.
+
+### Phase 4: Verify authorization outcome
+
+Confirm through test accounts whether query manipulation changes identity or returns an unauthorized synthetic entry. Never attempt login as a real user or modify directory records.
+
+### Phase 5: Review filter/DN controls
+
+Check RFC filter escaping separately from DN escaping, allowlisted attributes, safe directory APIs, and authorization after lookup.
+
+## What Constitutes a Finding
+
+- **Candidate / lead:** malformed input produces a directory parser error or query results change unexpectedly.
+- **Confirmed finding:** input reproducibly alters query logic beyond the intended literal field and affects synthetic entry or authentication outcome.
+- **Not a finding:** error alone, intentional broad search, or response without an unauthorized result.
+
+## Evidence Requirements
+
+- Sanitized baseline/probe requests, input field, role, timestamp, and environment.
+- Synthetic directory entry IDs and expected/actual result.
+- Source trace to filter/DN construction and escaping function where available.
+- No real directory records, password hashes, or group dumps.
+
+## Tools
+
+- **Burp Suite:** compare directory-backed requests.
+- **ldapsearch:** use only against owned lab/test directory and scoped base DN.
+- **Source review:** locate filter/DN concatenation and escaping.
+- **Directory audit logs:** corroborate only the test identity's query.
+
+## LDAP Context and Evidence Matrix
+
+| Context | Risk | Safe verification |
+|---|---|---|
+| Search filter | Metacharacter changes predicate | Known synthetic entry, bounded query |
+| Login filter | Query changes identity selection | Tester-owned accounts and baseline |
+| Distinguished name | DN structure changes target | Lab OU and synthetic DN only |
+| Attribute selection | Caller controls protected field name | Review allowlist/source or safe test field |
+| Group/role lookup | Query changes authorization mapping | Synthetic group and test principal |
+| Error handling | Internal filter/DN leak | Capture sanitized error; no enumeration |
+
+**Mitigation:** safe directory APIs, correct context-specific escaping, allowlisted attributes, authorization after lookup, and invalid-character regression tests.
+
+## Verification and False Positives
+
+- Parser errors can originate in validation middleware.
+- Filter and DN escaping are different contexts.
+- Intentional search behavior must be judged against access policy.
+- Stop before broad production queries, employee enumeration, sensitive attributes, or directory changes.
+
+## References
+
+- [uphiago — hunt-ldap](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-ldap)
+- [Claude-BugHunter — hunt-ldap](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-ldap)
+- [OWASP LDAP Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/LDAP_Injection_Prevention_Cheat_Sheet.html)
