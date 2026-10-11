@@ -339,13 +339,13 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
     ),
     rootCause: matchingSentences(
       text,
-      /root cause|because|missing (?:an? )?(?:authorization|validation|check|control)|lack of|not enforced|trusts? (?:the )?user|fails? to (?:check|validate|verify|authorize)|improper(?:ly)?|insecure(?:ly)?|vulnerab(?:le|ility)/i,
+      /root cause|because|missing (?:an? )?(?:authorization|validation|check|control)|authorization.{0,40}missing|lack of|not enforced|trusts? (?:the )?user|fails? to (?:check|validate|verify|authorize)|improper(?:ly)?|insecure(?:ly)?|vulnerab(?:le|ility)/i,
       6,
       1800,
     ),
     requestResponseEvidence: matchingSentences(
       text,
-      /(?:GET|POST|PUT|PATCH|DELETE)\\s+\\/|HTTP\\/1\\.[01]|request(?: body| header| parameter)?|response(?: body| header| code| status)?|status code|compare (?:the )?(?:response|result)|returned \\d{3}|payload/i,
+      /(?:GET|POST|PUT|PATCH|DELETE)\s+\/|HTTP\/1\.[01]|request(?: body| header| parameter)?|response(?: body| header| code| status)?|status code|compare (?:the )?(?:response|result)|returned \d{3}|payload/i,
       8,
       2400,
     ),
