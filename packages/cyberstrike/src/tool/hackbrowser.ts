@@ -59,7 +59,7 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       .boolean()
       .optional()
       .describe(
-        "Open the browser with a visible window when false (useful for visual debug). Defaults to true. Forced to false when credentials are provided (manual login requires a visible browser).",
+        "Open the browser with a visible window when false. Defaults to true; saved profiles and manual credential IDs force a visible browser.",
       ),
   }),
   async execute(args, ctx) {
