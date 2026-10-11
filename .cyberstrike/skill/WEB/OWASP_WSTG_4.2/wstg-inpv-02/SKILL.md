@@ -3,7 +3,7 @@ name: wstg-inpv-02
 description: "Testing for Stored Cross-Site Scripting (XSS)"
 category: input-validation
 owasp_id: WSTG-INPV-02
-version: "1.0.0"
+version: "1.0.1"
 author: cyberstrike-official
 tags: [injection, input-validation, xss, sqli, wstg, inpv]
 tech_stack: [javascript, html, php, java, python, nodejs, react, angular, vue]
@@ -469,6 +469,16 @@ element.innerHTML = clean
 
 
 ---
+
+
+## Safe Validation and Impact Confirmation
+
+- Test only authorized application areas and use a test account with synthetic content. Prefer a harmless proof marker that demonstrates execution without reading browser storage, cookies, or page data.
+- Confirm persistence: submit the marker, navigate away, then reload the affected view or open it in a second test session. Distinguish stored XSS from reflected or DOM-based behavior.
+- Verify the execution context and affected role. Text appearing in HTML, a response containing a payload, or a scanner alert alone does not prove JavaScript execution.
+- Use a benign local proof such as a visible marker or console message. Do not use credential theft, session exfiltration, external callback collectors, or actions that alter another user's account.
+- Check output contexts separately (HTML text, attribute, URL, JavaScript, and rich-text rendering) and record whether sanitization or encoding occurs at input or output.
+- Report the exact submission location, persistence path, affected audience, required privileges, sanitized evidence, and realistic impact. Avoid automatic Critical severity claims; score based on demonstrated scope and consequences.
 
 ## Checklist
 
