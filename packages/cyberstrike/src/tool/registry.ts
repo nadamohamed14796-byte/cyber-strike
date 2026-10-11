@@ -51,6 +51,7 @@ import { WebUpdateCredentialClaimsTool } from "./web-update-credential-claims"
 import { WebUpdateCredentialTool } from "./web-update-credential"
 import { CsrfExtractTool } from "./csrf-extract"
 import { HackbrowserTool } from "./hackbrowser"
+import { AuthManagerTool } from "./auth-manager"
 import { AddIntelTool } from "./intel"
 import { UpdateVrtCheckTool } from "./vrt-check"
 import { RecordCoverageNoteTool, GetCoverageNotesTool } from "./coverage-note"
@@ -198,6 +199,8 @@ export namespace ToolRegistry {
       // Hackbrowser — autonomous crawler that produces captures the
       // proxy-analyzer ingests. Upstream of the rest of the web pipeline.
       HackbrowserTool,
+      // Shared encrypted website login profile manager (separate from target notes/research knowledge).
+      AuthManagerTool,
       // Methodology Engine Tools — intelligence, coverage, chain detection
       AddIntelTool,
       UpdateVrtCheckTool,
