@@ -220,7 +220,17 @@ export namespace FindingValidation {
           const rightPath = new URL(right.targetURL).pathname.length
           return rightPath - leftPath
         })
-      const workspace = observed[0]
+      const best = observed[0]
+      const second = observed[1]
+      const bestPathLength = best ? new URL(best.targetURL).pathname.length : 0
+      const secondPathLength = second ? new URL(second.targetURL).pathname.length : 0
+      const unambiguousBest = Boolean(
+        best &&
+          (!second ||
+            best.hostname.length > second.hostname.length ||
+            (best.hostname.length === second.hostname.length && bestPathLength > secondPathLength)),
+      )
+      const workspace = unambiguousBest ? best : undefined
       if (workspace) {
         const note = await TargetMemory.addNote(workspace.targetURL, {
           kind: "finding",

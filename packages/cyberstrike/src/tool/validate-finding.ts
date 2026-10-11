@@ -52,7 +52,11 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
       })
       return {
         title: "Finding validation: " + result.verdict,
-        output: result.output,
+        output: result.output + (
+          result.targetNoteID
+            ? "\\nTarget-specific validation note saved: " + result.targetNoteID
+            : "\\nNo target note was written because no uniquely matched, observed target workspace was available."
+        ),
         metadata: {
           validation_id: result.id,
           finding_id: result.findingID,
