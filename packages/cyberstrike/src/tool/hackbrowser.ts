@@ -65,7 +65,10 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       ),
   }),
   async execute(args, ctx) {
-    if (args.use_gmail_otp && !args.auth_profile_id) {\n      return { title: "Saved login profile required", output: "Gmail OTP assistance can only be enabled together with auth_profile_id.", metadata: { started: false, reason: "profile_required" } }\n    }\n    if (args.auth_profile_id && args.credentials?.length) {
+    if (args.use_gmail_otp && !args.auth_profile_id) {
+      return { title: "Saved login profile required", output: "Gmail OTP assistance can only be enabled together with auth_profile_id.", metadata: { started: false, reason: "profile_required" } }
+    }
+    if (args.auth_profile_id && args.credentials?.length) {
       return { title: "Conflicting authentication options", output: "Use either auth_profile_id for a saved login or credentials for manual identity-tagged login, not both.", metadata: { started: false, reason: "conflicting_auth" } }
     }
 
@@ -88,7 +91,11 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
         const workspace = TargetMemory.list().find((item) => item.id === args.auth_target_id && normalizeAuthOrigin(item.targetURL) === origin)
         if (!workspace) return { title: "Target binding mismatch", output: "No existing target workspace with this ID matches the exact site origin. No credential was read.", metadata: { started: false, reason: "target_binding_mismatch" } }
       }
-      if (args.use_gmail_otp) {\n        if (!GmailService.status().configured) return { title: "Gmail is not configured", output: "Configure the Gmail OAuth environment variables before enabling browser OTP assistance. No website credential was read.", metadata: { started: false, reason: "gmail_not_configured" } }\n        await ctx.ask({ permission: "gmail-read", patterns: [origin], always: [], metadata: { purpose, targetID: args.auth_target_id, source: "hackbrowser-mfa" } })\n      }\n      await ctx.ask({ permission: "auth-credential-use", patterns: [origin], always: [], metadata: { profileID: args.auth_profile_id, purpose, targetID: args.auth_target_id } })
+      if (args.use_gmail_otp) {
+        if (!GmailService.status().configured) return { title: "Gmail is not configured", output: "Configure the Gmail OAuth environment variables before enabling browser OTP assistance. No website credential was read.", metadata: { started: false, reason: "gmail_not_configured" } }
+        await ctx.ask({ permission: "gmail-read", patterns: [origin], always: [], metadata: { purpose, targetID: args.auth_target_id, source: "hackbrowser-mfa" } })
+      }
+      await ctx.ask({ permission: "auth-credential-use", patterns: [origin], always: [], metadata: { profileID: args.auth_profile_id, purpose, targetID: args.auth_target_id } })
       const profile = await AuthVault.getSecret({ id: args.auth_profile_id, origin, purpose, targetID: purpose === "target" ? args.auth_target_id : undefined })
       if (!profile) return { title: "Saved login not found", output: "No saved profile matched the exact origin, purpose, and target binding. No credentials were sent to the browser.", metadata: { started: false, reason: "profile_not_found" } }
       savedLogin = { username: profile.username, password: profile.password, origin: profile.origin, useGmailOtp: !!args.use_gmail_otp }
@@ -123,7 +130,8 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
 
     const output = [
       `Hackbrowser crawl started for ${args.target}.`,
-      ...(savedLogin ? ["Saved login profile was supplied to the visible browser. Credentials are not included in this response."] : []),\n      ...(savedLogin?.useGmailOtp ? ["Gmail OTP assistance is enabled for matching recent verification emails; if none is found, the browser will request human input."] : []),
+      ...(savedLogin ? ["Saved login profile was supplied to the visible browser. Credentials are not included in this response."] : []),
+      ...(savedLogin?.useGmailOtp ? ["Gmail OTP assistance is enabled for matching recent verification emails; if none is found, the browser will request human input."] : []),
       `Captures stream into this session as the crawl progresses (typically 30s–2min).`,
       ``,
       `Do NOT call this tool again to wait for results — it is already running.`,
