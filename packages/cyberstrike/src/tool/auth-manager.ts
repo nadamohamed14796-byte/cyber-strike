@@ -1,6 +1,6 @@
 import z from "zod"
 import { AuthVault } from "../auth-vault"
-import { GmailOtp } from "../gmail-otp"
+import { GmailService } from "../gmail-service"
 import { Tool } from "./tool"
 
 export const AuthManagerTool = Tool.define("auth_manager", {
@@ -27,12 +27,12 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     }
     if (params.action === "gmail_otp") {
       await ctx.ask({ permission: "gmail-otp-read", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id } })
-      const result = await GmailOtp.latest({ siteUrl: params.site_url, after: params.after })
+      const result = await GmailService.latestOtp({ siteUrl: params.site_url, after: params.after })
       if (!result) return { title: "No matching OTP email", output: "No recent verification code was found from the site's exact hostname or a subdomain. Third-party senders are intentionally ignored.", metadata: { found: false } }
       return {
         title: "Verification code found",
-        output: `Found a recent verification email from ${result.from} (subject: ${result.subject}). Code: ${result.code}. Received: ${new Date(result.receivedAt).toISOString()}. Use it only to continue the login flow you initiated.`,
-        metadata: { found: true, messageID: result.messageId, receivedAt: result.receivedAt },
+        output: `Found a recent verification email from ${result.from} (subject: ${result.subject}). Code: ${result.code}. Received: ${result.date}. Use it only to continue the login flow you initiated.`,
+        metadata: { found: true, messageID: result.id, receivedAt: result.receivedAt },
       }
     }
     if (params.action === "save") {
