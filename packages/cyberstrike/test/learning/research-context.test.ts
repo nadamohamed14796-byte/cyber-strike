@@ -56,6 +56,17 @@ test("request-derived research signals cover JavaScript, auth, uploads, and URL-
   expect(requestResearchSignals({ method: "GET", path: "/assets/app.js", contentType: "application/javascript", status: 200 })).not.toContain("idor")
 })
 
+test("explicit user request produces bounded global retrieval tags without retaining request text", () => {
+  const { promptResearchSignals } = require("../../src/learning/research-context") as typeof import("../../src/learning/research-context")
+  expect(promptResearchSignals("Please investigate whether the order ID has an IDOR issue in the API and compare owner/non-owner behavior")).toEqual(
+    expect.arrayContaining(["idor", "object-identifier", "api-endpoint"]),
+  )
+  expect(promptResearchSignals("ordinary copywriting task with no security signal")).toEqual([])
+  expect(promptResearchSignals("JWT OAuth refresh token login session")).toEqual(
+    expect.arrayContaining(["authentication-flow", "token-or-jwt"]),
+  )
+})
+
 test("maps request patterns to broad research classes without treating them as findings", () => {
   expect(researchClassForSignalTags(["object-identifier"])).toBe("idor")
   expect(researchClassForSignalTags(["authorization-boundary"])).toBe("access-control")

@@ -786,7 +786,12 @@ export namespace SessionPrompt {
       if (targetMemoryCtx) system.push(targetMemoryCtx)
 
       // Public research recommendations are advisory only and come from SQLite; no network fetch occurs during prompting.
-      const researchContext = ResearchContext.generate(Session.root(sessionID))
+      const userSignalText = (lastUserMsg?.parts ?? [])
+        .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
+        .map((part) => part.type === "text" ? part.text : "")
+        .join(" ")
+        .slice(0, 4000)
+      const researchContext = ResearchContext.generate(Session.root(sessionID), userSignalText)
       if (researchContext) system.push(researchContext)
 
       // Inject MCP tool availability info so the LLM knows to use tool_search

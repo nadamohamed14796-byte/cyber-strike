@@ -59,8 +59,38 @@ export function researchClassForSignalTags(input: string[]): string | undefined 
   return knownClasses.has(normalized) ? normalized : undefined
 }
 
+/**
+ * Convert an explicit user request into retrieval tags only. The request text itself is
+ * never persisted or copied into the global knowledge query; tags are bounded and generic.
+ */
+export function promptResearchSignals(input: string): string[] {
+  const text = input.slice(0, 4000).toLowerCase()
+  const signals: string[] = []
+  const patterns: Array<[string, RegExp]> = [
+    ["idor", /\bidor\b|\bbola\b|insecure direct object|object[- ]level authorization/],
+    ["object-identifier", /object id|user id|account id|order id|resource identifier|object identifier/],
+    ["authorization-boundary", /authorization|authorisation|access control|permission check|role[- ]based|privilege escalation|tenant isolation/],
+    ["authentication-flow", /authentication|login|session fixation|password reset|account recovery|sign[- ]?in/],
+    ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|\boauth\b/],
+    ["javascript-client", /javascript|\.m?js\b|source map|frontend script|client[- ]side bundle/],
+    ["api-endpoint", /\bapi\b|endpoint|graphql|rest api|api route/],
+    ["file-upload", /file upload|multipart|filename|attachment upload/],
+    ["server-side-request", /\bssrf\b|server[- ]side request forgery|url fetch|webhook fetch/],
+    ["cache-behavior", /cache[- ]control|cache poisoning|cache deception|cdn cache/],
+    ["race-condition", /race condition|time[- ]of[- ]check|concurrent request|toctou/],
+    ["business-logic", /business logic|workflow|state transition|coupon|payment flow|checkout/],
+    ["injection-sink", /sql injection|command injection|template injection|\bsqli\b|\bssti\b/],
+    ["open-redirect", /open redirect|unvalidated redirect/],
+    ["path-traversal", /path traversal|directory traversal/],
+    ["prototype-pollution", /prototype pollution/],
+    ["request-smuggling", /request smuggling|http desynchronization/],
+  ]
+  for (const [signal, pattern] of patterns) if (pattern.test(text)) signals.push(signal)
+  return [...new Set(signals)].slice(0, 12)
+}
+
 export namespace ResearchContext {
-  export function generate(sessionID: string): string | null {
+  export function generate(sessionID: string, userSignalText = ""): string | null {
     const projectID = Instance.project.id
     const sessionIDs = new Set<string>([sessionID])
     let frontier = [sessionID]
@@ -138,7 +168,14 @@ export namespace ResearchContext {
     })
     // Prefer fresh observed traffic and modeled workflows over generic Intel titles.
     // Otherwise eight older actionable Intel rows can starve the current request signals.
-    const signalPool = [...requestSignals, ...functionSignals, ...entries]
+    // The current user request can itself provide a concrete retrieval signal before
+    // any target request has been captured. Only generic tags enter the query; raw text
+    // is neither persisted nor included in the global knowledge context.
+    const explicitSignals = promptResearchSignals(userSignalText)
+    const explicitSignalEntries = explicitSignals.length
+      ? [{ title: explicitSignals.join(" "), type: "user_prompt_signal", tags: explicitSignals }]
+      : []
+    const signalPool = [...requestSignals, ...functionSignals, ...explicitSignalEntries, ...entries]
 
     const baseline = [
       "## Global Research Memory — Signal-Triggered Use",
