@@ -60,7 +60,11 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       ),
   }),
   async execute(args, ctx) {
-    if (args.auth_profile_id && args.credentials?.length) {\n      return { title: "Conflicting authentication options", output: "Use either auth_profile_id for a saved login or credentials for manual identity-tagged login, not both.", metadata: { started: false, reason: "conflicting_auth" } }\n    }\n\n    // Permission gate — opening a browser + outbound network is high-risk;
+    if (args.auth_profile_id && args.credentials?.length) {
+      return { title: "Conflicting authentication options", output: "Use either auth_profile_id for a saved login or credentials for manual identity-tagged login, not both.", metadata: { started: false, reason: "conflicting_auth" } }
+    }
+
+    // Permission gate — opening a browser + outbound network is high-risk;
     // require explicit consent. Pattern is the target URL so the user can
     // grant blanket permission for a host on first use.
     await ctx.ask({
@@ -70,7 +74,22 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       metadata: { scope: args.scope, exclude: args.exclude },
     })
 
-    let savedLogin: { username: string; password: string; origin: string } | undefined\n    if (args.auth_profile_id) {\n      const purpose = args.auth_purpose ?? "target"\n      const origin = normalizeAuthOrigin(args.target)\n      if (purpose === "target") {\n        if (!args.auth_target_id?.trim()) return { title: "Target ID required", output: "Target-purpose saved logins require auth_target_id. No credential was read.", metadata: { started: false, reason: "target_id_required" } }\n        const workspace = TargetMemory.list().find((item) => item.id === args.auth_target_id && normalizeAuthOrigin(item.targetURL) === origin)\n        if (!workspace) return { title: "Target binding mismatch", output: "No existing target workspace with this ID matches the exact site origin. No credential was read.", metadata: { started: false, reason: "target_binding_mismatch" } }\n      }\n      await ctx.ask({ permission: "auth-credential-use", patterns: [origin], always: [], metadata: { profileID: args.auth_profile_id, purpose, targetID: args.auth_target_id } })\n      const profile = await AuthVault.getSecret({ id: args.auth_profile_id, origin, purpose, targetID: purpose === "target" ? args.auth_target_id : undefined })\n      if (!profile) return { title: "Saved login not found", output: "No saved profile matched the exact origin, purpose, and target binding. No credentials were sent to the browser.", metadata: { started: false, reason: "profile_not_found" } }\n      savedLogin = { username: profile.username, password: profile.password, origin: profile.origin }\n    }\n\n    // Fire and forget — launchHackbrowser returns immediately after sync
+    let savedLogin: { username: string; password: string; origin: string } | undefined
+    if (args.auth_profile_id) {
+      const purpose = args.auth_purpose ?? "target"
+      const origin = normalizeAuthOrigin(args.target)
+      if (purpose === "target") {
+        if (!args.auth_target_id?.trim()) return { title: "Target ID required", output: "Target-purpose saved logins require auth_target_id. No credential was read.", metadata: { started: false, reason: "target_id_required" } }
+        const workspace = TargetMemory.list().find((item) => item.id === args.auth_target_id && normalizeAuthOrigin(item.targetURL) === origin)
+        if (!workspace) return { title: "Target binding mismatch", output: "No existing target workspace with this ID matches the exact site origin. No credential was read.", metadata: { started: false, reason: "target_binding_mismatch" } }
+      }
+      await ctx.ask({ permission: "auth-credential-use", patterns: [origin], always: [], metadata: { profileID: args.auth_profile_id, purpose, targetID: args.auth_target_id } })
+      const profile = await AuthVault.getSecret({ id: args.auth_profile_id, origin, purpose, targetID: purpose === "target" ? args.auth_target_id : undefined })
+      if (!profile) return { title: "Saved login not found", output: "No saved profile matched the exact origin, purpose, and target binding. No credentials were sent to the browser.", metadata: { started: false, reason: "profile_not_found" } }
+      savedLogin = { username: profile.username, password: profile.password, origin: profile.origin }
+    }
+
+    // Fire and forget — launchHackbrowser returns immediately after sync
     // prep (Provider resolve, Server URL, log sink). The actual runCrawl
     // runs in a background IIFE so the chat session prompt loop unblocks
     // and ingest queue tasks (proxy-analyzer dispatches) can run in
@@ -81,8 +100,9 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       scope: args.scope,
       exclude: args.exclude,
       credentials: args.credentials,
+      savedLogin,
       steps: args.steps,
-      headless: args.headless,
+      headless: savedLogin ? false : args.headless,
       // Intentionally NOT passing signal: ctx.abort. ctx.abort is the agent
       // TURN's abort — it fires on every normal turn-end (cancel → match.abort),
       // which would forward an abort to the worker and kill the still-running
