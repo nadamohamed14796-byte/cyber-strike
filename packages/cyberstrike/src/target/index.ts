@@ -319,8 +319,11 @@ export namespace TargetMemory {
     )
   }
 
-  /** Store an idempotent note in SQLite and append it to the target's editable notes.md file. */
-  export async function addNote(targetURL: string, input: NoteInput): Promise<{ workspace: Workspace; note: TargetNote; created: boolean }> {
+  /** Store a provenance-aware, idempotent note in SQLite and keep its generated notes.md metadata in sync. */
+  export async function addNote(
+    targetURL: string,
+    input: NoteInput,
+  ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
     const content = input.content?.trim()
     if (!content) throw new Error("Note content cannot be empty.")
     if (content.length > 100_000) throw new Error("Note content is too large (maximum 100,000 characters).")
@@ -328,12 +331,15 @@ export namespace TargetMemory {
     const workspace = await ensure(targetURL)
     const kind = input.kind ?? "manual"
     const title = input.title?.trim() || null
-    const contentHash = createHash("sha256").update([kind, title ?? "", content].join("\0")).digest("hex")
     const now = Date.now()
     const source = (input.source?.trim() || "manual").slice(0, 120)
     const sourceURL = normalizedSourceURL(input.sourceURL)
-    const status = input.status ?? "observed"
+    const statusForInsert = input.status ?? "observed"
     const tags = [...new Set((input.tags ?? []).map((tag) => tag.trim()).filter(Boolean))].slice(0, 30)
+    // Provenance is part of note identity, so identical lessons from distinct sources do not erase attribution.
+    const contentHash = createHash("sha256")
+      .update([kind, title ?? "", source, sourceURL ?? "", content].join("\0"))
+      .digest("hex")
 
     const saved = Database.transaction((db) => {
       const inserted = db
@@ -347,7 +353,7 @@ export namespace TargetMemory {
           source,
           source_url: sourceURL ?? null,
           content_hash: contentHash,
-          status,
+          status: statusForInsert,
           tags,
           time_created: now,
           time_updated: now,
@@ -355,7 +361,7 @@ export namespace TargetMemory {
         .onConflictDoNothing()
         .returning()
         .get()
-      if (inserted) return { row: inserted, created: true }
+      if (inserted) return { row: inserted, created: true, updated: false }
 
       const existing = db
         .select()
@@ -363,7 +369,21 @@ export namespace TargetMemory {
         .where(and(eq(TargetNoteTable.target_id, workspace.id), eq(TargetNoteTable.content_hash, contentHash)))
         .get()
       if (!existing) throw new Error("Note was not inserted and the duplicate record could not be loaded.")
-      return { row: existing, created: false }
+
+      // Omitted status/tags means "preserve existing state", not reset a confirmed note to observed.
+      const nextStatus = input.status ?? existing.status
+      const existingTags = (existing.tags as string[] | null) ?? []
+      const nextTags = input.tags === undefined ? existingTags : tags
+      const changed = nextStatus !== existing.status || JSON.stringify(nextTags) !== JSON.stringify(existingTags)
+      if (!changed) return { row: existing, created: false, updated: false }
+
+      const updated = db
+        .update(TargetNoteTable)
+        .set({ status: nextStatus, tags: nextTags, time_updated: now })
+        .where(eq(TargetNoteTable.id, existing.id))
+        .returning()
+        .get()
+      return { row: updated ?? existing, created: false, updated: true }
     })
 
     const note = mapNote(saved.row)
@@ -375,7 +395,9 @@ export namespace TargetMemory {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
     }
-    if (!notesFile.includes(marker)) {
+
+    const markerIndex = notesFile.indexOf(marker)
+    if (markerIndex < 0) {
       const timestamp = new Date(note.timeCreated).toISOString()
       const heading = note.title ? "### " + note.title : "### " + timestamp
       const provenance = [
@@ -387,9 +409,27 @@ export namespace TargetMemory {
       ]
       const entry = "\n\n" + marker + "\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
       await fs.appendFile(notesPath, entry, "utf-8")
+    } else {
+      // Update only this generated entry's metadata and preserve all surrounding human edits.
+      const provenanceStart = notesFile.indexOf("- Type: ", markerIndex)
+      const provenanceEnd = provenanceStart >= 0 ? notesFile.indexOf("\n\n", provenanceStart) : -1
+      if (provenanceStart >= 0 && provenanceEnd > provenanceStart) {
+        const metadata = notesFile.slice(provenanceStart, provenanceEnd).split("\n")
+        const statusIndex = metadata.findIndex((line) => line.startsWith("- Status: "))
+        if (statusIndex >= 0) metadata[statusIndex] = "- Status: " + note.status
+        const tagsIndex = metadata.findIndex((line) => line.startsWith("- Tags: "))
+        if (note.tags.length) {
+          if (tagsIndex >= 0) metadata[tagsIndex] = "- Tags: " + note.tags.join(", ")
+          else metadata.push("- Tags: " + note.tags.join(", "))
+        } else if (tagsIndex >= 0) {
+          metadata.splice(tagsIndex, 1)
+        }
+        const nextFile = notesFile.slice(0, provenanceStart) + metadata.join("\n") + notesFile.slice(provenanceEnd)
+        if (nextFile !== notesFile) await fs.writeFile(notesPath, nextFile, "utf-8")
+      }
     }
 
-    return { workspace, note, created: saved.created }
+    return { workspace, note, created: saved.created, updated: saved.updated }
   }
 
   export function allNotes(targetID: string): TargetNote[] {
