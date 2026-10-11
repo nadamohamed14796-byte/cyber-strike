@@ -414,18 +414,31 @@ export namespace JavaScriptCorrelation {
           responseSize: request.response_size ?? null,
           redactedPreview: redact(request.processed_response),
         })),
-      requests: relevantRequests.map((request) => ({
-        id: request.id,
-        method: request.method,
-        host: request.host ?? null,
-        url: (request.origin ?? "") + request.normalized_path,
-        normalizedPath: request.normalized_path,
-        responseStatus: request.response_status ?? null,
-        responseContentType: request.response_content_type ?? null,
-        responseSize: request.response_size ?? null,
-        responsePreview: redact(request.processed_response),
-        hasRawRequest: Boolean(request.raw_request),
-      })),
+      requests: relevantRequests.map((request) => {
+        // Older captures may have host/page_url but no normalized origin. Build
+        // a URL only from an observed base; never invent a host for path-only rows.
+        const base = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+        let observedURL: string | null = null
+        if (base) {
+          try {
+            observedURL = new URL(request.normalized_path, base).href
+          } catch {
+            observedURL = null
+          }
+        }
+        return {
+          id: request.id,
+          method: request.method,
+          host: request.host ?? base?.host ?? null,
+          url: observedURL,
+          normalizedPath: request.normalized_path,
+          responseStatus: request.response_status ?? null,
+          responseContentType: request.response_content_type ?? null,
+          responseSize: request.response_size ?? null,
+          responsePreview: redact(request.processed_response),
+          hasRawRequest: Boolean(request.raw_request),
+        }
+      }),
       webFunctions: webFunctions.map((fn) => ({
         id: fn.id,
         name: fn.name,
