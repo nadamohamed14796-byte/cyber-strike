@@ -4,6 +4,7 @@ import fs from "node:fs/promises"
 import { and, asc, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
+import { redactTargetNoteSecrets } from "./redact"
 import { Instance } from "../project/instance"
 import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
@@ -324,18 +325,22 @@ export namespace TargetMemory {
     targetURL: string,
     input: NoteInput,
   ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
-    const content = input.content?.trim()
-    if (!content) throw new Error("Note content cannot be empty.")
-    if (content.length > 100_000) throw new Error("Note content is too large (maximum 100,000 characters).")
+    const rawContent = input.content?.trim()
+    if (!rawContent) throw new Error("Note content cannot be empty.")
+    if (rawContent.length > 100_000) throw new Error("Note content is too large (maximum 100,000 characters).")
+    // Redact at the persistence boundary, not only in the agent-facing tool:
+    // the CLI and future callers must not be able to write secrets to disk.
+    const content = redactTargetNoteSecrets(rawContent)
 
     const workspace = await ensure(targetURL)
     const kind = input.kind ?? "manual"
-    const title = input.title?.trim() || null
+    const rawTitle = input.title?.trim()
+    const title = rawTitle ? redactTargetNoteSecrets(rawTitle).slice(0, 180) || null : null
     const now = Date.now()
-    const source = (input.source?.trim() || "manual").slice(0, 120)
-    const sourceURL = normalizedSourceURL(input.sourceURL)
+    const source = redactTargetNoteSecrets((input.source?.trim() || "manual").slice(0, 120))
+    const sourceURL = normalizedSourceURL(input.sourceURL ? redactTargetNoteSecrets(input.sourceURL) : undefined)
     const statusForInsert = input.status ?? "observed"
-    const tags = [...new Set((input.tags ?? []).map((tag) => tag.trim()).filter(Boolean))].slice(0, 30)
+    const tags = [...new Set((input.tags ?? []).map((tag) => redactTargetNoteSecrets(tag.trim())).filter(Boolean))].slice(0, 30)
     // Provenance is part of note identity, so identical lessons from distinct sources do not erase attribution.
     const contentHash = createHash("sha256")
       .update([kind, title ?? "", source, sourceURL ?? "", content].join("\0"))
