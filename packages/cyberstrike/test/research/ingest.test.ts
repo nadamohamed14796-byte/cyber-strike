@@ -42,7 +42,7 @@ test("research extraction preserves remediation, version, stack, and negative ev
       "The researcher could not reproduce the issue after applying the patch.",
       "Remediation: upgrade to the patched release and enforce authorization on every object request.",
       "The attack chain combines a source map disclosure with an IDOR that leads to account data exposure.",
-    ].join("\\n"),
+    ].join("\n"),
   )
   expect(extracted.affectedVersions).toContain("Affected versions")
   expect(extracted.technologyStack).toContain("Express")

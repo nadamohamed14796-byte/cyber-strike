@@ -373,13 +373,13 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
     ),
     affectedVersions: matchingSentences(
       text,
-      /affected versions?|vulnerable versions?|version(?:s)? (?:before|prior to|up to|through|between)|introduced in|fixed in|patched in|release \\d|\\bv?\\d+\\.\\d+(?:\\.\\d+)?/i,
+      /affected versions?|vulnerable versions?|version(?:s)? (?:before|prior to|up to|through|between)|introduced in|fixed in|patched in|release \d|\bv?\d+\.\d+(?:\.\d+)?/i,
       6,
       1600,
     ),
     technologyStack: matchingSentences(
       text,
-      /\\b(?:react|next\\.js|angular|vue(?:\\.js)?|express|node\\.js|django|flask|rails|laravel|spring|asp\\.net|graphql|grpc|kubernetes|docker|nginx|apache|redis|mongodb|postgres(?:ql)?|mysql|oauth|openid|jwt)\\b|framework|library|middleware|deployment|architecture/i,
+      /\b(?:react|next\.js|angular|vue(?:\.js)?|express|node\.js|django|flask|rails|laravel|spring|asp\.net|graphql|grpc|kubernetes|docker|nginx|apache|redis|mongodb|postgres(?:ql)?|mysql|oauth|openid|jwt)\b|framework|library|middleware|deployment|architecture/i,
       6,
       1600,
     ),
