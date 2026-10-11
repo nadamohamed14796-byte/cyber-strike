@@ -36,6 +36,7 @@ import { Session } from "../session"
 import { HackbrowserStatus } from "../session/hackbrowser-status"
 import { Global } from "../global"
 import { GmailService } from "../gmail-service"
+import { buildHackbrowserWorkerEnvironment } from "../hackbrowser-subprocess/worker-environment"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -525,15 +526,15 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
   // Sync prep first — fail fast on any issue before claiming the slot.
   const prepared = await prepareCrawl(opts)
 
-  // Spawn worker subprocess. stdin/stdout are pipes for JSON IPC.
-  // Inherits full parent env so AWS/GCP/other provider credentials
-  // (AWS_ACCESS_KEY_ID, GOOGLE_APPLICATION_CREDENTIALS, etc.) are
-  // available to the worker without explicit forwarding.
+  // Spawn worker with an explicit, provider-scoped environment. Model API
+  // credentials are carried in the prepared WorkerOptions IPC payload; only
+  // Bedrock/Vertex ambient credential-chain variables are forwarded when
+  // required. Never inherit the parent process's unrelated secrets.
   const proc = Bun.spawn([prepared.runtime, prepared.workerPath], {
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env },
+    env: buildHackbrowserWorkerEnvironment(process.env, prepared.workerOptions.model.npm),
   })
 
   activeRuns.set(opts.sessionID, { proc, modelInfo: prepared.modelInfo })
