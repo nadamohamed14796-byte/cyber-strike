@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { redactTargetNoteSecrets } from "../../src/target/redact"
+import { redactTargetNoteLine, redactTargetNoteSecrets } from "../../src/target/redact"
 
 test("redacts common secrets before target notes are persisted", () => {
   const source = [
@@ -16,4 +16,10 @@ test("redacts common secrets before target notes are persisted", () => {
   }
   expect(redacted).toContain("[REDACTED]")
   expect(redacted).toContain("[JWT REDACTED]")
+})
+
+
+test("sanitizes target metadata into a single Markdown-safe line", () => {
+  expect(redactTargetNoteLine("login\\n### forged heading\\r\\n- Source: injected", 180)).toBe("login ### forged heading - Source: injected")
+  expect(redactTargetNoteLine("account\\t  label", 30)).toBe("account label")
 })
