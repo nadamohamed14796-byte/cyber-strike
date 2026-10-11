@@ -115,6 +115,18 @@ After confirming a dangling CNAME:
 - Distinguish abandoned service responses from provider-wide outages, custom error pages, DNS propagation, and misconfigured but non-claimable resources.
 - Confirm the hostname is in scope and controlled by the organization. A third-party or vendor-owned hostname may be excluded even if its DNS appears stale.
 - Record DNS chain, TTL, provider fingerprint, timestamp, and evidence of claimability. Avoid serving malicious content or collecting visitors.
+## DNS Ownership and Claimability Decision Tree
+
+Treat dangling DNS as a lead, not proof. For each in-scope hostname, record the authoritative CNAME/alias chain, final provider, current DNS status, and whether the provider returns a documented unclaimed-resource signature.
+
+1. Confirm the hostname is in scope and capture DNS answers with a timestamp.
+2. Resolve the complete alias chain and distinguish NXDOMAIN, provider-side not-found, parked resources, and transient DNS failures.
+3. Check the provider's current documented claimability conditions and whether registration is actually possible; a generic error page is insufficient.
+4. Do not register the target resource, upload content, or take control of the hostname unless the program explicitly permits takeover simulation. Use provider documentation and a controlled equivalent to validate claimability.
+5. Recheck DNS and provider response before reporting because resource ownership can change.
+
+Evidence should include the hostname, sanitized DNS chain, provider-specific response, relevant claimability documentation, and realistic impact. Avoid claiming account takeover or cookie theft without proving applicable cookie scope and browser behavior.
+
 ## References
 
 - [Can I Take Over XYZ](https://github.com/EdOverflow/can-i-take-over-xyz)
