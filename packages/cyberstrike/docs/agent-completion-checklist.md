@@ -6,7 +6,7 @@ Purpose: track concrete runtime, integration, security, and test gaps. A box is 
 
 ## P0 — must be resolved before merge
 
-- [ ] **Worker environment isolation** — stop passing the entire parent environment to Hackbrowser; provide only required runtime/platform variables and provider-specific credentials required for the selected model. Never pass AuthVault encryption keys, website-password handoff variables, Gmail OAuth client secret/refresh token, or unrelated application secrets.
+- [x] **Worker environment isolation** — stop passing the entire parent environment to Hackbrowser; provide only required runtime/platform variables and provider-specific credentials required for the selected model. Never pass AuthVault encryption keys, website-password handoff variables, Gmail OAuth client secret/refresh token, or unrelated application secrets.
 - [ ] **Branch/PR divergence review** — examine the whole PR diff and the four commits on `main` not present on the feature branch; reconcile safely without force-pushing or writing directly to `main`.
 - [ ] **Automated verification** — run package-level unit tests, typecheck, and build in an environment with the required Bun/toolchain; record exact commands and outcomes. No test is marked passed from file existence or static inspection.
 - [ ] **CI status** — inspect PR workflow runs and resolve any failing or missing checks before merge.
@@ -34,6 +34,6 @@ Purpose: track concrete runtime, integration, security, and test gaps. A box is 
 
 ## Verification notes
 
-- Initial static review found `hackbrowser-launcher.ts` spawning the worker with `env: { ...process.env }`, which can inherit application secrets. This is a confirmed code-level issue pending repair.
+- Worker environment isolation was changed to an explicit allowlist in `hackbrowser-subprocess/worker-environment.ts`; Bedrock/Vertex credential variables are forwarded only for the matching provider. Focused tests were added, but have not been run in this review environment.
 - The feature branch was reported by GitHub compare as 183 commits ahead and 4 behind `main`; it must be reconciled carefully.
-- Unit tests, typecheck, build, real Gmail OAuth, and browser login have not yet been verified as passing in this review.
+- Unit tests, typecheck, build, real Gmail OAuth, and browser login have not yet been verified as passing in this review. GitHub currently reports no combined status entries or PR-associated workflow runs for the inspected head commit.
