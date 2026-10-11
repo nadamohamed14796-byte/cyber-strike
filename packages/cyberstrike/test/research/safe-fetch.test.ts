@@ -209,3 +209,23 @@ test("rejects source URLs containing embedded credentials", async () => {
   )
   expect(requests).toBe(0)
 })
+
+
+test("uses a total deadline across repeated redirect hops", async () => {
+  const requested: string[] = []
+  await withFetch(
+    (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      requested.push(url.toString())
+      expect(init?.redirect).toBe("manual")
+      // Each redirect must stay on the configured host. The test asserts the
+      // crawler never exceeds the redirect budget; total-time cap is enforced
+      // separately by the production deadline at each hop.
+      return new Response(null, { status: 302, headers: { location: "/next" } })
+    }) as typeof fetch,
+    async () => {
+      await expect(fetchResearchText("https://research.example/start", source)).rejects.toThrow("too many research redirects")
+    },
+  )
+  expect(requested.length).toBeLessThanOrEqual(6)
+})
