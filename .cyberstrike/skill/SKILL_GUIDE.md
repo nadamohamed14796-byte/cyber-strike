@@ -232,6 +232,49 @@ Level 1 or Level 2, and assessment status (Automated/Manual).
 
 ---
 
+## Operational Quality Gate for Existing Skills
+
+Apply this gate when editing an existing skill, not only when creating a new one. Preserve its current directory, filename, loader conventions, useful examples, and established section order unless a concrete defect requires a change.
+
+### Before editing
+- Read the complete target SKILL.md and its frontmatter.
+- Inspect every local name in chains_with, prerequisites, severity_boost, and relative links. Confirm the referenced directory/file exists in this repository; external research URLs must remain clearly external.
+- Read relevant authoritative documentation and research references. Adapt concepts to CyberStrike conventions rather than copying another repository's filenames or internal paths.
+- Identify existing coverage before adding content. Extend the relevant section instead of creating a second version of the same procedure.
+
+### Required test-quality properties
+- Scope: state authorization assumptions, target boundaries, permitted test accounts, and any high-risk action that needs explicit approval.
+- Baseline: establish normal behavior before modifying one variable at a time.
+- Reproducibility: provide placeholders, bounded timeouts/concurrency, expected output, and a clean way to repeat the test.
+- Verification: separate a signal from a confirmed vulnerability; include alternative explanations and false-positive conditions.
+- Impact: prove the security boundary and practical consequence with synthetic data or controlled accounts; do not infer critical impact from a tool alert alone.
+- Evidence: collect the minimum sanitized request, response, role/context, timestamp, and final state needed to reproduce.
+- Stop conditions: stop on unexpected state changes, instability, data exposure, rate-limit thresholds, or any scope boundary uncertainty.
+- Remediation: give a concrete fix and a regression test that would prevent recurrence.
+- References: prefer primary/vendor documentation and authoritative research; keep URLs valid and do not invent citations.
+
+### Cross-skill and duplication checks
+- Reuse a shared concept through chains_with instead of copying a full methodology into multiple files.
+- Every local chain/prerequisite must resolve to an actual skill directory. If a concept has no local skill, describe it in prose or link to an external source; do not invent a path.
+- severity_boost must explain a demonstrated conditional chain, not claim that two labels automatically increase severity.
+- Do not change the skill name or directory to match an upstream repository. CyberStrike's local names and paths are canonical.
+- Preserve existing valuable content. Add a new section only when it provides a distinct workflow, coverage dimension, validation gate, or evidence requirement.
+- Do not mark a skill as verified or tested unless the relevant checks were actually run.
+
+### Final review checklist
+- [ ] YAML frontmatter opens and closes correctly and required fields remain present.
+- [ ] name matches the existing skill directory and remains unique.
+- [ ] Local chain/prerequisite names and internal links resolve.
+- [ ] No duplicate headings or repeated procedures were introduced.
+- [ ] Commands use placeholders, bounded timeouts, and non-destructive defaults where applicable.
+- [ ] Expected results, false positives, evidence, impact, and remediation are stated.
+- [ ] References are external only when intended and remain accurate.
+- [ ] File path and filename are unchanged.
+- [ ] The change is committed to the intended working branch and is not described as merged unless it is merged.
+
+---
+
+
 ## Naming Conventions
 
 | Skill Type          | Name Pattern                    | Example                     |
