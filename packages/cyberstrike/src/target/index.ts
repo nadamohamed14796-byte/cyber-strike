@@ -150,19 +150,75 @@ function mapWorkspace(row: typeof TargetWorkspaceTable.$inferSelect, relativePat
   }
 }
 
-async function createIfMissing(filePath: string, content: string): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
+/**
+ * Create a directory beneath the active project root without following
+ * symlinks from an untrusted checkout into an unrelated filesystem location.
+ */
+async function ensureSafeDirectoryPath(rootPath: string, relativePath: string): Promise<string> {
+  const lexicalRoot = path.resolve(rootPath)
+  const root = await fs.realpath(lexicalRoot)
+  const relative = path.relative(lexicalRoot, path.resolve(lexicalRoot, relativePath))
+  if (!relative || relative === "." || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+    throw new Error("Target workspace path must remain inside the active project.")
+  }
+  const segments = relative.split(path.sep)
+  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
+    throw new Error("Target workspace path contains an unsafe component.")
+  }
+
+  let current = root
+  for (const segment of segments) {
+    const next = path.join(current, segment)
+    let info
+    try {
+      info = await fs.lstat(next)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+      try {
+        await fs.mkdir(next, { mode: 0o700 })
+      } catch (mkdirError) {
+        if ((mkdirError as NodeJS.ErrnoException).code !== "EEXIST") throw mkdirError
+      }
+      info = await fs.lstat(next)
+    }
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new Error("Unsafe target workspace path: symbolic links and non-directory components are not allowed.")
+    }
+    current = await fs.realpath(next)
+    const escaped = path.relative(root, current)
+    if (escaped === ".." || escaped.startsWith(".." + path.sep) || path.isAbsolute(escaped)) {
+      throw new Error("Target workspace path resolves outside the active project.")
+    }
+  }
+  return current
+}
+
+async function assertRegularFileOrMissing(filePath: string): Promise<void> {
   try {
-    await fs.writeFile(filePath, content, { encoding: "utf-8", flag: "wx" })
+    const info = await fs.lstat(filePath)
+    if (info.isSymbolicLink() || !info.isFile()) {
+      throw new Error("Unsafe target workspace file: symbolic links and non-regular files are not allowed.")
+    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
   }
 }
 
+async function createIfMissing(filePath: string, content: string): Promise<void> {
+  await assertRegularFileOrMissing(filePath)
+  try {
+    await fs.writeFile(filePath, content, { encoding: "utf-8", flag: "wx", mode: 0o600 })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+  }
+  await assertRegularFileOrMissing(filePath)
+}
+
 async function prepareWorkspace(workspace: Workspace): Promise<void> {
-  await fs.mkdir(workspace.workspacePath, { recursive: true })
+  const root = projectRoot()
+  workspace.workspacePath = await ensureSafeDirectoryPath(root, workspace.relativePath)
   for (const directory of TARGET_DIRECTORIES) {
-    await fs.mkdir(path.join(workspace.workspacePath, directory), { recursive: true })
+    await ensureSafeDirectoryPath(root, path.join(workspace.relativePath, directory))
   }
   await createIfMissing(
     path.join(workspace.workspacePath, "target.json"),
