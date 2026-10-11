@@ -153,6 +153,21 @@ Use a test account and a harmless test message. A `101 Switching Protocols` resp
 - [uphiago/recon-skills — WebSocket hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-websocket/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — WebSocket hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-websocket/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## WebSocket Authorization and Origin Test Matrix
+
+Use two controlled accounts and a test tenant. Evaluate handshake and message-level controls separately:
+
+| Test | Comparison | Security property |
+|---|---|---|
+| Handshake authentication | valid, missing, expired session | connection requires valid identity |
+| Origin validation | trusted origin vs controlled untrusted origin | browser-origin policy enforced where needed |
+| Cross-site initiation | authenticated browser session vs clean browser | CSWSH requires exploitable cookie/session behavior |
+| Message authorization | owner vs second test account | every sensitive message is authorized server-side |
+| Subscription/room IDs | own channel vs another test channel | tenant and object isolation |
+| Session revocation | active connection before/after logout or permission change | server closes or reauthorizes stale connections as required |
+
+Keep message volume low and avoid broadcast channels containing real user data. A successful handshake or permissive Origin header alone is not proof of impact. Capture the handshake, cookie attributes with values redacted, Origin, message, server response, account roles, and the exact cross-account boundary demonstrated.
+
 ## References
 
 - [PortSwigger: WebSocket Vulnerabilities](https://portswigger.net/web-security/websockets)
