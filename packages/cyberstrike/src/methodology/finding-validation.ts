@@ -19,7 +19,7 @@ export const FINDING_VALIDATION_CHECKS = [
   { number: 6, id: "alternative_causes", question: "Have cache, CDN/WAF, environment, race conditions, stale state, and tool artifacts been reasonably excluded?" },
   { number: 7, id: "control_comparison", question: "Was there a baseline or control comparison that separates vulnerable behavior from expected behavior?" },
   { number: 8, id: "evidence_complete", question: "Is the evidence attributable, reproducible, minimal, and sufficient for independent review?" },
-  { number: 9, id: "benign_behavior_ruled_out", question: "Has a documented intended or benign explanation been ruled out?" },
+  { number: 9, id: "benign_behavior_ruled_out", question: "Does controlled evidence rule out an intended or benign explanation? Mark fail only when evidence demonstrates a benign/intended explanation; use unknown if this has not been tested." },
   { number: 10, id: "reviewable", question: "Are the finding, limitations, and reproduction steps documented so another reviewer can verify them?" },
 ] as const
 

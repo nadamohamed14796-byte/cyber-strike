@@ -23,7 +23,7 @@ const CHECK_STATUS = z.enum(["pass", "fail", "unknown", "not_applicable"])
 
 const DESCRIPTION = [
   "Validate an already-recorded finding with the ten required evidence-based checks.",
-  "Fill one unique entry for every check ID below. Use status=unknown when the relevant test or evidence has not been collected; missing evidence is not proof of a false positive.",
+  "Fill one unique entry for every check ID below. Use status=unknown when the relevant test or evidence has not been collected; missing evidence is not proof of a false positive. For check #9, fail means concrete evidence supports an intended/benign explanation, not merely that you have not ruled one out.",
   "A status=fail requires BOTH a concrete reason and observable evidence. Do not guess a failure or invent evidence.",
   ...FINDING_VALIDATION_CHECKS.map((check) => "#" + check.number + " [" + check.id + "] " + check.question),
   "The tool stores every assessment in SQLite and appends the latest summary to the finding. It may set finding status to false_positive only when multiple evidence-backed contradictions are recorded, including at least one primary contradiction. Otherwise it returns confirmed or inconclusive according to the rubric.",
