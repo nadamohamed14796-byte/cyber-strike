@@ -303,21 +303,6 @@ export namespace JavaScriptCorrelation {
     const targetURL = new URL(normalizedTarget.targetURL)
     const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     if (explicitJS) {
-      const alreadyObserved = jsCandidates.some((item) =>
-        item.url.origin + item.url.pathname === explicitJS.origin + explicitJS.pathname,
-      )
-      if (!isJavaScriptAssetAllowed({
-        targetURL: normalizedTarget.targetURL,
-        javascriptURL: explicitJS.href,
-        alreadyObserved,
-      })) {
-        throw new Error(
-          "The JavaScript URL is outside the target host/path and is not a JavaScript asset already recorded in this session. Record and verify the asset first, or use a URL matching the target workspace.",
-        )
-      }
-    }
-
-    if (explicitJS) {
       const explicitKey = explicitJS.origin + explicitJS.pathname
       const alreadyObserved = jsCandidates.some((item) => item.url.origin + item.url.pathname === explicitKey)
       if (!isJavaScriptAssetAllowed({
