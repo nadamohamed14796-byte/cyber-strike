@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { extractStaticJavaScriptEndpoints } from "../../src/target/javascript-correlation"
+import { extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -28,21 +28,21 @@ test("does not treat ordinary labels or non-path relative strings as endpoints",
 
 
 test("explicit JavaScript target matching rejects unrelated hosts and sibling paths unless observed", () => {
-  const target = new URL("https://app.example.com/portal")
-  const insideHost = new URL("https://app.example.com/portal/assets/app.js")
-  const outsidePath = new URL("https://app.example.com/other-app/app.js")
-  const external = new URL("https://unrelated.example.net/app.js")
-  const pathWithin = (candidate: URL, scoped: URL) => {
-    const base = scoped.pathname.replace(/\/$/, "") || "/"
-    return candidate.pathname === base || candidate.pathname.startsWith(base + "/")
-  }
-  const matchesHost = (candidate: URL, scoped: URL) =>
-    candidate.hostname === scoped.hostname || candidate.hostname.endsWith("." + scoped.hostname)
-  const allowed = (candidate: URL, scoped: URL, observed: boolean) =>
-    (matchesHost(candidate, scoped) && (scoped.pathname === "/" || candidate.hostname !== scoped.hostname || pathWithin(candidate, scoped))) || observed
-
-  expect(allowed(insideHost, target, false)).toBe(true)
-  expect(allowed(outsidePath, target, false)).toBe(false)
-  expect(allowed(external, target, false)).toBe(false)
-  expect(allowed(external, target, true)).toBe(true)
+  expect(isJavaScriptAssetAllowed({
+    targetURL: "https://app.example.com/portal",
+    javascriptURL: "https://app.example.com/portal/assets/app.js",
+  })).toBe(true)
+  expect(isJavaScriptAssetAllowed({
+    targetURL: "https://app.example.com/portal",
+    javascriptURL: "https://app.example.com/other-app/app.js",
+  })).toBe(false)
+  expect(isJavaScriptAssetAllowed({
+    targetURL: "https://app.example.com/portal",
+    javascriptURL: "https://unrelated.example.net/app.js",
+  })).toBe(false)
+  expect(isJavaScriptAssetAllowed({
+    targetURL: "https://app.example.com/portal",
+    javascriptURL: "https://unrelated.example.net/app.js",
+    alreadyObserved: true,
+  })).toBe(true)
 })

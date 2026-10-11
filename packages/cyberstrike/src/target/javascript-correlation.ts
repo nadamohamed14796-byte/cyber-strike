@@ -88,6 +88,24 @@ function pathWithinScope(candidate: string | null | undefined, scopedPath: strin
   return value === base || value.startsWith(base + "/")
 }
 
+/** Local correlation boundary only; this does not replace the existing scope engine. */
+export function isJavaScriptAssetAllowed(input: {
+  targetURL: string
+  javascriptURL: string
+  alreadyObserved?: boolean
+}): boolean {
+  const target = safeURL(input.targetURL)
+  const script = safeURL(input.javascriptURL)
+  if (!target || !script) return false
+  const hostMatches = script.hostname === target.hostname || script.hostname.endsWith("." + target.hostname)
+  const targetPath = target.pathname.replace(/\/$/, "") || "/"
+  const pathMatches =
+    targetPath === "/" ||
+    script.hostname !== target.hostname ||
+    pathWithinScope(script.pathname, targetPath)
+  return (hostMatches && pathMatches) || input.alreadyObserved === true
+}
+
 function normalizeEndpointLiteral(value: string): string | undefined {
   const trimmed = value.trim()
   if (!trimmed || trimmed.length > 240) return undefined
@@ -285,12 +303,14 @@ export namespace JavaScriptCorrelation {
     const targetURL = new URL(normalizedTarget.targetURL)
     const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     if (explicitJS) {
-      const hostMatches = explicitJS.hostname === targetURL.hostname || explicitJS.hostname.endsWith("." + targetURL.hostname)
-      const pathMatches = targetPath === "/" || explicitJS.hostname !== targetURL.hostname || pathWithinScope(explicitJS.pathname, targetPath)
       const alreadyObserved = jsCandidates.some((item) =>
         item.url.origin + item.url.pathname === explicitJS.origin + explicitJS.pathname,
       )
-      if ((!hostMatches || !pathMatches) && !alreadyObserved) {
+      if (!isJavaScriptAssetAllowed({
+        targetURL: normalizedTarget.targetURL,
+        javascriptURL: explicitJS.href,
+        alreadyObserved,
+      })) {
         throw new Error(
           "The JavaScript URL is outside the target host/path and is not a JavaScript asset already recorded in this session. Record and verify the asset first, or use a URL matching the target workspace.",
         )
