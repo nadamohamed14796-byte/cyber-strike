@@ -126,7 +126,7 @@ export namespace ResearchContext {
     // API/auth/business-logic signal). Query the most recent actionable signals
     // independently, then deduplicate the global public references.
     const actionableType = /^(endpoint|api_schema|authentication_flow|business_rule|parameter|configuration|technology|vulnerability_hint|sensitive_data|infrastructure)$/i
-    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|authori[sz]|access.?control|privilege|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
+    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
     const signalEntries = signalPool.filter((entry) => {
       const tags = ((entry.tags as string[] | null) ?? []).slice(0, 8)
       return actionableType.test(entry.type ?? "") ||
@@ -141,9 +141,14 @@ export namespace ResearchContext {
         .filter(Boolean)
       const classTag = tags
         .map((tag) => tag.replace(/^target:/i, "").toLowerCase())
-        .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization)$/.test(tag))
+        .find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization)$/.test(tag))
       const classAliases: Record<string, string> = {
         bola: "idor",
+        "object-identifier": "idor",
+        "resource-identifier": "idor",
+        "authorization-boundary": "access-control",
+        "server-side-request": "ssrf",
+        "token-or-jwt": "jwt",
         authz: "access-control",
         authorization: "access-control",
       }
@@ -156,7 +161,7 @@ export namespace ResearchContext {
       const normalizedClass = classTag ? (classAliases[classTag] ?? classTag) : undefined
       const vulnerabilityClass = normalizedClass && knownClasses.has(normalizedClass) ? normalizedClass : undefined
       const cweTag = tags.find((tag) => /\bCWE-\d+\b/i.test(tag))
-      const query = [entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 4)].filter(Boolean).join(" ").slice(0, 220)
+      const query = [vulnerabilityClass, cweTag, entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 6)].filter(Boolean).join(" ").slice(0, 260)
       const rows = ReportKnowledge.recommendations({
         signal: query,
         vulnerabilityClass,

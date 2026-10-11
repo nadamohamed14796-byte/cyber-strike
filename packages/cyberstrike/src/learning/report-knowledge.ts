@@ -327,7 +327,7 @@ export namespace ReportKnowledge {
   ])
 
   const SIGNAL_PATTERNS: Array<[string, RegExp]> = [
-    ["idor", /\bidor\b|insecure direct object|object[- ](?:level )?authorization|object identifier|another user's? (?:data|object|account)/i],
+    ["idor", /\bidor\b|insecure direct object|object[- ](?:level )?authorization|object[- ]identifier|resource identifier|object identifier|another user's? (?:data|object|account)/i],
     ["authorization-boundary", /authorization|access control|privilege escalation|role[- ]based access|another account/i],
     ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/i],
     ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/i],

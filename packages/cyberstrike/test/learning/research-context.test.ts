@@ -27,6 +27,9 @@ test("request-derived global research signals are pattern-based and do not asser
     expect.arrayContaining(["api-endpoint", "business-logic"]),
   )
   expect(requestResearchSignals({ method: "GET", path: "/about", contentType: "text/html", status: 200 })).not.toContain("authorization-boundary")
+  // Numeric object IDs are a retrieval signal even when the response is 200;
+  // this does not establish that authorization is broken.
+  expect(requestResearchSignals({ method: "GET", path: "/users/123", contentType: "application/json", status: 200 })).toContain("object-identifier")
 })
 
 test("request-derived research signals cover JavaScript, auth, uploads, and URL-fetching surfaces without asserting findings", async () => {
