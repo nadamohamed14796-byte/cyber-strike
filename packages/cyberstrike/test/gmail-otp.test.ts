@@ -17,11 +17,12 @@ describe("Gmail OTP extraction", () => {
 describe("Gmail OTP sender scope", () => {
   test("accepts exact hostname and subdomains", () => {
     expect(isAllowedSiteSender("Example <no-reply@app.example.com>", "https://example.com/login")).toBe(true)
-    expect(isAllowedSiteSender("no-reply@example.com", "https://www.example.com")).toBe(true)
+    expect(isAllowedSiteSender("no-reply@sub.www.example.com", "https://www.example.com")).toBe(true)
   })
   test("rejects lookalike and third-party sender domains", () => {
     expect(isAllowedSiteSender("no-reply@notexample.com", "https://example.com")).toBe(false)
     expect(isAllowedSiteSender("no-reply@mail-provider.net", "https://example.com")).toBe(false)
+    expect(isAllowedSiteSender("no-reply@example.com", "https://www.example.com")).toBe(false)
   })
   test("rejects non-http site URLs", () => {
     expect(() => isAllowedSiteSender("no-reply@example.com", "file:///tmp/a")).toThrow()
