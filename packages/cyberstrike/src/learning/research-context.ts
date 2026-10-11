@@ -50,24 +50,42 @@ export namespace ResearchContext {
     ].join("\n")
     if (entries.length === 0) return baseline
 
-    const signals = new Set<string>()
-    for (const entry of entries) {
-      if (entry.type) signals.add(entry.type.replace(/[_-]+/g, " "))
-      for (const tag of ((entry.tags as string[] | null) ?? []).slice(0, 4)) {
-        const clean = tag.trim().replace(/[^a-zA-Z0-9 ._-]/g, " ").slice(0, 48)
-        if (clean) signals.add(clean)
-      }
-      const words = entry.title
-        .toLowerCase()
-        .replace(/[^a-z0-9 _-]/g, " ")
-        .split(/\s+/)
-        .filter((word) => word.length >= 3)
-        .slice(0, 5)
-      for (const word of words) signals.add(word)
-    }
+    // Avoid building one noisy query from every Intel title (credentials,
+    // generic subdomains, and unrelated technologies otherwise drown out a real
+    // API/auth/business-logic signal). Query the most recent actionable signals
+    // independently, then deduplicate the global public references.
+    const actionableType = /^(endpoint|api_schema|authentication_flow|business_rule|parameter|configuration|technology|vulnerability_hint|sensitive_data|infrastructure)$/i
+    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|authori[sz]|access.?control|privilege|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
+    const signalEntries = entries.filter((entry) => {
+      const tags = ((entry.tags as string[] | null) ?? []).slice(0, 8)
+      return actionableType.test(entry.type ?? "") ||
+        actionableSignal.test(entry.title) ||
+        tags.some((tag) => actionableSignal.test(tag))
+    })
 
-    const query = [...signals].slice(0, 24).join(" ").slice(0, 280)
-    const results = ReportKnowledge.recommendations({ signal: query, limit: 5 })
+    const matched = new Map<string, (typeof ReportKnowledge extends never ? never : ReturnType<typeof ReportKnowledge.recommendations>[number])>()
+    for (const entry of signalEntries.slice(0, 8)) {
+      const tags = ((entry.tags as string[] | null) ?? [])
+        .map((tag) => tag.trim().replace(/[^a-zA-Z0-9 ._-]/g, " ").slice(0, 48))
+        .filter(Boolean)
+      const classTag = tags
+        .map((tag) => tag.replace(/^target:/i, "").toLowerCase())
+        .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|business.logic|race.condition|file.upload|injection)$/.test(tag))
+      const cweTag = tags.find((tag) => /\bCWE-\d+\b/i.test(tag))
+      const query = [entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 4)].filter(Boolean).join(" ").slice(0, 220)
+      const rows = ReportKnowledge.recommendations({
+        signal: query,
+        vulnerabilityClass: classTag,
+        cweID: cweTag?.match(/CWE-\d+/i)?.[0],
+        limit: 2,
+      })
+      for (const row of rows) {
+        if (!matched.has(row.id)) matched.set(row.id, row)
+        if (matched.size >= 5) break
+      }
+      if (matched.size >= 5) break
+    }
+    const results = [...matched.values()]
     if (results.length === 0) return baseline
 
     const items = results.map((row) => {
