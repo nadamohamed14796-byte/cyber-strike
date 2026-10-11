@@ -51,3 +51,19 @@ test("research extraction preserves remediation, version, stack, and negative ev
   expect(extracted.remediation).toContain("upgrade to the patched release")
   expect(extracted.attackChain).toContain("attack chain")
 })
+
+
+test("research PoC extraction recognizes HTTPie and Python HTTP-client examples", async () => {
+  const extracted = (await import("../../src/research/ingest")).extractResearchDetails(
+    "Authenticated API object access",
+    [
+      "http --follow GET https://app.example.test/api/objects/123",
+      "requests.get('https://app.example.test/api/objects/123', headers=headers)",
+      "httpx.post('https://app.example.test/api/transfer', json=payload)",
+    ].join(" "),
+    "idor",
+  )
+  expect(extracted.poc).toContain("http --follow GET https://app.example.test/api/objects/123")
+  expect(extracted.poc).toContain("requests.get(")
+  expect(extracted.poc).toContain("httpx.post(")
+})
