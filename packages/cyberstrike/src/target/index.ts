@@ -444,6 +444,61 @@ export namespace TargetMemory {
     )
   }
 
+  /** Exact host plus path-prefix matching for session observations; never fetches or authorizes a target. */
+  export function targetObservationMatches(targetURL: string, observedURL: string): boolean {
+    const target = normalizeTarget(targetURL)
+    try {
+      const raw = observedURL.trim()
+      const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : "https://" + raw
+      const observed = new URL(candidate)
+      if ((observed.protocol !== "http:" && observed.protocol !== "https:") || observed.username || observed.password) return false
+      const host = observed.hostname.toLowerCase()
+      if (host !== target.hostname && !host.endsWith("." + target.hostname)) return false
+      const targetPath = new URL(target.targetURL).pathname.replace(/\/$/, "") || "/"
+      if (targetPath === "/") return true
+      const observedPath = observed.pathname.replace(/\/$/, "") || "/"
+      return observedPath === targetPath || observedPath.startsWith(targetPath + "/")
+    } catch {
+      return false
+    }
+  }
+
+  /** True only when this session tree has observed a URL matching an existing target workspace. */
+  export function isObservedInSession(sessionID: string, targetURL: string): boolean {
+    const normalized = normalizeTarget(targetURL)
+    const projectID = Instance.project.id
+    const sessionIDs = new Set<string>([sessionID])
+    let frontier = [sessionID]
+    while (frontier.length > 0) {
+      const children = Database.use((db) =>
+        db.select({ id: SessionTable.id }).from(SessionTable)
+          .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, frontier)))
+          .all().map((row) => row.id).filter((id) => !sessionIDs.has(id)),
+      )
+      for (const child of children) sessionIDs.add(child)
+      frontier = children
+    }
+    const requests = Database.use((db) =>
+      db.select({ host: RequestTable.host, origin: RequestTable.origin, normalizedPath: RequestTable.normalized_path, pageURL: RequestTable.page_url })
+        .from(RequestTable).where(inArray(RequestTable.session_id, [...sessionIDs])).all(),
+    )
+    const assets = Database.use((db) =>
+      db.select({ asset: IntelEntryTable.asset }).from(IntelEntryTable)
+        .where(inArray(IntelEntryTable.session_id, [...sessionIDs])).all().map((row) => row.asset),
+    )
+    const observedURLs: string[] = []
+    for (const request of requests) {
+      if (request.pageURL) observedURLs.push(request.pageURL)
+      if (request.origin) observedURLs.push(request.origin)
+      if (request.host) observedURLs.push(request.host)
+      if (request.origin && request.normalizedPath) {
+        try { observedURLs.push(new URL(request.normalizedPath, request.origin).href) } catch {}
+      }
+    }
+    observedURLs.push(...assets.filter((asset): asset is string => typeof asset === "string" && asset.length > 0))
+    return observedURLs.some((observed) => targetObservationMatches(normalized.targetURL, observed))
+  }
+
   /**
    * Retrieve notes for the most relevant known target seen in this session.
    * It only reads existing target workspaces and session observations; it does not
