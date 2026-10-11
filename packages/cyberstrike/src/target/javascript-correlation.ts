@@ -282,6 +282,21 @@ export namespace JavaScriptCorrelation {
       }))
       .filter((item): item is { row: typeof intel[number]; url: URL } => Boolean(item.url))
 
+    const targetURL = new URL(normalizedTarget.targetURL)
+    const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
+    if (explicitJS) {
+      const hostMatches = explicitJS.hostname === targetURL.hostname || explicitJS.hostname.endsWith("." + targetURL.hostname)
+      const pathMatches = targetPath === "/" || explicitJS.hostname !== targetURL.hostname || pathWithinScope(explicitJS.pathname, targetPath)
+      const alreadyObserved = jsCandidates.some((item) =>
+        item.url.origin + item.url.pathname === explicitJS.origin + explicitJS.pathname,
+      )
+      if ((!hostMatches || !pathMatches) && !alreadyObserved) {
+        throw new Error(
+          "The JavaScript URL is outside the target host/path and is not a JavaScript asset already recorded in this session. Record and verify the asset first, or use a URL matching the target workspace.",
+        )
+      }
+    }
+
     if (explicitJS) {
       const explicitKey = explicitJS.origin + explicitJS.pathname
       if (!jsCandidates.some((item) => item.url.origin + item.url.pathname === explicitKey)) {
@@ -299,8 +314,6 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
-    const targetURL = new URL(normalizedTarget.targetURL)
-    const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     const filteredAssets = explicitJS
       ? jsCandidates.filter((item) => item.url.origin + item.url.pathname === explicitJS.origin + explicitJS.pathname)
       : jsCandidates.filter((item) => {
