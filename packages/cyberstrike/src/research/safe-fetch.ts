@@ -3,6 +3,7 @@ import type { ResearchSource } from "./sources"
 const MAX_DOCUMENT_BYTES = 1_500_000
 const MAX_REDIRECTS = 5
 const REQUEST_TIMEOUT_MS = 20_000
+const MAX_TOTAL_FETCH_MS = 120_000
 const MAX_RETRIES = 2
 
 class NonRetryableResearchError extends Error {}
@@ -60,6 +61,9 @@ export async function fetchResearchText(url: string, source: ResearchSource) {
     throw new NonRetryableResearchError("blocked research host: " + initial.hostname)
   }
 
+  // Bound a whole document fetch, including redirects and retries, so a
+  // worker cannot hold a queue lease indefinitely on a slow trusted host.
+  const deadline = Date.now() + MAX_TOTAL_FETCH_MS
   let lastError: unknown
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     let current = new URL(url)
@@ -69,8 +73,12 @@ export async function fetchResearchText(url: string, source: ResearchSource) {
           throw new NonRetryableResearchError("blocked research host: " + current.hostname)
         }
 
+        const remainingMs = deadline - Date.now()
+        if (remainingMs <= 0) {
+          throw new NonRetryableResearchError("research fetch exceeded total time budget")
+        }
         const controller = new AbortController()
-        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+        const timer = setTimeout(() => controller.abort(), Math.min(REQUEST_TIMEOUT_MS, remainingMs))
         try {
           const response = await fetch(current, {
             signal: controller.signal,
