@@ -4,6 +4,9 @@ import { FindingValidation } from "../../src/methodology/finding-validation"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { Vulnerability } from "../../src/session/vulnerability"
+import { Database } from "../../src/storage/db"
+import { IntelEntryTable } from "../../src/methodology/methodology.sql"
+import { TargetMemory } from "../../src/target"
 import { tmpdir } from "../fixture/fixture"
 
 function checklist(
@@ -118,4 +121,66 @@ test("a check cannot pass without evidence, and not-applicable needs a rationale
   expect(() =>
     assessFindingChecks(checklist({ identity_context: { status: "not_applicable", reason: "" } })),
   ).toThrow("not_applicable check needs a reason")
+})
+
+test("persists validation summaries into notes for the uniquely observed target only", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      const workspace = await TargetMemory.ensure("https://validation-note.example.test")
+      Database.use((db) =>
+        db.insert(IntelEntryTable).values({
+          id: "intel_validation_note_test",
+          session_id: session.id,
+          type: "endpoint",
+          title: "Observed orders endpoint",
+          detail: "Captured during the test session",
+          source: "test",
+          asset: "https://validation-note.example.test/api/orders/123",
+          confidence_level: "high",
+          tags: ["api-endpoint", "object-identifier"],
+          chain_potential: null,
+          related_entries: [],
+          status: "new",
+          position: 1,
+        }).run(),
+      )
+      const finding = Vulnerability.add({
+        sessionID: session.id,
+        data: {
+          severity: "medium",
+          title: "Candidate order authorization issue",
+          description: "Initial candidate.",
+          endpoint: "GET /api/orders/123",
+          status: "approved",
+        },
+      })
+      const result = await FindingValidation.record({
+        sessionID: session.id,
+        vulnerabilityID: finding.id,
+        checks: checklist({
+          reproducible: {
+            status: "fail",
+            reason: "Controlled replay did not reproduce unauthorized access.",
+            evidence: "Three replays returned the expected owner-authorized response.",
+          },
+          unexpected_behavior: {
+            status: "fail",
+            reason: "The response matched the expected access-control behavior.",
+            evidence: "Owner and non-owner control responses contained no unauthorized object data.",
+          },
+        }),
+      })
+      expect(result.targetNoteID).toBeTruthy()
+      const notes = TargetMemory.allNotes(workspace.id)
+      const note = notes.find((item) => item.id === result.targetNoteID)
+      expect(note?.title).toContain("Candidate order authorization issue")
+      expect(note?.content).toContain("false_positive")
+      expect(note?.content).toContain("reproducible, unexpected_behavior")
+      expect(note?.content).not.toContain("Three replays returned")
+      await Session.remove(session.id)
+    },
+  })
 })
