@@ -19,13 +19,13 @@ export const UpdateCommand = cmd({
   describe: "discover public research, learn queued items, and persist knowledge for hunting",
   builder: (yargs: Argv) =>
     yargs
-      .option("pages", { type: "number", default: 100, describe: "maximum discovery pages per source for each cycle" })
+      .option("pages", { type: "number", default: 10, describe: "maximum discovery pages per source for each cycle" })
       .option("depth", { type: "number", default: 2, describe: "maximum discovery depth" })
       .option("limit", { type: "number", default: 30, describe: "maximum queued items to study per cycle" })
       .option("watch", { type: "boolean", default: false, describe: "repeat bounded update cycles until interrupted" })
       .option("interval", { type: "number", default: 60, describe: "seconds between watch cycles" }),
   async handler(args) {
-    const pages = bounded(args.pages, 100, 1, 1000)
+    const pages = bounded(args.pages, 10, 1, 1000)
     const depth = bounded(args.depth, 2, 0, 4)
     const limit = bounded(args.limit, 30, 1, 500)
     const interval = bounded(args.interval, 60, 5, 3600)

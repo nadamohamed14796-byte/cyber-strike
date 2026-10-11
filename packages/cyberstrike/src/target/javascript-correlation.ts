@@ -80,7 +80,7 @@ function endpointLiterals(content: string): string[] {
   return [...found]
 }
 
-interface JavaScriptSourceFile {
+export interface JavaScriptSourceFile {
   relativePath: string
   basename: string
   sha256: string
@@ -410,6 +410,8 @@ export namespace JavaScriptCorrelation {
         const endpointPath = endpointURL?.pathname ?? endpoint.split(/[?#]/, 1)[0]
         for (const request of graph.requests) {
           const observedPath = request.normalizedPath
+          const requestHost = safeURL(request.url)?.hostname ?? safeURL(request.host)?.hostname
+          if (endpointURL && requestHost !== endpointURL.hostname) continue
           const base = endpointPath.replace(/\{param\}/g, "").replace(/\/$/, "")
           if (base.length > 4 && (observedPath === endpointPath || observedPath.startsWith(base + "/") || endpointPath.startsWith(observedPath.replace(/\{[^}]+\}/g, "")))) {
             graph.edges.push({
@@ -488,6 +490,7 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
+    graph.notes.push("Local JavaScript files are hashed and scanned only for static URL/path literals; source code is never copied into the graph.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
     graph.notes.push("Response previews are length-limited and redacted heuristically; the original captured request/response remains the source of evidence in the session database.")
