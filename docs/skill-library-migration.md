@@ -108,3 +108,21 @@ Nine more adapted drafts were added and registered in `.cyberstrike/skill/index.
 - `attack-supply-chain-recon`
 
 These remain `unverified` registry entries until loader behavior, referenced tools, and end-to-end routing have been checked.
+
+
+## Fourth migration batch
+
+Ten additional adapted drafts were added and registered in `.cyberstrike/skill/index.json`:
+
+- `attack-ldap`
+- `attack-k8s`
+- `attack-vcenter`
+- `attack-m365-entra`
+- `attack-okta`
+- `attack-brute-force`
+- `attack-ntlm`
+- `attack-lfi`
+- `attack-nosqli`
+- `attack-session-management`
+
+These remain `unverified` registry entries until the real runtime loader, tool availability, and end-to-end routing have been checked.
