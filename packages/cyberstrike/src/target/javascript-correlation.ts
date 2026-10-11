@@ -51,6 +51,81 @@ function sameHost(left: string | null | undefined, right: string | null | undefi
   return Boolean(a && b && a.hostname.toLowerCase() === b.hostname.toLowerCase())
 }
 
+function normalizeEndpointLiteral(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.length > 240) return undefined
+  const absolute = safeURL(trimmed)
+  if (absolute) return absolute.origin + absolute.pathname
+  if (!trimmed.startsWith("/")) return undefined
+  const noQuery = trimmed.split(/[?#]/, 1)[0]
+  const normalized = noQuery
+    .replace(/\$\{[^}]+\}/g, "{param}")
+    .replace(/:[A-Za-z_$][\w$]*/g, "{param}")
+    .replace(/\/{2,}/g, "/")
+  return normalized.length > 1 ? normalized : undefined
+}
+
+function endpointLiterals(content: string): string[] {
+  const found = new Set<string>()
+  const callArgument = /(?:fetch|axios\.(?:get|post|put|patch|delete)|\.open)\s*\(\s*["'\`]([^"'\`]{1,240})["'\`]/gi
+  const routeString = /["'\`]((?:https?:\/\/)[^"'\`\s]{1,240}|\/(?:api|graphql|rest|rpc|v\d+|auth|admin|users|account|orders|cart|checkout|upload|download|search|profile)(?:\/[^"'\`\s]{0,160})?)["'\`]/gi
+  for (const pattern of [callArgument, routeString]) {
+    for (const match of content.matchAll(pattern)) {
+      const normalized = normalizeEndpointLiteral(match[1])
+      if (normalized) found.add(normalized)
+      if (found.size >= 200) break
+    }
+    if (found.size >= 200) break
+  }
+  return [...found]
+}
+
+interface JavaScriptSourceFile {
+  relativePath: string
+  basename: string
+  sha256: string
+  bytes: number
+  endpointLiterals: string[]
+}
+
+/** Inventory only local JS source files; never follow symlinks or execute their contents. */
+async function inventoryJavaScriptFiles(root: string): Promise<JavaScriptSourceFile[]> {
+  const output: JavaScriptSourceFile[] = []
+  let totalBytes = 0
+  async function visit(directory: string, depth: number): Promise<void> {
+    if (depth > 4 || output.length >= 250 || totalBytes >= 5 * 1024 * 1024) return
+    let entries
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+      throw error
+    }
+    for (const entry of entries) {
+      if (output.length >= 250 || totalBytes >= 5 * 1024 * 1024) break
+      const fullPath = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        await visit(fullPath, depth + 1)
+        continue
+      }
+      if (!entry.isFile() || !/\.(?:m?js|cjs)$/i.test(entry.name)) continue
+      const stat = await fs.stat(fullPath)
+      if (stat.size < 0 || stat.size > 1024 * 1024 || totalBytes + stat.size > 5 * 1024 * 1024) continue
+      const content = await fs.readFile(fullPath, "utf-8")
+      totalBytes += Buffer.byteLength(content, "utf-8")
+      output.push({
+        relativePath: path.relative(path.dirname(root), fullPath).split(path.sep).join("/"),
+        basename: entry.name,
+        sha256: createHash("sha256").update(content).digest("hex"),
+        bytes: Buffer.byteLength(content, "utf-8"),
+        endpointLiterals: endpointLiterals(content),
+      })
+    }
+  }
+  await visit(root, 0)
+  return output
+}
+
 export interface JavaScriptCorrelationGraph {
   schemaVersion: 1
   createdAt: string
@@ -63,6 +138,16 @@ export interface JavaScriptCorrelationGraph {
     discoveredBy: string | null
     confidence: string | null
     tags: string[]
+  }>
+  sourceFiles: JavaScriptSourceFile[]
+  evidence: Array<{
+    id: string
+    requestID: string
+    kind: "captured-response"
+    responseStatus: number | null
+    contentType: string | null
+    responseSize: number | null
+    redactedPreview: string | null
   }>
   requests: Array<{
     id: string
@@ -115,6 +200,8 @@ export namespace JavaScriptCorrelation {
   }): Promise<{ graph: JavaScriptCorrelationGraph; workspacePath: string; graphPath: string; noteID: string }> {
     const rootSessionID = Session.root(input.sessionID)
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
+    const workspace = await TargetMemory.ensure(input.targetURL)
+    const sourceFiles = await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     if (input.javascriptURL && !explicitJS) throw new Error("javascriptURL must be a valid HTTP(S) URL without embedded credentials.")
 
@@ -252,6 +339,18 @@ export namespace JavaScriptCorrelation {
         confidence: item.row.confidence_level ?? null,
         tags: (item.row.tags as string[] | null) ?? [],
       })),
+      sourceFiles,
+      evidence: relevantRequests
+        .filter((request) => request.response_status !== null || Boolean(request.processed_response))
+        .map((request) => ({
+          id: "response:" + request.id,
+          requestID: request.id,
+          kind: "captured-response" as const,
+          responseStatus: request.response_status ?? null,
+          contentType: request.response_content_type ?? null,
+          responseSize: request.response_size ?? null,
+          redactedPreview: redact(request.processed_response),
+        })),
       requests: relevantRequests.map((request) => ({
         id: request.id,
         method: request.method,
@@ -292,6 +391,46 @@ export namespace JavaScriptCorrelation {
       })),
       edges: [],
       notes: [],
+    }
+
+    const assetBasenames = new Map(graph.javascriptAssets.map((asset) => [path.posix.basename(new URL(asset.url).pathname).toLowerCase(), asset.url]))
+    for (const file of graph.sourceFiles) {
+      const matchedURL = assetBasenames.get(file.basename.toLowerCase())
+      if (matchedURL) {
+        graph.edges.push({
+          from: "javascript-file:" + file.relativePath,
+          to: "javascript:" + matchedURL,
+          relation: "basename-match",
+          confidence: "candidate",
+          evidence: "Local file and observed asset share a basename; verify the content/hash before treating them as identical.",
+        })
+      }
+      for (const endpoint of file.endpointLiterals) {
+        const endpointURL = safeURL(endpoint)
+        const endpointPath = endpointURL?.pathname ?? endpoint.split(/[?#]/, 1)[0]
+        for (const request of graph.requests) {
+          const observedPath = request.normalizedPath
+          const base = endpointPath.replace(/\{param\}/g, "").replace(/\/$/, "")
+          if (base.length > 4 && (observedPath === endpointPath || observedPath.startsWith(base + "/") || endpointPath.startsWith(observedPath.replace(/\{[^}]+\}/g, "")))) {
+            graph.edges.push({
+              from: "javascript-file:" + file.relativePath,
+              to: "request:" + request.id,
+              relation: "static-endpoint-literal-match",
+              confidence: "candidate",
+              evidence: "Static endpoint literal was found in the JavaScript source and overlaps the captured normalized path; execution is not proven.",
+            })
+          }
+        }
+      }
+    }
+    for (const response of graph.evidence) {
+      graph.edges.push({
+        from: "request:" + response.requestID,
+        to: "evidence:" + response.id,
+        relation: "captured-response-evidence",
+        confidence: "direct",
+        evidence: "Response status/content metadata is linked to the request record in SQLite.",
+      })
     }
 
     for (const asset of graph.javascriptAssets) {
@@ -354,7 +493,6 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Response previews are length-limited and redacted heuristically; the original captured request/response remains the source of evidence in the session database.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
 
-    const workspace = await TargetMemory.ensure(input.targetURL)
     const urlList = graph.javascriptAssets.map((asset) => asset.url).join("\n")
     const content = [
       "# JavaScript Correlation Snapshot",
@@ -362,12 +500,18 @@ export namespace JavaScriptCorrelation {
       "- Target: " + workspace.targetURL,
       "- Session: " + rootSessionID,
       "- Created: " + graph.createdAt,
-      "- JavaScript assets: " + graph.javascriptAssets.length,
+      "- JavaScript asset URLs: " + graph.javascriptAssets.length,
+      "- Local JavaScript source files indexed: " + graph.sourceFiles.length,
+      "- Static endpoint literals extracted: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
+      "- Captured response evidence nodes: " + graph.evidence.length,
       "- Related captured requests: " + graph.requests.length,
       "- Web functions: " + graph.webFunctions.length,
       "- Request observations: " + graph.observations.length,
       "- Candidate findings: " + graph.findings.length,
       "- Recorded graph edges: " + graph.edges.length,
+      "",
+      "## Local JavaScript files",
+      ...(graph.sourceFiles.length ? graph.sourceFiles.map((file) => "- " + file.relativePath + " — SHA-256 " + file.sha256 + " — " + file.bytes + " bytes — " + file.endpointLiterals.length + " static endpoint literal(s)") : ["No local .js/.mjs/.cjs source files found in the target workspace."]),
       "",
       "## JavaScript assets",
       ...(urlList ? [urlList] : ["No JavaScript asset matched the current stored Intel. Provide --javascript-url or record an asset with add_intel first."]),
