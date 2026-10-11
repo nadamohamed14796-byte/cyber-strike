@@ -50,7 +50,9 @@ function isStoredProfile(value: unknown): value is StoredProfile {
     !value.account.trim() ||
     typeof value.username !== "string" ||
     !value.username.trim() ||
+    typeof value.createdAt !== "number" ||
     !Number.isSafeInteger(value.createdAt) ||
+    typeof value.updatedAt !== "number" ||
     !Number.isSafeInteger(value.updatedAt)
   ) return false
 
@@ -63,12 +65,15 @@ function isStoredProfile(value: unknown): value is StoredProfile {
   if (value.purpose === "target" && (typeof value.targetID !== "string" || !value.targetID.trim())) return false
   if (value.targetID !== undefined && typeof value.targetID !== "string") return false
   if (!isRecord(value.password)) return false
-  if (!isBase64(value.password.iv) || !isBase64(value.password.tag) || !isBase64(value.password.ciphertext)) return false
+  const iv = value.password.iv
+  const tag = value.password.tag
+  const ciphertext = value.password.ciphertext
+  if (!isBase64(iv) || !isBase64(tag) || !isBase64(ciphertext)) return false
 
   // AES-256-GCM uses a 12-byte IV and 16-byte authentication tag here.
-  return Buffer.from(value.password.iv, "base64").length === 12 &&
-    Buffer.from(value.password.tag, "base64").length === 16 &&
-    Buffer.from(value.password.ciphertext, "base64").length > 0
+  return Buffer.from(iv, "base64").length === 12 &&
+    Buffer.from(tag, "base64").length === 16 &&
+    Buffer.from(ciphertext, "base64").length > 0
 }
 
 /** Validate persisted JSON before exposing account metadata or decrypting any secret. */
