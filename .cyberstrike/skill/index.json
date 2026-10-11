@@ -3458,6 +3458,142 @@
       "files": [
         "SKILL.md"
       ]
+    },
+    {
+      "name": "attack-captcha-bypass",
+      "description": "Assess CAPTCHA and anti-automation controls with bounded tests",
+      "verified": "unverified",
+      "tags": [
+        "captcha",
+        "anti-automation",
+        "rate-limit"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-cloud-misconfig",
+      "description": "Review cloud configuration for exposed resources and ineffective security boundaries",
+      "verified": "unverified",
+      "tags": [
+        "cloud",
+        "misconfiguration",
+        "storage"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-mcp-security",
+      "description": "Assess MCP servers for tool trust, access control, and data-boundary failures",
+      "verified": "unverified",
+      "tags": [
+        "mcp",
+        "ai-security",
+        "authorization"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-llm-security",
+      "description": "Assess LLM apps for prompt injection, unsafe tool use, and data-boundary failures",
+      "verified": "unverified",
+      "tags": [
+        "llm",
+        "prompt-injection",
+        "ai-security"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-email-security",
+      "description": "Review email-domain authentication and messaging exposure",
+      "verified": "unverified",
+      "tags": [
+        "email",
+        "spf",
+        "dkim",
+        "dmarc"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-401-403-bypass",
+      "description": "Investigate 401/403 access-control inconsistencies with bounded tests",
+      "verified": "unverified",
+      "tags": [
+        "401",
+        "403",
+        "authorization"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-source-leak",
+      "description": "Validate suspected source-code, build-artifact, backup, and configuration leaks",
+      "verified": "unverified",
+      "tags": [
+        "source-leak",
+        "artifacts",
+        "recon"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-firebase-supabase",
+      "description": "Assess Firebase and Supabase data access rules safely",
+      "verified": "unverified",
+      "tags": [
+        "firebase",
+        "supabase",
+        "authorization"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-supply-chain-recon",
+      "description": "Map software supply-chain trust boundaries and exposed build/dependency risks",
+      "verified": "unverified",
+      "tags": [
+        "supply-chain",
+        "dependencies",
+        "cicd"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
     }
   ]
 }
