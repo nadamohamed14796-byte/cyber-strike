@@ -133,3 +133,22 @@ test("refuses target workspaces that resolve through a symlink", async () => {
     },
   })
 })
+
+
+test("refuses symlinked generated workspace outputs", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const workspace = await TargetMemory.ensure("https://example.com")
+      const outsideFile = path.join(tmp.path, "outside-output.json")
+      const outputLink = path.join(workspace.workspacePath, "javascript", "graph.json")
+      await fs.writeFile(outsideFile, "original", "utf-8")
+      await fs.symlink(outsideFile, outputLink)
+
+      await expect(TargetMemory.writeWorkspaceFile(workspace, "javascript/graph.json", "overwritten")).rejects.toThrow(/symbolic links/i)
+      expect(await fs.readFile(outsideFile, "utf-8")).toBe("original")
+      await Instance.dispose()
+    },
+  })
+})
