@@ -2,7 +2,7 @@
 
 Branch under review: `feat/target-memory-foundation`
 Target branch: `main`
-Purpose: track concrete runtime, integration, security, and test gaps. A box is checked only after the change is committed and its available verification is recorded. Code review alone is not a passing runtime test.
+Purpose: track concrete runtime, integration, security, and test gaps. Implementation boxes record reviewed code changes; the P0 verification item separately tracks whether runtime checks actually passed. Checked code is not a claim that tests passed.
 
 ## P0 — must be resolved before merge
 
@@ -13,7 +13,7 @@ Purpose: track concrete runtime, integration, security, and test gaps. A box is 
 
 ## P1 — feature wiring and data integrity
 
-- [ ] **CLI and tool registration** — verify target, research, update, auth-manager, Gmail, JavaScript correlation, and finding-validation features are reachable through their documented entry points and the expected registry/commands.
+- [x] **CLI and tool registration** — static wiring is present: target/research/update commands are imported in the CLI; auth-manager, Gmail, JavaScript correlation, research knowledge, target notes, and finding validation are included in the tool registry. Runtime command execution remains covered by the P0 verification item.
 - [ ] **Target workspace lifecycle** — verify create/load/list, normalized target identity, workspace paths, SQLite rows, notes, and duplicate handling work together across project/worktree boundaries.
 - [ ] **Database migrations** — validate migration ordering, idempotent startup behavior, existing-install upgrade, new-install initialization, foreign keys/indexes, and compatibility with current schema.
 - [ ] **Research ingestion to learning** — verify source discovery, safe fetching, filtering, dedupe, queue claim/retry/recovery, redaction, extraction, and persistence; ensure weak/non-bug-bounty content does not dominate useful knowledge.
@@ -21,6 +21,7 @@ Purpose: track concrete runtime, integration, security, and test gaps. A box is 
 - [ ] **JavaScript-to-endpoint correlation** — verify captured JS assets, extracted routes, requests/responses, target and session provenance, dedupe, and findings analysis use the same identifiers and persisted records.
 - [ ] **Finding-validation lifecycle** — verify exactly ten checks, evidence requirements, verdict rubric, SQLite persistence, existing-finding lookup/update, and target-note linkage; no unsupported confirmation.
 - [ ] **Cross-target isolation and scope** — verify stored accounts, notes, learned global methodology, requests, and outputs cannot silently cross-bind between targets or expand allowed scope.
+- [x] **Target-note secret redaction boundary** — centralized redaction is enforced by `TargetMemory.addNote`, so both CLI and agent-tool callers pass through it; regression tests cover quoted multi-word secrets. The tests still need to run under the P0 verification item.
 - [ ] **AuthVault correctness** — test encrypted-at-rest persistence, permissions, corruption/wrong-key handling, overwrite/remove/list, target binding, atomic writes, and concurrent update behavior.
 - [ ] **Auth-manager consent and secret lifecycle** — check permission prompts occur before sensitive side effects, secrets are cleared in all success/failure paths, summaries/tool output/logs contain no passwords, and index failures are reported accurately.
 - [ ] **Hackbrowser saved login and MFA** — verify exact-origin guard, target workspace binding, visible login, OTP IPC timeout/fallback, manual MFA, abort/worker cleanup, and no secrets in logs/arguments.
@@ -35,5 +36,8 @@ Purpose: track concrete runtime, integration, security, and test gaps. A box is 
 ## Verification notes
 
 - Worker environment isolation was changed to an explicit allowlist in `hackbrowser-subprocess/worker-environment.ts`; Bedrock/Vertex credential variables are forwarded only for the matching provider. Focused tests were added, but have not been run in this review environment.
+- `TargetMemory.addNote` now sanitizes titles, content, source labels/URLs, and tags at the persistence boundary; this closes the prior bypass where the CLI could skip the agent-tool-only redactor. A regression test was added, and a V8-level check of the regex showed no leakage for tested multi-word quoted values. This is not a substitute for the package test suite.
+- AuthVault writes now enforce a private data-directory mode, clean up temporary files, and serialize in-process save/remove read-modify-write operations. Multi-process locking and runtime verification remain open.
+- Saved-password consent is requested before consuming `CYBERSTRIKE_AUTH_PASSWORD`, and the local reference is cleared in a `finally` path. Validation tool output now uses actual line breaks for target-note status.
 - The feature branch was reported by GitHub compare as 183 commits ahead and 4 behind `main`; it must be reconciled carefully.
 - Unit tests, typecheck, build, real Gmail OAuth, and browser login have not yet been verified as passing in this review. GitHub currently reports no combined status entries or PR-associated workflow runs for the inspected head commit.
