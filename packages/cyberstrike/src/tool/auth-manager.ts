@@ -8,8 +8,8 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     "Manage locally saved website login profiles shared by CyberStrike agents. Use this when a site presents a login wall or an authenticated session expires.",
     "Profiles are matched by exact URL origin (scheme + hostname + port), never by substring. Research accounts are separate from target accounts; target accounts require the current explicit targetID.",
     "Passwords are encrypted at rest with AES-256-GCM. Set CYBERSTRIKE_CREDENTIALS_KEY to a private secret of at least 32 characters before using this tool. The key is not stored by CyberStrike.",
-    "Actions: save a profile, list matching profiles (metadata only), or forget a profile. Passwords are never returned by this agent-facing tool. This tool stores credentials; it does not itself bypass login challenges or automate browser form submission. CAPTCHA, MFA, and consent screens require the supported human flow.",
-    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here for mailbox access. Gmail OTP integration must use a separate explicit Google OAuth grant with minimum scopes.",
+    "Actions: save, list, or forget a website login profile, or request a site-specific OTP through the shared Gmail service. Passwords are never returned by this agent-facing tool. Browser login automation is not yet connected to the encrypted vault; CAPTCHA, MFA, and consent screens require the supported human flow.",
+    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here. Gmail access uses the shared read-only gmail service and a separate OAuth grant.",
   ].join("\n"),
   parameters: z.object({
     action: z.enum(["save", "list", "forget", "gmail_otp"]),
@@ -26,7 +26,7 @@ export const AuthManagerTool = Tool.define("auth_manager", {
       return { title: "Target ID required", output: "Target credentials must be bound to an explicit target_id. No credentials were read or written.", metadata: { ok: false } }
     }
     if (params.action === "gmail_otp") {
-      await ctx.ask({ permission: "gmail-otp-read", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id } })
+      await ctx.ask({ permission: "gmail-read", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id } })
       const result = await GmailService.latestOtp({ siteUrl: params.site_url, after: params.after })
       if (!result) return { title: "No matching OTP email", output: "No recent verification code was found from the site's exact hostname or a subdomain. Third-party senders are intentionally ignored.", metadata: { found: false } }
       return {
