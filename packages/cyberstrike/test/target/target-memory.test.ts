@@ -87,3 +87,28 @@ test("does not associate an existing target workspace with a session that has no
     },
   })
 })
+
+
+test("redacts secret-bearing fields at the target-note persistence boundary", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const workspace = await TargetMemory.ensure("https://example.com")
+      const secret = "multi word password phrase that must not persist"
+      const result = await TargetMemory.addNote("https://example.com", {
+        kind: "manual",
+        title: "Login observation",
+        content: '{"password":"' + secret + '","client_secret":"another private phrase"}',
+        source: "test",
+      })
+
+      expect(result.note.content).not.toContain(secret)
+      expect(result.note.content).not.toContain("another private phrase")
+      const disk = await fs.readFile(path.join(workspace.workspacePath, "notes.md"), "utf-8")
+      expect(disk).not.toContain(secret)
+      expect(disk).not.toContain("another private phrase")
+      await Instance.dispose()
+    },
+  })
+})
