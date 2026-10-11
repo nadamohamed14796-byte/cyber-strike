@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test"
 import { assessFindingChecks, FINDING_VALIDATION_CHECKS, type FindingValidationInputCheck } from "../../src/methodology/finding-validation"
+import { FindingValidation } from "../../src/methodology/finding-validation"
+import { Instance } from "../../src/project/instance"
+import { Session } from "../../src/session"
+import { Vulnerability } from "../../src/session/vulnerability"
+import { tmpdir } from "../fixture/fixture"
 
 function checklist(
   overrides: Partial<Record<FindingValidationInputCheck["id"], Partial<FindingValidationInputCheck>>> = {},
@@ -53,6 +58,57 @@ test("one failed check alone does not automatically classify a false positive", 
     reproducible: { status: "fail", reason: "This attempt did not reproduce the behavior", evidence: "One replay returned normal behavior" },
   })
   expect(assessFindingChecks(checks).verdict).toBe("inconclusive")
+})
+
+
+test("records validation history and removes false positives from confirmed findings", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      const finding = Vulnerability.add({
+        sessionID: session.id,
+        data: {
+          severity: "medium",
+          title: "Candidate authorization issue",
+          description: "Initial finding description.",
+          endpoint: "GET /api/orders/123",
+          status: "approved",
+        },
+      })
+      const checks = checklist({
+        reproducible: {
+          status: "fail",
+          reason: "Controlled replay did not reproduce unauthorized access.",
+          evidence: "Three replays returned the same owner-authorized response.",
+        },
+        unexpected_behavior: {
+          status: "fail",
+          reason: "The response matches the expected access-control behavior.",
+          evidence: "Owner and non-owner control responses show no unauthorized object data.",
+        },
+      })
+
+      const result = FindingValidation.record({
+        sessionID: session.id,
+        vulnerabilityID: finding.id,
+        checks,
+      })
+      const updated = Vulnerability.get(session.id).find((row) => row.id === finding.id)
+      const history = FindingValidation.history({ sessionID: session.id, vulnerabilityID: finding.id })
+
+      expect(result.verdict).toBe("false_positive")
+      expect(result.output).toContain("#1")
+      expect(result.output).toContain("#3")
+      expect(updated?.status).toBe("false_positive")
+      expect(updated?.description).toContain("[Latest finding validation]")
+      expect(Vulnerability.confirmed(session.id).some((row) => row.id === finding.id)).toBe(false)
+      expect(history).toHaveLength(1)
+      expect(history[0]?.failed_check_ids).toEqual(["reproducible", "unexpected_behavior"])
+      await Session.remove(session.id)
+    },
+  })
 })
 
 test("a check cannot pass without evidence, and not-applicable needs a rationale", () => {
