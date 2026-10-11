@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { ResearchQueue } from "../../src/research/queue"
-import { Database, and, eq } from "../../src/storage/db"
+import { Database, eq } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
