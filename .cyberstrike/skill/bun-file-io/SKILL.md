@@ -57,6 +57,21 @@ Use Filesystem.exists(...) instead if path can be file or directory
 - For important outputs, write to a temporary file and rename it into place when the platform/filesystem supports atomic rename; do not assume every write is atomic.
 - Capture and decode subprocess stdout/stderr, check the exit code, and apply a timeout/termination policy to processes that can hang.
 
+## Test Strategy: Paths, Symlinks, and Race Windows
+
+Test file handling with a temporary directory and synthetic files, not with real user data. Cover the path lifecycle from input validation through canonicalization, permission checks, open/write, and cleanup.
+
+| Case | What to check | Safe fixture |
+|---|---|---|
+| Relative paths | parent traversal, mixed separators, encoded separators | temporary root and marker file |
+| Absolute paths | platform-specific absolute paths and drive prefixes | outside-root temporary marker |
+| Symlinks | link resolves inside vs outside allowed root | test-created symlink only |
+| TOCTOU | path changes between validation and open | isolated test directory with bounded repetition |
+| Permissions | read/write/create/delete behavior | least-privileged test user |
+| Errors | whether paths or contents leak | synthetic filenames and contents |
+
+Prefer APIs that operate relative to a trusted directory handle where supported, canonicalize and validate the final path, and avoid check-then-use patterns. Do not attempt to read sensitive system files or overwrite existing user files. Include runtime and OS version, exact API sequence, expected boundary, actual file effect, and a regression test.
+
 ## References
 
 - [Bun file I/O](https://bun.sh/docs/api/file-io)
