@@ -3229,6 +3229,216 @@
       "files": [
         "SKILL.md"
       ]
+    },
+    {
+      "name": "attack-cache-poison",
+      "description": "Assess web cache poisoning and cache-key trust boundaries",
+      "verified": "unverified",
+      "tags": [
+        "cache",
+        "http",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-cors",
+      "description": "Assess cross-origin resource sharing policy and credentialed data access",
+      "verified": "unverified",
+      "tags": [
+        "cors",
+        "browser",
+        "http"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-host-header",
+      "description": "Assess host-header trust in routing, redirects, and generated links",
+      "verified": "unverified",
+      "tags": [
+        "host-header",
+        "http",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-jwt",
+      "description": "Assess JWT validation, claims, key handling, and token trust boundaries",
+      "verified": "unverified",
+      "tags": [
+        "jwt",
+        "tokens",
+        "authentication"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-open-redirect",
+      "description": "Validate redirect handling and trusted destination enforcement",
+      "verified": "unverified",
+      "tags": [
+        "open-redirect",
+        "url",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-prototype-pollution",
+      "description": "Assess prototype pollution signals and validate downstream impact safely",
+      "verified": "unverified",
+      "tags": [
+        "prototype-pollution",
+        "javascript",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-race-condition",
+      "description": "Assess concurrency and state consistency using bounded, controlled tests",
+      "verified": "unverified",
+      "tags": [
+        "race-condition",
+        "concurrency",
+        "business-logic"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-rate-limit-bypass",
+      "description": "Assess rate-limit consistency and abuse controls with low-volume tests",
+      "verified": "unverified",
+      "tags": [
+        "rate-limit",
+        "abuse-controls",
+        "api"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-request-smuggling",
+      "description": "Assess HTTP message parsing discrepancies in authorized test environments",
+      "verified": "unverified",
+      "tags": [
+        "http",
+        "request-smuggling",
+        "proxy"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-ssrf",
+      "description": "Assess server-side request forgery using controlled, non-sensitive destinations",
+      "verified": "unverified",
+      "tags": [
+        "ssrf",
+        "network",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-ssti",
+      "description": "Assess server-side template injection using harmless, context-aware markers",
+      "verified": "unverified",
+      "tags": [
+        "ssti",
+        "templates",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-subdomain-takeover",
+      "description": "Validate dangling DNS and hosted-service claims without claiming unrelated resources",
+      "verified": "unverified",
+      "tags": [
+        "subdomain-takeover",
+        "dns",
+        "recon"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-websocket",
+      "description": "Assess WebSocket authentication, authorization, and message validation",
+      "verified": "unverified",
+      "tags": [
+        "websocket",
+        "api",
+        "authorization"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-xxe",
+      "description": "Assess XML external entity handling using safe, non-exfiltrating checks",
+      "verified": "unverified",
+      "tags": [
+        "xxe",
+        "xml",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
     }
   ]
 }
