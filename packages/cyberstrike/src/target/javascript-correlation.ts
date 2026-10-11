@@ -803,21 +803,27 @@ export namespace JavaScriptCorrelation {
     const filenameHost = (explicitJS?.hostname ?? new URL(workspace.targetURL).hostname).replace(/[^a-z0-9.-]/gi, "-").slice(0, 50)
     const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
     const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, snapshotSelector])).digest("hex").slice(0, 12)
-    const graphPath = path.join(workspace.workspacePath, "javascript", filenameHost + "-" + digest + ".json")
-    const endpointPath = path.join(workspace.workspacePath, "endpoints", filenameHost + "-" + digest + ".json")
-    await fs.mkdir(path.dirname(graphPath), { recursive: true })
-    await fs.mkdir(path.dirname(endpointPath), { recursive: true })
-    // Generated snapshots are stable per target/session/selector; refresh them instead
-    // of growing an unbounded collection of duplicate files.
-    await fs.writeFile(graphPath, JSON.stringify(graph, null, 2) + "\n", "utf-8")
-    await fs.writeFile(endpointPath, JSON.stringify({
-      schemaVersion: 1,
-      generatedAt: graph.createdAt,
-      targetURL: graph.targetURL,
-      sessionID: graph.sessionID,
-      note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
-      endpoints: graph.endpointCandidates,
-    }, null, 2) + "\n", "utf-8")
+    // Refresh stable per-target/session outputs atomically, refusing symlink
+    // parents or files that could redirect writes outside the workspace.
+    const graphFilename = filenameHost + "-" + digest + ".json"
+    const endpointFilename = filenameHost + "-" + digest + ".json"
+    const graphPath = await TargetMemory.writeWorkspaceFile(
+      workspace,
+      path.posix.join("javascript", graphFilename),
+      JSON.stringify(graph, null, 2) + "\n",
+    )
+    const endpointPath = await TargetMemory.writeWorkspaceFile(
+      workspace,
+      path.posix.join("endpoints", endpointFilename),
+      JSON.stringify({
+        schemaVersion: 1,
+        generatedAt: graph.createdAt,
+        targetURL: graph.targetURL,
+        sessionID: graph.sessionID,
+        note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
+        endpoints: graph.endpointCandidates,
+      }, null, 2) + "\n",
+    )
     return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, noteID: note.note.id }
   }
 }
