@@ -133,6 +133,22 @@ Object.prototype['data-tooltip'] = '<img src=x onerror=alert(1)>'
 - Do not jump from a pollution primitive to RCE, authorization bypass, or XSS. Demonstrate a reachable gadget and concrete impact separately; avoid destructive payloads or command execution.
 - Check parsing libraries, sanitizers, and framework behavior with a baseline request. A literal marker reflected in JSON may simply be data, not a prototype mutation.
 - Use only test-owned data, bounded requests, and sanitized evidence. Report the primitive and the demonstrated impact as separate claims when impact is limited.
+## Source-to-Sink Validation Matrix
+
+Separate server-side prototype pollution from client-side pollution and trace the complete source-to-sink path:
+
+| Stage | Questions | Evidence |
+|---|---|---|
+| Source | Does user-controlled JSON, query data, or merge input reach an unsafe object operation? | minimal harmless input and endpoint |
+| Primitive | Is a prototype or inherited property actually changed? | controlled before/after observable behavior |
+| Reachability | Does the polluted property reach a sensitive configuration or application decision? | call path or deterministic behavior difference |
+| Impact | Does it change authorization, execution, response integrity, or availability? | safe, reproducible effect in a test instance |
+| Persistence | Is the effect request-local, process-wide, or browser-session-local? | repeat with a clean request/session and note scope |
+
+Prefer harmless marker properties and isolated test instances. Do not alter production process configuration, attempt destructive denial of service, or claim RCE merely because a pollution primitive exists. Demonstrate the actual downstream impact and whether it survives a clean request.
+
+Include the exact input location, affected object/merge behavior, runtime context, clean baseline, observed effect, and a minimal sanitized PoC. Explain whether the issue is client-side or server-side and avoid double-counting the primitive and its downstream impact as separate findings unless they are independently exploitable.
+
 ## References
 
 - [PortSwigger: Prototype Pollution](https://portswigger.net/web-security/prototype-pollution)
