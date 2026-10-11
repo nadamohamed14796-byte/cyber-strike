@@ -31,6 +31,57 @@ interface StoredProfile {
 
 export type AuthProfileSummary = Omit<StoredProfile, "password">
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isBase64(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)
+}
+
+function isStoredProfile(value: unknown): value is StoredProfile {
+  if (!isRecord(value)) return false
+  if (
+    typeof value.id !== "string" ||
+    !/^[a-f0-9]{32}$/i.test(value.id) ||
+    typeof value.origin !== "string" ||
+    (value.purpose !== "research" && value.purpose !== "target") ||
+    typeof value.account !== "string" ||
+    !value.account.trim() ||
+    typeof value.username !== "string" ||
+    !value.username.trim() ||
+    !Number.isSafeInteger(value.createdAt) ||
+    !Number.isSafeInteger(value.updatedAt)
+  ) return false
+
+  try {
+    if (normalizeAuthOrigin(value.origin) !== value.origin) return false
+  } catch {
+    return false
+  }
+
+  if (value.purpose === "target" && (typeof value.targetID !== "string" || !value.targetID.trim())) return false
+  if (value.targetID !== undefined && typeof value.targetID !== "string") return false
+  if (!isRecord(value.password)) return false
+  if (!isBase64(value.password.iv) || !isBase64(value.password.tag) || !isBase64(value.password.ciphertext)) return false
+
+  // AES-256-GCM uses a 12-byte IV and 16-byte authentication tag here.
+  return Buffer.from(value.password.iv, "base64").length === 12 &&
+    Buffer.from(value.password.tag, "base64").length === 16 &&
+    Buffer.from(value.password.ciphertext, "base64").length > 0
+}
+
+/** Validate persisted JSON before exposing account metadata or decrypting any secret. */
+export function isAuthVaultDataValid(value: unknown): boolean {
+  if (!Array.isArray(value)) return false
+  const ids = new Set<string>()
+  for (const row of value) {
+    if (!isStoredProfile(row) || ids.has(row.id)) return false
+    ids.add(row.id)
+  }
+  return true
+}
+
 function key() {
   const secret = process.env.CYBERSTRIKE_CREDENTIALS_KEY
   if (!secret || secret.length < 32) {
@@ -57,7 +108,10 @@ async function read(): Promise<StoredProfile[]> {
   try {
     const raw = await fs.readFile(FILE, "utf8")
     const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) throw new Error("Invalid credential vault format.")
+    if (!isAuthVaultDataValid(parsed)) {
+      // Fail closed; malformed rows must never be partially trusted or decrypted.
+      throw new Error("Invalid credential vault format; refusing to use malformed records.")
+    }
     return parsed as StoredProfile[]
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return []
