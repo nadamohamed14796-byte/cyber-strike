@@ -64,17 +64,34 @@ export namespace ResearchContext {
     if (results.length === 0) return null
 
     const items = results.map((row) => {
-      const trust = row.metadata?.source_trust
+      const metadata = row.metadata ?? {}
+      const extracted =
+        metadata.extracted && typeof metadata.extracted === "object"
+          ? (metadata.extracted as Record<string, unknown>)
+          : {}
+      const trust = metadata.source_trust
       const trustLabel = typeof trust === "number" && Number.isFinite(trust) ? Math.max(0, Math.min(100, Math.round(trust))) + "%" : "unknown"
+      const stringValue = (value: unknown, max = 1000) => (typeof value === "string" ? value.slice(0, max) : "")
+      const signals = Array.isArray(extracted.retrieval_signals)
+        ? extracted.retrieval_signals.filter((value): value is string => typeof value === "string").slice(0, 12)
+        : []
       return [
         "### " + row.title,
         "Class: " + (row.vulnerability_class ?? "unclassified") +
           " | Severity mentioned by source: " + row.severity +
           " | Source trust metadata: " + trustLabel +
-          " | Status: " + row.status,
+          " | Status: " + row.status +
+          " | Independently verified by this system: no",
         "Lesson extracted: " + (row.lesson ?? "No lesson extracted; inspect the source before using it."),
         ...(row.attack_vector ? ["Attack vector extracted: " + row.attack_vector] : []),
         ...(row.impact ? ["Impact described: " + row.impact] : []),
+        ...(stringValue(extracted.prerequisites) ? ["Prerequisites reported: " + stringValue(extracted.prerequisites)] : []),
+        ...(row.reproduction ? ["Reproduction notes extracted: " + row.reproduction.slice(0, 1800)] : []),
+        ...(row.poc ? ["PoC snippet extracted (untrusted; inspect before use): " + row.poc.slice(0, 1200)] : []),
+        ...(stringValue(extracted.verification_signals) ? ["Verification signals reported: " + stringValue(extracted.verification_signals)] : []),
+        ...(stringValue(extracted.false_positive_cautions) ? ["False-positive / limitation cautions: " + stringValue(extracted.false_positive_cautions)] : []),
+        ...(signals.length ? ["Retrieval signals: " + signals.join(", ")] : []),
+        ...(stringValue(metadata.excerpt, 1600) ? ["Source excerpt: " + stringValue(metadata.excerpt, 1600)] : []),
         "Source URL: " + (row.source_url ?? "unknown"),
       ].join("\n")
     })
