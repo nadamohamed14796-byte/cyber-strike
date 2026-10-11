@@ -51,8 +51,9 @@ The expected result is one comprehensive, CyberStrike-native file per existing c
 - Cloud assessment: `cloud-assessment`
 - CI/CD review: `ci-assessment` and `cicd-attacks`
 - LLM application security: `llm-security`
+- Existing WSTG targets: `wstg-inpv-01` (reflected XSS), `wstg-inpv-02` (stored XSS), `wstg-inpv-05` (SQLi), `wstg-inpv-11.1` (LFI/RFI), `wstg-clnt-09` (clickjacking), `wstg-apit-00` (API assessment overview), `wstg-busl-01` (business logic), and `wstg-athn-09` (password reset).
 
-These are the first consolidation batch only. The two upstream catalogs have **not** yet been fully audited and merged source-by-source.
+These are the first consolidation batch: 29 existing CyberStrike skill files expanded. The two upstream catalogs have **not** yet been fully audited and merged source-by-source.
 
 ## Remaining work
 
