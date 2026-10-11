@@ -8,7 +8,7 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     "Profiles are matched by exact URL origin (scheme + hostname + port), never by substring. Research accounts are separate from target accounts; target accounts require the current explicit targetID.",
     "Passwords are encrypted at rest with AES-256-GCM. Set CYBERSTRIKE_CREDENTIALS_KEY to a private secret of at least 32 characters before using this tool. The key is not stored by CyberStrike.",
     "Actions: save a profile, list matching profiles (metadata only), or forget a profile. Passwords are never returned by this agent-facing tool. This tool stores credentials; it does not itself bypass login challenges or automate browser form submission. CAPTCHA, MFA, and consent screens require the supported human flow.",
-    "Never save Google account passwords here for mailbox access. Gmail OTP integration must use a separate explicit Google OAuth grant with minimum scopes.",
+    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here for mailbox access. Gmail OTP integration must use a separate explicit Google OAuth grant with minimum scopes.",
   ].join("\n"),
   parameters: z.object({
     action: z.enum(["save", "list", "forget"]),
@@ -18,20 +18,24 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     profile_id: z.string().optional().describe("Profile ID for forget."),
     account: z.string().optional().describe("Human-readable account label, e.g. researcher-main."),
     username: z.string().optional().describe("Login username/email."),
-    password: z.string().optional().describe("Password to encrypt locally; never put it in notes or research knowledge."),
   }),
   async execute(params, ctx) {
     if (params.purpose === "target" && !params.target_id?.trim()) {
       return { title: "Target ID required", output: "Target credentials must be bound to an explicit target_id. No credentials were read or written.", metadata: { ok: false } }
     }
     if (params.action === "save") {
-      if (!params.account?.trim() || !params.username?.trim() || !params.password) {
-        return { title: "Missing account details", output: "Saving requires account, username, and password.", metadata: { ok: false } }
+      if (!params.account?.trim() || !params.username?.trim()) {
+        return { title: "Missing account details", output: "Saving requires account and username.", metadata: { ok: false } }
       }
+      const password = process.env.CYBERSTRIKE_AUTH_PASSWORD
+      if (!password) {
+        return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
+      }
+      delete process.env.CYBERSTRIKE_AUTH_PASSWORD
       await ctx.ask({ permission: "auth-credential-save", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, account: params.account } })
       const saved = await AuthVault.save({
         origin: params.site_url, purpose: params.purpose, account: params.account,
-        username: params.username, password: params.password, targetID: params.target_id,
+        username: params.username, password, targetID: params.target_id,
       })
       return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}. Secret is not included in this response.`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose } }
     }
