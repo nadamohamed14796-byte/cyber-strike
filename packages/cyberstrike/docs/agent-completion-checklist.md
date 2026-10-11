@@ -6,7 +6,7 @@ Purpose: track concrete runtime, integration, security, and test gaps. Implement
 
 ## P0 — must be resolved before merge
 
-- [x] **Worker environment isolation** — stop passing the entire parent environment to Hackbrowser; provide only required runtime/platform variables and provider-specific credentials required for the selected model. Never pass AuthVault encryption keys, website-password handoff variables, Gmail OAuth client secret/refresh token, or unrelated application secrets.
+- [x] **Worker and browser-installer environment isolation** — Hackbrowser worker and the Chromium installer now use a minimal, provider-scoped environment instead of inheriting the full parent environment. The installer uses argument-array execution and normal TLS verification; it no longer sets `NODE_TLS_REJECT_UNAUTHORIZED=0`. Focused tests are present but not yet run.
 - [ ] **Branch/PR divergence review** — examine the whole PR diff and the four commits on `main` not present on the feature branch; reconcile safely without force-pushing or writing directly to `main`.
 - [ ] **Automated verification** — run package-level unit tests, typecheck, and build in an environment with the required Bun/toolchain; record exact commands and outcomes. No test is marked passed from file existence or static inspection.
 - [ ] **CI status** — inspect PR workflow runs and resolve any failing or missing checks before merge.
@@ -22,7 +22,7 @@ Purpose: track concrete runtime, integration, security, and test gaps. Implement
 - [ ] **Finding-validation lifecycle** — verify exactly ten checks, evidence requirements, verdict rubric, SQLite persistence, existing-finding lookup/update, and target-note linkage; no unsupported confirmation.
 - [ ] **Cross-target isolation and scope** — verify stored accounts, notes, learned global methodology, requests, and outputs cannot silently cross-bind between targets or expand allowed scope.
 - [x] **Target-note secret redaction boundary** — centralized redaction is enforced by `TargetMemory.addNote`, so both CLI and agent-tool callers pass through it; regression tests cover quoted multi-word secrets. The tests still need to run under the P0 verification item.
-- [ ] **AuthVault correctness** — test encrypted-at-rest persistence, permissions, corruption/wrong-key handling, overwrite/remove/list, target binding, atomic writes, and concurrent update behavior.
+- [ ] **AuthVault correctness** — run tests for encrypted-at-rest persistence, permissions, wrong-key handling, overwrite/remove/list, target binding, atomic writes, and concurrent update behavior. Shape validation and duplicate-ID rejection are implemented; the focused tests are present but not run.
 - [ ] **Auth-manager consent and secret lifecycle** — check permission prompts occur before sensitive side effects, secrets are cleared in all success/failure paths, summaries/tool output/logs contain no passwords, and index failures are reported accurately.
 - [ ] **Hackbrowser saved login and MFA** — verify exact-origin guard, target workspace binding, visible login, OTP IPC timeout/fallback, manual MFA, abort/worker cleanup, and no secrets in logs/arguments.
 - [ ] **Documentation and user-facing flow** — make CLI help, `/update` behavior, environment setup, migration/upgrade guidance, limitations, and troubleshooting match actual behavior.
@@ -37,7 +37,8 @@ Purpose: track concrete runtime, integration, security, and test gaps. Implement
 
 - Worker environment isolation was changed to an explicit allowlist in `hackbrowser-subprocess/worker-environment.ts`; Bedrock/Vertex credential variables are forwarded only for the matching provider. Focused tests were added, but have not been run in this review environment.
 - `TargetMemory.addNote` now sanitizes titles, content, source labels/URLs, and tags at the persistence boundary; this closes the prior bypass where the CLI could skip the agent-tool-only redactor. A regression test was added, and a V8-level check of the regex showed no leakage for tested multi-word quoted values. This is not a substitute for the package test suite.
-- AuthVault writes now enforce a private data-directory mode, clean up temporary files, and serialize in-process save/remove read-modify-write operations. Multi-process locking and runtime verification remain open.
+- AuthVault now validates each stored record’s identity/origin/purpose/timestamps and AES-GCM payload structure, and rejects duplicate IDs before exposing records. Writes enforce a private data-directory mode, clean up temporary files, and serialize in-process save/remove read-modify-write operations. Multi-process locking and runtime verification remain open.
+- The Chromium path/installer subprocess now uses `execFileSync` argument arrays, a minimal environment, and ordinary TLS verification; this removes shell-string execution and the previous `NODE_TLS_REJECT_UNAUTHORIZED=0` override. Installer behavior requires runtime validation.
 - Saved-password consent is requested before consuming `CYBERSTRIKE_AUTH_PASSWORD`, and the local reference is cleared in a `finally` path. Validation tool output now uses actual line breaks for target-note status.
 - The feature branch was reported by GitHub compare as 183 commits ahead and 4 behind `main`; it must be reconciled carefully.
 - Unit tests, typecheck, build, real Gmail OAuth, and browser login have not yet been verified as passing in this review. GitHub currently reports no combined status entries or PR-associated workflow runs for the inspected head commit.
