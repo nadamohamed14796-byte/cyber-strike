@@ -78,8 +78,8 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     target_id: z.string().max(128).optional().describe("Required for target-purpose profiles; use the stable current target identifier."),
     profile_id: z.string().optional().describe("Profile ID for forget."),
     after: z.number().int().positive().optional().describe("Optional Unix timestamp in milliseconds; only consider OTP messages received after this time."),
-    account: z.string().min(1).max(120).refine((value) => !/[\\r\\n\\0]/.test(value), "Account label must be one line.").optional().describe("Human-readable account label, e.g. researcher-main."),
-    username: z.string().min(1).max(320).refine((value) => !/[\\r\\n\\0]/.test(value), "Username must be one line.").optional().describe("Login username/email."),
+    account: z.string().min(1).max(120).refine((value) => !/[\r\n\0]/.test(value), "Account label must be one line.").optional().describe("Human-readable account label, e.g. researcher-main."),
+    username: z.string().min(1).max(320).refine((value) => !/[\r\n\0]/.test(value), "Username must be one line.").optional().describe("Login username/email."),
   }),
   async execute(params, ctx) {
     if (params.purpose === "target" && !params.target_id?.trim()) {
