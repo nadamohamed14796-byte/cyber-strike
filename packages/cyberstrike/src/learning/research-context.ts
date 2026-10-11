@@ -12,11 +12,25 @@ import { ReportKnowledge } from "./report-knowledge"
 export function requestResearchSignals(input: { method: string; path: string; contentType?: string | null; status?: number | null }): string[] {
   const requestPath = input.path.toLowerCase()
   const contentType = (input.contentType ?? "").toLowerCase()
-  const tags = ["captured-request", input.method.toLowerCase()]
-  if (/\/api(?:\/|$)|graphql/.test(requestPath) || /json/.test(contentType)) tags.push("api-endpoint")
+  const method = input.method.toLowerCase()
+  const tags = ["captured-request", method]
+
+  // Signals describe where a useful methodology might apply; none establishes a vulnerability.
+  if (/\/api(?:\/|$)|graphql/.test(requestPath) || /json|graphql/.test(contentType)) tags.push("api-endpoint")
+  if (/\.m?js(?:$|[?#])|source.?map|\/assets?\//i.test(requestPath) || /javascript/.test(contentType)) {
+    tags.push("javascript-client")
+    if (/\.map(?:$|[?#])|source.?map/i.test(requestPath)) tags.push("source-map")
+  }
+  if (/graphql/.test(requestPath) || /graphql/.test(contentType)) tags.push("graphql")
+  if (/(?:^|\/)(?:login|log-in|signin|sign-in|auth|oauth|sso|token|session|callback|password-reset|recover)(?:\/|$|[?#])/.test(requestPath)) {
+    tags.push("authentication-flow")
+    if (/oauth|token|callback|sso/.test(requestPath)) tags.push("token-or-jwt")
+  }
+  if (/\/(?:users?|accounts?|orders?|invoices?|documents?|files?|projects?|teams?)\/[^/?#]+/i.test(requestPath)) tags.push("object-identifier")
+  if (/upload|attachment|import-file|media/.test(requestPath) || /multipart\/form-data/.test(contentType)) tags.push("file-upload")
+  if (/redirect|return[-_]?url|next[-_]?url|proxy|webhook|fetch[-_]?url|import[-_]?url/.test(requestPath)) tags.push("server-side-request")
   if (input.status === 401 || input.status === 403) tags.push("authorization-boundary")
-  if (/^(post|put|patch|delete)$/i.test(input.method)) tags.push("business-logic")
-  if (/\/(?:users?|accounts?|orders?|invoices?|documents?|files?)\/[^/]+/i.test(requestPath)) tags.push("object-identifier")
+  if (/^(post|put|patch|delete)$/i.test(method)) tags.push("business-logic")
   return [...new Set(tags)]
 }
 export namespace ResearchContext {

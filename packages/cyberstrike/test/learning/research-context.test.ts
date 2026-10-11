@@ -28,3 +28,23 @@ test("request-derived global research signals are pattern-based and do not asser
   )
   expect(requestResearchSignals({ method: "GET", path: "/about", contentType: "text/html", status: 200 })).not.toContain("authorization-boundary")
 })
+
+test("request-derived research signals cover JavaScript, auth, uploads, and URL-fetching surfaces without asserting findings", async () => {
+  const { requestResearchSignals } = await import("../../src/learning/research-context")
+  expect(requestResearchSignals({ method: "GET", path: "/assets/app.js", contentType: "application/javascript", status: 200 })).toEqual(
+    expect.arrayContaining(["javascript-client"]),
+  )
+  expect(requestResearchSignals({ method: "GET", path: "/assets/app.js.map", contentType: "application/json", status: 200 })).toEqual(
+    expect.arrayContaining(["javascript-client", "source-map"]),
+  )
+  expect(requestResearchSignals({ method: "POST", path: "/oauth/callback", contentType: "application/json", status: 302 })).toEqual(
+    expect.arrayContaining(["authentication-flow", "token-or-jwt"]),
+  )
+  expect(requestResearchSignals({ method: "POST", path: "/files/upload", contentType: "multipart/form-data", status: 200 })).toEqual(
+    expect.arrayContaining(["file-upload", "business-logic"]),
+  )
+  expect(requestResearchSignals({ method: "POST", path: "/webhook/import-url", contentType: "application/json", status: 200 })).toEqual(
+    expect.arrayContaining(["server-side-request", "business-logic"]),
+  )
+  expect(requestResearchSignals({ method: "GET", path: "/assets/app.js", contentType: "application/javascript", status: 200 })).not.toContain("idor")
+})
