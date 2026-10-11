@@ -73,6 +73,9 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
     "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
     "Cookie: sessionid=live-session-value",
     "api_key=live-api-key-value",
+    "csrf_token=live-csrf-token sessionid=live-session-id",
+    "ghp_123456789012345678901234567890123456",
+    "AKIA1234567890ABCDEF",
     "https://example.test/callback?token=live-query-token&next=%2Fhome",
     "eyJabcdefghijk.abcdefghijk.abcdefghijk",
     "-----BEGIN PRIVATE KEY-----private-key-material-----END PRIVATE KEY-----",
@@ -81,6 +84,10 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
   expect(safe).not.toContain("abcdefghijklmnopqrstuvwxyz")
   expect(safe).not.toContain("live-session-value")
   expect(safe).not.toContain("live-api-key-value")
+  expect(safe).not.toContain("live-csrf-token")
+  expect(safe).not.toContain("live-session-id")
+  expect(safe).not.toContain("ghp_123456789012345678901234567890123456")
+  expect(safe).not.toContain("AKIA1234567890ABCDEF")
   expect(safe).not.toContain("live-query-token")
   expect(safe).not.toContain("eyJabcdefghijk.abcdefghijk.abcdefghijk")
   expect(safe).not.toContain("private-key-material")
