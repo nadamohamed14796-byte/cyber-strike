@@ -1,8 +1,8 @@
 ---
 name: attack-request-smuggling
-description: "HTTP request smuggling — CL.TE, TE.CL, TE.TE desync attacks for cache poisoning and auth bypass"
+description: "Assess HTTP request-boundary parsing differences using explicitly authorized, low-impact desynchronization checks"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - request-smuggling
@@ -137,7 +137,7 @@ X: x
 
 ```bash
 # HTTP/2 downgrade smuggling
-curl --http2 https://TARGET/ \
+curl --max-time 15 --connect-timeout 5 --http2 https://TARGET/ \
   -H "Content-Length: 0" \
   -H "Transfer-Encoding: chunked" \
   -d "0\r\n\r\nGET /admin HTTP/1.1\r\nHost: TARGET\r\n\r\n"
@@ -158,6 +158,13 @@ curl --http2 https://TARGET/ \
 - Proof of desync (wrong response, timing, captured request)
 - Impact demonstration (auth bypass, cache poison, request capture)
 
+## Verification and Safe-Testing Gate
+
+- Request smuggling can affect other users and shared connections. Test only when the program explicitly permits desynchronization testing; prefer a dedicated test environment or isolated connection.
+- Begin with passive protocol/header observations and low-impact probes. Do not use payloads designed to poison real users' responses, bypass authentication for other users, or cause persistent queue desynchronization.
+- A timeout, 400/403 response, or connection close is not sufficient proof. Correlate front-end/back-end behavior and demonstrate a reproducible parsing discrepancy with a harmless marker.
+- Avoid high concurrency and stop immediately if unrelated responses appear, connections become unstable, or another user's request could be affected.
+- Treat cache poisoning and authorization impact as separate findings unless you independently demonstrate the chain. Link to `attack-cache-poison` only when a clean request receives a poisoned shared response.
 ## References
 
 - [PortSwigger: Request Smuggling](https://portswigger.net/web-security/request-smuggling)

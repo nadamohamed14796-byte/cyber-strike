@@ -1,8 +1,8 @@
 ---
 name: attack-jwt
-description: "JWT token attacks — alg:none bypass, key confusion, claim tampering, signature stripping"
+description: "Validate JWT signature, algorithm, key-selection, and claim-validation weaknesses using test accounts"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - jwt
@@ -69,7 +69,7 @@ If server uses RS256, try signing with the public key as HS256 secret:
 
 ```bash
 # Fetch public key
-curl -s https://TARGET/.well-known/jwks.json
+curl --max-time 15 --connect-timeout 5 -s https://TARGET/.well-known/jwks.json
 
 # Convert JWK to PEM and sign
 attack_script jwt_tamper EYTOKEN --set role=admin --key "$(cat public.pem)" --set-header alg=HS256
@@ -89,7 +89,7 @@ attack_script jwt_tamper EYTOKEN --set-header "kid=/proc/sys/kernel/hostname"
 
 ```bash
 # Test tampered token
-curl -s -H "Authorization: Bearer TAMPERED_TOKEN" https://TARGET/api/admin/users
+curl --max-time 15 --connect-timeout 5 -s -H "Authorization: Bearer TAMPERED_TOKEN" https://TARGET/api/admin/users
 ```
 
 ## What Constitutes a Finding
@@ -115,6 +115,28 @@ curl -s -H "Authorization: Bearer TAMPERED_TOKEN" https://TARGET/api/admin/users
 - `attack_script jwt_tamper` — automated decode/tamper/re-encode
 - `jwt_tool` (external) — comprehensive JWT testing
 - `hashcat -m 16500` — JWT secret cracking
+
+## JWT Validation Matrix
+
+Treat each JWT weakness as a separate hypothesis. With a token issued to a test account, test one property at a time and verify the server-side result:
+
+- **Signature and algorithm:** confirm the server rejects altered claims when the signature is invalid and does not accept an algorithm/key-type mismatch.
+- **Claims:** check `iss`, `aud`, `exp`, `nbf`, `sub`, and role/scope claims against the application's documented expectations. Decoding a claim does not show that the server trusts it.
+- **Key selection:** review `kid`/JWKS behavior for unsafe key selection or stale-key handling without attempting to read arbitrary files or alter production key material.
+- **Session lifecycle:** where permitted, verify whether logout, password change, or role removal invalidates previously issued tokens. A long expiry alone is not proof of a vulnerability if revocation is not part of the security contract.
+
+Only claim privilege escalation when the modified token is accepted and a controlled, previously unauthorized operation succeeds. A changed status code or a JWT decoder's warning is not sufficient.
+
+## Verification and False Positives
+
+- Decode-only tools show claims but do not validate a token's signature or prove a vulnerability. Confirm server-side acceptance of the modified token and a concrete authorization change.
+- Test with tokens issued to accounts you control. Keep the original token, the exact modification, and the response comparison; redact tokens from reports and logs.
+- Treat `alg:none`, algorithm/key confusion, `kid` manipulation, and claim tampering as hypotheses, not findings. Modern libraries may reject them, and a changed response code alone is not proof of privilege escalation.
+- For role/subject changes, confirm whether the server accepts the altered claim and grants access to an operation that the test account is not authorized to perform. Do not access real users' data.
+- Check expiration, issuer, audience, key rotation, and signature validation independently. A weak token configuration is not automatically exploitable if the server correctly rejects invalid tokens.
+- Do not include live secrets, private signing keys, or reusable production tokens in evidence. Use the least-privileged proof that demonstrates the authorization boundary failure.
+- [uphiago/recon-skills — JWT attack methodology](https://github.com/uphiago/recon-skills/blob/main/recon/jwt-attack/SKILL.md) (external research reference; not a local Cyber Strike skill path).
+- [elementalsouls/Claude-BugHunter — JWT crypto hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-jwt-crypto/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 ## References
 

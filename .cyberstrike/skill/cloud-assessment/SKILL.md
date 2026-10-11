@@ -5,7 +5,7 @@ category: assessment
 tags: [cloud, aws, azure, gcp, security-audit, cis-benchmark, iam, storage, network, encryption, logging, dns, tls]
 tech_stack: [aws, azure, gcp, aws-cli, az-cli, gcloud-cli]
 cwe_ids: [CWE-269, CWE-311, CWE-319, CWE-693, CWE-778]
-version: "1.0"
+version: "1.2.0"
 ---
 
 # Cloud Security Assessment Methodology
@@ -14,7 +14,7 @@ Multi-cloud READ-ONLY security assessment using the `cloud_audit` tool. All chec
 
 ## Safety First
 
-**ALWAYS run `verify_readonly` before any other audit program.** This confirms the current credentials have no dangerous write permissions. If the check returns FAIL, stop and request read-only credentials.
+**ALWAYS run `verify_readonly` before any other audit program.** This is a preflight check, not a mathematical guarantee that every write path is absent. If it returns FAIL, stop and request read-only credentials; if it passes, still confirm the active identity and scope and use only the documented read-only audit commands.
 
 ```
 cloud_audit verify_readonly --provider all
@@ -92,6 +92,13 @@ External-facing services need DNS security and valid TLS.
 | DNS | `cloud_audit dns_audit --domain TARGET` | Dangling CNAMEs (subdomain takeover), DNSSEC, CAA records |
 | TLS | `cloud_audit tls_audit --target HOST:PORT` | Protocol version, certificate expiry, cipher strength, HSTS |
 
+## Evidence and Severity Gate
+
+- For each potential finding, capture provider, account/project/subscription, region, principal, resource, effective permission or configuration, and the exact read-only command used.
+- Separate benchmark non-compliance from exploitable impact. A CIS failure can be a valid hardening gap without proving attacker reachability; label the finding accordingly and follow the program’s accepted-impact rules.
+- Never place account IDs, tenant IDs, bucket names, hostnames, or principal names from a private environment into public examples. Sanitize evidence before storage or submission.
+- Prefer least-privileged verification. Do not validate a public storage finding by downloading customer data; use metadata or an approved synthetic object and stop once the exposure is established.
+
 ## Vulnerability Reporting
 
 For each FAIL finding, report via `report_vulnerability`:
@@ -115,6 +122,14 @@ record_coverage_note
   scope: wide
   note: "AWS IAM audit complete — 5 findings across 12 users. No root access keys detected."
 ```
+
+## Verification and False Positives
+
+- Keep the assessment read-only unless a specific state-changing test is explicitly authorized. Confirm the active account, tenant/project/subscription, and region before each provider-specific check.
+- A public endpoint, broad-looking policy, or scanner warning is not by itself a confirmed finding. Verify effective access using the documented identity and a non-sensitive test resource.
+- Separate configuration drift from exploitable impact. State which principal can perform which action on which resource, and what data or operation is actually exposed.
+- Use provider-native audit evidence and least-privileged test identities. Do not retrieve real cloud credentials, export customer data, disable logging, or modify IAM policies as proof.
+- Preserve sanitized commands, policy snippets, provider/account context, timestamps, and the relevant expected/observed behavior. Redact tokens, keys, and private resource identifiers.
 
 ## Program Reference
 

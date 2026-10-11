@@ -6,13 +6,20 @@ tags: [kubernetes, k8s, cis-benchmark, rbac, network-policy, pod-security, secre
 tech_stack: [kubernetes, kubectl]
 cwe_ids: [CWE-269, CWE-284, CWE-311, CWE-732, CWE-693]
 chains_with: [T1613, T1087.004, T1078.004]
-prerequisites: [kubectl-access]
-version: "1.0"
+prerequisites: []
+version: "1.2.0"
 ---
 
 # Kubernetes Security Assessment Methodology
 
 READ-ONLY Kubernetes security assessment using kubectl CLI. No resources are created, modified, or deleted — all checks use get/list/describe/auth can-i verbs only. Based on CIS Kubernetes Benchmark v1.8+.
+
+## Scope and Safety Preconditions
+
+- Confirm the authorized cluster, context, namespaces, and allowed assessment window before running any checks. A kubeconfig entry alone does not establish authorization or scope.
+- Capture `kubectl config current-context` and the active namespace before assessment. If the context or cluster identity is unexpected, stop rather than probing.
+- Run `k8s_audit verify_readonly` first as described below. Also use `kubectl auth can-i` to check permissions; neither check replaces the written scope and least-privilege requirements.
+- Keep the assessment read-only. Do not create pods, exec into workloads, change RBAC, fetch secret values, or test node/host access as part of this checklist.
 
 ## Prerequisites
 
@@ -90,6 +97,21 @@ Confirms current identity has no write/modify/delete permissions via kubectl aut
 | Image tags | `k8s_audit image_audit` | — |
 | Untrusted registries | `k8s_audit image_audit` | — |
 | SA auto-mount tokens | `k8s_audit serviceaccount_audit` | 5.1.5-6 |
+
+## Evidence and Severity Gate
+
+- For each finding, record the cluster/context, namespace, Kubernetes version where available, identity/ServiceAccount, exact read-only command, expected permission, observed permission, and timestamp.
+- Distinguish configuration hardening gaps from demonstrated exposure. A privileged Pod spec or wildcard role is a lead; verify whether a reachable identity can actually use the permission and what boundary it crosses.
+- Do not include Secret values, bearer tokens, kubeconfigs, certificate private keys, or raw customer workloads in reports or repository examples. Use metadata or an approved synthetic resource for verification.
+- Follow the engagement’s accepted-impact policy and severity rubric; do not assign severity from a CIS control failure alone.
+
+## Verification and False Positives
+
+- Keep checks read-only and verify the active kubeconfig context and namespace before every command. Do not create pods, change RBAC, read unrelated secrets, or modify workloads in this assessment.
+- A role binding or pod security setting is a lead. Verify effective permissions with `kubectl auth can-i` and compare them with the intended role and namespace boundary.
+- An exposed Secret object is not automatically a confirmed leak if the current identity cannot read its data. Do not print secret values; use metadata and an approved synthetic secret to prove access.
+- Distinguish cluster-wide permissions from namespace-scoped permissions and document the actual service account or user identity used for the check.
+- Preserve sanitized commands, context/namespace, role bindings, timestamps, and expected/observed results. Redact tokens, certificates, and private workload data.
 
 ## Program Reference
 

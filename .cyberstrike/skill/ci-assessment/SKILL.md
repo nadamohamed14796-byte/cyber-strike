@@ -5,9 +5,9 @@ category: security-assessment
 tags: [cicd, github-actions, supply-chain, dependency-security, branch-protection, secrets, pipeline-security]
 tech_stack: [github, gh-cli]
 cwe_ids: [CWE-94, CWE-78, CWE-269, CWE-311, CWE-502, CWE-829]
-chains_with: [T1195.002, T1059.004, T1552.001]
-prerequisites: [gh-cli-access]
-version: "1.0"
+chains_with: [cicd-attacks, T1059.004, T1552.001]
+prerequisites: []
+version: "1.1.0"
 ---
 
 # CI/CD Pipeline Security Assessment
@@ -67,6 +67,14 @@ gh repo view OWNER/REPO # verify repo access
 | **Branch Protection** | Rule configuration | Bypass via admin override audit trail |
 | **Dependencies** | Versions, lockfiles, known CVEs | Transitive dependency behavior |
 | **Supply Chain** | Automation config, CODEOWNERS | SBOM completeness, SLSA compliance level |
+
+## Verification and False Positives
+
+- This skill is read-only: do not edit workflows, open pull requests, publish artifacts, run pipeline jobs, or change repository settings during assessment.
+- A dangerous workflow trigger or writable permission is a lead. Confirm the trigger source, token permissions, branch protection, runner trust, and whether an untrusted contributor can reach the risky step.
+- Treat secret-name matches as leads, not proof of secret exposure. Do not print or upload real secrets; verify with metadata or an approved synthetic canary.
+- Confirm dependency findings against the resolved package/version and lockfile. A package name in source without a reachable dependency is not sufficient evidence.
+- Record repository, workflow path, event context, effective permissions, timestamps, and sanitized evidence. Do not copy private workflow logs or repository data into public files.
 
 ## Program Reference
 

@@ -1,8 +1,13 @@
 ---
 name: ad-security
-description: Active Directory security testing and attack techniques
-tags: [ad, windows, kerberos, ldap, internal-network]
-version: "1.0"
+description: "Assess Active Directory identity, directory permissions, and attack paths in an explicitly authorized environment"
+category: identity
+author: cyberstrike-official
+tags: [ad, windows, kerberos, ldap, internal-network, identity, authorization]
+tech_stack: [active-directory, windows, kerberos, ldap, impacket]
+chains_with: [kerberos-attacks, windows-postexploit]
+prerequisites: []
+version: "1.1.0"
 ---
 
 # Active Directory Security Testing
@@ -174,6 +179,13 @@ Local Admin on Workstation
 | lookupsid.py   | SID enumeration                 |
 | samrdump.py    | SAM Remote interface dump       |
 
+## Authorization and Verification Gate
+
+- Run Active Directory enumeration and attack-path tests only in an explicitly authorized domain/lab. Confirm the permitted hosts, accounts, time window, and whether credential-access or lateral-movement validation is allowed.
+- Start with read-only enumeration and least-privileged test accounts. Treat a tool finding, SPN, ACL, delegation flag, or exposed share as a lead; verify the effective permission and practical impact before reporting.
+- Do not dump hashes, extract credentials, alter group membership, create persistence, or move laterally on production systems unless the written engagement explicitly authorizes that action. Prefer lab fixtures and designated test accounts.
+- For privilege escalation, prove the exact permission edge and the resulting access using a controlled account. Avoid modifying domain objects just to demonstrate a theoretical path.
+- Keep captured directory data and credentials outside the reusable skill and report only redacted evidence. Do not include real usernames, hashes, tickets, or internal host inventories in committed files.
 ## Detection Evasion Considerations
 
 | Action        | Detection             | Evasion                      |

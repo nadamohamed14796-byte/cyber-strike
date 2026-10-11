@@ -5,9 +5,9 @@ category: post-exploitation
 tags: [cicd, github-actions, jenkins, gitlab, pipeline, supply-chain, secret-extraction, credential-access]
 tech_stack: [github, jenkins, gitlab, python, requests]
 cwe_ids: [CWE-522, CWE-693, CWE-829, CWE-284]
-chains_with: [T1195.002, T1552.004, T1059, T1098]
-prerequisites: [T1078]
-version: "1.0"
+chains_with: [ci-assessment, T1552.004, T1059, T1098]
+prerequisites: [ci-assessment]
+version: "1.1.0"
 ---
 
 # CI/CD Pipeline Attack Methodology
@@ -22,13 +22,13 @@ CI/CD pipeline attacks target the software delivery infrastructure to extract se
 
 ```bash
 # Quick prerequisite check — GitHub
-curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user | jq .login
+curl --max-time 15 --connect-timeout 5 -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user | jq .login
 
 # Quick prerequisite check — Jenkins
-curl -s -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/api/json" | jq .nodeDescription
+curl --max-time 15 --connect-timeout 5 -s -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/api/json" | jq .nodeDescription
 
 # Quick prerequisite check — GitLab
-curl -s -H "Private-Token: $GITLAB_TOKEN" "$GITLAB_URL/api/v4/user" | jq .username
+curl --max-time 15 --connect-timeout 5 -s -H "Private-Token: $GITLAB_TOKEN" "$GITLAB_URL/api/v4/user" | jq .username
 ```
 
 ## Kill Chain Phases
@@ -61,6 +61,14 @@ curl -s -H "Private-Token: $GITLAB_TOKEN" "$GITLAB_URL/api/v4/user" | jq .userna
 cipipe cleanup_ci
 ```
 
+## Verification and Safe-Testing Gate
+
+- Confirm repository, workflow, runner, package registry, and cloud identities are in scope before testing. CI/CD workflows can deploy software or expose secrets, so start with read-only configuration review.
+- Treat dangerous triggers, untrusted expression interpolation, writable workflow permissions, and exposed secrets as leads. Confirm the actual execution context, permission boundary, and reachable impact before reporting.
+- Use a fork or designated test branch with a harmless marker when validating pipeline injection. Do not alter production workflows, publish packages, deploy artifacts, or exfiltrate runner credentials without explicit written authorization.
+- For secrets exposure, prove only that a synthetic canary or approved test secret is accessible. Never print or upload real tokens, signing keys, or cloud credentials.
+- For supply-chain impact, identify the exact trust boundary (contributor, workflow, runner, artifact, package, or deployment) and what an attacker can actually modify. A misconfiguration alone is not proof of compromise.
+- Keep commands read-only by default, use conservative rate limits, and preserve sanitized workflow excerpts, permissions, event context, and timestamps.
 ## Detection Considerations
 
 - **GitHub Audit Log** — Workflow creation, secret access, branch creation

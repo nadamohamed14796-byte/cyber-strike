@@ -1,8 +1,8 @@
 ---
 name: attack-ssti
-description: "Server-Side Template Injection — detection, engine fingerprinting, and exploitation across 7 template engines"
+description: "Detect and validate server-side template injection with harmless expression probes and bounded impact checks"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - ssti
@@ -102,10 +102,10 @@ attack_script ssti_tester "https://TARGET/api/render" --param content --method P
 
 | Finding | Severity |
 |---------|----------|
-| Math expression evaluated (7*7=49) | High (P2) |
-| Config/env data leaked | High (P2) |
-| Command execution achieved | Critical (P1) |
-| File read via template | Critical (P1) |
+| Harmless template expression evaluated (for example, 7*7=49) | Confirms an SSTI primitive; severity depends on context and demonstrated impact |
+| Sensitive configuration data disclosed in an approved test environment | Severity depends on data sensitivity and exposure |
+| Server-side command execution demonstrated | Severity depends on privileges, reachable systems, and actual impact |
+| Sensitive file read demonstrated with an approved canary | Severity depends on file sensitivity and impact |
 
 ## Evidence Requirements
 
@@ -119,6 +119,32 @@ attack_script ssti_tester "https://TARGET/api/render" --param content --method P
 
 - `attack_script ssti_tester` — automated multi-engine detection
 - `tplmap` (external) — SSTI exploitation framework
+
+## Safe Expression-Detection Sequence
+
+Use a harmless arithmetic expression to distinguish evaluation from reflection. Test only in a field that the application is expected to render, and compare it with a plain-text baseline.
+
+```text
+{{7*7}}
+${7*7}
+<%= 7*7 %>
+```
+
+These are candidate syntax probes, not a universal payload. A result of `49` in the server-rendered output is a strong evaluation signal for the matching syntax; an echoed input, client-side template result, or generic error is not enough. Test one syntax at a time and avoid deliberately malformed expressions unless the program permits error-based fingerprinting.
+
+- Fingerprint the engine only after server-side evaluation is confirmed; a framework banner or stack trace alone does not establish SSTI.
+- Do not escalate from evaluation to command execution, file reads, or outbound callbacks unless the engagement explicitly authorizes that impact test. Prefer a harmless proof and report the exact demonstrated level.
+
+## Verification and False Positives
+
+- Start with a harmless arithmetic or string expression appropriate to the suspected template engine. Confirm that the server evaluates the expression; seeing the input echoed unchanged is reflection, not SSTI.
+- Change one expression at a time and compare against a baseline response. Exclude client-side rendering, cached content, sanitization, and WAF-generated errors before concluding the server template engine evaluated input.
+- Fingerprint the engine only after server-side evaluation is confirmed. A stack trace or framework name alone does not prove exploitable SSTI.
+- Use a harmless proof of evaluation. Do not run operating-system commands, read secrets, open reverse shells, or alter application state unless the engagement explicitly authorizes that level of testing and a safe test environment is available.
+- Report RCE only when code execution is actually demonstrated within scope. Template expression evaluation, file access, and command execution are different impact levels.
+- Record the exact parameter/template context, baseline, harmless expression, evaluated result, and any limitations. Redact secrets and session data.
+- [uphiago/recon-skills — SSTI hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-ssti/SKILL.md) (external research reference; not a local Cyber Strike skill path).
+- [elementalsouls/Claude-BugHunter — SSTI hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-ssti/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 ## References
 

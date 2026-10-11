@@ -2,7 +2,7 @@
 name: attack-websocket
 description: "WebSocket security testing — CSWSH, message injection, auth bypass, origin validation"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - websocket
@@ -34,11 +34,11 @@ Exploit WebSocket implementation flaws including cross-site WebSocket hijacking 
 
 ```bash
 # Look for WebSocket upgrade
-curl -s -D- https://TARGET/ -H "Upgrade: websocket" -H "Connection: Upgrade"
+curl --max-time 15 --connect-timeout 5 -s -D- https://TARGET/ -H "Upgrade: websocket" -H "Connection: Upgrade"
 
 # Check common paths
 for path in /ws /socket /websocket /api/ws /chat /live /realtime; do
-  curl -s -D- "https://TARGET$path" \
+  curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET$path" \
     -H "Upgrade: websocket" \
     -H "Connection: Upgrade" \
     -H "Sec-WebSocket-Version: 13" \
@@ -80,7 +80,7 @@ websocat "wss://TARGET/ws"
 websocat -H "Cookie: session=EXPIRED_TOKEN" "wss://TARGET/ws"
 
 # Connect with another user's token
-websocat -H "Cookie: session=VICTIM_TOKEN" "wss://TARGET/ws"
+websocat -H "Cookie: session=TEST_ACCOUNT_B_TOKEN" "wss://TARGET/ws"
 ```
 
 ### Phase 4: Message Injection
@@ -93,29 +93,32 @@ websocat "wss://TARGET/ws" <<< '{"action":"search","query":"test\" OR 1=1--"}'
 websocat "wss://TARGET/ws" <<< '{"action":"chat","message":"<img src=x onerror=alert(1)>"}'
 
 # Command injection
-websocat "wss://TARGET/ws" <<< '{"action":"exec","cmd":"id; cat /etc/passwd"}'
+websocat "wss://TARGET/ws" <<< '{"action":"exec","cmd":"printf CYBERSTRIKE_WS_CANARY"}'
 ```
 
-### Phase 5: Rate Limiting / DoS
+### Phase 5: Rate Limiting and Message-Size Controls
+
+Only test in a dedicated test environment or when the program explicitly permits it. Do not perform flood or resource-exhaustion testing against production.
 
 ```bash
-# Rapid message sending
-for i in $(seq 1 1000); do
-  echo '{"action":"ping"}'
-done | websocat "wss://TARGET/ws"
+# Three low-volume ping messages; observe whether the server enforces a limit
+for i in 1 2 3; do
+  printf '{"action":"ping","test_id":"WS_CANARY_%s"}\\n' "$i"
+  sleep 1
+done | websocat --max-messages 3 "wss://TARGET/ws"
 
-# Large message
-python3 -c "print('{\"data\":\"' + 'A'*1000000 + '\"}')" | websocat "wss://TARGET/ws"
+# Harmless 1 KiB marker payload; do not send megabyte-scale messages to production
+python3 -c "print('{\\\"data\\\":\\\"' + 'A'*1024 + '\\\"}')" | websocat --max-messages 1 "wss://TARGET/ws"
 ```
 
 ## What Constitutes a Finding
 
 | Finding | Severity |
 |---------|----------|
-| CSWSH — cross-site WebSocket hijacking | High (P2) |
-| No authentication on WebSocket | High (P2) |
-| SQL/command injection via WS message | Critical (P1) |
-| Stored XSS via WS message | High (P2) |
+| CSWSH with a browser-readable sensitive response or unauthorized action demonstrated | Severity depends on data/action and affected users |
+| Unauthenticated access to a protected WebSocket channel/message | Severity depends on data/action exposed |
+| SQL/command injection through a WebSocket message with concrete impact demonstrated | Severity depends on reachable privileges, data access, and resulting behavior |
+| Stored XSS through a WebSocket message that executes in a victim-equivalent test context | Severity depends on reachable users and impact |
 | Session not invalidated after logout | Medium (P3) |
 
 ## Evidence Requirements
@@ -129,6 +132,26 @@ python3 -c "print('{\"data\":\"' + 'A'*1000000 + '\"}')" | websocat "wss://TARGE
 
 - `websocat` (external) — WebSocket CLI client
 - Browser DevTools → Network → WS tab
+
+## CSWSH Confirmation Conditions
+
+Treat a successful WebSocket handshake as discovery only. A cross-site WebSocket hijacking claim requires the relevant conditions to be demonstrated together:
+
+- The browser authenticates the connection with ambient credentials such as a session cookie.
+- The application does not require an unpredictable per-connection token or equivalent anti-CSRF proof that prevents a hostile site from opening an authenticated socket.
+- The server does not enforce a trustworthy `Origin` policy for the authenticated connection, and a browser on a controlled test origin can actually read or perform a protected operation.
+
+Use a test account and a harmless test message. A `101 Switching Protocols` response from an untrusted Origin alone is not proof. Also test authorization after the handshake: every room/channel subscription and message type should enforce ownership and role checks independently.
+
+## Verification and False Positives
+
+- Verify the WebSocket handshake, authentication state, and authorization for each message type. A successful `101 Switching Protocols` handshake does not prove that protected messages are accessible.
+- Test with accounts you control. Compare the same message as an authorized and unauthorized role; do not subscribe to other users' private channels or capture their messages.
+- For cross-site WebSocket hijacking, confirm browser cookies are sent cross-origin, the server accepts the connection without a trustworthy Origin check, and a protected action/data read is possible. Origin reflection alone is not enough.
+- Check message-level authorization after the handshake; many applications authenticate the socket but fail to authorize individual room/channel IDs or commands.
+- Keep message counts low and avoid flood/DoS testing unless explicitly permitted. Redact cookies, tokens, and private messages in evidence.
+- [uphiago/recon-skills — WebSocket hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-websocket/SKILL.md) (external research reference; not a local Cyber Strike skill path).
+- [elementalsouls/Claude-BugHunter — WebSocket hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-websocket/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 ## References
 

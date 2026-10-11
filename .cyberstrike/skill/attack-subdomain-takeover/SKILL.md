@@ -2,7 +2,7 @@
 name: attack-subdomain-takeover
 description: "Subdomain takeover — CNAME detection, cloud service fingerprinting, dangling DNS exploitation"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - subdomain-takeover
@@ -37,7 +37,7 @@ Identify subdomains with dangling DNS records (CNAME pointing to unclaimed cloud
 subfinder -d TARGET.com -silent | tee subdomains.txt
 
 # Certificate transparency
-curl -s "https://crt.sh/?q=%25.TARGET.com&output=json" | jq -r '.[].name_value' | sort -u >> subdomains.txt
+curl --max-time 15 --connect-timeout 5 -s "https://crt.sh/?q=%25.TARGET.com&output=json" | jq -r '.[].name_value' | sort -u >> subdomains.txt
 
 # DNS brute force
 puredns bruteforce wordlist.txt TARGET.com -r resolvers.txt >> subdomains.txt
@@ -64,7 +64,7 @@ Checks 20 cloud services:
 dig +short CNAME subdomain.TARGET.com
 
 # Verify the pointed service is unclaimed
-curl -s https://subdomain.TARGET.com
+curl --max-time 15 --connect-timeout 5 -s https://subdomain.TARGET.com
 # Look for: "There isn't a GitHub Pages site here"
 # "No such app" (Heroku)
 # "NoSuchBucket" (S3)
@@ -88,11 +88,11 @@ After confirming a dangling CNAME:
 
 | Finding | Severity |
 |---------|----------|
-| Subdomain takeover — attacker controls content | High (P2) |
-| S3 bucket public write access | Critical (P1) |
-| S3 bucket listing enabled | High (P2) |
-| Dangling CNAME (service unreachable) | Medium (P3) |
-| Cloud storage public read | Medium (P3) |
+| Takeover confirmed on an in-scope hostname with a harmless proof of control | Severity depends on hostname trust, content reach, and impact |
+| Public write access to an in-scope storage resource with impact validated safely | Severity depends on writable content, permissions, and affected users |
+| Public listing exposes non-public objects or sensitive metadata | Severity depends on exposed data and access controls |
+| Dangling CNAME without confirmed claimability | Not a confirmed takeover; do not report as exploitable without provider-specific validation |
+| Public read exposes non-public or sensitive test data | Severity depends on data sensitivity and scope |
 
 ## Evidence Requirements
 
@@ -108,6 +108,13 @@ After confirming a dangling CNAME:
 - `attack_script cloud_storage_enum` — S3/Azure/GCP enumeration
 - `subfinder`, `puredns` — subdomain enumeration
 
+## Verification and False Positives
+
+- A dangling CNAME or stale DNS record is a lead, not proof of takeover. Confirm the target service is unclaimed and that the provider-specific error/claim flow matches the documented takeover condition.
+- Do not register, claim, delete, or modify the target resource unless the program explicitly authorizes ownership-claim validation. Prefer non-invasive provider fingerprinting and a unique harmless proof under a permitted test setup.
+- Distinguish abandoned service responses from provider-wide outages, custom error pages, DNS propagation, and misconfigured but non-claimable resources.
+- Confirm the hostname is in scope and controlled by the organization. A third-party or vendor-owned hostname may be excluded even if its DNS appears stale.
+- Record DNS chain, TTL, provider fingerprint, timestamp, and evidence of claimability. Avoid serving malicious content or collecting visitors.
 ## References
 
 - [Can I Take Over XYZ](https://github.com/EdOverflow/can-i-take-over-xyz)

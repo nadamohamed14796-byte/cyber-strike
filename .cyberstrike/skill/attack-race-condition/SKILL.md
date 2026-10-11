@@ -1,8 +1,8 @@
 ---
 name: attack-race-condition
-description: "Race condition / TOCTOU testing — concurrent requests to exploit time-of-check-to-time-of-use flaws"
+description: "Validate race conditions and TOCTOU flaws with bounded concurrent tests on test-owned records"
 category: "web-application"
-version: "1.0"
+version: "1.1.0"
 author: "cyberstrike-official"
 tags:
   - race-condition
@@ -42,20 +42,20 @@ State-changing operations vulnerable to race conditions:
 ### Phase 2: Automated Race Testing
 
 ```bash
-# Basic race test — 20 concurrent POST requests
+# Only against a test-owned disposable coupon/record, with explicit permission; start with five requests
 attack_script race_tester "https://TARGET/api/redeem" \
   -m POST \
   -H "Authorization:Bearer TOKEN" \
-  -d '{"coupon":"DISCOUNT50"}' \
-  -c 20 \
+  -d '{"coupon":"TEST_CANARY_COUPON"}' \
+  -c 5 \
   --json-output
 
 # With delay (staggered)
-attack_script race_tester "https://TARGET/api/transfer" \
+attack_script race_tester "https://TARGET/api/test-transfer" \
   -m POST \
-  -H "Authorization:Bearer TOKEN" \
-  -d '{"to":"attacker","amount":100}' \
-  -c 50 \
+  -H "Authorization:Bearer TEST_ACCOUNT_TOKEN" \
+  -d '{"to":"TEST_OWNED_ACCOUNT_ID","amount":1}' \
+  -c 5 \
   --delay 5
 ```
 
@@ -64,11 +64,11 @@ attack_script race_tester "https://TARGET/api/transfer" \
 For critical timing, send all requests in a single TCP packet:
 
 ```bash
-# Using curl with parallel connections
-for i in $(seq 1 20); do
-  curl -s -X POST https://TARGET/api/redeem \
-    -H "Authorization: Bearer TOKEN" \
-    -d '{"coupon":"DISCOUNT50"}' &
+# Use a test-owned disposable coupon and cap concurrency at five; never race production payments or other users' records
+for i in $(seq 1 5); do
+  curl --max-time 15 --connect-timeout 5 -s -X POST https://TARGET/api/test-redeem \
+    -H "Authorization: Bearer TEST_ACCOUNT_TOKEN" \
+    -d '{"coupon":"TEST_CANARY_COUPON"}' &
 done
 wait
 ```
@@ -84,26 +84,26 @@ Look for:
 ### Phase 5: Limit Bypass Race
 
 ```bash
-# Race on rate-limited endpoint
-attack_script race_tester "https://TARGET/api/login" \
+# If explicitly permitted, use a test account and a low-volume authentication test; never test real users or guess passwords
+attack_script race_tester "https://TARGET/api/test-login" \
   -m POST \
-  -d '{"email":"victim@test.com","password":"guess1"}' \
-  -c 30
+  -d '{"email":"YOUR_TEST_ACCOUNT@example.invalid","password":"INVALID_TEST_VALUE"}' \
+  -c 3
 
 # Race on one-time action
 attack_script race_tester "https://TARGET/api/claim-bonus" \
   -m POST \
   -H "Authorization:Bearer TOKEN" \
-  -c 20
+  -c 5
 ```
 
 ## What Constitutes a Finding
 
 | Finding | Severity |
 |---------|----------|
-| Financial: double-spend, duplicate transfer | Critical (P1) |
-| Coupon/code reused multiple times | High (P2) |
-| Rate limit bypassed via race | Medium (P3) |
+| Double-spend or duplicate transfer on a test transaction with demonstrated financial impact | Severity depends on the actual impact, exposure, and program policy; not automatically Critical |
+| One-time test coupon reused beyond the allowed count | Severity depends on value, reachability, and impact |
+| Rate limit bypass confirmed with a bounded test-account sequence | Severity depends on the protected action and practical abuse |
 | Duplicate record creation | Medium (P3) |
 | Vote/like manipulation | Low (P4) |
 
@@ -119,6 +119,13 @@ attack_script race_tester "https://TARGET/api/claim-bonus" \
 
 - `attack_script race_tester` — async concurrent request sender
 
+## Verification and Safe-Testing Gate
+
+- Use only test accounts and disposable records. Do not race real payments, production inventory, password resets, or destructive actions unless the program explicitly authorizes a controlled test.
+- Establish a sequential baseline first, then compare a small number of concurrent requests. Keep concurrency low and stop immediately if the service degrades or unintended state changes occur.
+- Confirm a race only when the final state violates an invariant (for example, a one-time action succeeds twice), not merely because requests overlap or return different status codes.
+- Record request ordering, timestamps, correlation IDs, response bodies, and final test-record state. Repeat only enough to establish reproducibility.
+- Check idempotency keys, transaction boundaries, locks, and retry behavior. A client retry or duplicate response is not proof of a server-side race.
 ## References
 
 - [PortSwigger: Race Conditions](https://portswigger.net/web-security/race-conditions)
