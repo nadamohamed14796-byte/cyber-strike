@@ -329,6 +329,7 @@ export namespace Agent {
             report_vulnerability: "allow",
             triage_vulnerability: "allow",
             validate_finding: "allow",
+            correlate_javascript: "allow",
             research_knowledge: "allow",
             add_intel: "allow",
             update_vrt_check: "allow",
@@ -546,6 +547,7 @@ export namespace Agent {
             web_get_request_detail: "allow",
             // Read-only shared knowledge may help interpret a concrete API/auth signal.
             research_knowledge: "allow",
+            correlate_javascript: "allow",
             web_write_role: "allow",
             web_write_object: "allow",
             web_write_object_value: "allow",
