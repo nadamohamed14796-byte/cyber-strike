@@ -146,6 +146,21 @@ attack_script waf_bypass "admin' OR 1=1--" --test-url "https://TARGET/api/login"
 - Verify the limit is actually bypassed by observing a protected action succeeding beyond the documented/expected threshold, not merely a different status code or error message.
 - Stop on account lockout, service degradation, CAPTCHA escalation, or unexpected alerts. Avoid triggering real emails, SMS, purchases, or password-reset messages repeatedly.
 - Document the exact request sequence, count, interval, identity used, expected limit, observed behavior, and the practical security impact.
+## Rate-Limit Measurement and Stop Conditions
+
+Measure a baseline first, then increase request volume gradually within the program's published limits. Prefer a designated test endpoint or account; do not run distributed, high-volume, or denial-of-service tests.
+
+Record the limit's scope and dimensions: per IP, account, API key, session, route, HTTP method, tenant, or time window. Observe status codes, Retry-After, rate-limit headers, reset timing, and whether counters are shared across equivalent routes.
+
+| Comparison | Why it matters | Safe evidence |
+|---|---|---|
+| Same identity, same route | establishes baseline enforcement | small bounded request sequence |
+| Same identity, alternate route/method | checks inconsistent policy mapping | compare equivalent operations only |
+| Two controlled test identities | identifies account vs IP scope | separate test accounts and redacted headers |
+| Authenticated vs anonymous | checks enforcement before/after auth | only where endpoint is explicitly in scope |
+
+Do not rotate proxies, spoof other users, or generate load to bypass production protections. Stop when a documented threshold is reached or latency/errors rise. A missing header is not proof of a bypass; demonstrate that an otherwise enforced limit can be exceeded and describe the practical consequence.
+
 ## References
 
 - [OWASP: Rate Limiting](https://owasp.org/www-community/controls/Rate_Limiting)
