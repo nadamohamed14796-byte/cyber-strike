@@ -80,16 +80,15 @@ export const AuthManagerTool = Tool.define("auth_manager", {
           return { title: "Target workspace mismatch", output: "site_url must share the exact origin with an existing target workspace, and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
         }
       }
-      // Ask for permission before consuming the one-shot password handoff.
-      // If the user denies the request, the secret remains available for retry.
-      await ctx.ask({ permission: "auth-credential-save", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, account: params.account } })
-      let password: string | undefined
+      // Move the one-shot secret out of process.env before any permission
+      // prompt can suspend the tool and allow other child processes to start.
+      let password: string | undefined = process.env.CYBERSTRIKE_AUTH_PASSWORD
+      if (!password) {
+        return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
+      }
+      delete process.env.CYBERSTRIKE_AUTH_PASSWORD
       try {
-        password = process.env.CYBERSTRIKE_AUTH_PASSWORD
-        if (!password) {
-          return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
-        }
-        delete process.env.CYBERSTRIKE_AUTH_PASSWORD
+        await ctx.ask({ permission: "auth-credential-save", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, account: params.account } })
         const saved = await AuthVault.save({
           origin: params.site_url, purpose: params.purpose, account: params.account,
           username: params.username, password, targetID: params.target_id,
