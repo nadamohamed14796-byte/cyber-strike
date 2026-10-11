@@ -195,7 +195,6 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
       "rce",
       "cve",
     ],
-    excludeTerms: ["career advice", "interview tips", "personal productivity", "marketing strategy"],
     trust: 90,
   },
   {
