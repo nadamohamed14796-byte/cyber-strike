@@ -296,6 +296,10 @@ function buildCrawlOptions(opts: WorkerOptions, signal: AbortSignal): CrawlOptio
 
   const model = createModelFromDescriptor(opts.model)
 
+  if (opts.savedLogin && opts.credentialDispatch.kind !== "none") {
+    throw new Error("Saved login profile cannot be combined with manual credential dispatch.")
+  }
+
   const credentialFields: Partial<CrawlOptions> = (() => {
     const d = opts.credentialDispatch
     if (d.kind === "single") return { authenticated: true, credentialID: d.credentialID }
@@ -309,7 +313,7 @@ function buildCrawlOptions(opts: WorkerOptions, signal: AbortSignal): CrawlOptio
     scope: opts.scope,
     exclude: opts.exclude,
     steps: opts.steps,
-    headless: opts.headless,
+    headless: opts.savedLogin ? false : opts.headless,
     panel: opts.panel,
     cyberstrikeUrl: opts.cyberstrikeUrl,
     model,
@@ -317,6 +321,7 @@ function buildCrawlOptions(opts: WorkerOptions, signal: AbortSignal): CrawlOptio
     logSink,
     eventSink,
     signal,
+    ...(opts.savedLogin ? { credentials: opts.savedLogin } : {}),
     ...credentialFields,
   }
 }
