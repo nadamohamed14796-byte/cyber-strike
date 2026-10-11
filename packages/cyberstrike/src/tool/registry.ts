@@ -52,6 +52,7 @@ import { WebUpdateCredentialTool } from "./web-update-credential"
 import { CsrfExtractTool } from "./csrf-extract"
 import { HackbrowserTool } from "./hackbrowser"
 import { AuthManagerTool } from "./auth-manager"
+import { GmailTool } from "./gmail"
 import { AddIntelTool } from "./intel"
 import { UpdateVrtCheckTool } from "./vrt-check"
 import { RecordCoverageNoteTool, GetCoverageNotesTool } from "./coverage-note"
@@ -201,6 +202,8 @@ export namespace ToolRegistry {
       HackbrowserTool,
       // Shared encrypted website login profile manager (separate from target notes/research knowledge).
       AuthManagerTool,
+      // Shared read-only Gmail connector for mailbox search, reading, and OTP workflows.
+      GmailTool,
       // Methodology Engine Tools — intelligence, coverage, chain detection
       AddIntelTool,
       UpdateVrtCheckTool,
