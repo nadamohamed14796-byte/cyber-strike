@@ -6,7 +6,7 @@ Generated from the Git trees of the two requested source repositories and the Cy
 
 - Claude-BugHunter source skills: 83.
 - recon-skills source skills: 146.
-- Current CyberStrike top-level curated skill directories on this branch: 63 (after the second adapted batch).
+- Current CyberStrike top-level curated skill directories on this branch: 72 (after the third adapted batch).
 - This is a staged migration inventory. The current branch includes an initial batch and a second batch of 12 adapted skills; it does not mean all upstream skills have been imported.
 
 ## Mapping rules
@@ -269,3 +269,18 @@ The following additional source areas have CyberStrike-native drafts on this bra
 | `attack-cicd-security` | Claude-BugHunter CI/CD security | Draft added; runtime support unverified |
 
 These rows describe work added in the feature branch. They are not claims that the matching upstream skill has been fully reconciled or that every procedure has been independently validated.
+
+
+## Third adapted batch (2026-10-11)
+
+| CyberStrike skill | Source area | Review status |
+|---|---|---|
+| `attack-captcha-bypass` | Claude-BugHunter `hunt-captcha-bypass` | Draft added; runtime support unverified |
+| `attack-cloud-misconfig` | Claude-BugHunter `hunt-cloud-misconfig` | Draft added; runtime support unverified |
+| `attack-mcp-security` | recon-skills `redteam/hunt-mcp-security` | Draft added; runtime support unverified |
+| `attack-llm-security` | Claude-BugHunter `hunt-llm-ai`; recon-skills `redteam/llm-prompt-injection` | Draft added; runtime support unverified |
+| `attack-email-security` | recon-skills `recon/email-security` | Draft added; runtime support unverified |
+| `attack-401-403-bypass` | recon-skills `recon/401-403-bypass` | Draft added; runtime support unverified |
+| `attack-source-leak` | Claude-BugHunter `hunt-source-leak`; recon-skills `recon/source-leak-hunt` | Draft added; runtime support unverified |
+| `attack-firebase-supabase` | recon-skills Firebase/Supabase assessment | Draft added; runtime support unverified |
+| `attack-supply-chain-recon` | Claude-BugHunter and recon-skills supply-chain reconnaissance | Draft added; runtime support unverified |
