@@ -120,14 +120,12 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       // which would forward an abort to the worker and kill the still-running
       // background crawl. The crawl is stopped only via stopHackbrowser (Esc /
       // session-delete / /hackbrowser-stop), never the turn lifecycle.
-    })
+    }).finally(() => { if (savedLogin) savedLogin.password = "" })
 
     // Output is intentionally a "started" notice, NOT a result summary.
     // Spell-out is for weak LLMs — see feedback_weak_llm_baseline:
     // explicit "do NOT poll" + "use web_get_session_context when you
     // need them" prevents looped re-invocation.
-    if (savedLogin) savedLogin.password = ""
-
     const output = [
       `Hackbrowser crawl started for ${args.target}.`,
       ...(savedLogin ? ["Saved login profile was supplied to the visible browser. Credentials are not included in this response."] : []),
