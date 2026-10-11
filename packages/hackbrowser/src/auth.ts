@@ -436,7 +436,7 @@ export async function autoLogin(
 
     await handle2FA(page)
   } catch (err) {
-    log.warn("auto-login failed, falling back to manual login", { err: String(err) })
+    log.warn("auto-login failed, falling back to manual login")
     await waitForManualLogin(page)
   }
 }
