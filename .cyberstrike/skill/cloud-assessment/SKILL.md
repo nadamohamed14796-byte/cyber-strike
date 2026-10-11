@@ -131,6 +131,14 @@ record_coverage_note
 - Use provider-native audit evidence and least-privileged test identities. Do not retrieve real cloud credentials, export customer data, disable logging, or modify IAM policies as proof.
 - Preserve sanitized commands, policy snippets, provider/account context, timestamps, and the relevant expected/observed behavior. Redact tokens, keys, and private resource identifiers.
 
+## Scope and Validation Notes
+
+- Record authorized account/tenant/project identifiers, regions, resource groups, and excluded services before running checks. Reachability does not establish authorization.
+- Prefer read-only inventory and policy inspection. Validate effective access with a designated least-privileged test identity rather than inferring impact from a policy fragment alone.
+- Use synthetic objects and designated test resources to demonstrate storage or identity exposure. Do not retrieve production secrets, modify IAM, disable logs, or create persistence as part of a read-only assessment.
+- Treat benchmark deviations as configuration findings until exposure, exploitability, and business impact are established. Note compensating controls and exceptions to reduce false positives.
+- Keep evidence minimal and sanitized: control ID, resource type, relevant setting, timestamp, and redacted command output. Never commit cloud credentials or customer data.
+
 ## Program Reference
 
 | Program | Domain | Providers |
