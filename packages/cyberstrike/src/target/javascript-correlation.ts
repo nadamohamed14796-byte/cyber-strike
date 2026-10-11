@@ -319,7 +319,15 @@ export namespace JavaScriptCorrelation {
 
     if (explicitJS) {
       const explicitKey = explicitJS.origin + explicitJS.pathname
-      if (!jsCandidates.some((item) => item.url.origin + item.url.pathname === explicitKey)) {
+      const alreadyObserved = jsCandidates.some((item) => item.url.origin + item.url.pathname === explicitKey)
+      if (!isJavaScriptAssetAllowed({
+        targetURL: normalizedTarget.targetURL,
+        javascriptURL: explicitJS.href,
+        alreadyObserved,
+      })) {
+        throw new Error("JavaScript asset is outside the target path/host boundary and is not already observed in this session. This correlation tool does not replace the existing scope engine.")
+      }
+      if (!alreadyObserved) {
         jsCandidates.unshift({
           row: {
             id: null as unknown as string,
