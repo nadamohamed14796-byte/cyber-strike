@@ -138,6 +138,23 @@ Only claim privilege escalation when the modified token is accepted and a contro
 - [uphiago/recon-skills — JWT attack methodology](https://github.com/uphiago/recon-skills/blob/main/recon/jwt-attack/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — JWT crypto hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-jwt-crypto/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## Token Validation and Safe Proof Matrix
+
+Assess token acceptance against a known-good baseline and vary only one property per test:
+
+| Property | Review | Evidence of a real issue |
+|---|---|---|
+| Signature | algorithm/key selection and signature enforcement | altered claims accepted without a valid signature |
+| Claims | issuer, audience, expiry, not-before, subject, tenant, scopes | token accepted outside its intended issuer, audience, time, or privilege |
+| Key selection | key ID, JWK/JWKS source, key rotation | untrusted key material changes trust decisions |
+| Token type | access, ID, refresh, reset tokens | one token class accepted in a different security context |
+| Revocation/session | logout, password reset, account disable | previously invalidated token still grants meaningful access contrary to policy |
+| Authorization | same endpoint with owner and second test identity | claims or scopes permit an unauthorized action |
+
+Never paste production tokens into online decoders or third-party services. Use test tokens, redact secrets, and avoid forging tokens for other users. A weak algorithm configuration or suspicious header is a lead; confirm that the server actually accepts the invalid token and that the accepted claims alter authorization.
+
+Record token type, issuer/audience, redacted header and claims, baseline vs modified behavior, expiry/revocation state, and the exact protected action demonstrated.
+
 ## References
 
 - [PortSwigger: JWT Attacks](https://portswigger.net/web-security/jwt)
