@@ -195,3 +195,19 @@ Local Admin on Workstation
 | Pass-the-Hash | 4624 Type 3 with NTLM | Overpass-the-Hash (Kerberos) |
 | BloodHound    | LDAP queries          | Reduce collection scope      |
 | Mimikatz      | AV signatures         | BOF, custom tools            |
+
+## Attack-Path Verification and Reporting
+
+Model Active Directory findings as a chain of specific edges, not as a list of tool alerts. For every edge, record the principal, object, effective right, and resulting security boundary.
+
+| Edge | Verify | Safe evidence |
+|---|---|---|
+| Principal to object | effective ACL, group membership, delegated right | read-only ACL output and controlled account context |
+| Credential to service | whether a designated test identity can authenticate | approved test account; never reuse captured user credentials |
+| Service to host | permitted access level and host scope | minimum access proof on an authorized lab endpoint |
+| Host to domain privilege | exact group/ACL/delegation path | configuration evidence plus controlled non-destructive validation |
+| Trust/delegation | actual impersonation or delegation boundary | test principals only; no access to unrelated mailboxes or files |
+
+A SPN, unconstrained delegation flag, writable ACL, or graph path is not automatically exploitable. Confirm effective rights and practical impact while avoiding password spraying, credential dumping, persistence, and lateral movement unless each action is explicitly authorized.
+
+Reports should include sanitized domain/host context, the exact relationship or permission, expected policy, observed access, impact, timestamps, and remediation. Keep tickets, hashes, passwords, and private directory exports out of committed evidence.
