@@ -55,7 +55,7 @@ function header(message: GmailMessage, name: string): string {
   return message.payload?.headers?.find((item) => item.name?.toLowerCase() === name.toLowerCase())?.value ?? ""
 }
 
-function extractCode(text: string): string | undefined {
+export function extractOtpCode(text: string): string | undefined {
   const normalized = text.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ")
   const patterns = [
     /(?:verification|security|confirmation|one[- ]time|login|sign[- ]in|authentication|otp)[^\d]{0,70}(\d{6,8})/i,
@@ -120,7 +120,7 @@ export namespace GmailOtp {
 
       const text = [message.snippet ?? "", collectText(message.payload)].join("\n")
       if (!/verification|security code|one[- ]time|sign[- ]in|login|authentication|otp/i.test(`${subject}\n${text}`)) continue
-      const code = extractCode(`${subject}\n${text}`)
+      const code = extractOtpCode(`${subject}\n${text}`)
       if (code) return { code, messageId: message.id, from, subject, receivedAt }
     }
     return undefined
