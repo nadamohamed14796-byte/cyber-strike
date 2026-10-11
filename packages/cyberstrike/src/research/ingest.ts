@@ -298,6 +298,10 @@ export interface ExtractedResearchDetails {
   prerequisites?: string
   verificationSignals?: string
   falsePositiveCautions?: string
+  rootCause?: string
+  requestResponseEvidence?: string
+  affectedComponents?: string
+  limitations?: string
   retrievalSignals: string[]
 }
 
@@ -332,6 +336,30 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
       /false positive|not exploitable|does not prove|not sufficient|expected behavior|by design|requires? (?:additional|manual) verification|out of scope|cannot reproduce|not reproducible/i,
       5,
       1400,
+    ),
+    rootCause: matchingSentences(
+      text,
+      /root cause|because|missing (?:an? )?(?:authorization|validation|check|control)|lack of|not enforced|trusts? (?:the )?user|fails? to (?:check|validate|verify|authorize)|improper(?:ly)?|insecure(?:ly)?|vulnerab(?:le|ility)/i,
+      6,
+      1800,
+    ),
+    requestResponseEvidence: matchingSentences(
+      text,
+      /(?:GET|POST|PUT|PATCH|DELETE)\\s+\\/|HTTP\\/1\\.[01]|request(?: body| header| parameter)?|response(?: body| header| code| status)?|status code|compare (?:the )?(?:response|result)|returned \\d{3}|payload/i,
+      8,
+      2400,
+    ),
+    affectedComponents: matchingSentences(
+      text,
+      /endpoint|route|parameter|header|cookie|token|API|function|component|feature|source map|javascript|upload|workflow/i,
+      5,
+      1400,
+    ),
+    limitations: matchingSentences(
+      text,
+      /only (?:works|applies|succeeds) when|requires? (?:a |an |the )?(?:specific|certain|authenticated|privileged|owner|non-owner)|depends on|environment|version|not tested|not confirmed|could not|limitation|assumption/i,
+      6,
+      1800,
     ),
     retrievalSignals: extractResearchSignals(fullText, vulnerabilityClass),
   }
@@ -719,6 +747,10 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
             prerequisites: extracted.prerequisites ?? null,
             verification_signals: extracted.verificationSignals ?? null,
             false_positive_cautions: extracted.falsePositiveCautions ?? null,
+            root_cause: extracted.rootCause ?? null,
+            request_response_evidence: extracted.requestResponseEvidence ?? null,
+            affected_components: extracted.affectedComponents ?? null,
+            limitations: extracted.limitations ?? null,
             retrieval_signals: extracted.retrievalSignals,
           },
         },
