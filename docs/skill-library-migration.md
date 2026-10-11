@@ -71,3 +71,23 @@ A skill is complete only when its triggers, prerequisites, procedure, verificati
 - https://github.com/elementalsouls/Claude-BugHunter
 - https://github.com/uphiago/recon-skills
 - https://github.com/uphiago/recon-skills/blob/main/STYLE.md
+
+
+## Second migration batch
+
+The following 12 focused drafts were added after the first batch:
+
+- `attack-api-misconfig`
+- `attack-ato`
+- `attack-business-logic`
+- `attack-clickjacking`
+- `attack-grpc`
+- `attack-cloud-iam`
+- `attack-deserialization`
+- `attack-api-noauth`
+- `attack-wordpress`
+- `attack-apk-redteam-pipeline`
+- `attack-bugcrowd-reporting`
+- `attack-cicd-security`
+
+Their entries have also been added to `.cyberstrike/skill/index.json`, along with the first batch and the expanded IDOR skill, so the index can discover those names. The registry marks these entries `unverified`; this is deliberate. Loader behavior, runtime trigger selection, actual tool availability, and end-to-end tests remain to be verified before these skills can be called fully integrated.
