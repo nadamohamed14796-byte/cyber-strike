@@ -430,7 +430,6 @@ export namespace TargetMemory {
     }
 
     const sessionIDs = [...relatedSessionIDs]
-    const sessionIDs = [...relatedSessionIDs]
     const requests = Database.use((db) =>
       db
         .select({
