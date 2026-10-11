@@ -271,7 +271,8 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
   const signals = new Set<string>()
   if (vulnerabilityClass) signals.add(vulnerabilityClass)
   const patterns: Array<[string, RegExp]> = [
-    ["idor", /\bidor\b|insecure direct object|object-level authorization/],
+    ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
+    ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
     ["authorization-boundary", /authorization|access control|privilege escalation|another user|other account/],
     ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/],
     ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/],
