@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { normalizeAuthOrigin } from "../src/auth-vault"
+import { isAuthVaultDataValid, normalizeAuthOrigin } from "../src/auth-vault"
 
 describe("normalizeAuthOrigin", () => {
   test("matches only the normalized origin, not a path", () => {
@@ -17,5 +17,42 @@ describe("normalizeAuthOrigin", () => {
 
   test("rejects credentials embedded in a URL", () => {
     expect(() => normalizeAuthOrigin("https://user:pass@example.com")).toThrow("Do not put credentials")
+  })
+})
+
+
+describe("AuthVault persisted data validation", () => {
+  const validRecord = () => ({
+    id: "0123456789abcdef0123456789abcdef",
+    origin: "https://example.com",
+    purpose: "target",
+    account: "research-account",
+    username: "tester@example.com",
+    targetID: "target_123",
+    password: {
+      iv: Buffer.alloc(12, 1).toString("base64"),
+      tag: Buffer.alloc(16, 2).toString("base64"),
+      ciphertext: Buffer.alloc(32, 3).toString("base64"),
+    },
+    createdAt: 1,
+    updatedAt: 2,
+  })
+
+  test("accepts an empty vault and a correctly shaped encrypted profile", () => {
+    expect(isAuthVaultDataValid([])).toBe(true)
+    expect(isAuthVaultDataValid([validRecord()])).toBe(true)
+  })
+
+  test("rejects malformed rows instead of trusting an array cast", () => {
+    expect(isAuthVaultDataValid([null])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), username: 123 }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), origin: "file:///etc/passwd" }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), targetID: undefined }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), password: { iv: "abc", tag: "bad", ciphertext: "x" } }])).toBe(false)
+  })
+
+  test("rejects duplicate profile IDs that would make secret lookup ambiguous", () => {
+    const row = validRecord()
+    expect(isAuthVaultDataValid([row, { ...row, account: "another-account" }])).toBe(false)
   })
 })
