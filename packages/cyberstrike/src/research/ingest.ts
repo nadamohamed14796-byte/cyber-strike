@@ -288,6 +288,56 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
   return [...signals].slice(0, 20)
 }
 
+export interface ExtractedResearchDetails {
+  severity: string
+  lesson?: string
+  attackVector?: string
+  impact?: string
+  reproduction?: string
+  poc?: string
+  prerequisites?: string
+  verificationSignals?: string
+  falsePositiveCautions?: string
+  retrievalSignals: string[]
+}
+
+export function extractResearchDetails(title: string, text: string, vulnerabilityClass?: string): ExtractedResearchDetails {
+  const fullText = title + " " + text
+  return {
+    severity: severityOf(fullText),
+    lesson: lessonOf(text, vulnerabilityClass),
+    attackVector: attackVectorOf(text),
+    impact: impactOf(text),
+    reproduction: matchingSentences(
+      text,
+      /reproduc|step\s+\d|first,|then,|send(?:ing)? (?:a |the )?request|modify the|change the|payload|parameter|proof[- ]of[- ]concept|\bpoc\b|exploit/i,
+      8,
+      2400,
+    ),
+    poc: pocSnippet(text),
+    prerequisites: matchingSentences(
+      text,
+      /prerequisite|requires? (?:an? |the )?(?:account|role|permission|token|feature|condition)|must be (?:logged|authenticated|authorized)|only when|if (?:the|a|an) (?:user|account|role|request|parameter|feature)/i,
+      5,
+      1400,
+    ),
+    verificationSignals: matchingSentences(
+      text,
+      /verify|confirm|reproduc|expected response|response code|response body|compare (?:the )?(?:response|result)|evidence|impact was|demonstrat/i,
+      6,
+      1800,
+    ),
+    falsePositiveCautions: matchingSentences(
+      text,
+      /false positive|not exploitable|does not prove|not sufficient|expected behavior|by design|requires? (?:additional|manual) verification|out of scope|cannot reproduce|not reproducible/i,
+      5,
+      1400,
+    ),
+    retrievalSignals: extractResearchSignals(fullText, vulnerabilityClass),
+  }
+}
+
+
 function pocSnippet(text: string) {
   const lines = text.split(/\n|(?<=\.)\s+/).map((line) => line.trim())
   const candidates = lines.filter((line) =>
@@ -619,45 +669,19 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
       }
 
       const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
-      const lesson = lessonOf(text, vulnerabilityClass)
-      const reproduction = matchingSentences(
-        text,
-        /reproduc|step\s+\d|first,|then,|send(?:ing)? (?:a |the )?request|modify the|change the|payload|parameter|proof[- ]of[- ]concept|\bpoc\b|exploit/i,
-        8,
-        2400,
-      )
-      const poc = pocSnippet(text)
-      const prerequisites = matchingSentences(
-        text,
-        /prerequisite|requires? (?:an? |the )?(?:account|role|permission|token|feature|condition)|must be (?:logged|authenticated|authorized)|only when|if (?:the|a|an) (?:user|account|role|request|parameter|feature)/i,
-        5,
-        1400,
-      )
-      const verification = matchingSentences(
-        text,
-        /verify|confirm|reproduc|expected response|response code|response body|compare (?:the )?(?:response|result)|evidence|impact was|demonstrat/i,
-        6,
-        1800,
-      )
-      const falsePositiveCautions = matchingSentences(
-        text,
-        /false positive|not exploitable|does not prove|not sufficient|expected behavior|by design|requires? (?:additional|manual) verification|out of scope|cannot reproduce|not reproducible/i,
-        5,
-        1400,
-      )
-      const technologySignals = extractResearchSignals(title + " " + text, vulnerabilityClass)
+      const extracted = extractResearchDetails(title, text, vulnerabilityClass)
       const ingested = ReportKnowledge.ingestExternalDetailed({
         title,
-        severity: severityOf(title + " " + text),
+        severity: extracted.severity,
         vulnerabilityClass,
         sourceURL: item.source_url,
-        attackVector: attackVectorOf(text),
-        impact: impactOf(text),
-        reproduction,
-        poc,
-        lesson,
+        attackVector: extracted.attackVector,
+        impact: extracted.impact,
+        reproduction: extracted.reproduction,
+        poc: extracted.poc,
+        lesson: extracted.lesson,
         sourceTrust: source.trust,
-        tags: Array.from(new Set([source.id, source.kind, ...technologySignals])),
+        tags: Array.from(new Set([source.id, source.kind, ...extracted.retrievalSignals])),
         metadata: {
           research_source: source.id,
           research_source_name: source.name,
@@ -671,15 +695,15 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           extraction_version: 2,
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
-            severity: severityOf(title + " " + text),
-            attack_vector: attackVectorOf(text) ?? null,
-            impact: impactOf(text) ?? null,
-            reproduction_steps: reproduction ?? null,
-            poc_snippet: poc ?? null,
-            prerequisites: prerequisites ?? null,
-            verification_signals: verification ?? null,
-            false_positive_cautions: falsePositiveCautions ?? null,
-            retrieval_signals: technologySignals,
+            severity: extracted.severity,
+            attack_vector: extracted.attackVector ?? null,
+            impact: extracted.impact ?? null,
+            reproduction_steps: extracted.reproduction ?? null,
+            poc_snippet: extracted.poc ?? null,
+            prerequisites: extracted.prerequisites ?? null,
+            verification_signals: extracted.verificationSignals ?? null,
+            false_positive_cautions: extracted.falsePositiveCautions ?? null,
+            retrieval_signals: extracted.retrievalSignals,
           },
         },
       })
