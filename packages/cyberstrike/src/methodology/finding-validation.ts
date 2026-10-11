@@ -3,6 +3,7 @@ import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { Session } from "../session"
 import { Vulnerability } from "../session/vulnerability"
+import { TargetMemory } from "../target"
 import {
   FindingValidationTable,
   type FindingValidationCheckRecord,
@@ -158,7 +159,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[]): Findi
 }
 
 export namespace FindingValidation {
-  export function record(input: {
+  export async function record(input: {
     sessionID: string
     vulnerabilityID: string
     checks: FindingValidationInputCheck[]
@@ -205,7 +206,47 @@ export namespace FindingValidation {
       description,
     })
 
-    return { ...assessment, id: validationID, findingID: input.vulnerabilityID }
+    // Save the outcome in target-specific notes only when an existing workspace is
+    // unambiguously matched to observations from this session tree. Never infer a target
+    // from a finding title or write validation details into global research memory.
+    let targetNoteID: string | undefined
+    try {
+      const observed = TargetMemory.list()
+        .filter((workspace) => TargetMemory.isObservedInSession(rootSessionID, workspace.targetURL))
+        .sort((left, right) => {
+          const hostSpecificity = right.hostname.length - left.hostname.length
+          if (hostSpecificity) return hostSpecificity
+          const leftPath = new URL(left.targetURL).pathname.length
+          const rightPath = new URL(right.targetURL).pathname.length
+          return rightPath - leftPath
+        })
+      const workspace = observed[0]
+      if (workspace) {
+        const note = await TargetMemory.addNote(workspace.targetURL, {
+          kind: "finding",
+          title: "Finding validation — " + finding.title,
+          content: [
+            "Finding ID: " + input.vulnerabilityID,
+            "Validation ID: " + validationID,
+            "Verdict: " + assessment.verdict,
+            assessment.summary,
+            assessment.nextStep,
+            "Failed checks: " + (assessment.failedCheckIDs.length ? assessment.failedCheckIDs.join(", ") : "none"),
+            "Unknown checks: " + (assessment.unknownCheckIDs.length ? assessment.unknownCheckIDs.join(", ") : "none"),
+            "Check history is stored in the SQLite finding_validation table. This note intentionally excludes raw request/response evidence.",
+          ].join("\n"),
+          source: "finding-validation:" + validationID,
+          status: assessment.verdict === "confirmed" ? "confirmed" : assessment.verdict === "false_positive" ? "disproven" : "unverified",
+          tags: ["finding-validation", assessment.verdict, ...assessment.failedCheckIDs.map((id) => "failed:" + id)],
+        })
+        targetNoteID = note.note.id
+      }
+    } catch (error) {
+      // A note-file failure must not roll back the durable validation record or verdict.
+      console.warn("[cyberstrike] target validation note could not be written:", error instanceof Error ? error.message : String(error))
+    }
+
+    return { ...assessment, id: validationID, findingID: input.vulnerabilityID, targetNoteID }
   }
 
   export function history(input: { sessionID: string; vulnerabilityID: string; limit?: number }) {

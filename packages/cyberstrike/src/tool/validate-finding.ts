@@ -45,7 +45,7 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
   }),
   async execute(params, ctx) {
     try {
-      const result = FindingValidation.record({
+      const result = await FindingValidation.record({
         sessionID: ctx.sessionID,
         vulnerabilityID: params.id,
         checks: params.checks as FindingValidationInputCheck[],
@@ -56,6 +56,7 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
         metadata: {
           validation_id: result.id,
           finding_id: result.findingID,
+          target_note_id: result.targetNoteID,
           verdict: result.verdict,
           rubric_confidence: result.confidence,
           failed_checks: result.failedCheckIDs,

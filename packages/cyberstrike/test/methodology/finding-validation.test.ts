@@ -90,7 +90,7 @@ test("records validation history and removes false positives from confirmed find
         },
       })
 
-      const result = FindingValidation.record({
+      const result = await FindingValidation.record({
         sessionID: session.id,
         vulnerabilityID: finding.id,
         checks,
