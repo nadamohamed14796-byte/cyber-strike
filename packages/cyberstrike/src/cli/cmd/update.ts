@@ -16,7 +16,7 @@ function bounded(value: number | undefined, fallback: number, min: number, max: 
  */
 export const UpdateCommand = cmd({
   command: "update",
-  describe: "discover public research, learn queued items, and persist knowledge for hunting",
+  describe: "discover and study public reports/writeups into globally shared research knowledge for every agent",
   builder: (yargs: Argv) =>
     yargs
       .option("pages", { type: "number", default: 10, describe: "maximum discovery pages per source for each cycle" })
