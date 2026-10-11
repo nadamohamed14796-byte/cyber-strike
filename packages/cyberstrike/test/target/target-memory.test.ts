@@ -112,3 +112,24 @@ test("redacts secret-bearing fields at the target-note persistence boundary", as
     },
   })
 })
+
+
+test("refuses target workspaces that resolve through a symlink", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://example.com"
+      const slug = TargetMemory.normalize(targetURL).slug
+      const targetsRoot = path.join(tmp.path, ".cyberstrike", "targets")
+      const outside = path.join(tmp.path, "outside-target")
+      await fs.mkdir(targetsRoot, { recursive: true })
+      await fs.mkdir(outside, { recursive: true })
+      await fs.symlink(outside, path.join(targetsRoot, slug), "dir")
+
+      await expect(TargetMemory.ensure(targetURL)).rejects.toThrow(/symbolic links/i)
+      expect(await fs.readdir(outside)).toEqual([])
+      await Instance.dispose()
+    },
+  })
+})
