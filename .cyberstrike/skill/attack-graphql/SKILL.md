@@ -135,6 +135,24 @@ Test GraphQL authorization at more than one layer. Use two controlled accounts w
 - [uphiago/recon-skills — GraphQL hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-graphql/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — GraphQL hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-graphql/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## GraphQL Coverage and Triage Matrix
+
+Track coverage by schema surface rather than by payload count:
+
+| Surface | Compare | Validate |
+|---|---|---|
+| Queries | same object as anonymous, owner, and other test user | object-level authorization |
+| Nested fields | parent allowed but sensitive child field requested | field-level authorization |
+| Mutations | valid owner vs non-owner; allowed vs disallowed state transition | authorization and server-side invariants |
+| Node/global IDs | IDs belonging to two controlled accounts | whether changing an identifier crosses ownership |
+| Aliases/batching | small bounded batch vs single operation | whether controls are applied per operation and per object |
+| Introspection/errors | enabled/disabled behavior and sanitized errors | information disclosure with actionable impact |
+| Pagination/filtering | boundary values and alternate filters | tenant isolation and unintended data expansion |
+
+Use only controlled accounts and synthetic records. Keep batch size small and stop if latency, error rate, or resource consumption rises unexpectedly. Do not use introspection output alone as proof of a vulnerability.
+
+A strong report contains the operation, variables, role/tenant context, expected authorization rule, observed result, and a redacted before/after response showing the exact unauthorized field or state change.
+
 ## References
 
 - [PortSwigger: GraphQL](https://portswigger.net/web-security/graphql)
