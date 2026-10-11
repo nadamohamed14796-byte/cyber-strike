@@ -136,7 +136,7 @@ export namespace ResearchContext {
         tags,
       }
     })
-    const signalPool = [...entries, ...requestSignals, ...functionSignals]
+    // Prefer fresh observed traffic and modeled workflows over generic Intel titles.\n    // Otherwise eight older actionable Intel rows can starve the current request signals.\n    const signalPool = [...requestSignals, ...functionSignals, ...entries]
 
     const baseline = [
       "## Global Research Memory — Signal-Triggered Use",
