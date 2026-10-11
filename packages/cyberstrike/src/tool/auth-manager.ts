@@ -125,7 +125,7 @@ export const AuthManagerTool = Tool.define("auth_manager", {
       }
       delete process.env.CYBERSTRIKE_AUTH_PASSWORD
       try {
-        await ctx.ask({ permission: "auth-credential-save", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, account: params.account } })
+        await ctx.ask({ permission: "auth-credential-save", patterns: [permissionOrigin], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, account: params.account } })
         const saved = await AuthVault.save({
           origin: params.site_url, purpose: params.purpose, account: params.account,
           username: params.username, password, targetID: params.target_id,
@@ -150,7 +150,7 @@ export const AuthManagerTool = Tool.define("auth_manager", {
       return { title: "Saved login profiles", output: profiles.length ? profiles.map((p) => `- ${p.account} | ${p.username} | id=${p.id} | ${p.origin} | ${p.purpose} | updated=${new Date(p.updatedAt).toISOString()}`).join("\n") : "No saved profile matches this exact origin and purpose.", metadata: { count: profiles.length } }
     }
     if (!params.profile_id) return { title: "Profile ID required", output: "Provide profile_id to forget a saved login profile.", metadata: { ok: false } }
-    await ctx.ask({ permission: "auth-credential-delete", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, profileID: params.profile_id } })
+    await ctx.ask({ permission: "auth-credential-delete", patterns: [permissionOrigin], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, profileID: params.profile_id } })
     const removed = await AuthVault.remove({ id: params.profile_id, origin: params.site_url, purpose: params.purpose, targetID: params.target_id })
     let indexSynced = false
     if (removed && params.purpose === "target" && params.target_id) {
