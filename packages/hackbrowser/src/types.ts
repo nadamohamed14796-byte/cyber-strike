@@ -265,7 +265,7 @@ export interface AgentConfig {
     // Path to a saved session file (cookies JSON)
     sessionFile?: string
     // If set, agent will auto-login with these credentials
-    credentials?: { username: string; password: string; origin?: string; usernameSelector?: string; passwordSelector?: string }
+    credentials?: { username: string; password: string; origin?: string; otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>; usernameSelector?: string; passwordSelector?: string }
     // If true, user logs in manually via browser button (Aşama 11)
     authenticated?: boolean
   }
