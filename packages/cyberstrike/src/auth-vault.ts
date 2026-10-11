@@ -48,8 +48,12 @@ function isStoredProfile(value: unknown): value is StoredProfile {
     (value.purpose !== "research" && value.purpose !== "target") ||
     typeof value.account !== "string" ||
     !value.account.trim() ||
+    value.account.length > 120 ||
+    /[\\r\\n\\0]/.test(value.account) ||
     typeof value.username !== "string" ||
     !value.username.trim() ||
+    value.username.length > 320 ||
+    /[\\r\\n\\0]/.test(value.username) ||
     typeof value.createdAt !== "number" ||
     !Number.isSafeInteger(value.createdAt) ||
     typeof value.updatedAt !== "number" ||
@@ -172,7 +176,12 @@ function summary({ password: _secret, ...profile }: StoredProfile): AuthProfileS
 export namespace AuthVault {
   export async function save(input: AuthProfileInput): Promise<AuthProfileSummary> {
     const origin = normalizeAuthOrigin(input.origin)
-    if (!input.account.trim() || !input.username.trim() || !input.password) throw new Error("Account label, username/email, and password are required.")
+    const account = input.account.trim()
+    const username = input.username.trim()
+    if (!account || !username || !input.password) throw new Error("Account label, username/email, and password are required.")
+    if (account.length > 120 || username.length > 320 || /[\\r\\n\\0]/.test(account) || /[\\r\\n\\0]/.test(username)) {
+      throw new Error("Account labels must be one line (maximum 120 characters) and usernames one line (maximum 320 characters).")
+    }
     if (input.purpose === "target" && !input.targetID?.trim()) {
       throw new Error("Target-purpose credentials must be bound to an explicit targetID to prevent cross-target reuse.")
     }
@@ -180,14 +189,14 @@ export namespace AuthVault {
       const rows = await read()
       const targetID = input.targetID?.trim()
       const existing = rows.find((row) => row.origin === origin && row.purpose === input.purpose &&
-        row.account.toLowerCase() === input.account.trim().toLowerCase() && row.targetID === targetID)
+        row.account.toLowerCase() === account.toLowerCase() && row.targetID === targetID)
       const now = Date.now()
       const row: StoredProfile = {
         id: existing?.id ?? randomBytes(16).toString("hex"),
         origin,
         purpose: input.purpose,
-        account: input.account.trim(),
-        username: input.username.trim(),
+        account,
+        username,
         ...(targetID ? { targetID } : {}),
         password: encrypt(input.password),
         createdAt: existing?.createdAt ?? now,
