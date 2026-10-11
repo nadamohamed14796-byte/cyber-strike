@@ -32,7 +32,7 @@ async function syncTargetProfileIndex(siteURL: string, targetID: string): Promis
     "> This file contains references only. Passwords are stored encrypted in CyberStrike's local auth vault and must never be copied here.",
     "",
     ...profiles.flatMap((profile) => [
-      `## ${profile.account.replace(/[\\r\\n#]/g, " ").slice(0, 120)}`,
+      `## ${profile.account.replace(/[\r\n#]/g, " ").slice(0, 120)}`,
       "",
       `- Profile ID: ${profile.id}`,
       `- Origin: ${profile.origin}`,
