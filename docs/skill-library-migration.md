@@ -91,3 +91,20 @@ The following 12 focused drafts were added after the first batch:
 - `attack-cicd-security`
 
 Their entries have also been added to `.cyberstrike/skill/index.json`, along with the first batch and the expanded IDOR skill, so the index can discover those names. The registry marks these entries `unverified`; this is deliberate. Loader behavior, runtime trigger selection, actual tool availability, and end-to-end tests remain to be verified before these skills can be called fully integrated.
+
+
+## Third migration batch
+
+Nine more adapted drafts were added and registered in `.cyberstrike/skill/index.json`:
+
+- `attack-captcha-bypass`
+- `attack-cloud-misconfig`
+- `attack-mcp-security`
+- `attack-llm-security`
+- `attack-email-security`
+- `attack-401-403-bypass`
+- `attack-source-leak`
+- `attack-firebase-supabase`
+- `attack-supply-chain-recon`
+
+These remain `unverified` registry entries until loader behavior, referenced tools, and end-to-end routing have been checked.
