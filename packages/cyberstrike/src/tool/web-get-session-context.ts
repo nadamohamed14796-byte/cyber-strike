@@ -143,13 +143,13 @@ export const WebGetSessionContextTool = Tool.define("web_get_session_context", {
     try {
       const research = ResearchContext.generate(sessionID)
       if (research) context.global_research_memory = research
-    } catch (error) {
+    } catch {
       context.global_research_memory = "Shared research memory is temporarily unavailable; continue with recorded target evidence and normal methodology."
     }
     try {
       const targetMemory = TargetMemory.contextForSession(sessionID)
       if (targetMemory) context.target_memory = targetMemory
-    } catch (error) {
+    } catch {
       context.target_memory = "Target-specific memory is temporarily unavailable; do not infer missing observations."
     }
 
