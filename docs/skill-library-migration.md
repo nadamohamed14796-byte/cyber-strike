@@ -1,147 +1,75 @@
-# External Skill Library Migration
+# Canonical Skill Library Consolidation
 
-## Goal
+## Objective
 
-Build a cohesive CyberStrike-native skill library from:
+Merge the useful methods from CyberStrike's existing skills and the two upstream libraries into **existing CyberStrike skill files**:
 - https://github.com/elementalsouls/Claude-BugHunter
 - https://github.com/uphiago/recon-skills
 
-This is a staged migration, not a claim that every upstream file has already been imported. Each skill must be reviewed, adapted, checked for duplicates, and validated against the real runtime before it is marked integrated.
+The expected result is one comprehensive, CyberStrike-native file per existing canonical skill name—not parallel files named after upstream skills.
+
+## Non-negotiable rules
+
+1. Preserve the existing CyberStrike skill name/path and frontmatter contract.
+2. Compare all three inputs: current CyberStrike file, relevant Claude-BugHunter skill(s), and relevant recon-skills skill(s).
+3. Merge complementary material into the existing canonical destination. Do not duplicate a topic in a newly invented root skill.
+4. When multiple upstream files cover one topic, synthesize them into one coherent procedure and retain all relevant source links.
+5. Where a topic is already represented by a nested OWASP WSTG or standards skill, merge into that existing destination rather than creating a parallel `attack-*` file.
+6. If no existing skill semantically fits, record the source as `unmapped` and explain the gap. Do not create a new skill unless the owner explicitly changes this canonical-only rule.
+7. Remove unverified commands and dangerous production examples. Any CLI/tool reference must be verified against CyberStrike's real registry and runtime before being presented as executable.
+8. Include scope, authorization, safe preconditions, baseline, bounded procedure, impact validation, false positives, evidence requirements, remediation, cleanup, output contract, and related-skill links where relevant.
+9. Preserve license notices and attribution. Do not copy secrets, tokens, target-specific artifacts, or private program data.
+10. Distinguish content completion from runtime integration. A file existing in the repository or registry does not prove the agent loads it.
 
 ## Source inventory
 
-### Claude-BugHunter
+- Claude-BugHunter: 83 skills.
+- recon-skills: 146 skills.
+- Total before semantic deduplication: 229 source files.
+- CyberStrike registry on `main`: 129 skills.
+- CyberStrike has 39 root skill directories and additional nested WSTG/standards/ATT&CK trees.
 
-The upstream catalog documents 83 skills across web vulnerability classes, enterprise/platform assessment, recon/OSINT, methodology, and reporting/validation. Its repository states that skill content is licensed separately from code. Review NOTICE, LICENSE-CONTENT, and credits before redistributing source-derived material.
+## Canonical files consolidated in this first batch
 
-### Recon Skills
+- IDOR/BOLA: `attack-idor-automation`
+- CORS: `attack-cors`
+- GraphQL: `attack-graphql`
+- JWT: `attack-jwt`
+- Open redirect: `attack-open-redirect`
+- Cache poisoning: `attack-cache-poison`
+- Host header: `attack-host-header`
+- Prototype pollution: `attack-prototype-pollution`
+- Race condition: `attack-race-condition`
+- Rate limits: `attack-rate-limit-bypass`
+- Request smuggling: `attack-request-smuggling`
+- SSRF: `attack-ssrf`
+- SSTI: `attack-ssti`
+- Subdomain takeover: `attack-subdomain-takeover`
+- WebSocket: `attack-websocket`
+- XXE: `attack-xxe`
+- Recon: `recon-methodology`
+- Cloud assessment: `cloud-assessment`
+- CI/CD review: `ci-assessment` and `cicd-attacks`
+- LLM application security: `llm-security`
 
-The upstream library covers authentication/SSO, attack chains, infrastructure, engagement methodology, reconnaissance, vulnerability validation, and reporting. It provides a skill quality baseline and an MIT license. Preserve applicable copyright and license notices for substantial reused portions.
+These are the first consolidation batch only. The two upstream catalogs have **not** yet been fully audited and merged source-by-source.
 
-## Migration rules
+## Remaining work
 
-1. **Inventory first:** record path, name, category, description, revision, source URL, license, and support files.
-2. **Compare against CyberStrike:** inspect existing skills and aliases before creating a new name.
-3. **Merge duplicates:** consolidate overlapping techniques into canonical skills while preserving meaningful differences.
-4. **Adapt, do not blindly copy:** align frontmatter and terminology; remove unverified commands, stale tool references, runtime assumptions, and engagement-specific data.
-5. **Safety and scope:** document authorization, boundaries, rate limits, stop conditions, and safe evidence handling.
-6. **Runtime truthfulness:** label proposed integrations as contracts until the loader, registry, schemas, and tests confirm them.
-7. **Attribution:** retain upstream URLs and applicable license notices.
-8. **Validation:** check frontmatter, duplicate names, references, tool/script existence, required sections, and tests before claiming completion.
-9. **Batch changes:** group work by methodology/recon, web/API vulnerability classes, auth/identity, infrastructure/cloud, chains, and reporting. Use reviewable pull requests rather than one unreviewable bulk import.
+1. Build a source-path → canonical-path mapping for all 229 upstream files.
+2. Review authentication/SSO, business logic, API, CMS, framework, cloud, container, mobile, enterprise identity, OSINT, and platform-specific sources against existing WSTG/ATT&CK/platform skills.
+3. Merge source material into existing nested WSTG/standards skills where appropriate.
+4. Mark each upstream source as merged, partially merged, duplicate, not applicable, or unmapped, with evidence.
+5. Verify all references to tools/scripts, frontmatter fields, cross-links, registry entries, and loader triggers.
+6. Add structural tests and runtime tests where the repository provides a test harness.
+7. Report exact coverage and unresolved gaps; do not claim complete consolidation until all source files have a terminal status.
 
-## First migration batches
+## Acceptance criteria
 
-This branch currently adds 18 CyberStrike-native skill drafts:
-
-**Methodology and reporting**
-- attack-bb-methodology
-- attack-triage-validation
-- attack-evidence-hygiene
-- attack-report-writing
-
-**Recon**
-- attack-web-recon
-- attack-subdomain-enumeration
-- attack-port-service-discovery
-- attack-web-enumeration
-- attack-js-secrets-extraction
-
-**Web vulnerability classes**
-- attack-xss
-- attack-sqli
-- attack-csrf
-- attack-file-upload
-
-**Authentication and recovery**
-- attack-auth-bypass
-- attack-oauth
-- attack-saml
-- attack-mfa-bypass
-- attack-password-reset
-
-These are adapted, attribution-linked drafts. They do not yet prove runtime auto-loading or tool integration. The expanded IDOR skill is tracked in the same feature branch separately.
-
-## Completion criteria
-
-A skill is complete only when its triggers, prerequisites, procedure, verification, pitfalls, and output contract are clear; referenced tools are checked against the repository; cross-references resolve; duplicate functionality is consolidated; attribution is present; a validator/test covers its structure; and loader/routing integration is verified where applicable.
-
-## Sources
-
-- https://github.com/elementalsouls/Claude-BugHunter
-- https://github.com/uphiago/recon-skills
-- https://github.com/uphiago/recon-skills/blob/main/STYLE.md
-
-
-## Second migration batch
-
-The following 12 focused drafts were added after the first batch:
-
-- `attack-api-misconfig`
-- `attack-ato`
-- `attack-business-logic`
-- `attack-clickjacking`
-- `attack-grpc`
-- `attack-cloud-iam`
-- `attack-deserialization`
-- `attack-api-noauth`
-- `attack-wordpress`
-- `attack-apk-redteam-pipeline`
-- `attack-bugcrowd-reporting`
-- `attack-cicd-security`
-
-Their entries have also been added to `.cyberstrike/skill/index.json`, along with the first batch and the expanded IDOR skill, so the index can discover those names. The registry marks these entries `unverified`; this is deliberate. Loader behavior, runtime trigger selection, actual tool availability, and end-to-end tests remain to be verified before these skills can be called fully integrated.
-
-
-## Third migration batch
-
-Nine more adapted drafts were added and registered in `.cyberstrike/skill/index.json`:
-
-- `attack-captcha-bypass`
-- `attack-cloud-misconfig`
-- `attack-mcp-security`
-- `attack-llm-security`
-- `attack-email-security`
-- `attack-401-403-bypass`
-- `attack-source-leak`
-- `attack-firebase-supabase`
-- `attack-supply-chain-recon`
-
-These remain `unverified` registry entries until loader behavior, referenced tools, and end-to-end routing have been checked.
-
-
-## Fourth migration batch
-
-Ten additional adapted drafts were added and registered in `.cyberstrike/skill/index.json`:
-
-- `attack-ldap`
-- `attack-k8s`
-- `attack-vcenter`
-- `attack-m365-entra`
-- `attack-okta`
-- `attack-brute-force`
-- `attack-ntlm`
-- `attack-lfi`
-- `attack-nosqli`
-- `attack-session-management`
-
-These remain `unverified` registry entries until the real runtime loader, tool availability, and end-to-end routing have been checked.
-
-
-## Fifth migration batch
-
-Eleven more adapted drafts were added and registered in `.cyberstrike/skill/index.json`:
-
-- `attack-aspnet`
-- `attack-laravel`
-- `attack-nodejs`
-- `attack-nextjs`
-- `attack-springboot`
-- `attack-ios-redteam-pipeline`
-- `attack-sharepoint`
-- `attack-enterprise-vpn`
-- `attack-web3-audit`
-- `attack-html-injection`
-- `attack-shadow-api`
-
-These remain `unverified` registry entries pending runtime, tool, and routing validation.
+- No new parallel root skills were introduced by this consolidation.
+- Canonical CyberStrike names remain unchanged.
+- Every upstream source file has a traceable mapping/status.
+- No unverified tool command is represented as confirmed executable.
+- Related-skill links resolve to existing paths.
+- All evidence and test examples are safe for the authorized context.
+- Loader, registry, and end-to-end runtime behavior are verified separately from documentation quality.
