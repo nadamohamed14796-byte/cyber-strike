@@ -1,9 +1,8 @@
 import { and, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Instance } from "../project/instance"
-import { SessionTable } from "../session/session.sql"
-import { IntelEntryTable, WebFunctionTable } from "../methodology/methodology.sql"
-import { RequestTable } from "../session/session.sql"
+import { SessionTable, RequestTable, WebFunctionTable } from "../session/session.sql"
+import { IntelEntryTable } from "../methodology/methodology.sql"
 import { ReportKnowledge } from "./report-knowledge"
 
 /**
