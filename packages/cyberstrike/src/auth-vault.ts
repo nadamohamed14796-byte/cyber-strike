@@ -67,12 +67,32 @@ async function read(): Promise<StoredProfile[]> {
 
 async function write(rows: StoredProfile[]) {
   await fs.mkdir(Global.Path.data, { recursive: true, mode: 0o700 })
-  const temp = `${FILE}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
-  await fs.writeFile(temp, JSON.stringify(rows, null, 2), { encoding: "utf8", mode: 0o600, flag: "wx" })
-  await fs.rename(temp, FILE)
-  await fs.chmod(FILE, 0o600)
+  // mkdir's mode is ignored when the directory already exists; enforce the
+  // private directory mode before writing the credential vault.
+  await fs.chmod(Global.Path.data, 0o700)
+  const temp = FILE + "." + process.pid + "." + randomBytes(6).toString("hex") + ".tmp"
+  try {
+    await fs.writeFile(temp, JSON.stringify(rows, null, 2), { encoding: "utf8", mode: 0o600, flag: "wx" })
+    await fs.rename(temp, FILE)
+    await fs.chmod(FILE, 0o600)
+  } finally {
+    // A failed write/rename must not leave temporary vault files behind.
+    await fs.rm(temp, { force: true }).catch(() => undefined)
+  }
 }
 
+// Serialize read-modify-write operations within this process. Without this,
+// concurrent saves/removals can overwrite one another's latest state.
+let mutationTail: Promise<unknown> = Promise.resolve()
+
+function serializeMutation<T>(operation: () => Promise<T>): Promise<T> {
+  const result = mutationTail.then(operation, operation)
+  mutationTail = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
 function encrypt(value: string) {
   const iv = randomBytes(12)
   const cipher = createCipheriv(ALGORITHM, key(), iv)
@@ -97,26 +117,28 @@ export namespace AuthVault {
     if (input.purpose === "target" && !input.targetID?.trim()) {
       throw new Error("Target-purpose credentials must be bound to an explicit targetID to prevent cross-target reuse.")
     }
-    const rows = await read()
-    const existing = rows.find((row) => row.origin === origin && row.purpose === input.purpose &&
-      row.account.toLowerCase() === input.account.trim().toLowerCase() && row.targetID === input.targetID)
-    const now = Date.now()
-    const row: StoredProfile = {
-      id: existing?.id ?? randomBytes(16).toString("hex"),
-      origin,
-      purpose: input.purpose,
-      account: input.account.trim(),
-      username: input.username.trim(),
-      ...(input.targetID ? { targetID: input.targetID.trim() } : {}),
-      password: encrypt(input.password),
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    }
-    const next = existing ? rows.map((item) => item.id === existing.id ? row : item) : [...rows, row]
-    await write(next)
-    return summary(row)
+    return serializeMutation(async () => {
+      const rows = await read()
+      const targetID = input.targetID?.trim()
+      const existing = rows.find((row) => row.origin === origin && row.purpose === input.purpose &&
+        row.account.toLowerCase() === input.account.trim().toLowerCase() && row.targetID === targetID)
+      const now = Date.now()
+      const row: StoredProfile = {
+        id: existing?.id ?? randomBytes(16).toString("hex"),
+        origin,
+        purpose: input.purpose,
+        account: input.account.trim(),
+        username: input.username.trim(),
+        ...(targetID ? { targetID } : {}),
+        password: encrypt(input.password),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      }
+      const next = existing ? rows.map((item) => item.id === existing.id ? row : item) : [...rows, row]
+      await write(next)
+      return summary(row)
+    })
   }
-
   export async function list(filter: { origin?: string; purpose?: AuthPurpose; targetID?: string } = {}): Promise<AuthProfileSummary[]> {
     const origin = filter.origin ? normalizeAuthOrigin(filter.origin) : undefined
     return (await read())
@@ -137,11 +159,13 @@ export namespace AuthVault {
 
   export async function remove(input: { id: string; origin: string; purpose: AuthPurpose; targetID?: string }): Promise<boolean> {
     const origin = normalizeAuthOrigin(input.origin)
-    const rows = await read()
-    const next = rows.filter((row) => !(row.id === input.id && row.origin === origin &&
-      row.purpose === input.purpose && (input.purpose !== "target" || row.targetID === input.targetID)))
-    if (next.length === rows.length) return false
-    await write(next)
-    return true
+    return serializeMutation(async () => {
+      const rows = await read()
+      const next = rows.filter((row) => !(row.id === input.id && row.origin === origin &&
+        row.purpose === input.purpose && (input.purpose !== "target" || row.targetID === input.targetID)))
+      if (next.length === rows.length) return false
+      await write(next)
+      return true
+    })
   }
 }
