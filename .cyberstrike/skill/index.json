@@ -3594,6 +3594,156 @@
       "files": [
         "SKILL.md"
       ]
+    },
+    {
+      "name": "attack-ldap",
+      "description": "Assess LDAP exposure, authentication boundaries, and directory access controls",
+      "verified": "unverified",
+      "tags": [
+        "ldap",
+        "active-directory",
+        "identity"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-k8s",
+      "description": "Review Kubernetes workloads, RBAC, network boundaries, and secret handling",
+      "verified": "unverified",
+      "tags": [
+        "kubernetes",
+        "rbac",
+        "containers"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-vcenter",
+      "description": "Assess VMware vCenter exposure, authentication boundaries, and configuration risks",
+      "verified": "unverified",
+      "tags": [
+        "vmware",
+        "vcenter",
+        "infrastructure"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-m365-entra",
+      "description": "Review Microsoft 365 and Entra identity, consent, and tenant boundaries",
+      "verified": "unverified",
+      "tags": [
+        "m365",
+        "entra",
+        "identity"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-okta",
+      "description": "Assess Okta tenant configuration, federation, session controls, and assignments",
+      "verified": "unverified",
+      "tags": [
+        "okta",
+        "sso",
+        "identity"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-brute-force",
+      "description": "Assess authentication throttling and lockout without credential spraying",
+      "verified": "unverified",
+      "tags": [
+        "brute-force",
+        "rate-limit",
+        "authentication"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-ntlm",
+      "description": "Review NTLM exposure, relay prerequisites, and legacy authentication boundaries",
+      "verified": "unverified",
+      "tags": [
+        "ntlm",
+        "windows",
+        "authentication"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-lfi",
+      "description": "Assess suspected local file inclusion with bounded non-sensitive validation",
+      "verified": "unverified",
+      "tags": [
+        "lfi",
+        "path-traversal",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-nosqli",
+      "description": "Assess NoSQL query injection with bounded, schema-aware validation",
+      "verified": "unverified",
+      "tags": [
+        "nosqli",
+        "mongodb",
+        "api"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-session-management",
+      "description": "Review session lifecycle, cookie protections, and revocation behavior",
+      "verified": "unverified",
+      "tags": [
+        "sessions",
+        "cookies",
+        "authentication"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
     }
   ]
 }
