@@ -16,6 +16,7 @@ test("global research retrieval guidance is available even before target signals
       expect(context).toContain("never copy them as the current target")
       expect(context).toContain("correlate_javascript")
       expect(context).toContain("javascript/ directory")
+      expect(context).toContain("target_note")
       await Instance.dispose()
     },
   })
