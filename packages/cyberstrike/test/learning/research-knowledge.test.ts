@@ -46,6 +46,13 @@ test("shared research retrieval uses signal tags and excludes target-specific re
       expect(matches.some((row) => row.id === shared?.id)).toBe(true)
       expect(matches.some((row) => row.id === targetSpecific?.id)).toBe(false)
 
+      // Natural-language observations are mapped to stored signal tags, not just exact words.
+      const bySignal = ReportKnowledge.recommendations({
+        signal: "client-side JavaScript source map reveals a REST API route",
+        limit: 5,
+      })
+      expect(bySignal.some((row) => row.id === shared?.id)).toBe(true)
+
       const byReproduction = ReportKnowledge.search({ query: "owner non-owner requests", sourceKind: "external_report", limit: 5 })
       expect(byReproduction.some((row) => row.id === shared?.id)).toBe(true)
       await Instance.dispose()

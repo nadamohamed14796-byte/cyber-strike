@@ -320,18 +320,45 @@ export namespace ReportKnowledge {
     return Math.max(minimum, Math.min(Math.floor(candidate), maximum))
   }
 
+  const QUERY_STOP_WORDS = new Set([
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "into", "is", "it",
+    "of", "on", "or", "that", "the", "then", "this", "to", "using", "was", "were", "with",
+    "reveals", "revealed", "shows", "showed", "found", "find", "when", "where", "while",
+  ])
+
+  const SIGNAL_PATTERNS: Array<[string, RegExp]> = [
+    ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|another user's? (?:data|object|account)/i],
+    ["authorization-boundary", /authorization|access control|privilege escalation|role[- ]based access|another account/i],
+    ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/i],
+    ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/i],
+    ["javascript-client", /javascript|\.m?js\b|source maps?|client[- ]side bundle|frontend script/i],
+    ["api-endpoint", /\bapi\b|api route|endpoint|graphql|rest(?:ful)? route/i],
+    ["file-upload", /file upload|multipart|content[- ]type|filename/i],
+    ["cache-behavior", /cache[- ]control|cache poisoning|cache deception|cdn/i],
+    ["cors-policy", /\bcors\b|access[- ]control[- ]allow[- ]origin/i],
+    ["race-condition", /race condition|concurrent|time[- ]of[- ]check|toctou/i],
+    ["server-side-request", /\bssrf\b|server[- ]side request forgery|url fetch/i],
+    ["injection-sink", /sql injection|command injection|template injection|deserialization/i],
+    ["business-logic", /business logic|workflow|coupon|payment|quantity|state transition/i],
+  ]
+
+  function canonicalSignals(query?: string) {
+    if (!query) return []
+    return SIGNAL_PATTERNS.filter(([, pattern]) => pattern.test(query)).map(([signal]) => signal)
+  }
+
   function queryTokens(query?: string) {
     return Array.from(
       new Set(
         normalize(query)
-          .split(/\s+/)
+          .split(/[^\p{L}\p{N}_-]+/u)
           .map((token) => token.trim())
-          .filter((token) => token.length >= 2),
+          .filter((token) => token.length >= 2 && !QUERY_STOP_WORDS.has(token)),
       ),
     )
   }
 
-  function relevanceScore(row: typeof ReportKnowledgeTable.$inferSelect, tokens: string[]) {
+  function relevanceScore(row: typeof ReportKnowledgeTable.$inferSelect, tokens: string[], signals: string[] = []) {
     if (!tokens.length) return 0
     const title = normalize(row.title)
     const lesson = normalize(row.lesson)
@@ -340,9 +367,21 @@ export namespace ReportKnowledge {
     const reproduction = normalize(row.reproduction)
     const poc = normalize(row.poc)
     const tags = normalize((row.tags ?? []).join(" "))
-    const metadata = normalize(JSON.stringify(row.metadata ?? {}))
+    const metadataValue = row.metadata ?? {}
+    const extracted = metadataValue.extracted && typeof metadataValue.extracted === "object"
+      ? metadataValue.extracted as Record<string, unknown>
+      : {}
+    const storedSignals = new Set([
+      ...((Array.isArray(extracted.retrieval_signals) ? extracted.retrieval_signals : []) as unknown[]).filter((v): v is string => typeof v === "string").map(normalize),
+      ...(row.tags ?? []).map(normalize),
+    ])
+    const metadata = normalize(JSON.stringify(metadataValue))
     const haystack = [title, lesson, attackVector, impact, reproduction, poc, tags, metadata].filter(Boolean).join(" ")
     let score = 0
+    for (const signal of signals) {
+      if (storedSignals.has(signal)) score += 55
+      else if (tags.includes(signal) || metadata.includes(signal)) score += 28
+    }
 
     for (const token of tokens) {
       const escaped = token.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")
@@ -388,37 +427,41 @@ export namespace ReportKnowledge {
         if (input.sourceKind) conditions.push(eq(ReportKnowledgeTable.source_kind, input.sourceKind))
 
         const tokens = queryTokens(input.query)
-        if (tokens.length) {
-          conditions.push(
-            or(
-              ...tokens.flatMap((token) => {
-                const q = "%" + token + "%"
-                return [
-                  like(ReportKnowledgeTable.title, q),
-                  like(ReportKnowledgeTable.lesson, q),
-                  like(ReportKnowledgeTable.attack_vector, q),
-                  like(ReportKnowledgeTable.impact, q),
-                  like(ReportKnowledgeTable.reproduction, q),
-                  like(ReportKnowledgeTable.poc, q),
-                  like(ReportKnowledgeTable.tags, q),
-                  like(sql<string>`${ReportKnowledgeTable.metadata}`, q),
-                  like(ReportKnowledgeTable.vulnerability_class, q),
-                  like(ReportKnowledgeTable.cwe_id, q),
-                ]
-              }),
-            ),
-          )
+        const signals = canonicalSignals(input.query)
+        if (tokens.length || signals.length) {
+          const candidateConditions = [
+            ...tokens.flatMap((token) => {
+              const q = "%" + token + "%"
+              return [
+                like(ReportKnowledgeTable.title, q),
+                like(ReportKnowledgeTable.lesson, q),
+                like(ReportKnowledgeTable.attack_vector, q),
+                like(ReportKnowledgeTable.impact, q),
+                like(ReportKnowledgeTable.reproduction, q),
+                like(ReportKnowledgeTable.poc, q),
+                like(ReportKnowledgeTable.tags, q),
+                like(sql<string>`${ReportKnowledgeTable.metadata}`, q),
+                like(ReportKnowledgeTable.vulnerability_class, q),
+                like(ReportKnowledgeTable.cwe_id, q),
+              ]
+            }),
+            ...signals.flatMap((signal) => [
+              like(ReportKnowledgeTable.tags, "%" + signal + "%"),
+              like(sql<string>`${ReportKnowledgeTable.metadata}`, "%" + signal + "%"),
+            ]),
+          ]
+          if (candidateConditions.length) conditions.push(or(...candidateConditions)!)
         }
 
         const query = db.select().from(ReportKnowledgeTable)
         const rows = (conditions.length ? query.where(and(...conditions)) : query)
           .orderBy(desc(ReportKnowledgeTable.time_updated))
-          .limit(tokens.length ? 300 : limit)
+          .limit(tokens.length || signals.length ? 500 : limit)
           .all()
 
         return rows
-          .map((row) => ({ row, score: relevanceScore(row, tokens) }))
-          .filter(({ score }) => !tokens.length || score >= 20)
+          .map((row) => ({ row, score: relevanceScore(row, tokens, signals) }))
+          .filter(({ score }) => (!(tokens.length || signals.length) || score >= 20))
           .sort(
             (a, b) =>
               b.score - a.score ||

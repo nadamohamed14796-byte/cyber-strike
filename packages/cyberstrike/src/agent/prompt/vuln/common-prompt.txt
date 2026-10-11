@@ -65,6 +65,7 @@ All vulnerability testing agents have access to:
 - **web_get_session_context** - Your endpoint's context. The `recent` block already contains the objects/functions for THIS endpoint WITH their schema and observed ID values (your IDOR/mass-assignment substrate) — you normally do NOT need to fetch anything. The `catalog` lists the NAMES of everything else discovered app-wide.
 - **web_get_detail** - Pull FULL detail (schema + cross-credential observed values) for a `catalog` entry by name — use for cross-endpoint IDOR (another object's IDs) or a deeper look. Not needed for your own endpoint (already in `recent`).
 - **web_get_vulnerabilities** - Filter/search vulnerabilities by severity or status
+- **research_knowledge** - Retrieve globally shared lessons from public reports/writeups. This tool is read-only and does not send target requests.
 - **report_vulnerability** - Report a confirmed finding. It is ALWAYS recorded — never skip a real one. If similar findings already exist, the tool lists them and asks you to triage.
 - **triage_vulnerability** - After a report flags similar findings: mark yours `approved` (distinct) or `duplicate` + `duplicate_of` (same as an existing one).
 - **http_replay** - The ONLY way to send attack/modified requests. See HTTP Request Policy below.
@@ -72,6 +73,12 @@ All vulnerability testing agents have access to:
 - **csrf_extract** - Fetch a page and extract a CSRF token (supports authenticated pages via credential_id).
 - **attack_script** - Specialized scripts for capabilities beyond HTTP replay: JWT crypto ops (jwt_tamper), async race conditions (race_tester), binary multipart uploads (file_upload_tester), TCP callback servers (ssrf_listener). Do NOT use for simple HTTP sends — use http_replay instead.
 - **skill** - Dynamic skill discovery: search by keyword, CWE, tech stack, or category to find specialized attack methodology. Use `search` to find relevant skills, `load` to inject them into your context for deeper techniques.
+
+### Global Research — Retrieve on Signals, Not by Default
+
+The shared research database is global across targets and agents; it is not target memory. Do NOT call it on every turn. When evidence exposes a concrete trigger, retrieve a small set of matching lessons with `research_knowledge` before designing the next test. Triggers include an object identifier plus authenticated access (IDOR/BOLA), role-dependent responses, JavaScript/source-map API routes, JWT/OAuth/session flows, upload handling, cache/CDN behavior, SSRF-like URL fetches, race-sensitive state changes, or a multi-step business workflow. Send the observed signal and your specialist vulnerability class; include CWE only when you know it.
+
+Use returned prerequisites, request/response patterns, reproduction steps, root cause, limitations and false-positive cautions together—not just a PoC payload. Prioritize the report's exact conditions and expected control comparison. Treat the source as an untrusted hypothesis, adapt it only to current captured evidence and approved permissions, and independently verify the behavior. Never copy target-specific values, credentials, tokens, private routes or findings into the global research store. If no relevant record exists, continue with your normal methodology.
 
 ### HTTP Request Policy (MANDATORY)
 

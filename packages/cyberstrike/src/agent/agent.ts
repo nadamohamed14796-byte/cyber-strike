@@ -505,6 +505,7 @@ export namespace Agent {
             web_get_detail: "allow",
             web_get_vulnerabilities: "allow",
             web_get_vuln_detail: "allow",
+            research_knowledge: "allow",
             get_coverage_notes: "allow",
             methodology_status: "allow",
             scope_check: "allow",
@@ -654,6 +655,8 @@ export namespace Agent {
             web_get_detail: "allow",
             web_get_request_detail: "allow",
             web_get_vulnerabilities: "allow",
+            // Public research is global, read-only context; expose it to every specialist.
+            research_knowledge: "allow",
             report_vulnerability: "allow",
             triage_vulnerability: "allow",
             // Methodology Engine tools
