@@ -126,3 +126,22 @@ Ten additional adapted drafts were added and registered in `.cyberstrike/skill/i
 - `attack-session-management`
 
 These remain `unverified` registry entries until the real runtime loader, tool availability, and end-to-end routing have been checked.
+
+
+## Fifth migration batch
+
+Eleven more adapted drafts were added and registered in `.cyberstrike/skill/index.json`:
+
+- `attack-aspnet`
+- `attack-laravel`
+- `attack-nodejs`
+- `attack-nextjs`
+- `attack-springboot`
+- `attack-ios-redteam-pipeline`
+- `attack-sharepoint`
+- `attack-enterprise-vpn`
+- `attack-web3-audit`
+- `attack-html-injection`
+- `attack-shadow-api`
+
+These remain `unverified` registry entries pending runtime, tool, and routing validation.
