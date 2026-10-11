@@ -13,6 +13,7 @@ describe("Hackbrowser worker environment", () => {
       CYBERSTRIKE_GMAIL_OAUTH_REFRESH_TOKEN: "gmail-refresh-must-not-leak",
       OPENAI_API_KEY: "unrelated-provider-key-must-not-leak",
       NODE_OPTIONS: "--require /tmp/untrusted.js",
+      NODE_TLS_REJECT_UNAUTHORIZED: "0",
       AWS_SECRET_ACCESS_KEY: "aws-secret-not-needed-for-openai",
       GOOGLE_APPLICATION_CREDENTIALS: "/tmp/gcp.json",
     } as NodeJS.ProcessEnv
@@ -28,6 +29,7 @@ describe("Hackbrowser worker environment", () => {
     expect(result.CYBERSTRIKE_GMAIL_OAUTH_REFRESH_TOKEN).toBeUndefined()
     expect(result.OPENAI_API_KEY).toBeUndefined()
     expect(result.NODE_OPTIONS).toBeUndefined()
+    expect(result.NODE_TLS_REJECT_UNAUTHORIZED).toBeUndefined()
     expect(result.AWS_SECRET_ACCESS_KEY).toBeUndefined()
     expect(result.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined()
     // The helper is a projection; it must not mutate the parent environment.
