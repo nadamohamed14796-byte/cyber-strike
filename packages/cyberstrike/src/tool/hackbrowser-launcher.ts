@@ -35,6 +35,7 @@ import { Identifier } from "../id/id"
 import { Session } from "../session"
 import { HackbrowserStatus } from "../session/hackbrowser-status"
 import { Global } from "../global"
+import { GmailService } from "../gmail-service"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -333,6 +334,17 @@ async function backgroundRun(
         }
 
         switch (msg.type) {
+          case "otp-request": {
+            try {
+              const otp = await GmailService.latestOtp({ siteUrl: msg.siteUrl, after: msg.after })
+              workerWrite(proc, JSON.stringify({ type: "otp-response", requestId: msg.requestId, code: otp?.code } satisfies ParentMessage) + "\n")
+              if (!otp) log.warn("no matching Gmail OTP; browser will request human input", { sessionID })
+            } catch {
+              workerWrite(proc, JSON.stringify({ type: "otp-response", requestId: msg.requestId } satisfies ParentMessage) + "\n")
+              log.warn("Gmail OTP lookup unavailable; browser will request human input", { sessionID })
+            }
+            break
+          }
           case "log": {
             const csLog = Log.create({ service: msg.service })
             csLog[msg.level](msg.message, msg.extra as Record<string, unknown> | undefined)
