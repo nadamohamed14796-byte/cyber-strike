@@ -1,140 +1,76 @@
 ---
 name: cloud-assessment
-description: Multi-cloud READ-ONLY security assessment methodology for AWS, Azure, and GCP using CIS benchmark-aligned checks
+description: "Read-only, evidence-led AWS, Azure, and GCP security assessment aligned with least privilege and benchmark controls"
 category: assessment
-tags: [cloud, aws, azure, gcp, security-audit, cis-benchmark, iam, storage, network, encryption, logging, dns, tls]
-tech_stack: [aws, azure, gcp, aws-cli, az-cli, gcloud-cli]
-cwe_ids: [CWE-269, CWE-311, CWE-319, CWE-693, CWE-778]
-version: "1.0"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [cloud, aws, azure, gcp, iam, cis, storage, logging]
+tech_stack: [aws, azure, gcp, iam, cloud]
+prerequisites:
+  - "Written authorization for the exact account, subscription, project, and assessment mode"
+  - "Read-only credentials or exported configuration whenever possible"
+chains_with: [ad-security, k8s-assessment, ci-assessment, cicd-attacks]
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/cloud-iam-deep/SKILL.md"
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-cloud-misconfig/SKILL.md"
+  - "https://github.com/uphiago/recon-skills/blob/main/redteam/cloud-iam-deep/SKILL.md"
 ---
 
-# Cloud Security Assessment Methodology
+# Multi-Cloud Security Assessment
 
-Multi-cloud READ-ONLY security assessment using the `cloud_audit` tool. All checks use describe/list/get CLI calls via native TypeScript — no Python dependency, no SDK imports. Uses aws/az/gcloud CLIs. Aligned with CIS benchmarks for AWS, Azure, and GCP.
+## Objective
 
-## Safety First
+Review cloud configuration, identity, storage, network exposure, logging, and workload trust boundaries using read-only evidence wherever possible. The assessment is not permission to assume roles, retrieve secrets, change policies, or access customer data.
 
-**ALWAYS run `verify_readonly` before any other audit program.** This confirms the current credentials have no dangerous write permissions. If the check returns FAIL, stop and request read-only credentials.
+## Scope and safety
 
-```
-cloud_audit verify_readonly --provider all
-```
+- Confirm provider, account/tenant/subscription/project identifiers, region boundaries, and excluded resources.
+- Prefer read-only roles, exported policies, provider policy simulators, and configuration snapshots.
+- Never create access keys, alter trust policies, disable logging, expose storage, or retrieve secrets unless that exact action is explicitly approved.
+- Redact account identifiers, resource names, secrets, and customer data according to the engagement rules.
 
-## Assessment Phases
+## Assessment workflow
 
-### Phase 1 — Credential Safety Verification
+### 1. Establish inventory and context
 
-| Check | Command | Purpose |
-|-------|---------|---------|
-| Verify read-only | `cloud_audit verify_readonly --provider all` | Confirm no write permissions — MUST pass before proceeding |
+Record cloud provider, organization structure, accounts/projects/subscriptions, regions, workloads, identity sources, public endpoints, storage, logging, and deployment paths. Separate observed facts from inferred relationships.
 
-### Phase 2 — Identity & Access Management
+### 2. Identity and effective permissions
 
-IAM is the most critical attack surface in cloud environments.
+Review users, groups, service principals, workload identities, roles, attached/inline policies, resource policies, permission boundaries, organization-level controls, and explicit denies. Evaluate effective permissions rather than judging a single policy statement in isolation. Flag broad wildcards, privilege-management operations, long-lived credentials, and overly broad cross-account trust.
 
-| Provider | Command | Key Checks |
-|----------|---------|------------|
-| AWS | `cloud_audit aws_iam_audit --json-output` | MFA status, wildcard policies, unused keys, cross-account trust, root access keys |
-| Azure | `cloud_audit azure_iam_audit --json-output` | Dangerous role assignments (Owner/Contributor), subscription-level owners, wildcard custom roles |
-| GCP | `cloud_audit gcp_iam_audit --json-output` | Primitive roles (Owner/Editor at project), SA key age >90d, domain-wide delegation |
+### 3. Trust and federation
 
-**Intelligence integration:** After IAM audit, report findings via `add_intel` with type `infrastructure`:
-```
-add_intel type=infrastructure data="IAM audit: 3 users without MFA, 2 wildcard policies found"
-```
+Inspect role-assumption conditions, external account/tenant constraints, audience/subject restrictions, MFA conditions, workload identity bindings, and federation issuer validation. Model a privilege path as principal → allowed action → resource → resulting capability. Treat the path as a hypothesis until a simulator or approved test identity confirms it.
 
-### Phase 3 — Storage Security
+### 4. Storage and data exposure
 
-Public storage buckets are the #1 cloud data breach vector.
+Review bucket/container ACLs, public access settings, object policies, signed URL lifetime, encryption settings, retention, and cross-account access. Use metadata or synthetic objects to validate controls; do not download sensitive customer objects to prove exposure.
 
-| Provider | Command | Key Checks |
-|----------|---------|------------|
-| AWS | `cloud_audit aws_storage_audit --json-output` | S3 Block Public Access, ACLs, default encryption, versioning, access logging |
-| Azure | `cloud_audit azure_storage_audit --json-output` | Blob public access, HTTPS-only, minimum TLS version, SAS policies |
-| GCP | `cloud_audit gcp_storage_audit --json-output` | allUsers/allAuthenticatedUsers bindings, uniform bucket-level access, versioning |
+### 5. Network and workload exposure
 
-### Phase 4 — Network Security
+Review security groups/firewall rules, public IPs, load balancers, management ports, private endpoints, container/cluster exposure, and egress. Validate reachability only within approved scope and rate limits. Do not pivot into internal workloads or metadata endpoints without explicit authorization.
 
-Open security groups and missing flow logs are common misconfigurations.
+### 6. Logging, monitoring, and recovery
 
-| Provider | Command | Key Checks |
-|----------|---------|------------|
-| AWS | `cloud_audit aws_network_audit --json-output` | SGs open to 0.0.0.0/0 on dangerous ports, IMDSv1, VPC flow logs |
-| Azure | `cloud_audit azure_network_audit --json-output` | NSG Any/Any rules, public IPs on VMs, NSG flow logs |
-| GCP | `cloud_audit gcp_network_audit --json-output` | Firewall rules open to 0.0.0.0/0, external IPs, legacy networks |
+Check audit logging coverage, retention, alerting, immutable storage, key management, backup posture, and recovery configuration. Distinguish missing configuration from a demonstrated security incident.
 
-### Phase 5 — Encryption at Rest
+### 7. Benchmark alignment
 
-Unencrypted storage is a compliance violation in most frameworks.
+Use the applicable CIS/provider baseline as a reference, recording benchmark version and control ID. A failed benchmark check is a configuration finding candidate; prioritize by exposure, privilege, data sensitivity, compensating controls, and demonstrated impact.
 
-| Provider | Command | Key Checks |
-|----------|---------|------------|
-| AWS | `cloud_audit aws_encryption_audit --json-output` | EBS/RDS encryption, KMS key rotation, CMK vs AWS-managed |
-| Azure | `cloud_audit azure_encryption_audit --json-output` | Disk encryption, storage CMK, Key Vault rotation |
-| GCP | `cloud_audit gcp_encryption_audit --json-output` | Disk/SQL/GCS CMEK, KMS key rotation |
+### 8. Safe validation and remediation
 
-### Phase 6 — Logging & Monitoring
+Use provider-native policy simulation, read-only APIs, and approved test identities. Avoid changing production settings. Recommend least privilege, narrowed trust policies, short-lived credentials, private storage defaults, egress restrictions, and complete audit coverage.
 
-Missing audit logs mean attacks go undetected.
+## Common false positives
 
-| Provider | Command | Key Checks |
-|----------|---------|------------|
-| AWS | `cloud_audit aws_logging_audit --json-output` | CloudTrail multi-region, GuardDuty, Config recorder |
-| Azure | `cloud_audit azure_logging_audit --json-output` | Activity Log retention, Diagnostic settings, Defender status |
-| GCP | `cloud_audit gcp_logging_audit --json-output` | Audit log config (DATA_READ/DATA_WRITE), log sinks, filters |
+- A wildcard permission constrained by an explicit deny or resource policy.
+- A public endpoint that exposes no sensitive action or data.
+- A missing control that is covered by an organization-level policy.
+- A theoretical privilege-escalation path without effective permission evaluation.
+- A benchmark deviation incorrectly labeled as confirmed compromise.
 
-### Phase 7 — DNS & TLS
+## Output contract
 
-External-facing services need DNS security and valid TLS.
-
-| Check | Command | Key Checks |
-|-------|---------|------------|
-| DNS | `cloud_audit dns_audit --domain TARGET` | Dangling CNAMEs (subdomain takeover), DNSSEC, CAA records |
-| TLS | `cloud_audit tls_audit --target HOST:PORT` | Protocol version, certificate expiry, cipher strength, HSTS |
-
-## Vulnerability Reporting
-
-For each FAIL finding, report via `report_vulnerability`:
-
-```
-report_vulnerability
-  title: "AWS IAM user without MFA: admin-user"
-  severity: high
-  evidence:
-    requestSent: "cloud_audit aws_iam_audit --json-output"
-    responseCode: 0
-    responseSummary: "checkId AWS-IAM-001 FAIL — user admin-user has console access without MFA"
-    reasoning: "CIS AWS 1.10 requires MFA for all IAM users with console access"
-```
-
-## Coverage Notes
-
-Use `record_coverage_note` with `scope: "wide"` for account-level findings:
-```
-record_coverage_note
-  scope: wide
-  note: "AWS IAM audit complete — 5 findings across 12 users. No root access keys detected."
-```
-
-## Program Reference
-
-| Program | Domain | Providers |
-|---------|--------|-----------|
-| verify_readonly | Safety | AWS, Azure, GCP |
-| aws_iam_audit | IAM | AWS |
-| azure_iam_audit | IAM | Azure |
-| gcp_iam_audit | IAM | GCP |
-| aws_storage_audit | Storage | AWS |
-| azure_storage_audit | Storage | Azure |
-| gcp_storage_audit | Storage | GCP |
-| aws_network_audit | Network | AWS |
-| azure_network_audit | Network | Azure |
-| gcp_network_audit | Network | GCP |
-| aws_encryption_audit | Encryption | AWS |
-| azure_encryption_audit | Encryption | Azure |
-| gcp_encryption_audit | Encryption | GCP |
-| aws_logging_audit | Logging | AWS |
-| azure_logging_audit | Logging | Azure |
-| gcp_logging_audit | Logging | GCP |
-| dns_audit | DNS | Cross-cloud |
-| tls_audit | TLS | Cross-cloud |
+Return provider and scope, resource identifier (redacted as required), control/baseline reference, evidence source, effective permission or exposure, preconditions, impact, confidence, and least-privilege remediation. Default to read-only evidence.
