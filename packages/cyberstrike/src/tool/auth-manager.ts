@@ -85,8 +85,26 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     if (params.purpose === "target" && !params.target_id?.trim()) {
       return { title: "Target ID required", output: "Target credentials must be bound to an explicit target_id. No credentials were read or written.", metadata: { ok: false } }
     }
+    let permissionOrigin: string
+    try {
+      permissionOrigin = normalizeAuthOrigin(params.site_url)
+    } catch {
+      return { title: "Invalid site URL", output: "Only a valid HTTP(S) site URL can be used for saved profiles or Gmail OTP.", metadata: { ok: false, reason: "invalid_site_url" } }
+    }
+    if (params.purpose === "target") {
+      const workspaceMatches = TargetMemory.list().some(
+        (item) => item.id === params.target_id && normalizeAuthOrigin(item.targetURL) === permissionOrigin,
+      )
+      if (!workspaceMatches) {
+        return {
+          title: "Target workspace mismatch",
+          output: "Every target-purpose operation requires an existing workspace whose stable ID and exact origin match site_url. No password, profile, or Gmail message was accessed.",
+          metadata: { ok: false, reason: "target_workspace_mismatch" },
+        }
+      }
+    }
     if (params.action === "gmail_otp") {
-      await ctx.ask({ permission: "gmail-read", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id } })
+      await ctx.ask({ permission: "gmail-read", patterns: [permissionOrigin], always: [], metadata: { purpose: params.purpose, targetID: params.target_id } })
       const result = await GmailService.latestOtp({ siteUrl: params.site_url, after: params.after })
       if (!result) return { title: "No matching OTP email", output: "No recent verification code was found from the site's exact hostname or a subdomain. Third-party senders are intentionally ignored.", metadata: { found: false } }
       return {
@@ -98,13 +116,6 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     if (params.action === "save") {
       if (!params.account?.trim() || !params.username?.trim()) {
         return { title: "Missing account details", output: "Saving requires account and username.", metadata: { ok: false } }
-      }
-      if (params.purpose === "target") {
-        const origin = normalizeAuthOrigin(params.site_url)
-        const workspace = TargetMemory.list().find((item) => item.id === params.target_id && normalizeAuthOrigin(item.targetURL) === origin)
-        if (!workspace) {
-          return { title: "Target workspace mismatch", output: "site_url must share the exact origin with an existing target workspace, and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
-        }
       }
       // Move the one-shot secret out of process.env before any permission
       // prompt can suspend the tool and allow other child processes to start.
