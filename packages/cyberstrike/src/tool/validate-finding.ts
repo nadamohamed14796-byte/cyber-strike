@@ -27,6 +27,7 @@ const DESCRIPTION = [
   "A status=fail requires BOTH a concrete reason and observable evidence. Do not guess a failure or invent evidence.",
   ...FINDING_VALIDATION_CHECKS.map((check) => "#" + check.number + " [" + check.id + "] " + check.question),
   "The tool stores every assessment in SQLite and appends the latest summary to the finding. It may set finding status to false_positive only when multiple evidence-backed contradictions are recorded, including at least one primary contradiction. Otherwise it returns confirmed or inconclusive according to the rubric.",
+  "When exactly one existing target workspace is the most specific match for observations in this session tree, it also saves a target-specific summary note and reports its note ID. Ambiguous/unobserved targets receive no note; raw request/response evidence is not copied into the note.",
   "The result is a conservative rubric, not a statistical probability or replacement for human review. Do not run actions outside the existing approved scope; this tool does not change scope enforcement.",
 ].join("\n")
 
