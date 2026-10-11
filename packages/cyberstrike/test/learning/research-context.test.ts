@@ -13,6 +13,7 @@ test("global research retrieval guidance is available even before target signals
       expect(context).toContain("shared across agents and targets")
       expect(context).toContain("research_knowledge")
       expect(context).toContain("not evidence about the current target")
+      expect(context).toContain("never copy them as the current target")
       await Instance.dispose()
     },
   })
