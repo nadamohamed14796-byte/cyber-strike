@@ -303,6 +303,18 @@ Public research and disclosures describe patterns including `X-Forwarded-Host` i
 - `attack-cors` — validate browser-readable cross-origin impact when Origin and cache variation interact.
 - `wstg-inpv-02` and `wstg-clnt-01` — follow up only when stored or DOM-based XSS is actually demonstrated.
 
+## Cache Test Runbook and Stop Conditions
+
+Use an endpoint approved for active testing and a unique, non-sensitive cache key. First establish normal cache behavior, then test one candidate unkeyed input at a time with a harmless marker.
+
+1. Capture cache headers and baseline body for a clean request.
+2. Send one controlled variation and record whether the origin response changes.
+3. Repeat the exact same URL without the variation; verify whether the marker remains and whether the response is a cache hit.
+4. Where the program permits, verify only with a second test session you control. Do not involve real users.
+5. Stop immediately after confirming shared-cache persistence or if the response could affect a public page, authentication flow, or other users.
+
+Never use destructive payloads, poison high-traffic shared URLs, or trigger repeated cached errors to demonstrate impact. Separate origin reflection, private-cache behavior, and shared-cache poisoning. Report the cache layer, key dimensions, TTL/status, clean-request reproduction, and only the minimum sanitized evidence needed.
+
 ## References
 
 - [uphiago/recon-skills — cache attack methodology](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-cache-poison/SKILL.md) (external research reference; not a local Cyber Strike skill path).
