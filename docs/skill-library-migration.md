@@ -32,7 +32,7 @@ The upstream library covers authentication/SSO, attack chains, infrastructure, e
 
 ## First migration batches
 
-This branch currently adds 13 CyberStrike-native skill drafts:
+This branch currently adds 18 CyberStrike-native skill drafts:
 
 **Methodology and reporting**
 - attack-bb-methodology
@@ -52,6 +52,13 @@ This branch currently adds 13 CyberStrike-native skill drafts:
 - attack-sqli
 - attack-csrf
 - attack-file-upload
+
+**Authentication and recovery**
+- attack-auth-bypass
+- attack-oauth
+- attack-saml
+- attack-mfa-bypass
+- attack-password-reset
 
 These are adapted, attribution-linked drafts. They do not yet prove runtime auto-loading or tool integration. The expanded IDOR skill is tracked in the same feature branch separately.
 
