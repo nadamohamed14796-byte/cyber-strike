@@ -76,6 +76,11 @@ export async function handle2FA(page: Page, otpProvider?: (siteUrl: string, afte
           log.warn("Gmail OTP lookup failed; falling back to human MFA input")
         }
       }
+      if (!code && otpProvider) {
+        // Worker stdin is reserved for IPC, so use the visible browser for manual MFA.
+        await waitForManualLogin(page, "MFA")
+        return true
+      }
       if (!code) code = await waitForHuman("Enter your 2FA code and press Enter:")
       await el.fill(code)
       const form = await page.$("form")
@@ -440,7 +445,7 @@ export async function autoLogin(
     await page.waitForLoadState("domcontentloaded").catch(() => {})
     log.info("auto-login attempted", { origin: credentials.origin ?? "unspecified" })
 
-    await handle2FA(page)
+    await handle2FA(page, credentials.otpProvider, credentials.origin)
   } catch (err) {
     log.warn("auto-login failed, falling back to manual login")
     await waitForManualLogin(page)
