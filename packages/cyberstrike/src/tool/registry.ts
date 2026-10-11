@@ -12,6 +12,7 @@ import { TriageVulnerabilityTool } from "./triage-vulnerability"
 import { ValidateFindingTool } from "./validate-finding"
 import { CorrelateJavaScriptTool } from "./correlate-javascript"
 import { ResearchKnowledgeTool } from "./research-knowledge"
+import { TargetNoteTool } from "./target-note"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
@@ -162,6 +163,7 @@ export namespace ToolRegistry {
       ValidateFindingTool,
       CorrelateJavaScriptTool,
       ResearchKnowledgeTool,
+      TargetNoteTool,
       // TodoReadTool,
       WebSearchTool,
       CodeSearchTool,
