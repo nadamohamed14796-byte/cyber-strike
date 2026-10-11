@@ -12,3 +12,12 @@ export function redactTargetNoteSecrets(value: string): string {
     // as {"password":"two word secret"} could leak everything after its first word.
     .replace(/(["']?(?:authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret)["']?\s*[:=]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,\s;}\r\n]+)/gi, "$1[REDACTED]")
 }
+
+/** Sanitize values embedded into generated Markdown metadata as one line. */
+export function redactTargetNoteLine(value: string, maxLength: number): string {
+  return redactTargetNoteSecrets(value)
+    .replace(/[\\r\\n\\t]+/g, " ")
+    .replace(/\\s{2,}/g, " ")
+    .trim()
+    .slice(0, maxLength)
+}
