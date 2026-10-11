@@ -298,6 +298,20 @@ Target Domain
 | Parameters  | SecLists/Discovery/Web-Content/burp-parameter-names.txt                      |
 | Passwords   | SecLists/Passwords/Common-Credentials/10-million-password-list-top-10000.txt |
 
+## Asset Confidence and Recon Prioritization
+
+Keep discovery evidence separate from conclusions. For every asset, track source, timestamp, DNS/HTTP status, ownership confidence, scope decision, and whether active testing is permitted.
+
+| Confidence | Evidence | Next step |
+|---|---|---|
+| High | exact in-scope hostname or asset listed by the program | test only within the stated limits |
+| Medium | linked subdomain, certificate/DNS relationship, or documented vendor asset | verify ownership and scope before active probes |
+| Low | inferred IP range, shared hosting, third-party SaaS, or stale passive result | passive research only until scope is confirmed |
+
+Prioritize by likely attack surface and business relevance, not by the number of discovered hosts. Deduplicate hostnames, normalize schemes/ports, preserve the source of each result, and separate live assets from stale DNS or wildcard responses.
+
+For active checks, use bounded concurrency, request timeouts, conservative rate limits, and explicit stop conditions. Do not scan neighboring tenants or third-party infrastructure merely because it resolves from an in-scope domain. Keep raw secrets and personal data out of recon output; retain sanitized command, timestamp, source, and validation evidence for reproducibility.
+
 ## References
 
 - [uphiago/recon-skills — subdomain enumeration](https://github.com/uphiago/recon-skills/tree/main/recon/subdomain-enumeration)
