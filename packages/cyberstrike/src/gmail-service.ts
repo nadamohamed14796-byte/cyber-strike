@@ -52,11 +52,12 @@ function decodeBase64Url(value: string): string {
   return Buffer.from(value.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")
 }
 function bodyText(part?: Part): string {
-  if (!part) return ""
+  if (!part || part.filename) return ""
   const own = part.body?.data && (!part.mimeType || part.mimeType === "text/plain" || part.mimeType === "text/html")
-    ? decodeBase64Url(part.body.data).replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
+    ? decodeBase64Url(part.body.data).slice(0, MAX_BODY_CHARS).replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
     : ""
-  return [own, ...(part.parts ?? []).map(bodyText)].filter(Boolean).join("\n")
+  const nested = (part.parts ?? []).map(bodyText).filter(Boolean).join("\n")
+  return [own, nested].filter(Boolean).join("\n").slice(0, MAX_BODY_CHARS)
 }
 
 /** Strict domain boundary: exact host or a true subdomain, never a suffix lookalike. */
@@ -80,6 +81,7 @@ function summary(message: Message): GmailMessageSummary {
   }
 }
 async function accessToken(): Promise<string> {
+  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 30_000) return cachedAccessToken.value
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -91,8 +93,9 @@ async function accessToken(): Promise<string> {
     }),
   })
   if (!response.ok) throw new Error(`Google OAuth token refresh failed (HTTP ${response.status}); re-authorize Gmail OAuth if the refresh token was revoked.`)
-  const data = await response.json() as { access_token?: string }
+  const data = await response.json() as { access_token?: string; expires_in?: number }
   if (!data.access_token) throw new Error("Google OAuth did not return an access token.")
+  cachedAccessToken = { value: data.access_token, expiresAt: Date.now() + Math.max(60, data.expires_in ?? 3600) * 1000 }
   return data.access_token
 }
 async function gmailFetch<T>(path: string, token: string): Promise<T> {
