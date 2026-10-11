@@ -8,6 +8,7 @@ export const CorrelateJavaScriptTool = Tool.define("correlate_javascript", {
     "This performs no network requests and does not execute JavaScript. It reads only the current session and descendant-agent data, then persists a redacted correlation snapshot to the per-target workspace and SQLite target notes.",
     "Pass the authorized target URL. Optionally pass a JavaScript file URL to narrow the correlation to that file; otherwise it uses JavaScript-like Intel assets already recorded for the target host.",
     "Same-host matches are labelled candidate relationships, not proof that a script issued a request. Foreign-key relationships from web_function/request_observation to a captured request are direct relationships.",
+    "For static endpoint extraction, place an already-observed/captured source file under the current target workspace's javascript/ directory, then run this tool. It scans bounded local files only; it does not download or execute scripts.",
     "Do not provide URL credentials, session tokens, or other secrets. This tool does not replace the existing scope enforcement.",
   ].join("\n"),
   parameters: z.object({
