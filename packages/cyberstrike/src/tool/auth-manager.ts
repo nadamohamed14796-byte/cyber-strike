@@ -14,13 +14,13 @@ import { Tool } from "./tool"
  */
 async function syncTargetProfileIndex(siteURL: string, targetID: string): Promise<void> {
   const origin = normalizeAuthOrigin(siteURL)
-  const listedWorkspace = TargetMemory.list().find((item) => item.id === targetID && normalizeAuthOrigin(item.targetURL) === origin)
-  if (!listedWorkspace) {
+  if (!TargetMemory.matchesWorkspaceOrigin(targetID, siteURL)) {
     throw new Error("Target account reference was not written: target_id must identify an existing workspace with the same exact origin.")
   }
 
-  // list() is metadata-only. Re-open through TargetMemory.get() so the
-  // workspace's on-disk path is checked for symlink escapes before any write.
+  // Re-open the matching workspace so its on-disk path is checked for symlink escapes.
+  const listedWorkspace = TargetMemory.list().find((item) => item.id === targetID && normalizeAuthOrigin(item.targetURL) === origin)
+  if (!listedWorkspace) throw new Error("Target account reference was not written: workspace metadata is unavailable.")
   const workspace = await TargetMemory.get(listedWorkspace.targetURL)
   if (!workspace || workspace.id !== targetID) {
     throw new Error("Target account reference was not written: the workspace path could not be safely verified.")
@@ -92,9 +92,7 @@ export const AuthManagerTool = Tool.define("auth_manager", {
       return { title: "Invalid site URL", output: "Only a valid HTTP(S) site URL can be used for saved profiles or Gmail OTP.", metadata: { ok: false, reason: "invalid_site_url" } }
     }
     if (params.purpose === "target") {
-      const workspaceMatches = TargetMemory.list().some(
-        (item) => item.id === params.target_id && normalizeAuthOrigin(item.targetURL) === permissionOrigin,
-      )
+      const workspaceMatches = TargetMemory.matchesWorkspaceOrigin(params.target_id!, permissionOrigin)
       if (!workspaceMatches) {
         return {
           title: "Target workspace mismatch",
