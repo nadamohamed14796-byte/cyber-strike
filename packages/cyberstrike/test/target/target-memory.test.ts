@@ -83,6 +83,7 @@ test("does not associate an existing target workspace with a session that has no
     fn: async () => {
       const workspace = await TargetMemory.ensure("https://example.com")
       expect(TargetMemory.isObservedInSession("ses_no_observations_test", workspace.targetURL)).toBe(false)
+      expect(TargetMemory.contextForSession("ses_from_another_project")).toBeNull()
       await Instance.dispose()
     },
   })
