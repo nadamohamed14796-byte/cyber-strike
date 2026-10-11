@@ -164,6 +164,21 @@ eBPF programs are detectable by:
 - `auditd` rules on `bpf()` syscall — `auditctl -a always,exit -F arch=b64 -S bpf`
 - EDR agents with BPF LSM hooks (Falco, Tracee, Tetragon)
 
+## Kernel Safety and Validation Matrix
+
+Use an isolated, recoverable lab host. eBPF and kernel-level experiments can destabilize a system, so establish kernel version, privileges, verifier limits, and rollback access before running any test.
+
+| Area | Safe validation | Stop condition |
+|---|---|---|
+| Capabilities | read-only capability and sysctl review | unexpected privilege boundary |
+| Program loading | minimal harmless program in a test namespace/host | verifier anomaly or kernel instability |
+| Attach points | approved tracepoint with synthetic event | unexpected production telemetry capture |
+| Policy enforcement | compare allowed vs denied test action | any bypass affecting real users |
+| Resource bounds | tiny bounded event volume | CPU, memory, or latency increase |
+| Cleanup | detach only test-created program | ownership of an existing program is unclear |
+
+Do not hide processes, intercept credentials, tamper with network traffic, or disable defenses. Record sanitized verifier output, kernel/config context, exact minimal test, and observed security boundary. A loaded program or available capability alone is not a vulnerability.
+
 ## Program Reference
 
 | Program | Hook Type | Target | MITRE ATT&CK |
