@@ -141,6 +141,10 @@ test("refuses symlinked generated workspace outputs", async () => {
     directory: tmp.path,
     async fn() {
       const workspace = await TargetMemory.ensure("https://example.com")
+      expect(TargetMemory.matchesWorkspaceOrigin(workspace.id, "https://example.com/login")).toBe(true)
+      expect(TargetMemory.matchesWorkspaceOrigin(workspace.id, "https://sub.example.com/login")).toBe(false)
+      expect(TargetMemory.matchesWorkspaceOrigin(workspace.id, "file:///etc/passwd")).toBe(false)
+      expect(TargetMemory.matchesWorkspaceOrigin("target-from-another-project", "https://example.com")).toBe(false)
       expect(TargetMemory.notes("target-from-another-project")).toEqual([])
       expect(TargetMemory.allNotes("target-from-another-project")).toEqual([])
       const forgedWorkspace = { ...workspace, projectID: "another-project" }
