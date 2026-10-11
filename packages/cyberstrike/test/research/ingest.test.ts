@@ -25,8 +25,28 @@ test("research extraction keeps reproduction, prerequisites, verification, cavea
   expect(extracted.rootCause).toContain("authorization is missing")
   expect(extracted.requestResponseEvidence).toContain("GET /api/objects/123")
   expect(extracted.affectedComponents).toContain("API")
+  expect(extracted.technologyStack).toBeUndefined()
+  expect(extracted.remediation).toBeUndefined()
   expect(extracted.poc).toContain("curl -i")
   expect(extracted.retrievalSignals).toContain("idor")
   expect(extracted.retrievalSignals).toContain("authorization-boundary")
   expect(extracted.retrievalSignals).toContain("api-endpoint")
+})
+
+test("research extraction preserves remediation, version, stack, and negative evidence when present", () => {
+  const extracted = extractResearchDetails(
+    "Vulnerable API route in Express",
+    [
+      "Affected versions: Express 4.18.0 through 4.18.2 are vulnerable.",
+      "The issue occurs in the Node.js Express middleware when the authorization check is missing.",
+      "The researcher could not reproduce the issue after applying the patch.",
+      "Remediation: upgrade to the patched release and enforce authorization on every object request.",
+      "The attack chain combines a source map disclosure with an IDOR that leads to account data exposure.",
+    ].join("\\n"),
+  )
+  expect(extracted.affectedVersions).toContain("Affected versions")
+  expect(extracted.technologyStack).toContain("Express")
+  expect(extracted.negativeEvidence).toContain("could not reproduce")
+  expect(extracted.remediation).toContain("upgrade to the patched release")
+  expect(extracted.attackChain).toContain("attack chain")
 })

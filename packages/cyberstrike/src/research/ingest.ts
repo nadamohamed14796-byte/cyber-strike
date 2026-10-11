@@ -312,6 +312,11 @@ export interface ExtractedResearchDetails {
   rootCause?: string
   requestResponseEvidence?: string
   affectedComponents?: string
+  affectedVersions?: string
+  technologyStack?: string
+  remediation?: string
+  attackChain?: string
+  negativeEvidence?: string
   limitations?: string
   retrievalSignals: string[]
 }
@@ -363,6 +368,36 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
     affectedComponents: matchingSentences(
       text,
       /endpoint|route|parameter|header|cookie|token|API|function|component|feature|source map|javascript|upload|workflow/i,
+      5,
+      1400,
+    ),
+    affectedVersions: matchingSentences(
+      text,
+      /affected versions?|vulnerable versions?|version(?:s)? (?:before|prior to|up to|through|between)|introduced in|fixed in|patched in|release \\d|\\bv?\\d+\\.\\d+(?:\\.\\d+)?/i,
+      6,
+      1600,
+    ),
+    technologyStack: matchingSentences(
+      text,
+      /\\b(?:react|next\\.js|angular|vue(?:\\.js)?|express|node\\.js|django|flask|rails|laravel|spring|asp\\.net|graphql|grpc|kubernetes|docker|nginx|apache|redis|mongodb|postgres(?:ql)?|mysql|oauth|openid|jwt)\\b|framework|library|middleware|deployment|architecture/i,
+      6,
+      1600,
+    ),
+    remediation: matchingSentences(
+      text,
+      /remediat|mitigat|fix(?:ed|es)?|patch(?:ed)?|upgrade to|workaround|recommend(?:ation)?|should (?:validate|verify|authorize|restrict|disable|remove|enforce)|apply (?:the )?(?:patch|update)|least privilege/i,
+      6,
+      1800,
+    ),
+    attackChain: matchingSentences(
+      text,
+      /chain(?:ed|ing)?|pivot|combine(?:d|s)? with|leads? to|result(?:s|ed)? in|escalat(?:e|ion)|account takeover|privilege escalation|lateral movement|from .* to /i,
+      6,
+      1800,
+    ),
+    negativeEvidence: matchingSentences(
+      text,
+      /did not reproduce|could not reproduce|not exploitable|no impact|no sensitive data|expected behavior|not vulnerable|not affected|failed to demonstrate|does not allow/i,
       5,
       1400,
     ),
@@ -570,8 +605,36 @@ export async function syncResearchSource(
             root_cause: extracted.rootCause ?? null,
             request_response_evidence: extracted.requestResponseEvidence ?? null,
             affected_components: extracted.affectedComponents ?? null,
+            affected_versions: extracted.affectedVersions ?? null,
+            technology_stack: extracted.technologyStack ?? null,
+            remediation: extracted.remediation ?? null,
+            attack_chain: extracted.attackChain ?? null,
+            negative_evidence: extracted.negativeEvidence ?? null,
             limitations: extracted.limitations ?? null,
             retrieval_signals: extracted.retrievalSignals,
+            extraction_coverage: {
+              present: [
+                extracted.lesson,
+                extracted.attackVector,
+                extracted.impact,
+                extracted.reproduction,
+                extracted.poc,
+                extracted.prerequisites,
+                extracted.verificationSignals,
+                extracted.falsePositiveCautions,
+                extracted.rootCause,
+                extracted.requestResponseEvidence,
+                extracted.affectedComponents,
+                extracted.affectedVersions,
+                extracted.technologyStack,
+                extracted.remediation,
+                extracted.attackChain,
+                extracted.negativeEvidence,
+                extracted.limitations,
+              ].filter(Boolean).length,
+              total: 17,
+              note: "Field presence only; not a quality score or practical validation.",
+            },
           },
         },
       })
@@ -759,10 +822,14 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           content_fingerprint: contentFingerprint,
           candidate_score: item.payload.candidate_score ?? 0,
           crawl_depth: item.payload.crawl_depth ?? 0,
-          excerpt: text.slice(0, 4200),
+          // Keep a useful bounded study excerpt, not just a title/short snippet.
+          // This is cleaned public-source text, still untrusted and not target evidence.
+          excerpt: text.slice(0, 12000),
           content_length: text.length,
+          stored_excerpt_length: Math.min(text.length, 12000),
           queue_id: item.public_id,
-          extraction_version: 2,
+          extraction_version: 3,
+          study_method: "bounded-heuristic-extraction",
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
             severity: extracted.severity,
