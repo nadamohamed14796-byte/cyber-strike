@@ -535,6 +535,8 @@ export namespace Agent {
             web_get_session_context: "allow",
             web_get_detail: "allow",
             web_get_request_detail: "allow",
+            // Read-only shared knowledge may help interpret a concrete API/auth signal.
+            research_knowledge: "allow",
             web_write_role: "allow",
             web_write_object: "allow",
             web_write_object_value: "allow",
