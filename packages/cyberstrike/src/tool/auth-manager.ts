@@ -89,10 +89,16 @@ export const AuthManagerTool = Tool.define("auth_manager", {
         origin: params.site_url, purpose: params.purpose, account: params.account,
         username: params.username, password, targetID: params.target_id,
       })
+      let indexSynced = false
       if (saved.purpose === "target" && saved.targetID) {
-        await syncTargetProfileIndex(params.site_url, saved.targetID)
+        try {
+          await syncTargetProfileIndex(params.site_url, saved.targetID)
+          indexSynced = true
+        } catch {
+          // The encrypted vault save is authoritative; a human-readable index is secondary.
+        }
       }
-      return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}. A reference (never the password) was written to the target workspace's auth-profiles.md file.`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose } }
+      return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}.${saved.purpose === "target" ? (indexSynced ? " A password-free reference was written to auth-profiles.md." : " The encrypted save succeeded, but the target reference index could not be refreshed.") : " Secret is not included in this response."}`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose, targetIndexSynced: saved.purpose === "target" ? indexSynced : undefined } }
     }
     if (params.action === "list") {
       const profiles = await AuthVault.list({ origin: params.site_url, purpose: params.purpose, targetID: params.target_id })
@@ -101,9 +107,15 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     if (!params.profile_id) return { title: "Profile ID required", output: "Provide profile_id to forget a saved login profile.", metadata: { ok: false } }
     await ctx.ask({ permission: "auth-credential-delete", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, profileID: params.profile_id } })
     const removed = await AuthVault.remove({ id: params.profile_id, origin: params.site_url, purpose: params.purpose, targetID: params.target_id })
+    let indexSynced = false
     if (removed && params.purpose === "target" && params.target_id) {
-      await syncTargetProfileIndex(params.site_url, params.target_id)
+      try {
+        await syncTargetProfileIndex(params.site_url, params.target_id)
+        indexSynced = true
+      } catch {
+        // Deletion from the encrypted vault remains authoritative.
+      }
     }
-    return { title: removed ? "Login profile forgotten" : "Profile not found", output: removed ? "The matching saved profile was deleted and the target account-reference file was refreshed." : "No profile matched that ID, exact origin, purpose, and target binding.", metadata: { ok: removed } }
+    return { title: removed ? "Login profile forgotten" : "Profile not found", output: removed ? (params.purpose === "target" ? (indexSynced ? "The encrypted profile was deleted and auth-profiles.md refreshed." : "The encrypted profile was deleted, but auth-profiles.md could not be refreshed.") : "The matching saved profile was deleted.") : "No profile matched that ID, exact origin, purpose, and target binding.", metadata: { ok: removed, targetIndexSynced: removed && params.purpose === "target" ? indexSynced : undefined } }
   },
 })
