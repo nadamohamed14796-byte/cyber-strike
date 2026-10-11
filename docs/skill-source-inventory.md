@@ -6,7 +6,7 @@ Generated from the Git trees of the two requested source repositories and the Cy
 
 - Claude-BugHunter source skills: 83.
 - recon-skills source skills: 146.
-- Current CyberStrike top-level curated skill directories on this branch: 72 (after the third adapted batch).
+- Current CyberStrike top-level curated skill directories on this branch: 82 (after the fourth adapted batch).
 - This is a staged migration inventory. The current branch includes an initial batch and a second batch of 12 adapted skills; it does not mean all upstream skills have been imported.
 
 ## Mapping rules
@@ -284,3 +284,19 @@ These rows describe work added in the feature branch. They are not claims that t
 | `attack-source-leak` | Claude-BugHunter `hunt-source-leak`; recon-skills `recon/source-leak-hunt` | Draft added; runtime support unverified |
 | `attack-firebase-supabase` | recon-skills Firebase/Supabase assessment | Draft added; runtime support unverified |
 | `attack-supply-chain-recon` | Claude-BugHunter and recon-skills supply-chain reconnaissance | Draft added; runtime support unverified |
+
+
+## Fourth adapted batch (2026-10-11)
+
+| CyberStrike skill | Source area | Review status |
+|---|---|---|
+| `attack-ldap` | Claude-BugHunter LDAP assessment | Draft added; runtime support unverified |
+| `attack-k8s` | Claude-BugHunter and recon-skills Kubernetes assessment | Draft added; runtime support unverified |
+| `attack-vcenter` | Claude-BugHunter and recon-skills vCenter assessment | Draft added; runtime support unverified |
+| `attack-m365-entra` | Claude-BugHunter M365/Entra assessment | Draft added; runtime support unverified |
+| `attack-okta` | Claude-BugHunter Okta assessment | Draft added; runtime support unverified |
+| `attack-brute-force` | Claude-BugHunter brute-force controls | Draft added; runtime support unverified |
+| `attack-ntlm` | Claude-BugHunter NTLM information/exposure | Draft added; runtime support unverified |
+| `attack-lfi` | Claude-BugHunter local file inclusion | Draft added; runtime support unverified |
+| `attack-nosqli` | Claude-BugHunter NoSQL injection | Draft added; runtime support unverified |
+| `attack-session-management` | Claude-BugHunter session assessment | Draft added; runtime support unverified |
