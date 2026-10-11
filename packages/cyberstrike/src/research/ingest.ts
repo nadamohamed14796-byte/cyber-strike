@@ -35,6 +35,21 @@ function normalizeUrl(value: string, base?: URL) {
   }
 }
 
+/**
+ * Redact credential-like values before any source text or extracted PoC is persisted.
+ * Public writeups are untrusted and can accidentally contain live tokens or secrets.
+ */
+export function redactResearchSecrets(input: string): string {
+  return input
+    .replace(/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\\s\\S]*?-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/gi, "[PRIVATE KEY REDACTED]")
+    .replace(/(authorization|proxy-authorization)\\s*:\\s*(?:bearer|basic)\\s+[^\\s"'<>]+/gi, "$1: [REDACTED]")
+    .replace(/(cookie|set-cookie)\\s*:\\s*[^\\s"'<>]+/gi, "$1: [REDACTED]")
+    .replace(/\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [REDACTED]")
+    .replace(/\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b/g, "[JWT REDACTED]")
+    .replace(/((?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|session[_-]?id|password|passwd|secret)\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s"'&,;<>]+)/gi, "$1[REDACTED]")
+    .replace(/([?&](?:access_token|refresh_token|token|api_key|apikey|secret|password|signature|sig|auth|session)=)[^&#\\s"'<>]+/gi, "$1[REDACTED]")
+}
+
 function cleanHtml(html: string) {
   const main =
     html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ??
@@ -552,7 +567,7 @@ export async function syncResearchSource(
         add(link, current.depth + 1)
       }
 
-      const text = cleanHtml(html)
+      const text = redactResearchSecrets(cleanHtml(html))
       const title = titleOf(html, current.url)
       if (text.length < 250) {
         result.skipped++
@@ -735,7 +750,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       try {
         const html = await fetchText(current.url, source)
         const title = titleOf(html, current.url)
-        const text = cleanHtml(html)
+        const text = redactResearchSecrets(cleanHtml(html))
         for (const link of linksOf(html, new URL(current.url), source)) {
           candidates++
           add(link, current.depth + 1)
@@ -789,7 +804,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
     }
     try {
       const html = await fetchText(item.source_url, source)
-      const text = cleanHtml(html)
+      const text = redactResearchSecrets(cleanHtml(html))
       const title = titleOf(html, item.source_url)
       if (text.length < 250) {
         ResearchQueue.complete(item.sequence, workerID, "rejected", "page content too short")

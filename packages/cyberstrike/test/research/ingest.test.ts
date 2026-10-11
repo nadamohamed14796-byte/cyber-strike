@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { extractResearchDetails } from "../../src/research/ingest"
+import { extractResearchDetails, redactResearchSecrets } from "../../src/research/ingest"
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
   const extracted = extractResearchDetails(
@@ -66,4 +66,23 @@ test("research PoC extraction recognizes HTTPie and Python HTTP-client examples"
   expect(extracted.poc).toContain("http --follow GET https://app.example.test/api/objects/123")
   expect(extracted.poc).toContain("requests.get(")
   expect(extracted.poc).toContain("httpx.post(")
+})
+
+test("research ingestion redacts credentials and secret-bearing URLs before persistence", () => {
+  const raw = [
+    "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+    "Cookie: sessionid=live-session-value",
+    "api_key=live-api-key-value",
+    "https://example.test/callback?token=live-query-token&next=%2Fhome",
+    "eyJabcdefghijk.abcdefghijk.abcdefghijk",
+    "-----BEGIN PRIVATE KEY-----private-key-material-----END PRIVATE KEY-----",
+  ].join(" ")
+  const safe = redactResearchSecrets(raw)
+  expect(safe).not.toContain("abcdefghijklmnopqrstuvwxyz")
+  expect(safe).not.toContain("live-session-value")
+  expect(safe).not.toContain("live-api-key-value")
+  expect(safe).not.toContain("live-query-token")
+  expect(safe).not.toContain("eyJabcdefghijk.abcdefghijk.abcdefghijk")
+  expect(safe).not.toContain("private-key-material")
+  expect(safe).toContain("next=%2Fhome")
 })
