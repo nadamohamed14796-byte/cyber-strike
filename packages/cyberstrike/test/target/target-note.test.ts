@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { redactTargetNoteSecrets } from "../../src/tool/target-note"
+import { redactTargetNoteSecrets } from "../../src/target/redact"
 
 test("redacts common secrets before target notes are persisted", () => {
   const source = [
