@@ -138,6 +138,22 @@ Do not test only one convenient API route. Build a small matrix of in-scope endp
 - Verify whether `Origin` is correctly included in the cache variation when responses differ by origin. If the issue is shared-cache mixing, link to `attack-cache-poison` only when cache impact is demonstrated.
 - Do not rely on malformed Origin values or CRLF-looking strings as proof. Confirm the server accepted the value and that the browser security boundary is actually crossed.
 
+## Reproducible Test Matrix and Triage
+
+Test each relevant endpoint across these dimensions, changing one variable at a time:
+
+| Dimension | Cases to compare | What to record |
+|---|---|---|
+| Origin | absent, exact allowed origin, untrusted origin, null where relevant | Access-Control-Allow-Origin |
+| Credentials | credentialed request vs non-credentialed request | Access-Control-Allow-Credentials and browser behavior |
+| Preflight | simple request, preflighted method/header | OPTIONS status and allow-method/header values |
+| Identity | anonymous, user A, user B with separate test accounts | Whether protected response data is readable cross-origin |
+| Cache | unique test URL, then normal repeat | Vary: Origin and whether one origin's response is reused for another |
+
+A permissive header alone is not enough. Demonstrate that a browser-origin security boundary is crossed and that meaningful response data is readable by an untrusted origin. Use synthetic data and a controlled test origin; do not collect another user's data.
+
+For every report, include the exact request origin, endpoint, authentication state, browser-relevant response headers, sanitized response body, and a minimal reproduction. Distinguish credentialed data exposure from public unauthenticated data, and note whether the endpoint contains sensitive user-specific content.
+
 ## References
 
 - [uphiago/recon-skills — CORS hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-cors/SKILL.md) (external research reference; not a local Cyber Strike skill path).
