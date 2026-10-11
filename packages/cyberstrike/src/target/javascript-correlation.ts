@@ -80,6 +80,14 @@ function sameHost(left: string | null | undefined, right: string | null | undefi
   return Boolean(a && b && a.hostname.toLowerCase() === b.hostname.toLowerCase())
 }
 
+function pathWithinScope(candidate: string | null | undefined, scopedPath: string): boolean {
+  const value = candidate?.split(/[?#]/, 1)[0]
+  if (!value) return false
+  const base = scopedPath.replace(/\/$/, "") || "/"
+  if (base === "/") return true
+  return value === base || value.startsWith(base + "/")
+}
+
 function normalizeEndpointLiteral(value: string): string | undefined {
   const trimmed = value.trim()
   if (!trimmed || trimmed.length > 240) return undefined
@@ -315,11 +323,23 @@ export namespace JavaScriptCorrelation {
         .all(),
     )
     const targetURL = new URL(normalizedTarget.targetURL)
+    const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     const relevantRequests = requests.filter((request) => {
       const hostURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
       if (!hostURL) return false
       const host = hostURL.hostname.toLowerCase()
-      if (host === targetURL.hostname || host.endsWith("." + targetURL.hostname)) return true
+      const isTargetHost = host === targetURL.hostname || host.endsWith("." + targetURL.hostname)
+      if (isTargetHost) {
+        // When the target is a path-scoped app, don't pull sibling applications' records
+        // from the same host unless the observed page itself belongs to the scoped path.
+        if (host === targetURL.hostname && targetPath !== "/") {
+          const pageURL = safeURL(request.page_url)
+          const requestPathMatches = pathWithinScope(request.normalized_path, targetPath)
+          const pagePathMatches = pageURL?.hostname === targetURL.hostname && pathWithinScope(pageURL.pathname, targetPath)
+          if (!requestPathMatches && !pagePathMatches) return false
+        }
+        return true
+      }
       return assets.some((asset) => asset.url.hostname.toLowerCase() === host)
     })
     const requestIDs = relevantRequests.map((request) => request.id)
@@ -358,7 +378,13 @@ export namespace JavaScriptCorrelation {
       if (!finding.endpoint) return false
       const endpoint = finding.endpoint.trim()
       if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
-        return sameHost(endpoint, normalizedTarget.targetURL) || assets.some((asset) => sameHost(endpoint, asset.url.href))
+        const endpointURL = safeURL(endpoint)
+        if (!endpointURL) return false
+        const isTargetHost = endpointURL.hostname === targetURL.hostname || endpointURL.hostname.endsWith("." + targetURL.hostname)
+        if (isTargetHost) {
+          return targetPath === "/" || pathWithinScope(endpointURL.pathname, targetPath)
+        }
+        return assets.some((asset) => sameHost(endpoint, asset.url.href))
       }
       return relevantRequests.some((request) => request.normalized_path === endpoint || request.normalized_path.includes(endpoint) || endpoint.includes(request.normalized_path))
     })
