@@ -17,9 +17,13 @@ cwe_ids:
 chains_with:
   - attack-cors
   - attack-jwt
+  - attack-host-header
+  - attack-cache-poison
 prerequisites: []
 severity_boost:
-  attack-jwt: "Open redirect + OAuth = JWT/token theft"
+  attack-jwt: "An open redirect may weaken an OAuth flow only when the redirect_uri validation or token/code delivery impact is demonstrated with a test client."
+  attack-host-header: "Host-derived redirect destinations can chain with host-header trust flaws when the destination is attacker-controlled and reproducible."
+  attack-cache-poison: "A redirect becomes a cache-poisoning chain only when a clean request receives the cached redirect without the injected input."
 ---
 
 # Open Redirect
@@ -139,7 +143,7 @@ Prioritize redirect parameters used in login, logout, OAuth/OIDC callback, invit
 - Check relative URLs, scheme-relative URLs, encoded delimiters, and allowlist parsing one at a time. A redirect to an allowlisted domain or a URL displayed in text is not an open redirect.
 - Severity depends on the trust boundary and demonstrated chain. A standalone redirect is not automatically account takeover or token theft.
 - Preserve the original URL, the exact redirect parameter, the `Location` response, and the final destination. Redact sensitive query values.
-- [uphiago/recon-skills — open-redirect hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-open-redirect/SKILL.md) (external research reference; not a local Cyber Strike skill path).
+- [uphiago/recon-skills — open-redirect hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-open-redirect/SKILL.md) (external research reference).
 - [elementalsouls/Claude-BugHunter — open-redirect hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-open-redirect/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 ## References
