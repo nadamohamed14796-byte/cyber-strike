@@ -401,7 +401,7 @@ export namespace ReportKnowledge {
                   like(ReportKnowledgeTable.reproduction, q),
                   like(ReportKnowledgeTable.poc, q),
                   like(ReportKnowledgeTable.tags, q),
-                  like(sql<string>\`${ReportKnowledgeTable.metadata}\`, q),
+                  like(sql<string>`${ReportKnowledgeTable.metadata}`, q),
                   like(ReportKnowledgeTable.vulnerability_class, q),
                   like(ReportKnowledgeTable.cwe_id, q),
                 ]
