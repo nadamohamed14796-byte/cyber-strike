@@ -76,6 +76,14 @@ gh repo view OWNER/REPO # verify repo access
 - Confirm dependency findings against the resolved package/version and lockfile. A package name in source without a reachable dependency is not sufficient evidence.
 - Record repository, workflow path, event context, effective permissions, timestamps, and sanitized evidence. Do not copy private workflow logs or repository data into public files.
 
+## Scope and Validation Notes
+
+- Confirm repository, organization, workflow, runner, package registry, and cloud integration scope before reviewing settings. A linked repository or deployment target is not automatically authorized.
+- Prefer read-only inspection of workflow permissions, branch protections, secrets configuration, dependency pinning, artifact provenance, and deployment gates.
+- Distinguish a risky configuration from demonstrated impact. For example, an untrusted expression is a lead until the execution context and reachable privilege boundary are shown.
+- Validate suspected workflow injection only in a designated test branch or fork with a harmless marker. Do not print real secrets, publish packages, deploy artifacts, or modify production workflows without explicit written permission.
+- Save the minimal sanitized evidence needed: workflow path and line, triggering event, effective permissions, expected versus observed behavior, and timestamps. Redact tokens and private repository data.
+
 ## Program Reference
 
 | Program | Focus | Tool |
