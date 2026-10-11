@@ -58,6 +58,7 @@ test("persists deduplicated endpoint candidates and links only host-compatible c
       { id: "req-2", method: "GET", host: "other.example.net", url: "https://other.example.net/v1/profile", normalizedPath: "/v1/profile", responseStatus: 200 },
       { id: "req-3", method: "GET", host: "api.example.com", url: "https://api.example.com/v1/profile", normalizedPath: "/v1/profile", responseStatus: 200 },
     ],
+    "app.example.com",
   )
   expect(endpoints).toHaveLength(2)
   const users = endpoints.find((endpoint) => endpoint.path === "/api/users")

@@ -162,6 +162,7 @@ export interface JavaScriptEndpointCandidate {
 export function correlateStaticJavaScriptEndpoints(
   sourceFiles: JavaScriptSourceFile[],
   requests: Array<{ id: string; method: string; host: string | null; url: string | null; normalizedPath: string; responseStatus: number | null }>,
+  targetHost: string,
 ): JavaScriptEndpointCandidate[] {
   const candidates = new Map<string, JavaScriptEndpointCandidate>()
   for (const file of sourceFiles) {
@@ -190,7 +191,10 @@ export function correlateStaticJavaScriptEndpoints(
       for (const request of requests) {
         const requestURL = safeURL(request.url) ?? safeURL(request.host)
         const requestHost = requestURL?.hostname.toLowerCase()
-        if (host && requestHost !== host) continue
+        if (!requestHost) continue
+        // Relative literals resolve against the application host; absolute literals
+        // must match their explicit host. Do not cross-correlate identical paths on a CDN.
+        if (host ? requestHost !== host : requestHost !== targetHost.toLowerCase()) continue
         const observedPath = request.normalizedPath.split(/[?#]/, 1)[0]
         const base = endpointPath.replace(/\{[^}]+\}/g, "").replace(/\/$/, "")
         const staticPrefix = endpointPath.replace(/\{[^}]+\}/g, "")
@@ -584,7 +588,7 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
-    graph.endpointCandidates = correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests)
+    graph.endpointCandidates = correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname)
     for (const endpoint of graph.endpointCandidates) {
       for (const sourceFile of endpoint.sourceFiles) {
         graph.edges.push({
