@@ -63,7 +63,7 @@ function bodyText(part?: Part): string {
 /** Strict domain boundary: exact host or a true subdomain, never a suffix lookalike. */
 export function isAllowedSiteSender(from: string, siteUrl: string): boolean {
   const origin = normalizeAuthOrigin(siteUrl)
-  const siteHost = new URL(origin).hostname.toLowerCase().replace(/^www\./, "")
+  const siteHost = new URL(origin).hostname.toLowerCase()
   const senderHost = /@([^\s>]+)/.exec(from)?.[1]?.replace(/[>),;]+$/, "").toLowerCase()
   return !!senderHost && (senderHost === siteHost || senderHost.endsWith(`.${siteHost}`))
 }
