@@ -90,6 +90,8 @@ export interface LauncherOptions {
   // honor the abort signal yet, so Esc / /hackbrowser-stop cannot cancel
   // during the login wait phase.
   credentials?: string[]
+  /** Decrypted only for the lifetime of this local crawl; never log this object. */
+  savedLogin?: { username: string; password: string; origin: string }
   steps?: number
   headless?: boolean
   // Connect to user's real Chrome via CDP instead of Playwright's Chromium.
@@ -227,6 +229,8 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
   // 5. Credential dispatch — translate cyberstrike credential IDs into the
   //    serializable CredentialDispatch union the worker sends to runCrawl.
   const ids = opts.credentials ?? []
+  if (opts.savedLogin && ids.length > 0) throw new Error("Use either a saved login profile or manual credential IDs, not both.")
+  if (opts.savedLogin && opts.headless !== false) throw new Error("Saved login profiles require headless=false for visible, user-supervised authentication.")
   if (ids.length >= 1 && opts.headless !== false) {
     throw new Error(
       `Crawling with credentials requires headless=false so the user can log in manually. ` +
@@ -251,6 +255,7 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
     cyberstrikeUrl,
     model: modelDescriptor,
     credentialDispatch,
+    savedLogin: opts.savedLogin,
     cdp: opts.cdp,
   }
 
