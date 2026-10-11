@@ -1,25 +1,52 @@
 ---
 name: recon-methodology
-description: "Plan authorized reconnaissance from passive discovery to bounded active validation with reproducible evidence"
-category: information-gathering
-author: cyberstrike-official
-tags: [recon, enumeration, osint, subdomain, web-enumeration, technology-detection, js-secrets, scope-triage, ASN, origin-ip, vhost, email-security, github-osint, gitlab-osint]
-tech_stack: [linux, dns, http, web]
-version: "1.3.0"
-chains_with: [attack-subdomain-takeover, attack-host-header, attack-ssrf]
+description: "Plan authorized reconnaissance from passive discovery to bounded active validation with reproducible evidence and strict ownership, scope, and false-positive controls."
+category: "process"
+version: "1.4.0"
+author: "cyberstrike-official"
+tags:
+  - recon
+  - enumeration
+  - osint
+  - subdomain
+  - web-enumeration
+  - api
+  - source-leak
+  - secrets-hygiene
+  - tls
+  - port-discovery
+  - scope-triage
+tech_stack:
+  - linux
+  - dns
+  - http
+  - web
+chains_with:
+  - attack-subdomain-takeover
+  - attack-host-header
+  - attack-ssrf
+  - attack-minio-s3
 prerequisites: []
+severity_boost: {}
 ---
 
 # Reconnaissance Methodology
 
-## Scope and Safety Preconditions
+## Objective
+
+Establish an owned, in-scope asset inventory and prioritize security checks without confusing third-party adjacency, passive signals, tool output, or a status-code differential for a vulnerability. This workflow supports authorized testing from discovery to minimal validation.
+
+## Methodology
+
+
+### Scope and Safety Preconditions
 
 - Confirm the exact authorized root domains, wildcard rules, excluded hosts, permitted test types, request limits, and engagement window before active probing.
 - Keep passive collection separate from active scans. A hostname discovered through OSINT is not automatically in scope; validate ownership/scope before sending probes.
 - Start with low request rates and bounded timeouts. Increase concurrency only when the program permits it and the target remains stable. Do not run broad port scans, fuzzing, or vulnerability templates outside the written scope.
 - Store outputs in a dedicated working directory and keep credentials, raw private evidence, and target-specific notes out of this reusable skill.
 
-## Ownership & Scope Triage (do this before trusting any recon output)
+### Ownership & Scope Triage (do this before trusting any recon output)
 
 Automated recon keyword-matches on the brand name. For any target whose name is a common or dictionary-ish word, a large share of "discovered" assets — repos, cloud buckets, mobile apps, breach combos, typosquats — belong to unrelated same-named organizations. Treat ownership as **guilty until proven**: an asset is the target's only when a concrete signal ties it to the target, never because a scanner's keyword matched.
 
@@ -41,7 +68,7 @@ Workflow:
 
 Anti-patterns: trusting a tool's "owned" label without verification; targeting a same-named third party because it appeared in a report (out of scope, real harm); reporting soft-404s as exposures; counting typosquats or brand-collision repos as offensive findings.
 
-### The soft-404 control
+#### The soft-404 control
 
 Automated `.env` / `.git` / `actuator` / admin-panel "Criticals" are overwhelmingly soft-404s: SPA or framework catch-alls that return HTTP 200 (or 403) for *every* path. Verify each one before believing it:
 
@@ -56,7 +83,7 @@ cmp -s /tmp/a /tmp/b && echo "SOFT-404 false positive" || echo "differs - invest
 
 A real exposure has a signature that differs from the catch-all: `.git/config` starts with `[core]`, `.env` contains `KEY=value` pairs, a real `phpinfo.php` carries the XHTML-transitional doctype plus a PHP version string. A bigger/different body than the junk control is the real-vs-soft-404 tell — always run this control before logging a sensitive-file finding.
 
-## Prerequisites
+### Prerequisites
 
 - A shell with `curl`, `jq`, `dig`, `subfinder`, `amass`, `dnsx`, `httpx`, `nmap`, and the specific optional tools used below.
 - Optional for deeper subdomain work: `gotator`, `puredns`, `tldbrute`, `gungnir` or `certwatcher`.
@@ -69,7 +96,7 @@ A real exposure has a signature that differs from the catch-all: `.git/config` s
 - An explicitly authorized target domain set as `TARGET`; optional API keys only for providers you are authorized to use.
 - A writable output directory: `OUTPUT_DIR="${OUTPUT_DIR:-./output}"`.
 
-## How to Run
+### How to Run
 
 ```bash
 # Set only a domain that is explicitly in scope; create an isolated output folder
@@ -79,9 +106,9 @@ mkdir -p "$OUTPUT_DIR"
 printf 'Target: %s\nOutput: %s\n' "$TARGET" "$OUTPUT_DIR"
 ```
 
-## Phase 1: Passive Reconnaissance
+### Phase 1: Passive Reconnaissance
 
-### Subdomain Enumeration (Passive)
+#### Subdomain Enumeration (Passive)
 
 ```bash
 # Certificate Transparency — crt.sh (retry: frequently 502s while its DB refreshes)
@@ -114,7 +141,7 @@ cat "$OUTPUT_DIR"/crtsh.txt "$OUTPUT_DIR"/crtname.txt "$OUTPUT_DIR"/subs.txt 2>/
   | grep -E '^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' | sort -u > "$OUTPUT_DIR/all_passive.txt"
 ```
 
-### Historical Data
+#### Historical Data
 
 ```bash
 # Wayback Machine URLs
@@ -130,7 +157,7 @@ cat "$OUTPUT_DIR/wayback.txt" "$OUTPUT_DIR/gau.txt" | sort -u | tee "$OUTPUT_DIR
 cat "$OUTPUT_DIR/historical_urls.txt" | grep "=" | qsreplace "FUZZ" | sort -u
 ```
 
-### Technology Detection
+#### Technology Detection
 
 ```bash
 # Wappalyzer CLI
@@ -143,7 +170,7 @@ whatweb -a 3 "https://$TARGET"
 if [ -n "${BUILTWITH_API_KEY:-}" ]; then curl --max-time 15 --connect-timeout 5 -s "https://api.builtwith.com/v19/api.json?KEY=$BUILTWITH_API_KEY&LOOKUP=$TARGET" -o "$OUTPUT_DIR/builtwith.json"; fi
 ```
 
-### Email Security Posture (SPF / DKIM / DMARC)
+#### Email Security Posture (SPF / DKIM / DMARC)
 
 Entirely passive DNS lookups — a useful signal of overall security maturity, and a standalone finding in its own right (a weak DMARC policy means the domain can be spoofed in phishing/BEC campaigns, which is relevant risk context even when email isn't the test's primary focus):
 
@@ -166,7 +193,7 @@ dig +short MX "$TARGET"
 
 A `p=none` or missing DMARC record is reportable as-is from DNS evidence alone. Actually demonstrating spoofed delivery (sending a test message that appears to originate from the domain) is a phishing-simulation action, not a recon action — it needs its own explicit authorization and rules of engagement, separate from this skill.
 
-### Source-Code & Repository OSINT (GitHub / GitLab)
+#### Source-Code & Repository OSINT (GitHub / GitLab)
 
 Developers push secrets to public repositories routinely. This is frequently higher-yield than directory brute-forcing, and it's effectively passive (read-only API calls against public resources) — but subject to the same Ownership & Scope Triage above, since brand-name code search pulls in unrelated projects that merely mention the word.
 
@@ -198,11 +225,11 @@ reg_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 "https://gitlab
 
 If a public repo or raw file genuinely contains credentials, record **which file, which commit, and which key names** are present as evidence — verify validity with a single minimal, read-only API call (e.g. `GET /user` for a GitHub token) rather than printing or reusing the full secret value, and never attempt write access or lateral use of a found credential without separate, explicit authorization covering that action.
 
-## Phase 2: Active Reconnaissance
+### Phase 2: Active Reconnaissance
 
 Run this phase only against assets confirmed in scope (after Ownership & Scope Triage above). Use one tool at a time at first and keep logs so repeated probes can be avoided.
 
-### DNS Enumeration
+#### DNS Enumeration
 
 ```bash
 # DNS records
@@ -221,7 +248,7 @@ dnsrecon -d "$TARGET" -t std
 puredns bruteforce wordlist.txt "$TARGET" -r resolvers.txt
 ```
 
-### Subdomain Resolution
+#### Subdomain Resolution
 
 ```bash
 # Resolve discovered subdomains
@@ -242,7 +269,7 @@ dig +short "nonexistent-$RANDOM.$TARGET"
 awk '{print $3}' "$OUTPUT_DIR/resolved.txt" | sort | uniq -c | sort -rn | head -10
 ```
 
-### Visual Triage (Screenshots)
+#### Visual Triage (Screenshots)
 
 With dozens or hundreds of live hosts, screenshotting beats manually opening each one. Pair it with tech detection so a screenshot's content and its fingerprint corroborate each other:
 
@@ -267,7 +294,7 @@ What a screenshot is telling you:
 | Directory listing | Readable file tree — look for config/backup files |
 | Identical screenshots across many hosts | Shared infrastructure — one vulnerable host may indicate the rest are too |
 
-### Port Scanning
+#### Port Scanning
 
 ```bash
 # Fast scan (top 100)
@@ -311,7 +338,7 @@ echo "$anon_test" | grep -qi "230" && echo "[HIGH] Anonymous FTP login succeeded
 
 Do **not** extend this pattern to guessing usernames/passwords against MySQL, SSH, or any service that requires a real credential — that is brute-forcing and is explicitly out of scope for reconnaissance (see Scope, Rate Limits, and Stop Conditions below). Record the open port and move it into a vulnerability-specific skill once genuinely in scope.
 
-### Infrastructure Mapping — ASN, CIDR, Origin IP
+#### Infrastructure Mapping — ASN, CIDR, Origin IP
 
 Passive subdomain enumeration only finds hosts with a DNS name. Pivoting through ASN/CIDR data and origin-IP techniques finds the organization's broader IP footprint and the real server behind a CDN/WAF.
 
@@ -357,7 +384,7 @@ done | grep -v "^403\|^000"
 
 Confirm a candidate origin by matching content (title/favicon) between the CDN-fronted site and the direct-IP request with the target's Host header — a matching favicon hash plus matching page title is reasonable confirmation; a bare open port on an unrelated IP is not.
 
-### Subdomain Categorization
+#### Subdomain Categorization
 
 Group discovered hostnames by likely purpose to prioritize manual review — admin/API/staging surfaces are higher value than static/CDN assets:
 
@@ -384,7 +411,7 @@ echo "=== Staging headers ===";    curl -skI --max-time 15 "https://$STAGING"
 # not the mere existence of a staging host.
 ```
 
-### Subdomain Takeover Check
+#### Subdomain Takeover Check
 
 ```bash
 # Bulk CNAME check (preferred over a dig loop)
@@ -412,7 +439,7 @@ done < "$OUTPUT_DIR/all_passive.txt"
 
 A takeover candidate is only confirmed once the CNAME target is manually verified as unclaimed on the provider — load `attack-subdomain-takeover` before attempting registration.
 
-### Permutation & Prediction
+#### Permutation & Prediction
 
 Generate mutations from already-discovered subdomains to surface services that passive sources missed:
 
@@ -424,7 +451,7 @@ gotator -sub "$OUTPUT_DIR/all_passive.txt" -perm permutations.txt -depth 1 -numb
 puredns resolve "$OUTPUT_DIR/subs_permuted.txt" -r resolvers.txt -o "$OUTPUT_DIR/subs_permuted_alive.txt"
 ```
 
-### TLD Expansion
+#### TLD Expansion
 
 An organization that owns `target.com` often neglects `target.io`, `target.net`, `target.xyz` — and parallel infrastructure on another TLD is a distinct ownership question, not automatically in scope. Treat any hit as a lead for the Ownership & Scope Triage step above, not a confirmed asset.
 
@@ -433,7 +460,7 @@ An organization that owns `target.com` often neglects `target.io`, `target.net`,
 tldbrute -d "$TARGET"
 ```
 
-### Live Certificate Monitoring
+#### Live Certificate Monitoring
 
 For longer engagements, catch newly issued certificates (and therefore new subdomains) as they appear:
 
@@ -445,9 +472,9 @@ gungnir -d "$TARGET"
 certwatcher -d "$TARGET"
 ```
 
-## Phase 3: Content Discovery
+### Phase 3: Content Discovery
 
-### CMS & Framework Fingerprinting
+#### CMS & Framework Fingerprinting
 
 Knowing the stack before probing paths avoids wasted WordPress-specific tests against a Laravel API (and vice versa):
 
@@ -481,7 +508,7 @@ curl -sk --max-time 15 "https://$TARGET/administrator/manifests/files/joomla.xml
 
 A known CMS/framework version is a lead to check against its public CVE list (e.g. the WordPress/Drupal/Magento security advisories) — not itself a finding. Load a vulnerability-specific skill once a version/CVE pairing needs validation.
 
-### Directory Fuzzing
+#### Directory Fuzzing
 
 ```bash
 # Feroxbuster
@@ -497,7 +524,7 @@ dirsearch -u "https://$TARGET" -e php,asp,html -t 10 --timeout 10 --max-rate 5 -
 gobuster dir -u "https://$TARGET" -w wordlist.txt -x php,html -t 10 --delay 200ms -o "$OUTPUT_DIR/gobuster.txt"
 ```
 
-### Sensitive File & Path Disclosure Scanning
+#### Sensitive File & Path Disclosure Scanning
 
 High-yield on neglected infrastructure: one exposed `.env` or `.git` directory can lead to full credential access. Always run the soft-404 junk-path control (above) on the same host before trusting any hit.
 
@@ -536,7 +563,7 @@ curl -sk --max-time 15 -r 0-2000 "https://$TARGET/error_log" | grep -iE 'PHP|War
 
 If server paths, SQL fragments, or a framework's session-signing keys (e.g. WordPress `AUTH_KEY`/`NONCE_SALT` constants) appear, that's reportable on its own — don't continue pulling the file just to see more.
 
-### Virtual Host (vHost) Enumeration
+#### Virtual Host (vHost) Enumeration
 
 Many servers hold hidden virtual hosts that only respond to a specific `Host` header and never show up in subdomain enumeration — reachable once you have a candidate IP (from origin-IP discovery or ASN/CIDR mapping above):
 
@@ -554,7 +581,7 @@ echo | openssl s_client -connect TARGET_IP:443 -servername "$TARGET" 2>/dev/null
 
 A hit must be verified manually (curl with the exact Host header, confirm distinct content from the calibrated default) before being logged — some servers echo any Host header back with a generic page, which looks like a hit but isn't one.
 
-### Cache / CDN Detection
+#### Cache / CDN Detection
 
 ```bash
 curl --max-time 30 --connect-timeout 10 -sI "https://$TARGET/" | grep -iE "age|x-cache|via|server|cf-cache-status"
@@ -563,7 +590,7 @@ curl --max-time 30 --connect-timeout 10 -sI "https://$TARGET/" | grep -iE "age|x
 # Cf-Cache-Status: HIT   = Cloudflare
 ```
 
-### Parameter Discovery
+#### Parameter Discovery
 
 ```bash
 # Arjun
@@ -579,7 +606,7 @@ x8 -u "https://$TARGET/endpoint" -o "$OUTPUT_DIR/x8_params.txt"
 ffuf -u "https://$TARGET/page?FUZZ=value" -w params.txt -mc 200 -t 10 -rate 5 -maxtime 300 -o "$OUTPUT_DIR/ffuf-params.json"
 ```
 
-### URL Category Extraction
+#### URL Category Extraction
 
 Once historical/crawled URLs are collected, split them by sensitivity to prioritize manual testing:
 
@@ -593,7 +620,7 @@ cat "$OUTPUT_DIR/historical_urls.txt" | grep -Ei "[0-9]{3,}"                    
 cat "$OUTPUT_DIR/historical_urls.txt" | grep -Ei "redirect|callback|goto|dest=|url="   > "$OUTPUT_DIR/redirect_urls.txt" # open-redirect candidates
 ```
 
-### WAF / 403 Bypass (authorized testing only)
+#### WAF / 403 Bypass (authorized testing only)
 
 Use only when the target is confirmed in scope and the engagement rules permit bypass testing. These are reconnaissance probes to understand access-control configuration, not an invitation to force access to admin functionality.
 
@@ -611,7 +638,7 @@ for method in GET POST PUT PATCH DELETE OPTIONS HEAD; do
 done
 ```
 
-### JavaScript Analysis
+#### JavaScript Analysis
 
 Modern bundles (Webpack/Vite/esbuild) often leak internal API URLs, environment variables (`VITE_*`, `REACT_APP_*`, `NEXT_PUBLIC_*`), and third-party service configuration (Firebase, Auth0, Supabase). This is routinely higher-yield than directory brute-forcing on SPA-heavy targets. Always check JS bundles on **every open port**, not just 443 — admin or internal apps are often served on an alternate port with a different bundle and different secrets than the public site.
 
@@ -669,9 +696,9 @@ done
 
 Each hit from this pass is a candidate, not a finding — it still needs a manual proof-of-concept before it's reportable.
 
-## Phase 4: Vulnerability Discovery
+### Phase 4: Vulnerability Discovery
 
-### Automated Scanning
+#### Automated Scanning
 
 ```bash
 # Nuclei (comprehensive)
@@ -684,7 +711,7 @@ nikto -h "https://$TARGET" -maxtime 5m -output "$OUTPUT_DIR/nikto.txt"
 wpscan --url "https://$TARGET" --enumerate u,p,t --max-threads 5 --throttle 1 --request-timeout 10 --output "$OUTPUT_DIR/wpscan.txt"
 ```
 
-### Manual Testing Points
+#### Manual Testing Points
 
 ```
 1. Authentication
@@ -711,7 +738,7 @@ wpscan --url "https://$TARGET" --enumerate u,p,t --max-threads 5 --throttle 1 --
    - Race conditions
 ```
 
-## Reconnaissance Flow
+### Reconnaissance Flow
 
 ```
 Target Domain
@@ -758,7 +785,7 @@ Target Domain
          └── Manual testing
 ```
 
-## Verification and Evidence Hygiene
+### Verification and Evidence Hygiene
 
 - Deduplicate and scope-check discovered hostnames before active requests; exclude third-party assets and unresolved ownership questions (see Ownership & Scope Triage).
 - Verify DNS answers and HTTP liveness independently. A DNS record, open port, technology fingerprint, or HTTP status is a lead, not a vulnerability finding.
@@ -770,7 +797,7 @@ Target Domain
 - Keep a list of tested hosts and endpoints to prevent duplicate scans. Stop or reduce rate when latency, errors, lockouts, or service instability increases.
 - Related skills use the exact existing names `attack-subdomain-takeover`, `attack-host-header`, and `attack-ssrf`; load them only when discovery provides a relevant signal.
 
-## Scope, Rate Limits, and Stop Conditions
+### Scope, Rate Limits, and Stop Conditions
 
 - Establish an explicit allowlist of domains, hosts, ports, and test windows before active probing. A discovered subdomain or linked third-party host is not automatically in scope.
 - Keep passive collection separate from active validation in notes and reports. Record source, timestamp, DNS/HTTP result, and the exact command so findings can be reproduced.
@@ -780,7 +807,7 @@ Target Domain
 - Treat third-party enrichment and scanner output as leads. Verify live reachability and ownership before reporting, and exclude secrets or personal data from saved output.
 - CIDR ranges from ASN pivoting can be enormous (large cloud providers especially). Only scan ranges confirmed to belong to the target, never an entire hosting provider's address space.
 
-## Wordlists
+### Wordlists
 
 | Purpose     | Recommended Wordlist                                                         |
 | ----------- | ---------------------------------------------------------------------------- |
@@ -790,7 +817,7 @@ Target Domain
 | Parameters  | SecLists/Discovery/Web-Content/burp-parameter-names.txt                      |
 | Passwords   | SecLists/Passwords/Common-Credentials/10-million-password-list-top-10000.txt |
 
-## Asset Confidence and Recon Prioritization
+### Asset Confidence and Recon Prioritization
 
 Keep discovery evidence separate from conclusions. For every asset, track source, timestamp, DNS/HTTP status, ownership confidence, scope decision, and whether active testing is permitted.
 
@@ -804,7 +831,7 @@ Prioritize by likely attack surface and business relevance, not by the number of
 
 For active checks, use bounded concurrency, request timeouts, conservative rate limits, and explicit stop conditions. Do not scan neighboring tenants or third-party infrastructure merely because it resolves from an in-scope domain. Keep raw secrets and personal data out of recon output; retain sanitized command, timestamp, source, and validation evidence for reproducibility.
 
-## Pitfalls
+### Pitfalls
 
 | Issue | Solution |
 |-------|----------|
@@ -818,6 +845,105 @@ For active checks, use bounded concurrency, request timeouts, conservative rate 
 | Huge ASN/CIDR ranges | Confirm the range belongs to the target via at least two sources before scanning any of it |
 | vHost false positives | Some servers return a generic 200 for any Host header — calibrate with a known-nonexistent hostname first |
 | GitHub/GitLab search noise | Most "secret" search hits are docs, examples, or template files — filter to real config filenames (`.env`, `.npmrc`, CI config) and verify before recording |
+
+
+### Phase 5: Specialized Recon Add-ons
+
+#### 401/403 Boundary and Routing Differential Checks
+
+Ownership/scope gate: use only a denied endpoint on a confirmed in-scope host. Capture one baseline and one benign comparison. Test a small number of documented path-normalization or method-routing variants individually; avoid long bypass wordlists, request-smuggling payloads, or attempts to access sensitive admin data. Confirmation requires the protected handler/content to be reached, not a changed status code alone. Compare body hashes, title, content type, and authentication challenge headers.
+
+#### Unauthenticated API Surface Validation
+
+Use JavaScript references, API documentation, and a few known routes to identify candidate APIs rather than broad path fuzzing. Compare an anonymous request against the same route with a test account and a known public/negative control. Keep read evidence to a short sanitized marker. For mutations, use a disposable synthetic record and explicit authorization; verify persisted state and clean it up. Never dump user collections or enumerate identifiers.
+
+#### Cache Behavior and Cache-Key Analysis
+
+Begin with Age, Via, X-Cache, and provider-specific cache status; a cache header alone is not a vulnerability. Use a unique query parameter and benign marker on an endpoint/cache key you control. Compare requests with and without one candidate header or parameter and observe MISS/HIT behavior. Never inject active script, poison shared pages, retrieve another user's cached response, or flush a production cache. Cache deception/poisoning candidates require a controlled lab or explicit test path and cleanup plan.
+
+#### Source, Backup, and Repository Exposure
+
+Probe only a small justified set of paths on a confirmed in-scope origin and compare each response with a random nonexistent path. A 200 or HTML page is not proof: verify a content signature, Git metadata marker, valid archive structure, or minimal config/log field. For secrets, record key name/type and a short truncated fragment at most; never print, store, test, or reuse a full secret. Do not retrieve database dumps, bulk backups, customer logs, or full repository contents from production.
+
+#### Hardcoded Credential and Secret Indicators
+
+Review public HTML, delivered JavaScript, source maps, and configuration endpoints for suspicious assignments, distinguishing public identifiers from private credentials. Record the file/commit/response location, variable/key name, and confidence. Never echo full token values; truncate minimally where needed and redact in reports. Do not test discovered credentials against live services. Escalate through the authorized program process for controlled validation or revocation.
+
+#### HTTP/2 and Header-Parsing Differences
+
+Use a local HTTP/2 test server, vendor documentation, or a test endpoint to compare protocol/header normalization. In production, keep to a few non-mutating requests and don't attempt desynchronization or conflicting framing unless specifically authorized. Browser/client fingerprints are environmental signals, not authentication. Document negotiated protocol, response differences, and whether an origin-side security boundary was crossed.
+
+#### Automation Reproducibility and Human Interaction
+
+Use browser automation to reproduce legitimate user workflows, not to evade account protection, CAPTCHAs, fraud prevention, or rate limits. Keep account, route, browser version, and network context constant while changing one variable. Respect challenge and lockout responses; do not automate challenge solving, create accounts at scale, rotate identities/IPs to evade controls, or disguise abusive traffic. If automated and manual behavior differs, preserve it as a lead pending controlled explanation.
+
+#### IoT Camera and Physical-Security Discovery
+
+Physical-security devices can affect privacy and safety. Confirm device ownership and exact scope before active testing. Prefer public product/version fingerprints and low-risk auth challenges; do not fetch snapshots, video, audio, recordings, admin configuration, or personal data. Do not try default passwords, scan large ranges, or invoke pan/tilt, door, alarm, relay, or firmware-control actions. Use an owner-provided test device and synthetic media if deeper proof is required.
+
+#### Port and Service Discovery
+
+Only scan explicitly authorized IPs/CIDRs and ports. Start with a small known-host list and low request rates, then confirm individual hits with a bounded service probe. Do not scan broad public ranges, shared cloud ranges, or infrastructure discovered through third-party sources unless explicitly included in scope. Stop on service instability, rate-limit/IDS notification, or ownership uncertainty. Keep excluded hosts in an explicit list and never treat an open port as proof of a vulnerability.
+
+#### Browser Automation and Anti-Bot Boundaries
+
+Use standard, observable browser configuration for repeatable tests and document version/extensions. Fingerprint differences between curl and browser can explain false negatives but do not authorize anti-bot evasion. Do not use proxy rotation, stealth patches, geolocation deception, CAPTCHA-solving services, or human-behavior simulation to bypass security/abuse controls. When browser-only checks are permitted, use a tester-owned account and one controlled session; stop if the service challenges or blocks the test.
+
+#### TLS Fingerprint and ClientHello Analysis
+
+Use passive certificate inspection and safe TLS handshakes to record protocol versions, cipher negotiation, ALPN, certificate chain, and negotiated parameters. ClientHello/JA3/JA4 mismatches may explain scanner/browser differences but are not vulnerabilities by themselves. Do not impersonate other clients to evade access controls or rate limits. If client-profile comparison is needed, reproduce it against a local test server or approved endpoint and log negotiated properties.
+
+#### Multi-Step Unauthenticated API Workflow Review
+
+Model the workflow as a state machine (initiate, submit, upload, review, complete, export) and identify the intended identity/ownership boundary at each step. Start with a test-owned flow and synthetic data. Verify one transition at a time, including whether workflow IDs are bound to creator and tenant. Do not complete real transactions, publish content, send notifications, upload active files, or export real data. A flow ID accepted by an API is not a finding until an unauthorized state transition or access boundary is demonstrated.
+
+## What This Produces
+
+- An auditable asset list with source, timestamp, ownership/scope confidence, and active-test permission.
+- A prioritized endpoint/service inventory with confidence notes and low-risk evidence.
+- Candidate leads clearly separated from confirmed security-boundary failures.
+- Sanitized artifacts plus a record of exclusions, unresolved ownership, cleanup, and stop events.
+
+## Evidence Requirements
+
+- Keep the original source for each hostname, route, endpoint, version string, or repository result.
+- Record timestamp/time zone, resolver, status, headers, body hash/size, and account/role for active checks.
+- Use random nonexistent paths and known public paths as negative controls where appropriate.
+- For secret indicators, retain key name/type and a short truncated fragment only; never expose full credentials, tokens, or customer data.
+- Document rate limits, scope decisions, stop events, cleanup, and uncertainty.
+
+## Tools
+
+- **dig / certificate transparency / passive DNS:** gather public DNS and certificate-history leads.
+- **subfinder / amass / dnsx / httpx:** enumerate and confirm only explicitly scoped hostnames at bounded rates.
+- **curl / browser DevTools / Burp Suite:** inspect a few routes and compare baselines with controlled requests.
+- **nmap:** confirm services on explicitly authorized hosts or small approved ranges; avoid mass-scan defaults.
+- **jq / grep / Python:** deduplicate results and inspect schemas while suppressing secret values.
+- **Vendor advisories and asset inventory:** verify ownership, version, and current vulnerability prerequisites.
+
+## Recon Technique and Decision Matrix
+
+| Stage | Positive signal | Required validation | Stop condition |
+|---|---|---|---|
+| Passive discovery | DNS, CT, archive, or public repo result | Tie ownership to target and confirm scope | Ambiguous owner/third-party adjacency |
+| DNS/HTTP liveness | Resolving host or HTTP response | Compare CNAME/provider and negative path | Scope unclear |
+| API discovery | JS route/schema/docs reference | Single bounded request and auth baseline | Bulk enumeration or real data exposure |
+| Source/backup exposure | Candidate file or repo path | Content signature and minimum sanitized marker | Full secret/backup/customer data appears |
+| Authentication/authorization | 401/403 or role differential | Same operation under controlled identities and compare state | Lockout risk, sensitive data, unapproved mutation |
+| Cache/protocol behavior | HIT/MISS or header/TLS difference | Controlled canary with test key or local harness | Shared cache poisoning, desync, or evasion required |
+| Port/service | Open port or banner | Bounded confirmation on allowlisted host | Range too broad, instability, or ownership doubt |
+| Reporting handoff | Reproducible evidence | Evidence hygiene, scope proof, false-positive gate | Unverified/inferred impact |
+
+A result is a lead until the actual security boundary and intended policy are established.
+
+## Verification and False Positives
+
+- A passive hostname, IP, repository, bucket, certificate, or linked SaaS domain is not automatically owned or in scope.
+- A status code, banner, JavaScript route, scan-template alert, or public namespace does not establish a vulnerability alone.
+- Use content checks and negative controls to detect SPA catch-all routes, soft 404s, stale assets, cache variance, and gateway errors.
+- Do not run credential guessing, brute force, high-volume scanning, service stress, destructive operations, active user-facing cache poisoning, or internal SSRF by default.
+- If a probe reveals credentials, personal data, a production state change, service instability, or unclear third-party ownership, stop and preserve only sanitized minimum evidence.
+- Validate candidate findings against the program's accepted impact list and keep unconfirmed leads out of the final findings.
 
 ## References
 
@@ -836,3 +962,15 @@ For active checks, use bounded concurrency, request timeouts, conservative rate 
 - [uphiago/recon-skills — GitLab public recon](https://github.com/uphiago/recon-skills/tree/main/recon/gitlab-public-recon)
 - [uphiago/recon-skills — error log mining](https://github.com/uphiago/recon-skills/tree/main/recon/error-log-mining)
 - [elementalsouls/Claude-BugHunter — recon scope triage](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/recon-scope-triage)
+- [uphiago/recon-skills — 401/403 bypass](https://github.com/uphiago/recon-skills/tree/main/recon/401-403-bypass)
+- [uphiago/recon-skills — API no-auth hunt](https://github.com/uphiago/recon-skills/tree/main/recon/api-noauth-hunt)
+- [uphiago/recon-skills — cache attack](https://github.com/uphiago/recon-skills/tree/main/recon/cache-attack)
+- [uphiago/recon-skills — source leak hunt](https://github.com/uphiago/recon-skills/tree/main/recon/source-leak-hunt)
+- [uphiago/recon-skills — hardcoded credential hunt](https://github.com/uphiago/recon-skills/tree/main/recon/hardcoded-credential-hunt)
+- [uphiago/recon-skills — HTTP/2 header impersonation](https://github.com/uphiago/recon-skills/tree/main/recon/http2-header-impersonation)
+- [uphiago/recon-skills — humanize automation](https://github.com/uphiago/recon-skills/tree/main/recon/humanize-automation)
+- [uphiago/recon-skills — IoT camera recon](https://github.com/uphiago/recon-skills/tree/main/recon/iot-camera-recon)
+- [uphiago/recon-skills — port mass scan](https://github.com/uphiago/recon-skills/tree/main/recon/port-mass-scan)
+- [uphiago/recon-skills — stealth browser launch](https://github.com/uphiago/recon-skills/tree/main/recon/stealth-browser-launch)
+- [uphiago/recon-skills — TLS fingerprint impersonation](https://github.com/uphiago/recon-skills/tree/main/recon/tls-fingerprint-impersonation)
+- [uphiago/recon-skills — unauthenticated API flow hijack](https://github.com/uphiago/recon-skills/tree/main/recon/unauth-api-flow-hijack)
