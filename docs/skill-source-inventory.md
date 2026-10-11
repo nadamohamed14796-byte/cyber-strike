@@ -6,7 +6,7 @@ Generated from the Git trees of the two requested source repositories and the Cy
 
 - Claude-BugHunter source skills: 83.
 - recon-skills source skills: 146.
-- Current CyberStrike top-level curated skill directories on this branch: 82 (after the fourth adapted batch).
+- Current CyberStrike top-level curated skill directories on this branch: 93 (after the fifth adapted batch).
 - This is a staged migration inventory. The current branch includes an initial batch and a second batch of 12 adapted skills; it does not mean all upstream skills have been imported.
 
 ## Mapping rules
@@ -300,3 +300,20 @@ These rows describe work added in the feature branch. They are not claims that t
 | `attack-lfi` | Claude-BugHunter local file inclusion | Draft added; runtime support unverified |
 | `attack-nosqli` | Claude-BugHunter NoSQL injection | Draft added; runtime support unverified |
 | `attack-session-management` | Claude-BugHunter session assessment | Draft added; runtime support unverified |
+
+
+## Fifth adapted batch (2026-10-11)
+
+| CyberStrike skill | Source area | Review status |
+|---|---|---|
+| `attack-aspnet` | Claude-BugHunter ASP.NET | Draft added; runtime support unverified |
+| `attack-laravel` | Claude-BugHunter Laravel | Draft added; runtime support unverified |
+| `attack-nodejs` | Claude-BugHunter Node.js | Draft added; runtime support unverified |
+| `attack-nextjs` | Claude-BugHunter Next.js | Draft added; runtime support unverified |
+| `attack-springboot` | Claude-BugHunter Spring Boot | Draft added; runtime support unverified |
+| `attack-ios-redteam-pipeline` | Claude-BugHunter iOS pipeline | Draft added; runtime support unverified |
+| `attack-sharepoint` | Claude-BugHunter SharePoint | Draft added; runtime support unverified |
+| `attack-enterprise-vpn` | Claude-BugHunter and recon-skills enterprise VPN | Draft added; runtime support unverified |
+| `attack-web3-audit` | Claude-BugHunter and recon-skills Web3 | Draft added; runtime support unverified |
+| `attack-html-injection` | Claude-BugHunter HTML injection | Draft added; runtime support unverified |
+| `attack-shadow-api` | Claude-BugHunter shadow API | Draft added; runtime support unverified |
