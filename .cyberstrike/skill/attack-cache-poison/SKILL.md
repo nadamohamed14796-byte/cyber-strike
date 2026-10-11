@@ -32,7 +32,7 @@ severity_boost:
 
 ## Objective
 
-Inject malicious content into cached responses via unkeyed inputs (headers, parameters) so that subsequent users receive the poisoned response.
+Assess two distinct cache flaws without conflating them: (1) Web Cache Poisoning (WCP), where an unkeyed input changes a shared cached response; and (2) Web Cache Deception (WCD), where URL/path handling causes a shared cache to store a sensitive response as if it were static. Prove the relevant cache behavior and security impact independently.
 
 ## Crown Jewel Targets
 
@@ -195,6 +195,14 @@ A reflected input is not sufficient evidence of cache poisoning. Confirm each la
 Use a unique query key for initial probes, and verify how the target treats query strings before assuming it isolates cache entries. Never repeatedly poison production assets or create a re-poisoning loop.
 
 ## Web Cache Deception (WCD)
+
+WCD is a separate cache-confusion issue, not a synonym for poisoning. The core question is whether a victim-specific response can be stored under a URL the cache treats as shared/static, then served to another request context. Use only two test accounts you control and synthetic/non-sensitive data.
+
+1. Identify an authenticated route that returns account-specific content and a nearby static-looking path pattern (for example, an application route with an extra path segment or static extension).
+2. Request the candidate URL as test account A, then inspect cache headers and whether the response is cacheable. Do not use a real user's data.
+3. Request the exact same URL from a clean session or test account B. Check whether A's synthetic marker appears without A's session.
+4. Stop once cross-session exposure is confirmed. Do not enumerate other users or collect real private responses.
+5. Report the cache key, path normalization behavior, cache status, account/session separation, and the minimum redacted evidence needed to reproduce.
 
 Treat WCD as a distinct hypothesis from cache poisoning. WCD occurs when a cache stores a victim's dynamic/private response at a URL it believes is static or publicly cacheable.
 
