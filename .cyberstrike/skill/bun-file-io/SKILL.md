@@ -61,6 +61,15 @@ Use Filesystem.exists(...) instead if path can be file or directory
 
 - [Bun file I/O](https://bun.sh/docs/api/file-io)
 - [Bun subprocesses](https://bun.sh/docs/runtime/child-process)
+## Verification and False Positives
+
+- Test path handling with temporary directories and synthetic files; never validate deletion or overwrite behavior against a real project directory or user data.
+- Resolve and validate paths before destructive operations. Reject traversal outside the configured root, including `..` segments, absolute paths, and symlink escapes where the threat model requires it.
+- Do not assume a string-prefix check proves containment (`/safe/root-evil` can share a prefix with `/safe/root`). Use path-aware relative checks and verify the resolved destination remains under the intended root.
+- For writes, use explicit encoding and error handling; where atomicity matters, write to a temporary file in the same filesystem and rename only after success.
+- For recursive scans, handle permission errors, missing files, symlink loops, and large directory trees without silently reporting incomplete results as complete.
+- Add tests for empty input, missing paths, permission failures, Unicode filenames, traversal attempts, and cleanup of test-created artifacts.
+
 ## Quick checklist
 
 - Use Bun APIs first.
