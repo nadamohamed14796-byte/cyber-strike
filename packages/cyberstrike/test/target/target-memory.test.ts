@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import fs from "node:fs/promises"
+import path from "node:path"
+import { tmpdir } from "../fixture/fixture"
+import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
 
 describe("target memory normalization", () => {
@@ -27,5 +31,40 @@ describe("target memory normalization", () => {
   test("rejects unsupported schemes and credentials", () => {
     expect(() => TargetMemory.normalize("ftp://example.com")).toThrow()
     expect(() => TargetMemory.normalize("https://user:password@example.com")).toThrow()
+  })
+
+  test("persists target workspace and notes idempotently in SQLite and notes.md", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const target = await TargetMemory.ensure("https://example.com")
+        expect(await fs.stat(path.join(target.workspacePath, "javascript"))).toBeTruthy()
+        expect(await fs.readFile(path.join(target.workspacePath, "target.json"), "utf-8")).toContain("example.com")
+
+        const first = await TargetMemory.addNote("https://example.com", {
+          kind: "lesson",
+          title: "Authorization boundary",
+          content: "Compare an authorized owner request with a controlled unauthorized request.",
+          source: "test",
+          tags: ["idor", "authorization"],
+        })
+        const duplicate = await TargetMemory.addNote("https://example.com", {
+          kind: "lesson",
+          title: "Authorization boundary",
+          content: "Compare an authorized owner request with a controlled unauthorized request.",
+          source: "test",
+          tags: ["idor", "authorization"],
+        })
+
+        expect(first.created).toBe(true)
+        expect(duplicate.created).toBe(false)
+        expect(duplicate.note.id).toBe(first.note.id)
+        expect(TargetMemory.allNotes(target.id)).toHaveLength(1)
+        const notesFile = await fs.readFile(path.join(target.workspacePath, "notes.md"), "utf-8")
+        expect(notesFile).toContain("Authorization boundary")
+        expect(notesFile).toContain("controlled unauthorized request")
+      },
+    })
   })
 })
