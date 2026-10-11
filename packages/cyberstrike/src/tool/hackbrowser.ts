@@ -99,6 +99,9 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       const profile = await AuthVault.getSecret({ id: args.auth_profile_id, origin, purpose, targetID: purpose === "target" ? args.auth_target_id : undefined })
       if (!profile) return { title: "Saved login not found", output: "No saved profile matched the exact origin, purpose, and target binding. No credentials were sent to the browser.", metadata: { started: false, reason: "profile_not_found" } }
       savedLogin = { username: profile.username, password: profile.password, origin: profile.origin, useGmailOtp: !!args.use_gmail_otp }
+      // Drop the decrypted secret from the temporary profile object; the login
+      // handoff object is cleared in the finally block after launch completes. 
+      profile.password = ""
     }
 
     // Fire and forget — launchHackbrowser returns immediately after sync
