@@ -141,6 +141,12 @@ test("refuses symlinked generated workspace outputs", async () => {
     directory: tmp.path,
     async fn() {
       const workspace = await TargetMemory.ensure("https://example.com")
+      expect(TargetMemory.notes("target-from-another-project")).toEqual([])
+      expect(TargetMemory.allNotes("target-from-another-project")).toEqual([])
+      const forgedWorkspace = { ...workspace, projectID: "another-project" }
+      await expect(
+        TargetMemory.writeWorkspaceFile(forgedWorkspace, "javascript/forged.json", "must not write"),
+      ).rejects.toThrow(/active project/i)
       const outsideFile = path.join(tmp.path, "outside-output.json")
       const outputLink = path.join(workspace.workspacePath, "javascript", "graph.json")
       await fs.writeFile(outsideFile, "original", "utf-8")
