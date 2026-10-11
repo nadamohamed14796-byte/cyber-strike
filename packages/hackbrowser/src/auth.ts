@@ -445,7 +445,7 @@ export async function autoLogin(
     await page.waitForLoadState("domcontentloaded").catch(() => {})
     log.info("auto-login attempted", { origin: credentials.origin ?? "unspecified" })
 
-    await handle2FA(page, credentials.otpProvider, credentials.origin)
+    await handle2FA(page, credentials.otpProvider ?? (async () => undefined), credentials.origin)
   } catch (err) {
     log.warn("auto-login failed, falling back to manual login")
     await waitForManualLogin(page)
