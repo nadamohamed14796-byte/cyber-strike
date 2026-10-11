@@ -53,6 +53,26 @@ test("shared research retrieval uses signal tags and excludes target-specific re
       })
       expect(bySignal.some((row) => row.id === shared?.id)).toBe(true)
 
+      const pathTraversal = ReportKnowledge.ingestExternalDetailed({
+        title: "Path traversal through a download endpoint",
+        severity: "high",
+        vulnerabilityClass: "path-traversal",
+        sourceURL: "https://research.example.test/reports/download-path-traversal",
+        attackVector: "A file path parameter is normalized incorrectly before access checks.",
+        impact: "An authenticated user can read files outside the intended directory.",
+        reproduction: "Change the download path and compare the returned file with an allowed baseline.",
+        lesson: "Check canonicalized paths and prove access outside the intended directory.",
+        sourceTrust: 80,
+        tags: ["path-traversal"],
+        metadata: { source_trust: 80, extracted: { retrieval_signals: ["path-traversal"] } },
+      })
+      expect(pathTraversal).not.toBeNull()
+      const byPathSignal = ReportKnowledge.recommendations({
+        signal: "download endpoint path traversal through parent directory",
+        limit: 5,
+      })
+      expect(byPathSignal.some((row) => row.id === pathTraversal?.id)).toBe(true)
+
       const byReproduction = ReportKnowledge.search({ query: "owner non-owner requests", sourceKind: "external_report", limit: 5 })
       expect(byReproduction.some((row) => row.id === shared?.id)).toBe(true)
       await Instance.dispose()
