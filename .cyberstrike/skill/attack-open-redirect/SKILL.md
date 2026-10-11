@@ -146,6 +146,23 @@ Prioritize redirect parameters used in login, logout, OAuth/OIDC callback, invit
 - [uphiago/recon-skills — open-redirect hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-open-redirect/SKILL.md) (external research reference).
 - [elementalsouls/Claude-BugHunter — open-redirect hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-open-redirect/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## Redirect Validation Matrix and Abuse Boundaries
+
+Test redirect handling with a controlled destination and a harmless path. Change one representation at a time and compare the parsed destination with the application's intended allowlist.
+
+| Input class | Compare | Record |
+|---|---|---|
+| Absolute URL | trusted host vs controlled external host | final Location and normalized destination |
+| Relative path | root-relative, path-relative, protocol-relative | browser-resolved destination |
+| Encoding | percent encoding, double encoding, mixed case | normalization order and final destination |
+| Host parsing | userinfo, trailing dot, subdomain suffix, alternate port | actual hostname parsed by the server/browser |
+| Redirect chain | one hop vs multiple hops | every Location and whether trust is revalidated |
+| OAuth flow | registered redirect URI and state handling | test-client behavior without exposing tokens |
+
+Use only test clients and accounts. Do not send real authorization codes or tokens to an external endpoint. A URL that looks suspicious is not sufficient; prove that the browser reaches an untrusted destination and describe the security consequence. For OAuth chains, verify the registered redirect URI and token/code delivery separately rather than assuming any open redirect causes token theft.
+
+Include the original URL, sanitized redirect chain, final destination, normalization behavior, test account context, and minimal reproducible evidence.
+
 ## References
 
 - [PortSwigger: Open Redirect](https://portswigger.net/kb/issues/00500100_open-redirection-reflected)
