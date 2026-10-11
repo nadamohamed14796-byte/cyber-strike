@@ -96,3 +96,18 @@ gh repo view OWNER/REPO # verify repo access
 | github_branch_protection_audit | Protection rule analysis | gh API |
 | dependency_audit | Lockfile, versions, npm audit | local + npm |
 | supply_chain_audit | Dependabot, CODEOWNERS, .npmrc | gh API + local |
+
+## Pipeline Trust-Boundary and Evidence Matrix
+
+Map untrusted input to the exact workflow execution context before testing. Review event type, actor permissions, branch protections, runner trust, token scopes, artifact flow, and deployment environment.
+
+| Boundary | Review | Proof standard |
+|---|---|---|
+| Pull request to workflow | event type and whether secrets are available | workflow/configuration evidence plus safe test branch |
+| Expression to shell | untrusted values interpolated into commands | harmless marker in a disposable branch |
+| Workflow token | default and job-level permissions | minimum permission that enables the demonstrated action |
+| Artifact/cache | producer, consumer, trust and key scope | synthetic artifact marker crosses an unintended boundary |
+| Runner to cloud | identity federation and audience/subject conditions | read-only trust-policy evidence or test identity |
+| Build to deployment | approvals, environments, signing and provenance | test artifact path; no production deploy without approval |
+
+Do not print real secrets, alter production workflows, publish packages, or deploy artifacts to validate a theoretical issue. A risky YAML pattern is a lead; establish the trigger, attacker-controlled input, execution identity, and reachable impact. Keep workflow logs sanitized and include commit/event context so the finding is reproducible.
