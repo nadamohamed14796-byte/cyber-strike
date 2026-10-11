@@ -30,16 +30,30 @@ The upstream library covers authentication/SSO, attack chains, infrastructure, e
 8. **Validation:** check frontmatter, duplicate names, references, tool/script existence, required sections, and tests before claiming completion.
 9. **Batch changes:** group work by methodology/recon, web/API vulnerability classes, auth/identity, infrastructure/cloud, chains, and reporting. Use reviewable pull requests rather than one unreviewable bulk import.
 
-## First migration batch
+## First migration batches
 
-This branch adds CyberStrike-native drafts for:
+This branch currently adds 13 CyberStrike-native skill drafts:
+
+**Methodology and reporting**
 - attack-bb-methodology
-- attack-web-recon
 - attack-triage-validation
 - attack-evidence-hygiene
 - attack-report-writing
 
-These are adapted, attribution-linked drafts. They do not yet prove runtime auto-loading or tool integration.
+**Recon**
+- attack-web-recon
+- attack-subdomain-enumeration
+- attack-port-service-discovery
+- attack-web-enumeration
+- attack-js-secrets-extraction
+
+**Web vulnerability classes**
+- attack-xss
+- attack-sqli
+- attack-csrf
+- attack-file-upload
+
+These are adapted, attribution-linked drafts. They do not yet prove runtime auto-loading or tool integration. The expanded IDOR skill is tracked in the same feature branch separately.
 
 ## Completion criteria
 
