@@ -39,6 +39,9 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
           "Two or more IDs: repeats the manual-login + crawl cycle once per credential, tagging captures per identity (role-based access tests). " +
           "Forces headless: false. Only use when a human is present to complete each login.",
       ),
+    auth_profile_id: z.string().optional().describe("Optional profile ID saved with auth_manager. Never pass a password here."),
+    auth_purpose: z.enum(["research", "target"]).optional().describe("Purpose for auth_profile_id; defaults to target. Target profiles also require auth_target_id."),
+    auth_target_id: z.string().optional().describe("Stable target workspace ID bound to a target-purpose saved profile."),
     scope: z
       .array(z.string())
       .optional()
@@ -114,6 +117,8 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
     // Spell-out is for weak LLMs — see feedback_weak_llm_baseline:
     // explicit "do NOT poll" + "use web_get_session_context when you
     // need them" prevents looped re-invocation.
+    if (savedLogin) savedLogin.password = ""
+
     const output = [
       `Hackbrowser crawl started for ${args.target}.`,
       ...(savedLogin ? ["Saved login profile was supplied to the visible browser. Credentials are not included in this response."] : []),
