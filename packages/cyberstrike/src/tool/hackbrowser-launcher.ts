@@ -340,13 +340,23 @@ async function backgroundRun(
 
         switch (msg.type) {
           case "otp-request": {
+            // Keep the sole IPC reader responsive even if Google stalls. GmailService
+            // also accepts this AbortSignal and applies its own network deadline.
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 15_000)
             try {
-              const otp = await GmailService.latestOtp({ siteUrl: msg.siteUrl, after: msg.after })
+              const otp = await GmailService.latestOtp({
+                siteUrl: msg.siteUrl,
+                after: msg.after,
+                signal: controller.signal,
+              })
               workerWrite(proc, JSON.stringify({ type: "otp-response", requestId: msg.requestId, code: otp?.code } satisfies ParentMessage) + "\n")
               if (!otp) log.warn("no matching Gmail OTP; browser will request human input", { sessionID })
             } catch {
               workerWrite(proc, JSON.stringify({ type: "otp-response", requestId: msg.requestId } satisfies ParentMessage) + "\n")
-              log.warn("Gmail OTP lookup unavailable; browser will request human input", { sessionID })
+              log.warn("Gmail OTP lookup unavailable or timed out; browser will request human input", { sessionID })
+            } finally {
+              clearTimeout(timeout)
             }
             break
           }
