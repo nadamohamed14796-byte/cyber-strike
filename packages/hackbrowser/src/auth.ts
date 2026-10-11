@@ -407,7 +407,7 @@ export async function waitForManualLogin(
  */
 export async function autoLogin(
   page: Page,
-  credentials: { username: string; password: string; usernameSelector?: string; passwordSelector?: string },
+  credentials: { username: string; password: string; origin?: string; usernameSelector?: string; passwordSelector?: string },
 ): Promise<void> {
   const userSel =
     credentials.usernameSelector ??
