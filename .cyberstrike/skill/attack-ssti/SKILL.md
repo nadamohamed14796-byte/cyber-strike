@@ -146,6 +146,22 @@ These are candidate syntax probes, not a universal payload. A result of `49` in 
 - [uphiago/recon-skills — SSTI hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-ssti/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — SSTI hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-ssti/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## Template Engine Identification and Impact Proof
+
+Use a staged, harmless expression sequence and compare it with a literal-string baseline. Start with arithmetic or string concatenation that cannot access files, execute commands, or alter application state. Confirm the output is evaluated by a template engine rather than reflected verbatim or transformed by client-side code.
+
+| Stage | Goal | Evidence threshold |
+|---|---|---|
+| Reflection baseline | establish where input appears | literal marker in response |
+| Expression evaluation | distinguish evaluation from reflection | deterministic computed value |
+| Engine fingerprint | identify likely syntax/runtime | multiple consistent benign probes |
+| Context and trust boundary | determine whether user input reaches server-side template compilation | trace or reproducible server-side evaluation |
+| Impact | assess access to sensitive objects only if explicitly permitted | minimum non-destructive proof in an isolated test |
+
+Do not jump from arithmetic evaluation to RCE. Avoid filesystem reads, environment dumps, command execution, or destructive payloads on production targets. If impact cannot be safely validated, clearly label it as unconfirmed and report the demonstrated template evaluation only.
+
+Include the exact input sink, template context, benign expression, expected literal result, actual computed result, suspected engine/version if supported, and safe remediation such as avoiding string-built templates and enforcing contextual escaping.
+
 ## References
 
 - [PortSwigger: SSTI](https://portswigger.net/research/server-side-template-injection)
