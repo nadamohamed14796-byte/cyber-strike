@@ -26,13 +26,42 @@ function safeURL(input?: string | null): URL | undefined {
   }
 }
 
-function isJavaScriptAsset(input: { type?: string | null; title?: string | null; asset?: string | null; tags?: string[] | null }) {
-  const joined = [input.type, input.title, input.asset, ...(input.tags ?? [])].filter(Boolean).join(" ").toLowerCase()
-  const url = safeURL(input.asset)
-  return (
-    /\bjavascript\b|\bjavascript[-_ ]?file\b|\bjs[-_ ]?asset\b|\bscript[-_ ]?asset\b/.test(joined) ||
-    Boolean(url && /\.m?js(?:$|[?#])/i.test(url.pathname))
-  )
+function javascriptAssetURL(input: { type?: string | null; title?: string | null; detail?: string | null; asset?: string | null; tags?: string[] | null }): URL | undefined {
+  const base = safeURL(input.asset)
+  if (base && /\.m?js$/i.test(base.pathname)) return base
+
+  // Intel's asset field is usually a target host, not a JavaScript file URL.
+  // Resolve an actual script path from title/detail instead of labeling the host as a JS asset.
+  const text = [input.title, input.detail].filter(Boolean).join("\n")
+  const absolute = /https?:\/\/[^\s"'<>),\x60]+\.(?:m?js)(?:\?[^\s"'<>)]*)?/gi
+  for (const match of text.matchAll(absolute)) {
+    const url = safeURL(match[0].replace(/[.,;]+$/, ""))
+    if (url && /\.m?js$/i.test(url.pathname)) return url
+  }
+
+  const relative = /(?:^|[\s"'(\x60=:])((?:\/|\.{1,2}\/)?[A-Za-z0-9_@.%+/-]+\.m?js(?:\?[^\s"'<>)]*)?)/gi
+  for (const match of text.matchAll(relative)) {
+    const candidate = match[1]
+    const direct = safeURL(candidate)
+    if (direct && /\.m?js$/i.test(direct.pathname)) return direct
+    if (base) {
+      try {
+        const resolved = new URL(candidate, base)
+        if ((resolved.protocol === "http:" || resolved.protocol === "https:") && /\.m?js$/i.test(resolved.pathname)) return resolved
+      } catch {}
+    }
+  }
+
+  const signal = [input.type, input.title, ...(input.tags ?? [])].filter(Boolean).join(" ").toLowerCase()
+  if (!/\bjavascript\b|\bjavascript[-_ ]?file\b|\bjs[-_ ]?asset\b|\bscript[-_ ]?asset\b/.test(signal)) return undefined
+  const titlePath = input.title?.trim()
+  if (base && titlePath && /\.m?js(?:$|[?#])/i.test(titlePath) && !/https?:\/\//i.test(titlePath)) {
+    try {
+      const resolved = new URL(titlePath, base)
+      if (resolved.protocol === "http:" || resolved.protocol === "https:") return resolved
+    } catch {}
+  }
+  return undefined
 }
 
 function redact(value?: string | null, max = 320): string | null {
@@ -233,8 +262,16 @@ export namespace JavaScriptCorrelation {
         .all(),
     )
     const jsCandidates = intel
-      .filter((row) => isJavaScriptAsset({ type: row.type, title: row.title, asset: row.asset, tags: row.tags as string[] | null }))
-      .map((row) => ({ row, url: safeURL(row.asset) }))
+      .map((row) => ({
+        row,
+        url: javascriptAssetURL({
+          type: row.type,
+          title: row.title,
+          detail: row.detail,
+          asset: row.asset,
+          tags: row.tags as string[] | null,
+        }),
+      }))
       .filter((item): item is { row: typeof intel[number]; url: URL } => Boolean(item.url))
 
     if (explicitJS) {
