@@ -41,8 +41,16 @@ Existing CyberStrike canonical files expanded (no new parallel skill names):
 - `.cyberstrike/skill/ci-assessment/SKILL.md`
 - `.cyberstrike/skill/cicd-attacks/SKILL.md`
 - `.cyberstrike/skill/llm-security/SKILL.md`
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-inpv-01/SKILL.md` — reflected XSS
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-inpv-02/SKILL.md` — stored XSS
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-inpv-05/SKILL.md` — SQL injection overview
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-inpv-11.1/SKILL.md` — file inclusion
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-clnt-09/SKILL.md` — clickjacking
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-apit-00/SKILL.md` — API testing overview
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-busl-01/SKILL.md` — business logic validation
+- `.cyberstrike/skill/WEB/OWASP_WSTG_4.2/wstg-athn-09/SKILL.md` — password change/reset
 
-This is the first canonical consolidation batch, not full completion of the two upstream libraries.
+This is the first canonical consolidation batch: 29 existing skill files expanded. It is not full completion of the two upstream libraries.
 
 ## Mapping rules
 
