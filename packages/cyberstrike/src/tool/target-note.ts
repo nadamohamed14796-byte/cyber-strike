@@ -45,12 +45,12 @@ export const TargetNoteTool = Tool.define("target_note", {
       const content = redactTargetNoteSecrets(params.content.trim() + (params.evidence?.trim() ? "\n\nEvidence: " + params.evidence.trim() : ""))
       const saved = await TargetMemory.addNote(workspace.targetURL, {
         kind: params.kind as TargetNoteKind,
-        title: params.title,
+        title: redactTargetNoteSecrets(params.title.trim()).slice(0, 180),
         content,
-        source: "agent:" + (ctx.agent || "cyberstrike"),
-        sourceURL: params.source_url,
+        source: "agent:" + redactTargetNoteSecrets(ctx.agent || "cyberstrike").slice(0, 100),
+        sourceURL: params.source_url ? redactTargetNoteSecrets(params.source_url) : undefined,
         status: params.status as TargetNoteStatus,
-        tags: params.tags,
+        tags: params.tags?.map((tag) => redactTargetNoteSecrets(tag).slice(0, 48)),
       })
       return {
         title: saved.created ? "Target note saved" : saved.updated ? "Target note updated" : "Target note already exists",
