@@ -70,16 +70,20 @@ export namespace ResearchContext {
         .filter(Boolean)
       const classTag = tags
         .map((tag) => tag.replace(/^target:/i, "").toLowerCase())
-        .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|business.logic|race.condition|file.upload|injection)$/.test(tag))
+        .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection)$/.test(tag))
       const classAliases: Record<string, string> = {
         bola: "idor",
-        authn: "authentication",
-        authz: "authorization",
-        "file-upload": "file-upload",
-        "race-condition": "race-condition",
-        "business-logic": "business-logic",
+        authz: "access-control",
+        authorization: "access-control",
       }
-      const vulnerabilityClass = classTag ? (classAliases[classTag] ?? classTag) : undefined
+      const knownClasses = new Set([
+        "idor", "xss", "ssrf", "csrf", "sqli", "xxe", "ssti", "race-condition",
+        "open-redirect", "auth-bypass", "access-control", "business-logic", "prototype-pollution",
+        "deserialization", "request-smuggling", "cache-poisoning", "file-upload", "graphql",
+        "jwt", "command-injection", "path-traversal", "subdomain-takeover", "oauth", "web-cache",
+      ])
+      const normalizedClass = classTag ? (classAliases[classTag] ?? classTag) : undefined
+      const vulnerabilityClass = normalizedClass && knownClasses.has(normalizedClass) ? normalizedClass : undefined
       const cweTag = tags.find((tag) => /\bCWE-\d+\b/i.test(tag))
       const query = [entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 4)].filter(Boolean).join(" ").slice(0, 220)
       const rows = ReportKnowledge.recommendations({
