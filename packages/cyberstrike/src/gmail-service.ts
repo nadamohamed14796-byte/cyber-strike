@@ -80,7 +80,7 @@ function summary(message: Message): GmailMessageSummary {
     snippet: (message.snippet ?? "").slice(0, 500),
   }
 }
-async function accessToken(): Promise<string> {
+async function accessToken(signal?: AbortSignal): Promise<string> {
   if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 30_000) return cachedAccessToken.value
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -91,6 +91,7 @@ async function accessToken(): Promise<string> {
       refresh_token: env("CYBERSTRIKE_GMAIL_OAUTH_REFRESH_TOKEN"),
       grant_type: "refresh_token",
     }),
+    signal: signal ?? AbortSignal.timeout(10_000),
   })
   if (!response.ok) throw new Error(`Google OAuth token refresh failed (HTTP ${response.status}); re-authorize Gmail OAuth if the refresh token was revoked.`)
   const data = await response.json() as { access_token?: string; expires_in?: number }
@@ -98,9 +99,10 @@ async function accessToken(): Promise<string> {
   cachedAccessToken = { value: data.access_token, expiresAt: Date.now() + Math.max(60, data.expires_in ?? 3600) * 1000 }
   return data.access_token
 }
-async function gmailFetch<T>(path: string, token: string): Promise<T> {
+async function gmailFetch<T>(path: string, token: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
     headers: { authorization: `Bearer ${token}` },
+    signal: signal ?? AbortSignal.timeout(10_000),
   })
   if (!response.ok) throw new Error(`Gmail API request failed (HTTP ${response.status}). Confirm Gmail API is enabled and OAuth includes ${SCOPES_DOC}.`)
   return await response.json() as T
@@ -111,19 +113,20 @@ export namespace GmailService {
     return { configured: configured(), scope: SCOPES_DOC, capabilities: ["search", "read", "otp"], readOnly: true as const }
   }
 
-  export async function search(input: { query: string; maxResults?: number }): Promise<GmailMessageSummary[]> {
+  export async function search(input: { query: string; maxResults?: number; signal?: AbortSignal }): Promise<GmailMessageSummary[]> {
     const query = input.query.trim()
     if (!query || query.length > 500) throw new Error("Provide a Gmail search query of 1–500 characters.")
-    const token = await accessToken()
+    const signal = input.signal ?? AbortSignal.timeout(15_000)
+    const token = await accessToken(signal)
     const limit = Math.max(1, Math.min(MAX_SEARCH_RESULTS, Math.floor(input.maxResults ?? 5)))
     const url = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages")
     url.searchParams.set("q", query)
     url.searchParams.set("maxResults", String(limit))
-    const result = await gmailFetch<{ messages?: MessageRef[] }>(`messages?${url.searchParams.toString()}`, token)
+    const result = await gmailFetch<{ messages?: MessageRef[] }>(`messages?${url.searchParams.toString()}`, token, signal)
     const refs = result.messages ?? []
     const messages = await Promise.all(refs.map(async (ref) => {
       try {
-        return await gmailFetch<Message>(`messages/${encodeURIComponent(ref.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`, token)
+        return await gmailFetch<Message>(`messages/${encodeURIComponent(ref.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`, token, signal)
       } catch {
         return undefined
       }
@@ -131,24 +134,29 @@ export namespace GmailService {
     return messages.filter((item): item is Message => !!item).map(summary)
   }
 
-  export async function read(messageId: string): Promise<GmailMessageContent> {
+  export async function read(messageId: string, signal?: AbortSignal): Promise<GmailMessageContent> {
     const id = messageId.trim()
     if (!/^[A-Za-z0-9_-]{1,256}$/.test(id)) throw new Error("Invalid Gmail message ID.")
-    const token = await accessToken()
-    const message = await gmailFetch<Message>(`messages/${encodeURIComponent(id)}?format=full`, token)
+    const requestSignal = signal ?? AbortSignal.timeout(10_000)
+    const token = await accessToken(requestSignal)
+    const message = await gmailFetch<Message>(`messages/${encodeURIComponent(id)}?format=full`, token, requestSignal)
     return { ...summary(message), body: bodyText(message.payload).slice(0, MAX_BODY_CHARS) }
   }
 
-  export async function latestOtp(input: { siteUrl: string; after?: number }): Promise<GmailOtpResult | undefined> {
+  export async function latestOtp(input: { siteUrl: string; after?: number; signal?: AbortSignal }): Promise<GmailOtpResult | undefined> {
     const origin = normalizeAuthOrigin(input.siteUrl)
+    // Bound the complete OTP flow, including token refresh, search, metadata
+    // lookups, and message body reads. This prevents a stuck Gmail request from
+    // blocking the Hackbrowser IPC reader indefinitely.
+    const signal = input.signal ?? AbortSignal.timeout(20_000)
     const after = input.after ?? Date.now() - 15 * 60_000
     const query = `after:${Math.floor(after / 1000)} newer_than:1d (subject:verification OR subject:code OR subject:OTP OR subject:security OR "one-time")`
-    const candidates = await search({ query, maxResults: 10 })
+    const candidates = await search({ query, maxResults: 10, signal })
     for (const candidate of candidates) {
       if (!isAllowedSiteSender(candidate.from, origin)) continue
       const receivedAt = Date.parse(candidate.date)
       if (!Number.isFinite(receivedAt) || receivedAt < after) continue
-      const full = await read(candidate.id)
+      const full = await read(candidate.id, signal)
       if (!/verification|security code|one[- ]time|sign[- ]in|login|authentication|otp/i.test(`${full.subject}\n${full.body}`)) continue
       const code = extractOtpCode(`${full.subject}\n${full.body}`)
       if (code) return { ...candidate, code, receivedAt }
