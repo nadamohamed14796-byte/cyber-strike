@@ -113,6 +113,14 @@ Confirms current identity has no write/modify/delete permissions via kubectl aut
 - Distinguish cluster-wide permissions from namespace-scoped permissions and document the actual service account or user identity used for the check.
 - Preserve sanitized commands, context/namespace, role bindings, timestamps, and expected/observed results. Redact tokens, certificates, and private workload data.
 
+## Scope and Validation Notes
+
+- Verify the active kubeconfig context, cluster, and namespace allowlist before assessment; print and inspect the current context before issuing commands.
+- Prefer read-only API queries and `kubectl auth can-i` to assess effective permissions. Do not create privileged pods, read unrelated secrets, or change RBAC in a read-only review.
+- A privileged setting or missing policy is a lead, not automatically exploitable. Consider admission controls, runtime restrictions, namespace boundaries, and the actual service-account permissions.
+- Use designated test namespaces and synthetic objects for any explicitly authorized active validation. Stop if workload health degrades or the test crosses the agreed namespace boundary.
+- Record sanitized manifests, relevant RBAC output, context/namespace, timestamps, and the minimal evidence supporting impact. Redact tokens, secret values, and tenant data.
+
 ## Program Reference
 
 | Program | Checks | CIS Section |
