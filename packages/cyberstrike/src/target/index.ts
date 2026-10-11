@@ -383,7 +383,7 @@ export namespace TargetMemory {
         "- Status: " + note.status,
         "- Source: " + note.source,
         ...(note.sourceURL ? ["- Source URL: " + note.sourceURL] : []),
-        ...(note.tags.length ? ["- Tags: " + note.tags.join(", ") : []),
+        ...(note.tags.length ? ["- Tags: " + note.tags.join(", ")] : []),
       ]
       const entry = "\n\n" + marker + "\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
       await fs.appendFile(notesPath, entry, "utf-8")
@@ -430,35 +430,34 @@ export namespace TargetMemory {
     }
 
     const sessionIDs = [...relatedSessionIDs]
-    const [requests, intelAssets, workspaces] = [
-      Database.use((db) =>
-        db
-          .select({
-            host: RequestTable.host,
-            origin: RequestTable.origin,
-            normalizedPath: RequestTable.normalized_path,
-            pageURL: RequestTable.page_url,
-          })
-          .from(RequestTable)
-          .where(inArray(RequestTable.session_id, sessionIDs))
-          .all(),
-      ),
-      Database.use((db) =>
-        db
-          .select({ asset: IntelEntryTable.asset })
-          .from(IntelEntryTable)
-          .where(inArray(IntelEntryTable.session_id, sessionIDs))
-          .all()
-          .map((row) => row.asset),
-      ),
-      Database.use((db) =>
-        db
-          .select()
-          .from(TargetWorkspaceTable)
-          .where(eq(TargetWorkspaceTable.project_id, projectID))
-          .all(),
-      ),
-    ]
+    const sessionIDs = [...relatedSessionIDs]
+    const requests = Database.use((db) =>
+      db
+        .select({
+          host: RequestTable.host,
+          origin: RequestTable.origin,
+          normalizedPath: RequestTable.normalized_path,
+          pageURL: RequestTable.page_url,
+        })
+        .from(RequestTable)
+        .where(inArray(RequestTable.session_id, sessionIDs))
+        .all(),
+    )
+    const intelAssets = Database.use((db) =>
+      db
+        .select({ asset: IntelEntryTable.asset })
+        .from(IntelEntryTable)
+        .where(inArray(IntelEntryTable.session_id, sessionIDs))
+        .all()
+        .map((row) => row.asset),
+    )
+    const workspaces = Database.use((db) =>
+      db
+        .select()
+        .from(TargetWorkspaceTable)
+        .where(eq(TargetWorkspaceTable.project_id, projectID))
+        .all(),
+    )
 
     const observedURLs = new Set<string>()
     const observedHosts = new Set<string>()
