@@ -63,7 +63,7 @@ export namespace ResearchContext {
         tags.some((tag) => actionableSignal.test(tag))
     })
 
-    const matched = new Map<string, (typeof ReportKnowledge extends never ? never : ReturnType<typeof ReportKnowledge.recommendations>[number])>()
+    const matched = new Map<string, ReturnType<typeof ReportKnowledge.recommendations>[number]>()
     for (const entry of signalEntries.slice(0, 8)) {
       const tags = ((entry.tags as string[] | null) ?? [])
         .map((tag) => tag.trim().replace(/[^a-zA-Z0-9 ._-]/g, " ").slice(0, 48))
@@ -71,11 +71,20 @@ export namespace ResearchContext {
       const classTag = tags
         .map((tag) => tag.replace(/^target:/i, "").toLowerCase())
         .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|business.logic|race.condition|file.upload|injection)$/.test(tag))
+      const classAliases: Record<string, string> = {
+        bola: "idor",
+        authn: "authentication",
+        authz: "authorization",
+        "file-upload": "file-upload",
+        "race-condition": "race-condition",
+        "business-logic": "business-logic",
+      }
+      const vulnerabilityClass = classTag ? (classAliases[classTag] ?? classTag) : undefined
       const cweTag = tags.find((tag) => /\bCWE-\d+\b/i.test(tag))
       const query = [entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 4)].filter(Boolean).join(" ").slice(0, 220)
       const rows = ReportKnowledge.recommendations({
         signal: query,
-        vulnerabilityClass: classTag,
+        vulnerabilityClass,
         cweID: cweTag?.match(/CWE-\d+/i)?.[0],
         limit: 2,
       })
