@@ -178,7 +178,8 @@ function isResearchCandidate(url: string, source: ResearchSource) {
 function classify(text: string) {
   const lower = text.toLowerCase()
   const classes: Array<[string, RegExp]> = [
-    ["idor", /\bidor\b|insecure direct object|broken object level authorization/],
+    ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
+    ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
     ["xss", /cross[- ]site scripting|\bxss\b/],
     ["ssrf", /server[- ]side request forgery|\bssrf\b/],
     ["csrf", /cross[- ]site request forgery|\bcsrf\b/],

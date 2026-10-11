@@ -31,6 +31,7 @@ test("research extraction keeps reproduction, prerequisites, verification, cavea
   expect(extracted.retrievalSignals).toContain("idor")
   expect(extracted.retrievalSignals).toContain("authorization-boundary")
   expect(extracted.retrievalSignals).toContain("api-endpoint")
+  expect(extracted.retrievalSignals).toContain("object-identifier")
 })
 
 test("research extraction preserves remediation, version, stack, and negative evidence when present", () => {
