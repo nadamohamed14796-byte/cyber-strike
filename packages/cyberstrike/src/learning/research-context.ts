@@ -1,5 +1,7 @@
-import { desc, eq } from "../storage/db"
+import { and, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
+import { Instance } from "../project/instance"
+import { SessionTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { ReportKnowledge } from "./report-knowledge"
 
@@ -9,6 +11,23 @@ import { ReportKnowledge } from "./report-knowledge"
  */
 export namespace ResearchContext {
   export function generate(sessionID: string): string | null {
+    const projectID = Instance.project.id
+    const sessionIDs = new Set<string>([sessionID])
+    let frontier = [sessionID]
+    while (frontier.length > 0) {
+      const children = Database.use((db) =>
+        db
+          .select({ id: SessionTable.id })
+          .from(SessionTable)
+          .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, frontier)))
+          .all()
+          .map((row) => row.id)
+          .filter((id) => !sessionIDs.has(id)),
+      )
+      for (const child of children) sessionIDs.add(child)
+      frontier = children
+    }
+
     const entries = Database.use((db) =>
       db
         .select({
@@ -17,9 +36,9 @@ export namespace ResearchContext {
           tags: IntelEntryTable.tags,
         })
         .from(IntelEntryTable)
-        .where(eq(IntelEntryTable.session_id, sessionID))
+        .where(inArray(IntelEntryTable.session_id, [...sessionIDs]))
         .orderBy(desc(IntelEntryTable.time_updated))
-        .limit(12)
+        .limit(24)
         .all(),
     )
     if (entries.length === 0) return null

@@ -102,7 +102,7 @@ function normalizeEndpointLiteral(value: string): string | undefined {
   return normalized.length > 1 ? normalized : undefined
 }
 
-function endpointLiterals(content: string): string[] {
+export function extractStaticJavaScriptEndpoints(content: string): string[] {
   const found = new Set<string>()
   const callArgument = /(?:fetch|axios\.(?:get|post|put|patch|delete)|\.open)\s*\(\s*["'\`]([^"'\`]{1,240})["'\`]/gi
   const routeString = /["'\`]((?:https?:\/\/)[^"'\`\s]{1,240}|\/(?:api|graphql|rest|rpc|v\d+|auth|admin|users|account|orders|cart|checkout|upload|download|search|profile)(?:\/[^"'\`\s]{0,160})?)["'\`]/gi
@@ -155,7 +155,7 @@ async function inventoryJavaScriptFiles(root: string): Promise<JavaScriptSourceF
         basename: entry.name,
         sha256: createHash("sha256").update(content).digest("hex"),
         bytes: Buffer.byteLength(content, "utf-8"),
-        endpointLiterals: endpointLiterals(content),
+        endpointLiterals: extractStaticJavaScriptEndpoints(content),
       })
     }
   }
@@ -237,10 +237,10 @@ export namespace JavaScriptCorrelation {
   }): Promise<{ graph: JavaScriptCorrelationGraph; workspacePath: string; graphPath: string; noteID: string }> {
     const rootSessionID = Session.root(input.sessionID)
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
-    const workspace = await TargetMemory.ensure(input.targetURL)
-    const sourceFiles = await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     if (input.javascriptURL && !explicitJS) throw new Error("javascriptURL must be a valid HTTP(S) URL without embedded credentials.")
+    const workspace = await TargetMemory.ensure(input.targetURL)
+    const sourceFiles = await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
 
     const projectID = Instance.project.id
     const sessionIDsSet = new Set<string>([rootSessionID])
@@ -299,11 +299,17 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
+    const targetURL = new URL(normalizedTarget.targetURL)
+    const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     const filteredAssets = explicitJS
       ? jsCandidates.filter((item) => item.url.origin + item.url.pathname === explicitJS.origin + explicitJS.pathname)
       : jsCandidates.filter((item) => {
-          const targetURL = new URL(normalizedTarget.targetURL)
-          return item.url.hostname === targetURL.hostname || item.url.hostname.endsWith("." + targetURL.hostname)
+          const hostMatches = item.url.hostname === targetURL.hostname || item.url.hostname.endsWith("." + targetURL.hostname)
+          if (!hostMatches) return false
+          // For a path-scoped application, ignore scripts from sibling applications
+          // mounted on the same hostname.
+          if (item.url.hostname === targetURL.hostname && targetPath !== "/" && !pathWithinScope(item.url.pathname, targetPath)) return false
+          return true
         })
     const seenAssets = new Set<string>()
     const assets = filteredAssets.filter((item) => {
@@ -322,8 +328,6 @@ export namespace JavaScriptCorrelation {
         .limit(2000)
         .all(),
     )
-    const targetURL = new URL(normalizedTarget.targetURL)
-    const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     const relevantRequests = requests.filter((request) => {
       const hostURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
       if (!hostURL) return false
@@ -578,7 +582,6 @@ export namespace JavaScriptCorrelation {
       "",
       "- Target: " + workspace.targetURL,
       "- Session: " + rootSessionID,
-      "- Created: " + graph.createdAt,
       "- JavaScript asset URLs: " + graph.javascriptAssets.length,
       "- Local JavaScript source files indexed: " + graph.sourceFiles.length,
       "- Static endpoint literals extracted: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
@@ -603,7 +606,7 @@ export namespace JavaScriptCorrelation {
     ].join("\n")
     const note = await TargetMemory.addNote(workspace.targetURL, {
       kind: "javascript",
-      title: "JavaScript correlation snapshot " + graph.createdAt,
+      title: "JavaScript correlation snapshot - " + rootSessionID + (explicitJS ? " - " + explicitJS.pathname : " - all assets"),
       content,
       source: "session:" + rootSessionID,
       sourceURL: explicitJS?.href,
@@ -612,10 +615,13 @@ export namespace JavaScriptCorrelation {
     })
 
     const filenameHost = (explicitJS?.hostname ?? new URL(workspace.targetURL).hostname).replace(/[^a-z0-9.-]/gi, "-").slice(0, 50)
-    const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, graph.createdAt, graph.javascriptAssets.map((a) => a.url)])).digest("hex").slice(0, 12)
+    const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
+    const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, snapshotSelector])).digest("hex").slice(0, 12)
     const graphPath = path.join(workspace.workspacePath, "javascript", filenameHost + "-" + digest + ".json")
     await fs.mkdir(path.dirname(graphPath), { recursive: true })
-    await fs.writeFile(graphPath, JSON.stringify(graph, null, 2) + "\n", { encoding: "utf-8", flag: "wx" })
+    // Generated graph path is stable per target/session/selector; refresh it instead
+    // of growing an unbounded collection of identical timestamped snapshots.
+    await fs.writeFile(graphPath, JSON.stringify(graph, null, 2) + "\n", "utf-8")
     return { graph, workspacePath: workspace.workspacePath, graphPath, noteID: note.note.id }
   }
 }
