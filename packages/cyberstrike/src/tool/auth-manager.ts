@@ -1,7 +1,41 @@
 import z from "zod"
+import fs from "node:fs/promises"
+import path from "node:path"
 import { AuthVault } from "../auth-vault"
 import { GmailService } from "../gmail-service"
+import { TargetMemory } from "../target"
 import { Tool } from "./tool"
+
+/**
+ * Keep a human-readable index of saved account references inside the target
+ * workspace. Passwords remain only in AuthVault's encrypted local store.
+ */
+async function syncTargetProfileIndex(siteURL: string, targetID: string): Promise<void> {
+  const workspace = await TargetMemory.get(siteURL)
+  if (!workspace || workspace.id !== targetID) {
+    throw new Error("Target account reference was not written: target_id must match the existing target workspace ID for this exact site URL.")
+  }
+  const profiles = await AuthVault.list({ purpose: "target", targetID })
+  const lines = [
+    "# Saved account references",
+    "",
+    "> This file contains references only. Passwords are stored encrypted in CyberStrike's local auth vault and must never be copied here.",
+    "",
+    ...profiles.flatMap((profile) => [
+      `## ${profile.account.replace(/[\r\n#]/g, " ").slice(0, 120)}`,
+      "",
+      `- Profile ID: ${profile.id}`,
+      `- Origin: ${profile.origin}`,
+      `- Username/email: ${profile.username.replace(/[\r\n]/g, " ").slice(0, 200)}`,
+      `- Updated: ${new Date(profile.updatedAt).toISOString()}`,
+      "- Password: stored encrypted in the local AuthVault; not present in this file",
+      "",
+    ]),
+  ]
+  const file = path.join(workspace.workspacePath, "auth-profiles.md")
+  await fs.writeFile(file, lines.join("\n") + "\n", { encoding: "utf8", mode: 0o600 })
+  await fs.chmod(file, 0o600)
+}
 
 export const AuthManagerTool = Tool.define("auth_manager", {
   description: [
@@ -39,6 +73,12 @@ export const AuthManagerTool = Tool.define("auth_manager", {
       if (!params.account?.trim() || !params.username?.trim()) {
         return { title: "Missing account details", output: "Saving requires account and username.", metadata: { ok: false } }
       }
+      if (params.purpose === "target") {
+        const workspace = await TargetMemory.get(params.site_url)
+        if (!workspace || workspace.id !== params.target_id) {
+          return { title: "Target workspace mismatch", output: "For target-purpose credentials, site_url must match an existing target workspace and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
+        }
+      }
       const password = process.env.CYBERSTRIKE_AUTH_PASSWORD
       if (!password) {
         return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
@@ -49,7 +89,10 @@ export const AuthManagerTool = Tool.define("auth_manager", {
         origin: params.site_url, purpose: params.purpose, account: params.account,
         username: params.username, password, targetID: params.target_id,
       })
-      return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}. Secret is not included in this response.`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose } }
+      if (saved.purpose === "target" && saved.targetID) {
+        await syncTargetProfileIndex(params.site_url, saved.targetID)
+      }
+      return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}. A reference (never the password) was written to the target workspace's auth-profiles.md file.`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose } }
     }
     if (params.action === "list") {
       const profiles = await AuthVault.list({ origin: params.site_url, purpose: params.purpose, targetID: params.target_id })
@@ -58,6 +101,9 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     if (!params.profile_id) return { title: "Profile ID required", output: "Provide profile_id to forget a saved login profile.", metadata: { ok: false } }
     await ctx.ask({ permission: "auth-credential-delete", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, profileID: params.profile_id } })
     const removed = await AuthVault.remove({ id: params.profile_id, origin: params.site_url, purpose: params.purpose, targetID: params.target_id })
-    return { title: removed ? "Login profile forgotten" : "Profile not found", output: removed ? "The matching saved profile was deleted." : "No profile matched that ID, exact origin, purpose, and target binding.", metadata: { ok: removed } }
+    if (removed && params.purpose === "target" && params.target_id) {
+      await syncTargetProfileIndex(params.site_url, params.target_id)
+    }
+    return { title: removed ? "Login profile forgotten" : "Profile not found", output: removed ? "The matching saved profile was deleted and the target account-reference file was refreshed." : "No profile matched that ID, exact origin, purpose, and target binding.", metadata: { ok: removed } }
   },
 })
