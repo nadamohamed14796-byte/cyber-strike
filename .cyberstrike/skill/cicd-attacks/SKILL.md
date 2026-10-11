@@ -78,6 +78,21 @@ cipipe cleanup_ci
 - **Required Reviews** — PR approval requirements block unauthorized workflow changes
 - **Secret Scanning** — GitHub/GitLab native scanning for leaked credentials
 
+## Pipeline Attack-Path Verification Matrix
+
+Trace each issue from attacker-controlled input to the workflow permission and resulting action. Review trigger type, actor trust, token permissions, runner persistence, artifact/cache sharing, registry credentials, and deployment gates.
+
+| Surface | Verify | Safe proof |
+|---|---|---|
+| Workflow triggers | pull_request, workflow_run, issue/comment events | test branch and harmless marker |
+| Expression injection | untrusted metadata reaches shell or script context | disposable branch; no secret access |
+| Token permissions | effective GITHUB_TOKEN or equivalent scope | read-only permission analysis and test repository |
+| Artifacts/cache | trust boundary between untrusted and privileged jobs | synthetic artifact in a test workflow |
+| Self-hosted runners | whether untrusted jobs can reach persistent runner state | configuration review or isolated runner |
+| Release/deploy | approvals, provenance, signing, environment protection | test artifact; no production deployment |
+
+Do not expose real secrets, publish packages, change production workflows, or deploy artifacts without explicit approval. A dangerous workflow pattern is a lead; document the trigger, attacker-controlled value, execution identity, and concrete reachable impact.
+
 ## Program Reference
 
 | Program | Technique | MITRE ATT&CK |
