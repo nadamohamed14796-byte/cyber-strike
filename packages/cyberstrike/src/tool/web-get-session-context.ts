@@ -9,6 +9,8 @@ import { Request } from "../session/request"
 import { Observation } from "../session/observation"
 import { Session } from "../session"
 import { Vulnerability } from "../session/vulnerability"
+import { ResearchContext } from "../learning/research-context"
+import { TargetMemory } from "../target"
 
 const description = `Get the bounded web-application context for this session — scoped to the endpoint you are testing, so it stays small no matter how large the session grows.
 
@@ -134,6 +136,21 @@ export const WebGetSessionContextTool = Tool.define("web_get_session_context", {
           .slice(0, 10)
           .map((r) => ({ id: r.id, request_id: r.request_id, trigger_type: r.trigger_type, priority: r.priority })),
       }
+    }
+
+    // Inject concise global public-research guidance and relevant signal-matched references
+    // alongside target-specific notes. Both are read-only; failure must not break core context.
+    try {
+      const research = ResearchContext.generate(sessionID)
+      if (research) context.global_research_memory = research
+    } catch (error) {
+      context.global_research_memory = "Shared research memory is temporarily unavailable; continue with recorded target evidence and normal methodology."
+    }
+    try {
+      const targetMemory = TargetMemory.contextForSession(sessionID)
+      if (targetMemory) context.target_memory = targetMemory
+    } catch (error) {
+      context.target_memory = "Target-specific memory is temporarily unavailable; do not infer missing observations."
     }
 
     return {
