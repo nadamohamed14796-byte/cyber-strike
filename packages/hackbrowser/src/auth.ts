@@ -414,6 +414,11 @@ export async function autoLogin(
     'input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], input[id*="user"], input[id*="email"]'
   const passSel = credentials.passwordSelector ?? 'input[type="password"]'
 
+  // Saved credentials are origin-bound. Fail closed before filling anything if navigation redirected elsewhere.
+  if (credentials.origin && new URL(page.url()).origin !== credentials.origin) {
+    throw new Error("Saved login origin mismatch; refusing to autofill credentials on a different origin.")
+  }
+
   try {
     await page.waitForSelector(userSel, { timeout: 5000 })
     await page.fill(userSel, credentials.username)
@@ -427,7 +432,7 @@ export async function autoLogin(
     }
 
     await page.waitForLoadState("domcontentloaded").catch(() => {})
-    log.info("auto-login attempted", { username: credentials.username })
+    log.info("auto-login attempted", { origin: credentials.origin ?? "unspecified" })
 
     await handle2FA(page)
   } catch (err) {
