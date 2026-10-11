@@ -339,11 +339,27 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
 
 
 function pocSnippet(text: string) {
-  const lines = text.split(/\n|(?<=\.)\s+/).map((line) => line.trim())
-  const candidates = lines.filter((line) =>
-    /^(curl\s|fetch\s*\(|axios\.|GET\s+\/|POST\s+\/|PUT\s+\/|PATCH\s+\/|DELETE\s+\/|HTTP\/1\.[01]|Authorization:|Content-Type:|{"|<\?xml)/i.test(line),
-  )
-  return candidates.slice(0, 12).join("\n").slice(0, 1800) || undefined
+  // The HTML cleaner intentionally flattens layout, so extract bounded command/request
+  // fragments from inline text instead of relying on preserved code-block newlines.
+  const patterns = [
+    /\bcurl\s+(?:-[a-zA-Z]+\s+)*https?:\/\/[^\s"'<>]{1,220}/gi,
+    /\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/[^\s"'<>]{1,180}(?:\s+HTTP\/1\.[01])?/gi,
+    /\bfetch\s*\([^)]{0,260}\)/gi,
+    /\baxios\.(?:get|post|put|patch|delete)\s*\([^)]{0,260}\)/gi,
+  ]
+  const candidates: string[] = []
+  const seen = new Set<string>()
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = match[0].trim()
+      if (!value || seen.has(value)) continue
+      seen.add(value)
+      candidates.push(value)
+      if (candidates.length >= 12) break
+    }
+    if (candidates.length >= 12) break
+  }
+  return candidates.join("\n").slice(0, 1800) || undefined
 }
 
 
