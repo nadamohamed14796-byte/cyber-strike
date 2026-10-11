@@ -9,7 +9,7 @@ Purpose: track concrete runtime, integration, security, and test gaps. Implement
 - [x] **Worker and browser-installer environment isolation** — Hackbrowser worker and the Chromium installer now use a minimal, provider-scoped environment instead of inheriting the full parent environment. The installer uses argument-array execution and normal TLS verification; it no longer sets `NODE_TLS_REJECT_UNAUTHORIZED=0`. Focused tests are present but not yet run.
 - [ ] **Branch/PR divergence review** — the four main-only commits were compared. The only main-side file difference is `auth-manager.ts`; its older version omits the newer GmailService/visible-browser integration on this branch, so the feature implementation should be retained. A proper merge/reconciliation commit is still pending; do not force-push or edit `main` directly.
 - [ ] **Automated verification** — run package-level unit tests, typecheck, and build in an environment with the required Bun/toolchain; record exact commands and outcomes. No test is marked passed from file existence or static inspection.
-- [ ] **CI status** — inspect PR workflow runs and resolve any failing or missing checks before merge.
+- [ ] **CI status** — the test workflow now has unit, monorepo typecheck, and build jobs, and its required job gates all three. GitHub still reports no workflow runs or status checks for the inspected head; confirm Actions actually executes and fix any failures.
 
 ## P1 — feature wiring and data integrity
 
@@ -42,4 +42,4 @@ Purpose: track concrete runtime, integration, security, and test gaps. Implement
 - The Chromium path/installer subprocess now uses `execFileSync` argument arrays, a minimal environment, and ordinary TLS verification; this removes shell-string execution and the previous `NODE_TLS_REJECT_UNAUTHORIZED=0` override. Installer behavior requires runtime validation.
 - Saved-password consent is requested before consuming `CYBERSTRIKE_AUTH_PASSWORD`, and the local reference is cleared in a `finally` path. Validation tool output now uses actual line breaks for target-note status.
 - The feature branch was reported by GitHub compare as 183 commits ahead and 4 behind `main`; it must be reconciled carefully.
-- Unit tests, typecheck, build, real Gmail OAuth, and browser login have not yet been verified as passing in this review. GitHub currently reports no combined status entries or PR-associated workflow runs for the inspected head commit.
+- The test workflow was expanded to run `bun turbo test`, `bun turbo typecheck`, and `bun turbo build`; the required status depends on all three. GitHub still reports no combined status entries or PR-associated workflow runs for the newest inspected head commit, so these commands have not been proven to execute or pass. Real Gmail OAuth and end-to-end browser login also remain unverified.
