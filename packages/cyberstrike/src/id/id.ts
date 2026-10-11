@@ -30,6 +30,8 @@ export namespace Identifier {
     validation_violation: "vvl",
     target_workspace: "tws",
     target_note: "tnote",
+    report_knowledge: "rkn",
+    report_knowledge_event: "rke",
   } as const
 
   export function schema(prefix: keyof typeof prefixes) {
