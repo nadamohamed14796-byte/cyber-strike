@@ -163,6 +163,22 @@ Do not limit the check to swapping a top-level numeric ID. With test-owned recor
 - [uphiago/recon-skills — IDOR hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-idor/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — IDOR hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-idor/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## Authorization Coverage and Evidence Quality
+
+Build a small ownership matrix using accounts and objects you control:
+
+| Principal | Own object | Another test user's object | Unauthenticated |
+|---|---|---|---|
+| Read | expected allow | expected deny unless sharing is intended | expected deny for private data |
+| Update | expected allow when permitted | expected deny | expected deny |
+| Delete/export/share | validate only if in scope | expected deny | expected deny |
+
+Exercise identifiers in path, query, JSON body, GraphQL variables, nested references, bulk operations, and export/download flows. Change one identifier at a time so the cause is clear. Verify server-side authorization, not merely UI hiding.
+
+Do not enumerate real users' IDs or retrieve their records. Use synthetic records, stop at the first confirmed cross-account boundary failure, and redact personal data in evidence.
+
+Report the principal's role, object owner, operation, expected policy, actual response, and business impact. A sequential ID or an HTTP 200 response alone is not a finding; prove unauthorized access or modification.
+
 ## References
 
 - [OWASP: IDOR](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/05-Authorization_Testing/04-Testing_for_Insecure_Direct_Object_References)
