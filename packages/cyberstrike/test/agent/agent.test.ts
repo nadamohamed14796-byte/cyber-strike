@@ -43,6 +43,22 @@ test("cyberstrike agent has correct default properties", async () => {
   })
 })
 
+test("proxy vulnerability agents can retrieve shared global research", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const idor = await Agent.get("proxy-tester-idor")
+      const orchestrator = await Agent.get("proxy-agent")
+      expect(idor).toBeDefined()
+      expect(orchestrator).toBeDefined()
+      expect(evalPerm(idor, "research_knowledge")).toBe("allow")
+      expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
+      expect(idor?.prompt).toContain("Global Research")
+    },
+  })
+})
+
 test("explore agent denies edits", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
