@@ -125,6 +125,22 @@ Use a single approved probe at a time. Do not run a loop over common ports or au
 - Confirm the behavior is server-side and not a client-side redirect, browser fetch, or unrelated DNS/HTTP interaction. Compare baseline and test requests and preserve sanitized evidence.
 - A blocked request, timing difference, or generic error is not enough on its own. State what was reached, what data/action was demonstrated, and what remains unverified.
 
+## SSRF Destination and Impact Matrix
+
+Validate reachability in increasing-risk order, and stop at the first sufficient proof. Use only controlled destinations and non-sensitive markers.
+
+| Destination class | Safe validation | Avoid |
+|---|---|---|
+| External controlled host | unique DNS/HTTP callback token | callbacks to third-party systems not controlled by you |
+| Internal test service | designated lab endpoint returning a harmless marker | broad internal port sweeps |
+| Cloud metadata | review code/configuration or use provider-approved simulator | fetching real metadata credentials or tokens |
+| Alternate protocols | confirm scheme handling with a benign controlled endpoint | destructive file, process, or socket access |
+| Redirect/DNS behavior | controlled redirect and documented DNS resolution | redirect chains into sensitive internal targets |
+
+Check whether the server actually makes the request, what response or side effect is observable, and whether redirects, DNS rebinding, IPv6, encoded addresses, and allowlist parsing change the security boundary. Do not equate an outbound callback with access to internal data.
+
+Report the controllable input, resolver/proxy path, destination restriction, observable request evidence, data or privilege boundary affected, and a redacted callback record. Never retrieve credentials or customer data to prove impact.
+
 ## References
 
 - [uphiago/recon-skills — SSRF hunting and OOB validation](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-ssrf/SKILL.md) (external research reference; not a local Cyber Strike skill path).
