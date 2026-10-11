@@ -1,5 +1,6 @@
 import z from "zod"
 import fs from "node:fs/promises"
+import { randomBytes } from "node:crypto"
 import path from "node:path"
 import { AuthVault, normalizeAuthOrigin } from "../auth-vault"
 import { GmailService } from "../gmail-service"
@@ -12,10 +13,18 @@ import { Tool } from "./tool"
  */
 async function syncTargetProfileIndex(siteURL: string, targetID: string): Promise<void> {
   const origin = normalizeAuthOrigin(siteURL)
-  const workspace = TargetMemory.list().find((item) => item.id === targetID && normalizeAuthOrigin(item.targetURL) === origin)
-  if (!workspace) {
+  const listedWorkspace = TargetMemory.list().find((item) => item.id === targetID && normalizeAuthOrigin(item.targetURL) === origin)
+  if (!listedWorkspace) {
     throw new Error("Target account reference was not written: target_id must identify an existing workspace with the same exact origin.")
   }
+
+  // list() is metadata-only. Re-open through TargetMemory.get() so the
+  // workspace's on-disk path is checked for symlink escapes before any write.
+  const workspace = await TargetMemory.get(listedWorkspace.targetURL)
+  if (!workspace || workspace.id !== targetID) {
+    throw new Error("Target account reference was not written: the workspace path could not be safely verified.")
+  }
+
   const profiles = await AuthVault.list({ purpose: "target", targetID })
   const lines = [
     "# Saved account references",
@@ -23,7 +32,7 @@ async function syncTargetProfileIndex(siteURL: string, targetID: string): Promis
     "> This file contains references only. Passwords are stored encrypted in CyberStrike's local auth vault and must never be copied here.",
     "",
     ...profiles.flatMap((profile) => [
-      `## ${profile.account.replace(/[\r\n#]/g, " ").slice(0, 120)}`,
+      `## ${profile.account.replace(/[\\r\\n#]/g, " ").slice(0, 120)}`,
       "",
       `- Profile ID: ${profile.id}`,
       `- Origin: ${profile.origin}`,
@@ -33,10 +42,26 @@ async function syncTargetProfileIndex(siteURL: string, targetID: string): Promis
     ]),
   ]
   const file = path.join(workspace.workspacePath, "auth-profiles.md")
-  await fs.writeFile(file, lines.join("\n") + "\n", { encoding: "utf8", mode: 0o600 })
-  await fs.chmod(file, 0o600)
-}
+  try {
+    const info = await fs.lstat(file)
+    if (info.isSymbolicLink() || !info.isFile()) {
+      throw new Error("Saved-account index path is unsafe; refusing to follow a symbolic link or non-regular file.")
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+  }
 
+  // Atomic replacement avoids following a pre-existing file symlink and
+  // prevents readers from seeing a partially written index.
+  const temp = file + "." + process.pid + "." + randomBytes(6).toString("hex") + ".tmp"
+  try {
+    await fs.writeFile(temp, lines.join("\n") + "\n", { encoding: "utf8", mode: 0o600, flag: "wx" })
+    await fs.rename(temp, file)
+    await fs.chmod(file, 0o600)
+  } finally {
+    await fs.rm(temp, { force: true }).catch(() => undefined)
+  }
+}
 export const AuthManagerTool = Tool.define("auth_manager", {
   description: [
     "Manage locally saved website login profiles shared by CyberStrike agents. Use this when a site presents a login wall or an authenticated session expires.",
