@@ -69,3 +69,27 @@ test("persists deduplicated endpoint candidates and links only host-compatible c
   expect(profile?.observedRequestIDs).toEqual(["req-3"])
   expect(profile?.observedRequestIDs).not.toContain("req-2")
 })
+
+
+test("extracts endpoints from already-captured JavaScript responses without retaining source text", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const sources = extractCapturedJavaScriptSources([
+    {
+      id: "req-js",
+      url: "https://app.example.com/assets/app.js",
+      responseContentType: "application/javascript",
+      responseBody: 'fetch("/api/users"); fetch("/api/orders/\${orderId}"); const key = "secret-value";',
+    },
+    {
+      id: "req-html",
+      url: "https://app.example.com/page",
+      responseContentType: "text/html",
+      responseBody: '<script>fetch("/api/not-js-response")</script>',
+    },
+  ])
+  expect(sources).toHaveLength(1)
+  expect(sources[0]?.endpointLiterals).toContain("/api/users")
+  expect(sources[0]?.endpointLiterals).toContain("/api/orders/{param}")
+  expect(JSON.stringify(sources)).not.toContain("secret-value")
+  expect(sources[0]?.relativePath).toContain("captured/app.example.com")
+})

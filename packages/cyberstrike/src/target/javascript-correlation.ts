@@ -143,6 +143,57 @@ export interface JavaScriptSourceFile {
   endpointLiterals: string[]
 }
 
+/**
+ * Extract route literals from already-captured JavaScript responses without
+ * persisting or executing the response body. Bounds mirror local-file inventory.
+ */
+export function extractCapturedJavaScriptSources(
+  requests: Array<{
+    id: string
+    url?: string | null
+    origin?: string | null
+    pageURL?: string | null
+    host?: string | null
+    normalizedPath?: string | null
+    responseContentType?: string | null
+    responseBody?: string | null
+  }>,
+): JavaScriptSourceFile[] {
+  const output: JavaScriptSourceFile[] = []
+  const seen = new Set<string>()
+  let totalBytes = 0
+  for (const request of requests) {
+    if (output.length >= 250 || totalBytes >= 5 * 1024 * 1024) break
+    const url = safeURL(request.url) ??
+      (request.origin && request.normalizedPath ? safeURL(new URL(request.normalizedPath, request.origin).href) : undefined) ??
+      safeURL(request.pageURL) ??
+      safeURL(request.host)
+    const body = request.responseBody
+    if (!url || !body) continue
+    const isJavaScript =
+      /(?:java|ecma)script|x-javascript/i.test(request.responseContentType ?? "") ||
+      /\.m?js$/i.test(url.pathname) ||
+      /\.cjs$/i.test(url.pathname)
+    if (!isJavaScript) continue
+    const bytes = Buffer.byteLength(body, "utf-8")
+    if (bytes < 1 || bytes > 1024 * 1024 || totalBytes + bytes > 5 * 1024 * 1024) continue
+    const digest = createHash("sha256").update(body).digest("hex")
+    if (seen.has(digest)) continue
+    seen.add(digest)
+    totalBytes += bytes
+    const basename = (url.pathname.split("/").filter(Boolean).pop() || "captured.js").replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
+    output.push({
+      relativePath: "captured/" + url.hostname.toLowerCase() + "/" + basename + "-" + digest.slice(0, 8),
+      basename,
+      sha256: digest,
+      bytes,
+      endpointLiterals: extractStaticJavaScriptEndpoints(body),
+    })
+  }
+  return output
+}
+
+
 export interface JavaScriptEndpointCandidate {
   id: string
   literal: string
@@ -447,6 +498,25 @@ export namespace JavaScriptCorrelation {
       }
       return assets.some((asset) => asset.url.hostname.toLowerCase() === host)
     })
+    // Analyze bodies that were already captured as JavaScript, but never save the
+    // source body to disk or the graph. The graph retains only hashes and route literals.
+    const capturedSources = extractCapturedJavaScriptSources(
+      relevantRequests.map((request) => ({
+        id: request.id,
+        url: (request.origin ?? "") + request.normalized_path,
+        origin: request.origin,
+        pageURL: request.page_url,
+        host: request.host,
+        normalizedPath: request.normalized_path,
+        responseContentType: request.response_content_type,
+        responseBody: request.processed_response,
+      })),
+    )
+    const localSourceKeys = new Set(sourceFiles.map((file) => file.sha256))
+    const mergedSourceFiles = [
+      ...sourceFiles,
+      ...capturedSources.filter((file) => !localSourceKeys.has(file.sha256)),
+    ].slice(0, 250)
     const requestIDs = relevantRequests.map((request) => request.id)
     const requestIDSet = new Set(requestIDs)
     const webFunctions = requestIDs.length
