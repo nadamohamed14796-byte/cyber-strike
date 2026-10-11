@@ -30,6 +30,21 @@ function send(msg: WorkerMessage): void {
   process.stdout.write(JSON.stringify(msg) + "\n")
 }
 
+const pendingOtpRequests = new Map<string, { resolve: (code?: string) => void; timeout: ReturnType<typeof setTimeout> }>()
+let otpRequestSequence = 0
+
+function requestGmailOtp(siteUrl: string, after: number): Promise<string | undefined> {
+  const requestId = `gmail-otp-${Date.now()}-${++otpRequestSequence}`
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingOtpRequests.delete(requestId)
+      resolve(undefined)
+    }, 30_000)
+    pendingOtpRequests.set(requestId, { resolve, timeout })
+    send({ type: "otp-request", requestId, siteUrl, after })
+  })
+}
+
 // ============================================================
 // Crash safety net (#117)
 // ============================================================
@@ -321,7 +336,7 @@ function buildCrawlOptions(opts: WorkerOptions, signal: AbortSignal): CrawlOptio
     logSink,
     eventSink,
     signal,
-    ...(opts.savedLogin ? { credentials: opts.savedLogin } : {}),
+    ...(opts.savedLogin ? { credentials: { username: opts.savedLogin.username, password: opts.savedLogin.password, origin: opts.savedLogin.origin, ...(opts.savedLogin.useGmailOtp ? { otpProvider: requestGmailOtp } : {}) } } : {}),
     ...credentialFields,
   }
 }
@@ -370,6 +385,16 @@ async function main(): Promise<void> {
     try {
       msg = JSON.parse(trimmed) as ParentMessage
     } catch {
+      return
+    }
+
+    if (msg.type === "otp-response") {
+      const pending = pendingOtpRequests.get(msg.requestId)
+      if (pending) {
+        clearTimeout(pending.timeout)
+        pendingOtpRequests.delete(msg.requestId)
+        pending.resolve(msg.code)
+      }
       return
     }
 
