@@ -4,7 +4,7 @@ import fs from "node:fs/promises"
 import { and, asc, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
-import { redactTargetNoteSecrets } from "./redact"
+import { redactTargetNoteLine, redactTargetNoteSecrets } from "./redact"
 import { Instance } from "../project/instance"
 import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
@@ -391,12 +391,12 @@ export namespace TargetMemory {
     const workspace = await ensure(targetURL)
     const kind = input.kind ?? "manual"
     const rawTitle = input.title?.trim()
-    const title = rawTitle ? redactTargetNoteSecrets(rawTitle).slice(0, 180) || null : null
+    const title = rawTitle ? redactTargetNoteLine(rawTitle, 180) || null : null
     const now = Date.now()
-    const source = redactTargetNoteSecrets((input.source?.trim() || "manual").slice(0, 120))
+    const source = redactTargetNoteLine((input.source?.trim() || "manual"), 120) || "manual"
     const sourceURL = normalizedSourceURL(input.sourceURL ? redactTargetNoteSecrets(input.sourceURL) : undefined)
     const statusForInsert = input.status ?? "observed"
-    const tags = [...new Set((input.tags ?? []).map((tag) => redactTargetNoteSecrets(tag.trim())).filter(Boolean))].slice(0, 30)
+    const tags = [...new Set((input.tags ?? []).map((tag) => redactTargetNoteLine(tag, 48)).filter(Boolean))].slice(0, 30)
     // Provenance is part of note identity, so identical lessons from distinct sources do not erase attribution.
     const contentHash = createHash("sha256")
       .update([kind, title ?? "", source, sourceURL ?? "", content].join("\0"))
