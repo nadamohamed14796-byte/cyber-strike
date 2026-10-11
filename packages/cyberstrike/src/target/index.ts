@@ -640,6 +640,14 @@ export namespace TargetMemory {
   export function isObservedInSession(sessionID: string, targetURL: string): boolean {
     const normalized = normalizeTarget(targetURL)
     const projectID = Instance.project.id
+    const rootSessionExists = Database.use((db) =>
+      db
+        .select({ id: SessionTable.id })
+        .from(SessionTable)
+        .where(and(eq(SessionTable.id, sessionID), eq(SessionTable.project_id, projectID)))
+        .get(),
+    )
+    if (!rootSessionExists) return false
     const sessionIDs = new Set<string>([sessionID])
     let frontier = [sessionID]
     while (frontier.length > 0) {
@@ -679,6 +687,14 @@ export namespace TargetMemory {
    */
   export function contextForSession(sessionID: string, maxNotes = 8): string | null {
     const projectID = Instance.project.id
+    const rootSessionExists = Database.use((db) =>
+      db
+        .select({ id: SessionTable.id })
+        .from(SessionTable)
+        .where(and(eq(SessionTable.id, sessionID), eq(SessionTable.project_id, projectID)))
+        .get(),
+    )
+    if (!rootSessionExists) return null
     const relatedSessionIDs = new Set<string>([sessionID])
     let frontier = [sessionID]
 
