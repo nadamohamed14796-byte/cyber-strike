@@ -9,7 +9,7 @@ export function redactTargetNoteSecrets(value: string): string {
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
     .replace(/(^|\n)(\s*(?:authorization|cookie|set-cookie)\s*:\s*)[^\r\n]*/gi, "$1$2[REDACTED]")
-    .replace(/(["\']?(?:authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|password|client_secret)["\']?\s*[:=]\s*)(["\']?)([^"\']\s\r\n,;}]+)(["\']?)/gi, "$1$2[REDACTED]$4")
+    .replace(/(["']?(?:authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|password|client_secret)["']?\s*[:=]\s*)(["']?)([^"'\s\r\n,;}]+)(["']?)/gi, "$1$2[REDACTED]$4")
 }
 
 export const TargetNoteTool = Tool.define("target_note", {
