@@ -139,6 +139,21 @@ record_coverage_note
 - Treat benchmark deviations as configuration findings until exposure, exploitability, and business impact are established. Note compensating controls and exceptions to reduce false positives.
 - Keep evidence minimal and sanitized: control ID, resource type, relevant setting, timestamp, and redacted command output. Never commit cloud credentials or customer data.
 
+## Cloud Identity and Exposure Validation Matrix
+
+Inventory the cloud provider, tenant/account/project, regions, identities, externally reachable services, data stores, and audit controls before testing. Keep a clear boundary between configuration review and active validation.
+
+| Area | Review | Validate |
+|---|---|---|
+| Identity | role trust, privilege scope, stale credentials metadata | effective rights using a designated test identity |
+| Network | public endpoints, firewall/security-group rules, private access | controlled connectivity check only |
+| Storage/data | public access, cross-tenant policy, encryption and retention | synthetic test object; no real data export |
+| Secrets | secret-management policy and access path | metadata/configuration proof; do not reveal secret values |
+| Workloads | instance/container identity and patch posture | version/config evidence and approved test resource |
+| Logging | audit coverage, retention, alerting | read-only policy and configuration evidence |
+
+Report the exact resource scope, principal, effective permission or exposure, reproducible evidence, and remediation. Do not create credentials, weaken controls, disable logging, or modify production resources unless the rules of engagement explicitly permit the change.
+
 ## Program Reference
 
 | Program | Domain | Providers |
