@@ -362,7 +362,22 @@ export namespace TargetMemory {
     return workspace
   }
 
+  /** Ensure a target ID belongs to the currently active project before reading its notes. */
+  function targetIsInCurrentProject(targetID: string): boolean {
+    const projectID = Instance.project.id
+    return Boolean(
+      Database.use((db) =>
+        db
+          .select({ id: TargetWorkspaceTable.id })
+          .from(TargetWorkspaceTable)
+          .where(and(eq(TargetWorkspaceTable.id, targetID), eq(TargetWorkspaceTable.project_id, projectID)))
+          .get(),
+      ),
+    )
+  }
+
   export function notes(targetID: string, limit = 100): TargetNote[] {
+    if (!targetIsInCurrentProject(targetID)) return []
     const boundedLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 100, 500))
     return Database.use((db) =>
       db
@@ -499,6 +514,24 @@ export namespace TargetMemory {
    * generated graph cannot overwrite files outside the workspace.
    */
   export async function writeWorkspaceFile(workspace: Workspace, relativeFilePath: string, content: string): Promise<string> {
+    const activeProjectID = Instance.project.id
+    const normalizedTarget = normalizeTarget(workspace.targetURL)
+    const workspaceRecord = Database.use((db) =>
+      db
+        .select({ targetKey: TargetWorkspaceTable.target_key })
+        .from(TargetWorkspaceTable)
+        .where(and(eq(TargetWorkspaceTable.id, workspace.id), eq(TargetWorkspaceTable.project_id, activeProjectID)))
+        .get(),
+    )
+    const expectedRelativePath = path.join(".cyberstrike", "targets", normalizedTarget.slug)
+    if (
+      workspace.projectID !== activeProjectID ||
+      !workspaceRecord ||
+      workspaceRecord.targetKey !== normalizedTarget.targetKey ||
+      path.normalize(workspace.relativePath) !== path.normalize(expectedRelativePath)
+    ) {
+      throw new Error("Workspace output target does not belong to the active project or has mismatched identity.")
+    }
     const normalized = relativeFilePath.trim()
     if (
       !normalized ||
@@ -541,6 +574,7 @@ export namespace TargetMemory {
   }
 
   export function allNotes(targetID: string): TargetNote[] {
+    if (!targetIsInCurrentProject(targetID)) return []
     return Database.use((db) =>
       db
         .select()
