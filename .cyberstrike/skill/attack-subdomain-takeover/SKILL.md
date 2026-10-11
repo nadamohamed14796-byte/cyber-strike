@@ -1,114 +1,61 @@
 ---
 name: attack-subdomain-takeover
-description: "Subdomain takeover — CNAME detection, cloud service fingerprinting, dangling DNS exploitation"
-category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - subdomain-takeover
-  - dns
-  - cloud
-  - web
-  - attack
-tech_stack:
-  - aws
-  - azure
-  - gcp
-  - web
-cwe_ids:
-  - CWE-284
-chains_with: []
-prerequisites: []
-severity_boost: {}
+description: "Validate dangling DNS and orphaned service bindings before classifying a subdomain takeover risk"
+category: "recon"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [subdomain, takeover, dns, cname, cloud]
+tech_stack: [dns, http, cloud, cdn]
+cwe_ids: [CWE-350]
+chains_with: [recon-methodology, attack-triage-validation]
+prerequisites:
+  - "The hostname must be explicitly in scope"
+  - "Permission for DNS/service validation; no unauthorized resource claiming"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-subdomain/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
 ---
 
-# Subdomain Takeover
+# Subdomain Takeover Assessment
 
 ## Objective
 
-Identify subdomains with dangling DNS records (CNAME pointing to unclaimed cloud resources) and claim them to serve attacker content.
+Determine whether an in-scope hostname points to a deprovisioned third-party service or unclaimed resource and whether the binding is actually claimable under the provider's current rules. A dangling CNAME or provider error page is a lead, not a confirmed takeover.
 
-## Testing Methodology
+## Scope and safety
 
-### Phase 1: Subdomain Enumeration
+Only assess hostnames included by the program's scope rules. Do not register, claim, or attach the target's hostname to an account/service unless the program explicitly authorizes a controlled proof. Never serve content to visitors or collect traffic. Use DNS and provider documentation first.
 
-```bash
-# Passive enumeration
-subfinder -d TARGET.com -silent | tee subdomains.txt
+## Procedure
 
-# Certificate transparency
-curl -s "https://crt.sh/?q=%25.TARGET.com&output=json" | jq -r '.[].name_value' | sort -u >> subdomains.txt
+### 1. Establish scope and DNS chain
 
-# DNS brute force
-puredns bruteforce wordlist.txt TARGET.com -r resolvers.txt >> subdomains.txt
-```
+Record the exact hostname, CNAME/A/AAAA chain, TTL, authoritative DNS, and source of discovery. Confirm wildcard and excluded-host rules. Resolve again to rule out transient DNS failures.
 
-### Phase 2: Automated Takeover Check
+### 2. Identify provider and binding state
 
-```bash
-# Check all subdomains for takeover
-attack_script subdomain_takeover subdomains.txt --json-output
-```
+Map the DNS target to the likely hosting/CDN/storage provider using current provider documentation. Record the exact error or unbound-resource indicator. Do not infer a vulnerable state from branding or an HTTP 404 alone.
 
-Checks 20 cloud services:
-- GitHub Pages, Heroku, Shopify, Tumblr, WordPress
-- AWS S3, AWS Elastic Beanstalk, Azure Web Apps
-- Netlify, Vercel, Fastly, Fly.io
-- Bitbucket, Surge, Ghost, Pantheon
-- Zendesk, README.io, Cargo, Feedpress
+### 3. Verify current claimability safely
 
-### Phase 3: Manual CNAME Verification
+Use provider-specific verification rules and a test resource only when explicitly authorized. If safe non-invasive verification cannot establish claimability, mark the issue as a dangling-DNS lead rather than takeover. Do not create an account or claim a resource merely to prove impact unless permitted.
 
-```bash
-# Check CNAME records
-dig +short CNAME subdomain.TARGET.com
+### 4. Exclude benign explanations
 
-# Verify the pointed service is unclaimed
-curl -s https://subdomain.TARGET.com
-# Look for: "There isn't a GitHub Pages site here"
-# "No such app" (Heroku)
-# "NoSuchBucket" (S3)
-```
+Check for maintenance, decommissioned-but-intentionally-retained DNS, provider migration, custom error pages, delayed DNS propagation, wildcard records, and ownership verification controls. Confirm the resource is not already bound to the legitimate owner.
 
-### Phase 4: Cloud Storage Enumeration
+### 5. Assess impact and remediation
 
-```bash
-# Check related cloud buckets
-attack_script cloud_storage_enum TARGET --json-output
-```
+Explain which hostname is affected, the DNS record and provider, whether takeover is confirmed or only suspected, and the potential trust impact. Recommend removing stale DNS records or restoring/claiming the intended resource through the legitimate owner.
 
-### Phase 5: Claim & Verify
+## Common false positives
 
-After confirming a dangling CNAME:
-1. Create the resource on the target service (e.g., GitHub Pages repo, S3 bucket)
-2. Serve a harmless proof page (e.g., `cyberstrike-takeover-proof.html`)
-3. Verify it's accessible at `subdomain.TARGET.com`
+- A provider-branded 404 with a valid resource binding.
+- A dangling-looking CNAME that cannot be claimed due to ownership verification.
+- A transient provider outage or DNS propagation delay.
+- A hostname outside the program's scope.
+- A takeover claim based only on a scanner signature.
 
-## What Constitutes a Finding
+## Output contract
 
-| Finding | Severity |
-|---------|----------|
-| Subdomain takeover — attacker controls content | High (P2) |
-| S3 bucket public write access | Critical (P1) |
-| S3 bucket listing enabled | High (P2) |
-| Dangling CNAME (service unreachable) | Medium (P3) |
-| Cloud storage public read | Medium (P3) |
-
-## Evidence Requirements
-
-- Subdomain with dangling CNAME record
-- Target cloud service identified
-- Service fingerprint (error message)
-- For takeover: proof of content hosting on subdomain
-- For buckets: listing output or write proof
-
-## Tools
-
-- `attack_script subdomain_takeover` — automated CNAME + fingerprint checker
-- `attack_script cloud_storage_enum` — S3/Azure/GCP enumeration
-- `subfinder`, `puredns` — subdomain enumeration
-
-## References
-
-- [Can I Take Over XYZ](https://github.com/EdOverflow/can-i-take-over-xyz)
-- [HackerOne: Subdomain Takeover](https://www.hackerone.com/vulnerability-management/guide-subdomain-takeovers)
+Return `hostname`, `scope_evidence`, `dns_chain`, `provider`, `orphan_signal`, `claimability_status`, `proof_method`, `impact`, `confidence`, and redacted evidence.
