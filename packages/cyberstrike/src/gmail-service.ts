@@ -11,6 +11,7 @@ import { normalizeAuthOrigin } from "./auth-vault"
 const SCOPES_DOC = "https://www.googleapis.com/auth/gmail.readonly"
 const MAX_SEARCH_RESULTS = 10
 const MAX_BODY_CHARS = 12_000
+let cachedAccessToken: { value: string; expiresAt: number } | undefined
 
 type Header = { name?: string; value?: string }
 type Part = { mimeType?: string; filename?: string; body?: { data?: string }; parts?: Part[] }
