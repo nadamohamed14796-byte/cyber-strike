@@ -2,7 +2,7 @@
 name: attack-cache-poison
 description: "Web cache poisoning and Web Cache Deception — validate unkeyed inputs, cache-key discrepancies, and exposure of private responses through shared caches"
 category: "web-application"
-version: "1.1.0"
+version: "1.2.0"
 author: "cyberstrike-official"
 tags:
   - cache-poisoning
@@ -34,6 +34,15 @@ severity_boost:
 
 Assess two distinct cache flaws without conflating them: (1) Web Cache Poisoning (WCP), where an unkeyed input changes a shared cached response; and (2) Web Cache Deception (WCD), where URL/path handling causes a shared cache to store a sensitive response as if it were static. Prove the relevant cache behavior and security impact independently.
 
+## Scope and Safety Preconditions
+
+- Start in a lab or an explicitly approved cache-test route; use unique throwaway URLs and harmless canary strings.
+- Never poison a homepage, login/reset flow, production JavaScript bundle, or high-traffic shared asset unless the program explicitly authorizes that exact risk and provides a recovery plan.
+- Use only test accounts and synthetic records for cache-deception checks. Do not request another user's private response or involve real users as clean-client proof.
+- Test one unkeyed input at a time and stop as soon as shared persistence is confirmed. Do not create re-poisoning loops, repeatedly cache errors, or attempt to evade rate limits.
+- Distinguish origin reflection, private browser cache, edge cache HIT, shared-cache persistence, and an actual security impact. A HIT or changed header alone is not a vulnerability.
+
+
 ## Crown Jewel Targets
 
 - Shared CDN/edge caches serving JavaScript, CSS, downloadable assets, or tenant-specific content.
@@ -53,10 +62,10 @@ Candidate inputs include `Host`, `X-Forwarded-Host`, `X-Host`, `X-Forwarded-Serv
 ### Phase 1: Identify Cache Behavior
 
 ```bash
-# Check cache headers
+#### Check cache headers
 curl --max-time 15 --connect-timeout 5 -s -D- https://TARGET/ | grep -i "x-cache\|age\|cache-control\|cf-cache\|x-varnish"
 
-# Identify cache key components (vary header)
+#### Identify cache key components (vary header)
 curl --max-time 15 --connect-timeout 5 -s -D- https://TARGET/ | grep -i "vary"
 ```
 
@@ -65,12 +74,12 @@ curl --max-time 15 --connect-timeout 5 -s -D- https://TARGET/ | grep -i "vary"
 Do not probe a normal shared URL with attacker-controlled headers as the first test. Use an in-scope, non-critical endpoint and a unique throwaway cache key for every candidate. Use a harmless marker, not executable JavaScript or a real external hostname.
 
 ```bash
-# Example: use a unique cache-busting key and a reserved .invalid marker
+#### Example: use a unique cache-busting key and a reserved .invalid marker
 curl --max-time 10 --connect-timeout 5 -s -D- \
   -H 'X-Forwarded-Host: cyberstrike-canary.invalid' \
   'https://TARGET/test-page?cb=UNIQUE_VALUE'
 
-# Repeat the exact URL without the candidate header
+#### Repeat the exact URL without the candidate header
 curl --max-time 10 --connect-timeout 5 -s -D- \
   'https://TARGET/test-page?cb=UNIQUE_VALUE'
 ```
@@ -82,7 +91,7 @@ Check whether the response changes and whether a later clean request receives th
 First use a unique throwaway cache key and a harmless canary. Do not begin with executable JavaScript or a production-shared URL.
 
 ```bash
-# Use an in-scope endpoint and a unique key for this test
+#### Use an in-scope endpoint and a unique key for this test
 curl --max-time 15 --connect-timeout 5 -s -D- \
   -H 'X-Forwarded-Host: canary.attacker.example' \
   'https://TARGET/page?cb=UNIQUE_VALUE'
@@ -97,11 +106,11 @@ Only continue if the clean request receives the canary from the cached response.
 ### Phase 4: Unkeyed Parameter Poisoning
 
 ```bash
-# Probe a harmless parameter on a unique test key
+#### Probe a harmless parameter on a unique test key
 curl --max-time 15 --connect-timeout 5 -s -D- \
   'https://TARGET/page?cb=UNIQUE_VALUE&utm_source=CANARY_VALUE'
 
-# Check the same URL without the candidate parameter where cache-key behavior permits
+#### Check the same URL without the candidate parameter where cache-key behavior permits
 curl --max-time 15 --connect-timeout 5 -s -D- \
   'https://TARGET/page?cb=UNIQUE_VALUE'
 ```
@@ -126,7 +135,7 @@ Compare origin behavior with the cache behavior. Do not intentionally overwrite 
 ### Phase 6: Cache Key Normalization
 
 ```bash
-# Path normalization differences
+#### Path normalization differences
 curl --max-time 15 --connect-timeout 5 -s "https://TARGET/path/../admin"
 curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/PATH?cb=UNIQUE_VALUE"
 curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/path?cb=UNIQUE_VALUE"
@@ -302,6 +311,8 @@ Public research and disclosures describe patterns including `X-Forwarded-Host` i
 - `attack-request-smuggling` — investigate proxy desynchronization only when authorized and supported by evidence.
 - `attack-cors` — validate browser-readable cross-origin impact when Origin and cache variation interact.
 - `wstg-inpv-02` and `wstg-clnt-01` — follow up only when stored or DOM-based XSS is actually demonstrated.
+- `triage-validation` — verify the shared-cache boundary, repeatability, scope, and actual impact before reporting.
+- `evidence-hygiene` — redact cookies, tokens, private response fields, and target-sensitive artifacts before attaching evidence.
 
 ## Cache Test Runbook and Stop Conditions
 
