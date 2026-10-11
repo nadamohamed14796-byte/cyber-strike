@@ -80,26 +80,34 @@ export const AuthManagerTool = Tool.define("auth_manager", {
           return { title: "Target workspace mismatch", output: "site_url must share the exact origin with an existing target workspace, and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
         }
       }
-      const password = process.env.CYBERSTRIKE_AUTH_PASSWORD
-      if (!password) {
-        return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
-      }
-      delete process.env.CYBERSTRIKE_AUTH_PASSWORD
+      // Ask for permission before consuming the one-shot password handoff.
+      // If the user denies the request, the secret remains available for retry.
       await ctx.ask({ permission: "auth-credential-save", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id, account: params.account } })
-      const saved = await AuthVault.save({
-        origin: params.site_url, purpose: params.purpose, account: params.account,
-        username: params.username, password, targetID: params.target_id,
-      })
-      let indexSynced = false
-      if (saved.purpose === "target" && saved.targetID) {
-        try {
-          await syncTargetProfileIndex(params.site_url, saved.targetID)
-          indexSynced = true
-        } catch {
-          // The encrypted vault save is authoritative; a human-readable index is secondary.
+      let password: string | undefined
+      try {
+        password = process.env.CYBERSTRIKE_AUTH_PASSWORD
+        if (!password) {
+          return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
         }
+        delete process.env.CYBERSTRIKE_AUTH_PASSWORD
+        const saved = await AuthVault.save({
+          origin: params.site_url, purpose: params.purpose, account: params.account,
+          username: params.username, password, targetID: params.target_id,
+        })
+        let indexSynced = false
+        if (saved.purpose === "target" && saved.targetID) {
+          try {
+            await syncTargetProfileIndex(params.site_url, saved.targetID)
+            indexSynced = true
+          } catch {
+            // The encrypted vault save is authoritative; a human-readable index is secondary.
+          }
+        }
+        return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}.${saved.purpose === "target" ? (indexSynced ? " A password-free reference was written to auth-profiles.md." : " The encrypted save succeeded, but the target reference index could not be refreshed.") : " Secret is not included in this response."}`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose, targetIndexSynced: saved.purpose === "target" ? indexSynced : undefined } }
+      } finally {
+        // Best-effort removal of the local reference on every exit path.
+        password = undefined
       }
-      return { title: "Login profile saved", output: `Saved encrypted profile "${saved.account}" for ${saved.origin} (${saved.purpose}). Profile ID: ${saved.id}.${saved.purpose === "target" ? (indexSynced ? " A password-free reference was written to auth-profiles.md." : " The encrypted save succeeded, but the target reference index could not be refreshed.") : " Secret is not included in this response."}`, metadata: { ok: true, profileID: saved.id, origin: saved.origin, purpose: saved.purpose, targetIndexSynced: saved.purpose === "target" ? indexSynced : undefined } }
     }
     if (params.action === "list") {
       const profiles = await AuthVault.list({ origin: params.site_url, purpose: params.purpose, targetID: params.target_id })
