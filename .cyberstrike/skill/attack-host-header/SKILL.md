@@ -1,129 +1,135 @@
 ---
 name: attack-host-header
-description: "Test Host and forwarded-host trust for reset-link poisoning, routing confusion, and cache impact"
+description: "Assess Host and forwarded-host trust for absolute URL generation, routing, redirect, and cache boundaries using controlled test domains and identities."
 category: "web-application"
-version: "1.1.0"
+version: "1.2.0"
 author: "cyberstrike-official"
 tags:
   - host-header
+  - forwarded-host
   - web
-  - injection
-  - attack
+  - routing
+  - cache
 tech_stack:
   - web
+  - http
+  - reverse-proxy
+  - cdn
 cwe_ids:
   - CWE-644
+  - CWE-346
+  - CWE-601
 chains_with:
   - attack-cache-poison
   - attack-open-redirect
+  - attack-information-disclosure
 prerequisites: []
 severity_boost:
-  attack-cache-poison: "Host header + cache poisoning = stored attack affecting all users"
+  attack-cache-poison: "Host-derived values raise impact only when a harmless altered response is stored in a shared cache and served to a clean test client."
 ---
 
-# Host Header Injection
+# Host Header and Forwarded-Host Trust Assessment
 
 ## Objective
 
-Exploit web server reliance on the Host header to poison password reset links, web caches, or route requests to internal services.
+Determine whether an application or intermediary trusts client-controlled Host-related headers for security-sensitive decisions such as absolute URL generation, routing, redirects, cache variation, or origin checks. Use a hostname you control and accounts you own. A reflected hostname or a changed status code is only a lead, not proof of impact.
+
+## Scope and Safety Preconditions
+
+- Confirm the target hostname, route, and permitted test type are explicitly in scope.
+- Use only a test email inbox and test account for password-reset, email-verification, invitation, and OAuth-related flows.
+- Use a domain or subdomain controlled by the tester for harmless canaries; never route real reset tokens or user traffic to an external collector.
+- Test one header per request. Avoid duplicate Host headers and parser-confusion variants on shared production infrastructure unless the program explicitly permits them; prefer a local proxy/origin lab.
+- Do not try to reach unrelated internal virtual hosts, admin panels, metadata endpoints, or third-party services through Host manipulation.
+- If an email or response unexpectedly contains a live token or private data, stop and redact it.
 
 ## Testing Methodology
 
-### Phase 1: Password Reset Poisoning
+### Phase 1: Map trust boundaries and establish a baseline
 
-```bash
-# Trigger password reset with injected Host
-curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/forgot-password \
-  -H "Host: attacker.com" \
-  -d "email=YOUR_TEST_EMAIL"
+Identify the front door (CDN/load balancer/reverse proxy), canonical host, origin behavior visible within scope, and relevant endpoints. Capture one normal request and record the Location header, absolute links, response body hash, cache headers, and any request-ID metadata.
 
-# X-Forwarded-Host variant
-curl --max-time 15 --connect-timeout 5 -X POST https://TARGET/forgot-password \
-  -H "X-Forwarded-Host: attacker.com" \
-  -d "email=victim@example.com"
-```
+Check whether the application is behind a proxy and whether documentation specifies trusted forwarded headers. Do not assume that X-Forwarded-Host or X-Host is trusted just because it is accepted by the HTTP parser.
 
-Use only `YOUR_TEST_EMAIL` and a hostname you control. If the reset email sent to your own inbox contains that controlled hostname, preserve the message and URL with the token redacted. Do not redeem tokens in a way that changes another account or forward tokens to an external collector.
+### Phase 2: Test a controlled Host-derived reflection
 
-### Phase 2: Duplicate Host Headers
+Use a harmless endpoint where Host-derived values may appear, such as a canonical link or a redirect generated for a synthetic route. Change one value at a time in an approved environment, using an owned controlled domain. Compare the normal request with the candidate request and confirm that the response actually changes in a security-relevant sink.
 
-```bash
-# Two Host headers
-curl --max-time 15 --connect-timeout 5 https://TARGET/ \
-  -H "Host: TARGET" \
-  -H "Host: attacker.com"
+A value that appears only in an error message or in a body reflecting the original request is not enough. Inspect HTML/JSON context, Location, absolute URL, and cache behavior separately.
 
-# Host with port injection
-curl --max-time 15 --connect-timeout 5 https://TARGET/ \
-  -H "Host: TARGET:@attacker.com"
-```
+### Phase 3: Verify password-reset and notification URL construction
 
-### Phase 3: X-Forwarded-Host / X-Host
+Perform this only when the program permits auth-flow testing and only with a test account/inbox you control. Request one reset or verification message and inspect the delivered link. Verify whether the generated hostname comes from an untrusted header or from a trusted canonical configuration.
 
-```bash
-curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Forwarded-Host: attacker.com"
-curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Host: attacker.com"
-curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Forwarded-Server: attacker.com"
-curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Original-URL: /admin"
-curl --max-time 15 --connect-timeout 5 https://TARGET/ -H "X-Rewrite-URL: /admin"
-```
+Do not submit reset requests for real users, change a real account's recovery email, forward live tokens, or redeem a token after changing state beyond the test account. If the host is wrong but the token is still scoped to a controlled test account, redact the token completely in retained evidence.
 
-### Phase 4: Absolute URL Routing
+### Phase 4: Review proxy-header behavior and routing
 
-```bash
-# Absolute URL overrides Host header
-curl --max-time 15 --connect-timeout 5 "https://TARGET/api" \
-  -H "Host: internal-admin.TARGET"
-```
+In a lab first, compare canonical Host handling with one forwarded header at a time (X-Forwarded-Host, Forwarded, X-Host, or X-Forwarded-Server) and document which layer consumes each value. For production checks, use a harmless route and do not target internal/admin route names as a bypass attempt.
 
-### Phase 5: Web Cache Poisoning via Host
+For path-rewrite headers such as X-Original-URL or X-Rewrite-URL, use only an approved benign test path and verify policy before probing. A proxy's 404/403/200 difference is not confirmation unless the expected handler and authorization boundary are independently demonstrated.
 
-```bash
-# If response is cached with injected host
-curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/?cb=UNIQUE_TEST_VALUE" -H "X-Forwarded-Host: canary.attacker.example"
-# Repeat the exact URL without the injected header; use a unique test key and confirm only your harmless canary persists
-```
+### Phase 5: Assess shared-cache interactions separately
+
+If the altered host-derived response may be cached, coordinate with the attack-cache-poison skill. Start with a unique throwaway URL or an approved cache-test key and a harmless marker. Send one altered request, then repeat the exact request without the altered header from a clean test client. Capture cache HIT/MISS/Age evidence and stop immediately after the minimal controlled proof.
+
+Never poison a homepage, login/reset route, static asset used by real users, or any shared high-traffic URL. Do not create a persistent entry or repeatedly refresh/re-poison production content.
+
+### Phase 6: Check absolute-form request-target and duplicate-header parsing only in a lab
+
+If evidence suggests a front proxy and origin disagree about authority, reproduce with a local proxy/origin or a program-provided lab. Duplicate Host headers, absolute-form request targets, unusual ports, and malformed authority syntax can cause parser inconsistencies; testing these on a shared live connection can affect unrelated requests. Do not conduct such probes on production absent explicit written permission and a dedicated test path.
+
+### Phase 7: Confirm root cause and remediation
+
+Trace which value controls URL generation, routing, redirects, cache keys, or origin validation. Recommend a canonical host allowlist, validated proxy trust configuration, and rejection of inconsistent authority values. Add regression checks for normal Host, untrusted forwarded-host, and invalid canonical host cases.
 
 ## What Constitutes a Finding
 
-| Finding | Severity |
-|---------|----------|
-| Reset link uses an attacker-controlled host on an account you control | Severity depends on whether a real token can be captured and redeemed; not automatically Critical |
-| Injected host is stored in a shared cache and served to clean clients with demonstrated impact | Severity depends on impact and blast radius |
-| Host manipulation reaches an otherwise unauthorized internal route | Severity depends on access-control impact and data/action exposed |
-| Host value is reflected but no executable or security-relevant impact is demonstrated | Usually informational/low; reflection alone is not a confirmed vulnerability |
+- **Candidate / lead:** a Host-related value is reflected, a redirect changes, or a service responds differently to a forwarded header.
+- **Confirmed URL-poisoning issue:** a reset/verification URL sent to a tester-owned inbox contains an attacker-controlled host contrary to the intended policy.
+- **Confirmed routing/access issue:** a controlled request reaches an unintended in-scope handler and demonstrates an authorization or data boundary failure.
+- **Confirmed cache issue:** a clean test client receives a harmless altered response stored by a shared cache without the injected input.
+- **Not a finding:** reflection alone, a normal 401/403, a public redirect by design, or a changed status without confirmed handler/impact.
 
 ## Evidence Requirements
 
-- Request with injected Host header
-- Response/email showing injected domain
-- For cache poisoning: cached response serving injected content
-- For password reset: full reset URL with attacker domain
+- Canonical baseline and one-header-at-a-time modified request, with cookies/tokens redacted.
+- Exact route, method, timestamp, and sanitized response/Location header.
+- For reset/verification URLs, evidence from a test inbox with the token and any personal data fully redacted.
+- For routing, evidence of the intended versus actual handler and a harmless controlled outcome.
+- For cache behavior, cache status and exact clean-request reproduction from a second tester-controlled session.
+- Identify whether validation was in an isolated lab or authorized production test; state unverified impact honestly.
 
-## Verification and False Positives
+## Tools
 
-- Use only a test account and an email address you control for password-reset flows. Do not send reset requests for real users or attempt to redeem another person's token.
-- Distinguish the HTTP `Host` header from proxy headers such as `X-Forwarded-Host`; record which value the application actually trusts.
-- A reflected attacker-controlled hostname is only a signal. Confirm a security-relevant consequence such as a generated reset URL on your test account, an authorization boundary crossed, or a poisoned shared-cache response.
-- For reset-link poisoning, a successful request or a generic “email sent” response does not prove that the delivered link uses the injected hostname. Verify the message delivered to your own test inbox.
-- For routing bypass, compare the same endpoint with the canonical host and the manipulated host. A different status code alone is not proof of unauthorized access; inspect the response and authorization behavior.
-- For cache impact, use `attack-cache-poison` as the companion skill and prove that a clean request receives the altered response without the injected header.
-- Do not treat duplicate Host-header parsing differences as exploitable unless the proxy/origin behavior and impact are reproducible within the program's rules.
+- **Burp Repeater / curl:** controlled one-variable header comparison on an approved endpoint.
+- **Browser / test mailbox:** verify generated links and redirects without sharing tokens.
+- **Reverse-proxy configuration review:** identify trusted forwarded headers and canonical-host settings.
+- **attack-cache-poison:** assess whether a Host-derived response is stored and served from a shared cache.
+- **Local proxy/origin lab:** reproduce ambiguous authority parsing and duplicate-header behavior safely.
 
 ## Host Trust-Boundary Matrix
 
-Compare the canonical Host value with forwarded-host and scheme headers while changing one header per request. Use a hostname you control and unique test URLs. Do not send password-reset links or authentication tokens to an external collector.
-
-| Sink | What to inspect | Proof threshold |
+| Sink | Safe test | Confirmation threshold |
 |---|---|---|
-| Absolute URL generation | canonical links, reset emails, redirects | controlled hostname appears in output sent to your own test inbox |
-| Cache | cache key and response variation | clean request receives the harmless canary from shared cache |
-| Routing | virtual host/backend selection | request reaches an unintended in-scope virtual host with demonstrable impact |
-| Security policy | origin checks, password reset, OAuth callbacks | trust decision changes and permits an unauthorized action in a test account |
+| Absolute URL generation | Owned test route and controlled hostname | Generated canonical URL uses an untrusted host in a security-sensitive context |
+| Password-reset/verification link | Test account and owned inbox | Delivered link uses attacker-controlled host; token stays redacted |
+| Redirect | Harmless in-scope route | Redirect target changes contrary to allowlist/policy and has meaningful impact |
+| Cache | Unique approved test URL plus clean client | Shared cached response persists without injected header |
+| Virtual-host routing | Local/test proxy or approved route | Wrong in-scope backend/handler reached and security boundary crossed |
+| Origin/security checks | Controlled request in a test flow | Trusted-origin decision changes and permits an unauthorized test action |
+| Duplicate Host/absolute-form | Isolated proxy/origin lab | Parser disagreement reproducible without involving unrelated users |
 
-A reflected Host value or unusual response is not sufficient. Preserve the raw sanitized request, generated URL/response, cache status if relevant, and exact trust boundary. Redact reset tokens and cookies, and never redeem another user's token.
+## Verification and False Positives
+
+- Proxies and CDNs may strip or rewrite Host-related headers before the application sees them; identify the layer responsible.
+- The application may intentionally use a trusted canonical host rather than the incoming header.
+- A response that echoes a hostname, an email-sent confirmation, or a status-code change alone does not demonstrate link poisoning or access bypass.
+- Cache headers and shared-cache behavior belong to a separate validation step; an origin-only reflection is not poisoning.
+- Stop before production cache poisoning, internal routing probes, real-user account recovery, active credential delivery, or ambiguous duplicate-header tests.
 
 ## References
 
 - [PortSwigger: Host Header Attacks](https://portswigger.net/web-security/host-header)
-- [OWASP: Host Header Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/17-Testing_for_Host_Header_Injection)
+- [OWASP WSTG: Testing for Host Header Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/17-Testing_for_Host_Header_Injection)
+- [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110.html)
