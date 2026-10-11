@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { Instance } from "../../src/project/instance"
-import { ResearchContext, researchClassForSignalTags } from "../../src/learning/research-context"
+import { ResearchContext, promptResearchSignals, researchClassForSignalTags } from "../../src/learning/research-context"
 import { tmpdir } from "../fixture/fixture"
 
 test("global research retrieval guidance is available even before target signals exist", async () => {
@@ -57,7 +57,6 @@ test("request-derived research signals cover JavaScript, auth, uploads, and URL-
 })
 
 test("explicit user request produces bounded global retrieval tags without retaining request text", () => {
-  const { promptResearchSignals } = require("../../src/learning/research-context") as typeof import("../../src/learning/research-context")
   expect(promptResearchSignals("Please investigate whether the order ID has an IDOR issue in the API and compare owner/non-owner behavior")).toEqual(
     expect.arrayContaining(["idor", "object-identifier", "api-endpoint"]),
   )
