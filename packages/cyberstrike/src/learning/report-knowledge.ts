@@ -350,8 +350,9 @@ export namespace ReportKnowledge {
       if (exact.test(title)) score += 45
       else if (exact.test(lesson)) score += 25
       else if (exact.test(attackVector) || exact.test(impact)) score += 18
-      else if (exact.test(reproduction) || exact.test(poc)) score += 16
-      else if (exact.test(tags)) score += 14
+      else if (exact.test(reproduction) || exact.test(poc)) score += 22
+      else if (exact.test(tags)) score += 24
+      else if (exact.test(metadata)) score += 18
       else if (haystack.includes(token)) score += 8
     }
 

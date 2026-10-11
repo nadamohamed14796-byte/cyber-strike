@@ -50,7 +50,7 @@ export const ResearchKnowledgeTool = Tool.define("research_knowledge", {
         "- Lesson: " + (row.lesson ?? "not extracted"),
         "- Attack vector: " + (row.attack_vector ?? "not extracted"),
         "- Impact: " + (row.impact ?? "not extracted"),
-        "- Prerequisites: " + clip(extracted.prerequisites, 1000 || 1000 || 1000) .replace(/^$/, "not extracted"),
+        "- Prerequisites: " + clip(extracted.prerequisites, 1000) || "not extracted",
         "- Reproduction notes: " + (row.reproduction ?? "not extracted"),
         "- PoC snippet (inspect before use): " + (row.poc ?? "not extracted"),
         "- Verification signals: " + (clip(extracted.verification_signals) || "not extracted"),
