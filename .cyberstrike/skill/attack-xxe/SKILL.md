@@ -158,6 +158,20 @@ Check parser behavior in this order: confirm the endpoint accepts XML, confirm w
 - [uphiago/recon-skills — XXE hunting](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-xxe/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — XXE hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-xxe/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
+## XML Parser Coverage and Safe Impact Proof
+
+Identify every XML-consuming surface in scope: upload/import, SOAP, SAML, document conversion, SVG, office formats, and APIs accepting XML content types. Compare normal XML with a minimal harmless entity test and use a controlled out-of-band endpoint only when permitted.
+
+| Capability | Safe proof | Do not do |
+|---|---|---|
+| External entity resolution | controlled callback with unique token | read local files containing secrets |
+| Blind XXE | DNS/HTTP callback with non-sensitive marker | use external hosts you do not control |
+| Entity expansion | parser/config evidence or tiny bounded test | exponential expansion or resource exhaustion |
+| XInclude/schema fetch | controlled harmless resource | internal network sweeps or metadata credential access |
+| Error disclosure | sanitized parser error | expose or store private server data |
+
+Confirm the XML parser actually processes the entity and that the observed request originates from the target system. A blocked callback or generic parser error is inconclusive. Report parser/content type, exact benign XML, callback timestamp/token, response behavior, and safe mitigations such as disabling external entities and limiting expansion.
+
 ## References
 
 - [PortSwigger: XXE](https://portswigger.net/web-security/xxe)
