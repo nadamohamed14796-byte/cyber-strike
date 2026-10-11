@@ -1,6 +1,5 @@
 import z from "zod"
 import { AuthVault } from "../auth-vault"
-import { GmailOtp } from "../gmail-otp"
 import { Tool } from "./tool"
 
 export const AuthManagerTool = Tool.define("auth_manager", {
@@ -9,30 +8,20 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     "Profiles are matched by exact URL origin (scheme + hostname + port), never by substring. Research accounts are separate from target accounts; target accounts require the current explicit targetID.",
     "Passwords are encrypted at rest with AES-256-GCM. Set CYBERSTRIKE_CREDENTIALS_KEY to a private secret of at least 32 characters before using this tool. The key is not stored by CyberStrike.",
     "Actions: save a profile, list matching profiles (metadata only), or forget a profile. Passwords are never returned by this agent-facing tool. This tool stores credentials; it does not itself bypass login challenges or automate browser form submission. CAPTCHA, MFA, and consent screens require the supported human flow.",
-    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here for mailbox access.",\n    "Action gmail_otp reads a recent OTP from Gmail using a separately configured Google OAuth refresh token with gmail.readonly. It only accepts messages from the exact site hostname or its subdomains; third-party email senders are not scanned. Configure CYBERSTRIKE_GMAIL_OAUTH_CLIENT_ID, CYBERSTRIKE_GMAIL_OAUTH_CLIENT_SECRET, and CYBERSTRIKE_GMAIL_OAUTH_REFRESH_TOKEN outside the repository."
+    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here for mailbox access. Gmail OTP integration must use a separate explicit Google OAuth grant with minimum scopes.",
   ].join("\n"),
   parameters: z.object({
-    action: z.enum(["save", "list", "forget", "gmail_otp"]),
+    action: z.enum(["save", "list", "forget"]),
     site_url: z.string().url().describe("Site URL; only its exact origin is used for matching."),
     purpose: z.enum(["research", "target"]),
     target_id: z.string().optional().describe("Required for target-purpose profiles; use the stable current target identifier."),
-    profile_id: z.string().optional().describe("Profile ID for forget."),\n    after: z.number().int().positive().optional().describe("Optional Unix timestamp in milliseconds; only consider OTP messages received after this time."),
+    profile_id: z.string().optional().describe("Profile ID for forget."),
     account: z.string().optional().describe("Human-readable account label, e.g. researcher-main."),
     username: z.string().optional().describe("Login username/email."),
   }),
   async execute(params, ctx) {
     if (params.purpose === "target" && !params.target_id?.trim()) {
       return { title: "Target ID required", output: "Target credentials must be bound to an explicit target_id. No credentials were read or written.", metadata: { ok: false } }
-    }
-    if (params.action === "gmail_otp") {
-      await ctx.ask({ permission: "gmail-otp-read", patterns: [params.site_url], always: [], metadata: { purpose: params.purpose, targetID: params.target_id } })
-      const result = await GmailOtp.latest({ siteUrl: params.site_url, after: params.after })
-      if (!result) return { title: "No matching OTP email", output: "No recent verification code was found from the site's exact hostname or a subdomain. Third-party senders are intentionally ignored.", metadata: { found: false } }
-      return {
-        title: "Verification code found",
-        output: `Found a recent verification email from ${result.from} (subject: ${result.subject}). Code: ${result.code}. Received: ${new Date(result.receivedAt).toISOString()}. Use it only to continue the login flow you initiated.`,
-        metadata: { found: true, messageID: result.messageId, receivedAt: result.receivedAt },
-      }
     }
     if (params.action === "save") {
       if (!params.account?.trim() || !params.username?.trim()) {
