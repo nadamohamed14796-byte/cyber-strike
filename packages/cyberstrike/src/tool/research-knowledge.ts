@@ -41,11 +41,19 @@ export const ResearchKnowledgeTool = Tool.define("research_knowledge", {
       const metadata = row.metadata ?? {}
       const extracted = (metadata.extracted && typeof metadata.extracted === "object" ? metadata.extracted : {}) as Record<string, unknown>
       const signals = Array.isArray(extracted.retrieval_signals) ? extracted.retrieval_signals.filter((v): v is string => typeof v === "string") : []
+      const coverage = extracted.extraction_coverage && typeof extracted.extraction_coverage === "object"
+        ? extracted.extraction_coverage as Record<string, unknown>
+        : {}
+      const coverageLabel = typeof coverage.present === "number" && typeof coverage.total === "number"
+        ? coverage.present + "/" + coverage.total + " fields present (not a quality or verification score)"
+        : "not recorded"
       return [
         "## " + (i + 1) + ". " + row.title,
         "- Class/CWE: " + (row.vulnerability_class ?? "unknown") + " / " + (row.cwe_id ?? "unknown"),
         "- Source: " + (row.source_url ?? "unknown") + " (public-source material; not independently verified here)",
         "- Source trust: " + (typeof metadata.source_trust === "number" ? metadata.source_trust + "/100" : "unknown"),
+        "- Study method: " + (typeof metadata.study_method === "string" ? metadata.study_method : "legacy extraction"),
+        "- Extraction coverage: " + coverageLabel,
         "- Record state: " + row.status + "; confidence field: " + row.confidence + "/100 (not proof of exploitability)",
         "- Lesson: " + (row.lesson ?? "not extracted"),
         "- Attack vector: " + (row.attack_vector ?? "not extracted"),

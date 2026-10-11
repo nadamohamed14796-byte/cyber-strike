@@ -170,12 +170,20 @@ export namespace ResearchContext {
       const signals = Array.isArray(extracted.retrieval_signals)
         ? extracted.retrieval_signals.filter((value): value is string => typeof value === "string").slice(0, 12)
         : []
+      const coverage = extracted.extraction_coverage && typeof extracted.extraction_coverage === "object"
+        ? (extracted.extraction_coverage as Record<string, unknown>)
+        : {}
+      const coverageLabel = typeof coverage.present === "number" && typeof coverage.total === "number"
+        ? coverage.present + "/" + coverage.total + " fields present (not a quality or verification score)"
+        : "not recorded"
       return [
         "### " + row.title,
         "Class: " + (row.vulnerability_class ?? "unclassified") +
           " | Severity mentioned by source: " + row.severity +
           " | Source trust metadata: " + trustLabel +
           " | Status: " + row.status +
+          " | Study method: " + (typeof metadata.study_method === "string" ? metadata.study_method : "legacy extraction") +
+          " | Extraction coverage: " + coverageLabel +
           " | Independently verified by this system: no",
         "Lesson extracted: " + (row.lesson ?? "No lesson extracted; inspect the source before using it."),
         ...(row.attack_vector ? ["Attack vector extracted: " + row.attack_vector] : []),
