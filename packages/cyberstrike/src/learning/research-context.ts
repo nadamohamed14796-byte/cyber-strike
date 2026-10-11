@@ -187,10 +187,15 @@ export namespace ResearchContext {
         ...(stringValue(extracted.root_cause) ? ["Root cause described by source: " + stringValue(extracted.root_cause, 1800)] : []),
         ...(stringValue(extracted.request_response_evidence) ? ["Request/response evidence patterns: " + stringValue(extracted.request_response_evidence, 2000)] : []),
         ...(stringValue(extracted.affected_components) ? ["Affected components/signals: " + stringValue(extracted.affected_components, 1400)] : []),
+        ...(stringValue(extracted.affected_versions) ? ["Affected versions reported: " + stringValue(extracted.affected_versions, 1200)] : []),
+        ...(stringValue(extracted.technology_stack) ? ["Technology/framework clues: " + stringValue(extracted.technology_stack, 1200)] : []),
+        ...(stringValue(extracted.remediation) ? ["Remediation described by source: " + stringValue(extracted.remediation, 1400)] : []),
+        ...(stringValue(extracted.attack_chain) ? ["Attack-chain notes: " + stringValue(extracted.attack_chain, 1400)] : []),
+        ...(stringValue(extracted.negative_evidence) ? ["Negative/failed evidence described by source: " + stringValue(extracted.negative_evidence, 1200)] : []),
         ...(stringValue(extracted.false_positive_cautions) ? ["False-positive cautions: " + stringValue(extracted.false_positive_cautions)] : []),
         ...(stringValue(extracted.limitations) ? ["Assumptions/limitations: " + stringValue(extracted.limitations, 1800)] : []),
         ...(signals.length ? ["Retrieval signals: " + signals.join(", ")] : []),
-        ...(stringValue(metadata.excerpt, 1600) ? ["Source excerpt: " + stringValue(metadata.excerpt, 1600)] : []),
+        ...(stringValue(metadata.excerpt, 2200) ? ["Source excerpt: " + stringValue(metadata.excerpt, 2200)] : []),
         "Source URL: " + (row.source_url ?? "unknown"),
       ].join("\n")
     })
