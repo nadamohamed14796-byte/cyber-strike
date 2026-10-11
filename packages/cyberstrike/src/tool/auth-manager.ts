@@ -75,6 +75,12 @@ export const AuthManagerTool = Tool.define("auth_manager", {
       if (params.purpose === "target") {
         const workspace = await TargetMemory.get(params.site_url)
         if (!workspace || workspace.id !== params.target_id) {
+          return { title: "Target workspace mismatch", output: "site_url must match an existing target workspace and target_id must equal its stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
+        }
+      }
+      if (params.purpose === "target") {
+        const workspace = await TargetMemory.get(params.site_url)
+        if (!workspace || workspace.id !== params.target_id) {
           return { title: "Target workspace mismatch", output: "For target-purpose credentials, site_url must match an existing target workspace and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
         }
       }
