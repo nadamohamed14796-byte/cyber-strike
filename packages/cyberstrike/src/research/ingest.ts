@@ -41,13 +41,13 @@ function normalizeUrl(value: string, base?: URL) {
  */
 export function redactResearchSecrets(input: string): string {
   return input
-    .replace(/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\\s\\S]*?-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/gi, "[PRIVATE KEY REDACTED]")
-    .replace(/(authorization|proxy-authorization)\\s*:\\s*(?:bearer|basic)\\s+[^\\s"'<>]+/gi, "$1: [REDACTED]")
-    .replace(/(cookie|set-cookie)\\s*:\\s*[^\\s"'<>]+/gi, "$1: [REDACTED]")
-    .replace(/\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [REDACTED]")
-    .replace(/\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b/g, "[JWT REDACTED]")
-    .replace(/((?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|session[_-]?id|password|passwd|secret)\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s"'&,;<>]+)/gi, "$1[REDACTED]")
-    .replace(/([?&](?:access_token|refresh_token|token|api_key|apikey|secret|password|signature|sig|auth|session)=)[^&#\\s"'<>]+/gi, "$1[REDACTED]")
+    .replace(/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/gi, "[PRIVATE KEY REDACTED]")
+    .replace(/(authorization|proxy-authorization)\s*:\s*(?:bearer|basic)\s+[^\s"'<>]+/gi, "$1: [REDACTED]")
+    .replace(/(cookie|set-cookie)\s*:\s*[^\s"'<>]+/gi, "$1: [REDACTED]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [REDACTED]")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
+    .replace(/((?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|session[_-]?id|password|passwd|secret)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s"'&,;<>]+)/gi, "$1[REDACTED]")
+    .replace(/([?&](?:access_token|refresh_token|token|api_key|apikey|secret|password|signature|sig|auth|session)=)[^&#\s"'<>]+/gi, "$1[REDACTED]")
 }
 
 function cleanHtml(html: string) {
