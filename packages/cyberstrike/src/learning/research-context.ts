@@ -71,16 +71,31 @@ export namespace ResearchContext {
             .all(),
         )
       : []
-    const requestSignals = recentRequests.map((request) => ({
-      title: [request.method, request.normalizedPath, request.contentType, request.status ? "status " + request.status : ""].filter(Boolean).join(" "),
-      type: "captured_request",
-      tags: ["captured-request", request.method.toLowerCase(), request.contentType ?? ""].filter(Boolean),
-    }))
-    const functionSignals = webFunctions.map((fn) => ({
-      title: [fn.name, fn.actionType, ...((fn.objects as string[] | null) ?? []).slice(0, 6)].filter(Boolean).join(" "),
-      type: "web_function",
-      tags: ["web-function", fn.actionType, ...((fn.objects as string[] | null) ?? []).slice(0, 6)],
-    }))
+    const requestSignals = recentRequests.map((request) => {
+      const requestPath = request.normalizedPath.toLowerCase()
+      const contentType = (request.contentType ?? "").toLowerCase()
+      const tags = ["captured-request", request.method.toLowerCase()]
+      if (/\/api(?:\/|$)|graphql/.test(requestPath) || /json/.test(contentType)) tags.push("api-endpoint")
+      if (request.status === 401 || request.status === 403) tags.push("authorization-boundary")
+      if (/^(post|put|patch|delete)$/i.test(request.method)) tags.push("business-logic")
+      if (/\/(?:users?|accounts?|orders?|invoices?|documents?|files?)\/[^/]+/i.test(requestPath)) tags.push("object-identifier")
+      return {
+        title: [request.method, request.normalizedPath, request.contentType, request.status ? "status " + request.status : ""].filter(Boolean).join(" "),
+        type: "captured_request",
+        tags,
+      }
+    })
+    const functionSignals = webFunctions.map((fn) => {
+      const objects = ((fn.objects as string[] | null) ?? []).slice(0, 6)
+      const tags = ["web-function", fn.actionType, ...objects]
+      if (/graphql|api/i.test([fn.name, ...objects].join(" "))) tags.push("api-endpoint")
+      if (/delete|update|create|transfer|checkout|submit|change/i.test([fn.name, fn.actionType].join(" "))) tags.push("business-logic")
+      return {
+        title: [fn.name, fn.actionType, ...objects].filter(Boolean).join(" "),
+        type: "web_function",
+        tags,
+      }
+    })
     const signalPool = [...entries, ...requestSignals, ...functionSignals]
 
     const baseline = [
