@@ -6,8 +6,8 @@ Generated from the Git trees of the two requested source repositories and the Cy
 
 - Claude-BugHunter source skills: 83.
 - recon-skills source skills: 146.
-- Current CyberStrike top-level curated skill directories on this branch: 51.
-- New/adapted skills in this PR are only a first batch; this inventory does not mean all upstream skills have been imported.
+- Current CyberStrike top-level curated skill directories on this branch: 63 (after the second adapted batch).
+- This is a staged migration inventory. The current branch includes an initial batch and a second batch of 12 adapted skills; it does not mean all upstream skills have been imported.
 
 ## Mapping rules
 
@@ -247,3 +247,25 @@ Generated from the Git trees of the two requested source repositories and the Cy
 | recon-skills | `redteam/wp-plugin-automation/SKILL.md` | `attack-wp-plugin-automation` | not mapped — review for new skill or merge |
 | recon-skills | `redteam/wp-plugin-cve-hunt/SKILL.md` | `attack-wp-plugin-cve-hunt` | not mapped — review for new skill or merge |
 | recon-skills | `redteam/wstg-web-pentest/SKILL.md` | `attack-wstg-web-pentest` | not mapped — review for new skill or merge |
+
+
+## Second adapted batch (2026-10-11)
+
+The following additional source areas have CyberStrike-native drafts on this branch. These are adapted playbooks with source attribution, not verbatim mirrors:
+
+| CyberStrike skill | Source area | Review status |
+|---|---|---|
+| `attack-api-misconfig` | Claude-BugHunter `hunt-api-misconfig` | Draft added; runtime support unverified |
+| `attack-ato` | Claude-BugHunter `hunt-ato` | Draft added; runtime support unverified |
+| `attack-business-logic` | Claude-BugHunter `hunt-business-logic` | Draft added; runtime support unverified |
+| `attack-clickjacking` | Claude-BugHunter `hunt-clickjacking` | Draft added; runtime support unverified |
+| `attack-grpc` | Claude-BugHunter gRPC testing | Draft added; runtime support unverified |
+| `attack-cloud-iam` | Claude-BugHunter `cloud-iam-deep` | Draft added; runtime support unverified |
+| `attack-deserialization` | Claude-BugHunter `hunt-deserialization` | Draft added; runtime support unverified |
+| `attack-api-noauth` | recon-skills API no-auth assessment area | Draft added; runtime support unverified |
+| `attack-wordpress` | Claude-BugHunter WordPress assessment | Draft added; runtime support unverified |
+| `attack-apk-redteam-pipeline` | Claude-BugHunter Android APK pipeline | Draft added; runtime support unverified |
+| `attack-bugcrowd-reporting` | Claude-BugHunter Bugcrowd reporting | Draft added; runtime support unverified |
+| `attack-cicd-security` | Claude-BugHunter CI/CD security | Draft added; runtime support unverified |
+
+These rows describe work added in the feature branch. They are not claims that the matching upstream skill has been fully reconciled or that every procedure has been independently validated.
