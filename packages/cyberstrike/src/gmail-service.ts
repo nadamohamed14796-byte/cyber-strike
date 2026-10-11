@@ -6,6 +6,7 @@
  * as instructions. This module intentionally has no send/delete/modify methods.
  */
 import { extractOtpCode } from "./gmail-otp"
+import { normalizeAuthOrigin } from "./auth-vault"
 
 const SCOPES_DOC = "https://www.googleapis.com/auth/gmail.readonly"
 const MAX_SEARCH_RESULTS = 10
@@ -56,6 +57,13 @@ function bodyText(part?: Part): string {
     : ""
   return [own, ...(part.parts ?? []).map(bodyText)].filter(Boolean).join("\n")
 }
+export function isAllowedSiteSender(from: string, siteUrl: string): boolean {
+  const origin = normalizeAuthOrigin(siteUrl)
+  const siteHost = new URL(origin).hostname.toLowerCase().replace(/^www\\./, "")
+  const senderHost = /@([^\\s>]+)/.exec(from)?.[1]?.replace(/[>),;]+$/, "").toLowerCase()
+  return !!senderHost && (senderHost === siteHost || senderHost.endsWith(`.${siteHost}`))
+}
+
 function summary(message: Message): GmailMessageSummary {
   const receivedAt = Number(message.internalDate ?? 0)
   return {
