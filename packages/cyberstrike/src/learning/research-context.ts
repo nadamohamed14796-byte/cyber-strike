@@ -70,7 +70,7 @@ export namespace ResearchContext {
         .filter(Boolean)
       const classTag = tags
         .map((tag) => tag.replace(/^target:/i, "").toLowerCase())
-        .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection)$/.test(tag))
+        .find((tag) => /^(idor|bola|ssrf|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization)$/.test(tag))
       const classAliases: Record<string, string> = {
         bola: "idor",
         authz: "access-control",

@@ -340,6 +340,17 @@ export namespace ReportKnowledge {
     ["server-side-request", /\bssrf\b|server[- ]side request forgery|url fetch/i],
     ["injection-sink", /sql injection|command injection|template injection|deserialization/i],
     ["business-logic", /business logic|workflow|coupon|payment|quantity|state transition/i],
+    ["graphql", /\bgraphql\b|graphql endpoint|graphql mutation/i],
+    ["jwt", /\bjwt\b|json web token/i],
+    ["oauth", /\boauth\b|open authorization/i],
+    ["open-redirect", /open redirect|unvalidated redirect/i],
+    ["path-traversal", /path traversal|directory traversal|parent directory/i],
+    ["prototype-pollution", /prototype pollution|prototype chain pollution/i],
+    ["deserialization", /insecure deserialization|unsafe deserialization|deserialize untrusted/i],
+    ["request-smuggling", /request smuggling|http desynchronization|cl\.te|te\.cl/i],
+    ["subdomain-takeover", /subdomain takeover|dangling cname/i],
+    ["command-injection", /command injection|os command injection/i],
+    ["web-cache", /web cache|cache deception/i],
   ]
 
   function canonicalSignals(query?: string) {
@@ -359,7 +370,7 @@ export namespace ReportKnowledge {
   }
 
   function relevanceScore(row: typeof ReportKnowledgeTable.$inferSelect, tokens: string[], signals: string[] = []) {
-    if (!tokens.length) return 0
+    if (!tokens.length && !signals.length) return 0
     const title = normalize(row.title)
     const lesson = normalize(row.lesson)
     const attackVector = normalize(row.attack_vector)

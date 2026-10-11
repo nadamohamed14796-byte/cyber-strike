@@ -283,6 +283,17 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
     ["server-side-request", /\bssrf\b|server-side request forgery|url fetch/],
     ["injection-sink", /sql injection|command injection|template injection|deserialization/],
     ["business-logic", /business logic|workflow|coupon|payment|quantity|state transition/],
+    ["graphql", /\bgraphql\b|graphql endpoint|graphql mutation/],
+    ["jwt", /\bjwt\b|json web token/],
+    ["oauth", /\boauth\b|open authorization/],
+    ["open-redirect", /open redirect|unvalidated redirect/],
+    ["path-traversal", /path traversal|directory traversal|parent directory/],
+    ["prototype-pollution", /prototype pollution|prototype chain pollution/],
+    ["deserialization", /insecure deserialization|unsafe deserialization|deserialize untrusted/],
+    ["request-smuggling", /request smuggling|http desynchronization|cl\.te|te\.cl/],
+    ["subdomain-takeover", /subdomain takeover|dangling cname/],
+    ["command-injection", /command injection|os command injection/],
+    ["web-cache", /web cache|cache deception/],
   ]
   for (const [signal, pattern] of patterns) if (pattern.test(lower)) signals.add(signal)
   return [...signals].slice(0, 20)
