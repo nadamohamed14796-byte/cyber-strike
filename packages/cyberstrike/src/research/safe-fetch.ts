@@ -9,7 +9,10 @@ class NonRetryableResearchError extends Error {}
 
 function hostAllowed(url: URL, source: ResearchSource) {
   return (
-    url.protocol === "https:" && source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
+    url.protocol === "https:" &&
+    !url.username &&
+    !url.password &&
+    source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
   )
 }
 
