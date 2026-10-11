@@ -143,6 +143,76 @@ export interface JavaScriptSourceFile {
   endpointLiterals: string[]
 }
 
+export interface JavaScriptEndpointCandidate {
+  id: string
+  literal: string
+  host: string | null
+  path: string
+  sourceFiles: string[]
+  observedRequestIDs: string[]
+  observedInTraffic: boolean
+  confidence: "candidate" | "observed"
+}
+
+/**
+ * Correlates statically extracted route literals with captured traffic.
+ * A matching path is evidence the route was observed, not proof that this
+ * particular JavaScript file executed the request.
+ */
+export function correlateStaticJavaScriptEndpoints(
+  sourceFiles: JavaScriptSourceFile[],
+  requests: Array<{ id: string; method: string; host: string | null; url: string | null; normalizedPath: string; responseStatus: number | null }>,
+): JavaScriptEndpointCandidate[] {
+  const candidates = new Map<string, JavaScriptEndpointCandidate>()
+  for (const file of sourceFiles) {
+    for (const literal of file.endpointLiterals) {
+      const endpointURL = safeURL(literal)
+      const endpointPath = (endpointURL?.pathname ?? literal.split(/[?#]/, 1)[0]).replace(/\/{2,}/g, "/")
+      if (!endpointPath.startsWith("/")) continue
+      const host = endpointURL?.hostname.toLowerCase() ?? null
+      const key = (host ?? "*") + endpointPath
+      let candidate = candidates.get(key)
+      if (!candidate) {
+        candidate = {
+          id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+          literal,
+          host,
+          path: endpointPath,
+          sourceFiles: [],
+          observedRequestIDs: [],
+          observedInTraffic: false,
+          confidence: "candidate",
+        }
+        candidates.set(key, candidate)
+      }
+      if (!candidate.sourceFiles.includes(file.relativePath)) candidate.sourceFiles.push(file.relativePath)
+
+      for (const request of requests) {
+        const requestURL = safeURL(request.url) ?? safeURL(request.host)
+        const requestHost = requestURL?.hostname.toLowerCase()
+        if (host && requestHost !== host) continue
+        const observedPath = request.normalizedPath.split(/[?#]/, 1)[0]
+        const base = endpointPath.replace(/\{[^}]+\}/g, "").replace(/\/$/, "")
+        const staticPrefix = endpointPath.replace(/\{[^}]+\}/g, "")
+        const matches =
+          base.length > 4 &&
+          (observedPath === endpointPath ||
+            observedPath === base ||
+            observedPath.startsWith(base + "/") ||
+            (staticPrefix.length > 4 && staticPrefix.startsWith(observedPath.replace(/\{[^}]+\}/g, ""))))
+        if (matches && !candidate.observedRequestIDs.includes(request.id)) {
+          candidate.observedRequestIDs.push(request.id)
+        }
+      }
+      if (candidate.observedRequestIDs.length) {
+        candidate.observedInTraffic = true
+        candidate.confidence = "observed"
+      }
+    }
+  }
+  return [...candidates.values()].slice(0, 1000)
+}
+
 /** Inventory only local JS source files; never follow symlinks or execute their contents. */
 async function inventoryJavaScriptFiles(root: string): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
@@ -195,6 +265,7 @@ export interface JavaScriptCorrelationGraph {
     tags: string[]
   }>
   sourceFiles: JavaScriptSourceFile[]
+  endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
     id: string
     requestID: string
@@ -252,7 +323,7 @@ export namespace JavaScriptCorrelation {
     sessionID: string
     targetURL: string
     javascriptURL?: string
-  }): Promise<{ graph: JavaScriptCorrelationGraph; workspacePath: string; graphPath: string; noteID: string }> {
+  }): Promise<{ graph: JavaScriptCorrelationGraph; workspacePath: string; graphPath: string; endpointPath: string; noteID: string }> {
     const rootSessionID = Session.root(input.sessionID)
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
@@ -433,6 +504,7 @@ export namespace JavaScriptCorrelation {
         tags: (item.row.tags as string[] | null) ?? [],
       })),
       sourceFiles,
+      endpointCandidates: [],
       evidence: relevantRequests
         .filter((request) => request.response_status !== null || Boolean(request.processed_response))
         .map((request) => ({
@@ -511,24 +583,26 @@ export namespace JavaScriptCorrelation {
           evidence: "Local file and observed asset share a basename; verify the content/hash before treating them as identical.",
         })
       }
-      for (const endpoint of file.endpointLiterals) {
-        const endpointURL = safeURL(endpoint)
-        const endpointPath = endpointURL?.pathname ?? endpoint.split(/[?#]/, 1)[0]
-        for (const request of graph.requests) {
-          const observedPath = request.normalizedPath
-          const requestHost = safeURL(request.url)?.hostname ?? safeURL(request.host)?.hostname
-          if (endpointURL && requestHost !== endpointURL.hostname) continue
-          const base = endpointPath.replace(/\{param\}/g, "").replace(/\/$/, "")
-          if (base.length > 4 && (observedPath === endpointPath || observedPath.startsWith(base + "/") || endpointPath.startsWith(observedPath.replace(/\{[^}]+\}/g, "")))) {
-            graph.edges.push({
-              from: "javascript-file:" + file.relativePath,
-              to: "request:" + request.id,
-              relation: "static-endpoint-literal-match",
-              confidence: "candidate",
-              evidence: "Static endpoint literal was found in the JavaScript source and overlaps the captured normalized path; execution is not proven.",
-            })
-          }
-        }
+    }
+    graph.endpointCandidates = correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests)
+    for (const endpoint of graph.endpointCandidates) {
+      for (const sourceFile of endpoint.sourceFiles) {
+        graph.edges.push({
+          from: "javascript-file:" + sourceFile,
+          to: endpoint.id,
+          relation: "contains-static-endpoint",
+          confidence: "candidate",
+          evidence: "Static route literal was extracted from this local JavaScript file; runtime execution is not proven.",
+        })
+      }
+      for (const requestID of endpoint.observedRequestIDs) {
+        graph.edges.push({
+          from: endpoint.id,
+          to: "request:" + requestID,
+          relation: "static-endpoint-path-overlap",
+          confidence: "candidate",
+          evidence: "The route pattern overlaps a captured request path. This confirms traffic observation only, not that this source file issued the request.",
+        })
       }
     }
     for (const response of graph.evidence) {
@@ -597,6 +671,7 @@ export namespace JavaScriptCorrelation {
       }
     }
     graph.notes.push("Local JavaScript files are hashed and scanned only for static URL/path literals; source code is never copied into the graph.")
+    graph.notes.push("Static endpoint candidates are saved separately under endpoints/; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
     graph.notes.push("Response previews are length-limited and redacted heuristically; the original captured request/response remains the source of evidence in the session database.")
@@ -611,6 +686,8 @@ export namespace JavaScriptCorrelation {
       "- JavaScript asset URLs: " + graph.javascriptAssets.length,
       "- Local JavaScript source files indexed: " + graph.sourceFiles.length,
       "- Static endpoint literals extracted: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
+      "- Unique endpoint candidates: " + graph.endpointCandidates.length,
+      "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
       "- Captured response evidence nodes: " + graph.evidence.length,
       "- Related captured requests: " + graph.requests.length,
       "- Web functions: " + graph.webFunctions.length,
@@ -623,6 +700,9 @@ export namespace JavaScriptCorrelation {
       "",
       "## JavaScript assets",
       ...(urlList ? [urlList] : ["No JavaScript asset matched the current stored Intel. Provide --javascript-url or record an asset with add_intel first."]),
+      "",
+      "## Static endpoint candidates",
+      ...(graph.endpointCandidates.length ? graph.endpointCandidates.map((endpoint) => "- " + (endpoint.host ? endpoint.host : "(relative)") + endpoint.path + " — " + (endpoint.observedInTraffic ? "path overlap observed" : "not yet observed in captured traffic") + " — source: " + endpoint.sourceFiles.join(", ") + (endpoint.observedRequestIDs.length ? " — requests: " + endpoint.observedRequestIDs.join(", ") : "")) : ["No static endpoint literals extracted."]),
       "",
       "## Notes about relationship confidence",
       ...graph.notes.map((note) => "- " + note),
@@ -644,10 +724,20 @@ export namespace JavaScriptCorrelation {
     const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
     const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, snapshotSelector])).digest("hex").slice(0, 12)
     const graphPath = path.join(workspace.workspacePath, "javascript", filenameHost + "-" + digest + ".json")
+    const endpointPath = path.join(workspace.workspacePath, "endpoints", filenameHost + "-" + digest + ".json")
     await fs.mkdir(path.dirname(graphPath), { recursive: true })
-    // Generated graph path is stable per target/session/selector; refresh it instead
-    // of growing an unbounded collection of identical timestamped snapshots.
+    await fs.mkdir(path.dirname(endpointPath), { recursive: true })
+    // Generated snapshots are stable per target/session/selector; refresh them instead
+    // of growing an unbounded collection of duplicate files.
     await fs.writeFile(graphPath, JSON.stringify(graph, null, 2) + "\n", "utf-8")
-    return { graph, workspacePath: workspace.workspacePath, graphPath, noteID: note.note.id }
+    await fs.writeFile(endpointPath, JSON.stringify({
+      schemaVersion: 1,
+      generatedAt: graph.createdAt,
+      targetURL: graph.targetURL,
+      sessionID: graph.sessionID,
+      note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
+      endpoints: graph.endpointCandidates,
+    }, null, 2) + "\n", "utf-8")
+    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, noteID: note.note.id }
   }
 }

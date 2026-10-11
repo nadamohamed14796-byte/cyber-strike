@@ -28,10 +28,13 @@ export const CorrelateJavaScriptTool = Tool.define("correlate_javascript", {
         output: [
           "Target workspace: " + result.workspacePath,
           "Graph JSON: " + result.graphPath,
+          "Endpoint candidates JSON: " + result.endpointPath,
           "Saved note ID: " + result.noteID,
           "JavaScript asset URLs: " + graph.javascriptAssets.length,
           "Local JavaScript files: " + graph.sourceFiles.length,
           "Static endpoint literals: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
+          "Unique endpoint candidates: " + graph.endpointCandidates.length,
+          "Candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
           "Captured response evidence nodes: " + graph.evidence.length,
           "Related requests/responses: " + graph.requests.length,
           "Web functions: " + graph.webFunctions.length,
@@ -42,6 +45,9 @@ export const CorrelateJavaScriptTool = Tool.define("correlate_javascript", {
         ].join("\n"),
         metadata: {
           graph_path: result.graphPath,
+          endpoint_path: result.endpointPath,
+          endpoint_candidates: graph.endpointCandidates.length,
+          observed_endpoint_candidates: graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
           target_workspace: result.workspacePath,
           javascript_assets: graph.javascriptAssets.length,
           requests: graph.requests.length,
