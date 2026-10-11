@@ -67,6 +67,8 @@ test("proxy vulnerability agents can retrieve shared global research", async () 
       expect(evalPerm(await Agent.get("internal-network"), "research_knowledge")).toBe("allow")
       expect(evalPerm(await Agent.get("general"), "research_knowledge")).toBe("allow")
       expect(idor?.prompt).toContain("Global Research")
+      expect(idor?.prompt).toContain("correlate_javascript")
+      expect(idor?.prompt).toContain("validate_finding")
       expect(analyzer?.prompt).toContain("research_knowledge")
     },
   })
