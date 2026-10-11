@@ -121,6 +121,21 @@ Confirms current identity has no write/modify/delete permissions via kubectl aut
 - Use designated test namespaces and synthetic objects for any explicitly authorized active validation. Stop if workload health degrades or the test crosses the agreed namespace boundary.
 - Record sanitized manifests, relevant RBAC output, context/namespace, timestamps, and the minimal evidence supporting impact. Redact tokens, secret values, and tenant data.
 
+## Kubernetes Coverage and Evidence Matrix
+
+Record the active context, cluster, namespace, identity, and authorization boundary before each test. Prefer read-only discovery and verify permissions with built-in authorization checks.
+
+| Area | Review | Validation |
+|---|---|---|
+| RBAC | Role/ClusterRole bindings and subject scope | least-privileged test identity and effective can-i checks |
+| Workloads | securityContext, capabilities, host mounts, service accounts | manifest review or test namespace |
+| Secrets | mounts, env injection, API access | synthetic secret only |
+| Network | NetworkPolicy and service exposure | bounded connectivity test between test pods |
+| Admission | policy enforcement and exemptions | dry-run or designated test object |
+| Tenant boundary | namespace/service-account separation | controlled test namespaces and synthetic resources |
+
+Do not create privileged pods, mount host filesystems, read unrelated secrets, or change cluster-wide RBAC on production. A risky manifest alone is not proof; document the effective permission or reachable boundary, sanitized YAML, namespace/context, and safe remediation.
+
 ## Program Reference
 
 | Program | Checks | CIS Section |
