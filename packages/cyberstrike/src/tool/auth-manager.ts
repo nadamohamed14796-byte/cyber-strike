@@ -80,12 +80,6 @@ export const AuthManagerTool = Tool.define("auth_manager", {
           return { title: "Target workspace mismatch", output: "site_url must share the exact origin with an existing target workspace, and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
         }
       }
-      if (params.purpose === "target") {
-        const workspace = await TargetMemory.get(params.site_url)
-        if (!workspace || workspace.id !== params.target_id) {
-          return { title: "Target workspace mismatch", output: "For target-purpose credentials, site_url must match an existing target workspace and target_id must equal that workspace's stable ID. No password was read or saved.", metadata: { ok: false, reason: "target_workspace_mismatch" } }
-        }
-      }
       const password = process.env.CYBERSTRIKE_AUTH_PASSWORD
       if (!password) {
         return { title: "Password not provided securely", output: "Set CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment, then retry. The password is intentionally not accepted as a tool argument because tool arguments may be stored in conversation history.", metadata: { ok: false, reason: "secure_password_missing" } }
