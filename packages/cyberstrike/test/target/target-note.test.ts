@@ -20,6 +20,6 @@ test("redacts common secrets before target notes are persisted", () => {
 
 
 test("sanitizes target metadata into a single Markdown-safe line", () => {
-  expect(redactTargetNoteLine("login\\n### forged heading\\r\\n- Source: injected", 180)).toBe("login ### forged heading - Source: injected")
-  expect(redactTargetNoteLine("account\\t  label", 30)).toBe("account label")
+  expect(redactTargetNoteLine("login\n### forged heading\r\n- Source: injected", 180)).toBe("login ### forged heading - Source: injected")
+  expect(redactTargetNoteLine("account\t  label", 30)).toBe("account label")
 })
