@@ -16,6 +16,8 @@ import { ServeCommand } from "./cli/cmd/serve"
 import { DebugCommand } from "./cli/cmd/debug"
 import { StatsCommand } from "./cli/cmd/stats"
 import { TargetCommand } from "./cli/cmd/target"
+import { ResearchCommand } from "./cli/cmd/research"
+import { UpdateCommand } from "./cli/cmd/update"
 import { McpCommand } from "./cli/cmd/mcp"
 import { GithubCommand } from "./cli/cmd/github"
 import { ExportCommand } from "./cli/cmd/export"
@@ -139,6 +141,8 @@ const cli = yargs(hideBin(process.argv))
   .command(ModelsCommand)
   .command(StatsCommand)
   .command(TargetCommand)
+  .command(ResearchCommand)
+  .command(UpdateCommand)
   .command(ExportCommand)
   .command(ImportCommand)
   .command(GithubCommand)
