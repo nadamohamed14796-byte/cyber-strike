@@ -3744,6 +3744,171 @@
       "files": [
         "SKILL.md"
       ]
+    },
+    {
+      "name": "attack-aspnet",
+      "description": "Assess ASP.NET apps for configuration and authorization weaknesses",
+      "verified": "unverified",
+      "tags": [
+        "aspnet",
+        "dotnet",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-laravel",
+      "description": "Review Laravel routes, middleware, configuration, and authorization",
+      "verified": "unverified",
+      "tags": [
+        "laravel",
+        "php",
+        "web"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-nodejs",
+      "description": "Assess Node.js apps for unsafe input handling and security configuration",
+      "verified": "unverified",
+      "tags": [
+        "nodejs",
+        "javascript",
+        "api"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-nextjs",
+      "description": "Assess Next.js routing, server/client boundaries, and cache isolation",
+      "verified": "unverified",
+      "tags": [
+        "nextjs",
+        "ssr",
+        "cache"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-springboot",
+      "description": "Review Spring Boot management endpoints and security boundaries",
+      "verified": "unverified",
+      "tags": [
+        "spring-boot",
+        "java",
+        "actuator"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-ios-redteam-pipeline",
+      "description": "Assess authorized iOS apps through static review and controlled runtime testing",
+      "verified": "unverified",
+      "tags": [
+        "ios",
+        "mobile",
+        "ipa"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-sharepoint",
+      "description": "Review SharePoint exposure, sharing links, and identity boundaries",
+      "verified": "unverified",
+      "tags": [
+        "sharepoint",
+        "m365",
+        "permissions"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-enterprise-vpn",
+      "description": "Assess enterprise VPN exposure, authentication, and configuration boundaries",
+      "verified": "unverified",
+      "tags": [
+        "vpn",
+        "enterprise",
+        "mfa"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-web3-audit",
+      "description": "Review Web3 apps for contract trust, wallet flows, and integration risks",
+      "verified": "unverified",
+      "tags": [
+        "web3",
+        "blockchain",
+        "wallet"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-html-injection",
+      "description": "Assess HTML injection separately from script execution and XSS",
+      "verified": "unverified",
+      "tags": [
+        "html-injection",
+        "output-encoding",
+        "xss"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
+    },
+    {
+      "name": "attack-shadow-api",
+      "description": "Discover and validate undocumented API surfaces within authorized scope",
+      "verified": "unverified",
+      "tags": [
+        "shadow-api",
+        "api-inventory",
+        "endpoints"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ]
     }
   ]
 }
