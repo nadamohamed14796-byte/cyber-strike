@@ -12,7 +12,12 @@ import { TargetMemory } from "./index"
 function safeURL(input?: string | null): URL | undefined {
   if (!input?.trim()) return undefined
   try {
-    const url = new URL(input.trim())
+    const value = input.trim()
+    // Request.host is stored as a bare hostname in legacy captures; normalize that
+    // form here without treating relative paths as URLs.
+    const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : value.includes("/") || value.includes("?") || value.includes("#") ? "" : "https://" + value
+    if (!candidate) return undefined
+    const url = new URL(candidate)
     if (url.protocol !== "http:" && url.protocol !== "https:") return undefined
     if (url.username || url.password) return undefined
     return url
@@ -44,11 +49,6 @@ function sameHost(left: string | null | undefined, right: string | null | undefi
   const a = safeURL(left)
   const b = safeURL(right)
   return Boolean(a && b && a.hostname.toLowerCase() === b.hostname.toLowerCase())
-}
-
-function urlPath(value?: string | null): string | undefined {
-  const url = safeURL(value)
-  return url?.pathname
 }
 
 export interface JavaScriptCorrelationGraph {
