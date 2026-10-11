@@ -34,14 +34,58 @@ jobs:
       - name: Run unit tests
         run: bun turbo test
 
+  typecheck:
+    name: typecheck (linux)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Run monorepo typecheck
+        run: bun turbo typecheck
+
+  build:
+    name: build (linux)
+    runs-on: ubuntu-24.04
+    needs:
+      - typecheck
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Build monorepo
+        run: bun turbo build
+
   required:
     name: test (linux)
     runs-on: ubuntu-24.04
     needs:
       - unit
+      - typecheck
+      - build
     if: always()
     steps:
-      - name: Verify upstream test jobs passed
+      - name: Verify all required validation jobs passed
         run: |
           echo "unit=${{ needs.unit.result }}"
+          echo "typecheck=${{ needs.typecheck.result }}"
+          echo "build=${{ needs.build.result }}"
           test "${{ needs.unit.result }}" = "success"
+          test "${{ needs.typecheck.result }}" = "success"
+          test "${{ needs.build.result }}" = "success"
