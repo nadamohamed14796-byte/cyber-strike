@@ -5,6 +5,7 @@ import path from "node:path"
 import { AuthVault, normalizeAuthOrigin } from "../auth-vault"
 import { GmailService } from "../gmail-service"
 import { TargetMemory } from "../target"
+import { redactTargetNoteLine } from "../target/redact"
 import { Tool } from "./tool"
 
 /**
@@ -32,7 +33,7 @@ async function syncTargetProfileIndex(siteURL: string, targetID: string): Promis
     "> This file contains references only. Passwords are stored encrypted in CyberStrike's local auth vault and must never be copied here.",
     "",
     ...profiles.flatMap((profile) => [
-      `## ${profile.account.replace(/[\r\n#]/g, " ").slice(0, 120)}`,
+      `## ${redactTargetNoteLine(profile.account, 120).replace(/#/g, " ")}`,
       "",
       `- Profile ID: ${profile.id}`,
       `- Origin: ${profile.origin}`,
