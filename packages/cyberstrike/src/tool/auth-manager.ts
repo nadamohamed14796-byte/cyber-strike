@@ -26,7 +26,6 @@ async function syncTargetProfileIndex(siteURL: string, targetID: string): Promis
       "",
       `- Profile ID: ${profile.id}`,
       `- Origin: ${profile.origin}`,
-      `- Username/email: ${profile.username.replace(/[\r\n]/g, " ").slice(0, 200)}`,
       `- Updated: ${new Date(profile.updatedAt).toISOString()}`,
       "- Password: stored encrypted in the local AuthVault; not present in this file",
       "",
@@ -42,7 +41,7 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     "Manage locally saved website login profiles shared by CyberStrike agents. Use this when a site presents a login wall or an authenticated session expires.",
     "Profiles are matched by exact URL origin (scheme + hostname + port), never by substring. Research accounts are separate from target accounts; target accounts require the current explicit targetID.",
     "Passwords are encrypted at rest with AES-256-GCM. Set CYBERSTRIKE_CREDENTIALS_KEY to a private secret of at least 32 characters before using this tool. The key is not stored by CyberStrike.",
-    "Actions: save, list, or forget a website login profile, or request a site-specific OTP through the shared Gmail service. Passwords are never returned by this agent-facing tool. Browser login automation is not yet connected to the encrypted vault; CAPTCHA, MFA, and consent screens require the supported human flow.",
+    "Actions: save, list, or forget a website login profile, or request a site-specific OTP through the shared Gmail service. Passwords are never returned by this agent-facing tool. Hackbrowser can use a saved profile for visible, exact-origin login autofill; CAPTCHA, passkeys, MFA, and consent screens may still require human interaction.",
     "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here. Gmail access uses the shared read-only gmail service and a separate OAuth grant.",
   ].join("\n"),
   parameters: z.object({
