@@ -337,7 +337,11 @@ export namespace ReportKnowledge {
     const lesson = normalize(row.lesson)
     const attackVector = normalize(row.attack_vector)
     const impact = normalize(row.impact)
-    const haystack = [title, lesson, attackVector, impact].filter(Boolean).join(" ")
+    const reproduction = normalize(row.reproduction)
+    const poc = normalize(row.poc)
+    const tags = normalize((row.tags ?? []).join(" "))
+    const metadata = normalize(JSON.stringify(row.metadata ?? {}))
+    const haystack = [title, lesson, attackVector, impact, reproduction, poc, tags, metadata].filter(Boolean).join(" ")
     let score = 0
 
     for (const token of tokens) {
@@ -346,6 +350,8 @@ export namespace ReportKnowledge {
       if (exact.test(title)) score += 45
       else if (exact.test(lesson)) score += 25
       else if (exact.test(attackVector) || exact.test(impact)) score += 18
+      else if (exact.test(reproduction) || exact.test(poc)) score += 16
+      else if (exact.test(tags)) score += 14
       else if (haystack.includes(token)) score += 8
     }
 
@@ -391,6 +397,10 @@ export namespace ReportKnowledge {
                   like(ReportKnowledgeTable.lesson, q),
                   like(ReportKnowledgeTable.attack_vector, q),
                   like(ReportKnowledgeTable.impact, q),
+                  like(ReportKnowledgeTable.reproduction, q),
+                  like(ReportKnowledgeTable.poc, q),
+                  like(ReportKnowledgeTable.tags, q),
+                  like(ReportKnowledgeTable.metadata, q),
                   like(ReportKnowledgeTable.vulnerability_class, q),
                   like(ReportKnowledgeTable.cwe_id, q),
                 ]

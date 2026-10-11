@@ -251,6 +251,52 @@ function lessonOf(text: string, vulnerabilityClass?: string) {
     : undefined
 }
 
+function matchingSentences(text: string, pattern: RegExp, max = 8, maxLength = 2400) {
+  const seen = new Set<string>()
+  const selected: string[] = []
+  for (const raw of text.split(/(?<=[.!?])\s+|(?<=\n)/)) {
+    const sentence = raw.replace(/\s+/g, " ").trim()
+    const key = sentence.toLowerCase()
+    if (sentence.length < 30 || !pattern.test(sentence) || seen.has(key)) continue
+    seen.add(key)
+    selected.push(sentence.slice(0, 420))
+    if (selected.length >= max) break
+  }
+  return selected.join("\n").slice(0, maxLength) || undefined
+}
+
+function extractResearchSignals(text: string, vulnerabilityClass?: string) {
+  const lower = text.toLowerCase()
+  const signals = new Set<string>()
+  if (vulnerabilityClass) signals.add(vulnerabilityClass)
+  const patterns: Array<[string, RegExp]> = [
+    ["idor", /\bidor\b|insecure direct object|object-level authorization/],
+    ["authorization-boundary", /authorization|access control|privilege escalation|another user|other account/],
+    ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/],
+    ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/],
+    ["javascript-client", /\.m?js\b|javascript|source map|client-side|frontend/],
+    ["api-endpoint", /\bapi\b|endpoint|graphql|rest api/],
+    ["file-upload", /file upload|multipart|content-type|filename/],
+    ["cache-behavior", /cache-control|cache poisoning|cache deception|cdn/],
+    ["cors-policy", /\bcors\b|access-control-allow-origin/],
+    ["race-condition", /race condition|concurrent|time-of-check|toctou/],
+    ["server-side-request", /\bssrf\b|server-side request forgery|url fetch/],
+    ["injection-sink", /sql injection|command injection|template injection|deserialization/],
+    ["business-logic", /business logic|workflow|coupon|payment|quantity|state transition/],
+  ]
+  for (const [signal, pattern] of patterns) if (pattern.test(lower)) signals.add(signal)
+  return [...signals].slice(0, 20)
+}
+
+function pocSnippet(text: string) {
+  const lines = text.split(/\n|(?<=\.)\s+/).map((line) => line.trim())
+  const candidates = lines.filter((line) =>
+    /^(curl\s|fetch\s*\(|axios\.|GET\s+\/|POST\s+\/|PUT\s+\/|PATCH\s+\/|DELETE\s+\/|HTTP\/1\.[01]|Authorization:|Content-Type:|{"|<\?xml)/i.test(line),
+  )
+  return candidates.slice(0, 12).join("\n").slice(0, 1800) || undefined
+}
+
+
 export function candidateScore(url: string, source: ResearchSource) {
   const parsed = new URL(url)
   const path = parsed.pathname.toLowerCase()
@@ -574,6 +620,32 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
 
       const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
       const lesson = lessonOf(text, vulnerabilityClass)
+      const reproduction = matchingSentences(
+        text,
+        /reproduc|step\s+\d|first,|then,|send(?:ing)? (?:a |the )?request|modify the|change the|payload|parameter|proof[- ]of[- ]concept|\bpoc\b|exploit/i,
+        8,
+        2400,
+      )
+      const poc = pocSnippet(text)
+      const prerequisites = matchingSentences(
+        text,
+        /prerequisite|requires? (?:an? |the )?(?:account|role|permission|token|feature|condition)|must be (?:logged|authenticated|authorized)|only when|if (?:the|a|an) (?:user|account|role|request|parameter|feature)/i,
+        5,
+        1400,
+      )
+      const verification = matchingSentences(
+        text,
+        /verify|confirm|reproduc|expected response|response code|response body|compare (?:the )?(?:response|result)|evidence|impact was|demonstrat/i,
+        6,
+        1800,
+      )
+      const falsePositiveCautions = matchingSentences(
+        text,
+        /false positive|not exploitable|does not prove|not sufficient|expected behavior|by design|requires? (?:additional|manual) verification|out of scope|cannot reproduce|not reproducible/i,
+        5,
+        1400,
+      )
+      const technologySignals = extractResearchSignals(title + " " + text, vulnerabilityClass)
       const ingested = ReportKnowledge.ingestExternalDetailed({
         title,
         severity: severityOf(title + " " + text),
@@ -581,9 +653,11 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         sourceURL: item.source_url,
         attackVector: attackVectorOf(text),
         impact: impactOf(text),
+        reproduction,
+        poc,
         lesson,
         sourceTrust: source.trust,
-        tags: [source.id, source.kind].concat(vulnerabilityClass ? [vulnerabilityClass] : []),
+        tags: Array.from(new Set([source.id, source.kind, ...technologySignals])),
         metadata: {
           research_source: source.id,
           research_source_name: source.name,
@@ -591,14 +665,21 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           content_fingerprint: contentFingerprint,
           candidate_score: item.payload.candidate_score ?? 0,
           crawl_depth: item.payload.crawl_depth ?? 0,
-          excerpt: text.slice(0, 1600),
+          excerpt: text.slice(0, 4200),
           content_length: text.length,
           queue_id: item.public_id,
+          extraction_version: 2,
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
             severity: severityOf(title + " " + text),
             attack_vector: attackVectorOf(text) ?? null,
             impact: impactOf(text) ?? null,
+            reproduction_steps: reproduction ?? null,
+            poc_snippet: poc ?? null,
+            prerequisites: prerequisites ?? null,
+            verification_signals: verification ?? null,
+            false_positive_cautions: falsePositiveCautions ?? null,
+            retrieval_signals: technologySignals,
           },
         },
       })
