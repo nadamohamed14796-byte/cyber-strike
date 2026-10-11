@@ -17,6 +17,7 @@ export {
 } from "../session/session.sql"
 export { SessionShareTable } from "../share/share.sql"
 export { ProjectTable } from "../project/project.sql"
+export { TargetWorkspaceTable, TargetNoteTable } from "../target/target.sql"
 export {
   IntelEntryTable,
   VrtCheckTable,
