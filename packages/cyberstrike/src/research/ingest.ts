@@ -532,17 +532,21 @@ export async function syncResearchSource(
       }
 
       const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
-      const lesson = lessonOf(text, vulnerabilityClass)
+      // Keep one extraction contract for both direct sync and the durable queue worker.
+      // Otherwise the same report would be learned differently depending on the CLI path.
+      const extracted = extractResearchDetails(title, text, vulnerabilityClass)
       const ingested = ReportKnowledge.ingestExternalDetailed({
         title,
-        severity: severityOf(title + " " + text),
+        severity: extracted.severity,
         vulnerabilityClass,
         sourceURL: current.url,
-        attackVector: attackVectorOf(text),
-        impact: impactOf(text),
-        lesson,
+        attackVector: extracted.attackVector,
+        impact: extracted.impact,
+        reproduction: extracted.reproduction,
+        poc: extracted.poc,
+        lesson: extracted.lesson,
         sourceTrust: source.trust,
-        tags: [source.id, source.kind].concat(vulnerabilityClass ? [vulnerabilityClass] : []),
+        tags: Array.from(new Set([source.id, source.kind, ...extracted.retrievalSignals])),
         metadata: {
           research_source: source.id,
           research_source_name: source.name,
@@ -550,13 +554,24 @@ export async function syncResearchSource(
           content_fingerprint: contentFingerprint,
           candidate_score: current.score,
           crawl_depth: current.depth,
-          excerpt: text.slice(0, 1600),
+          excerpt: text.slice(0, 4200),
           content_length: text.length,
+          extraction_version: 2,
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
-            severity: severityOf(title + " " + text),
-            attack_vector: attackVectorOf(text) ?? null,
-            impact: impactOf(text) ?? null,
+            severity: extracted.severity,
+            attack_vector: extracted.attackVector ?? null,
+            impact: extracted.impact ?? null,
+            reproduction_steps: extracted.reproduction ?? null,
+            poc_snippet: extracted.poc ?? null,
+            prerequisites: extracted.prerequisites ?? null,
+            verification_signals: extracted.verificationSignals ?? null,
+            false_positive_cautions: extracted.falsePositiveCautions ?? null,
+            root_cause: extracted.rootCause ?? null,
+            request_response_evidence: extracted.requestResponseEvidence ?? null,
+            affected_components: extracted.affectedComponents ?? null,
+            limitations: extracted.limitations ?? null,
+            retrieval_signals: extracted.retrievalSignals,
           },
         },
       })
