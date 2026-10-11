@@ -164,10 +164,16 @@ export function extractCapturedJavaScriptSources(
   let totalBytes = 0
   for (const request of requests) {
     if (output.length >= 250 || totalBytes >= 5 * 1024 * 1024) break
-    const url = safeURL(request.url) ??
-      (request.origin && request.normalizedPath ? safeURL(new URL(request.normalizedPath, request.origin).href) : undefined) ??
-      safeURL(request.pageURL) ??
-      safeURL(request.host)
+    let url = safeURL(request.url)
+    const base = safeURL(request.origin) ?? safeURL(request.pageURL) ?? safeURL(request.host)
+    if (!url && base && request.normalizedPath) {
+      try {
+        url = new URL(request.normalizedPath, base)
+      } catch {
+        url = undefined
+      }
+    }
+    url ??= base
     const body = request.responseBody
     if (!url || !body) continue
     const isJavaScript =
@@ -577,7 +583,7 @@ export namespace JavaScriptCorrelation {
         confidence: item.row.confidence_level ?? null,
         tags: (item.row.tags as string[] | null) ?? [],
       })),
-      sourceFiles,
+      sourceFiles: mergedSourceFiles,
       endpointCandidates: [],
       evidence: relevantRequests
         .filter((request) => request.response_status !== null || Boolean(request.processed_response))
