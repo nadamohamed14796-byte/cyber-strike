@@ -110,6 +110,19 @@ curl --max-time 15 --connect-timeout 5 -s -D- "https://TARGET/?cb=UNIQUE_TEST_VA
 - For cache impact, use `attack-cache-poison` as the companion skill and prove that a clean request receives the altered response without the injected header.
 - Do not treat duplicate Host-header parsing differences as exploitable unless the proxy/origin behavior and impact are reproducible within the program's rules.
 
+## Host Trust-Boundary Matrix
+
+Compare the canonical Host value with forwarded-host and scheme headers while changing one header per request. Use a hostname you control and unique test URLs. Do not send password-reset links or authentication tokens to an external collector.
+
+| Sink | What to inspect | Proof threshold |
+|---|---|---|
+| Absolute URL generation | canonical links, reset emails, redirects | controlled hostname appears in output sent to your own test inbox |
+| Cache | cache key and response variation | clean request receives the harmless canary from shared cache |
+| Routing | virtual host/backend selection | request reaches an unintended in-scope virtual host with demonstrable impact |
+| Security policy | origin checks, password reset, OAuth callbacks | trust decision changes and permits an unauthorized action in a test account |
+
+A reflected Host value or unusual response is not sufficient. Preserve the raw sanitized request, generated URL/response, cache status if relevant, and exact trust boundary. Redact reset tokens and cookies, and never redeem another user's token.
+
 ## References
 
 - [PortSwigger: Host Header Attacks](https://portswigger.net/web-security/host-header)
