@@ -70,6 +70,8 @@ export interface WorkerOptions {
   cyberstrikeUrl: string
   model: ModelDescriptor
   credentialDispatch: CredentialDispatch
+  /** One exact-origin saved login profile; secret exists only in local IPC/process memory. Never log or persist it. */
+  savedLogin?: { username: string; password: string; origin: string }
   cdp?: string
 }
 
