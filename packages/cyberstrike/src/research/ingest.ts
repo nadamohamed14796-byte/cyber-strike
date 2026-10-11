@@ -589,9 +589,12 @@ export async function syncResearchSource(
           content_fingerprint: contentFingerprint,
           candidate_score: current.score,
           crawl_depth: current.depth,
-          excerpt: text.slice(0, 4200),
+          // Same bounded study depth as the durable queue worker.
+          excerpt: text.slice(0, 12000),
           content_length: text.length,
-          extraction_version: 2,
+          stored_excerpt_length: Math.min(text.length, 12000),
+          extraction_version: 3,
+          study_method: "bounded-heuristic-extraction",
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
             severity: extracted.severity,
