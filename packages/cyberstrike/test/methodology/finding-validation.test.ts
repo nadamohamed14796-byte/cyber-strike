@@ -54,3 +54,12 @@ test("one failed check alone does not automatically classify a false positive", 
   })
   expect(assessFindingChecks(checks).verdict).toBe("inconclusive")
 })
+
+test("a check cannot pass without evidence, and not-applicable needs a rationale", () => {
+  expect(() =>
+    assessFindingChecks(checklist({ reproducible: { status: "pass", evidence: "" } })),
+  ).toThrow("passed check needs concrete evidence")
+  expect(() =>
+    assessFindingChecks(checklist({ identity_context: { status: "not_applicable", reason: "" } })),
+  ).toThrow("not_applicable check needs a reason")
+})

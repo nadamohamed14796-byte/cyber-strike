@@ -64,6 +64,12 @@ export function assessFindingChecks(input: FindingValidationInputCheck[]): Findi
     if (check.status === "fail" && (!check.reason?.trim() || !check.evidence?.trim())) {
       throw new Error("A failed check needs a reason and concrete evidence. Use unknown when evidence is missing.")
     }
+    if (check.status === "pass" && !check.evidence?.trim()) {
+      throw new Error("A passed check needs concrete evidence from an observed test or artifact.")
+    }
+    if (check.status === "not_applicable" && !check.reason?.trim()) {
+      throw new Error("A not_applicable check needs a reason explaining why it does not apply.")
+    }
   }
   for (const definition of FINDING_VALIDATION_CHECKS) {
     if (!byID.has(definition.id)) throw new Error("Missing validation check: " + definition.id)
