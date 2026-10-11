@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 import path from "node:path"
 import fs from "node:fs/promises"
 import { and, asc, desc, eq, inArray } from "../storage/db"
@@ -491,6 +491,53 @@ export namespace TargetMemory {
     }
 
     return { workspace, note, created: saved.created, updated: saved.updated }
+  }
+
+  /**
+   * Atomically write a generated file beneath a target workspace. Re-validate
+   * every parent directory and refuse symlink/non-regular output files so a
+   * generated graph cannot overwrite files outside the workspace.
+   */
+  export async function writeWorkspaceFile(workspace: Workspace, relativeFilePath: string, content: string): Promise<string> {
+    const normalized = relativeFilePath.trim()
+    if (
+      !normalized ||
+      path.isAbsolute(normalized) ||
+      normalized.includes("\\") ||
+      normalized.split("/").some((part) => !part || part === "." || part === "..")
+    ) {
+      throw new Error("Workspace output path must be a clean relative path inside the target workspace.")
+    }
+
+    const verifiedWorkspacePath = await ensureSafeDirectoryPath(projectRoot(), workspace.relativePath)
+    const workspaceEscape = path.relative(verifiedWorkspacePath, path.resolve(verifiedWorkspacePath, normalized))
+    if (workspaceEscape === ".." || workspaceEscape.startsWith(".." + path.sep) || path.isAbsolute(workspaceEscape)) {
+      throw new Error("Workspace output path resolves outside the target workspace.")
+    }
+
+    const relativeParent = path.dirname(normalized)
+    const parentPath = relativeParent === "."
+      ? verifiedWorkspacePath
+      : await ensureSafeDirectoryPath(projectRoot(), path.join(workspace.relativePath, relativeParent))
+    const filePath = path.join(parentPath, path.basename(normalized))
+    try {
+      const info = await fs.lstat(filePath)
+      if (info.isSymbolicLink() || !info.isFile()) {
+        throw new Error("Unsafe workspace output file: symbolic links and non-regular files are not allowed.")
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+
+    const temp = filePath + "." + process.pid + "." + randomBytes(6).toString("hex") + ".tmp"
+    try {
+      await fs.writeFile(temp, content, { encoding: "utf8", mode: 0o600, flag: "wx" })
+      await fs.rename(temp, filePath)
+      await fs.chmod(filePath, 0o600)
+    } finally {
+      await fs.rm(temp, { force: true }).catch(() => undefined)
+    }
+    return filePath
   }
 
   export function allNotes(targetID: string): TargetNote[] {
