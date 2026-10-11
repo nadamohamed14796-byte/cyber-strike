@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lt, or } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, lt, or } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
 
@@ -65,7 +65,7 @@ export namespace ResearchQueue {
         .where(
           or(
             inArray(ResearchQueueTable.status, ["queued", "retry"]),
-            and(eq(ResearchQueueTable.status, "studying"), lt(ResearchQueueTable.lease_until, now)),
+            and(eq(ResearchQueueTable.status, "studying"), or(isNull(ResearchQueueTable.lease_until), lt(ResearchQueueTable.lease_until, now))),
           ),
         )
         .orderBy(asc(ResearchQueueTable.sequence))
@@ -89,7 +89,7 @@ export namespace ResearchQueue {
             eq(ResearchQueueTable.sequence, row.sequence),
             or(
               inArray(ResearchQueueTable.status, ["queued", "retry"]),
-              and(eq(ResearchQueueTable.status, "studying"), lt(ResearchQueueTable.lease_until, now)),
+              and(eq(ResearchQueueTable.status, "studying"), or(isNull(ResearchQueueTable.lease_until), lt(ResearchQueueTable.lease_until, now))),
             ),
           ),
         )
