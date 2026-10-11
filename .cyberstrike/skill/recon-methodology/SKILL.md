@@ -279,6 +279,15 @@ Target Domain
 - Keep a list of tested hosts and endpoints to prevent duplicate scans. Stop or reduce rate when latency, errors, lockouts, or service instability increases.
 - Related skills use the exact existing names `attack-subdomain-takeover`, `attack-host-header`, and `attack-ssrf`; load them only when discovery provides a relevant signal.
 
+## Scope, Rate Limits, and Stop Conditions
+
+- Establish an explicit allowlist of domains, hosts, ports, and test windows before active probing. A discovered subdomain or linked third-party host is not automatically in scope.
+- Keep passive collection separate from active validation in notes and reports. Record source, timestamp, DNS/HTTP result, and the exact command so findings can be reproduced.
+- Use bounded concurrency and request timeouts. Start with low request rates, increase only when the program permits it, and stop on elevated error rates, rate-limit responses, service degradation, or an out-of-scope redirect.
+- Do not brute-force credentials, run destructive checks, or submit exploit payloads during reconnaissance. Move to a vulnerability-specific skill only after confirming the endpoint is in scope.
+- Deduplicate hosts by canonical hostname and resolved asset identity where appropriate; preserve meaningful virtual hosts, ports, and environment differences rather than silently merging them.
+- Treat third-party enrichment and scanner output as leads. Verify live reachability and ownership before reporting, and exclude secrets or personal data from saved output.
+
 ## Wordlists
 
 | Purpose     | Recommended Wordlist                                                         |
