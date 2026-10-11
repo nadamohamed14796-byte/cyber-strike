@@ -9,7 +9,7 @@ tech_stack: [http, browser, web, api]
 prerequisites:
   - "Authorized application and controlled test account"
   - "A reversible, low-impact state change approved for testing"
-chains_with: [attack-triage-validation, attack-evidence-hygiene, attack-report-writing, attack-session-management]
+chains_with: [attack-triage-validation, attack-evidence-hygiene, attack-report-writing]
 sources:
   - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-csrf/SKILL.md"
 ---
