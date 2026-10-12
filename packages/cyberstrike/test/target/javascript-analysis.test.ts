@@ -124,6 +124,15 @@ test("keeps concatenated query values out of the inferred path and defaults fetc
   expect(item?.pathParameters).toContain("id")
 })
 
+test("does not guess GET when fetch method is dynamic", () => {
+  const source = [
+    "const method = isWrite ? 'POST' : 'GET'",
+    'fetch("/api/items", { method })',
+  ].join("\n")
+  const request = analyzeJavaScriptSource(source).requests[0]
+  expect(request?.method).toBe(null)
+})
+
 test("normalizes static numeric and UUID path values to placeholders", () => {
   const source = [
     'fetch("/api/users/12345")',
