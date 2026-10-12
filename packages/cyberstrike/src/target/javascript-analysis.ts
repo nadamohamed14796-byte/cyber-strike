@@ -38,7 +38,15 @@ export interface JavaScriptSourceAnalysis {
 }
 
 const cleanUnique = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))]
-const lineNumber = (source: string, index: number) => source.slice(0, index).split("\n").length
+function lineNumber(lineStarts: number[], index: number): number {
+  let low = 0, high = lineStarts.length
+  while (low < high) {
+    const middle = (low + high) >>> 1
+    if (lineStarts[middle]! <= index) low = middle + 1
+    else high = middle
+  }
+  return low
+}
 const fieldNames = (value: string) => cleanUnique(
   Array.from(value.matchAll(/(?:^|[,{\n])\s*["']?([A-Za-z_$][\w$-]{0,99})["']?\s*:/g), (m) => m[1]!),
 ).slice(0, 100)
@@ -144,16 +152,33 @@ function splitTopLevelArguments(value: string): string[] {
  */
 export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis {
   const source = input.slice(0, 1_000_000)
+  const lineStarts = [0]
+  for (let i = 0; i < source.length; i++) if (source.charCodeAt(i) === 10) lineStarts.push(i + 1)
   const functions: JavaScriptFunctionCandidate[] = []
   const fnPatterns = [
     /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g,
     /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>/g,
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*=>/g,
     /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function\b\s*\(([^)]*)\)/g,
     /\b([A-Za-z_$][\w$]*)\s*:\s*(?:async\s+)?\(([^)]*)\)\s*=>/g,
   ]
   const fnSeen = new Set<string>()
   for (const pattern of fnPatterns) for (const match of source.matchAll(pattern)) {
-    const name = match[1]!, line = lineNumber(source, match.index ?? 0), key = line + ":" + name
+    const name = match[1]!, line = lineNumber(lineStarts, match.index ?? 0), key = line + ":" + name
+    if (fnSeen.has(key)) continue
+    fnSeen.add(key)
+    const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
+      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p))).slice(0, 40)
+    functions.push({ name, line, parameters })
+    if (functions.length >= 300) break
+  }
+  // Capture class/object shorthand methods and accessors as well as declarations and arrows.
+  const reservedMethodNames = new Set(["if", "for", "while", "switch", "catch", "with", "function", "return", "throw", "new", "else", "try", "do"])
+  const methodPattern = /(?:^|[;{}]\s*|\n\s*)(?:static\s+|async\s+|public\s+|private\s+|protected\s+|get\s+|set\s+)*([A-Za-z_$][\w$]*)\s*\(([^()]*)\)\s*\{/gm
+  for (const match of source.matchAll(methodPattern)) {
+    const name = match[1]!
+    if (reservedMethodNames.has(name)) continue
+    const line = lineNumber(lineStarts, match.index ?? 0), key = line + ":" + name
     if (fnSeen.has(key)) continue
     fnSeen.add(key)
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
@@ -219,7 +244,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (/\b(?:searchParams|URLSearchParams)\b/i.test(all)) {
       for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']{1,100})["']/gi)) endpoint.queryParameters.push(m[1]!)
     }
-    const line = lineNumber(source, index)
+    const line = lineNumber(lineStarts, index)
     const sourceFunction = [...functions].reverse().find((fn) => fn.line <= line)?.name ?? null
     const item: JavaScriptRequestCandidate = {
       id: "js-request:" + createHash("sha256").update(line + ":" + endpoint.urlTemplate + ":" + (method ?? "?")).digest("hex").slice(0, 16),
@@ -240,7 +265,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const rawValue = match[3] ?? ""
     if (!rawValue || /^(?:\$\{|\{\{|\$[A-Z_][A-Z0-9_]*|<[^>]+>)/i.test(rawValue.trim())) continue
     const item: JavaScriptSecretCandidate = {
-      kind: (match[1] ?? "secret").toLowerCase().replace(/[_-]+/g, "-"), line: lineNumber(source, match.index ?? 0),
+      kind: (match[1] ?? "secret").toLowerCase().replace(/[_-]+/g, "-"), line: lineNumber(lineStarts, match.index ?? 0),
       fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
     }
     secrets.set(item.kind + ":" + item.fingerprint, item)
@@ -254,7 +279,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const kind = /admin|superuser/.test(lower) ? "admin-role-hint" : /role|permission/.test(lower) ? "authorization-hint"
       : /feature.?flag/.test(lower) ? "feature-flag-hint" : /debug/.test(lower) ? "debug-path-hint"
       : /impersonat/.test(lower) ? "impersonation-hint" : "internal-feature-hint"
-    const item = { kind, value, line: lineNumber(source, match.index ?? 0) }
+    const item = { kind, value, line: lineNumber(lineStarts, match.index ?? 0) }
     roles.set(kind + ":" + value + ":" + item.line, item)
     if (roles.size >= 100) break
   }
