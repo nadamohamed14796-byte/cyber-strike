@@ -1,4 +1,7 @@
 import { expect, test } from "bun:test"
+import { eq } from "drizzle-orm"
+import { Database } from "../../src/storage/db"
+import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
@@ -200,6 +203,19 @@ test("authenticated research retry resumes report and index URLs only for the se
         ResearchQueue.blockAuthentication({ sourceID, sourceURL: reportURL, reason: "HTTP 401" })
         ResearchQueue.blockAuthentication({ sourceID: "portswigger", sourceURL: otherURL, reason: "HTTP 401" })
 
+        // Recent authentication failures must stay parked until the retry cooldown expires.
+        expect(await retryAuthenticatedResearch({ sourceID, limit: 10 })).toBe(0)
+
+        // Emulate entries whose operator has now configured credentials after the cooldown.
+        const retryAfter = Date.now() - 11 * 60_000
+        for (const url of [indexURL, reportURL]) {
+          const row = ResearchQueue.find(sourceID, url)
+          if (!row) throw new Error("expected auth-blocked research row to exist")
+          Database.use((db) =>
+            db.update(ResearchQueueTable).set({ updated_at: retryAfter })
+              .where(eq(ResearchQueueTable.sequence, row.sequence)).run(),
+          )
+        }
         expect(await retryAuthenticatedResearch({ sourceID, limit: 10 })).toBe(2)
         expect(ResearchQueue.find(sourceID, indexURL)?.status).toBe("discovered")
         expect(ResearchQueue.find(sourceID, indexURL)?.payload?.crawl_page).toBe(true)
