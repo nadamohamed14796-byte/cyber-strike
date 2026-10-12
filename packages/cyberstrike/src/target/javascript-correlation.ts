@@ -152,6 +152,14 @@ export interface JavaScriptSourceFile {
  * Extract route literals from already-captured JavaScript responses without
  * persisting or executing the response body. Bounds mirror local-file inventory.
  */
+function unwrapProcessedResponseBody(value: string): string {
+  const metadata = /^\[Status:\s*\d+,\s*Type:\s*[^,\]\r\n]+,\s*Size:\s*[^\]\r\n]+\]\r?\n/
+  if (!metadata.test(value)) return value
+  return value
+    .replace(metadata, "")
+    .replace(/\r?\n\[TRUNCATED - showing first 100KB of [^\]]+\]$/, "")
+}
+
 export function extractCapturedJavaScriptSources(
   requests: Array<{
     id: string
@@ -179,8 +187,11 @@ export function extractCapturedJavaScriptSources(
       }
     }
     url ??= base
-    const body = request.responseBody
-    if (!url || !body) continue
+    const storedBody = request.responseBody
+    if (!url || !storedBody) continue
+    // RequestTable stores the response-processor's metadata prefix and truncation marker;
+    // strip them so source line numbers and content hashes refer to the captured JS itself.
+    const body = unwrapProcessedResponseBody(storedBody)
     const isJavaScript =
       /(?:java|ecma)script|x-javascript/i.test(request.responseContentType ?? "") ||
       /\.m?js$/i.test(url.pathname) ||
