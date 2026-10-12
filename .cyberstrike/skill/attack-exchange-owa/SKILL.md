@@ -106,6 +106,8 @@ Confirm whether metadata is genuinely non-public and security-relevant. Stop at 
 
 ## References
 
+- [uphiago/recon-skills — Exchange OWA attack](https://github.com/uphiago/recon-skills/blob/main/recon/exchange-owa-attack/SKILL.md) — merged service-specific source.
+
 - [uphiago/recon-skills — exchange-owa-attack](https://github.com/uphiago/recon-skills/tree/main/recon/exchange-owa-attack)
 - [Microsoft Exchange Server documentation](https://learn.microsoft.com/en-us/exchange/)
 - [Microsoft Security Update Guide](https://msrc.microsoft.com/update-guide)
