@@ -7,7 +7,7 @@ import { Identifier } from "../id/id"
 import { createHash } from "crypto"
 import { processResponse, type ResponseInput } from "./response-processor"
 
-const Status = z.enum(["queued", "processing", "processed"])
+const Status = z.enum(["queued", "processing", "processed", "failed"])
 const Method = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
 const NormSource = z.enum(["tier1", "tier2", "tier3", "failed"])
 
