@@ -123,6 +123,8 @@ test("persists an explicit target scope with authorization provenance and exclus
       const saved = await TargetMemory.getScope("https://example.com")
       expect(saved?.scopeItems).toEqual(["*.example.com", "example.com"])
       expect(saved?.authorizationSource).toBe("Example disclosure program")
+      // An unrelated workspace on the same protocol/port must not make a wildcard target ambiguous.
+      await TargetMemory.ensure("https://unrelated.example.test")
       const allowed = await TargetMemory.checkURLScope("https://api.example.com/v1/users")
       expect(allowed.allowed).toBe(true)
       expect(allowed.workspace?.id).toBe(configured.workspace.id)
