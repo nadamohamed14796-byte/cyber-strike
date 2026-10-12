@@ -104,7 +104,7 @@ test("downloads and extracts archive bytes without UTF-8 corruption", async () =
   await using tmp = await tmpdir()
   const sourceFile = path.join(tmp.path, "SKILL.md")
   const archiveFile = path.join(tmp.path, "fixture.tar.gz")
-  await fs.writeFile(sourceFile, "# Binary archive fixture\\n\\narchive bytes must be preserved\\n")
+  await fs.writeFile(sourceFile, "# Binary archive fixture\n\narchive bytes must be preserved\n")
   await tar.c({ gzip: true, file: archiveFile, cwd: tmp.path }, ["SKILL.md"])
   const archiveBytes = await fs.readFile(archiveFile)
   const skillName = "archive-fixture-" + process.pid + "-" + Date.now()
@@ -116,7 +116,11 @@ test("downloads and extracts archive bytes without UTF-8 corruption", async () =
         skills: [{ name: skillName, description: "binary fixture", type: "archive", url: "fixture.tar.gz" }],
       }), { headers: { "content-type": "application/json" } })
     }
-    if (url.endsWith("/fixture.tar.gz")) return new Response(archiveBytes)
+    if (url.endsWith("/fixture.tar.gz")) {
+      const body = new ArrayBuffer(archiveBytes.byteLength)
+      new Uint8Array(body).set(archiveBytes)
+      return new Response(body)
+    }
     return new Response("not found", { status: 404 })
   }) as typeof fetch
 
