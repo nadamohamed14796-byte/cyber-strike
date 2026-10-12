@@ -22,9 +22,7 @@ This tool runs ASYNCHRONOUSLY: it returns immediately after starting the backgro
 
 Defaults to anonymous headless mode. To crawl as authenticated user(s), pass \`credentials\` — the browser opens visibly and the user must log in manually before the crawl begins. Each credential ID in the array triggers its own login + crawl cycle, so multiple IDs run a sequence (role-based access tests). A saved login profile may be supplied via auth_profile_id; CyberStrike decrypts it locally, checks the exact origin and target binding, and fills the login form in a visible browser. CAPTCHA, passkeys, MFA, and unusual login forms may still need human interaction. Never put passwords in tool arguments or target notes.`
 
-export const HackbrowserTool = Tool.define("hackbrowser", {
-  description: DESCRIPTION,
-  parameters: z.object({
+const HackBrowserParameters = z.object({
     target: z
       .string()
       .url()
@@ -63,7 +61,11 @@ export const HackbrowserTool = Tool.define("hackbrowser", {
       .describe(
         "Open the browser with a visible window when false. Defaults to true; saved profiles and manual credential IDs force a visible browser.",
       ),
-  }),
+  })
+
+export const HackbrowserTool = Tool.define<typeof HackBrowserParameters, Tool.Metadata>("hackbrowser", {
+  description: DESCRIPTION,
+  parameters: HackBrowserParameters,
   async execute(args, ctx) {
     if (args.use_gmail_otp && !args.auth_profile_id) {
       return { title: "Saved login profile required", output: "Gmail OTP assistance can only be enabled together with auth_profile_id.", metadata: { started: false, reason: "profile_required" } }
