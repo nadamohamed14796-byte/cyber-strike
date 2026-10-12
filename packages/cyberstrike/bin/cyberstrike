@@ -162,6 +162,23 @@ function findBinary(startDir) {
 
 const resolved = findBinary(scriptDir)
 if (!resolved) {
+  // A linked source checkout has no platform-specific binary package yet.
+  // Run the TypeScript entrypoint with Bun when this is a source installation.
+  const sourceEntrypoint = path.resolve(scriptDir, "../src/index.ts")
+  if (fs.existsSync(sourceEntrypoint)) {
+    const bun = process.env.BUN_INSTALL ? path.join(process.env.BUN_INSTALL, "bin", "bun") : "bun"
+    const result = childProcess.spawnSync(
+      bun,
+      ["run", "--conditions=browser", sourceEntrypoint, ...process.argv.slice(2)],
+      { stdio: "inherit" },
+    )
+    if (result.error) {
+      console.error("Could not launch CyberStrike source with Bun: " + result.error.message)
+      process.exit(1)
+    }
+    process.exit(typeof result.status === "number" ? result.status : 1)
+  }
+
   console.error(
     "It seems that your package manager failed to install the right version of the cyberstrike CLI for your platform. You can try manually installing " +
       names.map((n) => `\"${n}\"`).join(" or ") +
