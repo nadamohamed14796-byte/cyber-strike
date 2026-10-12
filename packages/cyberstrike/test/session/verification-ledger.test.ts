@@ -78,6 +78,13 @@ describe("VerificationLedger terminal outcomes", () => {
           eq(VerificationAttemptTable.hypothesis_key, common.hypothesisKey),
         )).run())
 
+        const duplicateRetry = VerificationLedger.record({
+          ...common,
+          attempt: attempt("legacy-single-check", "evidence://old-disproof"),
+        })
+        expect(duplicateRetry.attempt.outcome).toBe("inconclusive")
+        expect(duplicateRetry.decision.outcome).toBe("inconclusive")
+
         const resumed = VerificationLedger.record({
           ...common,
           attempt: attempt("new-valid-check"),
