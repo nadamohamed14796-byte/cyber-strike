@@ -95,7 +95,7 @@ export namespace ResearchQueue {
     })
   }
 
-  export function claimNext(workerID: string) {
+  export function claimNext(workerID: string, sourceID?: string) {
     const now = Date.now()
     // Lease identity must be unique per claim, not just per configured worker label.
     // Otherwise a stale process could complete work reclaimed by a second process
@@ -105,12 +105,18 @@ export namespace ResearchQueue {
       const row = db
         .select()
         .from(ResearchQueueTable)
-        .where(
-          or(
-            inArray(ResearchQueueTable.status, ["queued", "retry"]),
-            and(eq(ResearchQueueTable.status, "studying"), or(isNull(ResearchQueueTable.lease_until), lt(ResearchQueueTable.lease_until, now))),
-          ),
-        )
+        .where(sourceID
+          ? and(
+              eq(ResearchQueueTable.source_id, sourceID),
+              or(
+                inArray(ResearchQueueTable.status, ["queued", "retry"]),
+                and(eq(ResearchQueueTable.status, "studying"), or(isNull(ResearchQueueTable.lease_until), lt(ResearchQueueTable.lease_until, now))),
+              ),
+            )
+          : or(
+              inArray(ResearchQueueTable.status, ["queued", "retry"]),
+              and(eq(ResearchQueueTable.status, "studying"), or(isNull(ResearchQueueTable.lease_until), lt(ResearchQueueTable.lease_until, now))),
+            ))
         .orderBy(asc(ResearchQueueTable.sequence))
         .limit(1)
         .get()
@@ -130,6 +136,7 @@ export namespace ResearchQueue {
         .where(
           and(
             eq(ResearchQueueTable.sequence, row.sequence),
+            eq(ResearchQueueTable.source_id, row.source_id),
             or(
               inArray(ResearchQueueTable.status, ["queued", "retry"]),
               and(eq(ResearchQueueTable.status, "studying"), or(isNull(ResearchQueueTable.lease_until), lt(ResearchQueueTable.lease_until, now))),

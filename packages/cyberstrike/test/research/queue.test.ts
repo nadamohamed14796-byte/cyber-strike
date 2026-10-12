@@ -104,3 +104,22 @@ test("research queue records auth-blocked work and only retries it explicitly", 
     },
   })
 })
+
+
+test("source-filtered queue claims never consume another source's work", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const other = ResearchQueue.enqueue({ sourceID: "other-source", sourceURL: "https://other.example.test/report" })
+      const wanted = ResearchQueue.enqueue({ sourceID: "wanted-source", sourceURL: "https://wanted.example.test/report" })
+      const claim = ResearchQueue.claimNext("filtered-worker", "wanted-source")
+      expect(claim?.sequence).toBe(wanted.sequence)
+      expect(claim?.source_id).toBe("wanted-source")
+      expect(ResearchQueue.find("other-source", "https://other.example.test/report")?.status).toBe("queued")
+      expect(ResearchQueue.complete(wanted.sequence, claim!.lease_owner, "learned")?.status).toBe("learned")
+      expect(other.created).toBe(true)
+      await Instance.dispose()
+    },
+  })
+})

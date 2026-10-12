@@ -539,175 +539,28 @@ export async function syncResearchSource(
   const limit = boundedInteger(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
   const maxPages = boundedInteger(options.pages, DEFAULT_PAGES, 1, MAX_PAGES)
   const maxDepth = boundedInteger(options.depth, DEFAULT_DEPTH, 0, MAX_DEPTH)
-  const result: ResearchIngestResult = {
+
+  // Route every sync through the durable queue. This keeps direct API callers and
+  // the CLI on the same idempotent discovery/learning path instead of re-learning
+  // previously completed reports through an in-memory-only crawl.
+  const discovered = await discoverResearch({ sourceID: source.id, pages: maxPages, depth: maxDepth })
+  const discovery = discovered[0]
+  const learned = await learnResearchQueue({
+    limit: exhaustive ? MAX_LIMIT : limit,
+    sourceID: source.id,
+  })
+  return {
     source: source.id,
-    fetched: 0,
-    learned: 0,
-    skipped: 0,
-    failed: 0,
-    blocked_auth: 0,
-    pages_crawled: 0,
-    candidates_discovered: 0,
-    error_samples: [],
+    fetched: discovery?.pages ?? 0,
+    learned: learned.learned,
+    skipped: learned.skipped,
+    failed: learned.failed,
+    blocked_auth: (discovery?.blocked_auth ?? 0) + learned.blocked_auth,
+    pages_crawled: discovery?.pages ?? 0,
+    candidates_discovered: discovery?.candidates ?? 0,
+    error_samples: [...(discovery?.errors ?? []), ...learned.errors].slice(0, 5),
   }
-
-  const queue: Array<{ url: string; depth: number; score: number }> = []
-  const queued = new Set<string>()
-  const visited = new Set<string>()
-  const add = (url: string, depth: number) => {
-    // Seeds are depth 0. Do not enqueue links or sitemap entries beyond the
-    // caller's requested depth budget; without this guard the CLI depth option
-    // was calculated but had no effect on crawl expansion.
-    if (depth > maxDepth) return
-    const normalized = normalizeUrl(url)
-    if (!normalized || queued.has(normalized) || visited.has(normalized)) return
-    try {
-      const parsed = new URL(normalized)
-      if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) return
-      if (depth > 0 && !isResearchCandidate(normalized, source)) return
-    } catch {
-      return
-    }
-    queued.add(normalized)
-    queue.push({ url: normalized, depth, score: candidateScore(normalized, source) })
-  }
-
-  for (const seed of discoverySeeds(source, maxPages)) add(seed, 0)
-  for (const sitemapURL of await discoverSitemap(source)) add(sitemapURL, 1)
-
-  while (queue.length && result.pages_crawled < maxPages && (exhaustive || result.learned < limit)) {
-    queue.sort((a, b) => b.score - a.score || a.depth - b.depth)
-    const current = queue.shift()!
-    if (visited.has(current.url)) continue
-    visited.add(current.url)
-    result.pages_crawled++
-
-    try {
-      const html = await fetchText(current.url, source)
-      result.fetched++
-
-      for (const link of linksOf(html, new URL(current.url), source)) {
-        result.candidates_discovered++
-        add(link, current.depth + 1)
-      }
-
-      const text = redactResearchSecrets(cleanHtml(html))
-      const title = redactResearchSecrets(titleOf(html, current.url))
-      if (text.length < 250) {
-        result.skipped++
-        continue
-      }
-
-      const relevance = sourceRelevance(current.url, title, text, source)
-      if (!relevance.accepted || isIndexLikeResearchUrl(current.url)) {
-        result.skipped++
-        continue
-      }
-
-      const vulnerabilityClass = classify(title + " " + text)
-      if (!vulnerabilityClass && source.kind !== "reference" && source.kind !== "academy" && current.depth > 0) {
-        result.skipped++
-        continue
-      }
-
-      const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
-      // Keep one extraction contract for both direct sync and the durable queue worker.
-      // Otherwise the same report would be learned differently depending on the CLI path.
-      const extracted = extractResearchDetails(title, text, vulnerabilityClass)
-      const ingested = ReportKnowledge.ingestExternalDetailed({
-        title,
-        severity: extracted.severity,
-        vulnerabilityClass,
-        sourceURL: current.url,
-        attackVector: extracted.attackVector,
-        impact: extracted.impact,
-        reproduction: extracted.reproduction,
-        poc: extracted.poc,
-        lesson: extracted.lesson,
-        sourceTrust: source.trust,
-        tags: Array.from(new Set([source.id, source.kind, ...extracted.retrievalSignals])),
-        metadata: {
-          research_source: source.id,
-          research_source_name: source.name,
-          source_trust: source.trust,
-          content_fingerprint: contentFingerprint,
-          candidate_score: current.score,
-          crawl_depth: current.depth,
-          // Same bounded study depth as the durable queue worker.
-          excerpt: text.slice(0, 12000),
-          content_length: text.length,
-          stored_excerpt_length: Math.min(text.length, 12000),
-          extraction_version: 4,
-          study_method: "bounded-heuristic-extraction",
-          extracted: {
-            vulnerability_class: vulnerabilityClass ?? null,
-            severity: extracted.severity,
-            attack_vector: extracted.attackVector ?? null,
-            impact: extracted.impact ?? null,
-            reproduction_steps: extracted.reproduction ?? null,
-            poc_snippet: extracted.poc ?? null,
-            prerequisites: extracted.prerequisites ?? null,
-            verification_signals: extracted.verificationSignals ?? null,
-            false_positive_cautions: extracted.falsePositiveCautions ?? null,
-            root_cause: extracted.rootCause ?? null,
-            request_response_evidence: extracted.requestResponseEvidence ?? null,
-            affected_components: extracted.affectedComponents ?? null,
-            affected_versions: extracted.affectedVersions ?? null,
-            technology_stack: extracted.technologyStack ?? null,
-            remediation: extracted.remediation ?? null,
-            attack_chain: extracted.attackChain ?? null,
-            negative_evidence: extracted.negativeEvidence ?? null,
-            limitations: extracted.limitations ?? null,
-            retrieval_signals: extracted.retrievalSignals,
-            extraction_coverage: {
-              present: [
-                extracted.lesson,
-                extracted.attackVector,
-                extracted.impact,
-                extracted.reproduction,
-                extracted.poc,
-                extracted.prerequisites,
-                extracted.verificationSignals,
-                extracted.falsePositiveCautions,
-                extracted.rootCause,
-                extracted.requestResponseEvidence,
-                extracted.affectedComponents,
-                extracted.affectedVersions,
-                extracted.technologyStack,
-                extracted.remediation,
-                extracted.attackChain,
-                extracted.negativeEvidence,
-                extracted.limitations,
-              ].filter(Boolean).length,
-              total: 17,
-              note: "Field presence only; not a quality score or practical validation.",
-            },
-          },
-        },
-      })
-
-      if (!ingested) {
-        result.skipped++
-        continue
-      }
-
-      if (!ingested.created) {
-        result.skipped++
-        continue
-      }
-      result.learned++
-    } catch (error) {
-      result.failed++
-      if (result.error_samples.length < 5) {
-        result.error_samples.push(current.url + " — " + (error instanceof Error ? error.message : String(error)))
-      }
-    }
-  }
-
-  return result
 }
-
-const RESEARCH_SOURCE_CONCURRENCY = 4
 
 export async function syncResearch(input: { sourceID?: string } & ResearchSyncOptions = {}) {
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
@@ -829,14 +682,14 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
 }
 
 /** Learning-only worker: claim persisted candidates, extract a lesson, and record a terminal/retry state. */
-export async function learnResearchQueue(input: { limit?: number; workerID?: string } = {}) {
+export async function learnResearchQueue(input: { limit?: number; workerID?: string; sourceID?: string } = {}) {
   const { ResearchQueue } = await import("./queue")
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
   const limit = Math.max(1, Math.min(input.limit ?? 50, MAX_LIMIT))
   const result = { worker: workerID, claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
 
   for (let i = 0; i < limit; i++) {
-    const item = ResearchQueue.claimNext(workerID)
+    const item = ResearchQueue.claimNext(workerID, input.sourceID)
     if (!item) break
     result.claimed++
     const source = RESEARCH_SOURCES.find((entry) => entry.id === item.source_id)
