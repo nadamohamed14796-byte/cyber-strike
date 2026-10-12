@@ -6,7 +6,7 @@ version: "1.0.0"
 author: "cyberstrike-official"
 tags: [recon, GitLab, source-code, CI/CD, information-disclosure]
 tech_stack: [GitLab, Git, HTTP, CI/CD]
-chains_with: [attack-source-leak, attack-cicd, recon-methodology]
+chains_with: [attack-source-leak, cicd-attacks, recon-methodology]
 prerequisites:
   - "A confirmed organization namespace or public GitLab instance"
 severity_boost:
