@@ -70,6 +70,25 @@ test("handles custom API clients and concatenated path parameters", () => {
   expect(post?.headerNames).toContain("X-Trace")
 })
 
+test("extracts class methods, single-argument arrows, and separates query from path variables", () => {
+  const tick = String.fromCharCode(96)
+  const source = [
+    "class InvoiceService {",
+    " async listInvoices(accountId, limit = 20) {",
+    '  return this.api.get(' + tick + "/api/accounts/$" + "{accountId}/invoices?limit=$" + "{limit}" + tick + ', { headers: { "X-Client": "web" } })',
+    " }",
+    "}",
+    "const findInvoice = async invoiceId => fetch(" + tick + "/api/invoices/$" + "{invoiceId}" + tick + ")",
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.functions.find((item) => item.name === "listInvoices")?.parameters).toEqual(["accountId", "limit"])
+  expect(result.functions.find((item) => item.name === "findInvoice")?.parameters).toEqual(["invoiceId"])
+  const request = result.requests.find((item) => item.path.startsWith("/api/accounts/"))
+  expect(request?.path).toBe("/api/accounts/{accountId}/invoices")
+  expect(request?.pathParameters).toEqual(["accountId"])
+  expect(request?.queryParameters).toContain("limit")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
