@@ -334,7 +334,7 @@ export interface JavaScriptCorrelationGraph {
   /** Static JS review leads, kept separate from verified findings. */
   javascriptAnalysis: {
     functions: Array<JavaScriptFunctionCandidate & { sourceFile: string }>
-    requestCandidates: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[] }>
+    requestCandidates: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[]; recommendedChecks: string[] }>
     secretCandidates: Array<JavaScriptSecretCandidate & { sourceFile: string }>
     roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
   }
@@ -611,7 +611,16 @@ export namespace JavaScriptCorrelation {
               (segment.startsWith("{") && segment.endsWith("}")) ? Boolean(actualSegments[index]) : segment === actualSegments[index],
             )
           }).map((request) => request.id)
-          return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs)].slice(0, 100) }
+          const recommendedChecks = [
+            "Baseline replay and response capture",
+            ...(item.pathParameters.length ? ["Compare path parameter type/boundary values using controlled test data"] : []),
+            ...(item.queryParameters.length ? ["Compare omitted and altered query parameters"] : []),
+            ...(item.bodyParameters.length ? ["Compare required/optional body fields and expected types"] : []),
+            ...(item.authSignals.length || item.cookieSignals.length ? ["Compare authenticated and unauthenticated/session-cookie behavior using controlled accounts"] : ["Determine authentication requirements from captured requests and controlled account tests"]),
+            "Check authorization with accounts that own only their own test data",
+            "Manually confirm server-side validation; static JavaScript alone is not proof",
+          ]
+          return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs)].slice(0, 100), recommendedChecks }
         })).slice(0, 1500),
         secretCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
@@ -818,7 +827,7 @@ export namespace JavaScriptCorrelation {
       ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) => "- " + fn.name + "(" + fn.parameters.join(", ") + ") — " + fn.sourceFile + ":" + fn.line) : ["No named function candidates extracted."]),
       "",
       "## Structured request candidates",
-      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — source: " + request.sourceFile + ":" + request.sourceLine + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth: " + request.authAssessment + (request.observedRequestIDs.length ? " — captured requests: " + request.observedRequestIDs.join(", ") : " — no matching captured request")) : ["No structured request candidates extracted."]),
+      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — source: " + request.sourceFile + ":" + request.sourceLine + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth: " + request.authAssessment + (request.observedRequestIDs.length ? " — captured requests: " + request.observedRequestIDs.join(", ") : " — no matching captured request") + " — review plan (not run): " + request.recommendedChecks.join("; ")) : ["No structured request candidates extracted."]),
       "",
       "## Secret-like assignments (redacted)",
       ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — fingerprint " + item.fingerprint) : ["No secret-like assignments matched the static heuristics."]),
