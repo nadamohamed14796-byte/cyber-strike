@@ -16,6 +16,34 @@ describe("remote skill path validation", () => {
     expect(await Discovery.readBoundedBody(new Response("1234", { headers: { "content-length": "5" } }), 4)).toBeUndefined()
   })
 
+  test("remote skill URL policy rejects local, literal-IP, credentialed, and non-HTTPS destinations", () => {
+    expect(Discovery.isSafeRemoteURLShape("https://developers.cloudflare.com/.well-known/skills/index.json")).toBe(true)
+    for (const url of [
+      "http://example.com/index.json",
+      "file:///etc/passwd",
+      "https://127.0.0.1/index.json",
+      "https://[::1]/index.json",
+      "https://localhost/index.json",
+      "https://internal.example.local/index.json",
+      "https://user:pass@example.com/index.json",
+      "https://example.com:8443/index.json",
+    ]) {
+      expect(Discovery.isSafeRemoteURLShape(url)).toBe(false)
+    }
+  })
+
+  test("remote DNS destinations must resolve only to public addresses", () => {
+    expect(Discovery.isPublicAddress("8.8.8.8")).toBe(true)
+    expect(Discovery.isPublicAddress("2606:4700:4700::1111")).toBe(true)
+    for (const address of [
+      "127.0.0.1", "10.0.0.1", "169.254.169.254", "172.16.0.1",
+      "192.168.1.1", "192.0.2.1", "198.51.100.1", "203.0.113.1",
+      "224.0.0.1", "::1", "fc00::1", "fe80::1", "2001:db8::1",
+    ]) {
+      expect(Discovery.isPublicAddress(address)).toBe(false)
+    }
+  })
+
   test("accepts ordinary skill slugs and nested relative files", () => {
     expect(Discovery.isSafeSkillName("agents-sdk")).toBe(true)
     expect(Discovery.isSafeSkillName("wstg.injection_01")).toBe(true)
