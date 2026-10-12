@@ -104,7 +104,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Confirm the candidate log/debug artifact is publicly reachable and in scope; request a random-path or equivalent inaccessible-resource control to detect generic error pages.
+2. Identify log type, time range, and application ownership from minimal metadata first. Distinguish harmless stack traces from live session material, credentials, personal data, or internal-only request details.
+3. Collect only a few sanitized lines necessary to prove exposure. Do not download full logs, test credentials found in logs, or follow tokens into other services.
+4. Check whether output is cached, generated per request, intentionally public, or requires an authenticated role; verify the access boundary using your own test session if applicable.
+5. Report exact URL/role, sensitive categories, minimal redacted proof, and remediation for access control, secret rotation, log redaction, and cache invalidation.
+
 
 ### Deduplication and stop rules
 

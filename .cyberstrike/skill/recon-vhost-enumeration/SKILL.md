@@ -94,7 +94,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Confirm the destination IP/host and the parent domain are in scope; capture a normal Host/SNI response and an intentionally invalid-host response as controls.
+2. Build a small candidate list from first-party names, certificates, existing DNS, or documented naming patterns rather than an unbounded dictionary.
+3. Vary Host header and TLS SNI separately when tooling allows; preserve status, redirects, title, body hash, certificate, and server timing so front-end defaults can be distinguished from named virtual hosts.
+4. Normalize dynamic content and cluster identical fingerprints. Check for wildcard/default virtual hosts and shared CDN behavior before promoting a candidate; a different status code alone is not proof.
+5. Keep request rates low and stop at instability, unexpected sensitive data, or scope uncertainty. Return each confirmed vhost with source, control comparison, attribution confidence, and a safe next-step trigger.
+
 
 ### Deduplication and stop rules
 

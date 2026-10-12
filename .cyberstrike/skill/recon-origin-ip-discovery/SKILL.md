@@ -94,7 +94,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Start from confirmed domains and passive evidence (historical DNS, certificate data, provider records, and first-party configuration) before any network probes.
+2. Correlate candidate addresses with ownership, ASN/provider, TLS/SNI certificate, application response, and current DNS. A historical A record or shared IP alone does not identify a unique origin.
+3. Use only low-impact checks within explicitly scoped address ranges; do not bypass CDN/WAF controls to attack origin services, scan neighboring tenants, or change host routing.
+4. Compare a candidate address with the normal CDN/front-door response using the expected Host/SNI and a random-host control. Distinguish genuine origin reachability from shared hosting or a provider edge.
+5. Return each candidate with source, timestamp, ownership confidence, corroborating signals, and scope decision. Discovery is not permission to probe the address and is not itself a vulnerability.
+
 
 ### Deduplication and stop rules
 

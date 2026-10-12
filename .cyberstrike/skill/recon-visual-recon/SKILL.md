@@ -120,6 +120,14 @@ Deduplicate by canonical host/URL, redirect destination, title/DOM fingerprint a
 
 Return normalized asset, scope/provenance, capture conditions, confidence, duplicate cluster, negative control, prioritization rationale, candidate hypothesis, safe next step and trigger for any linked attack skill. A screenshot is evidence of what rendered, not proof of a vulnerability.
 
+### Skill-specific next steps
+
+1. Collect screenshots only for confirmed in-scope live URLs and approved test roles; do not sign in using real customer identities or capture unrelated tenants.
+2. Normalize scheme, redirects, trailing slashes, viewport, locale, and authentication state before comparing images; preserve URL and timestamp with each screenshot.
+3. Deduplicate by canonical URL, page title, stable visual hash, and application identity. Treat SPA catch-alls, error pages, CDN placeholders, and generic login screens as separate clusters.
+4. Redact or avoid screenshots containing personal data, session values, API keys, internal hostnames, or customer content; store evidence in a target-scoped directory with appropriate permissions.
+5. Return an application inventory and visual-difference leads with provenance and confidence. Visual similarity/difference helps prioritization but never confirms a vulnerability without protocol-level verification.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/visual-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/visual-recon/SKILL.md)

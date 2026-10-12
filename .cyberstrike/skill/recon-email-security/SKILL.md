@@ -101,7 +101,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Anchor checks to the verified organizational domain and query SPF, DMARC, MX, and observed DKIM selectors using DNS-only requests; save raw answers, resolver, and timestamp.
+2. Parse SPF includes/redirects and the 10-DNS-lookup limit, and inspect DMARC policy, alignment, reporting destinations, and subdomain policy. A record's existence does not prove correct enforcement.
+3. Do not infer absence of DKIM from a short list of guessed selectors; use selector evidence from authorized sample mail or first-party configuration when available.
+4. Treat p=none, missing records, and weak alignment as posture observations whose reportability depends on program scope and impact. Do not send spoofed mail or claim successful spoofing from DNS records alone.
+5. Return normalized records, parsing result, provenance, confidence, and specific safe remediation (SPF mechanism cleanup, DKIM key lifecycle, DMARC alignment/enforcement and reporting) without collecting message content or recipient data.
+
 
 ### Deduplication and stop rules
 

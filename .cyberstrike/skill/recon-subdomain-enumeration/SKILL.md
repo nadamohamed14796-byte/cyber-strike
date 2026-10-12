@@ -104,7 +104,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Confirm the root domain is in scope, then collect passive names from certificate transparency, first-party links, approved passive providers, and installed tooling; keep provenance per hostname.
+2. Normalize wildcards, case, trailing dots, IDNs, and duplicate results. Preserve raw input and timestamps before creating a deduplicated candidate list.
+3. Resolve A/AAAA/CNAME/MX as relevant, inspect the CNAME chain and TTL, and compare multiple random labels to detect wildcard DNS. Distinguish NXDOMAIN, NODATA, SERVFAIL, and transient resolver failures.
+4. Validate live HTTP/TLS hosts with conservative timeouts and stable fingerprints; use random-host and random-path controls to eliminate wildcard responses, parked domains, CDN edges, and soft-404 pages.
+5. Quarantine ambiguous ownership and third-party SaaS until corroborated. Return confidence, evidence, scope decision, deduplication key, and the specific next recon/attack skill trigger; discovered names are not findings.
+
 
 ### Deduplication and stop rules
 

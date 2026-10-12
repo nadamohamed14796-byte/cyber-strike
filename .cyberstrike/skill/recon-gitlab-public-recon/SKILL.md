@@ -100,7 +100,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Confirm the GitLab host and organization/group attribution through first-party domains, verified group ownership, or repository metadata; a matching brand string alone is insufficient.
+2. Use read-only public metadata and bounded pagination to inventory public projects, snippets, package/container registries, CI configuration, and release artifacts that are explicitly in scope.
+3. Distinguish public-by-design content from accidental exposure; inspect a minimal file/commit context and avoid cloning unrelated projects or collecting private contributor data.
+4. If a secret-shaped value appears, record detector type, project, path, and commit without copying it. Only verify validity through a single read-only identity call if explicit authorization allows it.
+5. Return provenance, deduplication key, last-seen commit/time, ownership confidence, and safe next-step trigger. Do not treat a public project, open signup, or a code fingerprint as a vulnerability by itself.
+
 
 ### Deduplication and stop rules
 
