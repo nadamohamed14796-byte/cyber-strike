@@ -20,6 +20,8 @@ Use this when you have a target URL but no captured requests yet — hackbrowser
 
 This tool runs ASYNCHRONOUSLY: it returns immediately after starting the background crawl. Captures stream into the session over the next 30s–2min. Do NOT call this tool again to "wait" for results — use web_get_session_context to inspect captured endpoints when you actually need them. The hackbrowser status (running / completed / failed) appears in the TUI sidebar.
 
+After the crawl is marked completed and JavaScript response captures are available, invoke `correlate_javascript` with this same authorized target URL before detailed `http_replay` tests. It performs local, bounded static analysis only: it does not download or execute JavaScript. Review its saved request/function candidates and pending verification plan; rerun correlation if new JavaScript captures arrive.
+
 Defaults to anonymous headless mode. To crawl as authenticated user(s), pass \`credentials\` — the browser opens visibly and the user must log in manually before the crawl begins. Each credential ID in the array triggers its own login + crawl cycle, so multiple IDs run a sequence (role-based access tests). A saved login profile may be supplied via auth_profile_id; CyberStrike decrypts it locally, checks the exact origin and target binding, and fills the login form in a visible browser. CAPTCHA, passkeys, MFA, and unusual login forms may still need human interaction. Never put passwords in tool arguments or target notes.`
 
 const HackBrowserParameters = z.object({
