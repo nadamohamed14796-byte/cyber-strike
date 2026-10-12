@@ -120,13 +120,13 @@ http_replay(request_id, mutations: [
 - Baseline request (own resource) returns the same structure — confirming the endpoint works correctly for authorized access
 - The diff is: baseline returns your data, exploit returns someone else's data
 
-**Not Vulnerable If:**
-- 401 Unauthorized
-- 403 Forbidden
-- 404 Not Found (consistent timing)
-- Empty response (no data disclosed)
-- Both baseline and exploit return identical error responses
-- The "different" response is just a generic error, not actual unauthorized data
+**Not confirmed by this response alone (continue adaptive verification):**
+- 401 Unauthorized or 403 Forbidden: validate that the session/credential is active and the request prerequisites are correct.
+- 404 Not Found: check whether the resource ID is valid and whether the endpoint intentionally conceals unauthorized resources.
+- Empty response or identical errors: compare against a valid owner-controlled baseline and check method, content type, CSRF token, and required fields.
+- Generic errors: do not claim IDOR without evidence of unauthorized access, but do not label the hypothesis false positive from a single failed probe.
+
+Only conclude DISPROVEN when valid test conditions and direct evidence contradict the specific IDOR hypothesis. Use `verification_attempt` for every meaningful angle, and `verification_attempt(action="status")` before finalizing. At 20 distinct attempts without decisive evidence, preserve as INCONCLUSIVE / NEEDS REVIEW.
 
 **Edge Cases:**
 - Timing differences (404 for existing vs non-existing) — information disclosure only, not IDOR
@@ -215,3 +215,8 @@ Response (200 OK):
 4. **Check error messages** - timing differences can leak resource existence
 5. **Document exact payloads** - include credential used, ID tested, response received
 6. **Verify consistently** - test multiple times to confirm
+
+
+## Mandatory Adaptive Verification Ledger
+
+For every plausible IDOR hypothesis, use the shared `verification_attempt` tool. Reuse one stable hypothesis_key per endpoint/resource/ownership claim. Test meaningful, authorized angles such as valid owner baseline, non-owner access, cross-credential object IDs, role differences, read versus non-destructive write checks, and resource-validity controls as applicable. Record the rationale and actual response evidence for each attempt. Do not enumerate arbitrary identifiers or modify/delete real user data without explicit authorization. The 20-attempt ceiling is not a target: stop early for decisive evidence, missing prerequisites, scope limits, rate limits, or safety. Exhaustion alone is INCONCLUSIVE, never a false positive.
