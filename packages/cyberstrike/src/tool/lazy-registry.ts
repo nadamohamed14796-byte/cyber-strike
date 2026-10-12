@@ -112,8 +112,21 @@ export namespace LazyToolRegistry {
     })
   }
 
+  function stableHash(value: string): string {
+    // FNV-1a, used only to disambiguate IDs after normalization (not for security).
+    let hash = 0x811c9dc5
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i)
+      hash = Math.imul(hash, 0x01000193)
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0")
+  }
+
   function sanitizeID(value: string): string {
-    return value.replace(/[^a-zA-Z0-9_-]/g, "_")
+    const sanitized = value.replace(/[^a-zA-Z0-9_-]/g, "_")
+    // Preserve readable legacy IDs for safe names. Unsafe names get a stable
+    // suffix so distinct names cannot silently overwrite each other.
+    return sanitized === value ? sanitized : sanitized + "__" + stableHash(value)
   }
 
   function removeServerTools(serverName: string): void {
