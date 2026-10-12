@@ -9,8 +9,8 @@
 
 ## Latest-main verification checkpoint — 2026-10-12
 
-- **Verified code head (CI):** `6522bcbbb8cdaa13016bab33145ebd27fbef2997`. Current `main` is `d35fff41f9341cf95194604ce2363256f749dd27`; the commits after the verified code head only update this audit ledger.
-- **GitHub Actions:** typecheck run [38240947275](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947275), unit/integration test run [38240947314](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947314), build run [38240947281](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947281), and CodeQL run [38240947166](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947166) all completed successfully on this exact commit.
+- **Verified code head (CI):** `6522bcbbb8cdaa13016bab33145ebd27fbef2997`. Current `main` is `78159d72b17be1f9f7e39d82e4cf2dec7a4c9396`; intervening commits after the verified code head are audit-ledger documentation updates only.
+- **Latest-main GitHub Actions:** typecheck [38242067494](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067494), unit/integration tests [38242067491](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067491), build [38242067501](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067501), and CodeQL [38242067818](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067818) all completed successfully on current `main`.
 - **Test detail:** 1,799 passed, 5 skipped, 0 failed across 1,804 tests in 148 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
 - **Scope of claim:** this confirms automated CI on the recorded commit. It does not claim live Gmail/OAuth, external target validation, browser MFA, or manual runtime scenarios were exercised.
 
@@ -265,9 +265,9 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 | `skills/ad-security-verification-gates-20261012` and `integration/ad-security-verification-gates-main-20261012` | No merge required | The reviewed AD security skill file blob is identical to main. |
 | `feat/discovery-core` | Retain; do not merge wholesale | It is heavily divergent and includes active mutating-method probes that are not appropriate for the current conservative reconnaissance path. |
 | `feat/proxy-config` / `dev` | Retain; selective review only | Both contain broad, highly divergent networking/replay/browser changes; there is no safe evidence for a wholesale merge. |
-| PR #7 / `feat/target-memory-foundation` | Retain; selective review only | A large portion of the feature set is already integrated through earlier PRs, but the remaining head is highly divergent and needs per-file accounting. |
+| PR #7 / `feat/target-memory-foundation` | No wholesale merge; per-file review shows no safe bulk merge | The 77 changed paths all exist on current `main`; reviewed core files for research, target memory, finding validation, Gmail, auth manager, and Hackbrowser are identical or newer on main. Main has dedicated typecheck/build workflows, so the PR's workflow consolidation is unnecessary. Keep the branch until the remaining per-file delta is reviewed; do not replace newer main files. |
 | PR #40 / `docs/audit-ledger-refresh-20-pass-20261012` | Keep open; do not merge wholesale | Its useful 20-pass evidence and merged-fix summary were selectively reconciled into main. GitHub currently reports the PR as unmergeable and its baseline/branch metadata is stale. |
-| PR #6 / `improve/skill-quality-reference-audit` | Retain; selective review only | Main contains newer/reconciled skill content; the branch remains divergent and should not replace current files wholesale. |
+| PR #6 / `improve/skill-quality-reference-audit` | Retain; selective review only | Main contains newer/reconciled skill content; the branch remains divergent and should not replace current files wholesale. No branch deletion until remaining unique paths are accounted for. |
 | PR #2 / `hackbrowser-improvement` | Retain; do not merge wholesale | The inspected branch disables TLS certificate verification. Any safe unique browser changes require isolated review and tests. |
 | `seo/readme-hero-refresh` | Selectively ported | The branch contained only two README hero lines; the provider-agnostic wording was copied to main to avoid an unsupported “first” claim. No wholesale merge or branch deletion was performed. |
 
