@@ -68,6 +68,8 @@ export interface WorkerOptions {
   headless: boolean
   panel: boolean
   cyberstrikeUrl: string
+  /** Optional local-server auth secret; passed only through the private stdin IPC start message, never process.env. */
+  cyberstrikePassword?: string
   model: ModelDescriptor
   credentialDispatch: CredentialDispatch
   /** One exact-origin saved login profile; secret exists only in local IPC/process memory. Never log or persist it. */
