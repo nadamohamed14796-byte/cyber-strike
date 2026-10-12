@@ -214,7 +214,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         metadata: {} as { name?: string; dir?: string },
       })
 
-      SkillContext.load(params.name)
+      await SkillContext.load(params.name)
 
       const dir = path.dirname(skill.location)
       const base = pathToFileURL(dir).href
