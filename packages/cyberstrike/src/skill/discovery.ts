@@ -127,7 +127,7 @@ export namespace Discovery {
    * tar can otherwise contain an enormous number of empty headers and consume
    * CPU even when declared member sizes are tiny.
    */
-  async function prepareArchiveForInspection(archive: string): Promise<PreparedArchive | undefined> {
+  async function prepareArchiveForInspection(archive: string, budget: ResourceBudget): Promise<PreparedArchive | undefined> {
     const header = new Uint8Array(await Bun.file(archive).slice(0, 4).arrayBuffer())
     const isGzip = header[0] === 0x1f && header[1] === 0x8b
     const isZstd = header[0] === 0x28 && header[1] === 0xb5 && header[2] === 0x2f && header[3] === 0xfd
@@ -145,8 +145,12 @@ export namespace Discovery {
       const limiter = new Transform({
         transform(chunk: Buffer, _encoding, callback) {
           expandedBytes += chunk.byteLength
-          if (expandedBytes > MAX_ARCHIVE_TAR_BYTES) {
-            callback(new Error("Skill archive exceeds the bounded decompressed tar size"))
+          budget.decompressedArchiveBytes += chunk.byteLength
+          if (
+            expandedBytes > MAX_ARCHIVE_TAR_BYTES ||
+            budget.decompressedArchiveBytes > MAX_TOTAL_ARCHIVE_TAR_BYTES
+          ) {
+            callback(new Error("Skill archive exceeds the per-archive or total decompressed tar budget"))
             return
           }
           callback(null, chunk)
@@ -175,7 +179,7 @@ export namespace Discovery {
     const rootStat = await lstat(root)
     if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) return false
     const realRoot = await realpath(root)
-    const preparedArchive = await prepareArchiveForInspection(archive)
+    const preparedArchive = await prepareArchiveForInspection(archive, budget)
     if (!preparedArchive) return false
     try {
       const archiveToInspect = preparedArchive.path
@@ -419,6 +423,7 @@ export namespace Discovery {
   const MAX_ARCHIVE_MEMBER_BYTES = 25 * 1024 * 1024
   const MAX_ARCHIVE_EXPANDED_BYTES = 100 * 1024 * 1024
   const MAX_ARCHIVE_TAR_BYTES = 125 * 1024 * 1024
+  const MAX_TOTAL_ARCHIVE_TAR_BYTES = 300 * 1024 * 1024
   const MAX_TOTAL_EXPANDED_BYTES = 250 * 1024 * 1024
   const MAX_TOTAL_PULL_MS = 5 * 60 * 1000
   const DOWNLOAD_TIMEOUT_MS = 15_000
@@ -427,6 +432,7 @@ export namespace Discovery {
     downloadedBytes: number
     expandedBytes: number
     reservedExpandedBytes: number
+    decompressedArchiveBytes: number
     deadline: number
   }
 
@@ -537,6 +543,7 @@ export namespace Discovery {
       downloadedBytes: 0,
       expandedBytes: 0,
       reservedExpandedBytes: 0,
+      decompressedArchiveBytes: 0,
       deadline: Date.now() + MAX_TOTAL_PULL_MS,
     }
     let base: string
