@@ -198,7 +198,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
       "; unknown checks: " + (unknown.length ? unknown.map((check) => "#" + check.number).join(", ") : "none") + ". " +
       (enoughDistinctAttempts ? "The minimum of 20 distinct evidence-backed attempts has been reached." : "False-positive classification is blocked: " + attempts.length + "/20 distinct evidence-backed attempts are recorded.")
     nextStep = enoughDistinctAttempts
-      ? "Review the contradictory evidence and run any remaining case-specific controls before deciding. Do not promote the record based on missing evidence."
+      ? "Twenty distinct attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
       : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - attempts.length) + " more distinct, case-specific tests. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
   }
 
