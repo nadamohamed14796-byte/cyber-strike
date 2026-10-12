@@ -21,6 +21,19 @@ export namespace VerificationAttempts {
     validConditions: boolean
   }
 
+  export interface HypothesisIdentity {
+    asset: string
+    endpoint?: string
+    vulnerabilityClass: string
+  }
+
+  /** A hypothesis key cannot mix evidence across different endpoints or vulnerability classes. */
+  export function sameHypothesisIdentity(a: HypothesisIdentity, b: HypothesisIdentity): boolean {
+    return a.asset.trim().toLowerCase() === b.asset.trim().toLowerCase() &&
+      (a.endpoint?.trim() ?? "") === (b.endpoint?.trim() ?? "") &&
+      a.vulnerabilityClass.trim().toLowerCase() === b.vulnerabilityClass.trim().toLowerCase()
+  }
+
   export interface DecisionInput {
     attempts: Attempt[]
     /** Evidence directly supports the stated vulnerability hypothesis. */
