@@ -11,7 +11,6 @@ describe("remote skill path validation", () => {
   const root = path.resolve("/tmp/cyberstrike-skill-cache/example")
 
   test("bounded response reader accepts bodies at the limit and rejects oversized bodies", async () => {
-    const { Discovery } = await import("../../src/skill/discovery")
     expect(await Discovery.readBoundedBody(new Response("1234"), 4)).toEqual(new Uint8Array([49, 50, 51, 52]))
     expect(await Discovery.readBoundedBody(new Response("12345"), 4)).toBeUndefined()
     expect(await Discovery.readBoundedBody(new Response("1234", { headers: { "content-length": "5" } }), 4)).toBeUndefined()
