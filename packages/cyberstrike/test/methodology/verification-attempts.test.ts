@@ -62,6 +62,18 @@ describe("VerificationAttempts", () => {
     expect(result.canContinue).toBe(true)
   })
 
+  test("scope and safety hard stops prevent verdicts and stop further attempts", () => {
+    const result = VA.decide({
+      attempts: [{ ...attempt("auth-check", "valid-session"), evidenceRef: "evidence://response-2" }],
+      decisiveDisproof: true,
+      decisiveEvidenceRef: "evidence://response-2",
+      blockedReason: "Target is out of scope",
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(false)
+    expect(result.reason).toBe("Target is out of scope")
+  })
+
   test("direct disproof evidence cannot produce a false-positive verdict before 20 valid attempts", () => {
     const attempts = Array.from({ length: 19 }, (_, i) => attempt("auth-check-" + i, "valid-session"))
     attempts[attempts.length - 1] = {
