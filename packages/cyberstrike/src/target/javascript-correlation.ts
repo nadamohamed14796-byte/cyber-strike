@@ -8,6 +8,7 @@ import { Session } from "../session"
 import { SessionTable, RequestTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
+import { analyzeJavaScriptSource, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint } from "./javascript-analysis"
 
 function safeURL(input?: string | null): URL | undefined {
   if (!input?.trim()) return undefined
@@ -141,6 +142,8 @@ export interface JavaScriptSourceFile {
   sha256: string
   bytes: number
   endpointLiterals: string[]
+  /** Sanitized static-analysis metadata; never stores raw source or literal secret values. */
+  analysis?: JavaScriptSourceAnalysis
 }
 
 /**
@@ -194,6 +197,7 @@ export function extractCapturedJavaScriptSources(
       sha256: digest,
       bytes,
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
+      analysis: analyzeJavaScriptSource(body),
     })
   }
   return output
@@ -305,6 +309,7 @@ async function inventoryJavaScriptFiles(root: string): Promise<JavaScriptSourceF
         sha256: createHash("sha256").update(content).digest("hex"),
         bytes: Buffer.byteLength(content, "utf-8"),
         endpointLiterals: extractStaticJavaScriptEndpoints(content),
+        analysis: analyzeJavaScriptSource(content),
       })
     }
   }
@@ -326,6 +331,13 @@ export interface JavaScriptCorrelationGraph {
     tags: string[]
   }>
   sourceFiles: JavaScriptSourceFile[]
+  /** Static JS review leads, kept separate from verified findings. */
+  javascriptAnalysis: {
+    functions: Array<JavaScriptFunctionCandidate & { sourceFile: string }>
+    requestCandidates: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[] }>
+    secretCandidates: Array<JavaScriptSecretCandidate & { sourceFile: string }>
+    roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
+  }
   endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
     id: string
@@ -584,6 +596,26 @@ export namespace JavaScriptCorrelation {
         tags: (item.row.tags as string[] | null) ?? [],
       })),
       sourceFiles: mergedSourceFiles,
+      javascriptAnalysis: {
+        functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
+        requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).map((item) => {
+          const observedRequestIDs = relevantRequests.filter((request) => {
+            const requestURL = safeURL(request.url ?? undefined) ?? safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+            if (!requestURL) return false
+            if (item.host && requestURL.host.toLowerCase() !== item.host.toLowerCase()) return false
+            if (!item.host && requestURL.hostname !== targetURL.hostname && !assets.some((asset) => safeURL(asset.url)?.hostname === requestURL.hostname)) return false
+            if (item.method && request.method.toUpperCase() !== item.method) return false
+            const expectedSegments = item.path.split("/").filter(Boolean)
+            const actualSegments = request.normalized_path.split(/[?#]/, 1)[0]!.split("/").filter(Boolean)
+            return expectedSegments.length <= actualSegments.length && expectedSegments.every((segment, index) =>
+              /^\\{[A-Za-z_$][\\w$]*\\}$/.test(segment) ? Boolean(actualSegments[index]) : segment === actualSegments[index],
+            )
+          }).map((request) => request.id)
+          return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs)].slice(0, 100) }
+        })).slice(0, 1500),
+        secretCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
+        roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
+      },
       endpointCandidates: [],
       evidence: relevantRequests
         .filter((request) => request.response_status !== null || Boolean(request.processed_response))
@@ -766,6 +798,10 @@ export namespace JavaScriptCorrelation {
       "- JavaScript asset URLs: " + graph.javascriptAssets.length,
       "- Local JavaScript source files indexed: " + graph.sourceFiles.length,
       "- Static endpoint literals extracted: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
+      "- JavaScript function candidates: " + graph.javascriptAnalysis.functions.length,
+      "- Structured request candidates: " + graph.javascriptAnalysis.requestCandidates.length,
+      "- Secret-like assignments (values redacted): " + graph.javascriptAnalysis.secretCandidates.length,
+      "- Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
       "- Unique endpoint candidates: " + graph.endpointCandidates.length,
       "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
       "- Captured response evidence nodes: " + graph.evidence.length,
@@ -777,6 +813,18 @@ export namespace JavaScriptCorrelation {
       "",
       "## Local JavaScript files",
       ...(graph.sourceFiles.length ? graph.sourceFiles.map((file) => "- " + file.relativePath + " — SHA-256 " + file.sha256 + " — " + file.bytes + " bytes — " + file.endpointLiterals.length + " static endpoint literal(s)") : ["No local .js/.mjs/.cjs source files found in the target workspace."]),
+      "",
+      "## Function candidates",
+      ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) => "- " + fn.name + "(" + fn.parameters.join(", ") + ") — " + fn.sourceFile + ":" + fn.line) : ["No named function candidates extracted."]),
+      "",
+      "## Structured request candidates",
+      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — source: " + request.sourceFile + ":" + request.sourceLine + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth: " + request.authAssessment + (request.observedRequestIDs.length ? " — captured requests: " + request.observedRequestIDs.join(", ") : " — no matching captured request")) : ["No structured request candidates extracted."]),
+      "",
+      "## Secret-like assignments (redacted)",
+      ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — fingerprint " + item.fingerprint) : ["No secret-like assignments matched the static heuristics."]),
+      "",
+      "## Role and hidden-feature hints",
+      ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) => "- " + item.kind + " — " + item.value + " — " + item.sourceFile + ":" + item.line) : ["No role/feature hints matched the static heuristics."]),
       "",
       "## JavaScript assets",
       ...(urlList ? [urlList] : ["No JavaScript asset matched the current stored Intel. Provide --javascript-url or record an asset with add_intel first."]),
@@ -822,6 +870,7 @@ export namespace JavaScriptCorrelation {
         sessionID: graph.sessionID,
         note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
         endpoints: graph.endpointCandidates,
+        javascriptAnalysis: graph.javascriptAnalysis,
       }, null, 2) + "\n",
     )
     return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, noteID: note.note.id }
