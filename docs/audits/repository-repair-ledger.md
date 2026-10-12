@@ -9,7 +9,7 @@
 
 ## Latest-main verification checkpoint — 2026-10-12
 
-- **Verified code head (CI):** `6522bcbbb8cdaa13016bab33145ebd27fbef2997`. Commits after this verified code head are audit-ledger documentation updates only; the code tested by the recorded CI runs was not changed by those documentation commits.
+- **Previously verified code head (CI):** `6522bcbbb8cdaa13016bab33145ebd27fbef2997` (historical runs below apply to that head). A subsequent verification-policy change is now on `main` at `2f3fe8d2ddcb35e2a902240da069f6ac14eccd9c`: a false-positive/disproven verdict requires 20 distinct valid attempts; invalid-precondition attempts do not consume the budget; scope/safety hard stops override verdicts. GitHub Actions test, typecheck, build, and CodeQL runs are queued on that exact code commit. Do not treat the new behavior as verified until those runs complete successfully.
 - **Latest-main GitHub Actions:** typecheck [38242067494](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067494), unit/integration tests [38242067491](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067491), build [38242067501](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067501), and CodeQL [38242067818](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067818) all completed successfully on current `main`.
 - **Test detail:** 1,799 passed, 5 skipped, 0 failed across 1,804 tests in 148 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
 - **Scope of claim:** this confirms automated CI on the recorded commit. It does not claim live Gmail/OAuth, external target validation, browser MFA, or manual runtime scenarios were exercised.
