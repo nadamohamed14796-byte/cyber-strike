@@ -2,7 +2,7 @@
 name: attack-cache-poison
 description: "Web cache poisoning and Web Cache Deception — validate unkeyed inputs, cache-key discrepancies, and exposure of private responses through shared caches"
 category: "web-application"
-version: "1.2.0"
+version: "1.3.0"
 author: "cyberstrike-official"
 tags:
   - cache-poisoning
@@ -34,14 +34,7 @@ severity_boost:
 
 Assess two distinct cache flaws without conflating them: (1) Web Cache Poisoning (WCP), where an unkeyed input changes a shared cached response; and (2) Web Cache Deception (WCD), where URL/path handling causes a shared cache to store a sensitive response as if it were static. Prove the relevant cache behavior and security impact independently.
 
-## Scope and Safety Preconditions
-
-- Start in a lab or an explicitly approved cache-test route; use unique throwaway URLs and harmless canary strings.
-- Never poison a homepage, login/reset flow, production JavaScript bundle, or high-traffic shared asset unless the program explicitly authorizes that exact risk and provides a recovery plan.
-- Use only test accounts and synthetic records for cache-deception checks. Do not request another user's private response or involve real users as clean-client proof.
-- Test one unkeyed input at a time and stop as soon as shared persistence is confirmed. Do not create re-poisoning loops, repeatedly cache errors, or attempt to evade rate limits.
-- Distinguish origin reflection, private browser cache, edge cache HIT, shared-cache persistence, and an actual security impact. A HIT or changed header alone is not a vulnerability.
-
+Authorization is governed by the engagement scope and the library's central scope policy. The methods below cover cache behavior on real targets when that testing class is permitted; use a unique test key, controlled marker, and clean test client to isolate the result.
 
 ## Crown Jewel Targets
 
@@ -53,7 +46,7 @@ Assess two distinct cache flaws without conflating them: (1) Web Cache Poisoning
 
 ## Attack Surface Signals
 
-Cache signals include `X-Cache`, `X-Cache-Status`, `CF-Cache-Status`, `Age`, `Via`, `Surrogate-Control`, `Cache-Control: public`, and `X-Served-By`. These indicate a possible cache layer but do not prove that an attacker-controlled response is shared.
+Cache signals include `X-Cache`, `X-Cache-Status`, `CF-Cache-Status`, `Age`, `Via`, `Surrogate-Control`, `Cache-Control: public`, and `X-Served-By`. These indicate a possible cache layer but do not prove that an attacker-controlled response is shared. Identify browser, service-worker, reverse-proxy, CDN, and origin cache layers separately; note cache key dimensions, default TTL, revalidation behavior, and whether authenticated and anonymous traffic share a cache namespace.
 
 Candidate inputs include `Host`, `X-Forwarded-Host`, `X-Host`, `X-Forwarded-Server`, `X-HTTP-Host-Override`, `X-Forwarded-Proto`, `X-Forwarded-Port`, `Forwarded`, `X-Original-URL`, `X-Rewrite-URL`, `X-HTTP-Method-Override`, `True-Client-IP`, and `Origin`. Test one input at a time; reflection alone does not establish that it is unkeyed.
 
@@ -191,7 +184,7 @@ On explicitly in-scope link/redirect endpoints, check whether a candidate header
 - Second request (clean) still receiving poisoned content
 - Impact: shared script execution, redirect, private-response exposure (WCD), CORS data read, or service disruption
 
-## Advanced Validation: Prove Shared-Cache Impact
+## Advanced Validation: Prove Shared-Cache Impact and Locate the Fault
 
 A reflected input is not sufficient evidence of cache poisoning. Confirm each layer separately:
 
@@ -221,7 +214,7 @@ Treat WCD as a distinct hypothesis from cache poisoning. WCD occurs when a cache
 - Request the exact test URL without authentication from a separate clean session. Do not attempt to retrieve another user's private data.
 - A mismatched content type or a cache HIT is only an indicator. Confirm that the unauthenticated response actually exposes the test account's private response before reporting WCD.
 
-## Cache-Key and Origin/Edge Discrepancy Checks
+## Cache-Key, Normalization, and Origin/Edge Discrepancy Checks
 
 Use only controlled, low-volume requests on in-scope endpoints. Change one dimension per comparison:
 
@@ -282,7 +275,7 @@ These are triage indicators only. Confirm semantics and clean-client impact befo
 7. `Origin` changes CORS response headers but the cache does not vary on Origin.
 8. Proxy parsing or hop-by-hop header handling differs across layers.
 
-## Bypass and Variant Checks
+## Bypass, Variant, and Cache-Key Coverage Checks
 
 - Header variants: `X-Host`, `X-Forwarded-Server`, `Forwarded: host=...`, `X-Original-URL`, and `X-Rewrite-URL`.
 - Query handling: ignored tracking parameters, parameter order, duplicate parameters, and query strings omitted from the cache key.
@@ -291,7 +284,7 @@ These are triage indicators only. Confirm semantics and clean-client impact befo
 - Cache policy: whether sensitive routes honor `Cache-Control: private` and whether `Vary` matches the inputs that change the response.
 - Request smuggling is a separate test class. Pursue it only when explicitly in scope; link findings only after the shared-cache impact is independently demonstrated.
 
-## Historical Case Patterns
+## Historical Case Patterns and Root-Cause Taxonomy
 
 Public research and disclosures describe patterns including `X-Forwarded-Host` influencing generated URLs, `X-Forwarded-Port` poisoning cached redirects, method-override/cache confusion, static-looking suffixes exposing authenticated responses, cache-deception extension gaps, path-normalization differences, and proxy parsing discrepancies affecting edge caches. Treat these as test hypotheses, not proof that a target is vulnerable or that a specific payout/severity applies.
 
@@ -314,7 +307,7 @@ Public research and disclosures describe patterns including `X-Forwarded-Host` i
 - `triage-validation` — verify the shared-cache boundary, repeatability, scope, and actual impact before reporting.
 - `evidence-hygiene` — redact cookies, tokens, private response fields, and target-sensitive artifacts before attaching evidence.
 
-## Cache Test Runbook and Stop Conditions
+## Cache Test Runbook, Cleanup, and Stop Conditions
 
 Use an endpoint approved for active testing and a unique, non-sensitive cache key. First establish normal cache behavior, then test one candidate unkeyed input at a time with a harmless marker.
 
