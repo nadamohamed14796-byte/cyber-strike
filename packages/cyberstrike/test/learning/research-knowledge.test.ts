@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test"
+import { eq } from "drizzle-orm"
 import { Instance } from "../../src/project/instance"
+import { Database } from "../../src/storage/db"
+import { SessionTable } from "../../src/session/session.sql"
+import { ReportKnowledgeEventTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { tmpdir } from "../fixture/fixture"
 
@@ -77,6 +81,72 @@ test("shared research retrieval uses signal tags and excludes target-specific re
 
       const byReproduction = ReportKnowledge.search({ query: "owner non-owner requests", sourceKind: "external_report", limit: 5 })
       expect(byReproduction.some((row) => row.id === shared?.id)).toBe(true)
+      await Instance.dispose()
+    },
+  })
+})
+
+test("target outcomes do not relabel globally shared external research", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sessionID = "ses_external_outcome_" + marker
+      const now = Date.now()
+      Database.use((db) =>
+        db.insert(SessionTable).values({
+          id: sessionID,
+          project_id: Instance.project.id,
+          slug: "external-outcome",
+          directory: dir.path,
+          title: "External research outcome isolation",
+          version: "1",
+          time_created: now,
+          time_updated: now,
+        }).run(),
+      )
+
+      const title = "Shared external access-control methodology " + marker
+      const report = ReportKnowledge.ingestExternalDetailed({
+        title,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL: "https://research.example.test/" + marker + "/shared-methodology",
+        lesson: "Compare a controlled owner-account baseline with a second controlled account.",
+        sourceTrust: 85,
+        tags: ["idor", "authorization-boundary"],
+        metadata: { source_trust: 85, extracted: { retrieval_signals: ["idor", "authorization-boundary"] } },
+      })
+      expect(report).not.toBeNull()
+      if (!report) throw new Error("test external report was not persisted")
+
+      ReportKnowledge.recordOutcome({
+        reportID: report.id,
+        sessionID,
+        outcome: "disproven",
+        signal: "owner-vs-non-owner check on this target",
+        evidence: "The second account received an authorization denial on this target.",
+        hook: "verification",
+      })
+
+      const stored = ReportKnowledge.search({ query: title, sourceKind: "external_report", limit: 10 })
+        .find((row) => row.id === report.id)
+      expect(stored?.status).toBe("observed")
+      expect(stored?.times_rejected).toBe(0)
+      expect(stored?.outcome).toBeNull()
+
+      const events = Database.use((db) =>
+        db.select().from(ReportKnowledgeEventTable)
+          .where(eq(ReportKnowledgeEventTable.report_id, report.id))
+          .all(),
+      )
+      expect(events.some((event) =>
+        event.session_id === sessionID &&
+        event.outcome === "disproven" &&
+        event.hook === "verification"
+      )).toBe(true)
+
       await Instance.dispose()
     },
   })
