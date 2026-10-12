@@ -5,6 +5,7 @@ import { ResearchQueueTable } from "./queue.sql"
 export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth"
 
 const LEASE_MS = 5 * 60_000
+const CRAWL_PAGE_TTL_MS = 6 * 60 * 60_000
 
 function publicID(sequence: number) {
   return "RPT-" + String(sequence).padStart(6, "0")
@@ -26,7 +27,28 @@ export namespace ResearchQueue {
           and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL)),
         )
         .get()
-      if (existing) return { id: publicID(existing.sequence), sequence: existing.sequence, created: false }
+      if (existing) {
+        // A URL first seen as an index page may later become a relevant report.
+        // Promote it in place rather than letting the crawl cache suppress it forever.
+        if (existing.payload?.crawl_page === true) {
+          const promoted = db.update(ResearchQueueTable).set({
+            title: input.title ?? existing.title,
+            payload: input.payload ?? {},
+            status: "queued",
+            attempts: 0,
+            last_error: null,
+            lease_owner: null,
+            lease_until: null,
+            completed_at: null,
+            updated_at: now,
+          }).where(and(
+            eq(ResearchQueueTable.sequence, existing.sequence),
+            eq(ResearchQueueTable.status, "discovered"),
+          )).returning().get()
+          if (promoted) return { id: publicID(promoted.sequence), sequence: promoted.sequence, created: true }
+        }
+        return { id: publicID(existing.sequence), sequence: existing.sequence, created: false }
+      }
 
       const row = db
         .insert(ResearchQueueTable)
@@ -59,6 +81,49 @@ export namespace ResearchQueue {
   export function find(sourceID: string, sourceURL: string) {
     return Database.use((db) => db.select().from(ResearchQueueTable)
       .where(and(eq(ResearchQueueTable.source_id, sourceID), eq(ResearchQueueTable.source_url, sourceURL))).get())
+  }
+
+  export function isFreshCrawlPage(sourceID: string, sourceURL: string, now = Date.now(), maxAge = CRAWL_PAGE_TTL_MS) {
+    const row = find(sourceID, sourceURL)
+    return row?.payload?.crawl_page === true && now >= row.updated_at && now - row.updated_at < maxAge
+  }
+
+  export function markVisitedPage(input: { sourceID: string; sourceURL: string; title?: string; contentFingerprint?: string }) {
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const existing = db.select().from(ResearchQueueTable)
+        .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
+      // Never downgrade or overwrite a real report/auth record with an index-page marker.
+      if (existing && existing.payload?.crawl_page !== true) return existing
+      if (existing) {
+        return db.update(ResearchQueueTable).set({
+          title: input.title ?? existing.title,
+          payload: {
+            ...existing.payload,
+            crawl_page: true,
+            ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
+          },
+          status: "discovered",
+          updated_at: now,
+          last_error: null,
+          lease_owner: null,
+          lease_until: null,
+        }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      }
+      const inserted = db.insert(ResearchQueueTable).values({
+        source_id: input.sourceID,
+        source_url: input.sourceURL,
+        title: input.title ?? null,
+        payload: { crawl_page: true, ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}) },
+        status: "discovered",
+        attempts: 0,
+        discovered_at: now,
+        updated_at: now,
+      }).onConflictDoNothing().returning().get()
+      if (inserted) return inserted
+      return db.select().from(ResearchQueueTable)
+        .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
+    })
   }
 
   export function blockAuthentication(input: { sourceID: string; sourceURL: string; title?: string; reason: string; payload?: Record<string, unknown> }) {
@@ -182,8 +247,11 @@ export namespace ResearchQueue {
   export function stats() {
     return Database.use((db) => {
       const rows = db.select().from(ResearchQueueTable).orderBy(asc(ResearchQueueTable.sequence)).all()
+      const crawlPages = rows.filter((row) => row.payload?.crawl_page === true).length
+      const reportRows = rows.filter((row) => row.payload?.crawl_page !== true)
       const counts: Record<string, number> = {
-        total: rows.length,
+        total: reportRows.length,
+        crawl_pages: crawlPages,
         discovered: 0,
         queued: 0,
         studying: 0,
@@ -192,7 +260,7 @@ export namespace ResearchQueue {
         rejected: 0,
         blocked_auth: 0,
       }
-      for (const row of rows) counts[row.status] = (counts[row.status] ?? 0) + 1
+      for (const row of reportRows) counts[row.status] = (counts[row.status] ?? 0) + 1
       return counts
     })
   }

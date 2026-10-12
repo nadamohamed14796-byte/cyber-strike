@@ -619,6 +619,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
+    const primarySeeds = new Set(source.seedUrls.map((url) => normalizeUrl(url)).filter((url): url is string => !!url))
     const queued = new Set<string>()
     const visited = new Set<string>()
     const errors: string[] = []
@@ -648,9 +649,19 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       const current = queue.shift()!
       if (visited.has(current.url)) continue
       visited.add(current.url)
-      if (current.depth > 0 && isResearchCandidate(current.url, source)) {
-        if (ResearchQueue.find(source.id, current.url) || knownKnowledgeURLs.has(current.url)) continue
-      }
+      const existing = ResearchQueue.find(source.id, current.url)
+      const isReportURL = isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)
+      // Never fetch a known report again, including legacy reports already in knowledge.
+      // Refresh primary index pages every cycle; cache pagination/sitemap pages for six hours.
+      if (isReportURL && (
+        (existing && existing.payload?.crawl_page !== true) ||
+        knownKnowledgeURLs.has(current.url)
+      )) continue
+      if (
+        existing?.payload?.crawl_page === true &&
+        !primarySeeds.has(current.url) &&
+        ResearchQueue.isFreshCrawlPage(source.id, current.url)
+      ) continue
       pages++
       try {
         const html = await fetchText(current.url, source)
@@ -693,6 +704,12 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
             if (row.created) added++
           }
         }
+        ResearchQueue.markVisitedPage({
+          sourceID: source.id,
+          sourceURL: current.url,
+          title,
+          contentFingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
+        })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {

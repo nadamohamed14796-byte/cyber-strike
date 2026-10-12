@@ -157,3 +157,38 @@ test("source-filtered queue claims never consume another source's work", async (
     },
   })
 })
+
+
+test("research crawl-page cache skips recent index pages and promotes newly relevant URLs", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const url = "https://research.example.test/archive?page=2"
+      const visited = ResearchQueue.markVisitedPage({
+        sourceID: "test-crawl-cache",
+        sourceURL: url,
+        title: "Archive page",
+        contentFingerprint: "fingerprint-1",
+      })
+      expect(visited?.status).toBe("discovered")
+      expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url)).toBe(true)
+      expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url, Date.now() + 7 * 60 * 60_000)).toBe(false)
+      expect(ResearchQueue.stats().total).toBe(0)
+      expect(ResearchQueue.stats().crawl_pages).toBe(1)
+
+      const promoted = ResearchQueue.enqueue({
+        sourceID: "test-crawl-cache",
+        sourceURL: url,
+        title: "Newly relevant report",
+        payload: { cached_text: "report content" },
+      })
+      expect(promoted.created).toBe(true)
+      expect(ResearchQueue.find("test-crawl-cache", url)?.status).toBe("queued")
+      expect(ResearchQueue.find("test-crawl-cache", url)?.payload?.crawl_page).not.toBe(true)
+      expect(ResearchQueue.stats().total).toBe(1)
+      expect(ResearchQueue.stats().crawl_pages).toBe(0)
+      await Instance.dispose()
+    },
+  })
+})
