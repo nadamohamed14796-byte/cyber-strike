@@ -68,6 +68,58 @@ const TargetShowCommand = cmd({
   },
 })
 
+const TargetScopeCommand = cmd({
+  command: "scope <url>",
+  describe: "show or configure an explicitly authorized target scope",
+  builder: (yargs: Argv) =>
+    yargs
+      .positional("url", { type: "string", demandOption: true })
+      .option("include", { type: "string", array: true, describe: "authorized domain, *.domain wildcard, or IPv4 CIDR (repeatable)" })
+      .option("exclude", { type: "string", array: true, describe: "explicitly excluded domain, wildcard, or IPv4 CIDR (repeatable)" })
+      .option("source", { type: "string", describe: "program or authorization source name" })
+      .option("reference", { type: "string", describe: "HTTPS URL for the official program scope/policy" }),
+  async handler(args) {
+    await Instance.provide({
+      directory: process.cwd(),
+      async fn() {
+        const requestedChange = Boolean(args.include?.length || args.exclude?.length || args.source || args.reference)
+        if (requestedChange) {
+          const result = await TargetMemory.configureScope(args.url, {
+            include: args.include ?? [],
+            exclude: args.exclude ?? [],
+            authorizationSource: args.source ?? "",
+            authorizationReference: args.reference ?? "",
+          })
+          console.log("Scope configured for: " + result.workspace.targetURL)
+          console.log("Authorization source: " + result.scope.authorizationSource)
+          console.log("Reference: " + result.scope.authorizationReference)
+          console.log("Included: " + result.scope.scopeItems.join(", "))
+          console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
+          console.log("Scope file: " + result.workspace.workspacePath + "/scope/scope.json")
+          console.log("Review the official program policy before active testing; this manifest records your explicit scope decision.")
+          return
+        }
+
+        const scope = await TargetMemory.getScope(args.url)
+        if (!scope) {
+          console.log("No target workspace exists. Create one with: cyberstrike target init " + args.url)
+          return
+        }
+        console.log("Target: " + scope.targetURL)
+        console.log("Status: " + scope.status)
+        console.log("Included: " + (scope.scopeItems.join(", ") || "(none)"))
+        console.log("Excluded: " + (scope.excludedItems.join(", ") || "(none)"))
+        console.log("Authorization source: " + (scope.authorizationSource ?? "(not configured)"))
+        console.log("Reference: " + (scope.authorizationReference ?? "(not configured)"))
+        if (scope.status !== "configured") {
+          console.log("WARNING: Scope is unconfigured. Do not perform active testing.")
+          console.log("Configure with --include <domain> --source <program> --reference <official-https-url>.")
+        }
+      },
+    })
+  },
+})
+
 const TargetNoteCommand = cmd({
   command: "note <url> <content>",
   describe: "save a durable note to SQLite and the target notes.md file",
@@ -122,6 +174,7 @@ export const TargetCommand = cmd({
       .command(TargetInitCommand)
       .command(TargetListCommand)
       .command(TargetShowCommand)
+      .command(TargetScopeCommand)
       .command(TargetNoteCommand)
       .demandCommand(),
   async handler() {},
