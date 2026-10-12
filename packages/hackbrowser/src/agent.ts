@@ -27,8 +27,8 @@ import {
   headersChanged,
   initAuth,
 } from "./ingest.ts"
-import { loadSession, autoLogin, handle2FA, waitForManualLogin } from "./auth.ts"
-import { resolveModel, planPage, planUnexploredElements, isAuthError } from "./navigator.ts"
+import { loadSession, autoLogin, handle2FA, waitForManualLogin, isLoginLikeUrl, isSocialLoginLabel } from "./auth.ts"
+import { resolveModel, planPage, planUnexploredElements, planLogin, isAuthError } from "./navigator.ts"
 import {
   collectElements,
   isViewportCenterBlocked,
@@ -774,6 +774,48 @@ async function explorePageWithAI(
   }
   elements = filterVisitedLinks(elements, pageUrl, globalState.visitedPages)
   log.debug("initial scan", { elements: elements.length })
+
+  // Authentication pages are system-owned. Never send their forms to the generic planner.
+  const loginUrl = isLoginLikeUrl(pageUrl)
+  const hasPasswordField = elements.some((element) => element.type === "password")
+  if (loginUrl || hasPasswordField) {
+    const visibleLinks = () => elements
+      .filter((element) => element.role === "link" && !!element.href)
+      .map((element) => element.href)
+    const credentials = globalState.storedCredentials
+    if (!credentials) {
+      log.warn("login page detected without saved credentials; skipping login-form planning", { url: pageUrl })
+      return visibleLinks()
+    }
+
+    const retryKey = normalizeUrl(pageUrl)
+    if (globalState.authRetryAttempts.has(retryKey)) {
+      log.warn("login page already retried during this crawl; skipping to avoid an authentication loop", { url: pageUrl })
+      return visibleLinks()
+    }
+    globalState.authRetryAttempts.add(retryKey)
+
+    let result = await autoLogin(page, credentials)
+    if (!result.success && result.error !== "saved_login_origin_mismatch") {
+      result = await aiLogin(page, credentials, model, usageAcc)
+    }
+    if (!result.success) {
+      log.warn("automatic session recovery did not complete; waiting for operator authentication", {
+        reason: result.error,
+      })
+      await waitForManualLogin(page, "session re-authentication")
+    }
+
+    pageUrl = page.url()
+    elements = filterVisitedLinks(await collectElements(page), pageUrl, globalState.visitedPages)
+    const stillHasPassword = elements.some((element) => element.type === "password")
+    if (stillHasPassword || isLoginLikeUrl(pageUrl)) {
+      log.warn("login page remains after recovery; generic planner skipped", { url: pageUrl })
+      return visibleLinks()
+    }
+    globalState.authPhase = "authenticated"
+    globalState.loginHandled = true
+  }
 
   // 2. Ask LLM once — get the full exploration plan for this page
   const vcBlocked = await isViewportCenterBlocked(page)
@@ -1588,6 +1630,77 @@ function fieldAction(role: string): "fill" | "select" | "click" {
 }
 
 /** Find an element by role+label. Falls back to prefix match for enriched labels. */
+async function aiLogin(
+  page: Page,
+  credentials: NonNullable<AgentConfig["auth"]["credentials"]>,
+  model: LanguageModel,
+  usageAcc?: CrawlUsage,
+): Promise<{ success: boolean; error?: string }> {
+  const originAllowed = () => {
+    if (!credentials.origin) return true
+    try {
+      return new URL(page.url()).origin === credentials.origin
+    } catch {
+      return false
+    }
+  }
+  const stillOnLogin = async () => {
+    const passwordField = await page.$('input[type="password"]')
+    const passwordVisible = passwordField ? await passwordField.isVisible().catch(() => false) : false
+    return passwordVisible || isLoginLikeUrl(page.url())
+  }
+  const noopUI = () => {}
+
+  for (let step = 0; step < 3; step++) {
+    if (!originAllowed()) return { success: false, error: "saved_login_origin_mismatch" }
+    const elements = await collectElements(page)
+    const formElements = elements.filter((element) => {
+      const label = (element.label + " " + element.placeholder).slice(0, 240)
+      if (/otp|one[- ]time|mfa|verification code|recovery code|captcha/i.test(label)) return false
+      return element.type === "password" || element.type === "email" ||
+        (element.role === "textbox" && ["text", "search", "tel", "url", ""].includes(element.type)) ||
+        element.role === "button"
+    }).slice(0, 80)
+    if (!formElements.length) break
+
+    const plan = await planLogin(formElements, model, usageAcc)
+    if (plan.done) return (await stillOnLogin()) ? { success: false, error: "login_form_still_visible" } : { success: true }
+
+    let acted = false
+    if (plan.username) {
+      const element = resolveElement(elements, plan.username.role, plan.username.label)
+      const label = element ? (element.label + " " + element.placeholder) : ""
+      if (element && element.role === "textbox" && element.type !== "password" &&
+          !/otp|one[- ]time|mfa|verification code|recovery code|captcha/i.test(label)) {
+        await execute(page, element, "fill", credentials.username, noopUI, elements.length)
+        acted = true
+      }
+    }
+    if (plan.password) {
+      const element = resolveElement(elements, plan.password.role, plan.password.label)
+      if (element && element.type === "password") {
+        await execute(page, element, "fill", credentials.password, noopUI, elements.length)
+        acted = true
+      }
+    }
+    if (plan.submit) {
+      const element = resolveElement(elements, plan.submit.role, plan.submit.label)
+      if (element && element.role === "button" && !isSocialLoginLabel(element.label + " " + element.href)) {
+        await execute(page, element, "click", undefined, noopUI, elements.length)
+        acted = true
+      }
+    }
+    if (!acted) break
+
+    await page.waitForLoadState("domcontentloaded").catch(() => {})
+    await handle2FA(page, credentials.otpProvider, credentials.origin)
+    await page.waitForTimeout(750)
+    if (!(await stillOnLogin())) return { success: true }
+  }
+
+  return (await stillOnLogin()) ? { success: false, error: "ai_login_failed" } : { success: true }
+}
+
 function resolveElement(elements: RawElement[], role: string, label: string): RawElement | undefined {
   return (
     elements.find((e) => e.role === role && e.label === label) ??
@@ -2579,13 +2692,31 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
         }
       }
     } else if (config.auth.credentials) {
-      await autoLogin(page, config.auth.credentials)
+      const loginResult = await autoLogin(page, config.auth.credentials)
+      if (!loginResult.success && loginResult.error !== "saved_login_origin_mismatch") {
+        const fallback = model
+          ? await aiLogin(page, config.auth.credentials, model, usageAcc)
+          : { success: false, error: "no_model" }
+        if (!fallback.success) {
+          log.warn("AI login fallback failed; waiting for operator login", { reason: fallback.error })
+          await waitForManualLogin(page, "initial login")
+        }
+      } else if (loginResult.error === "saved_login_origin_mismatch") {
+        log.warn("saved login does not match the current page origin; refusing credential autofill")
+        await waitForManualLogin(page, "external authentication")
+      }
     } else {
       await handle2FA(page)
     }
 
     // Initialize global state (Aşama 13: outOfScope snapshotted from config)
     const globalState = createGlobalState({ outOfScope: config.outOfScope })
+    if (config.auth.credentials) {
+      globalState.storedCredentials = config.auth.credentials
+      globalState.loginHandled = true
+    } else if (config.auth.authenticated) {
+      globalState.loginHandled = true
+    }
     if (config.outOfScope?.length) {
       log.info("out-of-scope labels", { count: config.outOfScope.length, labels: config.outOfScope })
     }

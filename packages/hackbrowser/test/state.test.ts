@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test"
 import {
   createGlobalState,
+  buildPlannerSnapshot,
   markPageEmpty,
   drainEmptyStateQueue,
   drainOnMutation,
@@ -291,4 +292,10 @@ test("getIntelligence: single-cred sentinel and labels live in the same map", ()
   expect(getIntelligence(s, SINGLE_CRED).emptyStateQueue.has("/checkout")).toBe(true)
   expect(getIntelligence(s, "admin").emptyStateQueue.has("/checkout")).toBe(true)
   expect(s.intelligenceByCredential.size).toBe(2)
+})
+
+
+test("buildPlannerSnapshot marks login as system-handled", () => {
+  const snapshot = buildPlannerSnapshot("https://app.example.test/login", [], createGlobalState(), C, false)
+  expect(snapshot.loginHandled).toBe(true)
 })

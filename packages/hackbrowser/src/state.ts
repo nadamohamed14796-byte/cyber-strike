@@ -22,6 +22,8 @@ const MAX_FAILED_ELEMENTS = 20
 export function createGlobalState(opts?: { outOfScope?: readonly string[] }): GlobalState {
   return {
     visitedPages: new Set(),
+    authRetryAttempts: new Set(),
+    loginHandled: false,
     visitedNav: new Set(),
     emittedEndpoints: new Set(),
     capturedEndpoints: new Set(),
@@ -458,6 +460,8 @@ export function findElement(pageState: PageState, elementId: string): RawElement
 /** Minimal snapshot sent to LLM planner — no action history, no failed elements */
 export interface PlannerSnapshot {
   url: string
+  /** Generic planner must never fill a login form using synthetic values. */
+  loginHandled: boolean
   viewportCenterBlocked: boolean
   totalPagesVisited: number
   elements: PromptElement[]
@@ -494,6 +498,7 @@ export function buildPlannerSnapshot(
   }
   const snapshot: PlannerSnapshot = {
     url,
+    loginHandled: true,
     viewportCenterBlocked,
     totalPagesVisited: globalState.visitedPages.size,
     elements: promptElements,

@@ -1,4 +1,4 @@
-import type { Page, BrowserContext } from "playwright"
+import type { Page, BrowserContext, ElementHandle } from "playwright"
 import { Log } from "./log.ts"
 import fs from "fs"
 import readline from "readline"
@@ -412,42 +412,178 @@ export async function waitForManualLogin(
 // Auto-login
 // ============================================================
 
+const USER_SELECTORS = [
+  'input[type="email"]',
+  'input[name="identifier"]',
+  'input[autocomplete="username"]',
+  'input[name*="email" i]',
+  'input[name*="user" i]',
+  'input[id*="email" i]',
+  'input[id*="user" i]',
+  'input[type="text"]',
+]
+
+const SOCIAL_RE = /google|facebook|github|apple|microsoft|twitter|linkedin|gitlab|okta|saml|sso|discord|slack|continue with|sign ?in with|log ?in with|with (google|github|apple)/i
+const PRIMARY_RE = /\b(continue|next|sign ?in|log ?in|submit|proceed|verify|confirm)\b/i
+const LOGIN_PATH_RE = /\/(login|sign-?in|auth|accounts)(?:\/|$)/i
+
+export function isLoginLikeUrl(value: string): boolean {
+  try {
+    return LOGIN_PATH_RE.test(new URL(value).pathname)
+  } catch {
+    return false
+  }
+}
+
+export function isSocialLoginLabel(value: string): boolean {
+  return SOCIAL_RE.test(value)
+}
+
+export interface AutoLoginResult {
+  success: boolean
+  error?: string
+}
+
+async function firstVisible(page: Page, selectors: string[]): Promise<ElementHandle<HTMLElement> | null> {
+  for (const selector of selectors) {
+    const candidates = await page.$$(selector)
+    for (const candidate of candidates) {
+      if (await candidate.isVisible().catch(() => false)) return candidate as ElementHandle<HTMLElement>
+    }
+  }
+  return null
+}
+
+async function clickLoginSubmit(page: Page, scope?: ElementHandle<HTMLElement> | null): Promise<void> {
+  const root = scope ?? page
+  const candidates = await root.$$(
+    'button[type="submit"], input[type="submit"], button:not([type]), button[type="button"], [role="button"]',
+  )
+  let best: ElementHandle<Element> | null = null
+  let bestScore = -1
+  for (const button of candidates) {
+    const info = await button.evaluate((element) => {
+      const node = element as HTMLElement & { disabled?: boolean; value?: string }
+      const text = (node.textContent || node.value || node.getAttribute("aria-label") || "").trim().slice(0, 180)
+      return {
+        text,
+        type: node.getAttribute("type") || "",
+        href: node.getAttribute("href") || "",
+        disabled: node.disabled === true,
+        visible: !!(node.offsetParent || node.getClientRects().length),
+      }
+    }).catch(() => null)
+    if (!info || info.disabled || !info.visible || isSocialLoginLabel(info.text + " " + info.href)) continue
+    let score = 0
+    if (info.type === "submit") score += 2
+    if (PRIMARY_RE.test(info.text)) score += 3
+    if (!info.text) score += 1
+    if (score > bestScore) {
+      bestScore = score
+      best = button
+    }
+  }
+  if (best) {
+    await best.click()
+    return
+  }
+  await page.keyboard.press("Enter")
+}
+
 /**
- * Auto-login with username/password credentials.
- * Falls back to manual login via browser button if form not found.
+ * Auto-login with operator-supplied, origin-bound credentials.
+ * Handles single-step and common email -> Continue -> password flows. Reports a
+ * bounded result; the caller may use the safe AI fallback or request human input.
  */
 export async function autoLogin(
   page: Page,
-  credentials: { username: string; password: string; origin?: string; otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>; usernameSelector?: string; passwordSelector?: string },
-): Promise<void> {
-  const userSel =
-    credentials.usernameSelector ??
-    'input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], input[id*="user"], input[id*="email"]'
-  const passSel = credentials.passwordSelector ?? 'input[type="password"]'
-
-  // Saved credentials are origin-bound. Fail closed before filling anything if navigation redirected elsewhere.
-  if (credentials.origin && new URL(page.url()).origin !== credentials.origin) {
-    throw new Error("Saved login origin mismatch; refusing to autofill credentials on a different origin.")
-  }
-
+  credentials: {
+    username: string
+    password: string
+    origin?: string
+    otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>
+    usernameSelector?: string
+    passwordSelector?: string
+  },
+): Promise<AutoLoginResult> {
+  const passSelector = credentials.passwordSelector ?? 'input[type="password"]'
   try {
-    await page.waitForSelector(userSel, { timeout: 5000 })
-    await page.fill(userSel, credentials.username)
-    await page.fill(passSel, credentials.password)
+    const current = new URL(page.url())
+    if (credentials.origin && current.origin !== credentials.origin) {
+      log.warn("auto-login blocked by origin mismatch", {
+        expectedOrigin: credentials.origin,
+        actualOrigin: current.origin,
+      })
+      return { success: false, error: "saved_login_origin_mismatch" }
+    }
 
-    const submitBtn = await page.$('button[type="submit"], input[type="submit"], button:not([type])')
-    if (submitBtn) {
-      await submitBtn.click()
+    let passwordField = await firstVisible(page, [passSelector])
+    if (!passwordField && !isLoginLikeUrl(page.url())) {
+      // Do not mistake a search box or unrelated form on a landing page for login.
+      return { success: true }
+    }
+
+    let usernameField: ElementHandle<HTMLElement> | null = null
+    if (credentials.usernameSelector) {
+      usernameField = await firstVisible(page, [credentials.usernameSelector])
     } else {
-      await page.keyboard.press("Enter")
+      for (let attempt = 0; attempt < 10 && !usernameField; attempt++) {
+        usernameField = await firstVisible(page, USER_SELECTORS)
+        if (!usernameField) await page.waitForTimeout(500)
+      }
+    }
+
+    if (!usernameField && !passwordField) return { success: false, error: "login_form_not_found" }
+
+    let formHandle: ElementHandle<HTMLElement> | null = null
+    if (usernameField) {
+      formHandle = await usernameField
+        .evaluateHandle((element) => element.closest("form"))
+        .then((handle) => handle.asElement() as ElementHandle<HTMLElement> | null)
+        .catch(() => null)
+      await usernameField.fill(credentials.username)
+    }
+
+    passwordField = await firstVisible(page, [passSelector])
+    if (passwordField) {
+      await passwordField.fill(credentials.password)
+      await clickLoginSubmit(page, formHandle)
+    } else {
+      if (!usernameField) return { success: false, error: "username_field_not_visible" }
+      await clickLoginSubmit(page, formHandle)
+      try {
+        await page.waitForSelector(passSelector, { timeout: 8000, state: "visible" })
+      } catch {
+        log.warn("auto-login: password step did not appear after identifier submit", {
+          origin: credentials.origin ?? current.origin,
+        })
+        return { success: false, error: "multi_step_password_not_found" }
+      }
+      passwordField = await firstVisible(page, [passSelector])
+      if (!passwordField) return { success: false, error: "password_field_not_visible" }
+      await passwordField.fill(credentials.password)
+      const currentPasswordField = (await page.$(passSelector)) as ElementHandle<HTMLElement> | null
+      const passwordForm = await currentPasswordField
+        ?.evaluateHandle((element) => element.closest("form"))
+        .then((handle) => handle?.asElement() as ElementHandle<HTMLElement> | null)
+        .catch(() => null)
+      await clickLoginSubmit(page, passwordForm)
     }
 
     await page.waitForLoadState("domcontentloaded").catch(() => {})
-    log.info("auto-login attempted", { origin: credentials.origin ?? "unspecified" })
+    await handle2FA(page, credentials.otpProvider, credentials.origin)
+    await page.waitForTimeout(1000)
 
-    await handle2FA(page, credentials.otpProvider ?? (async () => undefined), credentials.origin)
-  } catch (err) {
-    log.warn("auto-login failed, falling back to manual login")
-    await waitForManualLogin(page)
+    const passwordStillVisible = Boolean(await firstVisible(page, [passSelector]))
+    if (passwordStillVisible && isLoginLikeUrl(page.url())) {
+      log.warn("auto-login: login form remains visible after submit", {
+        origin: credentials.origin ?? current.origin,
+      })
+      return { success: false, error: "credentials_rejected" }
+    }
+    return { success: true }
+  } catch {
+    log.warn("auto-login failed; caller will use fallback authentication")
+    return { success: false, error: "auto_login_error" }
   }
 }

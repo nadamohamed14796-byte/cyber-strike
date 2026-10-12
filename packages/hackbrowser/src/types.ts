@@ -44,6 +44,12 @@ export interface IntelligenceState {
 /** Global state: lives across entire crawl */
 export interface GlobalState {
   // Shared across credentials
+  /** Credentials exist only in this worker's memory; persisted credentials come from encrypted AuthVault. */
+  storedCredentials?: NonNullable<AgentConfig["auth"]["credentials"]>
+  /** Login URLs already retried during this crawl, to prevent authentication loops. */
+  authRetryAttempts: Set<string>
+  /** Login forms are handled by the system, never by generic planner tasks. */
+  loginHandled: boolean
   visitedPages: Set<string>
   visitedNav: Set<string> // site-chrome nav items already surfaced ("role::label") — crawl-wide nav dedup (#127)
   emittedEndpoints: Set<string> // discovered endpoints already ingested ("METHOD url") — crawl-wide emit dedup (#129)
