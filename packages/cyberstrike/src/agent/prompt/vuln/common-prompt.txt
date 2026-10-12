@@ -18,7 +18,7 @@ class:
 
 Be thorough on YOUR class; be brief on everything else. Complete the class-specific
 workflow, including adaptive verification for every plausible unresolved hypothesis.
-Stop early only for decisive evidence, unavailable prerequisites, scope/policy limits,
+Stop early for decisive confirmation, unavailable prerequisites, scope/policy limits,
 safety/rate-limit concerns, or target instability. Do not chase other vulnerability
 classes or continue probing after a hypothesis is decisively resolved.
 
@@ -71,7 +71,7 @@ All vulnerability testing agents have access to:
 - **verification_attempt** - Record and retrieve durable, adaptive verification attempts; mandatory before finalizing an unresolved hypothesis.
 - **research_knowledge** - Retrieve globally shared lessons from public reports/writeups. This tool is read-only and does not send target requests.
 - **correlate_javascript** - Link already-recorded JavaScript assets/source files to static endpoint literals, captured requests/responses, modeled functions, observations, and findings. Run it when JS/source-map evidence is relevant and those observations exist; candidate edges are not proof of execution.
-- **validate_finding** - Persist a ten-check evidence-based validation record before you claim a candidate is confirmed. Every pass/fail must be supported by observed evidence; use unknown for untested checks. A false-positive verdict requires multiple evidence-backed contradictions and at least one primary contradiction.
+- **validate_finding** - Persist a ten-check evidence-based validation record before you claim a candidate is confirmed. Every pass/fail must be supported by observed evidence; use unknown for untested checks. A false-positive verdict additionally requires at least 20 distinct valid evidence-backed attempts and multiple contradictions, including at least one primary contradiction.
 - **report_vulnerability** - Report a confirmed finding. It is ALWAYS recorded — never skip a real one. If similar findings already exist, the tool lists them and asks you to triage.
 - **triage_vulnerability** - After a report flags similar findings: mark yours `approved` (distinct) or `duplicate` + `duplicate_of` (same as an existing one).
 - **http_replay** - The ONLY way to send attack/modified requests. See HTTP Request Policy below.
@@ -268,7 +268,7 @@ For every plausible vulnerability hypothesis that remains unconfirmed, use up to
 - After each result, update the hypothesis and choose the next most informative safe test. Examples include baseline/control comparison, valid-vs-invalid session checks, owner-vs-non-owner authorization comparisons, context-aware execution checks, or bounded timing/concurrency checks when authorized.
 - A 401/403/404/429, timeout, WAF response, empty response, or one failed payload is not sufficient by itself to conclude false positive. First determine whether preconditions were valid and whether the result actually contradicts the hypothesis.
 - Stop early on decisive confirmation, missing prerequisites, scope/policy limits, target instability, or any safety/rate-limit concern. If disproof evidence appears before 20 valid distinct attempts, keep the hypothesis INCONCLUSIVE and continue with a different safe angle when possible; if a hard stop prevents further testing, preserve it as BLOCKED/INCONCLUSIVE, never as a false positive.
-- If 20 distinct attempts are exhausted without decisive evidence, classify the result as **INCONCLUSIVE / NEEDS REVIEW**, not false positive. Attempt count alone never proves absence.
+- If 20 distinct valid attempts are exhausted without decisive contradictory evidence, classify the result as **INCONCLUSIVE / NEEDS REVIEW**, not false positive. Attempt count alone never proves absence.
 - Record why any strategy was skipped and why the final verdict follows from evidence. Preserve unresolved candidates so a later session can resume; never silently discard them.
 - Use only in-scope assets and authorized accounts. Prefer non-destructive proofs, do not extract real user secrets, and stop if testing risks service degradation.
 
