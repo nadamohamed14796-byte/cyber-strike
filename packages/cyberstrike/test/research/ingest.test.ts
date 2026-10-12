@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
-import { extractResearchDetails, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets } from "../../src/research/ingest"
+import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets } from "../../src/research/ingest"
+import { ResearchQueue } from "../../src/research/queue"
+import { Instance } from "../../src/project/instance"
+import { tmpdir } from "../fixture/fixture"
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
   const extracted = extractResearchDetails(
@@ -127,4 +130,45 @@ test("research URL normalization removes embedded credentials and secret query p
     .toBe("https://reports.example.test/report?id=42")
   expect(normalizeResearchUrl("https://reports.example.test/report?access_token=abc&Page=2"))
     .toBe("https://reports.example.test/report?Page=2")
+})
+
+
+test("learning reuses cached report text instead of fetching the same report URL again", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "portswigger"
+      const sourceURL = "https://portswigger.net/web-security/access-control/idor"
+      ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "IDOR report",
+        payload: {
+          cached_text: [
+            "Insecure direct object reference (IDOR) occurs when an application does not check object-level authorization.",
+            "An authenticated user can change the object ID in GET /api/users/123 and read another user's private account data.",
+            "Reproduction: use two controlled accounts, capture the owner's request, then repeat it with the second account and compare the response.",
+            "Impact: unauthorized access to private records. Verify the result against an owner-account baseline and do not infer a vulnerability from an identifier alone.",
+          ].join(" ").repeat(4),
+        },
+      })
+
+      const originalFetch = globalThis.fetch
+      let fetchCalls = 0
+      globalThis.fetch = (async () => {
+        fetchCalls++
+        throw new Error("cached research content must not trigger another HTTP fetch")
+      }) as typeof fetch
+      try {
+        const result = await learnResearchQueue({ limit: 1, sourceID })
+        expect(result.learned).toBe(1)
+        expect(fetchCalls).toBe(0)
+        expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("learned")
+      } finally {
+        globalThis.fetch = originalFetch
+        await Instance.dispose()
+      }
+    },
+  })
 })
