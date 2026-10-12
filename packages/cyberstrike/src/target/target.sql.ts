@@ -14,6 +14,8 @@ export const TargetWorkspaceTable = sqliteTable(
     project_id: text()
       .notNull()
       .references(() => ProjectTable.id, { onDelete: "cascade" }),
+    // ProjectTable shares "global" for non-Git directories; this key isolates them.
+    owner_key: text().notNull().default("legacy:unscoped"),
     target_key: text().notNull(),
     target_url: text().notNull(),
     hostname: text().notNull(),
@@ -22,8 +24,8 @@ export const TargetWorkspaceTable = sqliteTable(
     ...Timestamps,
   },
   (table) => [
-    uniqueIndex("target_workspace_project_key_idx").on(table.project_id, table.target_key),
-    index("target_workspace_host_idx").on(table.project_id, table.hostname),
+    uniqueIndex("target_workspace_owner_target_key_idx").on(table.owner_key, table.target_key),
+    index("target_workspace_owner_host_idx").on(table.owner_key, table.hostname),
   ],
 )
 
