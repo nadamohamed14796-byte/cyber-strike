@@ -121,12 +121,16 @@ test("research queue records auth-blocked work and only retries it explicitly", 
         sourceID: "test-auth",
         sourceURL: "https://research.example.test/private-report",
         reason: "HTTP 401",
+        payload: { cached_text: "Sign in to continue", crawl_depth: 1 },
       })
       expect(blocked?.status).toBe("blocked_auth")
       expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.last_error).toBe("HTTP 401")
+      expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.payload).not.toHaveProperty("cached_text")
+      expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.payload?.auth_required).toBe(true)
       expect(ResearchQueue.claimNext("worker-auth", "test-auth")).toBeNull()
       expect(ResearchQueue.retryAuthenticationBlocked(10, "test-auth")).toBe(1)
       expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.status).toBe("queued")
+      expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.payload?.auth_required).toBeUndefined()
       const claimed = ResearchQueue.claimNext("worker-auth", "test-auth")
       expect(claimed?.status).toBe("studying")
       expect(claimed?.attempts).toBe(1)

@@ -132,15 +132,21 @@ export namespace ResearchQueue {
       const existing = db.select().from(ResearchQueueTable)
         .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
       if (existing?.status === "learned" || existing?.status === "rejected") return existing
-      if (existing) return db.update(ResearchQueueTable).set({
-        status: "blocked_auth", title: input.title ?? existing.title,
-        payload: { ...(existing.payload ?? {}), ...(input.payload ?? {}), auth_required: true },
-        last_error: input.reason.slice(0, 1000), lease_owner: null, lease_until: null,
-        updated_at: now, completed_at: now,
-      }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      if (existing) {
+        // A cached login page must never be reused after credentials are configured.
+        const { cached_text: _cachedText, auth_required: _authRequired, ...existingPayload } = existing.payload ?? {}
+        const { cached_text: _incomingCachedText, ...incomingPayload } = input.payload ?? {}
+        return db.update(ResearchQueueTable).set({
+          status: "blocked_auth", title: input.title ?? existing.title,
+          payload: { ...existingPayload, ...incomingPayload, auth_required: true },
+          last_error: input.reason.slice(0, 1000), lease_owner: null, lease_until: null,
+          updated_at: now, completed_at: now,
+        }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      }
+      const { cached_text: _incomingCachedText, ...incomingPayload } = input.payload ?? {}
       return db.insert(ResearchQueueTable).values({
         source_id: input.sourceID, source_url: input.sourceURL, title: input.title ?? null,
-        payload: { ...(input.payload ?? {}), auth_required: true }, status: "blocked_auth", attempts: 0,
+        payload: { ...incomingPayload, auth_required: true }, status: "blocked_auth", attempts: 0,
         last_error: input.reason.slice(0, 1000), discovered_at: now, updated_at: now, completed_at: now,
       }).returning().get()
     })
@@ -153,9 +159,13 @@ export namespace ResearchQueue {
         ? and(eq(ResearchQueueTable.status, "blocked_auth"), eq(ResearchQueueTable.source_id, sourceID))
         : eq(ResearchQueueTable.status, "blocked_auth"))
         .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
-      for (const row of rows) db.update(ResearchQueueTable).set({
-        status: "queued", attempts: 0, last_error: null, lease_owner: null, lease_until: null, completed_at: null, updated_at: now,
-      }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).run()
+      for (const row of rows) {
+        const { auth_required: _authRequired, cached_text: _cachedText, ...payload } = row.payload ?? {}
+        db.update(ResearchQueueTable).set({
+          status: "queued", payload, attempts: 0, last_error: null, lease_owner: null, lease_until: null,
+          completed_at: null, updated_at: now,
+        }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).run()
+      }
       return rows.length
     })
   }

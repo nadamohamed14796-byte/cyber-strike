@@ -697,7 +697,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 candidate_score: candidateScore(current.url, source),
                 // Discovery already fetched and sanitized this report. Cache the bounded text
                 // so the learning worker does not issue a second HTTP request for the same page.
-                cached_text: text.length <= 100_000 ? text : undefined,
+                cached_text: text,
                 content_fingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
               },
             })
@@ -758,7 +758,13 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         title = redactResearchSecrets(titleOf(html, item.source_url))
       }
       if (looksLikeResearchAuthenticationWall(item.source_url, title, text, html)) {
-        ResearchQueue.complete(item.sequence, item.lease_owner, "blocked_auth", "authentication wall detected; configure a source-scoped session, then run research retry-auth")
+        ResearchQueue.blockAuthentication({
+          sourceID: item.source_id,
+          sourceURL: item.source_url,
+          title,
+          reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
+          payload: { source_name: source.name, source_kind: source.kind, crawl_depth: item.payload.crawl_depth },
+        })
         result.blocked_auth++
         continue
       }
