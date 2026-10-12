@@ -1341,7 +1341,6 @@ export const SessionRoutes = lazy(() =>
               } finally {
                 Request.updateStatus({ id: req.id, status: finalStatus })
               }
-            }
             })
           }
         } else {
