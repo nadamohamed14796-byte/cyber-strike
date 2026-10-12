@@ -52,6 +52,25 @@ test("never persists JavaScript source in correlation response previews", () => 
   expect(jsonPreview).not.toContain("this-is-a-secret-value")
 })
 
+test("correlates security sink candidates from captured JavaScript without retaining source", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const sources = extractCapturedJavaScriptSources([{
+    id: "req-risk-js",
+    url: "https://app.example.com/assets/card.js",
+    responseContentType: "application/javascript",
+    responseBody: [
+      "function renderCard(untrustedHtml) {",
+      " document.querySelector('#card').innerHTML = untrustedHtml",
+      "}",
+      'fetch("/api/cards")',
+    ].join("\n"),
+  }])
+  expect(sources).toHaveLength(1)
+  expect(sources[0]?.analysis?.riskSignals.some((signal) => signal.kind === "dom-html-sink")).toBe(true)
+  expect(JSON.stringify(sources)).not.toContain("untrustedHtml")
+  expect(JSON.stringify(sources)).not.toContain("innerHTML")
+})
+
 test("does not treat ordinary labels or non-path relative strings as endpoints", () => {
   const endpoints = extractStaticJavaScriptEndpoints([
     'fetch("not-a-path")',
