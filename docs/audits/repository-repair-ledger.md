@@ -6,20 +6,28 @@
 **Working ref:** `main` (focused fixes committed directly; no per-fix branch created)  
 **Execution limitation:** the runtime could not resolve `github.com` for a local clone, and Bun is not installed in the execution container. Repository inspection and edits are therefore being performed through GitHub's repository API; verification must use GitHub Actions for this branch. No local test result is claimed.
 
+
+## Latest-main verification checkpoint — 2026-10-12
+
+- **Verified main head:** `6522bcbbb8cdaa13016bab33145ebd27fbef2997`.
+- **GitHub Actions:** typecheck run [38240947275](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947275), unit/integration test run [38240947314](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947314), build run [38240947281](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947281), and CodeQL run [38240947166](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947166) all completed successfully on this exact commit.
+- **Test detail:** 1,799 passed, 5 skipped, 0 failed across 1,804 tests in 148 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
+- **Scope of claim:** this confirms automated CI on the recorded commit. It does not claim live Gmail/OAuth, external target validation, browser MFA, or manual runtime scenarios were exercised.
+
 ## Confirmed issues
 
 | ID | Priority | Category | Root cause / evidence | Attempts | Status |
 |---|---|---|---|---:|---|
-| SEC-001 | P1 | Security / path confinement | `packages/cyberstrike/src/skill/discovery.ts` used untrusted skill names and legacy file paths to construct cache destinations; archive extraction also used an unrestricted shell `tar` command. PR #18 contains the intended mitigation but its current CI fails with actual parser errors caused by escaped backticks/interpolation (typecheck run 38202096941) and a missing argument to `get`. | 5 | in_progress |
-| SEC-002 | P2 | Test and type contract | Helper functions are exported as members of the `Discovery` namespace, not as top-level module exports; the first repair iteration imported them incorrectly. CI typecheck exposed this. | 3 | in_progress |
-| INT-001 | P2 | Branch integration | Open PR #11's five skill additions and IDOR skill edit overlap with already merged skill-library batches (#20/#21). The PR is 91 commits behind `main`; do not merge wholesale. Verify any unique remaining content before disposition. | 1 | in_progress |
-| INT-002 | P2 | Branch integration | Open PR #7 contains a broad target-memory / research / auth feature set; PR #17 has already merged an integration branch for target memory, global research learning, and scoped auth profiles. PR #7 is 91 commits behind and 311 commits ahead at its current head, so only a unique-diff review can safely establish whether it is redundant. | 1 | in_progress |
-| INT-003 | P2 | Branch integration | Draft PR #6 is heavily diverged (159 commits ahead, 91 behind). PR #15 merged a reconciled skill-quality audit, so the original branch must not be merged wholesale. Remaining unique changes require selective comparison. | 1 | in_progress |
+| SEC-001 | P1 | Security / path confinement | Remote skill cache paths and archive extraction are constrained in current `main`; PR #18's parser failure is historical, not the current-main state. | 5 | resolved; current-main CI green |
+| SEC-002 | P2 | Test and type contract | Tests call helpers through the `Discovery` namespace; current-main typecheck passed on `6522bcbbb8`. | 3 | resolved |
+| INT-001 | P2 | Branch integration | Open PR #11's five skill additions and IDOR skill edit overlap with already merged skill-library batches (#20/#21). The PR is 187 commits behind `main`; do not merge wholesale. Verify any unique remaining content before disposition. | 1 | in_progress |
+| INT-002 | P2 | Branch integration | Open PR #7 contains a broad target-memory / research / auth feature set; PR #17 has already merged an integration branch for target memory, global research learning, and scoped auth profiles. PR #7 is 187 commits behind and 311 commits ahead at its current head, so only a unique-diff review can safely establish whether it is redundant. | 1 | in_progress |
+| INT-003 | P2 | Branch integration | Draft PR #6 is heavily diverged (159 commits ahead, 187 behind). PR #15 merged a reconciled skill-quality audit, so the original branch must not be merged wholesale. Remaining unique changes require selective comparison. | 1 | in_progress |
 | INT-004 | P2 | Branch integration | PR #2 is 201 commits behind and contains broad HackBrowser changes. Its cookie-file deletion is already covered by merged PR #14; remaining functionality needs isolated diff and regression review before integration. | 1 | in_progress |
 
-| FUN-001 | P2 | Archive download integrity | `get()` decoded every response via `response.text()` before writing. Binary gzip tarballs can be corrupted during UTF-8 decoding, so the new safe archive extractor would not reliably receive the original archive bytes. | 1 | in_progress |
-| SEC-003 | P2 | Test/type contract | CI on the archive regression test exposed that `tar.x()` passes an entry union without a guaranteed `.type` property, and TypeScript rejects a Node `Buffer` as a `Response` body. Add runtime type validation and copy fixture bytes to an `ArrayBuffer`. | 1 | in_progress |
-| SEC-004 | P1 | Path normalization | The `tar.x()` filter callback had an over-escaped backslash regex that normalized pairs of backslashes rather than a single Windows path separator. The main resolver's `path.resolve` containment check also protects against escapes, but this defense-in-depth mismatch and single-backslash coverage needed correction. | 1 | in_progress |
+| FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
+| SEC-003 | P2 | Test/type contract | Tar entry properties are validated at runtime; current-main tests and typecheck pass. | 1 | resolved |
+| SEC-004 | P1 | Path normalization | Archive path normalization now handles single backslashes and is covered by current safe-path checks; current-main tests and typecheck pass. | 1 | resolved |
 
 ## Baseline verification evidence
 
@@ -41,7 +49,7 @@
 
 - Repairs described below were committed directly to `main`; no per-fix feature branches were created.
 - **Open PR #40 — audit-ledger refresh:** its useful 20-pass evidence and merged-fix summary were selectively reconciled into this file. GitHub reports it as unmergeable; do not merge the stale branch wholesale.
-- **Open PR #7 — target memory/auth/Gmail:** 311 commits ahead and 162 behind at the inspected head. Several features have already landed through prior integrations; preserve the branch and port only individually reviewed changes.
+- **Open PR #7 — target memory/auth/Gmail:** 311 commits ahead and 187 behind at the inspected head. Several features have already landed through prior integrations; preserve the branch and port only individually reviewed changes.
 - **Open PR #6 — skill-quality/reference audit:** heavily diverged; main contains newer/reconciled skill content. Do not merge wholesale.
 - **Open PR #2 — Hackbrowser improvement:** heavily diverged and the inspected branch disables TLS certificate verification. Do not merge wholesale.
 - **No merge needed:** scope-check IPv4/CIDR, bounded WebFetch, non-mutating WebRecon probes, target-workspace owner-index reconciliation, and remote skill cache confinement are already represented on main with later hardening.
