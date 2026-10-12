@@ -9,6 +9,8 @@ import {
   type FindingValidationCheckRecord,
   type FindingValidationStatus,
   type FindingValidationVerdict,
+  type FindingValidationAttemptRecord,
+  type FindingValidationAttemptStrategy,
 } from "./finding-validation.sql"
 
 export const FINDING_VALIDATION_CHECKS = [
@@ -26,6 +28,10 @@ export const FINDING_VALIDATION_CHECKS = [
 
 export type FindingValidationCheckID = (typeof FINDING_VALIDATION_CHECKS)[number]["id"]
 
+export interface FindingValidationAttemptInput extends FindingValidationAttemptRecord {}
+
+export const FINDING_VALIDATION_MIN_ATTEMPTS = 20
+
 export interface FindingValidationInputCheck {
   id: FindingValidationCheckID
   status: FindingValidationStatus
@@ -42,6 +48,8 @@ export interface FindingValidationAssessment {
   summary: string
   nextStep: string
   output: string
+  attemptCount: number
+  attemptsRemaining: number
 }
 
 const CONTRADICTION_CHECKS = new Set([
@@ -53,12 +61,26 @@ const CONTRADICTION_CHECKS = new Set([
 ])
 const PRIMARY_CONTRADICTION_CHECKS = new Set(["reproducible", "request_path", "unexpected_behavior"])
 
-export function assessFindingChecks(input: FindingValidationInputCheck[]): FindingValidationAssessment {
+export function assessFindingChecks(input: FindingValidationInputCheck[], attempts: FindingValidationAttemptInput[] = []): FindingValidationAssessment {
   if (input.length !== FINDING_VALIDATION_CHECKS.length) {
     throw new Error("Exactly 10 validation checks are required. Missing checks must be marked unknown, not omitted.")
   }
 
   const byID = new Map<string, FindingValidationInputCheck>()
+  const attemptKeys = new Set<string>()
+  for (const attempt of attempts) {
+    const strategy = String(attempt.strategy).trim()
+    const variation = String(attempt.variation).trim().toLowerCase()
+    if (!strategy || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
+      throw new Error("Every validation attempt requires a strategy, unique variation, hypothesis, and concrete observed evidence.")
+    }
+    if (variation.length > 160 || attempt.hypothesis.length > 800 || attempt.evidence.length > 2000) {
+      throw new Error("Validation attempt fields exceed safe length limits.")
+    }
+    const key = strategy + ":" + variation
+    if (attemptKeys.has(key)) throw new Error("Duplicate validation attempt variation: " + key)
+    attemptKeys.add(key)
+  }
   for (const check of input) {
     if (byID.has(check.id)) throw new Error("Duplicate validation check: " + check.id)
     byID.set(check.id, check)
@@ -91,7 +113,8 @@ export function assessFindingChecks(input: FindingValidationInputCheck[]): Findi
     (check) => CONTRADICTION_CHECKS.has(check.id) && Boolean(check.reason && check.evidence),
   )
   const hasPrimaryContradiction = contradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
-  const falsePositive = contradictions.length >= 2 && hasPrimaryContradiction
+  const enoughDistinctAttempts = attempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
+  const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction
 
   const requiredPasses = [
     "reproducible",
@@ -133,8 +156,11 @@ export function assessFindingChecks(input: FindingValidationInputCheck[]): Findi
   } else {
     summary = "Inconclusive: evidence does not justify classifying this finding as confirmed or false positive. Failed checks: " +
       (failed.length ? failed.map((check) => "#" + check.number).join(", ") : "none") +
-      "; unknown checks: " + (unknown.length ? unknown.map((check) => "#" + check.number).join(", ") : "none") + "."
-    nextStep = "Run controlled tests for unknown or failed checks, prioritizing reproducibility, the expected request path, a safe baseline/control, and evidence of real impact. Do not promote the record based on missing evidence."
+      "; unknown checks: " + (unknown.length ? unknown.map((check) => "#" + check.number).join(", ") : "none") + ". " +
+      (enoughDistinctAttempts ? "The minimum of 20 distinct evidence-backed attempts has been reached." : "False-positive classification is blocked: " + attempts.length + "/20 distinct evidence-backed attempts are recorded.")
+    nextStep = enoughDistinctAttempts
+      ? "Review the contradictory evidence and run any remaining case-specific controls before deciding. Do not promote the record based on missing evidence."
+      : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - attempts.length) + " more distinct, case-specific tests. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
   }
 
   const output = [
@@ -155,6 +181,8 @@ export function assessFindingChecks(input: FindingValidationInputCheck[]): Findi
     summary,
     nextStep,
     output,
+    attemptCount: attempts.length,
+    attemptsRemaining: Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - attempts.length),
   }
 }
 
@@ -163,6 +191,7 @@ export namespace FindingValidation {
     sessionID: string
     vulnerabilityID: string
     checks: FindingValidationInputCheck[]
+    attempts?: FindingValidationAttemptInput[]
   }) {
     const rootSessionID = Session.root(input.sessionID)
     const finding = Vulnerability.get(rootSessionID).find((row) => row.id === input.vulnerabilityID)
@@ -170,7 +199,28 @@ export namespace FindingValidation {
       throw new Error("Finding " + input.vulnerabilityID + " was not found in the current session. No validation record was saved.")
     }
 
-    const assessment = assessFindingChecks(input.checks)
+    const priorAttempts = Database.use((db) =>
+      db
+        .select({ attempts: FindingValidationTable.attempts })
+        .from(FindingValidationTable)
+        .where(and(eq(FindingValidationTable.session_id, rootSessionID), eq(FindingValidationTable.vulnerability_id, input.vulnerabilityID)))
+        .all()
+        .flatMap((row) => row.attempts ?? []),
+    )
+    const newAttempts = input.attempts ?? []
+    const currentKeys = new Set<string>()
+    for (const attempt of newAttempts) {
+      const key = attempt.strategy + ":" + attempt.variation.trim().toLowerCase()
+      if (currentKeys.has(key)) throw new Error("Duplicate validation attempt variation in this assessment: " + key)
+      currentKeys.add(key)
+    }
+    const accumulated = new Map<string, FindingValidationAttemptRecord>()
+    for (const attempt of [...priorAttempts, ...newAttempts]) {
+      const key = attempt.strategy + ":" + attempt.variation.trim().toLowerCase()
+      if (!accumulated.has(key)) accumulated.set(key, attempt)
+    }
+    const allAttempts = [...accumulated.values()]
+    const assessment = assessFindingChecks(input.checks, allAttempts)
     const validationID = Identifier.ascending("finding_validation")
     const now = Date.now()
     Database.transaction((db) =>
@@ -183,6 +233,8 @@ export namespace FindingValidation {
           verdict: assessment.verdict,
           confidence: assessment.confidence,
           checks: assessment.checks,
+          attempts: allAttempts,
+          attempt_count: allAttempts.length,
           failed_check_ids: assessment.failedCheckIDs,
           unknown_check_ids: assessment.unknownCheckIDs,
           summary: assessment.summary,
@@ -239,6 +291,7 @@ export namespace FindingValidation {
             "Finding ID: " + input.vulnerabilityID,
             "Validation ID: " + validationID,
             "Verdict: " + assessment.verdict,
+            "Distinct evidence-backed attempts: " + assessment.attemptCount + "/" + FINDING_VALIDATION_MIN_ATTEMPTS,
             assessment.summary,
             assessment.nextStep,
             "Failed checks: " + (assessment.failedCheckIDs.length ? assessment.failedCheckIDs.join(", ") : "none"),
