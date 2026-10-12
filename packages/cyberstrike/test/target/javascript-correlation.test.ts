@@ -67,8 +67,10 @@ test("correlates security sink candidates from captured JavaScript without retai
   }])
   expect(sources).toHaveLength(1)
   expect(sources[0]?.analysis?.riskSignals.some((signal) => signal.kind === "dom-html-sink")).toBe(true)
-  expect(JSON.stringify(sources)).not.toContain("untrustedHtml")
-  expect(JSON.stringify(sources)).not.toContain("innerHTML")
+  // Parameter names are intentional analysis output; executable source and sink expressions are not.
+  expect(sources[0]?.analysis?.functions.find((fn) => fn.name === "renderCard")?.parameters).toContain("untrustedHtml")
+  expect(JSON.stringify(sources)).not.toContain("document.querySelector")
+  expect(JSON.stringify(sources)).not.toContain("innerHTML = untrustedHtml")
 })
 
 test("does not treat ordinary labels or non-path relative strings as endpoints", () => {
