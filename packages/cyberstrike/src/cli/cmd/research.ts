@@ -169,10 +169,11 @@ export const ResearchCommand = cmd({
         },
       })
       .command({
-        command: "queue-stats",
+        command: "queue-stats [source]",
         describe: "show persistent research queue counts by status",
-        async handler() {
-          const stats = ResearchQueue.stats()
+        builder: (yargs) => yargs.positional("source", { type: "string", describe: "optional source ID filter" }),
+        async handler(args) {
+          const stats = ResearchQueue.stats(args.source)
           for (const [status, count] of Object.entries(stats)) console.log(status + "=" + count)
         },
       })

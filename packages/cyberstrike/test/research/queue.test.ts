@@ -16,7 +16,7 @@ test("research queue enqueue is idempotent for an already-seen source URL", asyn
       expect(first.created).toBe(true)
       expect(second.created).toBe(false)
       expect(second.sequence).toBe(first.sequence)
-      expect(ResearchQueue.stats().total).toBe(1)
+      expect(ResearchQueue.stats("test-dedupe").total).toBe(1)
       // Leave no queued work behind: other queue tests deliberately claim the oldest item.
       const cleanupClaim = ResearchQueue.claimNext("dedupe-test-cleanup")
       expect(cleanupClaim?.sequence).toBe(first.sequence)
@@ -174,8 +174,8 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
       expect(visited?.status).toBe("discovered")
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url)).toBe(true)
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url, Date.now() + 7 * 60 * 60_000)).toBe(false)
-      expect(ResearchQueue.stats().total).toBe(0)
-      expect(ResearchQueue.stats().crawl_pages).toBe(1)
+      expect(ResearchQueue.stats("test-crawl-cache").total).toBe(0)
+      expect(ResearchQueue.stats("test-crawl-cache").crawl_pages).toBe(1)
 
       const promoted = ResearchQueue.enqueue({
         sourceID: "test-crawl-cache",
@@ -186,8 +186,8 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
       expect(promoted.created).toBe(true)
       expect(ResearchQueue.find("test-crawl-cache", url)?.status).toBe("queued")
       expect(ResearchQueue.find("test-crawl-cache", url)?.payload?.crawl_page).not.toBe(true)
-      expect(ResearchQueue.stats().total).toBe(1)
-      expect(ResearchQueue.stats().crawl_pages).toBe(0)
+      expect(ResearchQueue.stats("test-crawl-cache").total).toBe(1)
+      expect(ResearchQueue.stats("test-crawl-cache").crawl_pages).toBe(0)
       await Instance.dispose()
     },
   })

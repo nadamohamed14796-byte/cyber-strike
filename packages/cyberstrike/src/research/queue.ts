@@ -244,9 +244,11 @@ export namespace ResearchQueue {
     )
   }
 
-  export function stats() {
+  export function stats(sourceID?: string) {
     return Database.use((db) => {
-      const rows = db.select().from(ResearchQueueTable).orderBy(asc(ResearchQueueTable.sequence)).all()
+      const rows = sourceID
+        ? db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.source_id, sourceID)).orderBy(asc(ResearchQueueTable.sequence)).all()
+        : db.select().from(ResearchQueueTable).orderBy(asc(ResearchQueueTable.sequence)).all()
       const crawlPages = rows.filter((row) => row.payload?.crawl_page === true).length
       const reportRows = rows.filter((row) => row.payload?.crawl_page !== true)
       const counts: Record<string, number> = {
