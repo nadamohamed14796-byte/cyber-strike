@@ -196,3 +196,35 @@ export const ValidationViolationTable = sqliteTable(
     index("validation_violation_severity_idx").on(table.session_id, table.severity),
   ],
 )
+
+/**
+ * Durable adaptive verification ledger. A hypothesis can have up to 20 distinct
+ * strategy/variant attempts; unresolved hypotheses remain inconclusive.
+ */
+export const VerificationAttemptTable = sqliteTable(
+  "verification_attempt",
+  {
+    id: text().primaryKey(),
+    session_id: text().notNull().references(() => SessionTable.id, { onDelete: "cascade" }),
+    hypothesis_key: text().notNull(),
+    asset: text().notNull(),
+    endpoint: text(),
+    vulnerability_class: text().notNull(),
+    strategy_id: text().notNull(),
+    variant_key: text().notNull(),
+    rationale: text().notNull(),
+    result_summary: text().notNull(),
+    evidence_ref: text(),
+    valid_conditions: integer().notNull().default(0),
+    outcome: text().notNull().default("inconclusive"),
+    time_created: integer().notNull(),
+    time_updated: integer().notNull(),
+  },
+  (table) => [
+    index("verification_attempt_session_idx").on(table.session_id),
+    index("verification_attempt_hypothesis_idx").on(table.session_id, table.hypothesis_key),
+    uniqueIndex("verification_attempt_unique_strategy_idx").on(
+      table.session_id, table.hypothesis_key, table.strategy_id, table.variant_key,
+    ),
+  ],
+)
