@@ -127,6 +127,15 @@ async function main() {
     publicKeyB64 = xB64 + pad
   }
 
+  // Never label signatures as official unless the private key matches the runtime trust root.
+  // In --generate mode the public key above has just been embedded in signing.ts.
+  const signingSource = await Bun.file(signingModule).text()
+  const officialKeyMatch = signingSource.match(/const OFFICIAL_PUBLIC_KEY_B64 = "([^"]*)"/)
+  if (!officialKeyMatch || officialKeyMatch[1] !== publicKeyB64) {
+    console.error("Private key does not match OFFICIAL_PUBLIC_KEY_B64 in signing.ts. Refusing to sign skills with a key the runtime will reject.")
+    process.exit(1)
+  }
+
   // Scan and sign all skills
   const glob = new Bun.Glob("**/SKILL.md")
   const files: string[] = []
