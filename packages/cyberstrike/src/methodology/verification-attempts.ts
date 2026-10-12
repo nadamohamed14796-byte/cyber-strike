@@ -89,7 +89,8 @@ export namespace VerificationAttempts {
 
   export function canRunAttempt(attempts: Attempt[], next: Pick<Attempt, "strategyID" | "variantKey">): boolean {
     const unique = uniqueAttempts(attempts)
-    return unique.length < MAX_ATTEMPTS && Boolean(next.strategyID.trim() && next.variantKey.trim()) &&
+    const validAttemptCount = unique.filter((attempt) => attempt.validConditions).length
+    return validAttemptCount < MAX_ATTEMPTS && Boolean(next.strategyID.trim() && next.variantKey.trim()) &&
       !unique.some((attempt) => attemptKey(attempt) === attemptKey(next))
   }
 
