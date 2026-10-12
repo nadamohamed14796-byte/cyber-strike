@@ -71,6 +71,24 @@ test("persists deduplicated endpoint candidates and links only host-compatible c
 })
 
 
+test("strips response processor metadata before analyzing captured JavaScript lines", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const sources = extractCapturedJavaScriptSources([{
+    id: "processed-js",
+    url: "https://app.example.com/assets/processed.js",
+    responseContentType: "application/javascript",
+    responseBody: [
+      "[Status: 200, Type: application/javascript, Size: 1.2 MB]",
+      'fetch("/api/clean-route")',
+      "[TRUNCATED - showing first 100KB of 1.2 MB]",
+    ].join("\n"),
+  }])
+  expect(sources).toHaveLength(1)
+  expect(sources[0]?.endpointLiterals).toContain("/api/clean-route")
+  expect(sources[0]?.analysis?.requests[0]?.sourceLine).toBe(1)
+  expect(sources[0]?.sha256).not.toBe("")
+})
+
 test("extracts endpoints from already-captured JavaScript responses without retaining source text", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const sources = extractCapturedJavaScriptSources([
