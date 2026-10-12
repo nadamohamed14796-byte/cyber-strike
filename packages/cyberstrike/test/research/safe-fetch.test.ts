@@ -1,10 +1,10 @@
 import { expect, spyOn, test } from "bun:test"
+import { fetchResearchText, isPublicResearchAddress } from "../../src/research/safe-fetch"
 
 const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }]
 function fetchTest(url: string, selectedSource: typeof source = source, resolveHost = publicLookup) {
   return fetchResearchText(url, selectedSource, resolveHost)
 }
-import { fetchResearchText, isPublicResearchAddress } from "../../src/research/safe-fetch"
 
 const source = {
   id: "test",
