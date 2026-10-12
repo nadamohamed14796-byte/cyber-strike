@@ -86,6 +86,35 @@ export namespace Database {
     return (row?.c ?? 0) > 0
   }
 
+  /**
+   * Prepare migration SQL for an existing database without losing migration steps.
+   * Older releases could add target_workspace.owner_key via schema reconciliation
+   * before the dedicated migration was journaled. In that case skip only the
+   * duplicate ADD COLUMN statement; keep the migration's data backfill and indexes.
+   */
+  export function prepareMigrations(sqlite: BunDatabase, entries: { sql: string; timestamp: number; name: string }[]) {
+    return entries.map((entry) => {
+      let sql = entry.sql
+        .replace(/CREATE TABLE `/g, "CREATE TABLE IF NOT EXISTS `")
+        .replace(/CREATE INDEX `/g, "CREATE INDEX IF NOT EXISTS `")
+        .replace(/CREATE UNIQUE INDEX `/g, "CREATE UNIQUE INDEX IF NOT EXISTS `")
+
+      if (
+        entry.name === "20261012110000_target-workspace-owner-key" &&
+        tableExists(sqlite, "target_workspace") &&
+        tableColumns(sqlite, "target_workspace").has("owner_key")
+      ) {
+        const addOwnerKey = /ALTER TABLE target_workspace ADD COLUMN owner_key TEXT NOT NULL DEFAULT 'legacy:unscoped';/i
+        if (!addOwnerKey.test(sql)) {
+          throw new Error("The target-workspace owner migration no longer matches its compatibility guard.")
+        }
+        sql = sql.replace(addOwnerKey, "SELECT 1;")
+      }
+
+      return { ...entry, sql }
+    })
+  }
+
   /** Reconcile an existing SQLite file with current schemas; exported for migration regression tests. */
   export function reconcile(sqlite: BunDatabase) {
     // Phase 1: Structural repairs (table reshaping that can't be handled by ADD COLUMN)
@@ -201,17 +230,7 @@ export namespace Database {
         count: entries.length,
         mode: typeof CYBERSTRIKE_MIGRATIONS !== "undefined" ? "bundled" : "dev",
       })
-      // Make CREATE statements idempotent so migrations survive re-install over an
-      // existing database (e.g. `cyberstrike uninstall` removes the binary but leaves
-      // the SQLite DB — the migration journal is gone but the tables remain).
-      const safe = entries.map((e) => ({
-        ...e,
-        sql: e.sql
-          .replace(/CREATE TABLE `/g, "CREATE TABLE IF NOT EXISTS `")
-          .replace(/CREATE INDEX `/g, "CREATE INDEX IF NOT EXISTS `")
-          .replace(/CREATE UNIQUE INDEX `/g, "CREATE UNIQUE INDEX IF NOT EXISTS `"),
-      }))
-      migrate(db, safe)
+      migrate(db, prepareMigrations(sqlite, entries))
     }
 
     // Reconcile schema: ensures all tables have all expected columns.
