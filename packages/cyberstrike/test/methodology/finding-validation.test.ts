@@ -31,9 +31,10 @@ const ATTEMPT_STRATEGIES = [
 function makeAttempts(count = 20) {
   return Array.from({ length: count }, (_, index) => ({
     strategy: ATTEMPT_STRATEGIES[index % ATTEMPT_STRATEGIES.length],
+    checkID: (["reproducible", "unexpected_behavior", "request_path", "security_impact", "identity_context", "alternative_causes", "control_comparison", "evidence_complete", "benign_behavior_ruled_out", "reviewable"] as const)[index % 10],
     variation: "controlled-variation-" + (index + 1),
     hypothesis: "Test a distinct condition for variation " + (index + 1),
-    outcome: index < 2 ? "contradicts" as const : "inconclusive" as const,
+    outcome: index === 0 || index === 1 ? "contradicts" as const : "inconclusive" as const,
     evidence: "Observed controlled response comparison for variation " + (index + 1),
   }))
 }
