@@ -136,6 +136,38 @@ test("research URL normalization removes embedded credentials and secret query p
 })
 
 
+test("learning queue floors non-integer item limits instead of exceeding the requested budget", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const cachedText = [
+        "A bug bounty report describes an insecure direct object reference (IDOR) caused by missing object-level authorization.",
+        "Prerequisite: use two test-owned accounts and one object owned by the first account.",
+        "Reproduction: capture the owner's GET /api/objects/123 request, repeat it with the second controlled account, and compare the response.",
+        "Impact: the second account can read a private record without authorization. Confirm the result against the owner baseline.",
+        "False-positive caution: an exposed identifier alone does not demonstrate unauthorized access.",
+        "Unique fixture marker: " + marker,
+      ].join(" ").repeat(4)
+
+      for (const suffix of ["first", "second"]) {
+        ResearchQueue.enqueue({
+          sourceID: "portswigger",
+          sourceURL: "https://portswigger.net/web-security/access-control/idor?limit_test=" + marker + "-" + suffix,
+          title: "IDOR limit test " + marker + "-" + suffix,
+          payload: { cached_text: cachedText + " " + suffix },
+        })
+      }
+
+      const result = await learnResearchQueue({ limit: 1.5, sourceID: "portswigger" })
+      expect(result.claimed).toBe(1)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
+      await Instance.dispose()
+    },
+  })
+})
+
 test("learning worker applies one global automatic auth-retry budget across sources", async () => {
   const credentialEnvs = [
     "CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY",
