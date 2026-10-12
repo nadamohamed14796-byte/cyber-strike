@@ -29,7 +29,8 @@
 
 - **Attempt 1 (reproduce/diagnose):** read the current `main` implementation and the complete PR #18 CI logs; confirmed that `skill.name` and `skill.files[]` fed filesystem paths before robust containment validation, and the PR's source contained escaped template-literal delimiters.
 - **Attempt 2 (primary repair):** ported the mitigation to a new branch from current `main`; corrected escaped template literals/interpolation, included the missing archive helper import in tests, fixed the `get(url, dest, root)` call contract, removed the pre-validation parent-directory creation, canonicalized the cache root, rejected symlink/non-directory skill roots, and constrained archive entries to safe path/type combinations. Added the required `tar@7.5.7` package and lockfile entry.
-- **Attempt 3 (integration correction):** GitHub typecheck on PR #23 (run 38227294532) found the `tar.t()` callback is typed as `ReadEntry | Stats`, and that tests imported namespace functions as top-level exports. Guarded `onReadEntry` with property narrowing and changed tests to call `Discovery.isSafeSkillName`, `Discovery.resolveSkillFilePath`, and `Discovery.isSafeArchiveEntry`.
+- **Attempt 3 (integration correction):** GitHub typecheck on PR #23 (run 38227294532) found the `tar.t()` callback is typed as `ReadEntry | Stats`, and that tests imported namespace functions as top-level exports. Changed tests to call `Discovery.isSafeSkillName`, `Discovery.resolveSkillFilePath`, and `Discovery.isSafeArchiveEntry`.
+- **Attempt 4 (alternative diagnosis):** the next typecheck (run 38227486303) still rejected `'type' in entry` narrowing for `ReadEntry | Stats`. Replaced the guard with runtime checks on a narrow `{ path?: unknown; type?: unknown }` view, requiring both fields to be strings before adding a tar member to the allow-list.
 - **Verification:** re-run CI after this commit. Keep the issue `in_progress` until typecheck and unit tests pass on the latest PR head.
 
 ## Branch / PR ledger (snapshot at baseline)
@@ -50,7 +51,7 @@ The 20 distinct passes have **not** yet been completed. Record each pass only af
 |---:|---|---|---|
 | 01 | Repository integrity and completeness | PENDING | Not yet audited in this checkpoint. |
 | 02 | Architecture and dependency graph | PENDING | Not yet audited in this checkpoint. |
-| 03 | Type safety and runtime contracts | PENDING | Not yet audited in this checkpoint. |
+| 03 | Type safety and runtime contracts | IN_PROGRESS | Full monorepo typecheck has been run on PR #23 heads; two successive CI failures exposed incorrect namespace imports and a tar callback union. Each is recorded as a separate repair attempt; re-run remains pending on the next commit. |
 | 04 | Build and packaging | PENDING | Not yet audited in this checkpoint. |
 | 05 | CLI and configuration | PENDING | Not yet audited in this checkpoint. |
 | 06 | Agent orchestration and lifecycle | PENDING | Not yet audited in this checkpoint. |
