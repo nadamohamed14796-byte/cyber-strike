@@ -85,3 +85,16 @@ The 20 distinct passes have **not** yet been completed. Record each pass only af
 - Do not change an issue to `fixed_verified` until the final code on the relevant branch passes the required CI and integration checks.
 - Do not merge stale branches merely because a related feature name appears in `main`; inspect unique diffs first.
 - Do not claim the 20-pass audit is complete until every row has independent inspection/check evidence.
+
+
+## Follow-up checkpoint — 2026-10-12: target workspace ownership reconciliation
+
+### DB-001 — P1: stale target-workspace indexes can defeat owner isolation
+
+- **Evidence:** `packages/cyberstrike/src/target/target.sql.ts` defines `owner_key` plus unique/index keys `target_workspace_owner_target_key_idx` and `target_workspace_owner_host_idx`. The original `20261011180000_target-workspace-memory/migration.sql` still creates `target_workspace_project_key_idx(project_id, target_key)` and `target_workspace_host_idx(project_id, hostname)`. `Database.reconcile()` previously added absent columns but did not backfill `owner_key` or replace stale indexes. The later `20261011210000_target-workspace-owner-key/migration.sql` exists on `fix/target-memory-owner-isolation` but is absent from `main`.
+- **Impact:** non-Git directories use `project_id = "global"`; a stale unique index on `(project_id, target_key)` can reject the same target in a second directory even though application lookups use an owner key. Existing rows added by schema reconciliation may also have `owner_key = "legacy:unscoped"`.
+- **Repair strategy:** make startup reconciliation backfill non-global owners, isolate un-attributable legacy global rows using a per-row legacy key, remove obsolete indexes, and create the owner-key indexes idempotently. Do not blindly port the stale branch wholesale because its `target/index.ts` predates current path-confinement and secret-redaction hardening.
+- **Regression coverage added:** `packages/cyberstrike/test/target/target-memory.test.ts` now verifies that two non-Git directories with the shared global Project ID can create distinct workspaces for the same target and cannot see each other's notes.
+- **Validation status:** source-level change and test were authored on `fix/target-workspace-owner-index-reconciliation-20261012`; GitHub Actions must pass on its PR head before this issue can be marked verified. Local Bun execution is unavailable in this environment. This is not a claim that the test passed.
+- **Branch disposition:** `fix/target-memory-owner-isolation` is not safe to merge wholesale: the inspected branch's target implementation lacks current `ensureSafeDirectoryPath` and note-secret-redaction paths. The necessary owner-index behavior is being ported selectively.
+
