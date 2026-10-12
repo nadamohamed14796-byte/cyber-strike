@@ -80,11 +80,11 @@ export namespace VerificationLedger {
 
     if (existing) {
       recorded = existing
+    } else if (before.length >= Policy.MAX_ATTEMPTS) {
+      // Do not create attempt 21. Still allow decisive evidence from the final
+      // attempt to be attached as a verdict update without consuming more budget.
+      recorded = before[before.length - 1]
     } else {
-      if (before.length >= Policy.MAX_ATTEMPTS) {
-        const decision = Policy.decide({ attempts: before, blockedReason: "The 20-distinct-attempt budget is exhausted; verdict remains inconclusive." })
-        return { attempt: before[before.length - 1], decision, duplicate: false }
-      }
       const now = Date.now()
       const id = Identifier.ascending("verification_attempt")
       Database.use((db) => db.insert(VerificationAttemptTable).values({
@@ -114,7 +114,7 @@ export namespace VerificationLedger {
     const decision = Policy.decide({
       attempts: all,
       decisiveConfirmation: input.decisiveResult === "confirmed" && Boolean(input.attempt.evidenceRef?.trim()),
-      decisiveDisproof: input.decisiveResult === "disproven" && Boolean(input.attempt.evidenceRef?.trim()),
+      decisiveDisproof: input.decisiveResult === "disproven" && input.attempt.validConditions && Boolean(input.attempt.evidenceRef?.trim()),
       blockedReason: input.blockedReason,
     })
     Database.use((db) => db.update(VerificationAttemptTable).set({
