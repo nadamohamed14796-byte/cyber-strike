@@ -32,6 +32,12 @@ severity_boost:
 
 Determine whether a browser sends an authenticated state-changing request that lacks required intent/origin validation. Test a controlled account and reversible test state; never trigger actions for other users.
 
+## Scope
+
+- Only test accounts the tester owns or was explicitly provisioned for the engagement. Never craft a PoC intended to be delivered to, clicked by, or visited by a real third-party user, in-scope or not.
+- Reversible, low-impact mutations only during live testing (e.g., a display-name or preference field). Security-sensitive mutations (password/email change, MFA enrollment/removal, payment, account deletion) are modeled and reasoned about, not actually triggered, unless the engagement explicitly authorizes it with a disposable account.
+- A local/staging HTML PoC page is acceptable for reproduction; it must never be hosted where it could be reached by anyone other than the tester.
+
 ## Testing Methodology
 
 ### Phase 1: Map state-changing endpoints
@@ -59,6 +65,16 @@ Confirm the server-side result, restore the test value, and distinguish CSRF fro
 - **Candidate / lead:** a mutation endpoint lacks an obvious token or relies only on cookies.
 - **Confirmed finding:** controlled cross-site browser request causes a protected state change on the tester's account without required intent validation.
 - **Not a finding:** read-only GET, UI-only change, or request blocked by effective browser/server defenses.
+
+## Impact
+
+Severity tracks what the forged request actually controls, not the mere absence of a token:
+
+- **Low:** cosmetic or easily-reversible preference with no security or financial consequence.
+- **Medium:** data exposure to the attacker's own planted state, non-sensitive profile changes, or an action a victim would need to notice to undo.
+- **High/Critical:** account takeover primitives (email/password change, MFA removal, API key or OAuth app linkage), financial transactions, or privilege/role changes — especially when the forged request can run silently without user-visible feedback.
+
+State the exact mutation reached, the privilege level required to exploit it, and whether the attacker needs a victim to be authenticated and simply visit a page, or to also perform an action.
 
 ## Evidence Requirements
 
