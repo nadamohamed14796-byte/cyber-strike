@@ -72,6 +72,38 @@ function normalizeEndpoint(value: string) {
   return { host, path, urlTemplate: (host ? "https://" + host : "") + path, pathParameters, queryParameters }
 }
 
+function addConcatenatedPathParameters(
+  endpoint: NonNullable<ReturnType<typeof normalizeEndpoint>>,
+  expression: string,
+): NonNullable<ReturnType<typeof normalizeEndpoint>> {
+  const first = expression.match(/(['"\x60])([^'"\x60]{1,2048})\1/)
+  if (!first || first.index === undefined) return endpoint
+  let path = endpoint.path
+  let rest = expression.slice(first.index + first[0].length)
+  const pathParameters = [...endpoint.pathParameters]
+  for (let i = 0; i < 12; i++) {
+    const dynamic = rest.match(/^\s*\+\s*(?:(?:encodeURIComponent|String|Number)\s*\(\s*)?([A-Za-z_$][\w$]*)(?:\s*\))?/)
+    if (!dynamic) break
+    const name = dynamic[1]!
+    path = path.endsWith("/") ? path + "{" + name + "}" : path + "/{" + name + "}"
+    pathParameters.push(name)
+    rest = rest.slice(dynamic[0].length)
+    const staticPart = rest.match(/^\s*\+\s*(['"\x60])([^'"\x60]{0,500})\1/)
+    if (!staticPart) break
+    const suffix = staticPart[2] ?? ""
+    if (suffix.includes("?") || suffix.includes("#")) break
+    path += suffix
+    rest = rest.slice(staticPart[0].length)
+  }
+  path = path.replace(/\/{2,}/g, "/")
+  return {
+    ...endpoint,
+    path,
+    urlTemplate: (endpoint.host ? "https://" + endpoint.host : "") + path,
+    pathParameters: cleanUnique(pathParameters).slice(0, 80),
+  }
+}
+
 function findCallEnd(source: string, start: number): number {
   let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false
   for (let i = start; i < source.length; i++) {
@@ -132,7 +164,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   functions.sort((a, b) => a.line - b.line)
 
   const requests: JavaScriptRequestCandidate[] = []
-  const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.open)\s*\(/gi
+  const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
   for (const match of source.matchAll(callPattern)) {
     const index = match.index ?? 0, callee = (match[1] ?? "").toLowerCase()
     const open = index + match[0].lastIndexOf("(")
@@ -140,15 +172,20 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (close < 0 || close - open > 7000) continue
     const args = splitTopLevelArguments(source.slice(open + 1, close))
     const isXHR = callee.endsWith(".open")
-    const axiosMethod = callee.startsWith("axios.") && !callee.endsWith(".request") ? callee.slice(6).toUpperCase() : null
+    const methodSuffix = /\.(get|post|put|patch|delete|head|options)$/i.exec(callee)?.[1]?.toUpperCase() ?? null
+    const axiosMethod = methodSuffix
     const urlExpression = isXHR ? args[1] ?? "" : args[0] ?? ""
     const literalMatch = callee === "axios.request"
       ? (args[0] ?? "").match(/\burl\s*:\s*["'\x60]([^"'\x60]{1,2048})["'\x60]/)
       : urlExpression.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
     if (!literalMatch) continue
-    const endpoint = normalizeEndpoint(literalMatch[1]!)
-    if (!endpoint) continue
-    const options = isXHR ? "" : callee === "axios.request" ? args[0] ?? "" : callee.startsWith("axios.") ? args.slice(2).join(",") : args.slice(1).join(",")
+    const normalizedEndpoint = normalizeEndpoint(literalMatch[1]!)
+    if (!normalizedEndpoint) continue
+    const endpoint = requestConfig ? normalizedEndpoint : addConcatenatedPathParameters(normalizedEndpoint, urlExpression)
+    const isFetch = callee === "fetch"
+    const isBodyMethod = /\.(?:post|put|patch)$/i.test(callee)
+    const options = isXHR ? "" : requestConfig ? args[0] ?? "" : callee.endsWith(".request") ? args.slice(1).join(",")
+      : isFetch ? args.slice(1).join(",") : /\.(?:get|head|options|delete)$/i.test(callee) ? args.slice(1).join(",") : args.slice(2).join(",")
     const optionText = options + "\n" + source.slice(index, Math.min(close + 1, index + 7000))
     const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
     const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : undefined) ?? "").toUpperCase() || null
@@ -157,11 +194,13 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
       ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
-    const bodyArgs = callee.startsWith("axios.") && !callee.endsWith(".request") ? args[1] ?? "" : options
+    const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch || callee.endsWith(".request") ? options : ""
     const directObject = bodyArgs.trim().startsWith("{") ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
+    const bodySource = options + "\n" + bodyArgs + (requestConfig ? "\n" + (args[0] ?? "") : "")
     const bodyParams = [
       ...fieldNames(directObject),
-      ...Array.from(bodyArgs.matchAll(/\b(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1] ?? "")).flat(),
+      ...Array.from(bodySource.matchAll(/\b(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1] ?? "")).flat(),
+      ...Array.from(bodySource.matchAll(/JSON\.stringify\s*\(\s*\{([\s\S]{0,2500}?)\}\s*\)/gi), (m) => fieldNames(m[1] ?? "")).flat(),
     ]
     const all = optionText + "\n" + bodyArgs
     const authSignals: string[] = [], cookieSignals: string[] = []
