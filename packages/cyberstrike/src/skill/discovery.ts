@@ -115,25 +115,45 @@ export namespace Discovery {
     }
   }
 
-  async function extractSafeArchive(archive: string, root: string): Promise<boolean> {
+  async function extractSafeArchive(archive: string, root: string, budget: ResourceBudget): Promise<boolean> {
     await mkdir(root, { recursive: true })
     const rootStat = await lstat(root)
     if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) return false
     const realRoot = await realpath(root)
-    const entries: Array<{ path: string; type: string }> = []
+    const entries: Array<{ path: string; type: string; size: number }> = []
+    let invalidManifest = false
     try {
       await tar.t({
         file: archive,
         strict: true,
         onReadEntry(entry) {
-          const item = entry as { path?: unknown; type?: unknown }
-          if (typeof item.path === "string" && typeof item.type === "string") {
-            entries.push({ path: item.path, type: item.type })
+          const item = entry as { path?: unknown; type?: unknown; size?: unknown }
+          if (
+            typeof item.path !== "string" ||
+            typeof item.type !== "string" ||
+            typeof item.size !== "number" ||
+            !Number.isSafeInteger(item.size) ||
+            item.size < 0 ||
+            entries.length >= MAX_ARCHIVE_ENTRIES
+          ) {
+            invalidManifest = true
+            return
           }
+          entries.push({ path: item.path, type: item.type, size: item.size })
         },
       })
     } catch (err) {
       log.error("failed to inspect skill archive", { archive, err })
+      return false
+    }
+    if (invalidManifest || !isSafeArchiveExpansion(entries.map((entry) => entry.size))) {
+      log.warn("refusing archive with excessive entries or expanded size", { archive, entries: entries.length })
+      return false
+    }
+
+    const expandedSize = entries.reduce((total, entry) => total + entry.size, 0)
+    if (budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
+      log.warn("refusing archive: total extraction budget exceeded", { archive, expandedSize })
       return false
     }
 
@@ -152,6 +172,7 @@ export namespace Discovery {
       permitted.add(path.normalize(entry.path.replace(/\\/g, "/")))
     }
 
+    budget.reservedExpandedBytes += expandedSize
     try {
       await tar.x({
         file: archive,
@@ -169,6 +190,11 @@ export namespace Discovery {
     } catch (err) {
       log.error("failed to safely extract skill archive", { archive, err })
       return false
+    } finally {
+      // Count the declared size even after an extraction error because tar.x may
+      // have already written some files before failing.
+      budget.reservedExpandedBytes -= expandedSize
+      budget.expandedBytes += expandedSize
     }
   }
 
@@ -274,7 +300,34 @@ export namespace Discovery {
 
   const MAX_INDEX_BYTES = 2 * 1024 * 1024
   const MAX_SKILL_DOWNLOAD_BYTES = 25 * 1024 * 1024
+  const MAX_TOTAL_DOWNLOAD_BYTES = 100 * 1024 * 1024
+  const MAX_REGISTRY_SKILLS = 10_000
+  const MAX_TOTAL_SKILL_ASSETS = 20_000
+  const MAX_CONCURRENT_SKILL_DOWNLOADS = 6
+  const MAX_ARCHIVE_ENTRIES = 10_000
+  const MAX_ARCHIVE_MEMBER_BYTES = 25 * 1024 * 1024
+  const MAX_ARCHIVE_EXPANDED_BYTES = 100 * 1024 * 1024
+  const MAX_TOTAL_EXPANDED_BYTES = 250 * 1024 * 1024
   const DOWNLOAD_TIMEOUT_MS = 15_000
+
+  type ResourceBudget = {
+    downloadedBytes: number
+    reservedDownloadBytes: number
+    expandedBytes: number
+    reservedExpandedBytes: number
+  }
+
+  /** Reject archive manifests that can expand beyond bounded entry or size limits. */
+  export function isSafeArchiveExpansion(sizes: number[]): boolean {
+    if (sizes.length > MAX_ARCHIVE_ENTRIES) return false
+    let total = 0
+    for (const size of sizes) {
+      if (!Number.isSafeInteger(size) || size < 0 || size > MAX_ARCHIVE_MEMBER_BYTES) return false
+      total += size
+      if (total > MAX_ARCHIVE_EXPANDED_BYTES) return false
+    }
+    return true
+  }
 
   /** Read a response incrementally so an untrusted registry cannot exhaust memory with an oversized body. */
   export async function readBoundedBody(response: Response, maxBytes: number): Promise<Uint8Array | undefined> {
@@ -312,31 +365,42 @@ export namespace Discovery {
     return result
   }
 
-  async function get(url: string, dest: string, root: string, binary = false): Promise<boolean> {
+  async function get(url: string, dest: string, root: string, budget: ResourceBudget, binary = false): Promise<boolean> {
     const safeDest = await safeCacheDestination(root, dest, true)
     if (!safeDest) {
       log.warn("refusing skill download to unsafe cache path", { dest })
       return false
     }
     if (await Bun.file(safeDest).exists()) return true
-    return fetchRemoteURL(url, AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS))
-      .then(async (response) => {
-        if (!response.ok) {
-          log.error("failed to download", { url, status: response.status })
-          return false
-        }
-        const bytes = await readBoundedBody(response, MAX_SKILL_DOWNLOAD_BYTES)
-        if (!bytes) {
-          log.warn("refusing oversized or unreadable skill download", { url, maxBytes: MAX_SKILL_DOWNLOAD_BYTES })
-          return false
-        }
-        await Bun.write(safeDest, binary ? bytes : new TextDecoder().decode(bytes))
-        return true
-      })
-      .catch((err) => {
-        log.error("failed to download", { url, err })
+
+    const remaining = MAX_TOTAL_DOWNLOAD_BYTES - budget.downloadedBytes - budget.reservedDownloadBytes
+    const reservation = Math.min(MAX_SKILL_DOWNLOAD_BYTES, remaining)
+    if (reservation <= 0) {
+      log.warn("refusing skill download: total download budget exhausted", { url })
+      return false
+    }
+    budget.reservedDownloadBytes += reservation
+    try {
+      const response = await fetchRemoteURL(url, AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS))
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {})
+        log.error("failed to download", { url, status: response.status })
         return false
-      })
+      }
+      const bytes = await readBoundedBody(response, reservation)
+      if (!bytes) {
+        log.warn("refusing oversized or unreadable skill download", { url, maxBytes: reservation })
+        return false
+      }
+      budget.downloadedBytes += bytes.byteLength
+      await Bun.write(safeDest, binary ? bytes : new TextDecoder().decode(bytes))
+      return true
+    } catch (err) {
+      log.error("failed to download", { url, err })
+      return false
+    } finally {
+      budget.reservedDownloadBytes -= reservation
+    }
   }
 
   export async function pull(url: string): Promise<string[]> {
@@ -398,38 +462,56 @@ export namespace Discovery {
       }
       return true
     })
+    const assetCount = list.reduce(
+      (count, skill) => count + ("files" in skill && Array.isArray(skill.files) ? skill.files.length : 1),
+      0,
+    )
+    if (list.length > MAX_REGISTRY_SKILLS || assetCount > MAX_TOTAL_SKILL_ASSETS) {
+      log.warn("refusing skill registry: entry or asset count exceeds limits", {
+        url: index,
+        skills: list.length,
+        assets: assetCount,
+      })
+      return result
+    }
 
-    await Promise.all(
-      list.map(async (skill) => {
+    const budget: ResourceBudget = {
+      downloadedBytes: 0,
+      reservedDownloadBytes: 0,
+      expandedBytes: 0,
+      reservedExpandedBytes: 0,
+    }
+    for (let offset = 0; offset < list.length; offset += MAX_CONCURRENT_SKILL_DOWNLOADS) {
+      const batch = list.slice(offset, offset + MAX_CONCURRENT_SKILL_DOWNLOADS)
+      await Promise.all(
+        batch.map(async (skill) => {
         const root = path.join(cacheRoot, skill.name)
         try {
           if ("files" in skill && Array.isArray(skill.files)) {
-            // Legacy format: array of individual files
-            await Promise.all(
-              skill.files.map(async (file) => {
-                const dest = resolveSkillFilePath(root, file)
-                if (!dest) {
-                  log.warn("skipping unsafe skill file path", { skill: skill.name, file })
-                  return
-                }
-                const link = new URL(file, `${host}/${skill.name}/`).href
-                await get(link, dest, root)
-              }),
-            )
+            // Sequential per-skill downloads keep global concurrency bounded by the outer batch.
+            for (const file of skill.files) {
+              const dest = resolveSkillFilePath(root, file)
+              if (!dest) {
+                log.warn("skipping unsafe skill file path", { skill: skill.name, file })
+                continue
+              }
+              const link = new URL(file, `${host}/${skill.name}/`).href
+              await get(link, dest, root, budget)
+            }
           } else if ("url" in skill && typeof skill.url === "string") {
             const link = new URL(skill.url, base).href
             if ("type" in skill && skill.type === "archive") {
               // Archive format: download tar.gz and extract
               const archive = path.join(root, `${skill.name}.tar.gz`)
               await mkdir(root, { recursive: true })
-              if (await get(link, archive, root, true)) {
-                await extractSafeArchive(archive, root)
+              if (await get(link, archive, root, budget, true)) {
+                await extractSafeArchive(archive, root, budget)
               }
             } else {
               // Single file (skill-md): download as SKILL.md
               const dest = path.join(root, "SKILL.md")
               await mkdir(root, { recursive: true })
-              await get(link, dest, root)
+              await get(link, dest, root, budget)
             }
           }
 
@@ -438,8 +520,9 @@ export namespace Discovery {
         } catch (err) {
           log.error("failed to process remote skill entry", { url: index, name: skill.name, err })
         }
-      }),
-    )
+        }),
+      )
+    }
 
     return result
   }
