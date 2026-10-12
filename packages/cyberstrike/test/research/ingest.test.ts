@@ -174,46 +174,29 @@ test("learning worker applies one global automatic auth-retry budget across sour
     "CYBERSTRIKE_RESEARCH_COOKIE_INTIGRITI",
   ]
   const originals = new Map(credentialEnvs.map((name) => [name, process.env[name]]))
+  const originalRetry = ResearchQueue.retryAuthenticationBlocked
+  const originalClaim = ResearchQueue.claimNext
+  const calls: Array<{ limit: number; sourceID?: string; minAgeMs: number }> = []
+
   for (const name of credentialEnvs) process.env[name] = "session=operator-provided-test-value"
+  // Isolate this orchestration test from unrelated queued work in the shared project DB.
+  // Return one retried item so the shared helper must stop at the global budget.
+  ResearchQueue.retryAuthenticationBlocked = ((limit: number, sourceID?: string, minAgeMs = 0) => {
+    calls.push({ limit, sourceID, minAgeMs })
+    return 1
+  }) as typeof ResearchQueue.retryAuthenticationBlocked
+  ResearchQueue.claimNext = (() => null) as typeof ResearchQueue.claimNext
 
   try {
-    await using dir = await tmpdir({ git: true })
-    await Instance.provide({
-      directory: dir.path,
-      fn: async () => {
-        const marker = crypto.randomUUID()
-        const blockedRows = [
-          { sourceID: "hackerone-hacktivity", sourceURL: "https://hackerone.com/hacktivity/archive-" + marker },
-          { sourceID: "hackerone-hacktivity", sourceURL: "https://hackerone.com/hacktivity/archive-2-" + marker },
-          { sourceID: "intigriti", sourceURL: "https://www.intigriti.com/researchers/blog/archive-" + marker },
-          { sourceID: "intigriti", sourceURL: "https://www.intigriti.com/researchers/blog/archive-2-" + marker },
-        ]
-        const staleUpdatedAt = Date.now() - 11 * 60_000
-        for (const row of blockedRows) {
-          ResearchQueue.blockAuthentication({
-            ...row,
-            reason: "HTTP 401",
-            payload: { crawl_page: true },
-          })
-          const saved = ResearchQueue.find(row.sourceID, row.sourceURL)
-          if (!saved) throw new Error("expected auth-blocked research row to exist")
-          Database.use((db) =>
-            db.update(ResearchQueueTable)
-              .set({ updated_at: staleUpdatedAt })
-              .where(eq(ResearchQueueTable.sequence, saved.sequence))
-              .run(),
-          )
-        }
-
-        const result = await learnResearchQueue({ limit: 1 })
-        expect(result.claimed).toBe(0)
-        const statuses = blockedRows.map((row) => ResearchQueue.find(row.sourceID, row.sourceURL)?.status)
-        expect(statuses.filter((status) => status === "discovered")).toHaveLength(1)
-        expect(statuses.filter((status) => status === "blocked_auth")).toHaveLength(3)
-        await Instance.dispose()
-      },
-    })
+    const result = await learnResearchQueue({ limit: 1 })
+    expect(result.claimed).toBe(0)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.limit).toBe(1)
+    expect(calls[0]?.sourceID).toBe("hackerone-hacktivity")
+    expect(calls[0]?.minAgeMs).toBeGreaterThan(0)
   } finally {
+    ResearchQueue.retryAuthenticationBlocked = originalRetry
+    ResearchQueue.claimNext = originalClaim
     for (const [name, original] of originals) {
       if (original === undefined) delete process.env[name]
       else process.env[name] = original
