@@ -553,12 +553,18 @@ export async function retryAuthenticatedResearch(input: {
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
   const minAgeMs = input.retryImmediately ? 0 : AUTH_RETRY_COOLDOWN_MS
-  return sources
-    .filter(researchSourceHasCredentials)
-    .reduce(
-      (total, source) => total + ResearchQueue.retryAuthenticationBlocked(limit, source.id, minAgeMs),
-      0,
-    )
+  // The CLI's limit is a global budget, not a per-source multiplier. Keep each
+  // source isolated while decrementing the remaining budget so --limit N never
+  // requeues more than N rows when no --source filter is supplied.
+  let remaining = limit
+  let total = 0
+  for (const source of sources.filter(researchSourceHasCredentials)) {
+    if (remaining <= 0) break
+    const retried = ResearchQueue.retryAuthenticationBlocked(remaining, source.id, minAgeMs)
+    total += retried
+    remaining -= retried
+  }
+  return total
 }
 
 export type ResearchSyncOptions = {
