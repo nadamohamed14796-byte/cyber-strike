@@ -126,7 +126,18 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
         hypothesisKey: params.verification_hypothesis_key,
       })
       const identityMismatch = attempts.some((attempt) =>
-        attempt.asset.trim().toLowerCase() !== entry.asset.trim().toLowerCase() ||
+        !Policy.sameHypothesisIdentity(
+          {
+            asset: attempt.asset,
+            endpoint: attempt.endpoint,
+            vulnerabilityClass: attempt.vulnerabilityClass,
+          },
+          {
+            asset: entry.asset,
+            endpoint: attempt.endpoint,
+            vulnerabilityClass: attempt.vulnerabilityClass,
+          },
+        ) ||
         !categoryMatchesClass(attempt.vulnerabilityClass, params.vrt_category),
       )
       if (identityMismatch) {
