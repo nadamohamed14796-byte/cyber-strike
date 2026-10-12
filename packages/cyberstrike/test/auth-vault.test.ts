@@ -132,7 +132,8 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
       new Response(proc.stdout).text(),
       new Response(proc.stderr).text(),
     ])
-    expect(exitCode).toBe(0, stderr)
+    if (exitCode !== 0) throw new Error("AuthVault subprocess failed: " + stderr)
+    expect(exitCode).toBe(0)
     const result = JSON.parse(stdout) as {
       profile: { id: string; origin: string; purpose: string; targetID?: string }
       decodedPassword: string
@@ -179,7 +180,8 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
       new Response(wrongKeyProc.stdout).text(),
       new Response(wrongKeyProc.stderr).text(),
     ])
-    expect(wrongKeyExit).toBe(0, wrongKeyErr)
+    if (wrongKeyExit !== 0) throw new Error("Wrong-key subprocess failed: " + wrongKeyErr)
+    expect(wrongKeyExit).toBe(0)
     expect(wrongKeyOut.trim()).toBe("wrong-key-rejected")
   } finally {
     await rm(root, { recursive: true, force: true })
