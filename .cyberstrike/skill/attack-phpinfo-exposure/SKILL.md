@@ -103,6 +103,8 @@ Confirm the diagnostics page is removed or access-controlled and that the respon
 
 ## References
 
+- [uphiago/recon-skills — phpinfo-to-rce](https://github.com/uphiago/recon-skills/blob/main/recon/phpinfo-to-rce/SKILL.md) — merged discovery and exposure-validation source.
+
 - [uphiago/recon-skills — phpinfo-to-rce](https://github.com/uphiago/recon-skills/tree/main/recon/phpinfo-to-rce)
 - [PHP Manual — phpinfo](https://www.php.net/manual/en/function.phpinfo.php)
 - [PHP Manual — Core INI directives](https://www.php.net/manual/en/ini.core.php)
