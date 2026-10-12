@@ -16,6 +16,11 @@ describe("remote skill path validation", () => {
     expect(await Discovery.readBoundedBody(new Response("1234", { headers: { "content-length": "5" } }), 4)).toBeUndefined()
   })
 
+  test("invalid registry URLs fail closed without throwing", async () => {
+    expect(await Discovery.pull("not a URL")).toEqual([])
+    expect(await Discovery.pull("")).toEqual([])
+  })
+
   test("remote skill URL policy rejects local, literal-IP, credentialed, and non-HTTPS destinations", () => {
     expect(Discovery.isSafeRemoteURLShape("https://developers.cloudflare.com/.well-known/skills/index.json")).toBe(true)
     for (const url of [
