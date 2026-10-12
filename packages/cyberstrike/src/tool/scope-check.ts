@@ -83,16 +83,18 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   if (allowed.startsWith("*.")) {
     const domain = parseHostname(allowed.slice(2))
     if (!domain) return { matches: false, reason: `invalid wildcard scope ${allowed}` }
-    if (hostname === domain) return { matches: true, reason: `matches root domain of wildcard ${allowed}` }
+    // A wildcard grants only subdomains. The apex must be listed explicitly
+    // when it is in scope; otherwise this broadens scope beyond the operator's entry.
     if (hostname.endsWith("." + domain)) return { matches: true, reason: `subdomain matches wildcard ${allowed}` }
     return { matches: false, reason: `does not match wildcard ${allowed}` }
   }
 
   const scopeHost = parseHostname(allowed)
   if (!scopeHost) return { matches: false, reason: "scope item is not a valid domain, IP address, or HTTP(S) URL" }
-  if (hostname === scopeHost) return { matches: true, reason: "domain/IP match (ignoring protocol, port, and path)" }
-  if (hostname.endsWith("." + scopeHost)) return { matches: true, reason: `subdomain of ${scopeHost}` }
-  return { matches: false, reason: "no match" }
+  // A bare domain is an exact entry, not an implicit wildcard. Programs that
+  // include subdomains must express that permission with an explicit wildcard.
+  if (hostname === scopeHost) return { matches: true, reason: "exact domain/IP match (ignoring protocol, port, and path)" }
+  return { matches: false, reason: "no exact domain/IP match; add an explicit wildcard if subdomains are in scope" }
 }
 
 /** Parse the actual HTTP(S) hostname. Bare hostnames and IPv4 literals are allowed. */
