@@ -39,9 +39,16 @@
 
 ## Branch / PR ledger (updated during execution)
 
-- `main` moved to `7ff8bbe5a1bc931549bb1cefdd9bee8bd36245e3` when PR #22 was merged during this audit.
-- PR #23 head `a8907825c3f96c21b2d8ae5ae3509cc4570178f0` passed typecheck run 38228127368, test/unit jobs in run 38228127203, and PR standards run 38228123971. Those checks apply to the old base. This clean integration branch is now based on current `main` and must pass its own required checks before merge.
-- Do not merge #23 as-is. If the clean integration PR succeeds, close #23 as superseded and retain its history for audit purposes.
+- Repairs described below were committed directly to `main`; no per-fix feature branches were created.
+- **Open PR #40 — audit-ledger refresh:** its useful 20-pass evidence and merged-fix summary were selectively reconciled into this file. GitHub reports it as unmergeable; do not merge the stale branch wholesale.
+- **Open PR #7 — target memory/auth/Gmail:** 311 commits ahead and 162 behind at the inspected head. Several features have already landed through prior integrations; preserve the branch and port only individually reviewed changes.
+- **Open PR #6 — skill-quality/reference audit:** heavily diverged; main contains newer/reconciled skill content. Do not merge wholesale.
+- **Open PR #2 — Hackbrowser improvement:** heavily diverged and the inspected branch disables TLS certificate verification. Do not merge wholesale.
+- **No merge needed:** scope-check IPv4/CIDR, bounded WebFetch, non-mutating WebRecon probes, target-workspace owner-index reconciliation, and remote skill cache confinement are already represented on main with later hardening.
+- **No unique commits relative to main:** `ci/monorepo-build-validation-20261012`, `fix/pr-management-fork-label-guard`, `fix/remote-skill-cache-confinement-main-20261012`, `improve/skill-quality-reference-audit-reconciled`, `feat/spa-nav-discovery`, and `stage` were reported as behind-only in the inspected comparisons.
+- **Dependency branches:** the DOMPurify proposal was ported with its lockfile; the mysql2 proposal was superseded by a safer 3.23.1 update; the provider-utils branch's manifest versions already match main, while its lockfile snapshot is stale relative to main.
+- **Retain for selective review:** `docs/idor-skill-expansion`, `skills/import-phase-1-methodology-recon`, `feat/discovery-core`, `feat/proxy-config`, `dev`, `fix/target-memory-owner-isolation`, and `fix/remove-orphan-auth-manager-typecheck-blocker` are divergent or contain older versions of code that main has since extended. Do not merge these branches wholesale.
+- **Branch deletion:** no branches were deleted. The available GitHub actions in this execution context do not expose a safe branch-delete operation; unmerged branches remain preserved to avoid losing unreviewed unique work.
 
 ## Branch / PR ledger (snapshot at baseline)
 
