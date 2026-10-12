@@ -8,7 +8,7 @@ import { Session } from "../session"
 import { SessionTable, RequestTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
-import { analyzeJavaScriptSource, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal } from "./javascript-analysis"
+import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal } from "./javascript-analysis"
 
 function safeURL(input?: string | null): URL | undefined {
   if (!input?.trim()) return undefined
@@ -111,14 +111,17 @@ function normalizeEndpointLiteral(value: string): string | undefined {
   const trimmed = value.trim()
   if (!trimmed || trimmed.length > 240) return undefined
   const absolute = safeURL(trimmed)
-  if (absolute) return absolute.origin + absolute.pathname
+  if (absolute) {
+    const normalizedPath = normalizeJavaScriptEndpointPath(absolute.pathname).path
+    return absolute.origin + normalizedPath
+  }
   if (!trimmed.startsWith("/")) return undefined
   const noQuery = trimmed.split(/[?#]/, 1)[0]
   const normalized = noQuery
     .replace(/\$\{[^}]+\}/g, "{param}")
     .replace(/:[A-Za-z_$][\w$]*/g, "{param}")
     .replace(/\/{2,}/g, "/")
-  return normalized.length > 1 ? normalized : undefined
+  return normalized.length > 1 ? normalizeJavaScriptEndpointPath(normalized).path : undefined
 }
 
 export function extractStaticJavaScriptEndpoints(content: string): string[] {
