@@ -374,3 +374,14 @@ Compared the remaining recently updated refs against current `main` after the la
 - `fix/pr-management-fork-label-guard`: the ref is behind main with zero unique commits in the comparison; no merge is required.
 
 The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill-quality/reference audit), are still drafts. Keep them open as review/reference work rather than merging wholesale: #2 contains a TLS certificate-verification bypass in the inspected branch, and #6 contains divergent skill content that needs file-by-file content review before any selected material can safely replace current skills. No branches were deleted because a safe branch-delete operation is unavailable in this execution context and unmerged unique work must be preserved.
+
+## Follow-up checkpoint — 2026-10-12: target-note concurrency and restart reconciliation
+
+### TARGET-001 — P2: concurrent target-note writes could lose Markdown updates
+
+- **Evidence:** TargetMemory.addNote() persisted each row to SQLite, then independently read and rewrote notes.md. Concurrent callers could read the same prior file and atomically rename competing complete-file writes, leaving some persisted notes absent from the human-readable companion. The prior workspace setup also recreated a missing notes.md template without restoring existing note rows from SQLite.
+- **Fix:** serialize per-workspace Markdown reconciliation; render/update generated note entries from the authoritative SQLite rows; keep user-authored text outside generated sections intact; reconcile on normal workspace open and after note persistence. The database transaction remains the source of truth, and a failed Markdown update is not reported as a successful note operation.
+- **Direct commits on main:** implementation 51e78b3f1c9f55831833f21f765b5524c44e414f; regression test 32f599c85dec54c4aee3a4976a1b58d5648b7ff9.
+- **Regression coverage authored:** 12 concurrent note additions; assert each row and Markdown marker is present; verify ordinary reconciliation preserves a manual annotation without duplicate markers; delete notes.md, reopen the workspace, and verify all SQLite-backed note entries are rebuilt.
+- **Validation status:** the test has been committed directly to main, but it has not been executed locally because Bun is unavailable in this environment. The combined commit-status endpoint returned no status entries for the new head, and the available workflow-run lookup only exposes pull-request-triggered runs; therefore no CI pass is claimed for 32f599c85dec54c4aee3a4976a1b58d5648b7ff9. The fix is implemented; exact-head CI verification remains pending/unverified.
+
