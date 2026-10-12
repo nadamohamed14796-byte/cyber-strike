@@ -107,6 +107,11 @@ Identify deployment rules, static-root mapping, archive retention, source-map pu
 
 ## References
 
+- [elementalsouls/Claude-BugHunter — hunt-source-leak](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-source-leak/SKILL.md) — merged source.
+- [uphiago/recon-skills — JavaScript secrets extraction](https://github.com/uphiago/recon-skills/blob/main/recon/js-secrets-extraction/SKILL.md) — merged for bundle/source-map review.
+- [uphiago/recon-skills — GitHub secret hunting](https://github.com/uphiago/recon-skills/blob/main/recon/github-secret-hunting/SKILL.md) — merged for public repository and history review; secret validation is limited to safe owner-side confirmation.
+- [elementalsouls/Claude-BugHunter — public source-leak hunting](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-source-leak) — merged source.
+
 - [uphiago/recon-skills — source leak hunt](https://github.com/uphiago/recon-skills/tree/main/recon/source-leak-hunt)
 - [OWASP — Source Code Disclosure](https://owasp.org/www-project-web-security-testing-guide/)
 - [CWE-538 — Insertion of Sensitive Information into Externally-Accessible File or Directory](https://cwe.mitre.org/data/definitions/538.html)
