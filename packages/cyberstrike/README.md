@@ -353,7 +353,7 @@ CyberStrike is the core platform. These MCP servers extend its capabilities:
 
 ## Research report queue and authenticated sources
 
-Research sync uses a persistent queue. Re-running discovery can revisit source indexes to find newly published reports, but report URLs already stored in the queue are not enqueued or fetched again just because sync was restarted. Reports fetched during discovery are cached in the queue for the learning worker, so the same report page is not immediately downloaded a second time. Use `research queue-stats` and `research queue-pending` to inspect progress; `research learn` resumes queued/retry work after a stop or restart.
+Research sync uses a persistent queue. Re-running discovery refreshes primary source indexes so newly published reports can be found, while non-primary pagination/sitemap pages are checkpointed for six hours. Report URLs already stored in the queue or shared knowledge are not fetched again just because sync was restarted. Reports fetched during discovery are cached in the queue for the learning worker, so the same report page is not immediately downloaded a second time. Crawl-page checkpoints are counted separately from report items in queue statistics. Use `research queue-stats` and `research queue-pending` to inspect progress; `research learn` resumes queued/retry work after a stop or restart.
 
 Public pages are fetched without login first. If a source genuinely requires an account, create/use an account yourself and configure a short-lived session cookie or an authorization value in the local process environment. The suffix is the source ID uppercased with non-alphanumeric characters replaced by underscores (check `research sources` for IDs):
 

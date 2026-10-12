@@ -69,6 +69,7 @@ export const UpdateCommand = cmd({
       )
       prompts.log.info(
         "queue: total=" + queueStats.total +
+          " crawl_pages=" + queueStats.crawl_pages +
           " queued=" + queueStats.queued +
           " studying=" + queueStats.studying +
           " retry=" + queueStats.retry +
