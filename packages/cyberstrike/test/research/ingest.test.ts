@@ -169,65 +169,64 @@ test("learning queue floors non-integer item limits instead of exceeding the req
   })
 })
 
-test("learning worker applies one global automatic auth-retry budget across sources", async () => {
-  await using dir = await tmpdir({ git: true })
-  const credentialEnvs = [
-    "CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY",
-    "CYBERSTRIKE_RESEARCH_COOKIE_INTIGRITI",
-  ]
+test("authenticated research retries enforce one global budget across configured sources", async () => {
+  const marker = crypto.randomUUID()
+  const templateIDs = ["hackerone-hacktivity", "intigriti"]
+  const templates = templateIDs.map((id) => RESEARCH_SOURCES.find((source) => source.id === id))
+  if (templates.some((source) => !source)) throw new Error("required authenticated research source is not configured")
+  const syntheticSources = templates.map((source, index) => ({
+    ...source!,
+    id: templateIDs[index] + "-budget-test-" + marker,
+    name: source!.name + " budget test",
+    seedUrls: [],
+  }))
+  const credentialEnvs = syntheticSources.map((source) =>
+    "CYBERSTRIKE_RESEARCH_COOKIE_" + source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_"),
+  )
   const originals = new Map(credentialEnvs.map((name) => [name, process.env[name]]))
   for (const name of credentialEnvs) process.env[name] = "session=operator-provided-test-value"
+  RESEARCH_SOURCES.push(...syntheticSources)
 
   try {
-    await Instance.provide({
-      directory: dir.path,
-      fn: async () => {
-        const sourceIDs = ["hackerone-hacktivity", "intigriti"]
-        const marker = crypto.randomUUID()
-        const urls = sourceIDs.map((sourceID) => ({
-          sourceID,
-          url: "https://research.example.test/" + sourceID + "/" + marker,
-        }))
+    const urls = syntheticSources.map((source) => ({
+      sourceID: source.id,
+      url: "https://" + source.hosts[0] + "/budget-test/" + marker,
+    }))
+    for (const item of urls) {
+      ResearchQueue.blockAuthentication({
+        sourceID: item.sourceID,
+        sourceURL: item.url,
+        title: "Auth retry budget " + marker,
+        reason: "HTTP 401",
+        payload: { crawl_page: true },
+      })
+      const row = ResearchQueue.find(item.sourceID, item.url)
+      if (!row) throw new Error("failed to create auth-blocked research fixture")
+      Database.use((db) =>
+        db.update(ResearchQueueTable)
+          .set({ updated_at: Date.now() - 15 * 60_000 })
+          .where(eq(ResearchQueueTable.sequence, row.sequence))
+          .run(),
+      )
+    }
 
-        // Exercise real queue state instead of replacing module-global methods. Both
-        // rows are crawl/index pages so a requeued row returns to discovery and cannot
-        // be consumed by the learning worker in the same call.
-        for (const item of urls) {
-          ResearchQueue.blockAuthentication({
-            sourceID: item.sourceID,
-            sourceURL: item.url,
-            title: "Auth retry budget " + marker,
-            reason: "HTTP 401",
-            payload: { crawl_page: true },
-          })
-          const row = ResearchQueue.find(item.sourceID, item.url)
-          if (!row) throw new Error("failed to create auth-blocked research fixture")
-          Database.use((db) =>
-            db.update(ResearchQueueTable)
-              .set({ updated_at: Date.now() - 15 * 60_000 })
-              .where(eq(ResearchQueueTable.sequence, row.sequence))
-              .run(),
-          )
-        }
-
-        const result = await learnResearchQueue({ limit: 1 })
-        expect(result.claimed).toBe(0)
-        const statuses = urls.map((item) => ResearchQueue.find(item.sourceID, item.url)?.status)
-        // The single global budget must release exactly one eligible row, not one
-        // per configured source. Which source comes first is configuration order.
-        expect(statuses.filter((status) => status === "discovered")).toHaveLength(1)
-        expect(statuses.filter((status) => status === "blocked_auth")).toHaveLength(1)
-        await Instance.dispose()
-      },
-    })
+    // Call the real retry coordinator directly: a worker call could also claim an
+    // unrelated queued report from the shared test database after retries finish.
+    expect(await retryAuthenticatedResearch({ limit: 1 })).toBe(1)
+    const statuses = urls.map((item) => ResearchQueue.find(item.sourceID, item.url)?.status)
+    expect(statuses.filter((status) => status === "discovered")).toHaveLength(1)
+    expect(statuses.filter((status) => status === "blocked_auth")).toHaveLength(1)
   } finally {
+    for (const source of syntheticSources) {
+      const index = RESEARCH_SOURCES.indexOf(source)
+      if (index >= 0) RESEARCH_SOURCES.splice(index, 1)
+    }
     for (const [name, original] of originals) {
       if (original === undefined) delete process.env[name]
       else process.env[name] = original
     }
   }
 })
-
 test("research queue resumes authenticated work and learns cached report text without a second fetch", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
