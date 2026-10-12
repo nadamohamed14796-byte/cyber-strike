@@ -4,14 +4,7 @@ import { TargetMemory, type TargetNoteKind, type TargetNoteStatus } from "../tar
 import { redactTargetNoteSecrets } from "../target/redact"
 import { Tool } from "./tool"
 
-export const TargetNoteTool = Tool.define("target_note", {
-  description: [
-    "Save a durable target-specific observation in the existing target workspace, SQLite, and notes.md so later agents can reuse it.",
-    "This tool only writes notes; it does not test the target. The target workspace must already exist and the target host/path must be present in the current session tree's observed requests or Intel. It will not create a workspace for an unobserved target.",
-    "Use concise, factual notes with provenance. Use observed/unverified unless evidence supports a stronger state. Confirmed or disproven notes require concrete evidence. Never store passwords, session cookies, bearer tokens, or other secrets.",
-    "Keep public report/writeup methodology in the global research database, not target notes. Use this for current-target assets, endpoints, test conditions, results, limitations, and finding-validation summaries.",
-  ].join("\n"),
-  parameters: z.object({
+const TargetNoteParameters = z.object({
     target_url: z.string().min(1).describe("Exact existing target workspace URL, including a path when the workspace is path-scoped"),
     kind: z.enum(["manual", "asset", "endpoint", "javascript", "finding", "evidence", "research", "lesson"]).default("manual"),
     title: z.string().min(1).max(180),
@@ -20,7 +13,16 @@ export const TargetNoteTool = Tool.define("target_note", {
     evidence: z.string().max(5000).optional().describe("Concrete evidence required when status is confirmed or disproven"),
     source_url: z.string().url().optional(),
     tags: z.array(z.string().min(1).max(48)).max(20).optional(),
-  }),
+  })
+
+export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Metadata>("target_note", {
+  description: [
+    "Save a durable target-specific observation in the existing target workspace, SQLite, and notes.md so later agents can reuse it.",
+    "This tool only writes notes; it does not test the target. The target workspace must already exist and the target host/path must be present in the current session tree's observed requests or Intel. It will not create a workspace for an unobserved target.",
+    "Use concise, factual notes with provenance. Use observed/unverified unless evidence supports a stronger state. Confirmed or disproven notes require concrete evidence. Never store passwords, session cookies, bearer tokens, or other secrets.",
+    "Keep public report/writeup methodology in the global research database, not target notes. Use this for current-target assets, endpoints, test conditions, results, limitations, and finding-validation summaries.",
+  ].join("\n"),
+  parameters: TargetNoteParameters,
   async execute(params, ctx) {
     try {
       const sessionID = Session.root(ctx.sessionID)
