@@ -199,3 +199,14 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Limitations:** host DNS is checked before each fetch, but the runtime's fetch implementation performs its own subsequent resolution; DNS rebinding between those operations is not cryptographically prevented in this implementation. Network egress controls remain the stronger defense where available.
 - **Validation:** committed to `main`; CI/typecheck/Bun test execution has not been verified in this environment. Keep this item pending until the latest main head passes.
 - **Status:** implemented; automated validation pending.
+
+
+## Follow-up checkpoint — 2026-10-12: DOMPurify dependency security update
+
+### SEC-009 — P1: UI sanitizer dependency was below the security fix
+
+- **Evidence:** `packages/ui/package.json` and the root `bun.lock` resolved DOMPurify 3.4.13. The published advisory identifies versions `>=3.4.13 <3.4.16` as affected by an XSS issue and recommends 3.4.16 or later. See [Snyk advisory](https://security.snyk.io/vuln/SNYK-JS-DOMPURIFY-20361471) and [DOMPurify 3.4.16 release](https://github.com/cure53/DOMPurify/releases/tag/3.4.16).
+- **Fix:** updated the UI dependency to `dompurify@3.4.16` and updated both corresponding Bun lockfile records, including the registry tarball integrity hash.
+- **Direct commits on main:** manifest `6f4f789261610903e0b0d2ed849675c4b7a8f692`; lockfile `d40d1b312a9d9a6e08467feb7da1637db5776d04`.
+- **Validation:** manifest and lockfile now agree on 3.4.16 and the published integrity value; package installation, lockfile regeneration, UI tests and full CI have not yet been run in this runtime.
+- **Status:** security update committed; automated validation pending.
