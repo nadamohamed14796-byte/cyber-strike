@@ -77,7 +77,35 @@ export namespace BackendFetch {
     const timer = setTimeout(() => controller.abort(), totalTimeout)
 
     try {
-      const url = opts.origin.replace(/\/+$/, "") + req.target
+      let base: URL
+      try {
+        base = new URL(opts.origin)
+      } catch {
+        throw new Error("Invalid replay origin.")
+      }
+      if (
+        (base.protocol !== "http:" && base.protocol !== "https:") ||
+        base.username ||
+        base.password
+      ) {
+        throw new Error("Replay origin must be an HTTP(S) origin without embedded credentials.")
+      }
+
+      let currentURL: URL
+      try {
+        currentURL = new URL(req.target, base)
+      } catch {
+        throw new Error("Invalid replay request target.")
+      }
+      // Request data must not replace the approved destination authority.
+      if (
+        currentURL.origin !== base.origin ||
+        (currentURL.protocol !== "http:" && currentURL.protocol !== "https:") ||
+        currentURL.username ||
+        currentURL.password
+      ) {
+        throw new Error("Replay request target escaped its approved origin.")
+      }
 
       const headers = new Headers()
       for (const h of req.headers) {
@@ -89,24 +117,62 @@ export namespace BackendFetch {
         }
       }
 
-      const hasBody = !BODYLESS.has(req.method.toUpperCase()) && req.body.length > 0
+      let method = req.method.toUpperCase()
+      let bodyValue: BodyInit | undefined =
+        !BODYLESS.has(method) && req.body.length > 0
+          ? (req.body as unknown as BodyInit)
+          : undefined
+      let res: Response
+      let redirects = 0
+      while (true) {
+        const init: RequestInit & { tls?: { rejectUnauthorized: boolean } } = {
+          method,
+          headers,
+          body: bodyValue,
+          // Handle redirects explicitly; native follow can leak credentials to
+          // an unapproved origin when a target returns a cross-origin Location.
+          redirect: "manual",
+          signal: controller.signal,
+        }
+        if (opts.rejectUnauthorized === false) init.tls = { rejectUnauthorized: false }
+        res = await fetch(currentURL, init)
 
-      const init: RequestInit & { tls?: { rejectUnauthorized: boolean } } = {
-        method: req.method,
-        headers,
-        // TS 5.7 types Uint8Array as generic over its backing buffer and won't
-        // accept Uint8Array<ArrayBufferLike> as BodyInit, though fetch handles it
-        // fine at runtime. Cast through unknown for this lib-generics friction.
-        body: hasBody ? (req.body as unknown as BodyInit) : undefined,
-        redirect: opts.followRedirects ? "follow" : "manual",
-        signal: controller.signal,
+        const location = res.headers.get("location")
+        const redirectStatus = res.status === 301 || res.status === 302 || res.status === 303 ||
+          res.status === 307 || res.status === 308
+        if (!opts.followRedirects || !redirectStatus || !location || redirects >= 3) break
+
+        let nextURL: URL
+        try {
+          nextURL = new URL(location, currentURL)
+        } catch {
+          break
+        }
+        // A cross-origin (including cross-port) redirect is returned as 3xx.
+        if (
+          nextURL.origin !== base.origin ||
+          (nextURL.protocol !== "http:" && nextURL.protocol !== "https:") ||
+          nextURL.username ||
+          nextURL.password
+        ) {
+          break
+        }
+
+        await res.body?.cancel().catch(() => undefined)
+        redirects++
+        if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === "POST")) {
+          method = "GET"
+          bodyValue = undefined
+          headers.delete("content-length")
+          headers.delete("content-type")
+          headers.delete("content-encoding")
+          headers.delete("transfer-encoding")
+        }
+        currentURL = nextURL
       }
-      if (opts.rejectUnauthorized === false) init.tls = { rejectUnauthorized: false }
 
-      const res = await fetch(url, init)
       const ttfbMs = performance.now() - start
-
-      const body = await readCapped(res, cap)
+      const body = await readCapped(res!, cap)
       const totalMs = performance.now() - start
 
       const parsed: ReplayResponse.Parsed = {
