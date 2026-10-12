@@ -46,6 +46,8 @@ describe("AuthVault persisted data validation", () => {
   test("rejects malformed rows instead of trusting an array cast", () => {
     expect(isAuthVaultDataValid([null])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), username: 123 }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), account: "bad\nlabel" }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), username: "bad\nname" }])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), origin: "file:///etc/passwd" }])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), targetID: undefined }])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), password: { iv: "abc", tag: "bad", ciphertext: "x" } }])).toBe(false)
