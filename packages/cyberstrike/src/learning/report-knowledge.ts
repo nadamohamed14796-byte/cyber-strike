@@ -293,19 +293,28 @@ export namespace ReportKnowledge {
         const row = db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, input.reportID)).get()
         if (!row) return
         const now = Date.now()
-        db.update(ReportKnowledgeTable)
-          .set({
-            status: input.outcome,
-            outcome: input.outcome,
-            times_useful: row.times_useful + (input.outcome === "useful" || input.outcome === "confirmed" ? 1 : 0),
-            times_rejected:
-              row.times_rejected +
-              (input.outcome === "rejected" || input.outcome === "duplicate" || input.outcome === "disproven" ? 1 : 0),
-            confidence: confidence(row, input.outcome),
-            time_updated: now,
-          })
-          .where(eq(ReportKnowledgeTable.id, input.reportID))
-          .run()
+        // Global external research is shared across every target. A validation
+        // outcome from one session describes that target's test, not whether the
+        // public source report itself is true or false for all other targets.
+        // Preserve shared external rows as advisory references and store this
+        // session-specific result only in the event ledger.
+        const sharedExternalResearch =
+          row.source_kind === "external_report" && !row.session_id && !normalize(row.target_pattern)
+        if (!sharedExternalResearch) {
+          db.update(ReportKnowledgeTable)
+            .set({
+              status: input.outcome,
+              outcome: input.outcome,
+              times_useful: row.times_useful + (input.outcome === "useful" || input.outcome === "confirmed" ? 1 : 0),
+              times_rejected:
+                row.times_rejected +
+                (input.outcome === "rejected" || input.outcome === "duplicate" || input.outcome === "disproven" ? 1 : 0),
+              confidence: confidence(row, input.outcome),
+              time_updated: now,
+            })
+            .where(eq(ReportKnowledgeTable.id, input.reportID))
+            .run()
+        }
         db.insert(ReportKnowledgeEventTable)
           .values({
             id: Identifier.ascending("report_knowledge_event"),
