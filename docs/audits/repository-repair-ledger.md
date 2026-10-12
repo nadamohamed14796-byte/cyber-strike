@@ -20,10 +20,10 @@
 |---|---|---|---|---:|---|
 | SEC-001 | P1 | Security / path confinement | Remote skill cache paths and archive extraction are constrained in current `main`; PR #18's parser failure is historical, not the current-main state. | 5 | resolved; current-main CI green |
 | SEC-002 | P2 | Test and type contract | Tests call helpers through the `Discovery` namespace; current-main typecheck passed on `6522bcbbb8`. | 3 | resolved |
-| INT-001 | P2 | Branch integration | Open PR #11's five skill additions and IDOR skill edit overlap with already merged skill-library batches (#20/#21). The PR is 187 commits behind `main`; do not merge wholesale. Verify any unique remaining content before disposition. | 1 | in_progress |
-| INT-002 | P2 | Branch integration | Open PR #7 contains a broad target-memory / research / auth feature set; PR #17 has already merged an integration branch for target memory, global research learning, and scoped auth profiles. PR #7 is 187 commits behind and 311 commits ahead at its current head, so only a unique-diff review can safely establish whether it is redundant. | 1 | in_progress |
-| INT-003 | P2 | Branch integration | Draft PR #6 is heavily diverged (159 commits ahead, 187 behind). PR #15 merged a reconciled skill-quality audit, so the original branch must not be merged wholesale. Remaining unique changes require selective comparison. | 1 | in_progress |
-| INT-004 | P2 | Branch integration | PR #2 is 201 commits behind and contains broad HackBrowser changes. Its cookie-file deletion is already covered by merged PR #14; remaining functionality needs isolated diff and regression review before integration. | 1 | in_progress |
+| INT-001 | P2 | Branch integration | PR #11 (`skills/import-phase-1-methodology-recon`) is 8 commits ahead / 190 behind current `main`, with 8 changed files. Its skill additions overlap merged batches; retain and review only any uniquely missing content. | 2 | blocked_unique_diff_review |
+| INT-002 | P2 | Branch integration | PR #7 (`feat/target-memory-foundation`) is 311 commits ahead / 190 behind, with 77 changed files. PR #17 integrated the feature set; current `main` has newer reviewed implementations, so no wholesale merge is safe. | 2 | blocked_no_bulk_merge |
+| INT-003 | P2 | Branch integration | PR #6 (`improve/skill-quality-reference-audit`) is 159 commits ahead / 190 behind, with 99 changed files. PR #15's reconciled quality work is already merged; skill changes are out of scope for this pass and must not be merged wholesale. | 2 | blocked_out_of_scope_and_diverged |
+| INT-004 | P1 | Branch integration / TLS safety | PR #2 (`hackbrowser-improvement`) is 44 commits ahead / 300 behind, with 36 changed files. Its launcher disables TLS certificate verification (`NODE_TLS_REJECT_UNAUTHORIZED=0`); do not merge wholesale. Review only isolated safe changes. | 2 | blocked_unsafe_to_merge_wholesale |
 
 | FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
 | SEC-003 | P2 | Test/type contract | Tar entry properties are validated at runtime; current-main tests and typecheck pass. | 1 | resolved |
@@ -48,10 +48,10 @@
 ## Branch / PR ledger (updated during execution)
 
 - Repairs described below were committed directly to `main`; no per-fix feature branches were created.
-- **Open PR #40 — audit-ledger refresh:** its useful 20-pass evidence and merged-fix summary were selectively reconciled into this file. GitHub reports it as unmergeable; do not merge the stale branch wholesale.
-- **Open PR #7 — target memory/auth/Gmail:** 311 commits ahead and 187 behind at the inspected head. Several features have already landed through prior integrations; preserve the branch and port only individually reviewed changes.
-- **Open PR #6 — skill-quality/reference audit:** heavily diverged; main contains newer/reconciled skill content. Do not merge wholesale.
-- **Open PR #2 — Hackbrowser improvement:** heavily diverged and the inspected branch disables TLS certificate verification. Do not merge wholesale.
+- **PR #40 — audit-ledger refresh:** its 20-pass evidence and merged-fix summary are already represented in this ledger. The branch is 1 commit ahead / 64 behind and unmergeable; treat it as superseded rather than merging its stale snapshot.
+- **PR #7 — target memory/auth/Gmail:** 311 commits ahead / 190 behind at the latest comparison. Preserve its history; reviewed feature paths are integrated through PR #17 and follow-up fixes, so no wholesale merge is safe.
+- **PR #6 — skill-quality/reference audit:** 159 commits ahead / 190 behind; newer/reconciled skill content is on `main`. Skill files are out of scope for this pass; do not merge wholesale.
+- **PR #2 — Hackbrowser improvement:** 44 commits ahead / 300 behind; the inspected branch disables TLS certificate verification. Do not merge wholesale.
 - **No merge needed:** scope-check IPv4/CIDR, bounded WebFetch, non-mutating WebRecon probes, target-workspace owner-index reconciliation, and remote skill cache confinement are already represented on main with later hardening.
 - **No unique commits relative to main:** `ci/monorepo-build-validation-20261012`, `fix/pr-management-fork-label-guard`, `fix/remote-skill-cache-confinement-main-20261012`, `improve/skill-quality-reference-audit-reconciled`, `feat/spa-nav-discovery`, and `stage` were reported as behind-only in the inspected comparisons.
 - **Dependency branches:** the DOMPurify proposal was ported with its lockfile; the mysql2 proposal was superseded by a safer 3.23.1 update; the provider-utils branch's manifest versions already match main, while its lockfile snapshot is stale relative to main.
