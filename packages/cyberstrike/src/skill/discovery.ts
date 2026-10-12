@@ -1,5 +1,10 @@
 import path from "path"
-import { lstat, mkdir, realpath } from "node:fs/promises"
+import { createReadStream, createWriteStream } from "node:fs"
+import { lstat, mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { Transform } from "node:stream"
+import { pipeline } from "node:stream/promises"
+import { createGunzip } from "node:zlib"
 import { lookup } from "node:dns/promises"
 import { isIP } from "node:net"
 import * as tar from "tar"
@@ -115,96 +120,156 @@ export namespace Discovery {
     }
   }
 
+  type PreparedArchive = { path: string; cleanup: () => Promise<void> }
+
+  /**
+   * Bound gzip expansion before node-tar sees the archive. A small compressed
+   * tar can otherwise contain an enormous number of empty headers and consume
+   * CPU even when declared member sizes are tiny.
+   */
+  async function prepareArchiveForInspection(archive: string): Promise<PreparedArchive | undefined> {
+    const header = new Uint8Array(await Bun.file(archive).slice(0, 4).arrayBuffer())
+    const isGzip = header[0] === 0x1f && header[1] === 0x8b
+    const isZstd = header[0] === 0x28 && header[1] === 0xb5 && header[2] === 0x2f && header[3] === 0xfd
+    if (isZstd) {
+      log.warn("refusing zstd-compressed skill archive without a bounded decompression path", { archive })
+      return undefined
+    }
+    if (!isGzip) return { path: archive, cleanup: async () => {} }
+
+    let tempDir: string | undefined
+    try {
+      tempDir = await mkdtemp(path.join(tmpdir(), "cyberstrike-skill-archive-"))
+      const unpacked = path.join(tempDir, "archive.tar")
+      let expandedBytes = 0
+      const limiter = new Transform({
+        transform(chunk: Buffer, _encoding, callback) {
+          expandedBytes += chunk.byteLength
+          if (expandedBytes > MAX_ARCHIVE_TAR_BYTES) {
+            callback(new Error("Skill archive exceeds the bounded decompressed tar size"))
+            return
+          }
+          callback(null, chunk)
+        },
+      })
+      await pipeline(
+        createReadStream(archive),
+        createGunzip(),
+        limiter,
+        createWriteStream(unpacked, { flags: "wx" }),
+      )
+      return {
+        path: unpacked,
+        cleanup: async () => rm(tempDir!, { recursive: true, force: true }),
+      }
+    } catch (err) {
+      if (tempDir) await rm(tempDir, { recursive: true, force: true }).catch(() => {})
+      log.warn("refusing invalid or oversized compressed skill archive", { archive, err })
+      return undefined
+    }
+  }
+
   async function extractSafeArchive(archive: string, root: string, budget: ResourceBudget): Promise<boolean> {
     if (Date.now() >= budget.deadline) return false
     await mkdir(root, { recursive: true })
     const rootStat = await lstat(root)
     if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) return false
     const realRoot = await realpath(root)
-    const entries: Array<{ path: string; type: string; size: number }> = []
-    let invalidManifest = false
+    const preparedArchive = await prepareArchiveForInspection(archive)
+    if (!preparedArchive) return false
     try {
-      await tar.t({
-        file: archive,
-        strict: true,
-        onReadEntry(entry) {
-          const item = entry as { path?: unknown; type?: unknown; size?: unknown }
-          if (
-            typeof item.path !== "string" ||
-            typeof item.type !== "string" ||
-            typeof item.size !== "number" ||
-            !Number.isSafeInteger(item.size) ||
-            item.size < 0 ||
-            entries.length >= MAX_ARCHIVE_ENTRIES
-          ) {
-            invalidManifest = true
-            // Stop parsing immediately: continuing through a hostile archive
-            // could spend CPU on hundreds of thousands of excess tar entries.
-            throw new Error("Archive entry manifest is invalid or exceeds the entry limit")
-          }
-          entries.push({ path: item.path, type: item.type, size: item.size })
-        },
-      })
-    } catch (err) {
-      log.error("failed to inspect skill archive", { archive, err })
-      return false
-    }
-    if (invalidManifest || !isSafeArchiveExpansion(entries.map((entry) => entry.size))) {
-      log.warn("refusing archive with excessive entries or expanded size", { archive, entries: entries.length })
-      return false
-    }
-
-    const expandedSize = entries.reduce((total, entry) => total + entry.size, 0)
-    if (Date.now() >= budget.deadline ||
-      budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
-      log.warn("refusing archive: total extraction or time budget exceeded", { archive, expandedSize })
-      return false
-    }
-
-    const permitted = new Set<string>()
-    for (const entry of entries) {
-      if (!isSafeArchiveEntry(realRoot, entry.path, entry.type)) {
-        log.warn("refusing unsafe skill archive entry", { path: entry.path, type: entry.type })
+      const archiveToInspect = preparedArchive.path
+      const entries: Array<{ path: string; type: string; size: number }> = []
+      let invalidManifest = false
+      try {
+        await tar.t({
+          file: archiveToInspect,
+          strict: true,
+          gzip: false,
+          brotli: false,
+          zstd: false,
+          onReadEntry(entry) {
+            const item = entry as { path?: unknown; type?: unknown; size?: unknown }
+            if (
+              typeof item.path !== "string" ||
+              typeof item.type !== "string" ||
+              typeof item.size !== "number" ||
+              !Number.isSafeInteger(item.size) ||
+              item.size < 0 ||
+              entries.length >= MAX_ARCHIVE_ENTRIES
+            ) {
+              invalidManifest = true
+              return
+            }
+            entries.push({ path: item.path, type: item.type, size: item.size })
+          },
+        })
+      } catch (err) {
+        log.error("failed to inspect skill archive", { archive, err })
         return false
       }
-      if (entry.path === "." || entry.path === "./") continue
-      const destination = resolveSkillFilePath(realRoot, entry.path)
-      if (!destination || !(await safeCacheDestination(realRoot, destination, false, entry.type === "Directory"))) {
-        log.warn("refusing archive write through unsafe cache path", { path: entry.path })
+      if (invalidManifest || !isSafeArchiveExpansion(entries.map((entry) => entry.size))) {
+        log.warn("refusing archive with excessive entries or expanded size", { archive, entries: entries.length })
         return false
       }
-      permitted.add(path.normalize(entry.path.replace(/\\/g, "/")))
-    }
 
-    // Path checks above await filesystem operations. Recheck and reserve here
-    // without yielding so concurrently processed archives cannot oversubscribe.
-    if (budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
-      log.warn("refusing archive: concurrent extraction budget exhausted", { archive, expandedSize })
-      return false
-    }
-    budget.reservedExpandedBytes += expandedSize
-    try {
-      await tar.x({
-        file: archive,
-        cwd: realRoot,
-        strict: true,
-        preservePaths: false,
-        filter(entryPath, entry) {
-          const item = entry as { type?: unknown }
-          if (typeof item.type !== "string") return false
-          return isSafeArchiveEntry(realRoot, entryPath, item.type) &&
-            permitted.has(path.normalize(entryPath.replace(/\\/g, "/")))
-        },
-      })
-      return true
-    } catch (err) {
-      log.error("failed to safely extract skill archive", { archive, err })
-      return false
+      const expandedSize = entries.reduce((total, entry) => total + entry.size, 0)
+      if (Date.now() >= budget.deadline ||
+        budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
+        log.warn("refusing archive: total extraction or time budget exceeded", { archive, expandedSize })
+        return false
+      }
+
+      const permitted = new Set<string>()
+      for (const entry of entries) {
+        if (!isSafeArchiveEntry(realRoot, entry.path, entry.type)) {
+          log.warn("refusing unsafe skill archive entry", { path: entry.path, type: entry.type })
+          return false
+        }
+        if (entry.path === "." || entry.path === "./") continue
+        const destination = resolveSkillFilePath(realRoot, entry.path)
+        if (!destination || !(await safeCacheDestination(realRoot, destination, false, entry.type === "Directory"))) {
+          log.warn("refusing archive write through unsafe cache path", { path: entry.path })
+          return false
+        }
+        permitted.add(path.normalize(entry.path.replace(/\\/g, "/")))
+      }
+
+      // Path checks above await filesystem operations. Recheck and reserve here
+      // without yielding so concurrently processed archives cannot oversubscribe.
+      if (budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
+        log.warn("refusing archive: concurrent extraction budget exhausted", { archive, expandedSize })
+        return false
+      }
+      budget.reservedExpandedBytes += expandedSize
+      try {
+        await tar.x({
+          file: archive,
+          cwd: realRoot,
+          strict: true,
+          gzip: false,
+          brotli: false,
+          zstd: false,
+          preservePaths: false,
+          filter(entryPath, entry) {
+            const item = entry as { type?: unknown }
+            if (typeof item.type !== "string") return false
+            return isSafeArchiveEntry(realRoot, entryPath, item.type) &&
+              permitted.has(path.normalize(entryPath.replace(/\\/g, "/")))
+          },
+        })
+        return true
+      } catch (err) {
+        log.error("failed to safely extract skill archive", { archive, err })
+        return false
+      } finally {
+        // Count the declared size even after an extraction error because tar.x may
+        // have already written some files before failing.
+        budget.reservedExpandedBytes -= expandedSize
+        budget.expandedBytes += expandedSize
+      }
     } finally {
-      // Count the declared size even after an extraction error because tar.x may
-      // have already written some files before failing.
-      budget.reservedExpandedBytes -= expandedSize
-      budget.expandedBytes += expandedSize
+      await preparedArchive.cleanup().catch(() => {})
     }
   }
 
@@ -353,6 +418,7 @@ export namespace Discovery {
   const MAX_ARCHIVE_ENTRIES = 10_000
   const MAX_ARCHIVE_MEMBER_BYTES = 25 * 1024 * 1024
   const MAX_ARCHIVE_EXPANDED_BYTES = 100 * 1024 * 1024
+  const MAX_ARCHIVE_TAR_BYTES = 125 * 1024 * 1024
   const MAX_TOTAL_EXPANDED_BYTES = 250 * 1024 * 1024
   const MAX_TOTAL_PULL_MS = 5 * 60 * 1000
   const DOWNLOAD_TIMEOUT_MS = 15_000
