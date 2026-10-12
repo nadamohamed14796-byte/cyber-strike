@@ -39,7 +39,7 @@ export namespace SkillIndex {
   })
   const current = () => states.get(Instance.directory) ?? emptyState()
 
-  const TECHNIQUE_ID = /^t\\d{4}(?:\\.\\d{3})?$/i
+  const TECHNIQUE_ID = /^t\d{4}(?:\.\d{3})?$/i
 
   function addReference(state: IndexState, reference: string | undefined, skillName: string) {
     const key = reference?.trim().toLowerCase()
@@ -54,7 +54,7 @@ export namespace SkillIndex {
     addReference(state, entry.name, entry.name)
     addReference(state, entry.owasp_id, entry.name)
 
-    const nameTechnique = /^((?:T\\d{4})(?:\\.\\d{3})?)(?:[_-]|$)/i.exec(entry.name)?.[1]
+    const nameTechnique = /^((?:T\d{4})(?:\.\d{3})?)(?:[_-]|$)/i.exec(entry.name)?.[1]
     if (nameTechnique) addReference(state, nameTechnique, entry.name)
     for (const tag of entry.tags) {
       if (TECHNIQUE_ID.test(tag.trim())) addReference(state, tag, entry.name)
