@@ -40,19 +40,31 @@ export namespace WebCredential {
 
   // Browser/UI events must never carry raw passwords or reusable auth tokens.
   // Internal get()/getById() calls remain credential-bearing for trusted auth flows.
-  export const PublicInfo = Info.omit({ password: true })
+  export const PublicInfo = Info.omit({ password: true, recipe: true })
   export type PublicInfo = z.infer<typeof PublicInfo>
 
-  function publicInfo(credential: Info): PublicInfo {
+  export function toPublicInfo(credential: Info): PublicInfo {
     const headers: Record<string, string> = {}
     for (const [name, value] of Object.entries(credential.headers ?? {})) {
-      headers[name] = COMMON_AUTH_HEADERS.includes(name.toLowerCase()) ? "[REDACTED]" : value
+      const sensitive = COMMON_AUTH_HEADERS.includes(name.toLowerCase()) ||
+        /(authorization|cookie|token|api[-_]?key|secret|password|session|csrf|credential|signature)/i.test(name)
+      headers[name] = sensitive ? "[REDACTED]" : value
     }
-    return { ...credential, password: undefined, headers }
+    return {
+      id: credential.id,
+      session_id: credential.session_id,
+      label: credential.label,
+      headers,
+      username: credential.username,
+      valid: credential.valid,
+      container_id: credential.container_id,
+      role_id: credential.role_id,
+      time: credential.time,
+    }
   }
 
   function publicList(credentials: Info[]): PublicInfo[] {
-    return credentials.map(publicInfo)
+    return credentials.map(toPublicInfo)
   }
 
   export const Event = {
