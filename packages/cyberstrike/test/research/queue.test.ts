@@ -198,6 +198,62 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
 })
 
 
+test("failed crawl pages get a cooldown and recover without becoming report work", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceID = "crawl-failure-" + marker
+      const failedURL = "https://research.example.test/" + marker + "/unavailable-index"
+
+      const failed = ResearchQueue.markFailedCrawlPage({
+        sourceID,
+        sourceURL: failedURL,
+        title: "Temporary network failure",
+        reason: "ECONNRESET while reading public research page",
+      })
+      expect(failed?.status).toBe("discovered")
+      expect(failed?.payload?.crawl_page).toBe(true)
+      expect(failed?.payload?.crawl_error).toBe(true)
+      expect(failed?.last_error).toContain("ECONNRESET")
+      expect(ResearchQueue.isFreshCrawlPage(sourceID, failedURL)).toBe(true)
+      expect(ResearchQueue.isFreshCrawlPage(sourceID, failedURL, Date.now() + 7 * 60 * 60_000)).toBe(false)
+      expect(ResearchQueue.stats(sourceID).total).toBe(0)
+      expect(ResearchQueue.stats(sourceID).crawl_pages).toBe(1)
+
+      const recovered = ResearchQueue.markVisitedPage({
+        sourceID,
+        sourceURL: failedURL,
+        title: "Recovered index",
+        contentFingerprint: "recovered-content",
+      })
+      expect(recovered?.status).toBe("discovered")
+      expect(recovered?.payload?.crawl_error).toBeUndefined()
+      expect(recovered?.last_error).toBeNull()
+      expect(ResearchQueue.isFreshCrawlPage(sourceID, failedURL)).toBe(true)
+
+      const failedReportURL = "https://research.example.test/" + marker + "/possible-report"
+      ResearchQueue.markFailedCrawlPage({
+        sourceID,
+        sourceURL: failedReportURL,
+        reason: "HTTP 503",
+      })
+      const promoted = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL: failedReportURL,
+        title: "Recovered report candidate",
+        payload: { cached_text: "A sufficiently useful research report body." },
+      })
+      expect(promoted.created).toBe(true)
+      expect(ResearchQueue.find(sourceID, failedReportURL)?.status).toBe("queued")
+      expect(ResearchQueue.find(sourceID, failedReportURL)?.payload?.crawl_page).not.toBe(true)
+      expect(ResearchQueue.find(sourceID, failedReportURL)?.payload?.crawl_error).toBeUndefined()
+      await Instance.dispose()
+    },
+  })
+})
+
 test("retry-auth sends blocked crawl pages back to discovery instead of the learning queue", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
