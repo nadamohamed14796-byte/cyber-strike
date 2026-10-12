@@ -75,7 +75,7 @@ export namespace VerificationLedger {
     // Keep identity checks, attempt-budget enforcement, insertion, and verdict
     // updates atomic so concurrent sessions/processes cannot bypass ledger invariants.
     return Database.transaction(() => {
-      const before = list({ sessionID, hypothesisKey })
+      let before = list({ sessionID, hypothesisKey })
       // A hypothesis key is the identity boundary for one claim. Mixing assets or
       // vulnerability classes under the same key corrupts attempt counts and can
       // make evidence from one target influence a verdict for another.
@@ -100,6 +100,7 @@ export namespace VerificationLedger {
           eq(VerificationAttemptTable.hypothesis_key, hypothesisKey),
         )).run())
         priorOutcome = "inconclusive"
+        before = list({ sessionID, hypothesisKey })
       }
       if (Policy.isTerminalOutcome(priorOutcome)) {
         throw new Error(`This hypothesis is already ${priorOutcome}; terminal hypotheses cannot accept more attempts. Start a new hypothesis_key only for a genuinely different claim.`)
