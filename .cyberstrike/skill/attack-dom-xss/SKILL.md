@@ -96,6 +96,29 @@ Determine whether code runs in the application origin, a sandboxed iframe, or a 
 - Never copy OAuth fragments or real browser tokens into logs/reports.
 - Stop if testing requires delivery to an uninvolved user, tenant crossing, or third-party payload execution.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+
+Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
+
+### Skill-specific hypothesis order
+
+Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture, with a relevant control and a clear trust-boundary failure.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not established.
+- **Unconfirmed:** the signal is ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control, valid authorization explanation, or repeatable contradictory evidence explains the signal. Record the attempts; do not claim every theoretical variant was exhausted.
+- Status, banners, stack traces, response length, endpoint existence, tool alerts, or frontend state are not sufficient on their own.
+
+### Stop, cleanup, and handoff
+
+Stop at scope boundaries, unexpected real-user data, production side effects, rate-limit/availability degradation, secret exposure, or prohibited action. Clean up disposable state, revoke temporary sessions/tokens when possible, and record status. Return target/scope evidence, baseline, hypothesis, attempts used, impact, controls, verdict/confidence, sanitized evidence, handoff signal, and cleanup status. Trigger a chained skill only when its signal is observed.
+
 ## References
 
 - [uphiago/recon-skills — hunt-dom](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-dom)

@@ -109,6 +109,29 @@ Trace the exact filter/handler/service configuration and patch. Add a regression
 - Version strings can be backported or hidden behind a proxy; verify dependency and patch state.
 - Never request heap dumps, full environment/config properties, logfiles or other secret-bearing diagnostics on production unless explicitly authorized and carefully scoped.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## References
 
 - [uphiago — hunt-springboot](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-springboot)

@@ -122,6 +122,29 @@ State exposed service, verified build confidence, advisory, preconditions, and w
 - Never try default credentials, spray SSO users, invoke exploit templates, upload files, run commands, modify VMs, access datastores, or pivot to internal-only systems by default.
 - Keep active proof in an isolated lab unless a separate explicit production exploit authorization and rollback plan exist.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+
+Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
+
+### Skill-specific hypothesis order
+
+Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated using a controlled identity/fixture and a meaningful control.
+- **Likely / needs corroboration:** independent indicators support the candidate, but the consequence or root cause remains uncertain.
+- **Unconfirmed:** evidence is generic, ambiguous, cached, or not tied to a security property.
+- **Refuted / false positive:** a relevant negative control or valid implementation/policy explanation accounts for the observation. Document tested branches; do not claim all imaginable variants were exhausted.
+- Scanner alerts, version strings, banner text, status codes, and response length alone are not proof.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected user data, state changes, service degradation, secret exposure or prohibited behavior. Clean disposable test state and revoke temporary sessions/tokens where possible. Return scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence and cleanup status. Start a chained skill only when its trigger has been independently observed.
+
 ## References
 
 - [uphiago/recon-skills — vmware-vcenter-attack](https://github.com/uphiago/recon-skills/tree/main/redteam/vmware-vcenter-attack)
