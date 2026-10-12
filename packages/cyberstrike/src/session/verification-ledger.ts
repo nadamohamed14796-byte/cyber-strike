@@ -77,9 +77,7 @@ export namespace VerificationLedger {
     // vulnerability classes under the same key corrupts attempt counts and can
     // make evidence from one target influence a verdict for another.
     const identityConflict = before.find((item) =>
-      item.asset.trim().toLowerCase() !== input.asset.trim().toLowerCase() ||
-      item.vulnerabilityClass.trim().toLowerCase() !== input.vulnerabilityClass.trim().toLowerCase() ||
-      (item.endpoint?.trim() && input.endpoint?.trim() && item.endpoint.trim() !== input.endpoint.trim()),
+      !Policy.sameHypothesisIdentity(item, input),
     )
     if (identityConflict) {
       throw new Error(
