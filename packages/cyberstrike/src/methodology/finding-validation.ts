@@ -32,6 +32,39 @@ export interface FindingValidationAttemptInput extends FindingValidationAttemptR
 
 export const FINDING_VALIDATION_MIN_ATTEMPTS = 20
 
+export function recommendValidationStrategies(context: string): FindingValidationAttemptStrategy[] {
+  const value = context.toLowerCase()
+  const common: FindingValidationAttemptStrategy[] = ["baseline_control", "negative_control", "response_comparison", "endpoint_variant"]
+  if (/(idor|bola|object.?level|object.?authorization|broken access control|authorization|privilege|tenant|cross.?account|access control)/.test(value)) {
+    return ["identity_role", "object_identifier", "permission_boundary", "baseline_control", "negative_control", "response_comparison", "state_change", "session_state", "endpoint_variant", "business_logic"]
+  }
+  if (/(xss|cross.?site scripting|html injection|script injection|dom.?based)/.test(value)) {
+    return ["business_logic", "content_type", "endpoint_variant", "baseline_control", "negative_control", "response_comparison", "session_state", "permission_boundary", "other"]
+  }
+  if (/(ssrf|server.?side request forgery|url fetch|webhook|url import)/.test(value)) {
+    return ["endpoint_variant", "permission_boundary", "negative_control", "response_comparison", "business_logic", "cache_waf_environment", "baseline_control", "other"]
+  }
+  if (/(sql.?injection|sqli|command injection|template injection|injection)/.test(value)) {
+    return ["baseline_control", "negative_control", "content_type", "http_method", "response_comparison", "business_logic", "endpoint_variant", "cache_waf_environment", "other"]
+  }
+  if (/(csrf|cross.?site request forgery)/.test(value)) {
+    return ["session_state", "identity_role", "state_change", "negative_control", "baseline_control", "response_comparison", "content_type", "permission_boundary"]
+  }
+  if (/(cors|cross.?origin|origin policy)/.test(value)) {
+    return ["endpoint_variant", "negative_control", "response_comparison", "permission_boundary", "session_state", "baseline_control", "other"]
+  }
+  if (/(open redirect|redirect|oauth|callback|ss.?open)/.test(value)) {
+    return ["endpoint_variant", "negative_control", "response_comparison", "permission_boundary", "session_state", "baseline_control", "other"]
+  }
+  if (/(race condition|race.?condition|concurrency|double.?spend|duplicate transaction)/.test(value)) {
+    return ["timing_race", "state_change", "business_logic", "baseline_control", "negative_control", "response_comparison", "session_state"]
+  }
+  if (/(authentication|login|session|token|password reset|account recovery|mfa|2fa)/.test(value)) {
+    return ["identity_role", "session_state", "permission_boundary", "negative_control", "baseline_control", "response_comparison", "state_change", "endpoint_variant"]
+  }
+  return [...common, "identity_role", "permission_boundary", "session_state", "business_logic", "state_change", "cache_waf_environment"]
+}
+
 export interface FindingValidationInputCheck {
   id: FindingValidationCheckID
   status: FindingValidationStatus
@@ -315,7 +348,18 @@ export namespace FindingValidation {
       console.warn("[cyberstrike] target validation note could not be written:", error instanceof Error ? error.message : String(error))
     }
 
-    return { ...assessment, id: validationID, findingID: input.vulnerabilityID, targetNoteID }
+    const strategyPlan = recommendValidationStrategies([finding.title, finding.description, finding.endpoint].join(" "))
+    const strategyGuidance = assessment.attemptsRemaining > 0
+      ? "\\nCase-specific strategy suggestions (choose only relevant, safe tests; do not blindly run all): " + strategyPlan.join(", ")
+      : ""
+    return {
+      ...assessment,
+      output: assessment.output + strategyGuidance,
+      strategyPlan,
+      id: validationID,
+      findingID: input.vulnerabilityID,
+      targetNoteID,
+    }
   }
 
   export function history(input: { sessionID: string; vulnerabilityID: string; limit?: number }) {
