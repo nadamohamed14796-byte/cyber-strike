@@ -402,3 +402,13 @@ The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill
 - **AuthVault runtime coverage:** added an isolated Bun subprocess test using temporary XDG directories. It verifies AES-GCM secret persistence/decryption, key mismatch rejection, no plaintext password in the JSON file, private file/directory permissions, same-profile password rotation, target-bound reads, list/remove, concurrent in-process saves, and temporary-file cleanup. Unit tests and typecheck passed on `7845e5ce5dcf6342e39ef66dda832029dd2da83f`; multi-process locking remains unverified.
 - **Research regression stabilization:** the cached-text fixture uses unique content identity so a persistent shared research store from an earlier test run cannot make the assertion flaky. The unit suite passed on the same head.
 - **CI:** unit and typecheck passed; monorepo build completed successfully; Python CodeQL passed. JavaScript/TypeScript CodeQL remained in progress at the last check. No live site login or provider-backed hunting is claimed.
+
+## Follow-up checkpoint — 2026-10-12: authenticated research crawl recovery
+
+### RES-009 — stale authentication marker after a successful crawl revisit
+
+- **Root cause:** `ResearchQueue.markVisitedPage()` promoted an existing crawl-page row to `discovered` after a successful revisit but copied `auth_required: true` from the previous authentication-blocked payload. This left the queue status and payload metadata contradictory; cached login text was also not explicitly excluded on this path.
+- **Fix on main:** the successful revisit now removes stale `auth_required` and `cached_text` fields, clears `completed_at`, and preserves other crawl metadata while updating the title/fingerprint.
+- **Regression test:** added a test that marks an index page visited, blocks it on HTTP 401, then simulates a successful revisit and asserts that the row is `discovered`, remains a crawl page, has no stale auth/login-text fields, and is fresh in the crawl cache.
+- **Commits:** implementation [e83cd953d5b02dac99af357edd9599f9bbfd081f](https://github.com/nadamohamed14796-byte/cyber-strike/commit/e83cd953d5b02dac99af357edd9599f9bbfd081f); regression test [8f080c82af096ac294ac3393e69b04899523f9ed](https://github.com/nadamohamed14796-byte/cyber-strike/commit/8f080c82af096ac294ac3393e69b04899523f9ed).
+- **Validation status:** source and test are committed directly to `main`. This connected environment returned no commit status checks for the new head, and local Bun execution is unavailable; therefore the regression is **implemented but not yet CI-verified**. Do not mark it verified until the relevant test, typecheck, build, and security workflows complete.
