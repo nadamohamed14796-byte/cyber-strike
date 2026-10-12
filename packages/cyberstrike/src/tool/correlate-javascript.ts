@@ -2,7 +2,12 @@ import z from "zod"
 import { Tool } from "./tool"
 import { JavaScriptCorrelation } from "../target/javascript-correlation"
 
-export const CorrelateJavaScriptTool = Tool.define("correlate_javascript", {
+const CorrelateJavaScriptParameters = z.object({
+    target_url: z.string().min(1).describe("Target URL already approved for the current session"),
+    javascript_url: z.string().url().optional().describe("Optional observed HTTP(S) JavaScript asset URL"),
+  })
+
+export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptParameters, Tool.Metadata>("correlate_javascript", {
   description: [
     "Correlate already-captured JavaScript asset information with stored endpoints, requests/responses, request observations, web functions, and findings.",
     "This performs no network requests and does not execute JavaScript. It reads only the current session and descendant-agent data, then persists a redacted correlation snapshot to the per-target workspace and SQLite target notes.",
@@ -11,10 +16,7 @@ export const CorrelateJavaScriptTool = Tool.define("correlate_javascript", {
     "For static endpoint extraction, place an already-observed/captured source file under the current target workspace's javascript/ directory, then run this tool. It scans bounded local files only; it does not download or execute scripts.",
     "Do not provide URL credentials, session tokens, or other secrets. This tool does not replace the existing scope enforcement.",
   ].join("\n"),
-  parameters: z.object({
-    target_url: z.string().min(1).describe("Target URL already approved for the current session"),
-    javascript_url: z.string().url().optional().describe("Optional observed HTTP(S) JavaScript asset URL"),
-  }),
+  parameters: CorrelateJavaScriptParameters,
   async execute(params, ctx) {
     try {
       const result = await JavaScriptCorrelation.build({
