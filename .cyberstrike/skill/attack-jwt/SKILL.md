@@ -157,5 +157,7 @@ Record token type, issuer/audience, redacted header and claims, baseline vs modi
 
 ## References
 
+- [uphiago/recon-skills — redteam/hunt-oauth](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-oauth/SKILL.md) — JWT and token validation sources.
+
 - [PortSwigger: JWT Attacks](https://portswigger.net/web-security/jwt)
 - [RFC 7519 - JSON Web Token](https://tools.ietf.org/html/rfc7519)
