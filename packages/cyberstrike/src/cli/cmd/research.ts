@@ -125,6 +125,7 @@ export const ResearchCommand = cmd({
           yargs
             .option("limit", { type: "number", default: 50, describe: "maximum queue items processed per cycle" })
             .option("worker", { type: "string", describe: "worker label for queue leases" })
+            .option("source", { type: "string", describe: "only process queue items from this source ID" })
             .option("watch", {
               type: "boolean",
               default: false,
@@ -134,7 +135,7 @@ export const ResearchCommand = cmd({
         async handler(args) {
           prompts.intro("CyberStrike Research Learning Worker")
           do {
-            const result = await learnResearchQueue({ limit: args.limit, workerID: args.worker })
+            const result = await learnResearchQueue({ limit: args.limit, workerID: args.worker, sourceID: args.source })
             prompts.log.info(
               "worker=" +
                 result.worker +
