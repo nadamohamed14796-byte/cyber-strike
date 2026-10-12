@@ -1,246 +1,86 @@
 ---
 name: recon-methodology
-description: Bug bounty and pentest reconnaissance methodology
-tags: [recon, enumeration, osint, subdomain]
-version: "1.0"
+description: "Plan and execute evidence-led, scope-locked reconnaissance that produces a deduplicated, prioritized testing queue"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [recon, enumeration, osint, subdomain, asset-inventory, scope]
+tech_stack: [dns, http, tls, javascript, api, cloud]
+prerequisites:
+  - "Written authorization, scope rules, exclusions, and permitted testing intensity"
+chains_with: [attack-subdomain-takeover, attack-idor-automation, attack-triage-validation]
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/web2-recon/SKILL.md"
+  - "https://github.com/uphiago/recon-skills/blob/main/meta/recon-playbook/SKILL.md"
+  - "https://github.com/uphiago/recon-skills/blob/main/meta/pentest-playbook/SKILL.md"
+  - "https://github.com/uphiago/recon-skills/blob/main/recon/subdomain-enumeration/SKILL.md"
+  - "https://github.com/uphiago/recon-skills/blob/main/recon/web-enumeration/SKILL.md"
 ---
 
 # Reconnaissance Methodology
 
-## Phase 1: Passive Reconnaissance
+## Mission
 
-### Subdomain Enumeration (Passive)
+Turn an authorized target list into a scope-checked, deduplicated inventory and a prioritized queue of hypotheses. Recon observations are leads, not findings. The goal is to identify the smallest next test likely to establish a meaningful security property.
 
-```bash
-# Certificate Transparency
-curl -s "https://crt.sh/?q=%25.target.com&output=json" | jq -r '.[].name_value' | sort -u
+## 1. Engagement contract
 
-# SecurityTrails
-curl -s "https://api.securitytrails.com/v1/domain/target.com/subdomains" \
-  -H "APIKEY: $API_KEY"
+Before any active request, record:
+- exact assets, wildcard rules, exclusions, third-party services, and program links;
+- allowed recon methods, request rate, scan windows, and prohibited techniques;
+- workspace and evidence-retention location;
+- stop conditions for instability, rate limits, unexpected sensitive data, or scope ambiguity.
 
-# Subfinder (passive)
-subfinder -d target.com -silent
+Public reachability does not imply authorization. Every discovered hostname, IP, API, repository, or third-party service must pass the scope resolver before active testing.
 
-# Amass (passive)
-amass enum -passive -d target.com
+## 2. Recon pipeline
 
-# Combined approach
-subfinder -d target.com -silent | anew subs.txt
-amass enum -passive -d target.com | anew subs.txt
-```
+### A. Normalize and lock scope
 
-### Historical Data
+Canonicalize hostnames, schemes, ports, trailing dots, IDNs, wildcard entries, and exclusions. Keep the original source and reason for every candidate. Resolve wildcard rules conservatively; do not treat an entire shared CDN or cloud provider as in scope.
 
-```bash
-# Wayback Machine URLs
-echo "target.com" | waybackurls | tee wayback.txt
+### B. Passive discovery first
 
-# GAU (GetAllURLs)
-echo "target.com" | gau --threads 5 | tee gau.txt
+Use program-provided asset lists, certificate transparency, public DNS history, public code search, archived URLs, and other permitted passive sources. Preserve provenance and timestamps. Do not scrape private systems or use leaked credentials.
 
-# Combined historical
-cat wayback.txt gau.txt | sort -u | tee historical_urls.txt
+### C. DNS and infrastructure mapping
 
-# Find parameters
-cat historical_urls.txt | grep "=" | qsreplace "FUZZ" | sort -u
-```
+Resolve candidates and distinguish confirmed records, aliases, wildcard DNS, parked domains, unresolved names, and stale records. Keep CNAME chains and provider fingerprints. DNS resolution is not proof that a hostname is owned or in scope.
 
-### Technology Detection
+### D. HTTP and service validation
 
-```bash
-# Wappalyzer CLI
-wappalyzer https://target.com
+For in-scope hosts, record status, title, redirect chain, TLS certificate, server hints, content type, and stable response fingerprints. Use bounded timeouts and concurrency. Avoid broad port scans or content brute force unless explicitly permitted.
 
-# WhatWeb
-whatweb -a 3 https://target.com
+### E. Web and API enumeration
 
-# BuiltWith API
-curl "https://api.builtwith.com/v19/api.json?KEY=$KEY&LOOKUP=target.com"
-```
+Collect URLs from permitted crawling, application traffic, JavaScript bundles, source maps, API documentation, robots/sitemap files, and known application routes. Normalize URLs and deduplicate while retaining parameter names, methods, auth context, source, and discovery time. Separate public routes from authenticated routes and write operations.
 
-## Phase 2: Active Reconnaissance
+### F. Technology and ownership signals
 
-### DNS Enumeration
+Record framework, CDN, cloud provider, CMS, API style, authentication mechanism, and likely tenant boundaries only when evidence supports the inference. Keep confidence and evidence for each fingerprint; do not convert a banner into a vulnerability claim.
 
-```bash
-# DNS records
-dig target.com ANY +noall +answer
-dig target.com MX +short
-dig target.com TXT +short
-dig target.com NS +short
+### G. Queue construction
 
-# Zone transfer attempt
-dig axfr @ns1.target.com target.com
+For each candidate, store target, scope decision, source/provenance, signal, hypothesis, expected security property, required account/role, safe validation step, priority, and status. Prioritize high-value trust boundaries, newly discovered assets, exposed APIs, cross-tenant behavior, and changes from the previous recon wave.
 
-# DNSRecon
-dnsrecon -d target.com -t std
+## 3. Delta analysis
 
-# Subdomain brute force
-puredns bruteforce wordlist.txt target.com -r resolvers.txt
-```
+Compare each recon run with the prior snapshot. Highlight new hosts, changed technologies, newly exposed endpoints, changed authentication behavior, new JavaScript assets, and DNS/provider changes. Avoid rerunning expensive scans if the delta does not justify them.
 
-### Subdomain Resolution
+## 4. Stop conditions and hygiene
 
-```bash
-# Resolve discovered subdomains
-cat subs.txt | dnsx -silent -a -resp | tee resolved.txt
+Stop when a target is out of scope, rate-limited, unstable, serving unexpected private data, or ownership is uncertain. Do not store tokens, personal data, or target-specific secrets in committed files. Keep raw outputs outside the source repository and attach redacted evidence references.
 
-# Filter live hosts
-cat resolved.txt | httpx -silent -title -status-code -tech-detect | tee live_hosts.txt
+## 5. Quality gates
 
-# Screenshot
-cat live_hosts.txt | cut -d' ' -f1 | gowitness file -f - --threads 10
-```
+Before handing a lead to a testing skill:
+- [ ] scope is explicitly confirmed;
+- [ ] the observation is reproducible;
+- [ ] duplicate URLs/hosts are normalized;
+- [ ] provenance and timestamp are recorded;
+- [ ] hypothesis and expected policy are explicit;
+- [ ] the next test is bounded and authorized;
+- [ ] the lead is not mislabeled as a vulnerability.
 
-### Port Scanning
+## Output contract
 
-```bash
-# Fast scan (top 100)
-nmap -F -sV target.com
-
-# Full TCP scan
-nmap -p- -T4 --min-rate 1000 target.com
-
-# UDP scan (top 20)
-nmap -sU --top-ports 20 target.com
-
-# Service version detection
-nmap -sV -sC -p 80,443,8080 target.com
-
-# Masscan (fast)
-masscan -p1-65535 --rate 10000 -oJ scan.json target.com
-```
-
-## Phase 3: Content Discovery
-
-### Directory Fuzzing
-
-```bash
-# Feroxbuster
-feroxbuster -u https://target.com -w /path/to/wordlist.txt -x php,asp,html
-
-# FFUF
-ffuf -u https://target.com/FUZZ -w wordlist.txt -mc 200,301,302,403
-
-# Dirsearch
-dirsearch -u https://target.com -e php,asp,html -t 50
-
-# Gobuster
-gobuster dir -u https://target.com -w wordlist.txt -x php,html -t 50
-```
-
-### Parameter Discovery
-
-```bash
-# Arjun
-arjun -u https://target.com/page
-
-# ParamSpider
-python3 paramspider.py -d target.com
-
-# FFUF parameter fuzzing
-ffuf -u "https://target.com/page?FUZZ=value" -w params.txt -mc 200
-```
-
-### JavaScript Analysis
-
-```bash
-# Extract JS files
-cat live_hosts.txt | getJS --complete | tee js_files.txt
-
-# Find endpoints in JS
-cat js_files.txt | xargs -I{} sh -c 'curl -s {} | linkfinder -i -'
-
-# Find secrets in JS
-cat js_files.txt | xargs -I{} sh -c 'curl -s {} | secretfinder -i -'
-
-# Nuclei JS analysis
-nuclei -l js_files.txt -t exposures/
-```
-
-## Phase 4: Vulnerability Discovery
-
-### Automated Scanning
-
-```bash
-# Nuclei (comprehensive)
-nuclei -l live_hosts.txt -t nuclei-templates/ -o nuclei_results.txt
-
-# Nikto
-nikto -h https://target.com -output nikto.txt
-
-# WPScan (WordPress)
-wpscan --url https://target.com --enumerate u,p,t
-```
-
-### Manual Testing Points
-
-```
-1. Authentication
-   - Login forms
-   - Password reset
-   - Registration
-   - Session management
-
-2. Authorization
-   - IDOR on IDs
-   - Horizontal privilege escalation
-   - Vertical privilege escalation
-
-3. Input Validation
-   - All parameters (GET, POST)
-   - Headers (Host, Referer, User-Agent)
-   - Cookies
-   - File uploads
-
-4. Business Logic
-   - Price manipulation
-   - Quantity tampering
-   - Skip steps
-   - Race conditions
-```
-
-## Reconnaissance Flow
-
-```
-Target Domain
-     │
-     ├── Passive Subdomain Enumeration
-     │   ├── crt.sh, SecurityTrails
-     │   ├── Subfinder, Amass (passive)
-     │   └── Historical data (wayback, gau)
-     │
-     ├── DNS Enumeration
-     │   ├── Record types (A, MX, TXT, NS)
-     │   └── Zone transfer attempt
-     │
-     ├── Active Subdomain Enumeration
-     │   └── Brute force (puredns)
-     │
-     ├── Resolution & Probing
-     │   ├── dnsx (resolve)
-     │   └── httpx (probe)
-     │
-     ├── Port Scanning
-     │   └── nmap / masscan
-     │
-     ├── Content Discovery
-     │   ├── Directory fuzzing
-     │   ├── Parameter discovery
-     │   └── JavaScript analysis
-     │
-     └── Vulnerability Scanning
-         ├── Nuclei
-         └── Manual testing
-```
-
-## Wordlists
-
-| Purpose     | Recommended Wordlist                                                         |
-| ----------- | ---------------------------------------------------------------------------- |
-| Subdomains  | SecLists/Discovery/DNS/subdomains-top1million-5000.txt                       |
-| Directories | SecLists/Discovery/Web-Content/raft-medium-directories.txt                   |
-| Files       | SecLists/Discovery/Web-Content/raft-medium-files.txt                         |
-| Parameters  | SecLists/Discovery/Web-Content/burp-parameter-names.txt                      |
-| Passwords   | SecLists/Passwords/Common-Credentials/10-million-password-list-top-10000.txt |
+Return a normalized asset inventory, endpoint inventory, scope decisions, evidence/provenance, delta summary, prioritized hypotheses, and next-step recommendations. Keep discovery facts separate from security conclusions.

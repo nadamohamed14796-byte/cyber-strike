@@ -1,122 +1,76 @@
 ---
 name: attack-jwt
-description: "JWT token attacks — alg:none bypass, key confusion, claim tampering, signature stripping"
+description: "Assess JWT verification, algorithm policy, key selection, claims, token lifecycle, and authorization impact"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - jwt
-  - authentication
-  - web
-  - token
-  - attack
-tech_stack:
-  - web
-cwe_ids:
-  - CWE-287
-  - CWE-347
-  - CWE-345
-chains_with:
-  - attack-idor-automation
-prerequisites: []
-severity_boost:
-  attack-idor-automation: "JWT tampering + IDOR = full account takeover"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [jwt, authentication, tokens, cryptography, authorization]
+tech_stack: [http, json, jwt, jwks]
+cwe_ids: [CWE-287, CWE-347, CWE-345]
+chains_with: [attack-idor-automation, attack-open-redirect, attack-oauth, attack-triage-validation]
+prerequisites:
+  - "Authorized application and test identity"
+  - "Permission to test token validation; never use another user's token"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-jwt-crypto/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/web-security/jwt"
+  - "https://www.rfc-editor.org/rfc/rfc7519"
 ---
 
-# JWT Token Attack
+# JSON Web Token (JWT) Security Assessment
 
 ## Objective
 
-Exploit JWT implementation weaknesses to bypass authentication, escalate privileges, or forge tokens.
+Determine whether the application verifies JWT signatures, algorithms, key selection, issuer/audience, expiry, and authorization claims correctly. Decoding a token is not verification; a vulnerability exists only when the server accepts a token or claim state that violates its security policy.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Decode & Analyze
+- Use a dedicated account and tokens issued to that account.
+- Do not attempt to access real users' accounts or data. Prove role/identity changes only in a test tenant or a controlled local environment.
+- Do not brute-force signing secrets against production. Use approved offline checks only for tokens you own and only within program policy.
+- Treat token strings as credentials: redact them from logs, shell history, commits, and reports.
 
-```bash
-# Automated JWT analysis and tamper token generation
-attack_script jwt_tamper EYTOKEN --json-output
+## Procedure
 
-# Manual decode
-echo "HEADER.PAYLOAD.SIG" | cut -d. -f1 | base64 -d 2>/dev/null
-echo "HEADER.PAYLOAD.SIG" | cut -d. -f2 | base64 -d 2>/dev/null
-```
+### 1. Identify JWT usage and baseline
 
-Check for:
-- Algorithm (`alg` field): RS256, HS256, none
-- Claims: `role`, `is_admin`, `sub`, `exp`, `aud`, `iss`
-- Key ID (`kid`): SQL injection, path traversal potential
+Locate tokens in authorization headers, cookies, or application responses. Decode header and payload locally without exposing the token to online services. Record `alg`, `kid`, `typ`, `iss`, `aud`, `sub`, `exp`, `nbf`, and role/scope claims as applicable. Establish a normal authenticated request and expected permissions.
 
-### Phase 2: Algorithm Attacks
+### 2. Verify algorithm allowlisting
 
-```bash
-# Generate alg=none token
-attack_script jwt_tamper EYTOKEN --set-header alg=none
+Check whether the server enforces a configured algorithm allowlist rather than trusting the token's `alg` header. In a controlled test environment, determine whether unsigned tokens or an algorithm mismatch are rejected. Never assume that changing `alg` or removing a signature is accepted; capture the server's actual decision.
 
-# Role escalation
-attack_script jwt_tamper EYTOKEN --set role=admin --set-header alg=none
+### 3. Check asymmetric/symmetric key confusion
 
-# User ID swap
-attack_script jwt_tamper EYTOKEN --set sub=1 --set-header alg=none
+If the application uses an asymmetric algorithm, verify that the verifier cannot reinterpret a public key as a symmetric secret. Use published keys and local test tokens in an isolated environment or approved test account. Do not forge tokens for real users or elevate privileges on production systems.
 
-# HS256 with known/weak key
-attack_script jwt_tamper EYTOKEN --set role=admin --key "secret"
-```
+### 4. Review key selection and remote key references
 
-### Phase 3: Key Confusion (RS256 → HS256)
+Inspect `kid` handling and configured JWKS/key sources. Look for unsafe file/path lookup, ambiguous key selection, untrusted `jku` or `x5u` references, or weak key-to-algorithm binding. Test only harmless invalid key identifiers unless a more intrusive test is explicitly authorized; do not use these fields to read server files or trigger outbound requests.
 
-If server uses RS256, try signing with the public key as HS256 secret:
+### 5. Validate claims and token lifecycle
 
-```bash
-# Fetch public key
-curl -s https://TARGET/.well-known/jwks.json
+Check signature verification, issuer, audience, expiry, not-before, subject binding, and expected claim types. Compare behavior for expired, not-yet-valid, wrong-issuer, wrong-audience, malformed, and revoked test tokens. Check whether logout, password reset, or account security changes invalidate tokens as documented.
 
-# Convert JWK to PEM and sign
-attack_script jwt_tamper EYTOKEN --set role=admin --key "$(cat public.pem)" --set-header alg=HS256
-```
+### 6. Confirm authorization impact
 
-### Phase 4: kid Injection
+Use a test account with known low privileges. A changed claim matters only if the server accepts the token and grants an unauthorized permission. Confirm the effect using a harmless test resource or isolated environment. A decoded payload, a generated token, or a parser response is not proof of bypass.
 
-```bash
-# SQL injection via kid
-attack_script jwt_tamper EYTOKEN --set-header "kid=../../../../../../dev/null" --key ""
+## Common false positives
 
-# kid pointing to accessible file
-attack_script jwt_tamper EYTOKEN --set-header "kid=/proc/sys/kernel/hostname"
-```
+- JWT payloads are readable by design; base64url encoding is not encryption.
+- A token contains a role claim that the server ignores or independently checks.
+- An untrusted `kid` causes a safe rejection.
+- A weak secret hypothesis without a verified accepted forged token.
+- Expiry differences caused by clock skew without meaningful policy failure.
 
-### Phase 5: Verify Impact
+## Evidence and output
 
-```bash
-# Test tampered token
-curl -s -H "Authorization: Bearer TAMPERED_TOKEN" https://TARGET/api/admin/users
-```
+Record token type (never the live value), algorithm policy, key source, redacted header/claims, baseline request, test condition, server acceptance/rejection, and demonstrated authorization impact. Return `token_location`, `algorithm`, `key_selection`, `claim_checks`, `lifecycle_behavior`, `auth_context`, `impact`, `confidence`, and redacted evidence references.
 
-## What Constitutes a Finding
+## Related skills
 
-| Attack | Severity |
-|--------|----------|
-| alg=none accepted — auth bypass | Critical (P1) |
-| Role escalation via claim tampering | Critical (P1) |
-| RS256→HS256 key confusion | Critical (P1) |
-| Weak signing key (crackable) | High (P2) |
-| kid SQL injection | Critical (P1) |
-| Expired tokens accepted | Medium (P3) |
-
-## Evidence Requirements
-
-- Original JWT decoded (header + payload)
-- Tampered JWT with modified claims
-- Server response accepting tampered token
-- Proof of elevated access (admin data, other user data)
-
-## Tools
-
-- `attack_script jwt_tamper` — automated decode/tamper/re-encode
-- `jwt_tool` (external) — comprehensive JWT testing
-- `hashcat -m 16500` — JWT secret cracking
-
-## References
-
-- [PortSwigger: JWT Attacks](https://portswigger.net/web-security/jwt)
-- [RFC 7519 - JSON Web Token](https://tools.ietf.org/html/rfc7519)
+- `attack-idor-automation` — object authorization after authentication.
+- `attack-open-redirect` / `attack-oauth` — redirect and OAuth token-flow boundaries.
+- `attack-triage-validation` — impact confirmation and false-positive review.

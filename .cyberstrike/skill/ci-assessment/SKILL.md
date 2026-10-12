@@ -1,82 +1,72 @@
 ---
 name: ci-assessment
-description: READ-ONLY CI/CD pipeline security assessment for GitHub Actions, dependency security, and software supply chain
+description: "Read-only assessment of CI/CD configuration, dependency integrity, runner isolation, and software supply-chain trust"
 category: security-assessment
-tags: [cicd, github-actions, supply-chain, dependency-security, branch-protection, secrets, pipeline-security]
-tech_stack: [github, gh-cli]
-cwe_ids: [CWE-94, CWE-78, CWE-269, CWE-311, CWE-502, CWE-829]
-chains_with: [T1195.002, T1059.004, T1552.001]
-prerequisites: [gh-cli-access]
-version: "1.0"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [cicd, github-actions, supply-chain, dependencies, runners, secrets]
+tech_stack: [github-actions, gitlab-ci, jenkins, containers, package-registries]
+prerequisites:
+  - "Authorization for the repositories, workflow files, runners, and deployment environments"
+  - "Read-only source/configuration access where possible"
+chains_with: [cicd-attacks, cloud-assessment, attack-triage-validation]
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-cicd/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
 ---
 
-# CI/CD Pipeline Security Assessment
+# CI/CD Security Assessment
 
-READ-ONLY CI/CD security assessment using gh CLI and local filesystem inspection. No repositories, workflows, or configurations are modified. Focused on GitHub Actions but includes dependency and supply chain checks applicable to any CI platform.
+## Objective
 
-## Prerequisites
+Review the path from source commit to build artifact and deployment for excessive trust, secret exposure, dependency tampering, and unsafe automation. This skill is read-only by default; active pipeline tests require explicit approval.
 
-1. **gh CLI installed and authenticated** — `gh auth status`
-2. **Repository access** — read access to target repository
-3. **For dependency_audit** — local checkout of the repository
+## Safety gates
 
-```bash
-# Quick prerequisite check
-gh auth status          # verify GitHub auth
-gh repo view OWNER/REPO # verify repo access
-```
+Do not trigger untrusted workflows, alter branch protections, access secret values, deploy code, or modify production artifacts. Use configuration review and static analysis first. A public workflow file or secret reference is not itself a vulnerability.
 
-## Assessment Phases
+## Procedure
 
-### Phase 1 — GitHub Actions Workflow Security
+### 1. Map the delivery chain
 
-| Check | Command | Risk |
-|-------|---------|------|
-| Dangerous triggers | `ci_audit github_actions_audit --repo OWNER/REPO` | pull_request_target, workflow_dispatch injection |
-| Script injection | `ci_audit github_actions_audit --repo OWNER/REPO` | ${{ github.event.* }} in run blocks |
-| Token permissions | `ci_audit github_permissions_audit --repo OWNER/REPO` | Missing or overly broad GITHUB_TOKEN scope |
-| Action pinning | `ci_audit github_actions_pinning_audit --repo OWNER/REPO` | Unpinned third-party actions (tag poisoning) |
+Record repository, workflow triggers, runner type, dependency sources, build outputs, artifact registry, deployment identity, environment gates, and production destination.
 
-### Phase 2 — Secrets & Runner Security
+### 2. Review trigger trust
 
-| Check | Command | Risk |
-|-------|---------|------|
-| Secret leakage | `ci_audit github_secrets_exposure_audit --repo OWNER/REPO` | Secrets in logs, env dumps, artifacts |
-| Self-hosted runners | `ci_audit github_runner_audit --repo OWNER/REPO` | Runner persistence, PR-triggered execution |
+Inspect pull-request, fork, tag, release, schedule, manual, and issue/comment triggers. Identify workflows that execute untrusted contributions with write-capable tokens, secrets, or persistent self-hosted runners.
 
-### Phase 3 — Repository Security
+### 3. Review permissions and credentials
 
-| Check | Command | Risk |
-|-------|---------|------|
-| Branch protection | `ci_audit github_branch_protection_audit --repo OWNER/REPO` | Missing reviews, force push, no status checks |
+Check job-level token permissions, deploy keys, cloud role assumption, environment protection, secret scoping, credential lifetime, and whether untrusted jobs can reach privileged jobs. Do not print or extract secret values.
 
-### Phase 4 — Dependency & Supply Chain
+### 4. Check action and dependency integrity
 
-| Check | Command | Risk |
-|-------|---------|------|
-| Dependency security | `ci_audit dependency_audit --path /path/to/repo` | Unpinned deps, no lockfile, known vulns |
-| Supply chain | `ci_audit supply_chain_audit --repo OWNER/REPO --path /path` | No Dependabot, missing CODEOWNERS, hardcoded tokens |
+Record whether third-party actions and dependencies are pinned to immutable revisions, whether package versions are locked, whether provenance/signatures are verified, and whether dependency updates are reviewed. Distinguish an outdated dependency from a reachable exploitable path.
 
-## Detection Scope
+### 5. Review runner and artifact isolation
 
-| Category | What We Check | What We Don't |
-|----------|---------------|---------------|
-| **Workflows** | Triggers, injection, permissions, pinning | Runtime behavior, actual secret values |
-| **Secrets** | Exposure patterns in YAML | Actual secret content or rotation status |
-| **Runners** | Self-hosted presence, risky triggers | Runner OS hardening, network isolation |
-| **Branch Protection** | Rule configuration | Bypass via admin override audit trail |
-| **Dependencies** | Versions, lockfiles, known CVEs | Transitive dependency behavior |
-| **Supply Chain** | Automation config, CODEOWNERS | SBOM completeness, SLSA compliance level |
+Check whether self-hosted runners persist state across jobs, process untrusted code, share credentials/workspaces, or allow artifact overwrite. Verify that release artifacts are built from trusted commits and promoted through controlled environments.
 
-## Program Reference
+### 6. Trace privilege paths
 
-| Program | Focus | Tool |
-|---------|-------|------|
-| github_actions_audit | Trigger analysis, script injection | gh API |
-| github_permissions_audit | GITHUB_TOKEN scope | gh API |
-| github_actions_pinning_audit | SHA pinning vs tag references | gh API |
-| github_secrets_exposure_audit | Secret leakage patterns | gh API |
-| github_runner_audit | Self-hosted runner risks | gh API |
-| github_branch_protection_audit | Protection rule analysis | gh API |
-| dependency_audit | Lockfile, versions, npm audit | local + npm |
-| supply_chain_audit | Dependabot, CODEOWNERS, .npmrc | gh API + local |
+Model contributor or dependency → workflow trigger → token/runner permissions → artifact/deploy step → protected resource. Each edge needs configuration evidence. Do not attempt secret exfiltration to prove the chain.
+
+### 7. Validate safely
+
+Use static workflow analysis, policy checks, repository settings, and approved test branches without production secrets. Any active test should use a dedicated test repository/environment and be approved in advance.
+
+### 8. Recommend remediation
+
+Use least-privilege tokens, immutable action pins, isolated ephemeral runners, protected environments, separate build/deploy identities, artifact attestations, dependency review, and explicit trust boundaries between forked code and privileged workflows.
+
+## Common false positives
+
+- A workflow references a secret but the job cannot access it.
+- A broad permission is constrained by a separate environment or organization policy.
+- A self-hosted runner is isolated and ephemeral.
+- An unpinned dependency exists but is not executed in a privileged path.
+- A theoretical workflow injection has no attacker-controlled input reaching an executable context.
+
+## Output contract
+
+Return repository/workflow path, trigger, permissions, runner type, trust boundary, evidence lines, reachable impact, confidence, and remediation. Redact all secret values and private infrastructure details.

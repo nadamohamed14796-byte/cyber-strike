@@ -1,121 +1,88 @@
 ---
 name: attack-graphql
-description: "GraphQL vulnerability testing — introspection exposure, complexity DoS, batch abuse, mutation auth bypass"
+description: "Assess GraphQL schema exposure, object and field authorization, mutation controls, batching, and query resource limits"
 category: "web-application"
-version: "1.0"
-author: "cyberstrike-official"
-tags:
-  - graphql
-  - api
-  - web
-  - dos
-  - attack
-tech_stack:
-  - web
-  - graphql
-cwe_ids:
-  - CWE-200
-  - CWE-284
-  - CWE-770
-chains_with:
-  - attack-idor-automation
-prerequisites: []
-severity_boost:
-  attack-idor-automation: "GraphQL introspection reveals IDOR-vulnerable queries"
+version: "1.1.0"
+author: "CyberStrike contributors; consolidated with upstream attribution"
+tags: [graphql, api, authorization, introspection, query-cost]
+tech_stack: [http, graphql, json, browser]
+cwe_ids: [CWE-200, CWE-284, CWE-770]
+chains_with: [attack-idor-automation, attack-cors, attack-race-condition, attack-triage-validation]
+prerequisites:
+  - "Authorized GraphQL endpoint and permitted operation types"
+  - "Controlled accounts and a low-impact query plan"
+sources:
+  - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-graphql/SKILL.md"
+  - "https://github.com/uphiago/recon-skills"
+  - "https://portswigger.net/web-security/graphql"
 ---
 
-# GraphQL Vulnerability Testing
+# GraphQL Security Assessment
 
 ## Objective
 
-Exploit GraphQL-specific vulnerabilities including schema exposure, query complexity abuse, and authorization bypass.
+Find authorization, validation, information exposure, and resource-control defects in GraphQL APIs. Schema visibility is a discovery signal; a reportable issue requires a policy violation or meaningful demonstrated impact.
 
-## Testing Methodology
+## Scope and safety
 
-### Phase 1: Automated Testing
+Confirm the endpoint, permitted query/mutation/subscription behavior, rate limits, and test account. Begin with low-cost read-only operations. Do not invoke destructive mutations, enumerate real user records, or run resource-exhaustion tests against production. Any load/complexity testing must stay within an explicitly approved low threshold.
 
-```bash
-# Full GraphQL test suite
-attack_script graphql_tester "https://TARGET/graphql" \
-  -H "Authorization:Bearer TOKEN" \
-  --json-output
+## Procedure
 
-# Custom depth/batch
-attack_script graphql_tester "https://TARGET/graphql" \
-  --depth 15 --batch-count 100
-```
+### 1. Discover and fingerprint
 
-### Phase 2: Introspection Query
+Look for GraphQL endpoints from in-scope browser traffic, application code, API documentation, and known paths. Confirm protocol and content type rather than assuming every JSON endpoint is GraphQL. Check whether the application uses one endpoint for multiple roles or versions.
 
-```bash
-# Full schema extraction
-curl -s -X POST https://TARGET/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query":"{ __schema { types { name fields { name type { name } } } mutationType { fields { name args { name type { name } } } } queryType { fields { name } } } }"}'
-```
+### 2. Inspect schema safely
 
-If introspection is enabled, map all types, queries, mutations, and subscriptions.
+Where permitted, test introspection with a minimal query and record whether type and field metadata are exposed. If introspection is disabled, use documented schema, client operations, and validation errors as discovery aids. Do not treat enabled introspection by itself as a vulnerability; determine whether sensitive operations or data are exposed to an unauthorized principal.
 
-### Phase 3: Authorization Bypass
+### 3. Build an operation inventory
 
-```graphql
-# Access admin queries without auth
-{ adminUsers { id email role } }
+For each query, mutation, and subscription, record:
+- operation and arguments;
+- object identifiers and nested relationships;
+- expected roles and tenant boundary;
+- read/write effect and sensitivity;
+- pagination, batching, and cost controls;
+- corresponding REST or alternate API operation, if one exists.
 
-# Mutation without auth
-mutation { deleteUser(id: "123") { success } }
+### 4. Validate object- and field-level authorization
 
-# Access other user's data
-{ user(id: "OTHER_USER_ID") { email ssn creditCard } }
-```
+Use two controlled accounts or tenants only when explicitly allowed. Establish a baseline for an object owned by account A, then compare a single identifier or nested reference with account B. Check both object-level authorization and field-level authorization. Treat `node`, `nodes`, global IDs, nested resolvers, bulk inputs, and indirect references as leads—not proof. Verify semantic data access or state change, not merely a successful HTTP status.
 
-### Phase 4: Complexity / DoS
+### 5. Validate mutation controls
 
-```graphql
-# Deeply nested query
-{ users { posts { comments { author { posts { comments { author { id } } } } } } } }
+For controlled test objects, check whether mutations enforce role, ownership, state-transition, and tenant constraints. Compare mutation behavior with the corresponding REST API if both exist. Pay special attention to stale membership or role state that differs between APIs. Do not delete, transfer, purchase, invite real users, or modify production privileges as proof.
 
-# Alias multiplication
-{ a1: __typename a2: __typename ... a100: __typename }
+### 6. Check alternate authorization paths
 
-# Batch queries (array)
-[{"query":"{ __typename }"}, {"query":"{ __typename }"}, ... x50]
-```
+Where observed in the schema or client, compare aliases, fragments, nested fields, batch requests, persisted queries, subscriptions, and alternate API versions. Keep requests small. Check whether rate limits apply consistently to aliases/batches, but do not deliberately overload the service.
 
-### Phase 5: Directive Abuse
+### 7. Review complexity and resource limits safely
 
-```graphql
-# Skip/include directive for info leakage
-{ user(id: "1") { name email @skip(if: false) secretField @include(if: true) } }
+Look for depth, pagination, cost, alias, batch, and recursion limits. Use a small, bounded query in a permitted environment and observe server-side rejection or predictable cost behavior. Do not attempt to crash, saturate, or degrade a live service. A timeout alone is not proof of a vulnerability.
 
-# Field suggestions (error-based enum)
-{ user { nonExistentField } }
-# Error may suggest: "Did you mean: password, secret_key?"
-```
+### 8. Validate cross-API state and race hypotheses
 
-## What Constitutes a Finding
+If the same object is managed by GraphQL and REST, compare authorization and state consistency. Race-condition claims belong in `attack-race-condition`; only test with disposable objects and explicit permission.
 
-| Finding | Severity |
-|---------|----------|
-| Introspection enabled (schema exposed) | Medium (P3) |
-| Admin mutations accessible without auth | Critical (P1) |
-| Other user data accessible (IDOR) | High (P2) |
-| DoS via complexity (server timeout/crash) | Medium (P3) |
-| Batch queries bypass rate limiting | Medium (P3) |
+## Common false positives
 
-## Evidence Requirements
+- Introspection enabled without sensitive impact.
+- A field suggestion or schema name that is not actually accessible.
+- A 200 response containing errors or null data.
+- A role-specific field that is intentionally public.
+- Query timeout caused by network conditions rather than server-side cost.
+- A mutation rejected by business rules but misread as successful.
 
-- GraphQL endpoint URL
-- Query/mutation sent
-- Response showing unauthorized data
-- For introspection: schema dump (types, mutations, queries)
-- For DoS: response timing proving server overload
+## Evidence and output
 
-## Tools
+Record the operation, redacted variables, caller role, expected authorization rule, baseline and test responses, data sensitivity, observed state, and minimal reproducible proof. Return `endpoint`, `operation_type`, `operation_name`, `auth_context`, `object_boundary`, `field_boundary`, `mutation_effect`, `cost_controls`, `impact`, `confidence`, and evidence references.
 
-- `attack_script graphql_tester` — automated introspection + DoS + batch testing
+## Related skills
 
-## References
-
-- [PortSwigger: GraphQL](https://portswigger.net/web-security/graphql)
-- [HackerOne: GraphQL Bugs](https://www.hackerone.com/vulnerability-management/graphql-security-guide)
+- `attack-idor-automation` — object ownership and tenant isolation.
+- `attack-cors` — browser cross-origin response exposure.
+- `attack-race-condition` — concurrent state transitions.
+- `attack-triage-validation` — false-positive and impact review.
