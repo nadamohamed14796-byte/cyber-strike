@@ -45,4 +45,23 @@ describe("VerificationAttempts", () => {
     expect(result.outcome).toBe("confirmed")
     expect(result.canContinue).toBe(false)
   })
+
+  test("confirmation without valid preconditions remains inconclusive", () => {
+    const result = VA.decide({
+      attempts: [attempt("xss.execution-check", "marker", false)],
+      decisiveConfirmation: true,
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(true)
+  })
+
+  test("blocked prerequisites stop safely without false-positive verdict", () => {
+    const result = VA.decide({
+      attempts: [attempt("auth-check", "missing-credential", false)],
+      blockedReason: "Required authorized test account is unavailable.",
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(false)
+    expect(result.reason).toContain("unavailable")
+  })
 })
