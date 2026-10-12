@@ -210,3 +210,46 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** manifest `6f4f789261610903e0b0d2ed849675c4b7a8f692`; lockfile `d40d1b312a9d9a6e08467feb7da1637db5776d04`.
 - **Validation:** manifest and lockfile now agree on 3.4.16 and the published integrity value; package installation, lockfile regeneration, UI tests and full CI have not yet been run in this runtime.
 - **Status:** security update committed; automated validation pending.
+
+
+## Follow-up checkpoint — 2026-10-12: verification ledger invariants and CI regression repair
+
+### INT-008 — P1: verification ledger read/check/write sequence was not atomic
+
+- **Evidence:** `VerificationLedger.record()` read the hypothesis history, checked identity/terminal state/attempt budget, then inserted or updated rows in separate database operations. Without one transaction around the entire decision, concurrent callers could observe inconsistent ledger state or race the uniqueness/budget checks.
+- **Fix:** wrapped the history read, identity/terminal/budget guards, attempt upsert, decision computation, and outcome update in `Database.transaction()`. Newly inserted strategy and variant identifiers are stored in normalized form to align the SQLite uniqueness key with the application-level deduplication key.
+- **Direct commit on main:** `8ef8f394feeb9deb1c50039cf22c660b868e5643`.
+- **Validation:** latest-head typecheck/build/test runs were still in progress when recorded; no local runtime was available. Keep pending until the latest main head is green.
+
+### INT-009 — P2: URL asset identity lowercased case-sensitive path components
+
+- **Evidence:** `sameHypothesisIdentity()` lowercased the entire asset string. If an asset is a full URL, this could conflate paths such as `/Admin` and `/admin` on case-sensitive servers.
+- **Fix:** canonicalize only explicit URL syntax through `URL.href`, which normalizes the host while preserving path case; non-URL asset identifiers remain exact after trimming.
+- **Regression coverage:** added tests proving host case normalizes but path case remains identity-significant.
+- **Direct commits on main:** implementation `52c5a3be60576970b9631d1b7e0b040eb579d8c7`; test `98ceaf0ea6228acb25c42d7b703f651477de0b2d`.
+- **Validation:** latest-head typecheck/build/test runs were in progress when recorded.
+
+### CI-001 — P2: archive fixture no longer satisfied the hardened DNS policy
+
+- **Evidence:** the archive-byte regression test used `.invalid` as its mocked registry hostname. The new remote URL policy correctly rejects `.invalid` before the mocked fetch runs, so the test received no skill directory.
+- **Fix:** changed the fixture to use the publicly resolvable `example.com` hostname while continuing to mock all HTTP responses. GitHub Actions on commit `b4acb0869937355b654cd8b7d1bb07654349bc61` reported unit tests and typecheck successful.
+- **Current validation state:** subsequent ledger fixes were pushed after that passing run; verify the newest main commit before marking the full set green.
+
+## Additional branch disposition audit — 2026-10-12
+
+| Branch / PR | Decision | Reason |
+|---|---|---|
+| `fix/remove-tracked-cookie-file` | No merge required | `packages/cyberstrike/cookies.txt` is already absent from main and `.gitignore` already excludes the cookie export. |
+| `fix/remote-skill-cache-confinement-20261012` and `fix/remote-skill-cache-confinement-main-20261012` | No merge required | Both are behind main; current main includes their cache-confinement work plus newer URL/DNS/redirect and resource-budget protections. |
+| `fix/audit-skill-discovery-path-confinement` | Retain; do not merge wholesale | Its discovery implementation is an older, substantially smaller version than main and lacks the current bounded-read, destination, redirect, and overall resource-budget controls. |
+| `fix/remove-orphan-auth-manager-typecheck-blocker` | Retain; do not merge wholesale | Its diff removes `packages/cyberstrike/src/tool/auth-manager.ts`; current main contains the auth manager used by auth-vault, Gmail and target-memory functionality. |
+| `fix/copilot-token-exchange` | No cherry-pick | Main already has shared `provider/copilot-session.ts` logic used by the plugin and browser worker, including token invalidation/retry behavior; the branch is heavily stale and duplicates token-exchange code. |
+| `skills/ad-security-verification-gates-20261012` and `integration/ad-security-verification-gates-main-20261012` | No merge required | The reviewed AD security skill file blob is identical to main. |
+| `feat/discovery-core` | Retain; do not merge wholesale | It is heavily divergent and includes active mutating-method probes that are not appropriate for the current conservative reconnaissance path. |
+| `feat/proxy-config` / `dev` | Retain; selective review only | Both contain broad, highly divergent networking/replay/browser changes; there is no safe evidence for a wholesale merge. |
+| PR #7 / `feat/target-memory-foundation` | Retain; selective review only | A large portion of the feature set is already integrated through earlier PRs, but the remaining head is highly divergent and needs per-file accounting. |
+| PR #40 / `docs/audit-ledger-refresh-20-pass-20261012` | Keep open; do not merge wholesale | Its useful 20-pass evidence and merged-fix summary were selectively reconciled into main. GitHub currently reports the PR as unmergeable and its baseline/branch metadata is stale. |
+| PR #6 / `improve/skill-quality-reference-audit` | Retain; selective review only | Main contains newer/reconciled skill content; the branch remains divergent and should not replace current files wholesale. |
+| PR #2 / `hackbrowser-improvement` | Retain; do not merge wholesale | The inspected branch disables TLS certificate verification. Any safe unique browser changes require isolated review and tests. |
+
+**Branch cleanup:** no branches were deleted. The available GitHub actions in this execution context do not provide a safe branch-delete operation; preserving unmerged divergent branches avoids accidental loss of unique work. Delete only after the remaining unique diffs are accounted for and a supported deletion action is available.
