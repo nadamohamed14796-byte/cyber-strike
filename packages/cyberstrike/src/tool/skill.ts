@@ -210,6 +210,11 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         const available = accessibleSkills.map((s) => s.name).join(", ")
         throw new Error(`Skill "${params.name}" not found or has an ambiguous metadata reference. Available: ${available || "none"}`)
       }
+      // Listing filters denied skills, but loading must enforce the same policy;
+      // otherwise an agent could bypass the filter by naming a denied skill directly.
+      if (!accessibleSkills.some((entry) => entry.name === canonicalName)) {
+        throw new Error(`Permission denied: skill "${canonicalName}" is not accessible to agent "${ctx.agent ?? "unknown"}".`)
+      }
 
       await ctx.ask({
         permission: "skill",
@@ -218,7 +223,10 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         metadata: {} as { name?: string; dir?: string },
       })
 
-      await SkillContext.load(params.name)
+      const loadedContent = await SkillContext.load(canonicalName)
+      if (loadedContent === undefined) {
+        throw new Error(`Failed to load skill "${canonicalName}" into context.`)
+      }
 
       const dir = path.dirname(skill.location)
       const base = pathToFileURL(dir).href
