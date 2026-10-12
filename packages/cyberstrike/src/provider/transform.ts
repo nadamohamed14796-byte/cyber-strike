@@ -372,6 +372,9 @@ export namespace ProviderTransform {
         high: { reasoningEffort: "high" },
       }
     }
+    // Grok 3 does not expose a reasoning-effort selector. Keep it distinct from
+    // Grok 3 Mini, which has its own supported low/high variants above.
+    if (model.api.npm === "@ai-sdk/xai" && id.endsWith("grok-3")) return {}
     switch (model.api.npm) {
       case "@openrouter/ai-sdk-provider":
         if (!model.id.includes("gpt") && !model.id.includes("gemini-3") && !model.id.includes("claude")) return {}
