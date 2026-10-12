@@ -47,6 +47,8 @@ const Parameters = z.object({
 })
 
 export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadata>("update_vrt_check", {
+  description:
+    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN with valid conditions and evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
   parameters: Parameters,
   async execute(params, ctx) {
     // Lane discipline: a proxy-tester may only record VRT checks in its own
