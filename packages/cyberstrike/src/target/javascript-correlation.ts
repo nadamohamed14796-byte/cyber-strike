@@ -608,7 +608,9 @@ export namespace JavaScriptCorrelation {
             if (item.method && request.method.toUpperCase() !== item.method) return false
             const expectedSegments = item.path.split("/").filter(Boolean)
             const actualSegments = request.normalized_path.split(/[?#]/, 1)[0]!.split("/").filter(Boolean)
-            return expectedSegments.length <= actualSegments.length && expectedSegments.every((segment, index) =>
+            // A route template must match the exact segment count. Prefix matching would
+            // incorrectly attach /api/users/{id} to /api/users/123/admin or /settings.
+            return expectedSegments.length === actualSegments.length && expectedSegments.every((segment, index) =>
               (segment.startsWith("{") && segment.endsWith("}")) ? Boolean(actualSegments[index]) : segment === actualSegments[index],
             )
           }).map((request) => request.id)
