@@ -543,14 +543,20 @@ export function looksLikeResearchAuthenticationWall(url: string, title: string, 
  * Report URLs return to the learning queue; index/crawl pages return to discovery.
  * A cooldown prevents invalid sessions from being retried on every watch cycle.
  */
-export async function retryAuthenticatedResearch(input: { sourceID?: string; limit?: number } = {}) {
+export async function retryAuthenticatedResearch(input: {
+  sourceID?: string
+  limit?: number
+  /** Explicit operator action may bypass cooldown, but never the configured-session requirement. */
+  retryImmediately?: boolean
+} = {}) {
   const { ResearchQueue } = await import("./queue")
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const minAgeMs = input.retryImmediately ? 0 : AUTH_RETRY_COOLDOWN_MS
   return sources
     .filter(researchSourceHasCredentials)
     .reduce(
-      (total, source) => total + ResearchQueue.retryAuthenticationBlocked(limit, source.id, AUTH_RETRY_COOLDOWN_MS),
+      (total, source) => total + ResearchQueue.retryAuthenticationBlocked(limit, source.id, minAgeMs),
       0,
     )
 }

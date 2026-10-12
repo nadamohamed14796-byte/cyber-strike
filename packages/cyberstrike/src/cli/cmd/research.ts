@@ -178,9 +178,13 @@ export const ResearchCommand = cmd({
           .option("source", { type: "string", describe: "optional source ID to retry" })
           .option("limit", { type: "number", default: 100, describe: "maximum blocked reports to requeue" }),
         async handler(args) {
-          const count = ResearchQueue.retryAuthenticationBlocked(args.limit, args.source)
+          const count = await retryAuthenticatedResearch({
+            sourceID: args.source,
+            limit: args.limit,
+            retryImmediately: true,
+          })
           console.log("requeued_for_auth_retry=" + count)
-          console.log("Configure CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID> or CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID>; use research sync/discover for index pages and research learn for report pages.")
+          console.log("Only sources with a configured session are retried. Configure CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID> or CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID>; index pages resume through research discover/sync and reports through research learn.")
         },
       })
       .command({

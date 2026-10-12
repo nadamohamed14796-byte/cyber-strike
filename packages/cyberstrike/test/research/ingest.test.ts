@@ -194,10 +194,16 @@ test("research queue resumes authenticated work and learns cached report text wi
           ResearchQueue.blockAuthentication({ sourceID: authSourceID, sourceURL: reportURL, reason: "HTTP 401" })
           ResearchQueue.blockAuthentication({ sourceID: "portswigger", sourceURL: otherURL, reason: "HTTP 401" })
 
-          // Recent authentication failures must stay parked until the retry cooldown expires.
+          // Automatic retries keep recently blocked work parked until the cooldown expires.
           expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10 })).toBe(0)
 
-          // Emulate entries whose operator has now configured credentials after the cooldown.
+          // An explicit retry-auth action may bypass cooldown, but still requires a configured session.
+          const immediateURL = "https://hackerone.com/reports/immediate123"
+          ResearchQueue.blockAuthentication({ sourceID: authSourceID, sourceURL: immediateURL, reason: "HTTP 401" })
+          expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10, retryImmediately: true })).toBe(1)
+          expect(ResearchQueue.find(authSourceID, immediateURL)?.status).toBe("queued")
+
+          // Emulate older entries whose operator has now configured credentials after the cooldown.
           const retryAfter = Date.now() - 11 * 60_000
           for (const url of [indexURL, reportURL]) {
             const row = ResearchQueue.find(authSourceID, url)
