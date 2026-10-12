@@ -62,14 +62,49 @@ describe("VerificationAttempts", () => {
     expect(result.canContinue).toBe(true)
   })
 
-  test("decisive disproof with direct evidence and valid conditions can resolve", () => {
+  test("direct disproof evidence cannot produce a false-positive verdict before 20 valid attempts", () => {
+    const attempts = Array.from({ length: 19 }, (_, i) => attempt("auth-check-" + i, "valid-session"))
+    attempts[attempts.length - 1] = {
+      ...attempts[attempts.length - 1],
+      evidenceRef: "evidence://response-2",
+    }
     const result = VA.decide({
-      attempts: [{ ...attempt("auth-check", "valid-session"), evidenceRef: "evidence://response-2" }],
+      attempts,
+      decisiveDisproof: true,
+      decisiveEvidenceRef: "evidence://response-2",
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.attemptsUsed).toBe(19)
+    expect(result.remainingAttempts).toBe(1)
+    expect(result.canContinue).toBe(true)
+    expect(result.reason).toContain("requires 20 distinct valid verification attempts")
+  })
+
+  test("direct disproof evidence can resolve only after 20 distinct valid attempts", () => {
+    const attempts = Array.from({ length: 20 }, (_, i) => attempt("auth-check-" + i, "valid-session"))
+    attempts[attempts.length - 1] = {
+      ...attempts[attempts.length - 1],
+      evidenceRef: "evidence://response-2",
+    }
+    const result = VA.decide({
+      attempts,
       decisiveDisproof: true,
       decisiveEvidenceRef: "evidence://response-2",
     })
     expect(result.outcome).toBe("disproven")
+    expect(result.attemptsUsed).toBe(20)
+    expect(result.remainingAttempts).toBe(0)
     expect(result.canContinue).toBe(false)
+  })
+
+  test("attempts with invalid preconditions do not consume the false-positive budget", () => {
+    const result = VA.decide({
+      attempts: Array.from({ length: 20 }, (_, i) => attempt("invalid-" + i, "setup", false)),
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.attemptsUsed).toBe(0)
+    expect(result.remainingAttempts).toBe(20)
+    expect(result.canContinue).toBe(true)
   })
 
   test("decisive confirmation stops early only with valid conditions and direct evidence", () => {
