@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { fetchResearchText } from "../../src/research/safe-fetch"
 
 const source = {
@@ -210,3 +210,31 @@ test("rejects source URLs containing embedded credentials", async () => {
   expect(requests).toBe(0)
 })
 
+
+
+test("enforces the total fetch deadline across redirects without sleeping", async () => {
+  let now = 1_000_000
+  const clock = spyOn(Date, "now").mockImplementation(() => now)
+  let requests = 0
+  try {
+    await withFetch(
+      (async () => {
+        requests++
+        // Simulate a slow first hop deterministically; no real 120-second wait.
+        now += 120_001
+        return new Response(null, {
+          status: 302,
+          headers: { location: "/next" },
+        })
+      }) as unknown as typeof fetch,
+      async () => {
+        await expect(fetchResearchText("https://research.example/start", source)).rejects.toThrow(
+          "research fetch exceeded total time budget",
+        )
+      },
+    )
+    expect(requests).toBe(1)
+  } finally {
+    clock.mockRestore()
+  }
+})
