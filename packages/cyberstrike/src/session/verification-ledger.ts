@@ -73,6 +73,19 @@ export namespace VerificationLedger {
     }
 
     const before = list({ sessionID, hypothesisKey })
+    // A hypothesis key is the identity boundary for one claim. Mixing assets or
+    // vulnerability classes under the same key corrupts attempt counts and can
+    // make evidence from one target influence a verdict for another.
+    const identityConflict = before.find((item) =>
+      item.asset.trim().toLowerCase() !== input.asset.trim().toLowerCase() ||
+      item.vulnerabilityClass.trim().toLowerCase() !== input.vulnerabilityClass.trim().toLowerCase() ||
+      (item.endpoint?.trim() && input.endpoint?.trim() && item.endpoint.trim() !== input.endpoint.trim()),
+    )
+    if (identityConflict) {
+      throw new Error(
+        `hypothesis_key "${hypothesisKey}" is already bound to a different asset, endpoint, or vulnerability class; use a separate key for a distinct claim.`,
+      )
+    }
     const priorOutcome = before[before.length - 1]?.outcome
     if ((priorOutcome === "confirmed" || priorOutcome === "disproven") && input.decisiveResult !== priorOutcome) {
       throw new Error(`This hypothesis is already ${priorOutcome}; do not continue testing it. Start a new hypothesis_key only for a genuinely different claim.`)
@@ -137,6 +150,7 @@ export namespace VerificationLedger {
       attempts: decisionAttempts,
       decisiveConfirmation: input.decisiveResult === "confirmed" && Boolean(input.attempt.evidenceRef?.trim()),
       decisiveDisproof: input.decisiveResult === "disproven" && input.attempt.validConditions && Boolean(input.attempt.evidenceRef?.trim()),
+      decisiveEvidenceRef: input.attempt.evidenceRef,
       blockedReason: input.blockedReason,
     })
     Database.use((db) => db.update(VerificationAttemptTable).set({
