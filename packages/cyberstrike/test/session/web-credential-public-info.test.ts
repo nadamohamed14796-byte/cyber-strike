@@ -38,7 +38,7 @@ test("credential update event schema accepts the sanitized public shape", () => 
     time: { created: 1, updated: 1 },
   })
   const safe = WebCredential.toPublicInfo(credential)
-  const event = WebCredential.Event.Updated.payload.parse({
+  const event = WebCredential.Event.Updated.properties.parse({
     sessionID: "ses_event_test",
     credentials: [safe],
   })
