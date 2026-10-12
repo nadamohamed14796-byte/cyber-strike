@@ -232,6 +232,62 @@ Level 1 or Level 2, and assessment status (Automated/Manual).
 
 ---
 
+## Operational Quality Gate for Existing Skills
+
+Apply this gate when editing an existing skill, not only when creating a new one. Preserve its current directory, filename, loader conventions, useful examples, and established section order unless a concrete defect requires a change.
+
+### Before editing
+- Read the complete target SKILL.md and its frontmatter.
+- Inspect every local name in chains_with, prerequisites, severity_boost, and relative links. Confirm the referenced directory/file exists in this repository; external research URLs must remain clearly external.
+- Read relevant authoritative documentation and research references. Adapt concepts to CyberStrike conventions rather than copying another repository's filenames or internal paths.
+- Identify existing coverage before adding content. Extend the relevant section instead of creating a second version of the same procedure.
+
+### Required test-quality properties
+- Scope: state authorization assumptions, target boundaries, permitted test accounts, and any high-risk action that needs explicit approval.
+- Baseline: establish normal behavior before modifying one variable at a time.
+- Reproducibility: provide placeholders, bounded timeouts/concurrency, expected output, and a clean way to repeat the test.
+- Verification: separate a signal from a confirmed vulnerability; include alternative explanations and false-positive conditions.
+- Impact: prove the security boundary and practical consequence with synthetic data or controlled accounts; do not infer critical impact from a tool alert alone.
+- Evidence: collect the minimum sanitized request, response, role/context, timestamp, and final state needed to reproduce.
+- Stop conditions: stop on unexpected state changes, instability, data exposure, rate-limit thresholds, or any scope boundary uncertainty.
+- Remediation: give a concrete fix and a regression test that would prevent recurrence.
+- References: prefer primary/vendor documentation and authoritative research; keep URLs valid and do not invent citations.
+
+### Cross-skill and duplication checks
+- Reuse a shared concept through chains_with instead of copying a full methodology into multiple files.
+- Every local chain/prerequisite must resolve to an actual skill directory. If a concept has no local skill, describe it in prose or link to an external source; do not invent a path.
+- severity_boost must explain a demonstrated conditional chain, not claim that two labels automatically increase severity.
+- Do not change the skill name or directory to match an upstream repository. CyberStrike's local names and paths are canonical.
+- Preserve existing valuable content. Add a new section only when it provides a distinct workflow, coverage dimension, validation gate, or evidence requirement.
+- Do not mark a skill as verified or tested unless the relevant checks were actually run.
+
+### Attack and reconnaissance playbook requirements
+
+For every `attack-*` and `recon-*` skill, quality is measured by a reproducible decision process, not by the number of payloads or paragraphs.
+
+- Replace generic hypothesis-order text with a skill-specific sequence tied to that skill's threat model, coverage matrix, and expected evidence. Each branch must say what to vary, what a positive signal means, and which control can refute it.
+- Treat the “up to 20 hypotheses” limit as a hard ceiling for distinct, evidence-producing hypotheses, never as a quota. Equivalent encodings, retries, or payload permutations do not count as independent hypotheses; stop earlier when a result is decisive, a relevant branch is exhausted, safety limits apply, or authorization is ambiguous.
+- Recon must establish authorization and ownership confidence before active probing, prefer passive evidence first, deduplicate results, preserve provenance, and hand off candidates—not findings—to attack skills.
+- Attack validation must establish a baseline, vary one trust boundary at a time, use test-owned identities/data, prove impact with a harmless canary or reversible fixture, and keep a relevant negative control.
+- For every candidate, distinguish observed signal, likely cause, confirmed impact, and refuted/false-positive explanation. HTTP status, response length, tool alerts, version banners, or endpoint existence alone are not confirmation.
+- Keep commands bounded with explicit timeouts, conservative request volume, placeholders, expected outcomes, and stop/cleanup conditions. State-changing or potentially disruptive checks need explicit program authorization and a disposable test fixture.
+- Preserve the existing local skill name, directory, file type, loader expectations, and useful content. External source paths must be labeled as external; only use `chains_with`, `prerequisites`, and relative links that resolve to real local skills/files.
+- Before committing edits, validate frontmatter, local chain references, duplicate headings, unresolved placeholders, Markdown link syntax, and whether the skill's own proof criteria match its claimed impact.
+
+### Final review checklist
+- [ ] YAML frontmatter opens and closes correctly and required fields remain present.
+- [ ] name matches the existing skill directory and remains unique.
+- [ ] Local chain/prerequisite names and internal links resolve.
+- [ ] No duplicate headings or repeated procedures were introduced.
+- [ ] Commands use placeholders, bounded timeouts, and non-destructive defaults where applicable.
+- [ ] Expected results, false positives, evidence, impact, and remediation are stated.
+- [ ] References are external only when intended and remain accurate.
+- [ ] File path and filename are unchanged.
+- [ ] The change is committed to the intended working branch and is not described as merged unless it is merged.
+
+---
+
+
 ## Naming Conventions
 
 | Skill Type          | Name Pattern                    | Example                     |
@@ -263,7 +319,7 @@ cwe_ids: [CWE-89, CWE-564]
 chains_with: [wstg-authz-02, wstg-inpv-06]
 prerequisites: [wstg-info-01]
 severity_boost:
-  wstg-authz-02: "SQLi + IDOR = Account Takeover (Critical)"
+  wstg-authz-02: "Assess combined impact only when both flaws are independently verified and their interaction is reproducible in a controlled test; do not infer account takeover from co-occurrence."
 ---
 ```
 
