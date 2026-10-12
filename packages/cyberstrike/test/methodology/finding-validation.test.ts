@@ -36,6 +36,7 @@ function makeAttempts(count = 20) {
     hypothesis: "Test a distinct condition for variation " + (index + 1),
     outcome: index === 0 || index === 1 ? "contradicts" as const : "inconclusive" as const,
     evidence: "Observed controlled response comparison for variation " + (index + 1),
+    validConditions: true,
   }))
 }
 
@@ -48,6 +49,19 @@ test("requires all ten unique checks", () => {
 test("classifies as confirmed only when all required checks pass", () => {
   const checks = checklist({ identity_context: { status: "not_applicable", reason: "No identity boundary is claimed" } })
   expect(assessFindingChecks(checks).verdict).toBe("confirmed")
+})
+
+test("invalid-precondition attempts do not count toward false-positive classification", () => {
+  const checks = checklist({
+    reproducible: { status: "fail", reason: "Controlled replay did not reproduce the claim", evidence: "Three replays returned the expected owner-bound record" },
+    unexpected_behavior: { status: "fail", reason: "Observed response matches intended owner-only behavior", evidence: "Response body and status match the same-account baseline" },
+  })
+  const invalidAttempts = makeAttempts(20).map((attempt) => ({ ...attempt, validConditions: false }))
+  const result = assessFindingChecks(checks, invalidAttempts)
+  expect(result.verdict).toBe("inconclusive")
+  expect(result.attemptCount).toBe(0)
+  expect(result.attemptsRemaining).toBe(20)
+  expect(result.output).toContain("0/20 distinct valid evidence-backed attempts")
 })
 
 test("false positive requires multiple evidence-backed contradictions and explains failed numbers", () => {
@@ -114,6 +128,15 @@ test("records validation history and removes false positives from confirmed find
         },
       })
 
+      const invalidAttemptResult = await FindingValidation.record({
+        sessionID: session.id,
+        vulnerabilityID: finding.id,
+        checks,
+        attempts: makeAttempts(20).map((attempt) => ({ ...attempt, validConditions: false })),
+      })
+      expect(invalidAttemptResult.verdict).toBe("inconclusive")
+      expect(invalidAttemptResult.attemptCount).toBe(0)
+
       const result = await FindingValidation.record({
         sessionID: session.id,
         vulnerabilityID: finding.id,
@@ -129,8 +152,10 @@ test("records validation history and removes false positives from confirmed find
       expect(updated?.status).toBe("false_positive")
       expect(updated?.description).toContain("[Latest finding validation]")
       expect(Vulnerability.confirmed(session.id).some((row) => row.id === finding.id)).toBe(false)
-      expect(history).toHaveLength(1)
-      expect(history[0]?.failed_check_ids).toEqual(["reproducible", "unexpected_behavior"])
+      expect(history).toHaveLength(2)
+      expect(history[0]?.attempt_count).toBe(0)
+      expect(history[1]?.attempt_count).toBe(20)
+      expect(history[1]?.failed_check_ids).toEqual(["reproducible", "unexpected_behavior"])
       await Session.remove(session.id)
     },
   })
