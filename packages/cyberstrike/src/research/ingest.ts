@@ -904,7 +904,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           content_truncated_for_learning: cachedTextTruncated,
           stored_excerpt_length: Math.min(text.length, 12000),
           queue_id: item.public_id,
-          extraction_version: 4,
+          extraction_version: 5,
           study_method: "bounded-heuristic-extraction",
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
