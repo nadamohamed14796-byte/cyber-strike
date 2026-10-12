@@ -53,7 +53,15 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
         output: attempts.length
           ? `Hypothesis: ${params.hypothesis_key}\nOutcome: ${outcome}\nAttempts: ${attempts.length}/${Policy.MAX_ATTEMPTS}\n${lines.join("\n")}${attempts.length >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nBudget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
           : `No verification attempts recorded for hypothesis ${params.hypothesis_key}.`,
-        metadata: { hypothesisKey: params.hypothesis_key, attemptsUsed: attempts.length, maxAttempts: Policy.MAX_ATTEMPTS, outcome },
+        metadata: {
+          hypothesisKey: params.hypothesis_key,
+          attemptsUsed: attempts.length,
+          maxAttempts: Policy.MAX_ATTEMPTS,
+          outcome,
+          remainingAttempts: Math.max(0, Policy.MAX_ATTEMPTS - attempts.length),
+          canContinue: outcome === "inconclusive" && attempts.length < Policy.MAX_ATTEMPTS,
+          duplicate: false,
+        },
       }
     }
 
@@ -90,7 +98,15 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
         `Reason: ${d.reason}`,
         next,
       ].join("\n"),
-      metadata: { hypothesisKey: params.hypothesis_key, attemptsUsed: d.attemptsUsed, maxAttempts: Policy.MAX_ATTEMPTS, remainingAttempts: d.remainingAttempts, outcome: d.outcome, canContinue: d.canContinue, duplicate: result.duplicate },
+      metadata: {
+        hypothesisKey: params.hypothesis_key,
+        attemptsUsed: d.attemptsUsed,
+        maxAttempts: Policy.MAX_ATTEMPTS,
+        remainingAttempts: d.remainingAttempts,
+        outcome: d.outcome,
+        canContinue: d.canContinue,
+        duplicate: result.duplicate,
+      },
     }
   },
 })
