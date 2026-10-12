@@ -29,6 +29,7 @@ describe("tool.skill", () => {
           `---
 name: tool-skill
 description: Skill for tool tests.
+owasp_id: T1078.004
 ---
 
 # Tool Skill
@@ -91,7 +92,7 @@ Use this skill.
             },
           }
 
-          const result = await tool.execute({ action: "load", name: "tool-skill" }, ctx)
+          const result = await tool.execute({ action: "load", name: "T1078.004" }, ctx)
           expect(SkillContext.isLoaded("tool-skill")).toBe(true)
           SkillContext.unload("tool-skill")
           const dir = path.join(tmp.path, ".cyberstrike", "skill", "tool-skill")
@@ -99,7 +100,7 @@ Use this skill.
 
           expect(requests.length).toBe(1)
           expect(requests[0].permission).toBe("skill")
-          expect(requests[0].patterns).toContain("tool-skill")
+          expect(requests[0].patterns).toContain("T1078.004")
           expect(requests[0].always).toContain("tool-skill")
 
           expect(result.metadata.dir).toBe(dir)
