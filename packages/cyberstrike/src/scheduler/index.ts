@@ -40,7 +40,10 @@ export namespace Scheduler {
     const scope = task.scope ?? "instance"
     const entry = scope === "global" ? shared : state()
     const current = entry.timers.get(task.id)
-    if (current && scope === "global") return
+    if (current && scope === "global") {
+      log.warn("duplicate global task registration ignored", { id: task.id })
+      return
+    }
     if (current) clearInterval(current)
 
     entry.tasks.set(task.id, task)
