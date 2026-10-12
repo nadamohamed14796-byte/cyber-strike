@@ -160,7 +160,7 @@ export namespace Discovery {
           const item = entry as { type?: unknown }
           if (typeof item.type !== "string") return false
           return isSafeArchiveEntry(realRoot, entryPath, item.type) &&
-            permitted.has(path.normalize(entryPath.replace(/\\\\/g, "/")))
+            permitted.has(path.normalize(entryPath.replace(/\\/g, "/")))
         },
       })
       return true
