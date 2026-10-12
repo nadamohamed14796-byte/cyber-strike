@@ -330,6 +330,12 @@ This is a proposed output contract, not a claim that the current CyberStrike dat
 
 Cross-skill chaining is a hypothesis-generation aid, not permission to perform account takeover, financial actions, bulk extraction, persistence, or destructive testing. Stop at the smallest safe proof of impact.
 
+## Runtime verification-ledger discipline
+
+When this skill is used by the CyberStrike agent, keep each hypothesis tied to one normalized asset, endpoint, and vulnerability class. Record meaningful strategies and variants through the verification-attempt workflow; an exact retry must not be counted as a new strategy. Continue with bounded, materially different checks while the hypothesis remains unresolved, up to the configured 20-distinct-attempt budget. A timeout, blocked precondition, missing test account, weak response difference, or exhausted budget is **inconclusive**, never proof that the issue is a false positive.
+
+Mark a hypothesis confirmed only with direct, durable evidence collected under valid preconditions. Mark it disproven only when valid negative controls and evidence contradict the same hypothesis. Stop earlier for scope ambiguity, unsafe impact, unexpected real-user data, or prohibited state changes. A VRT `tested_not_vulnerable` state must reference the matching evidence-backed disproof record; the skill's own execution notes are not a substitute for the runtime ledger.
+
 ## 13. References
 
 - [OWASP API Security Top 10 2023 — API1: Broken Object Level Authorization](https://api-security.owasp.org/editions/2023/en/0xa1-broken-object-level-authorization/)
