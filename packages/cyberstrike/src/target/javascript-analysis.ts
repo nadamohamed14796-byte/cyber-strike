@@ -29,11 +29,19 @@ export interface JavaScriptSecretCandidate {
   confidence: "candidate"
 }
 export interface JavaScriptRoleHint { kind: string; value: string; line: number }
+export interface JavaScriptRiskSignal {
+  id: string
+  kind: string
+  line: number
+  functionName: string | null
+  confidence: "candidate"
+}
 export interface JavaScriptSourceAnalysis {
   functions: JavaScriptFunctionCandidate[]
   requests: JavaScriptRequestCandidate[]
   secretCandidates: JavaScriptSecretCandidate[]
   roleHints: JavaScriptRoleHint[]
+  riskSignals: JavaScriptRiskSignal[]
   notes: string[]
 }
 
@@ -275,6 +283,29 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
 
   const roles = new Map<string, JavaScriptRoleHint>()
   const rolePattern = /\b(isAdmin|is_admin|adminOnly|requireAdmin|hasRole|checkPermission|hasPermission|featureFlag|feature_flag|debugMode|debug_mode|internalOnly|superuser|impersonate|impersonation|role|permission)\b/gi
+
+  // Security-relevant sinks are triage leads only; this deliberately stores rule names,
+  // source locations and function hints, never the matched source text or secret values.
+  const riskRules: Array<{ kind: string; regex: RegExp }> = [
+    { kind: "dom-html-sink", regex: /\b(?:innerHTML|outerHTML)\s*=/gi },
+    { kind: "html-fragment-insertion", regex: /\binsertAdjacentHTML\s*\(/gi },
+    { kind: "document-write-sink", regex: /\bdocument\.write(?:ln)?\s*\(/gi },
+    { kind: "dynamic-code-execution", regex: /\b(?:eval\s*\(|new\s+Function\s*\()/gi },
+    { kind: "string-timer-execution", regex: /\b(?:setTimeout|setInterval)\s*\(\s*["'`]/gi },
+    { kind: "navigation-or-redirect-sink", regex: /\b(?:window\.)?location(?:\.href)?\s*(?:=|\.assign\s*\(|\.replace\s*\()/gi },
+    { kind: "cross-window-message", regex: /\bpostMessage\s*\(/gi },
+    { kind: "message-event-handler", regex: /\baddEventListener\s*\(\s*["']message["']/gi },
+    { kind: "dynamic-regexp", regex: /\bnew\s+RegExp\s*\(\s*[A-Za-z_$]/gi },
+    { kind: "prototype-mutation", regex: /\b(?:__proto__|prototype)\s*(?:\[|\.)/gi },
+  ]
+  const riskSignals = new Map<string, JavaScriptRiskSignal>()
+  for (const rule of riskRules) for (const match of source.matchAll(rule.regex)) {
+    const index = match.index ?? 0, line = lineNumber(lineStarts, index)
+    const functionName = [...functions].reverse().find((fn) => fn.line <= line)?.name ?? null
+    const id = "js-risk:" + createHash("sha256").update(rule.kind + ":" + line + ":" + (functionName ?? "")).digest("hex").slice(0, 16)
+    riskSignals.set(id, { id, kind: rule.kind, line, functionName, confidence: "candidate" })
+    if (riskSignals.size >= 300) break
+  }
   for (const match of source.matchAll(rolePattern)) {
     const value = match[1]!, lower = value.toLowerCase()
     const kind = /admin|superuser/.test(lower) ? "admin-role-hint" : /role|permission/.test(lower) ? "authorization-hint"
@@ -285,11 +316,12 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (roles.size >= 100) break
   }
   return {
-    functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()],
+    functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
     notes: [
       "Bounded static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
       "Secret values are never returned or persisted; only type, line number, and one-way fingerprint are retained.",
+      "Static sink signals are triage candidates, can be false positives in comments/vendor code, and do not prove taint or exploitability.",
       "Function attribution is a nearest-preceding-function hint, not a proven runtime call relationship.",
     ],
   }
