@@ -18,7 +18,8 @@
       "packages/console/*",
       "packages/sdk/js",
       "packages/slack",
-      "packages/hackbrowser"
+      "packages/hackbrowser",
+      "github"
     ],
     "catalog": {
       "@types/bun": "1.3.9",
