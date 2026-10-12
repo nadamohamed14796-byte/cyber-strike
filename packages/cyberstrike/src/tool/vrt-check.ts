@@ -24,10 +24,15 @@ function categoryMatchesClass(vulnerabilityClass: string, category: string) {
   return terms ? terms.some((term) => cat.includes(term)) || terms.includes(cat) : cls === cat
 }
 
-export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
-  description:
-    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN with valid conditions and evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
-  parameters: z.object({
+type VrtCheckMetadata = {
+  entryID: string
+  category: string
+  status: string
+  attemptsUsed?: number
+  outcome?: string
+}
+
+const Parameters = z.object({
     entry_id: z.string().describe("The intel entry ID to update the VRT check for"),
     vrt_category: z.string().describe("The VRT category being tested (e.g., IDOR, XSS, SQLi, SSRF, Auth Bypass)"),
     status: z.enum(["tested_vulnerable", "tested_not_vulnerable", "not_applicable"]).describe("Result of the test"),
@@ -58,7 +63,12 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
       })
       .optional()
       .describe("Evidence supporting the test result. Required for 'tested_vulnerable' status."),
-  }),
+  })
+
+export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadata>("update_vrt_check", {
+  description:
+    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN with valid conditions and evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
+  parameters: Parameters,
   async execute(params, ctx) {
     // Lane discipline: a proxy-tester may only record VRT checks in its own
     // vulnerability class. Off-class checks are rejected (not written) with a
