@@ -68,10 +68,13 @@ describe("remote skill path validation", () => {
   test("remote DNS destinations must resolve only to public addresses", () => {
     expect(Discovery.isPublicAddress("8.8.8.8")).toBe(true)
     expect(Discovery.isPublicAddress("2606:4700:4700::1111")).toBe(true)
+    expect(Discovery.isPublicAddress("2001:200::1")).toBe(true)
     for (const address of [
       "127.0.0.1", "10.0.0.1", "169.254.169.254", "172.16.0.1",
       "192.168.1.1", "192.0.2.1", "198.51.100.1", "203.0.113.1",
       "224.0.0.1", "::1", "fc00::1", "fe80::1", "2001:db8::1",
+      "2001:1::1", "2001:2::1", "2002:7f00:1::", "3fff::1",
+      "2001:0000:0000:0000:0000:0000:0000:0001",
     ]) {
       expect(Discovery.isPublicAddress(address)).toBe(false)
     }
