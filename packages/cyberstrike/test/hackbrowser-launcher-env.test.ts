@@ -9,6 +9,7 @@ describe("Hackbrowser worker environment", () => {
       PLAYWRIGHT_BROWSERS_PATH: "/home/tester/.cache/ms-playwright",
       CYBERSTRIKE_CREDENTIALS_KEY: "vault-key-must-not-leak",
       CYBERSTRIKE_AUTH_PASSWORD: "site-password-must-not-leak",
+      CYBERSTRIKE_SERVER_PASSWORD: "local-server-password-is-explicit-ipc-only",
       CYBERSTRIKE_GMAIL_OAUTH_CLIENT_SECRET: "gmail-secret-must-not-leak",
       CYBERSTRIKE_GMAIL_OAUTH_REFRESH_TOKEN: "gmail-refresh-must-not-leak",
       OPENAI_API_KEY: "unrelated-provider-key-must-not-leak",
@@ -26,6 +27,7 @@ describe("Hackbrowser worker environment", () => {
     expect(result.PLAYWRIGHT_BROWSERS_PATH).toBe("/home/tester/.cache/ms-playwright")
     expect(result.CYBERSTRIKE_CREDENTIALS_KEY).toBeUndefined()
     expect(result.CYBERSTRIKE_AUTH_PASSWORD).toBeUndefined()
+    expect(result.CYBERSTRIKE_SERVER_PASSWORD).toBeUndefined()
     expect(result.CYBERSTRIKE_GMAIL_OAUTH_CLIENT_SECRET).toBeUndefined()
     expect(result.CYBERSTRIKE_GMAIL_OAUTH_REFRESH_TOKEN).toBeUndefined()
     expect(result.OPENAI_API_KEY).toBeUndefined()
