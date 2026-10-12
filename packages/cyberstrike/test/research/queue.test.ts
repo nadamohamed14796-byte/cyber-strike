@@ -14,7 +14,7 @@ test("research queue only accepts completion from the current lease owner", asyn
       const claim = ResearchQueue.claimNext("worker-a")
       expect(claim?.sequence).toBe(item.sequence)
       const leaseOwner = claim?.lease_owner
-      expect(leaseOwner).toStartWith("worker-a:")
+      expect(leaseOwner?.startsWith("worker-a:")).toBe(true)
       if (!leaseOwner) throw new Error("claimed research item did not include its lease token")
       expect(ResearchQueue.complete(item.sequence, "worker-b", "learned")).toBeUndefined()
       const current = Database.use((db) => db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.sequence, item.sequence)).get())
@@ -40,7 +40,7 @@ test("research queue reclaims legacy studying rows with no lease expiry", async 
 
       const reclaimed = ResearchQueue.claimNext("recovery-worker")
       expect(reclaimed?.sequence).toBe(item.sequence)
-      expect(reclaimed?.lease_owner).toStartWith("recovery-worker:")
+      expect(reclaimed?.lease_owner?.startsWith("recovery-worker:")).toBe(true)
       expect(reclaimed?.lease_until).toBeGreaterThan(Date.now())
       await Instance.dispose()
     },
@@ -56,7 +56,7 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
       const firstClaim = ResearchQueue.claimNext("same-worker")
       expect(firstClaim?.sequence).toBe(item.sequence)
       const firstLease = firstClaim?.lease_owner
-      expect(firstLease).toStartWith("same-worker:")
+      expect(firstLease?.startsWith("same-worker:")).toBe(true)
       if (!firstLease) throw new Error("first claim did not include its lease token")
 
       Database.use((db) =>
@@ -68,7 +68,7 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
       const reclaimed = ResearchQueue.claimNext("same-worker")
       expect(reclaimed?.sequence).toBe(item.sequence)
       const reclaimedLease = reclaimed?.lease_owner
-      expect(reclaimedLease).toStartWith("same-worker:")
+      expect(reclaimedLease?.startsWith("same-worker:")).toBe(true)
       if (!reclaimedLease) throw new Error("reclaimed item did not include its lease token")
       expect(reclaimedLease).not.toBe(firstLease)
 
