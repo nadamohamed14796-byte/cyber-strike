@@ -4,6 +4,7 @@ import path from "node:path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { TargetMemory, targetObservationMatches } from "../../src/target"
+import { targetWorkspaceOwnerKey } from "../../src/target/project-key"
 
 describe("target memory normalization", () => {
   test("normalizes a bare hostname and removes query strings and fragments", () => {
@@ -161,5 +162,19 @@ test("refuses symlinked generated workspace outputs", async () => {
       expect(await fs.readFile(outsideFile, "utf-8")).toBe("original")
       await Instance.dispose()
     },
+  })
+})
+
+
+describe("target workspace owner keys", () => {
+  test("isolates non-Git project directories that share the global Project ID", () => {
+    const first = targetWorkspaceOwnerKey("global", "/tmp/cyberstrike-project-a")
+    const second = targetWorkspaceOwnerKey("global", "/tmp/cyberstrike-project-b")
+    expect(first).not.toBe(second)
+  })
+
+  test("keeps Git project memory stable across worktrees", () => {
+    expect(targetWorkspaceOwnerKey("proj_example", "/tmp/repo"))
+      .toBe(targetWorkspaceOwnerKey("proj_example", "/tmp/repo-worktree"))
   })
 })
