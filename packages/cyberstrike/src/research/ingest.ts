@@ -908,6 +908,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           study_method: "bounded-heuristic-extraction",
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
+            classification_method: "title-first-dominant-body-v1",
             severity: extracted.severity,
             attack_vector: extracted.attackVector ?? null,
             impact: extracted.impact ?? null,
