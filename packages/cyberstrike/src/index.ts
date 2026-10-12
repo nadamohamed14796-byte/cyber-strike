@@ -141,6 +141,14 @@ const cli = yargs(hideBin(process.argv))
   .command(AttachCommand)
   .command(HackbrowserCommand)
   .command(RunCommand)
+  // The README's quick start is simply `cyberstrike`. Register the same
+  // interactive runner as yargs' default command so launching without
+  // subcommands starts the TUI instead of exiting without visible output.
+  .command({
+    ...RunCommand,
+    command: "$0",
+    describe: "start the interactive CyberStrike session",
+  })
   .command(GenerateCommand)
   .command(DebugCommand)
   .command(AuthCommand)
