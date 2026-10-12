@@ -124,7 +124,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const name = match[1]!, line = lineNumber(source, match.index ?? 0), key = line + ":" + name
     if (fnSeen.has(key)) continue
     fnSeen.add(key)
-    const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "")
+    const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
       .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p))).slice(0, 40)
     functions.push({ name, line, parameters })
     if (functions.length >= 300) break
@@ -170,7 +170,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (/\b(?:getToken|readToken|accessToken|access_token|authToken|idToken)\b/i.test(all)) authSignals.push("token-provider-or-token-variable")
     if (/\b(?:csrf|xsrf)[-_]?(?:token)?\b/i.test(all)) authSignals.push("csrf-or-xsrf-signal")
     if (/\b(?:sessionToken|session_id|sessionId)\b/i.test(all)) authSignals.push("session-token-signal")
-    if (/\b(?:credentials\s*:\s*["']include["']|withCredentials\s*:\s*true)\b/i.test(all)) {
+    if (/(?:\bcredentials\s*:\s*["']include["']|\bwithCredentials\s*:\s*true)/i.test(all)) {
       authSignals.push("credentialed-request")
       cookieSignals.push("credentialed-request-may-send-cookies")
     }
