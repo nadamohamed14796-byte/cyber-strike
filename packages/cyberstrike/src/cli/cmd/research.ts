@@ -69,6 +69,23 @@ export const ResearchCommand = cmd({
           prompts.intro("CyberStrike Research Learning")
           const deep = Boolean(args.deep)
           const exhaustive = Boolean(args.all)
+          // If a valid source-scoped session is configured, automatically resume
+          // blocked reports during sync rather than requiring retry-auth separately.
+          const authReadySources = (args.source
+            ? RESEARCH_SOURCES.filter((source) => source.id === args.source)
+            : RESEARCH_SOURCES
+          ).filter((source) => {
+            const suffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
+            return Boolean(
+              process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + suffix]?.trim() ||
+              process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + suffix]?.trim()
+            )
+          })
+          let authRequeued = 0
+          for (const source of authReadySources) {
+            authRequeued += ResearchQueue.retryAuthenticationBlocked(exhaustive ? 500 : args.limit, source.id)
+          }
+          if (authRequeued > 0) prompts.log.info("auth-blocked reports resumed=" + authRequeued)
           const discoveries = await discoverResearch({
             sourceID: args.source,
             pages: exhaustive ? 1000 : deep ? 750 : args.pages,
