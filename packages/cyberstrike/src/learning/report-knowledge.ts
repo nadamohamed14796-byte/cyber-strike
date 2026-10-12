@@ -435,9 +435,15 @@ export namespace ReportKnowledge {
     // record's primary class or title to agree. A passing mention buried in a
     // long excerpt is not enough to make an unrelated article a match.
     if (concreteClasses.length) {
+      const classificationMethod = typeof extracted.classification_method === "string"
+        ? extracted.classification_method
+        : undefined
       return concreteClasses.some((signal) => {
         const pattern = SPECIFIC_QUERY_PATTERNS.find(([name]) => name === signal)?.[1]
-        return normalize(row.vulnerability_class) === signal || Boolean(pattern?.test(row.title))
+        const titleMatches = Boolean(pattern?.test(row.title))
+        const currentClassificationMatches =
+          classificationMethod === "title-first-dominant-body-v1" && normalize(row.vulnerability_class) === signal
+        return titleMatches || currentClassificationMatches
       })
     }
     return requested.some((signal) => {
