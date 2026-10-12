@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, safeCorrelationResponsePreview } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, safeCorrelationResponsePreview } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -102,6 +102,30 @@ test("explicit JavaScript target matching rejects unrelated hosts and sibling pa
     javascriptURL: "https://unrelated.example.net/app.js",
     alreadyObserved: true,
   })).toBe(true)
+})
+
+test("explicit JavaScript asset filtering matches exact origin and path", () => {
+  const target = "https://app.example.com/assets/app.js"
+  expect(matchesCapturedJavaScriptAsset({
+    origin: "https://app.example.com",
+    normalizedPath: "/assets/app.js?cache=1",
+    host: "app.example.com",
+  }, target)).toBe(true)
+  expect(matchesCapturedJavaScriptAsset({
+    origin: "https://app.example.com",
+    normalizedPath: "/assets/vendor.js",
+    host: "app.example.com",
+  }, target)).toBe(false)
+  expect(matchesCapturedJavaScriptAsset({
+    origin: "https://cdn.example.com",
+    normalizedPath: "/assets/app.js",
+    host: "cdn.example.com",
+  }, target)).toBe(false)
+  expect(matchesCapturedJavaScriptAsset({
+    origin: "https://app.example.com",
+    normalizedPath: "/assets/app.js",
+    host: "app.example.com",
+  }, "javascript:alert(1)")).toBe(false)
 })
 
 test("persists deduplicated endpoint candidates and links only host-compatible captured requests", () => {
