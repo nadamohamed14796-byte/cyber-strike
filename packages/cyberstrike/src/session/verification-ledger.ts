@@ -93,8 +93,9 @@ export namespace VerificationLedger {
       }
       const key = Policy.attemptKey(input.attempt)
       const existing = before.find((item) => Policy.attemptKey(item) === key)
-      if (before.length >= Policy.MAX_ATTEMPTS && !existing) {
-        throw new Error("The 20-distinct-attempt budget is exhausted. Do not create attempt 21; use action=status and preserve unresolved cases as INCONCLUSIVE / NEEDS REVIEW.")
+      const validDistinctAttempts = Policy.uniqueAttempts(before).filter((item) => item.validConditions).length
+      if (validDistinctAttempts >= Policy.MAX_ATTEMPTS && !existing && input.attempt.validConditions) {
+        throw new Error("The 20-valid-distinct-attempt budget is exhausted. Do not create another valid attempt; use action=status and preserve unresolved cases as INCONCLUSIVE / NEEDS REVIEW.")
       }
       let duplicate = Boolean(existing)
       let recorded: Attempt
