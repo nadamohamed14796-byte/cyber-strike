@@ -1313,13 +1313,14 @@ export const SessionRoutes = lazy(() =>
             const agentName = body.agent ?? "proxy-agent"
             const source = `${normalized.method} ${normalized.normalizedPath}`
             IngestQueue.enqueue(sessionID, async () => {
-              Request.updateStatus({ id: req.id, status: "processing" })
-              const before = IngestSummary.snapshot(sessionID)
-              // Render at dequeue (send time) so `## Observed Values` includes observations
-              // that accrued while this prompt waited in the queue — other credentials and
-              // other values seen on the same endpoint shape in the meantime.
-              const promptText = buildPrompt()
+              // A request becomes processed only after agent processing and summary
+              // persistence both complete. Failed work stays visible and is not auto-replayed.
+              let finalStatus: "processed" | "failed" = "failed"
               try {
+                Request.updateStatus({ id: req.id, status: "processing" })
+                const before = IngestSummary.snapshot(sessionID)
+                // Render at dequeue so Observed Values includes observations accrued while waiting.
+                const promptText = buildPrompt()
                 await SessionPrompt.prompt({
                   sessionID,
                   agent: agentName,
@@ -1336,9 +1337,11 @@ export const SessionRoutes = lazy(() =>
                   before,
                   after: IngestSummary.snapshot(sessionID),
                 })
+                finalStatus = "processed"
               } finally {
-                Request.updateStatus({ id: req.id, status: "processed" })
+                Request.updateStatus({ id: req.id, status: finalStatus })
               }
+            }
             })
           }
         } else {
