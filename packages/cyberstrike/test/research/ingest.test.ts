@@ -90,6 +90,7 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
     slackTokenFixture,
     gitlabTokenFixture,
     "https://example.test/callback?token=live-query-token&next=%2Fhome",
+    "https://example.test/download?X-Amz-Signature=live-signed-value&AWS_SECRET_ACCESS_KEY=live-aws-url-secret&client_secret=live-client-secret&next=%2Fhome",
     "eyJabcdefghijk.abcdefghijk.abcdefghijk",
     "-----BEGIN PRIVATE KEY-----private-key-material-----END PRIVATE KEY-----",
   ].join(" ")
@@ -106,6 +107,9 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
   expect(safe).not.toContain(slackTokenFixture)
   expect(safe).not.toContain(gitlabTokenFixture)
   expect(safe).not.toContain("live-query-token")
+  expect(safe).not.toContain("live-signed-value")
+  expect(safe).not.toContain("live-aws-url-secret")
+  expect(safe).not.toContain("live-client-secret")
   expect(safe).not.toContain("eyJabcdefghijk.abcdefghijk.abcdefghijk")
   expect(safe).not.toContain("private-key-material")
   expect(safe).toContain("next=%2Fhome")
