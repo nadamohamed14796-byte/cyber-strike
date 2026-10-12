@@ -156,13 +156,13 @@ export namespace Database {
         columns.has("hostname")
       ) {
         sqlite.run(
-          "UPDATE target_workspace SET owner_key = 'project:' || project_id WHERE project_id <> 'global' AND owner_key = 'legacy:unscoped'",
+          "UPDATE target_workspace SET owner_key = 'project:' || project_id WHERE project_id <> 'global' AND (owner_key IS NULL OR owner_key = 'legacy:unscoped')",
         )
         // Existing global rows were shared across non-Git directories, so their true
         // owner cannot be inferred safely. Give each legacy row a private identity
         // instead of continuing to expose its notes to every non-Git project.
         sqlite.run(
-          "UPDATE target_workspace SET owner_key = 'legacy:' || id WHERE project_id = 'global' AND owner_key = 'legacy:unscoped'",
+          "UPDATE target_workspace SET owner_key = 'legacy:' || id WHERE project_id = 'global' AND (owner_key IS NULL OR owner_key = 'legacy:unscoped')",
         )
         sqlite.run("DROP INDEX IF EXISTS target_workspace_project_key_idx")
         sqlite.run("DROP INDEX IF EXISTS target_workspace_host_idx")
