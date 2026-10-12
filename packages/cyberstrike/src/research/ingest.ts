@@ -778,16 +778,13 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
 export async function learnResearchQueue(input: { limit?: number; workerID?: string; sourceID?: string } = {}) {
   const { ResearchQueue } = await import("./queue")
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
-  const limit = Math.max(1, Math.min(input.limit ?? 50, MAX_LIMIT))
+  const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
   const result = { worker: workerID, claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
 
-  // If the operator has configured a valid source-scoped session since a prior
-  // run, resume only that source's blocked reports automatically. Without credentials,
-  // auth-blocked items remain parked and are never pointlessly fetched on every run.
-  const authReadySources = RESEARCH_SOURCES.filter((source) =>
-    (!input.sourceID || source.id === input.sourceID) && researchSourceHasCredentials(source),
-  )
-  for (const source of authReadySources) ResearchQueue.retryAuthenticationBlocked(100, source.id, AUTH_RETRY_COOLDOWN_MS)
+  // Reuse the same source-scoped retry path as CLI/update instead of retrying
+  // 100 rows independently per source. This keeps auth recovery bounded globally
+  // and preserves the cooldown/session-configuration gates in one place.
+  await retryAuthenticatedResearch({ sourceID: input.sourceID, limit })
 
   for (let i = 0; i < limit; i++) {
     const item = ResearchQueue.claimNext(workerID, input.sourceID)
