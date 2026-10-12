@@ -4,6 +4,7 @@ import { Intel } from "../methodology/intel"
 import { Session } from "../session"
 import { vrtScopeViolation, offLaneMessage } from "./vuln-scope"
 import { VerificationLedger } from "../session/verification-ledger"
+import { VerificationAttempts as Policy } from "../methodology/verification-attempts"
 
 const VRT_CLASS_TERMS: Record<string, string[]> = {
   idor: ["idor", "bola", "insecure direct object"],
@@ -137,11 +138,12 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
       }
       const decisiveAttempt = attempts[attempts.length - 1]
       const outcome = decisiveAttempt?.outcome
-      if (outcome !== "disproven" || !decisiveAttempt?.validConditions || !decisiveAttempt?.evidenceRef?.trim()) {
+      const validAttemptsUsed = attempts.filter((attempt) => attempt.validConditions).length
+      if (outcome !== "disproven" || validAttemptsUsed < Policy.MAX_ATTEMPTS || !decisiveAttempt?.validConditions || !decisiveAttempt?.evidenceRef?.trim()) {
         return {
           title: `VRT clean verdict blocked — ${params.vrt_category}`,
-          output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome after 20 distinct valid attempts with direct evidence is required (current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
-          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: attempts.filter((attempt) => attempt.validConditions).length, outcome: outcome ?? "unrecorded" },
+          output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome after 20 distinct valid attempts with direct evidence is required (valid attempts: ${validAttemptsUsed}, current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: validAttemptsUsed, outcome: outcome ?? "unrecorded" },
         }
       }
       verificationEvidenceRef = decisiveAttempt.evidenceRef.trim()
