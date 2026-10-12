@@ -37,6 +37,7 @@ import { HackbrowserStatus } from "../session/hackbrowser-status"
 import { Global } from "../global"
 import { GmailService } from "../gmail-service"
 import { buildHackbrowserWorkerEnvironment } from "../hackbrowser-subprocess/worker-environment"
+import { Network } from "../network/network"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -250,6 +251,10 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
         ? { kind: "single", credentialID: ids[0] }
         : { kind: "none" }
 
+  const browserNetwork = await Network.forBrowser()
+  if (opts.cdp && browserNetwork.proxy) {
+    throw new Error("A CDP-managed browser cannot be reconfigured with network.proxy. Start Chromium with the desired proxy before attaching.")
+  }
   const workerOptions: WorkerOptions = {
     url: opts.target,
     sessionID: opts.sessionID,
@@ -266,6 +271,7 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
     credentialDispatch,
     savedLogin: opts.savedLogin,
     cdp: opts.cdp,
+    network: browserNetwork,
   }
 
   return { workerOptions, modelInfo, workerPath, runtime }

@@ -24,6 +24,11 @@ export namespace BackendSocket {
      * presenting a different name — vhost / host-confusion tests. */
     servername?: string
     rejectUnauthorized?: boolean
+    /** Optional trust root and client identity for mutual-TLS targets. */
+    ca?: string
+    cert?: string
+    key?: string
+    passphrase?: string
     totalTimeoutMs?: number
     connectTimeoutMs?: number
     bodyCapBytes?: number
@@ -103,6 +108,10 @@ export namespace BackendSocket {
             port: opts.port,
             servername: opts.servername ?? opts.host,
             rejectUnauthorized: opts.rejectUnauthorized ?? true,
+            ...(opts.ca ? { ca: opts.ca } : {}),
+            ...(opts.cert ? { cert: opts.cert } : {}),
+            ...(opts.key ? { key: opts.key } : {}),
+            ...(opts.passphrase ? { passphrase: opts.passphrase } : {}),
           })
         : net.connect({ host: opts.host, port: opts.port })
 

@@ -30,7 +30,7 @@ export const ConfigRoutes = lazy(() =>
         },
       }),
       async (c) => {
-        return c.json(await Config.get())
+        return c.json(Config.redactSecrets(await Config.get()))
       },
     )
     .patch(
@@ -55,7 +55,7 @@ export const ConfigRoutes = lazy(() =>
       async (c) => {
         const config = c.req.valid("json")
         await Config.update(config)
-        return c.json(config)
+        return c.json(Config.redactSecrets(config))
       },
     )
     .get(

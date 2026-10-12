@@ -4,6 +4,7 @@ import { Tool } from "./tool"
 import { Request } from "../session/request"
 import { WebCredential } from "../session/web/web-credential"
 import { Session } from "../session"
+import { Network } from "../network/network"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // inject_probe (v1 — XSS only) — an EVIDENCE ENGINE, NOT an oracle.
@@ -923,17 +924,16 @@ async function send(
   // combine the caller's abort with a per-request deadline — the deadline signal governs BOTH the
   // fetch (connect/headers) and the streamed `resp.text()` body read, so neither can hang forever.
   const signal = AbortSignal.any([abort, AbortSignal.timeout(SEND_TIMEOUT_MS)])
-  const init: RequestInit & { tls?: { rejectUnauthorized: boolean } } = {
+  const init: RequestInit & { tls?: Record<string, unknown>; proxy?: string } = {
     method: r.method,
     headers: sendHeaders,
     signal,
     redirect: "manual",
-    // authorized-testing: accept self-signed on the (already in-scope) target host
-    tls: { rejectUnauthorized: false },
   }
   if (r.method !== "GET" && r.method !== "HEAD") init.body = target.body
   const t0 = performance.now()
   try {
+    Object.assign(init, Network.toFetchInit(await Network.forUrl(u.toString())))
     const resp = await fetch(u.toString(), init as RequestInit)
     const text = (await resp.text()).slice(0, 200_000)
     return { status: resp.status, text, ms: Math.round(performance.now() - t0), headers: extractHeaders(resp.headers) }

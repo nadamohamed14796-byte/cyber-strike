@@ -75,6 +75,11 @@ export interface WorkerOptions {
   /** One exact-origin saved login profile; secret exists only in local IPC/process memory. Never log or persist it. */
   savedLogin?: { username: string; password: string; origin: string; useGmailOtp?: boolean }
   cdp?: string
+  /** Target proxy/TLS settings forwarded through private stdin IPC to the worker. */
+  network?: {
+    proxy?: { server: string; username?: string; password?: string; bypass?: string }
+    ignoreHTTPSErrors?: boolean
+  }
 }
 
 // ============================================================

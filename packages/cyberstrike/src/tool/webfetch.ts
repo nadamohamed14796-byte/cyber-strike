@@ -4,6 +4,7 @@ import TurndownService from "turndown"
 import DESCRIPTION from "./webfetch.txt"
 import { abortAfterAny } from "../util/abort"
 import { Identifier } from "../id/id"
+import { Network } from "../network/network"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const MAX_REDIRECTS = 5
@@ -72,7 +73,8 @@ export const WebFetchTool = Tool.define("webfetch", {
       let nextURL: URL | undefined
 
       try {
-        let response = await fetch(current, { signal, headers, redirect: "manual" })
+        const transport = Network.toFetchInit(await Network.forUrl(current.href))
+        let response = await fetch(current, { signal, headers, redirect: "manual", ...transport } as RequestInit)
 
         // Retry a Cloudflare bot challenge with an honest user agent. Keep redirects
         // manual on the retry too so it cannot bypass destination permission checks.
@@ -82,7 +84,8 @@ export const WebFetchTool = Tool.define("webfetch", {
             signal,
             headers: { ...headers, "User-Agent": "cyberstrike" },
             redirect: "manual",
-          })
+            ...transport,
+          } as RequestInit)
         }
 
         if ([301, 302, 303, 307, 308].includes(response.status)) {

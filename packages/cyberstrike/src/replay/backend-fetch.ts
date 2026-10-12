@@ -27,6 +27,10 @@ export namespace BackendFetch {
     followRedirects?: boolean
     /** External cancellation (e.g. the chat turn's abort). */
     signal?: AbortSignal
+    /** Target outbound proxy and TLS material resolved by Network.forUrl. */
+    proxy?: string
+    ca?: string
+    clientCertificate?: { cert?: string; key?: string; passphrase?: string }
   }
 
   const BODYLESS = new Set(["GET", "HEAD"])
@@ -125,7 +129,7 @@ export namespace BackendFetch {
       let res: Response
       let redirects = 0
       while (true) {
-        const init: RequestInit & { tls?: { rejectUnauthorized: boolean } } = {
+        const init: RequestInit & { tls?: Record<string, unknown>; proxy?: string } = {
           method,
           headers,
           body: bodyValue,
@@ -134,7 +138,13 @@ export namespace BackendFetch {
           redirect: "manual",
           signal: controller.signal,
         }
-        if (opts.rejectUnauthorized === false) init.tls = { rejectUnauthorized: false }
+        const tls: Record<string, unknown> = { rejectUnauthorized: opts.rejectUnauthorized ?? true }
+        if (opts.ca) tls.ca = opts.ca
+        if (opts.clientCertificate?.cert) tls.cert = opts.clientCertificate.cert
+        if (opts.clientCertificate?.key) tls.key = opts.clientCertificate.key
+        if (opts.clientCertificate?.passphrase) tls.passphrase = opts.clientCertificate.passphrase
+        init.tls = tls
+        if (opts.proxy) init.proxy = opts.proxy
         res = await fetch(currentURL, init)
 
         const location = res.headers.get("location")

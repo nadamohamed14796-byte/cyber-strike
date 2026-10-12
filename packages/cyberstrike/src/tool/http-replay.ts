@@ -24,6 +24,7 @@ import { ReplayResponse } from "../replay/response"
 import { Observe } from "../replay/observe"
 import { Mutate } from "../replay/mutate"
 import { Batch } from "../replay/batch"
+import { Network } from "../network/network"
 import { TargetMemory } from "../target"
 
 // Encode codecs mirrored as a zod enum for the tool schema (kept in sync with
@@ -292,13 +293,17 @@ async function sendGoverned(
     signal?: AbortSignal
   },
 ): Promise<Send.Result> {
+  const outbound = await Network.forUrl(origin)
   const budget = new Governor.GlobalBudget()
   const breaker = new Governor.CircuitBreaker()
   return Send.governed(
     () =>
       BackendFetch.send(msg, {
         origin,
-        rejectUnauthorized: shouldRejectUnauthorized(opts.insecure_tls),
+        rejectUnauthorized: Network.rejectUnauthorized(opts.insecure_tls, outbound),
+        proxy: outbound.proxy,
+        ca: outbound.ca,
+        clientCertificate: outbound.clientCertificate,
         totalTimeoutMs: opts.total_timeout_ms,
         followRedirects: opts.follow_redirects,
         signal: opts.signal,
@@ -822,12 +827,20 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
 
     const useTls = url.protocol === "https:"
     const port = url.port ? Number.parseInt(url.port, 10) : useTls ? 443 : 80
+    const outbound = await Network.forUrl(url.toString())
+    // Raw byte-exact replay uses a TCP/TLS socket and deliberately refuses to
+    // silently bypass a configured proxy, since that would break interception guarantees.
+    if (outbound.proxy) return err("http_replay_raw cannot tunnel through network.proxy. Use http_replay for proxy-routed traffic, or add this destination to network.proxy.bypass.")
 
     const result = await BackendSocket.send(new TextEncoder().encode(raw), {
       host: url.hostname,
       port,
       tls: useTls,
-      rejectUnauthorized: shouldRejectUnauthorized(params.insecure_tls),
+      rejectUnauthorized: Network.rejectUnauthorized(params.insecure_tls, outbound),
+      ca: outbound.ca,
+      cert: outbound.clientCertificate?.cert,
+      key: outbound.clientCertificate?.key,
+      passphrase: outbound.clientCertificate?.passphrase,
       totalTimeoutMs: params.total_timeout_ms,
       signal: ctx.abort,
     })

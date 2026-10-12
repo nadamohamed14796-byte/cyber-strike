@@ -260,6 +260,12 @@ export interface PageDiffContext {
   elements: Record<string, string[]> // "button:Delete User" → ["admin"]
 }
 
+export interface BrowserNetworkOptions {
+  proxy?: { server: string; username?: string; password?: string; bypass?: string }
+  /** Strict certificate verification is default; true only for an explicit insecure override. */
+  ignoreHTTPSErrors?: boolean
+}
+
 export interface AgentConfig {
   targetUrl: string
   cyberstrike: {
@@ -303,6 +309,8 @@ export interface AgentConfig {
   // bundled Chromium. Bypasses TLS fingerprinting (JA3/JA4) that WAFs like
   // Cloudflare use to detect automated browsers.
   cdp?: string
+  /** Explicit destination proxy/TLS policy resolved by the CyberStrike parent. */
+  network?: BrowserNetworkOptions
   // Cancellation signal — agent BFS loop checks signal.aborted at each
   // iteration boundary; browser closes via existing finally block.
   // Wired by api.ts from CrawlOptions.signal (Faz B.5).

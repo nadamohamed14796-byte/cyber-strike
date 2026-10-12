@@ -10,7 +10,7 @@ export const ConfigCommand = cmd({
   async handler() {
     await bootstrap(process.cwd(), async () => {
       const config = await Config.get()
-      process.stdout.write(JSON.stringify(config, null, 2) + EOL)
+      process.stdout.write(JSON.stringify(Config.redactSecrets(config), null, 2) + EOL)
     })
   },
 })

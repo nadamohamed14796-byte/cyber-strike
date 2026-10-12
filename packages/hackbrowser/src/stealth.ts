@@ -1,5 +1,6 @@
 import { existsSync } from "fs"
 import { chromium, type Browser, type LaunchOptions, type BrowserContextOptions } from "playwright"
+import type { BrowserNetworkOptions } from "./types"
 
 const PLATFORM_ARGS =
   process.platform === "linux"
@@ -20,13 +21,13 @@ const LAUNCH_ARGS = [
   ...PLATFORM_ARGS,
 ]
 
-export function launchOptions(headless: boolean): LaunchOptions {
+export function launchOptions(headless: boolean, network?: BrowserNetworkOptions): LaunchOptions {
   // Headful: maximize to the REAL screen instead of forcing a fixed 1920x1080 window, which
   // overflows (and hides the login bar) on any screen smaller than that. Maximized fits every
   // screen and looks natural. Paired with contextOptions' viewport:null so Chrome — not
   // Playwright — owns the window size.
   const args = headless ? LAUNCH_ARGS : [...LAUNCH_ARGS, "--start-maximized"]
-  return { headless, args }
+  return { headless, args, ...(network?.proxy ? { proxy: network.proxy } : {}) }
 }
 
 export function findSystemChrome(): string | undefined {
@@ -43,14 +44,19 @@ export function findSystemChrome(): string | undefined {
   return candidates.find((p) => existsSync(p))
 }
 
-export async function connect(opts: { cdp?: string; headless: boolean }): Promise<Browser> {
-  if (opts.cdp) return chromium.connectOverCDP(opts.cdp)
+export async function connect(opts: { cdp?: string; headless: boolean; network?: BrowserNetworkOptions }): Promise<Browser> {
+  if (opts.cdp) {
+    if (opts.network?.proxy) {
+      throw new Error("A CDP-managed browser cannot be reconfigured with network.proxy. Start Chromium with the desired proxy before attaching.")
+    }
+    return chromium.connectOverCDP(opts.cdp)
+  }
   const chrome = findSystemChrome()
-  if (chrome) return chromium.launch({ ...launchOptions(opts.headless), executablePath: chrome })
-  return chromium.launch(launchOptions(opts.headless))
+  if (chrome) return chromium.launch({ ...launchOptions(opts.headless, opts.network), executablePath: chrome })
+  return chromium.launch(launchOptions(opts.headless, opts.network))
 }
 
-export function contextOptions(headless = true): BrowserContextOptions {
+export function contextOptions(headless = true, network?: BrowserNetworkOptions): BrowserContextOptions {
   // Report the REAL Chrome UA (no spoof). A faked Windows UA over the real macOS/Linux
   // navigator.platform is a glaring cross-check mismatch that makes detection easier, not
   // harder; only automation tells are hidden (INIT_SCRIPT). The real host stays consistent.
@@ -60,6 +66,7 @@ export function contextOptions(headless = true): BrowserContextOptions {
     locale: "en-US",
     timezoneId: "America/New_York",
     extraHTTPHeaders: { "Accept-Language": "en-US,en;q=0.9" },
+    ignoreHTTPSErrors: network?.ignoreHTTPSErrors === true,
   }
 }
 

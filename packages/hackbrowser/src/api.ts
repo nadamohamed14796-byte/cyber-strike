@@ -21,7 +21,7 @@ import { run } from "./agent.ts"
 import { findSystemChrome } from "./stealth.ts"
 import { Log, type LogSink, type LogRecord, type LogLevel } from "./log.ts"
 import { setEventSink, clearEventSink } from "./panel/emit.ts"
-import type { AgentConfig, CredentialConfig, CrawlResult, CSEvent } from "./types.ts"
+import type { AgentConfig, BrowserNetworkOptions, CredentialConfig, CrawlResult, CSEvent } from "./types.ts"
 
 // ============================================================
 // Public types
@@ -85,6 +85,9 @@ export interface CrawlOptions {
   // of launching Playwright's bundled Chromium. Bypasses WAF TLS
   // fingerprinting (Cloudflare, etc.).
   cdp?: string
+
+  // Parent-resolved outbound proxy/TLS policy for Playwright.
+  network?: BrowserNetworkOptions
 
   // Cancellation — when fired, the agent finishes the current step and
   // gracefully exits the BFS loop. The browser closes via the existing
@@ -172,6 +175,7 @@ function toAgentConfig(opts: CrawlOptions): AgentConfig {
     panel: opts.panel,
     model: opts.model,
     cdp: opts.cdp,
+    network: opts.network,
     signal: opts.signal,
   }
 }
