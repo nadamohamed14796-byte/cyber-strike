@@ -225,6 +225,39 @@ test("retry-auth sends blocked crawl pages back to discovery instead of the lear
 })
 
 
+test("a successful crawl revisit clears stale auth markers from an index page", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "auth-crawl-revisit"
+      const url = "https://research.example.test/private-archive"
+      ResearchQueue.markVisitedPage({ sourceID, sourceURL: url, title: "Private archive" })
+      ResearchQueue.blockAuthentication({
+        sourceID,
+        sourceURL: url,
+        reason: "HTTP 401",
+        payload: { source_name: "Auth Crawl Revisit" },
+      })
+      expect(ResearchQueue.find(sourceID, url)?.status).toBe("blocked_auth")
+      expect(ResearchQueue.find(sourceID, url)?.payload?.auth_required).toBe(true)
+
+      const revisited = ResearchQueue.markVisitedPage({
+        sourceID,
+        sourceURL: url,
+        title: "Private archive after login",
+        contentFingerprint: "authenticated-index",
+      })
+      expect(revisited?.status).toBe("discovered")
+      expect(revisited?.payload?.crawl_page).toBe(true)
+      expect(revisited?.payload?.auth_required).toBeUndefined()
+      expect(revisited?.payload).not.toHaveProperty("cached_text")
+      expect(ResearchQueue.isFreshCrawlPage(sourceID, url)).toBe(true)
+      await Instance.dispose()
+    },
+  })
+})
+
 test("automatic auth retry cooldown prevents every watch cycle from refetching invalid sessions", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
