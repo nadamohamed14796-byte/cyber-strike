@@ -106,7 +106,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     const strategy = String(attempt.strategy).trim()
     const checkID = String(attempt.checkID).trim()
     const variation = String(attempt.variation).trim().toLowerCase().replace(/\s+/g, " ")
-    if (!ATTEMPT_STRATEGIES.has(attempt.strategy) || !strategy || !checkID || !FINDING_VALIDATION_CHECKS.some((check) => check.id === checkID) || !["supports", "contradicts", "inconclusive"].includes(attempt.outcome) || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
+    if (!ATTEMPT_STRATEGIES.has(attempt.strategy) || !strategy || !checkID || !FINDING_VALIDATION_CHECKS.some((check) => check.id === checkID) || !["supports", "contradicts", "inconclusive"].includes(attempt.outcome) || typeof attempt.validConditions !== "boolean" || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
       throw new Error("Every validation attempt requires a strategy, unique variation, hypothesis, and concrete observed evidence.")
     }
     if (variation.length > 160 || attempt.hypothesis.length > 800 || attempt.evidence.length > 2000) {
@@ -148,11 +148,12 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     (check) => CONTRADICTION_CHECKS.has(check.id) && Boolean(check.reason && check.evidence),
   )
   const hasPrimaryContradiction = contradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
-  const attemptContradictions = attempts.filter((attempt) => attempt.outcome === "contradicts")
+  const validAttempts = attempts.filter((attempt) => attempt.validConditions)
+  const attemptContradictions = validAttempts.filter((attempt) => attempt.outcome === "contradicts")
   const attemptContradictedCheckIDs = new Set(attemptContradictions.map((attempt) => attempt.checkID))
   const attemptBackedContradictions = contradictions.filter((check) => attemptContradictedCheckIDs.has(check.id))
   const attemptPrimaryContradiction = attemptBackedContradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
-  const enoughDistinctAttempts = attempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
+  const enoughDistinctAttempts = validAttempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
   const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction && attemptBackedContradictions.length >= 2 && attemptPrimaryContradiction
 
   const requiredPasses = [
@@ -196,10 +197,10 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     summary = "Inconclusive: evidence does not justify classifying this finding as confirmed or false positive. Failed checks: " +
       (failed.length ? failed.map((check) => "#" + check.number).join(", ") : "none") +
       "; unknown checks: " + (unknown.length ? unknown.map((check) => "#" + check.number).join(", ") : "none") + ". " +
-      (enoughDistinctAttempts ? "The minimum of 20 distinct evidence-backed attempts has been reached." : "False-positive classification is blocked: " + attempts.length + "/20 distinct evidence-backed attempts are recorded.")
+      (enoughDistinctAttempts ? "The minimum of 20 distinct valid evidence-backed attempts has been reached." : "False-positive classification is blocked: " + validAttempts.length + "/20 distinct valid evidence-backed attempts are recorded.")
     nextStep = enoughDistinctAttempts
-      ? "Twenty distinct attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
-      : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - attempts.length) + " more distinct, case-specific tests. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
+      ? "Twenty distinct valid attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching valid attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
+      : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " more distinct, case-specific tests under valid preconditions. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, invalid preconditions, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
   }
 
   const output = [
@@ -220,8 +221,8 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     summary,
     nextStep,
     output,
-    attemptCount: attempts.length,
-    attemptsRemaining: Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - attempts.length),
+    attemptCount: validAttempts.length,
+    attemptsRemaining: Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length),
   }
 }
 
@@ -244,7 +245,10 @@ export namespace FindingValidation {
         .from(FindingValidationTable)
         .where(and(eq(FindingValidationTable.session_id, rootSessionID), eq(FindingValidationTable.vulnerability_id, input.vulnerabilityID)))
         .all()
-        .flatMap((row) => row.attempts ?? []),
+        .flatMap((row) => row.attempts ?? [])
+        // Legacy records predate validConditions and therefore cannot count toward
+        // a false-positive verdict until new valid evidence is recorded.
+        .map((attempt) => ({ ...attempt, validConditions: attempt.validConditions === true })),
     )
     const newAttempts = input.attempts ?? []
     const currentKeys = new Set<string>()
@@ -256,7 +260,13 @@ export namespace FindingValidation {
     const accumulated = new Map<string, FindingValidationAttemptRecord>()
     for (const attempt of [...priorAttempts, ...newAttempts]) {
       const key = attempt.variation.trim().toLowerCase().replace(/\s+/g, " ")
-      if (!accumulated.has(key)) accumulated.set(key, attempt)
+      const existing = accumulated.get(key)
+      if (!existing) accumulated.set(key, attempt)
+      else if (!existing.validConditions && attempt.validConditions) {
+        // A corrected valid test can replace an earlier invalid setup attempt, but
+        // an invalid retry must never downgrade a valid observation or erase proof.
+        accumulated.set(key, attempt)
+      }
     }
     const allAttempts = [...accumulated.values()]
     const assessment = assessFindingChecks(input.checks, allAttempts)
@@ -273,7 +283,7 @@ export namespace FindingValidation {
           confidence: assessment.confidence,
           checks: assessment.checks,
           attempts: allAttempts,
-          attempt_count: allAttempts.length,
+          attempt_count: assessment.attemptCount,
           failed_check_ids: assessment.failedCheckIDs,
           unknown_check_ids: assessment.unknownCheckIDs,
           summary: assessment.summary,
