@@ -244,7 +244,7 @@ export namespace Discovery {
       budget.reservedExpandedBytes += expandedSize
       try {
         await tar.x({
-          file: archive,
+          file: archiveToInspect,
           cwd: realRoot,
           strict: true,
           gzip: false,
