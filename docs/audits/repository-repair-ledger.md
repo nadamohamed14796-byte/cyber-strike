@@ -253,3 +253,18 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 | PR #2 / `hackbrowser-improvement` | Retain; do not merge wholesale | The inspected branch disables TLS certificate verification. Any safe unique browser changes require isolated review and tests. |
 
 **Branch cleanup:** no branches were deleted. The available GitHub actions in this execution context do not provide a safe branch-delete operation; preserving unmerged divergent branches avoids accidental loss of unique work. Delete only after the remaining unique diffs are accounted for and a supported deletion action is available.
+
+
+## Follow-up checkpoint — 2026-10-12: MySQL2 credential-leak and decompression-bomb advisories
+
+### SEC-010 — P1: console MySQL driver was below two security fixes
+
+- **Evidence:** `packages/console/core/package.json` and `bun.lock` resolved `mysql2@3.14.4`. The driver was affected by the authentication downgrade/plaintext credential disclosure fixed in 3.22.0, and the later compressed-protocol unbounded-inflate DoS affected versions through 3.23.0. References: [GHSA-3f6p-5ww8-9rcr](https://advisories.gitlab.com/npm/mysql2/GHSA-3f6p-5ww8-9rcr/) and [GHSA-rgwj-5xj2-c3m3](https://github.com/advisories/GHSA-rgwj-5xj2-c3m3).
+- **Fix:** updated the direct dependency and matching Bun lockfile records to `mysql2@3.23.1`, the first release in the inspected advisory range that includes both fixes. The compatible dependency ranges resolve to package versions already represented in the lockfile.
+- **Direct commits on main:** manifest `1ef50d6b46a7badc2a79c5ba2db858eb3eb3581f`; lockfile `1868a66688302ff328b1cc62bce3203d8eb2ceb7`.
+- **Validation:** verify the new lockfile with Bun's frozen-lockfile install and wait for latest-main build/test/typecheck. These checks are not yet confirmed on this commit.
+
+### Dependency branch disposition update
+
+- `dependabot/npm_and_yarn/packages/console/core/mysql2-3.22.0` was **not merged wholesale**: its proposed 3.22.0 fixes the earlier credential advisory but is still within the later affected range `<=3.23.0`. The safer selective update to 3.23.1 is now on main.
+- `dependabot/npm_and_yarn/packages/ui/dompurify-3.4.16` was **not merged wholesale** because it only changed the package manifest and left the Bun lockfile stale. The 3.4.16 manifest and lock records were updated directly on main.
