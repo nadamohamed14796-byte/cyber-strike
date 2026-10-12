@@ -20,25 +20,20 @@ export const WebFetchTool = Tool.define("webfetch", {
     timeout: z.number().describe("Optional timeout in seconds (max 120)").optional(),
   }),
   async execute(params, ctx) {
-    // Validate URL
-    if (!params.url.startsWith("http://") && !params.url.startsWith("https://")) {
-      throw new Error("URL must start with http:// or https://")
-    }
+    let current = parseHttpURL(params.url)
 
     await ctx.ask({
       permission: "webfetch",
-      patterns: [params.url],
+      patterns: [current.href],
       always: ["*"],
       metadata: {
-        url: params.url,
+        url: current.href,
         format: params.format,
         timeout: params.timeout,
       },
     })
 
-    const timeout = Math.min((params.timeout ?? DEFAULT_TIMEOUT / 1000) * 1000, MAX_TIMEOUT)
-
-    const { signal, clearTimeout } = abortAfterAny(timeout, ctx.abort)
+    const timeout = Math.max(1, Math.min((params.timeout ?? DEFAULT_TIMEOUT / 1000) * 1000, MAX_TIMEOUT))
 
     // Build Accept header based on requested format with q parameters for fallbacks
     let acceptHeader = "*/*"
@@ -63,107 +58,176 @@ export const WebFetchTool = Tool.define("webfetch", {
       "Accept-Language": "en-US,en;q=0.9",
     }
 
-    const initial = await fetch(params.url, { signal, headers })
+    // Permission is checked for the initial URL above and for every redirect below.
+    // Network time is bounded across hops; time spent waiting for a redirect approval
+    // does not consume the network budget.
+    let networkElapsed = 0
+    let redirects = 0
+    while (true) {
+      const remaining = timeout - networkElapsed
+      if (remaining <= 0) throw new Error("Request timed out before the response completed")
+      const started = Date.now()
+      const { signal, clearTimeout } = abortAfterAny(remaining, ctx.abort)
+      let nextURL: URL | undefined
 
-    // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
-    const response =
-      initial.status === 403 && initial.headers.get("cf-mitigated") === "challenge"
-        ? await fetch(params.url, { signal, headers: { ...headers, "User-Agent": "cyberstrike" } })
-        : initial
+      try {
+        let response = await fetch(current, { signal, headers, redirect: "manual" })
 
-    clearTimeout()
+        // Retry a Cloudflare bot challenge with an honest user agent. Keep redirects
+        // manual on the retry too so it cannot bypass destination permission checks.
+        if (response.status === 403 && response.headers.get("cf-mitigated") === "challenge") {
+          await response.body?.cancel().catch(() => undefined)
+          response = await fetch(current, {
+            signal,
+            headers: { ...headers, "User-Agent": "cyberstrike" },
+            redirect: "manual",
+          })
+        }
 
-    if (!response.ok) {
-      throw new Error(`Request failed with status code: ${response.status}`)
-    }
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          const location = response.headers.get("location")
+          await response.body?.cancel().catch(() => undefined)
+          if (!location) throw new Error("Redirect response did not include a Location header")
+          if (redirects >= MAX_REDIRECTS) throw new Error("Too many redirects (maximum 5)")
+          nextURL = parseHttpURL(new URL(location, current))
+        } else {
+          if (!response.ok) {
+            await response.body?.cancel().catch(() => undefined)
+            throw new Error(\`Request failed with status code: \${response.status}\`)
+          }
 
-    // Check content length
-    const contentLength = response.headers.get("content-length")
-    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
-      throw new Error("Response too large (exceeds 5MB limit)")
-    }
+          // Fail early when a trustworthy length is provided, but always enforce the
+          // same cap while streaming because Content-Length may be absent or wrong.
+          const contentLength = response.headers.get("content-length")
+          const declaredLength = contentLength ? Number(contentLength) : 0
+          if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_SIZE) {
+            await response.body?.cancel().catch(() => undefined)
+            throw new Error("Response too large (exceeds 5MB limit)")
+          }
 
-    const arrayBuffer = await response.arrayBuffer()
-    if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
-      throw new Error("Response too large (exceeds 5MB limit)")
-    }
+          const bytes = await readBoundedBytes(response.body, MAX_RESPONSE_SIZE)
+          const contentType = response.headers.get("content-type") || ""
+          const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
+          const title = \`\${current.href} (\${contentType})\`
 
-    const contentType = response.headers.get("content-type") || ""
-    const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
-    const title = `${params.url} (${contentType})`
+          // Check if response is an image
+          const isImage = mime.startsWith("image/") && mime !== "image/svg+xml" && mime !== "image/vnd.fastbidsheet"
 
-    // Check if response is an image
-    const isImage = mime.startsWith("image/") && mime !== "image/svg+xml" && mime !== "image/vnd.fastbidsheet"
+          if (isImage) {
+            const base64Content = Buffer.from(bytes).toString("base64")
+            return {
+              title,
+              output: "Image fetched successfully",
+              metadata: {},
+              attachments: [
+                {
+                  id: Identifier.ascending("part"),
+                  sessionID: ctx.sessionID,
+                  messageID: ctx.messageID,
+                  type: "file",
+                  mime,
+                  url: \`data:\${mime};base64,\${base64Content}\`,
+                },
+              ],
+            }
+          }
 
-    if (isImage) {
-      const base64Content = Buffer.from(arrayBuffer).toString("base64")
-      return {
-        title,
-        output: "Image fetched successfully",
-        metadata: {},
-        attachments: [
-          {
-            id: Identifier.ascending("part"),
-            sessionID: ctx.sessionID,
-            messageID: ctx.messageID,
-            type: "file",
-            mime,
-            url: `data:${mime};base64,${base64Content}`,
-          },
-        ],
+          const text = new TextDecoder().decode(bytes)
+
+          // Handle content based on requested format and actual content type
+          switch (params.format) {
+            case "markdown":
+              if (contentType.includes("text/html")) {
+                const markdown = convertHTMLToMarkdown(text)
+                return { output: markdown, title, metadata: {} }
+              }
+              return { output: text, title, metadata: {} }
+
+            case "text":
+              if (contentType.includes("text/html")) {
+                const extracted = await extractTextFromHTML(text)
+                return { output: extracted, title, metadata: {} }
+              }
+              return { output: text, title, metadata: {} }
+
+            case "html":
+              return { output: text, title, metadata: {} }
+
+            default:
+              return { output: text, title, metadata: {} }
+          }
+        }
+      } finally {
+        clearTimeout()
+        networkElapsed += Date.now() - started
       }
-    }
 
-    const content = new TextDecoder().decode(arrayBuffer)
-
-    // Handle content based on requested format and actual content type
-    switch (params.format) {
-      case "markdown":
-        if (contentType.includes("text/html")) {
-          const markdown = convertHTMLToMarkdown(content)
-          return {
-            output: markdown,
-            title,
-            metadata: {},
-          }
-        }
-        return {
-          output: content,
-          title,
-          metadata: {},
-        }
-
-      case "text":
-        if (contentType.includes("text/html")) {
-          const text = await extractTextFromHTML(content)
-          return {
-            output: text,
-            title,
-            metadata: {},
-          }
-        }
-        return {
-          output: content,
-          title,
-          metadata: {},
-        }
-
-      case "html":
-        return {
-          output: content,
-          title,
-          metadata: {},
-        }
-
-      default:
-        return {
-          output: content,
-          title,
-          metadata: {},
-        }
+      if (!nextURL) throw new Error("Redirect handling failed without a destination")
+      if (networkElapsed >= timeout) throw new Error("Request timed out before redirect approval")
+      await ctx.ask({
+        permission: "webfetch",
+        patterns: [nextURL.href],
+        always: ["*"],
+        metadata: {
+          url: nextURL.href,
+          redirectedFrom: current.href,
+          format: params.format,
+          timeout: params.timeout,
+        },
+      })
+      current = nextURL
+      redirects++
     }
   },
+  },
 })
+
+function parseHttpURL(input: string | URL): URL {
+  let url: URL
+  try {
+    url = input instanceof URL ? new URL(input.href) : new URL(input)
+  } catch {
+    throw new Error("URL must be an absolute HTTP(S) URL")
+  }
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    !url.hostname ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error("URL must be an HTTP(S) URL without embedded credentials")
+  }
+  return url
+}
+
+async function readBoundedBytes(body: ReadableStream<Uint8Array> | null, maximum: number): Promise<Uint8Array> {
+  if (!body) return new Uint8Array()
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const item = await reader.read()
+      if (item.done) break
+      total += item.value.byteLength
+      if (total > maximum) {
+        await reader.cancel().catch(() => undefined)
+        throw new Error("Response too large (exceeds 5MB limit)")
+      }
+      chunks.push(item.value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const result = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return result
+}
 
 async function extractTextFromHTML(html: string) {
   let text = ""
