@@ -58,12 +58,13 @@ function normalizeEndpoint(value: string) {
   const rawQuery = noFragment.includes("?") ? noFragment.slice(noFragment.indexOf("?") + 1) : ""
   const queryParameters = cleanUnique(rawQuery.split("&").map((part) => part.split("=", 1)[0] ?? "")
     .filter((name) => /^[A-Za-z0-9_.~[\]-]{1,100}$/.test(name))).slice(0, 80)
+  const rawPath = noFragment.split("?", 1)[0]!
   const dynamic = [
-    ...Array.from(input.matchAll(/\$\{\s*([A-Za-z_$][\w$]*)[^}]*\}/g), (m) => m[1]!),
-    ...Array.from(input.matchAll(/:([A-Za-z_$][\w$]*)/g), (m) => m[1]!),
-    ...Array.from(input.matchAll(/\{([A-Za-z_$][\w$]*)\}/g), (m) => m[1]!),
+    ...Array.from(rawPath.matchAll(/\$\{\s*([A-Za-z_$][\w$]*)[^}]*\}/g), (m) => m[1]!),
+    ...Array.from(rawPath.matchAll(/:([A-Za-z_$][\w$]*)/g), (m) => m[1]!),
+    ...Array.from(rawPath.matchAll(/\{([A-Za-z_$][\w$]*)\}/g), (m) => m[1]!),
   ]
-  let path = noFragment.split("?", 1)[0]!
+  let path = rawPath
     .replace(/\$\{\s*([A-Za-z_$][\w$]*)[^}]*\}/g, "{$1}")
     .replace(/:([A-Za-z_$][\w$]*)/g, "{$1}")
   let host: string | null = null
