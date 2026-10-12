@@ -42,6 +42,18 @@ export type TargetNoteKind =
 
 export type TargetNoteStatus = "unverified" | "observed" | "confirmed" | "disproven"
 
+export interface TargetScope {
+  schemaVersion: 1
+  targetURL: string
+  status: "unconfigured" | "configured"
+  scopeItems: string[]
+  excludedItems: string[]
+  authorizationSource: string | null
+  authorizationReference: string | null
+  configuredAt: string | null
+  warning?: string
+}
+
 export interface NormalizedTarget {
   targetURL: string
   targetKey: string
@@ -94,6 +106,54 @@ function projectRoot(): string {
 
 function currentOwnerKey(): string {
   return targetWorkspaceOwnerKey(Instance.project.id, projectRoot())
+}
+
+function normalizeScopeItem(input: string): string {
+  const value = input?.trim()
+  if (!value) throw new Error("Scope entries cannot be empty.")
+  if (/[\u0000-\u0020\u007f]/.test(value)) throw new Error("Scope entries cannot contain whitespace or control characters.")
+
+  const cidr = value.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
+  if (cidr) {
+    const octets = cidr[1].split(".").map(Number)
+    const prefix = Number(cidr[2])
+    if (octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255) || prefix < 0 || prefix > 32) {
+      throw new Error("Invalid IPv4 CIDR scope entry: " + value)
+    }
+    return octets.join(".") + "/" + prefix
+  }
+
+  const wildcard = value.startsWith("*.")
+  const hostInput = wildcard ? value.slice(2) : value
+  let hostname: string
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(hostInput)) {
+    let url: URL
+    try {
+      url = new URL(hostInput)
+    } catch {
+      throw new Error("Invalid scope URL: " + value)
+    }
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password || url.port ||
+      (url.pathname !== "/" && url.pathname !== "") || url.search || url.hash) {
+      throw new Error("Scope URLs must be credential-free HTTP(S) origins without ports, paths, queries, or fragments.")
+    }
+    hostname = url.hostname.toLowerCase()
+  } else {
+    if (hostInput.includes("/") || hostInput.includes("@") || hostInput.includes(":") || hostInput.includes("?") || hostInput.includes("#")) {
+      throw new Error("Scope entries must be domains, explicit *.domain wildcards, or IPv4 CIDRs.")
+    }
+    try {
+      hostname = new URL("https://" + hostInput).hostname.toLowerCase()
+    } catch {
+      throw new Error("Invalid domain scope entry: " + value)
+    }
+  }
+  hostname = hostname.replace(/\.$/, "")
+  if (!hostname || hostname.includes(":") || hostname.startsWith(".") || hostname.endsWith(".") ||
+    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(hostname)) {
+    throw new Error("Invalid domain scope entry: " + value)
+  }
+  return (wildcard ? "*." : "") + hostname
 }
 
 function normalizedSourceURL(input?: string): string | undefined {
@@ -555,6 +615,65 @@ export namespace TargetMemory {
           return mapWorkspace(row, relativePath)
         }),
     )
+  }
+
+  /** Read the target's explicit scope manifest. Missing/corrupt manifests never imply authorization. */
+  export async function getScope(input: string): Promise<TargetScope | null> {
+    const workspace = await get(input)
+    if (!workspace) return null
+    const scopePath = path.join(workspace.workspacePath, "scope", "scope.json")
+    await assertRegularFileOrMissing(scopePath)
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await fs.readFile(scopePath, "utf-8"))
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
+      throw new Error("Target scope manifest is unreadable or invalid JSON.")
+    }
+    if (!parsed || typeof parsed !== "object") throw new Error("Target scope manifest has an invalid shape.")
+    const scope = parsed as Partial<TargetScope>
+    if (
+      scope.schemaVersion !== 1 ||
+      scope.targetURL !== workspace.targetURL ||
+      !Array.isArray(scope.scopeItems) ||
+      !Array.isArray(scope.excludedItems) ||
+      (scope.status !== "configured" && scope.status !== "unconfigured")
+    ) {
+      throw new Error("Target scope manifest identity or schema does not match this workspace.")
+    }
+    return scope as TargetScope
+  }
+
+  /** Configure a scope only with explicit authorization provenance and at least one allowed item. */
+  export async function configureScope(
+    input: string,
+    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference: string },
+  ): Promise<{ workspace: Workspace; scope: TargetScope }> {
+    const include = [...new Set((options.include ?? []).map(normalizeScopeItem))]
+    const exclude = [...new Set((options.exclude ?? []).map(normalizeScopeItem))]
+    const authorizationSource = redactTargetNoteLine(options.authorizationSource ?? "", 200)
+    if (!include.length) throw new Error("At least one explicitly authorized in-scope item is required.")
+    if (!authorizationSource) throw new Error("An authorization source is required (for example, the program name).")
+    const reference = normalizedSourceURL(options.authorizationReference)
+    if (!reference || !reference.startsWith("https://")) {
+      throw new Error("An HTTPS authorization reference is required; do not use a private or credential-bearing URL.")
+    }
+    const overlap = include.filter((item) => exclude.includes(item))
+    if (overlap.length) throw new Error("The same entry cannot be both included and excluded: " + overlap.join(", "))
+
+    const workspace = await ensure(input)
+    const scope: TargetScope = {
+      schemaVersion: 1,
+      targetURL: workspace.targetURL,
+      status: "configured",
+      scopeItems: include,
+      excludedItems: exclude,
+      authorizationSource,
+      authorizationReference: reference,
+      configuredAt: new Date().toISOString(),
+    }
+    await writeWorkspaceFile(workspace, "scope/scope.json", JSON.stringify(scope, null, 2) + "\n")
+    return { workspace, scope }
   }
 
   /**
