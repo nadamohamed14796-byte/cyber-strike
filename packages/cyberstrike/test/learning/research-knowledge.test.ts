@@ -45,6 +45,28 @@ test("shared research retrieval uses signal tags and excludes target-specific re
 
       expect(shared).not.toBeNull()
       expect(targetSpecific).not.toBeNull()
+
+      // Flood the candidate ranking with newer, high-similarity rows that must
+      // never enter cross-target recommendations. Filtering only after slicing
+      // would hide the eligible shared row below this target-specific noise.
+      for (let index = 0; index < 20; index++) {
+        await Bun.sleep(2)
+        ReportKnowledge.ingestExternalDetailed({
+          title: "JavaScript source map reveals API endpoints " + marker + " tenant " + index,
+          severity: "medium",
+          vulnerabilityClass: "idor",
+          sourceURL: "https://research.example.test/reports/" + marker + "/scoped-noise-" + index,
+          targetPattern: "private-target-" + marker + "-" + index + ".example",
+          lesson: "Map JavaScript routes and compare authorized API object access.",
+          sourceTrust: 80,
+          tags: ["javascript-client", "api-endpoint", "idor"],
+          metadata: {
+            source_trust: 80,
+            extracted: { retrieval_signals: ["javascript-client", "api-endpoint", "idor"] },
+          },
+        })
+      }
+
       expect(ReportKnowledge.externalSourceURLs()).toContain("https://research.example.test/reports/js-api-sourcemap")
       expect(ReportKnowledge.externalSourceURLs()).toContain("https://research.example.test/reports/private-route")
 
