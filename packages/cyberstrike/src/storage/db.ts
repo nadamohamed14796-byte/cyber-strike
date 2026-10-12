@@ -140,6 +140,40 @@ export namespace Database {
       }
     }
     if (added.length) log.info("schema reconciled", { added })
+
+    // Phase 3: Reconcile target-workspace ownership and indexes.
+    // Older databases may have gained owner_key through Phase 2's ADD COLUMN fallback
+    // before the dedicated owner-index migration existed. Backfill those rows before
+    // replacing the old project_id-based unique index, or different project owners
+    // can collide when creating the owner-scoped index.
+    if (tableExists(sqlite, "target_workspace")) {
+      const columns = tableColumns(sqlite, "target_workspace")
+      if (
+        columns.has("id") &&
+        columns.has("project_id") &&
+        columns.has("owner_key") &&
+        columns.has("target_key") &&
+        columns.has("hostname")
+      ) {
+        sqlite.run(
+          "UPDATE target_workspace SET owner_key = 'project:' || project_id WHERE project_id <> 'global' AND owner_key = 'legacy:unscoped'",
+        )
+        // Existing global rows were shared across non-Git directories, so their true
+        // owner cannot be inferred safely. Give each legacy row a private identity
+        // instead of continuing to expose its notes to every non-Git project.
+        sqlite.run(
+          "UPDATE target_workspace SET owner_key = 'legacy:' || id WHERE project_id = 'global' AND owner_key = 'legacy:unscoped'",
+        )
+        sqlite.run("DROP INDEX IF EXISTS target_workspace_project_key_idx")
+        sqlite.run("DROP INDEX IF EXISTS target_workspace_host_idx")
+        sqlite.run(
+          "CREATE UNIQUE INDEX IF NOT EXISTS target_workspace_owner_target_key_idx ON target_workspace(owner_key, target_key)",
+        )
+        sqlite.run(
+          "CREATE INDEX IF NOT EXISTS target_workspace_owner_host_idx ON target_workspace(owner_key, hostname)",
+        )
+      }
+    }
   }
 
   export const Client = lazy(() => {
