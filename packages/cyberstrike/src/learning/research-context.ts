@@ -185,7 +185,10 @@ export namespace ResearchContext {
     const explicitSignalEntries = explicitSignals.length
       ? [{ title: explicitSignals.join(" "), type: "user_prompt_signal", tags: explicitSignals }]
       : []
-    const signalPool = [...requestSignals, ...functionSignals, ...explicitSignalEntries, ...entries]
+    // Honor the current user's explicit security question before ambient traffic.
+    // Otherwise several recent generic API requests can fill the five-result budget
+    // before the request-specific vulnerability class is even queried.
+    const signalPool = [...explicitSignalEntries, ...requestSignals, ...functionSignals, ...entries]
 
     const baseline = [
       "## Global Research Memory — Signal-Triggered Use",
