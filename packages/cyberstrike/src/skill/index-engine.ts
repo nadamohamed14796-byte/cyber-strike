@@ -47,25 +47,25 @@ export namespace SkillIndex {
     }
   }
 
-  function indexEntry(entry: Entry) {
+  function indexEntry(entry: Entry, state: IndexState) {
     for (const tag of entry.tags) {
-      if (!tagIndex.has(tag)) tagIndex.set(tag, new Set())
-      tagIndex.get(tag)!.add(entry.name)
+      if (!state.tagIndex.has(tag.toLowerCase())) state.tagIndex.set(tag.toLowerCase(), new Set())
+      state.tagIndex.get(tag.toLowerCase())!.add(entry.name)
     }
     for (const tech of entry.tech_stack) {
       const key = tech.toLowerCase()
-      if (!techIndex.has(key)) techIndex.set(key, new Set())
-      techIndex.get(key)!.add(entry.name)
+      if (!state.techIndex.has(key)) state.techIndex.set(key, new Set())
+      state.techIndex.get(key)!.add(entry.name)
     }
     for (const cwe of entry.cwe_ids) {
       const key = cwe.toUpperCase()
-      if (!cweIndex.has(key)) cweIndex.set(key, new Set())
-      cweIndex.get(key)!.add(entry.name)
+      if (!state.cweIndex.has(key)) state.cweIndex.set(key, new Set())
+      state.cweIndex.get(key)!.add(entry.name)
     }
     if (entry.category) {
       const key = entry.category.toLowerCase()
-      if (!categoryIndex.has(key)) categoryIndex.set(key, new Set())
-      categoryIndex.get(key)!.add(entry.name)
+      if (!state.categoryIndex.has(key)) state.categoryIndex.set(key, new Set())
+      state.categoryIndex.get(key)!.add(entry.name)
     }
   }
 
@@ -79,19 +79,15 @@ export namespace SkillIndex {
     const pending = builds.get(directory)
     if (pending) return pending
     const build = (async () => {
-      entries = new Map()
-      tagIndex = new Map()
-      techIndex = new Map()
-      cweIndex = new Map()
-      categoryIndex = new Map()
+      const next = emptyState()
       const skills = await Skill.all()
       for (const skill of skills) {
         const entry = toEntry(skill)
-        entries.set(entry.name, entry)
-        indexEntry(entry)
+        next.entries.set(entry.name, entry)
+        indexEntry(entry, next)
       }
-      states.set(directory, { entries, tagIndex, techIndex, cweIndex, categoryIndex })
-      log.info("skill index built", { directory, count: entries.size })
+      states.set(directory, next)
+      log.info("skill index built", { directory, count: next.entries.size })
     })()
     builds.set(directory, build)
     try { await build } finally { if (builds.get(directory) === build) builds.delete(directory) }
