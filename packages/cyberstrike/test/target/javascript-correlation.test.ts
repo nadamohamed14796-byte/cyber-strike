@@ -92,4 +92,5 @@ test("extracts endpoints from already-captured JavaScript responses without reta
   expect(sources[0]?.endpointLiterals).toContain("/api/orders/{param}")
   expect(JSON.stringify(sources)).not.toContain("secret-value")
   expect(sources[0]?.relativePath).toContain("captured/app.example.com")
+  expect(sources[0]?.sourceRequestID).toBe("req-js")
 })
