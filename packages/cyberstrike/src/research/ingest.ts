@@ -810,7 +810,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
     result.claimed++
     const source = RESEARCH_SOURCES.find((entry) => entry.id === item.source_id)
     if (!source) {
-      ResearchQueue.complete(item.sequence, workerID, "rejected", "unknown source id")
+      ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "unknown source id")
       result.skipped++
       continue
     }
@@ -819,19 +819,19 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
       const text = redactResearchSecrets(cleanHtml(html))
       const title = redactResearchSecrets(titleOf(html, item.source_url))
       if (text.length < 250) {
-        ResearchQueue.complete(item.sequence, workerID, "rejected", "page content too short")
+        ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "page content too short")
         result.skipped++
         continue
       }
       const relevance = sourceRelevance(item.source_url, title, text, source)
       if (!relevance.accepted || isIndexLikeResearchUrl(item.source_url)) {
-        ResearchQueue.complete(item.sequence, workerID, "rejected", "page failed research relevance gate")
+        ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "page failed research relevance gate")
         result.skipped++
         continue
       }
       const vulnerabilityClass = classify(title + " " + text)
       if (!vulnerabilityClass && source.kind !== "reference" && source.kind !== "academy") {
-        ResearchQueue.complete(item.sequence, workerID, "rejected", "no recognizable security topic")
+        ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "no recognizable security topic")
         result.skipped++
         continue
       }
@@ -917,10 +917,10 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
       } else {
         result.skipped++
       }
-      ResearchQueue.complete(item.sequence, workerID, "learned")
+      ResearchQueue.complete(item.sequence, item.lease_owner, "learned")
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      ResearchQueue.complete(item.sequence, workerID, item.attempts >= 3 ? "rejected" : "retry", message)
+      ResearchQueue.complete(item.sequence, item.lease_owner, item.attempts >= 3 ? "rejected" : "retry", message)
       result.failed++
       if (result.errors.length < 5) result.errors.push(item.public_id + " " + item.source_url + " — " + message)
       // Do not immediately reclaim the same failing item repeatedly in one batch.

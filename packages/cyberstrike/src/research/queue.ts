@@ -58,6 +58,10 @@ export namespace ResearchQueue {
 
   export function claimNext(workerID: string) {
     const now = Date.now()
+    // Lease identity must be unique per claim, not just per configured worker label.
+    // Otherwise a stale process could complete work reclaimed by a second process
+    // that reused the same --worker value after the original lease expired.
+    const leaseOwner = workerID + ":" + crypto.randomUUID()
     return Database.transaction((db) => {
       const row = db
         .select()
@@ -78,7 +82,7 @@ export namespace ResearchQueue {
         .set({
           status: "studying",
           attempts: row.attempts + 1,
-          lease_owner: workerID,
+          lease_owner: leaseOwner,
           lease_until: now + LEASE_MS,
           claimed_at: now,
           updated_at: now,
@@ -95,13 +99,13 @@ export namespace ResearchQueue {
         )
         .returning()
         .get()
-      return claimed ? { ...claimed, public_id: publicID(claimed.sequence) } : null
+      return claimed ? { ...claimed, lease_owner: leaseOwner, public_id: publicID(claimed.sequence) } : null
     })
   }
 
   export function complete(
     sequence: number,
-    workerID: string,
+    leaseOwner: string,
     outcome: "learned" | "retry" | "rejected",
     error?: string,
   ) {
@@ -121,7 +125,7 @@ export namespace ResearchQueue {
           and(
             eq(ResearchQueueTable.sequence, sequence),
             eq(ResearchQueueTable.status, "studying"),
-            eq(ResearchQueueTable.lease_owner, workerID),
+            eq(ResearchQueueTable.lease_owner, leaseOwner),
           ),
         )
         .returning()

@@ -13,10 +13,13 @@ test("research queue only accepts completion from the current lease owner", asyn
       const item = ResearchQueue.enqueue({ sourceID: "test", sourceURL: "https://research.example.test/one" })
       const claim = ResearchQueue.claimNext("worker-a")
       expect(claim?.sequence).toBe(item.sequence)
+      const leaseOwner = claim?.lease_owner
+      expect(leaseOwner).toStartWith("worker-a:")
+      if (!leaseOwner) throw new Error("claimed research item did not include its lease token")
       expect(ResearchQueue.complete(item.sequence, "worker-b", "learned")).toBeUndefined()
       const current = Database.use((db) => db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.sequence, item.sequence)).get())
-      expect(current?.lease_owner).toBe("worker-a")
-      expect(ResearchQueue.complete(item.sequence, "worker-a", "learned")?.status).toBe("learned")
+      expect(current?.lease_owner).toBe(leaseOwner)
+      expect(ResearchQueue.complete(item.sequence, leaseOwner, "learned")?.status).toBe("learned")
       await Instance.dispose()
     },
   })
@@ -37,7 +40,7 @@ test("research queue reclaims legacy studying rows with no lease expiry", async 
 
       const reclaimed = ResearchQueue.claimNext("recovery-worker")
       expect(reclaimed?.sequence).toBe(item.sequence)
-      expect(reclaimed?.lease_owner).toBe("recovery-worker")
+      expect(reclaimed?.lease_owner).toStartWith("recovery-worker:")
       expect(reclaimed?.lease_until).toBeGreaterThan(Date.now())
       await Instance.dispose()
     },
@@ -50,7 +53,11 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
     directory: dir.path,
     fn: async () => {
       const item = ResearchQueue.enqueue({ sourceID: "test", sourceURL: "https://research.example.test/stale-worker" })
-      expect(ResearchQueue.claimNext("worker-a")?.sequence).toBe(item.sequence)
+      const firstClaim = ResearchQueue.claimNext("same-worker")
+      expect(firstClaim?.sequence).toBe(item.sequence)
+      const firstLease = firstClaim?.lease_owner
+      expect(firstLease).toStartWith("same-worker:")
+      if (!firstLease) throw new Error("first claim did not include its lease token")
 
       Database.use((db) =>
         db.update(ResearchQueueTable)
@@ -58,16 +65,19 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
           .where(eq(ResearchQueueTable.sequence, item.sequence))
           .run(),
       )
-      const reclaimed = ResearchQueue.claimNext("worker-b")
+      const reclaimed = ResearchQueue.claimNext("same-worker")
       expect(reclaimed?.sequence).toBe(item.sequence)
-      expect(reclaimed?.lease_owner).toBe("worker-b")
+      const reclaimedLease = reclaimed?.lease_owner
+      expect(reclaimedLease).toStartWith("same-worker:")
+      if (!reclaimedLease) throw new Error("reclaimed item did not include its lease token")
+      expect(reclaimedLease).not.toBe(firstLease)
 
-      expect(ResearchQueue.complete(item.sequence, "worker-a", "learned")).toBeUndefined()
+      expect(ResearchQueue.complete(item.sequence, firstLease, "learned")).toBeUndefined()
       const current = Database.use((db) =>
         db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.sequence, item.sequence)).get(),
       )
-      expect(current?.lease_owner).toBe("worker-b")
-      expect(ResearchQueue.complete(item.sequence, "worker-b", "learned")?.status).toBe("learned")
+      expect(current?.lease_owner).toBe(reclaimedLease)
+      expect(ResearchQueue.complete(item.sequence, reclaimedLease, "learned")?.status).toBe("learned")
       await Instance.dispose()
     },
   })
