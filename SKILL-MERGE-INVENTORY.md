@@ -9,7 +9,15 @@ This reconciled candidate carries forward only non-overlapping skills and docume
 - Source A: 146 SKILL.md files
 - Source B: 83 SKILL.md files
 - Total source files inventoried: 229
-- CyberStrike SKILL.md files in the current tree: 7721 (7,662 on the base plus 59 newly added, non-overlapping skill files in this candidate)
+- CyberStrike SKILL.md files at the inventory commit: 7,721 (7,662 on the base plus 59 newly added, non-overlapping skill files in this candidate).
+
+Current `main` snapshot (2026-10-12) contains 7,726 `SKILL.md` files. Five skills were added after this inventory snapshot and are outside the 59-file candidate; review their semantic overlap and chain references before treating the skill audit as complete:
+
+- `.cyberstrike/skill/attack-bb-methodology/SKILL.md`
+- `.cyberstrike/skill/attack-evidence-hygiene/SKILL.md`
+- `.cyberstrike/skill/attack-report-writing/SKILL.md`
+- `.cyberstrike/skill/attack-triage-validation/SKILL.md`
+- `.cyberstrike/skill/attack-web-recon/SKILL.md`
 
 | Source repository | Source file | Proposed CyberStrike destination | Status |
 |---|---|---|---|
