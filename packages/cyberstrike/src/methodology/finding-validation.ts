@@ -375,7 +375,7 @@ export namespace FindingValidation {
   export function history(input: { sessionID: string; vulnerabilityID: string; limit?: number }) {
     const sessionID = Session.root(input.sessionID)
     const limit = Math.max(1, Math.min(Math.floor(input.limit ?? 10), 100))
-    return Database.use((db) =>
+    const rows = Database.use((db) =>
       db
         .select()
         .from(FindingValidationTable)
@@ -384,5 +384,13 @@ export namespace FindingValidation {
         .limit(limit)
         .all(),
     )
+    return rows.map((row) => ({
+      ...row,
+      // Old JSON snapshots have no validConditions field and must be shown as invalid.
+      attempts: (row.attempts ?? []).map((attempt) => ({
+        ...attempt,
+        validConditions: attempt.validConditions === true,
+      })),
+    }))
   }
 }
