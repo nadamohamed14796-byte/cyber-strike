@@ -85,6 +85,9 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     if (params.purpose === "target" && !params.target_id?.trim()) {
       return { title: "Target ID required", output: "Target credentials must be bound to an explicit target_id. No credentials were read or written.", metadata: { ok: false } }
     }
+    if (params.purpose === "research" && params.target_id?.trim()) {
+      return { title: "Research profiles are global", output: "Research-purpose profiles must not include target_id. Omit target_id, or use purpose=target for an account bound to one existing target workspace.", metadata: { ok: false, reason: "research_profile_cannot_have_target_id" } }
+    }
     let permissionOrigin: string
     try {
       permissionOrigin = normalizeAuthOrigin(params.site_url)
