@@ -136,7 +136,7 @@ test("research URL normalization removes embedded credentials and secret query p
 })
 
 
-test("learning reuses cached report text instead of fetching the same report URL again", async () => {
+test("research queue resumes authenticated work and learns cached report text without a second fetch", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
     directory: dir.path,
@@ -168,6 +168,52 @@ test("learning reuses cached report text instead of fetching the same report URL
         expect(result.learned).toBe(1)
         expect(fetchCalls).toBe(0)
         expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("learned")
+
+        // Keep this coverage in the same Instance scope: Instance/Database are process-wide.
+        const authSourceID = "hackerone-hacktivity"
+        const cookieEnv = "CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY"
+        const authorizationEnv = "CYBERSTRIKE_RESEARCH_AUTHORIZATION_HACKERONE_HACKTIVITY"
+        const originalCookie = process.env[cookieEnv]
+        const originalAuthorization = process.env[authorizationEnv]
+        const indexURL = "https://hackerone.com/hacktivity"
+        const reportURL = "https://hackerone.com/reports/123456"
+        const otherURL = "https://portswigger.net/web-security/access-control/idor"
+        process.env[cookieEnv] = "session=operator-provided-test-value"
+        delete process.env[authorizationEnv]
+        try {
+          ResearchQueue.blockAuthentication({
+            sourceID: authSourceID,
+            sourceURL: indexURL,
+            reason: "HTTP 401",
+            payload: { crawl_page: true },
+          })
+          ResearchQueue.blockAuthentication({ sourceID: authSourceID, sourceURL: reportURL, reason: "HTTP 401" })
+          ResearchQueue.blockAuthentication({ sourceID: "portswigger", sourceURL: otherURL, reason: "HTTP 401" })
+
+          // Recent authentication failures must stay parked until the retry cooldown expires.
+          expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10 })).toBe(0)
+
+          // Emulate entries whose operator has now configured credentials after the cooldown.
+          const retryAfter = Date.now() - 11 * 60_000
+          for (const url of [indexURL, reportURL]) {
+            const row = ResearchQueue.find(authSourceID, url)
+            if (!row) throw new Error("expected auth-blocked research row to exist")
+            Database.use((db) =>
+              db.update(ResearchQueueTable).set({ updated_at: retryAfter })
+                .where(eq(ResearchQueueTable.sequence, row.sequence)).run(),
+            )
+          }
+          expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10 })).toBe(2)
+          expect(ResearchQueue.find(authSourceID, indexURL)?.status).toBe("discovered")
+          expect(ResearchQueue.find(authSourceID, indexURL)?.payload?.crawl_page).toBe(true)
+          expect(ResearchQueue.find(authSourceID, reportURL)?.status).toBe("queued")
+          expect(ResearchQueue.find("portswigger", otherURL)?.status).toBe("blocked_auth")
+        } finally {
+          if (originalCookie === undefined) delete process.env[cookieEnv]
+          else process.env[cookieEnv] = originalCookie
+          if (originalAuthorization === undefined) delete process.env[authorizationEnv]
+          else process.env[authorizationEnv] = originalAuthorization
+        }
       } finally {
         globalThis.fetch = originalFetch
         await Instance.dispose()
@@ -176,58 +222,3 @@ test("learning reuses cached report text instead of fetching the same report URL
   })
 })
 
-
-test("authenticated research retry resumes report and index URLs only for the selected configured source", async () => {
-  await using dir = await tmpdir({ git: true })
-  await Instance.provide({
-    directory: dir.path,
-    fn: async () => {
-      const sourceID = "hackerone-hacktivity"
-      const cookieEnv = "CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY"
-      const authorizationEnv = "CYBERSTRIKE_RESEARCH_AUTHORIZATION_HACKERONE_HACKTIVITY"
-      const originalCookie = process.env[cookieEnv]
-      const originalAuthorization = process.env[authorizationEnv]
-      const indexURL = "https://hackerone.com/hacktivity"
-      const reportURL = "https://hackerone.com/reports/123456"
-      const otherURL = "https://portswigger.net/web-security/access-control/idor"
-
-      process.env[cookieEnv] = "session=operator-provided-test-value"
-      delete process.env[authorizationEnv]
-      try {
-        ResearchQueue.blockAuthentication({
-          sourceID,
-          sourceURL: indexURL,
-          reason: "HTTP 401",
-          payload: { crawl_page: true },
-        })
-        ResearchQueue.blockAuthentication({ sourceID, sourceURL: reportURL, reason: "HTTP 401" })
-        ResearchQueue.blockAuthentication({ sourceID: "portswigger", sourceURL: otherURL, reason: "HTTP 401" })
-
-        // Recent authentication failures must stay parked until the retry cooldown expires.
-        expect(await retryAuthenticatedResearch({ sourceID, limit: 10 })).toBe(0)
-
-        // Emulate entries whose operator has now configured credentials after the cooldown.
-        const retryAfter = Date.now() - 11 * 60_000
-        for (const url of [indexURL, reportURL]) {
-          const row = ResearchQueue.find(sourceID, url)
-          if (!row) throw new Error("expected auth-blocked research row to exist")
-          Database.use((db) =>
-            db.update(ResearchQueueTable).set({ updated_at: retryAfter })
-              .where(eq(ResearchQueueTable.sequence, row.sequence)).run(),
-          )
-        }
-        expect(await retryAuthenticatedResearch({ sourceID, limit: 10 })).toBe(2)
-        expect(ResearchQueue.find(sourceID, indexURL)?.status).toBe("discovered")
-        expect(ResearchQueue.find(sourceID, indexURL)?.payload?.crawl_page).toBe(true)
-        expect(ResearchQueue.find(sourceID, reportURL)?.status).toBe("queued")
-        expect(ResearchQueue.find("portswigger", otherURL)?.status).toBe("blocked_auth")
-      } finally {
-        if (originalCookie === undefined) delete process.env[cookieEnv]
-        else process.env[cookieEnv] = originalCookie
-        if (originalAuthorization === undefined) delete process.env[authorizationEnv]
-        else process.env[authorizationEnv] = originalAuthorization
-        await Instance.dispose()
-      }
-    },
-  })
-})
