@@ -87,7 +87,20 @@ export namespace VerificationLedger {
           `hypothesis_key "${hypothesisKey}" is already bound to a different asset, endpoint, or vulnerability class; use a separate key for a distinct claim.`,
         )
       }
-      const priorOutcome = before[before.length - 1]?.outcome
+      let priorOutcome = before[before.length - 1]?.outcome
+      const priorValidDistinctAttempts = Policy.uniqueAttempts(before).filter((item) => item.validConditions).length
+      // Older ledger rows may have been marked DISPROVEN before the 20-valid-attempt
+      // guard existed. Downgrade those stale verdicts and allow verification to resume.
+      if (priorOutcome === "disproven" && priorValidDistinctAttempts < Policy.MAX_ATTEMPTS) {
+        Database.use((db) => db.update(VerificationAttemptTable).set({
+          outcome: "inconclusive",
+          time_updated: Date.now(),
+        }).where(and(
+          eq(VerificationAttemptTable.session_id, sessionID),
+          eq(VerificationAttemptTable.hypothesis_key, hypothesisKey),
+        )).run())
+        priorOutcome = "inconclusive"
+      }
       if (Policy.isTerminalOutcome(priorOutcome)) {
         throw new Error(`This hypothesis is already ${priorOutcome}; terminal hypotheses cannot accept more attempts. Start a new hypothesis_key only for a genuinely different claim.`)
       }
