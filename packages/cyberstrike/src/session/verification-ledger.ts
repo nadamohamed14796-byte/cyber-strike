@@ -107,26 +107,43 @@ export namespace VerificationLedger {
       const key = Policy.attemptKey(input.attempt)
       const existing = before.find((item) => Policy.attemptKey(item) === key)
       const validDistinctAttempts = Policy.uniqueAttempts(before).filter((item) => item.validConditions).length
-      if (validDistinctAttempts >= Policy.MAX_ATTEMPTS && !existing && input.attempt.validConditions) {
+      const existingWasValid = existing?.validConditions === true
+      if (
+        validDistinctAttempts >= Policy.MAX_ATTEMPTS &&
+        input.attempt.validConditions &&
+        !existingWasValid
+      ) {
         throw new Error("The 20-valid-distinct-attempt budget is exhausted. Do not create another valid attempt; use action=status and preserve unresolved cases as INCONCLUSIVE / NEEDS REVIEW.")
       }
       let duplicate = Boolean(existing)
       let recorded: Attempt
+      let effectiveAttempt = input.attempt
 
       if (existing) {
-        // A duplicate does not consume budget, but refresh its observed evidence so
-        // a corrected session/precondition result is not hidden by an older failure.
-        Database.use((db) => db.update(VerificationAttemptTable).set({
-          result_summary: input.attempt.resultSummary,
-          evidence_ref: input.attempt.evidenceRef ?? null,
-          valid_conditions: input.attempt.validConditions ? 1 : 0,
-          time_updated: Date.now(),
-        }).where(eq(VerificationAttemptTable.id, existing.id)).run())
+        // A duplicate can upgrade an invalid setup result after prerequisites are
+        // corrected, but it must never downgrade a previously valid observation or
+        // erase its evidence. Otherwise a retry could reopen an exhausted budget.
+        const preserveExisting = existing.validConditions && !input.attempt.validConditions
+        effectiveAttempt = preserveExisting
+          ? existing
+          : {
+              ...input.attempt,
+              evidenceRef: input.attempt.evidenceRef ?? existing.evidenceRef,
+              validConditions: existing.validConditions || input.attempt.validConditions,
+            }
+        if (!preserveExisting) {
+          Database.use((db) => db.update(VerificationAttemptTable).set({
+            result_summary: effectiveAttempt.resultSummary,
+            evidence_ref: effectiveAttempt.evidenceRef ?? null,
+            valid_conditions: effectiveAttempt.validConditions ? 1 : 0,
+            time_updated: Date.now(),
+          }).where(eq(VerificationAttemptTable.id, existing.id)).run())
+        }
         recorded = {
           ...existing,
-          resultSummary: input.attempt.resultSummary,
-          evidenceRef: input.attempt.evidenceRef,
-          validConditions: input.attempt.validConditions,
+          resultSummary: effectiveAttempt.resultSummary,
+          evidenceRef: effectiveAttempt.evidenceRef,
+          validConditions: effectiveAttempt.validConditions,
         }
       } else {
         const now = Date.now()
@@ -159,13 +176,13 @@ export namespace VerificationLedger {
       // without changing the distinct-attempt count.
       const decisionAttempts = [
         ...all.filter((item) => Policy.attemptKey(item) !== key),
-        input.attempt,
+        effectiveAttempt,
       ]
       const decision = Policy.decide({
         attempts: decisionAttempts,
-        decisiveConfirmation: input.decisiveResult === "confirmed" && Boolean(input.attempt.evidenceRef?.trim()),
-        decisiveDisproof: input.decisiveResult === "disproven" && input.attempt.validConditions && Boolean(input.attempt.evidenceRef?.trim()),
-        decisiveEvidenceRef: input.attempt.evidenceRef,
+        decisiveConfirmation: input.decisiveResult === "confirmed" && Boolean(effectiveAttempt.evidenceRef?.trim()),
+        decisiveDisproof: input.decisiveResult === "disproven" && effectiveAttempt.validConditions && Boolean(effectiveAttempt.evidenceRef?.trim()),
+        decisiveEvidenceRef: effectiveAttempt.evidenceRef,
         blockedReason: input.blockedReason,
       })
       Database.use((db) => db.update(VerificationAttemptTable).set({
