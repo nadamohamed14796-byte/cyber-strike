@@ -6,9 +6,8 @@ version: "1.0.0"
 author: "cyberstrike-official"
 tags: [recon, screenshots, visual-triage, web-enumeration]
 tech_stack: [HTTP, browser, TLS]
-chains_with: [recon-methodology, recon-vhost-enumeration, recon-staging-subdomain-hunt]
-prerequisites:
-  - "A list of attributable web URLs"
+chains_with: [recon-methodology, recon-vhost-enumeration, recon-subdomain-enumeration]
+prerequisites: [recon-subdomain-enumeration]
 severity_boost: {}
 ---
 
@@ -17,6 +16,12 @@ severity_boost: {}
 ## Objective
 
 Reduce a large host inventory into distinct applications and high-value testing candidates using reproducible visual evidence. Screenshots and titles are triage signals, not vulnerability proof.
+
+## Scope
+
+- Only capture URLs already confirmed as in-scope and attributable to the target organization (e.g., output of `recon-subdomain-enumeration` or a program-provided asset list). Do not expand capture to third-party SaaS, CDN, or parked infrastructure discovered incidentally.
+- Automated capture is passive (GET/navigation only). Do not submit forms, accept cookie/consent prompts beyond what is needed to render the page, or interact with authentication flows during the bulk pass.
+- If a captured page requires credentials the tester does not hold, or displays content suggesting it belongs to an unrelated customer/tenant, exclude it from the dataset and flag it for scope confirmation rather than clustering it.
 
 ## Methodology
 
@@ -80,6 +85,17 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 - Do not infer ownership from branding alone.
 - Treat screenshots as navigation evidence, not proof of server-side access.
 - Re-capture dynamic pages before concluding that two deployments differ.
+
+## Stop Conditions
+
+- Stop capturing a host and flag it for review if a page prompts for real payment details, displays what appears to be another customer's live data, or returns content inconsistent with program scope.
+- Stop and throttle if the target shows rate-limiting, CAPTCHA challenges, or WAF block pages across multiple hosts; bulk headless capture should not be mistaken for a denial-of-service attempt.
+- Stop before any authenticated or state-changing interaction; visual recon hands off to the relevant attack-* or auth skill once a testable hypothesis is formed, it does not perform the test itself.
+
+## Defensive Notes
+
+- Organizations can reduce the value of this technique by consolidating default/placeholder pages, disabling framework and admin-panel banners on production hosts, and keeping staging/legacy interfaces off public DNS or behind authentication.
+- Consistent, informative error pages (rather than framework-default error pages) reduce fingerprinting value from screenshots and titles alone.
 
 ## References
 
