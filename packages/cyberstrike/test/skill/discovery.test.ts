@@ -202,7 +202,7 @@ test("downloads and extracts archive bytes without UTF-8 corruption", async () =
   }) as typeof fetch
 
   try {
-    const dirs = await Discovery.pull("https://skill-fixture.invalid/")
+    const dirs = await Discovery.pull("https://example.com/")
     expect(dirs).toContain(path.join(Discovery.dir(), skillName))
     expect(await fs.readFile(path.join(Discovery.dir(), skillName, "SKILL.md"), "utf8")).toContain(
       "archive bytes must be preserved",
