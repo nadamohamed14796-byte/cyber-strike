@@ -7,7 +7,7 @@ import { VerificationLedger } from "../session/verification-ledger"
 
 export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
   description:
-    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. This feeds the coverage tracking system — every check moved from 'pending' to a tested state improves coverage.",
+    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN with valid conditions and evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
   parameters: z.object({
     entry_id: z.string().describe("The intel entry ID to update the VRT check for"),
     vrt_category: z.string().describe("The VRT category being tested (e.g., IDOR, XSS, SQLi, SSRF, Auth Bypass)"),
