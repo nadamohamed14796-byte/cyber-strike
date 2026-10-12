@@ -11,7 +11,24 @@ import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetNoteTable, TargetWorkspaceTable } from "./target.sql"
 
-const TARGET_DIRECTORIES = ["assets", "endpoints", "javascript", "findings", "evidence", "sessions", "research"] as const
+const TARGET_DIRECTORIES = [
+  "scope",
+  "assets",
+  "recon",
+  "urls",
+  "requests",
+  "javascript",
+  "endpoints",
+  "testing",
+  "findings",
+  "evidence",
+  "reports",
+  "scans",
+  "runs",
+  "logs",
+  "sessions",
+  "research",
+] as const
 
 export type TargetNoteKind =
   | "manual"
@@ -263,6 +280,52 @@ function defaultTargetNotes(workspace: Workspace): string {
   ].join("\n")
 }
 
+function defaultWorkspaceReadme(workspace: Workspace): string {
+  return [
+    "# CyberStrike Target Workspace",
+    "",
+    "- Target: " + workspace.targetURL,
+    "- Workspace ID: " + workspace.id,
+    "- Schema: 2",
+    "",
+    "## Safety and provenance",
+    "",
+    "- Treat `workspace.json` and SQLite target metadata as identity references; do not infer authorization from the existence of this workspace.",
+    "- Active testing requires an explicitly configured, current, program-authorized scope in `scope/scope.json`.",
+    "- Preserve source URL, timestamp, run/session ID, and evidence references for generated artifacts.",
+    "- Keep observations, hypotheses, validated findings, and reports separate. A note is not proof.",
+    "- Do not store passwords, cookies, bearer tokens, API keys, or other secrets.",
+    "",
+    "## Layout",
+    "",
+    "| Directory | Purpose |",
+    "| --- | --- |",
+    "| `scope/` | Explicit authorization and scope boundaries |",
+    "| `assets/` | Stable asset registry and provenance |",
+    "| `recon/` | Recon outputs |",
+    "| `urls/` | Discovered URLs |",
+    "| `requests/` | Request/response references and correlation metadata |",
+    "| `javascript/` | JS assets and analysis/correlation output |",
+    "| `endpoints/` | Endpoint inventory |",
+    "| `testing/` | Test cases and validation attempts |",
+    "| `findings/` | Finding records and lifecycle state |",
+    "| `evidence/` | Evidence artifacts and indexes |",
+    "| `reports/` | Report drafts and exports |",
+    "| `scans/` | Scan manifests and outputs |",
+    "| `runs/` | Resumable run manifests |",
+    "| `logs/` | Target-local logs |",
+    "| `sessions/` | Session references and resumable context |",
+    "| `research/` | Target-specific research observations (not global methodology) |",
+    "",
+    "## Source of truth",
+    "",
+    "- SQLite is authoritative for target identity and target notes.",
+    "- This README and `notes.md` are human-readable companions.",
+    "- Global writeups and methodology belong in the separate research knowledge store.",
+    "",
+  ].join("\n")
+}
+
 function applyTargetNoteToMarkdown(notesFile: string, note: TargetNote): string {
   const marker = "<!-- cyberstrike-target-note:" + note.id + " -->"
   const markerIndex = notesFile.indexOf(marker)
@@ -329,6 +392,8 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
   for (const directory of TARGET_DIRECTORIES) {
     await ensureSafeDirectoryPath(root, path.join(workspace.relativePath, directory))
   }
+  // target.json is retained for compatibility; workspace.json is the canonical
+  // manifest consumed by the target workflow and carries stable identity fields.
   await createIfMissing(
     path.join(workspace.workspacePath, "target.json"),
     JSON.stringify(
@@ -342,6 +407,51 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
       null,
       2,
     ) + "\n",
+  )
+  await createIfMissing(
+    path.join(workspace.workspacePath, "workspace.json"),
+    JSON.stringify(
+      {
+        schemaVersion: 2,
+        workspaceID: workspace.id,
+        projectID: workspace.projectID,
+        targetURL: workspace.targetURL,
+        targetKey: workspace.targetKey,
+        hostname: workspace.hostname,
+        slug: workspace.slug,
+        relativePath: workspace.relativePath,
+        createdAt: new Date(workspace.timeCreated).toISOString(),
+      },
+      null,
+      2,
+    ) + "\n",
+  )
+  await createIfMissing(path.join(workspace.workspacePath, "README.md"), defaultWorkspaceReadme(workspace))
+  await createIfMissing(
+    path.join(workspace.workspacePath, "scope", "scope.json"),
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        targetURL: workspace.targetURL,
+        status: "unconfigured",
+        scopeItems: [],
+        excludedItems: [],
+        authorizationSource: null,
+        authorizationReference: null,
+        configuredAt: null,
+        warning: "No authorization or in-scope assets have been configured. Do not perform active testing until scope is explicitly verified.",
+      },
+      null,
+      2,
+    ) + "\n",
+  )
+  await createIfMissing(
+    path.join(workspace.workspacePath, "assets", "registry.json"),
+    JSON.stringify({ schemaVersion: 1, targetURL: workspace.targetURL, assets: [] }, null, 2) + "\n",
+  )
+  await createIfMissing(
+    path.join(workspace.workspacePath, "runs", "index.json"),
+    JSON.stringify({ schemaVersion: 1, targetURL: workspace.targetURL, runs: [] }, null, 2) + "\n",
   )
   const notesPath = path.join(workspace.workspacePath, "notes.md")
   await createIfMissing(notesPath, defaultTargetNotes(workspace))
