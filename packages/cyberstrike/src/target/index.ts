@@ -311,6 +311,7 @@ export namespace TargetMemory {
         .values({
           id: Identifier.ascending("target_workspace"),
           project_id: projectID,
+          owner_key: ownerKey,
           target_key: normalized.targetKey,
           target_url: normalized.targetURL,
           hostname: normalized.hostname,
