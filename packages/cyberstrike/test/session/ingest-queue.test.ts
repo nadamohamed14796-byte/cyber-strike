@@ -3,6 +3,8 @@ import { IngestQueue } from "../../src/session/ingest-queue"
 import { SessionQueueStatus } from "../../src/session/queue-status"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
+import { Session } from "../../src/session"
+import { Request } from "../../src/session/request"
 
 function defer<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -205,6 +207,33 @@ describe("SessionQueueStatus", () => {
       expect(SessionQueueStatus.get(sid).paused).toBe(true)
       IngestQueue.resume(sid)
       expect(SessionQueueStatus.get(sid).paused).toBe(false)
+    })
+  })
+})
+
+
+describe("Request processing outcome persistence", () => {
+  test("stores failed separately from processed", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-status-failure-test" })
+      const request = Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/request-status-failure-test",
+        origin: "https://example.test",
+        keyHash: "request-status-failure-test-key",
+      })
+      expect(request).toBeDefined()
+      if (!request) throw new Error("request fixture was not inserted")
+
+      Request.updateStatus({ id: request.id, status: "processing" })
+      expect(Request.get(session.id).find((item) => item.id === request.id)?.status).toBe("processing")
+
+      Request.updateStatus({ id: request.id, status: "failed" })
+      expect(Request.get(session.id).find((item) => item.id === request.id)?.status).toBe("failed")
+      expect(Request.get(session.id).find((item) => item.id === request.id)?.status).not.toBe("processed")
+
+      await Session.remove(session.id)
     })
   })
 })
