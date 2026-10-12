@@ -267,7 +267,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       : isFetch ? args.slice(1).join(",") : /\.(?:get|head|options|delete)$/i.test(callee) ? args.slice(1).join(",") : args.slice(2).join(",")
     const optionText = options + "\n" + source.slice(index, Math.min(close + 1, index + 7000))
     const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
-    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : isFetch ? "GET" : undefined) ?? "").toUpperCase() || null
+    const hasDynamicMethodOption = isFetch && /\bmethod\s*:/i.test(optionText) && !methodOption
+    const inferredFetchMethod = isFetch && !hasDynamicMethodOption ? "GET" : undefined
+    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : inferredFetchMethod) ?? "").toUpperCase() || null
     const headers = [
       ...Array.from(optionText.matchAll(/\bheaders\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1]!)).flat(),
       ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
