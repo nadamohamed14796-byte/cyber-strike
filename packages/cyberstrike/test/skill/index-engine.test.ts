@@ -62,7 +62,14 @@ Skill body for ${name}.
     await fs.mkdir(nestedControl, { recursive: true })
     await Bun.write(
       path.join(nestedControl, "SKILL.md"),
-      `---\\nname: Demo benchmark control 1.1\\ndescription: Nested benchmark control\\n---\\nControl body.\\n`,
+      [
+        "---",
+        "name: Demo benchmark control 1.1",
+        "description: Nested benchmark control",
+        "---",
+        "Control body.",
+        "",
+      ].join("\n"),
     )
     await addSkill(
       "control-dependent",
