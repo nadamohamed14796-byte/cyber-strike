@@ -94,4 +94,67 @@ describe("tool.webfetch", () => {
       },
     )
   })
+  test("asks permission for every redirect destination before fetching it", async () => {
+    const asks: string[] = []
+    const requested: string[] = []
+    let count = 0
+    const redirectCtx = {
+      ...ctx,
+      ask: async (request: { patterns: string[] }) => {
+        asks.push(request.patterns[0]!)
+      },
+    }
+    await withFetch(
+      async (input) => {
+        requested.push(String(input))
+        count++
+        if (count === 1) {
+          return new Response(null, {
+            status: 302,
+            headers: { location: "https://redirect.example/next" },
+          })
+        }
+        return new Response("redirected content", { headers: { "content-type": "text/plain" } })
+      },
+      async () => {
+        await Instance.provide({
+          directory: projectRoot,
+          fn: async () => {
+            const webfetch = await WebFetchTool.init()
+            const result = await webfetch.execute({ url: "https://example.com/start", format: "text" }, redirectCtx)
+            expect(result.output).toBe("redirected content")
+          },
+        })
+      },
+    )
+    expect(requested).toEqual(["https://example.com/start", "https://redirect.example/next"])
+    expect(asks).toEqual(["https://example.com/start", "https://redirect.example/next"])
+  })
+
+  test("enforces the response size limit while streaming without Content-Length", async () => {
+    await withFetch(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(new Uint8Array(5 * 1024 * 1024 + 1))
+              controller.close()
+            },
+          }),
+          { headers: { "content-type": "text/plain" } },
+        ),
+      async () => {
+        await Instance.provide({
+          directory: projectRoot,
+          fn: async () => {
+            const webfetch = await WebFetchTool.init()
+            await expect(
+              webfetch.execute({ url: "https://example.com/large", format: "text" }, ctx),
+            ).rejects.toThrow(/Response too large/)
+          },
+        })
+      },
+    )
+  })
+
 })
