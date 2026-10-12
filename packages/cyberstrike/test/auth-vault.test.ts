@@ -170,6 +170,7 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
     expect(raw).toContain("ciphertext")
     expect((await stat(vaultPath)).mode & 0o777).toBe(0o600)
     expect((await stat(path.dirname(vaultPath))).mode & 0o777).toBe(0o700)
+    expect((await readdir(path.dirname(vaultPath))).filter((name) => name.endsWith(".tmp"))).toEqual([])
 
     const wrongKeyEnv = { ...env, CYBERSTRIKE_CREDENTIALS_KEY: "different-wrong-key-that-is-also-long-enough-for-test" }
     const wrongKeyScript = `
