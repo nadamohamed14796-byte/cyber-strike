@@ -19,24 +19,68 @@ const MAX_BODY = 2_000_000
 
 export type FetchResult = { status: number; headers: Headers; text: string }
 
+/**
+ * Fetch only a caller-selected HTTP(S) URL. Redirects are deliberately not
+ * followed automatically: a target-controlled Location header must never turn
+ * an approved probe into an unreviewed request to another host.
+ */
 export async function safeFetch(
   url: string,
-  opts: { timeout?: number; method?: string; body?: string; headers?: Record<string, string>; redirect?: RequestRedirect } = {},
+  opts: { timeout?: number; method?: string; body?: string; headers?: Record<string, string>; redirect?: "manual" } = {},
 ): Promise<FetchResult | null> {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) return null
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), (opts.timeout ?? 10) * 1000)
   try {
-    const resp = await fetch(url, {
+    const resp = await fetch(parsed.href, {
       method: opts.method ?? "GET",
       headers: { "User-Agent": UA, Accept: "*/*", ...opts.headers },
       body: opts.body,
       signal: controller.signal,
-      redirect: opts.redirect ?? "follow",
+      redirect: "manual",
     })
     const declared = Number(resp.headers.get("content-length") ?? "0")
-    if (declared > MAX_BODY) return { status: resp.status, headers: resp.headers, text: "" }
-    const text = await resp.text()
-    return { status: resp.status, headers: resp.headers, text: text.length > MAX_BODY ? text.slice(0, MAX_BODY) : text }
+    if (Number.isFinite(declared) && declared > MAX_BODY) {
+      await resp.body?.cancel()
+      return { status: resp.status, headers: resp.headers, text: "" }
+    }
+
+    // Bound bytes while reading, not only after response.text() has downloaded
+    // an unbounded body. This also covers responses without Content-Length.
+    const reader = resp.body?.getReader()
+    if (!reader) return { status: resp.status, headers: resp.headers, text: "" }
+    const chunks: Uint8Array[] = []
+    let size = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const remaining = MAX_BODY - size
+      if (remaining <= 0) {
+        await reader.cancel()
+        break
+      }
+      const chunk = value.byteLength > remaining ? value.subarray(0, remaining) : value
+      chunks.push(chunk)
+      size += chunk.byteLength
+      if (value.byteLength > remaining || size >= MAX_BODY) {
+        await reader.cancel()
+        break
+      }
+    }
+    const bytes = new Uint8Array(size)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return { status: resp.status, headers: resp.headers, text: new TextDecoder().decode(bytes) }
   } catch {
     return null
   } finally {
