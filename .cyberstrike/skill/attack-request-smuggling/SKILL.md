@@ -139,6 +139,9 @@ Close dedicated connections, reset the lab/proxy, clear synthetic cache entries,
 
 ## References
 
+- [uphiago/recon-skills — hunt-http-smuggling](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-http-smuggling/SKILL.md) — merged source.
+- [elementalsouls/Claude-BugHunter — hunt-http-smuggling](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-http-smuggling/SKILL.md) — merged source.
+
 - [PortSwigger: HTTP Request Smuggling](https://portswigger.net/web-security/request-smuggling)
 - [James Kettle: HTTP Desync Attacks — Request Smuggling Reborn](https://portswigger.net/research/http-desync-attacks-request-smuggling-reborn)
 - [RFC 9112: HTTP/1.1](https://www.rfc-editor.org/rfc/rfc9112.html)
