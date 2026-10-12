@@ -536,6 +536,32 @@ export function looksLikeResearchAuthenticationWall(url: string, title: string, 
  * Report URLs return to the learning queue; index/crawl pages return to discovery.
  * A cooldown prevents invalid sessions from being retried on every watch cycle.
  */
+/**
+ * Apply auth-blocked retries against one shared cap. Kept pure around the queue
+ * operation so the global budget can be tested without sharing the process-wide DB.
+ */
+export function retryAuthBlockedWithBudget<S extends { id: string }>(
+  sources: readonly S[],
+  requestedLimit: number,
+  hasCredentials: (source: S) => boolean,
+  retry: (limit: number, sourceID: string, minAgeMs: number) => number,
+  minAgeMs: number,
+): number {
+  let remaining = boundedInteger(requestedLimit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  let total = 0
+  for (const source of sources) {
+    if (remaining <= 0) break
+    if (!hasCredentials(source)) continue
+    const retried = retry(remaining, source.id, minAgeMs)
+    // Queue implementations must respect the passed limit. Clamp accounting as
+    // a defensive guard against a faulty adapter reporting an invalid count.
+    const used = Number.isFinite(retried) ? Math.max(0, Math.min(remaining, Math.floor(retried))) : 0
+    total += used
+    remaining -= used
+  }
+  return total
+}
+
 export async function retryAuthenticatedResearch(input: {
   sourceID?: string
   limit?: number
@@ -546,20 +572,14 @@ export async function retryAuthenticatedResearch(input: {
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
   const minAgeMs = input.retryImmediately ? 0 : AUTH_RETRY_COOLDOWN_MS
-  // The CLI's limit is a global budget, not a per-source multiplier. Keep each
-  // source isolated while decrementing the remaining budget so --limit N never
-  // requeues more than N rows when no --source filter is supplied.
-  let remaining = limit
-  let total = 0
-  for (const source of sources.filter(researchSourceHasCredentials)) {
-    if (remaining <= 0) break
-    const retried = ResearchQueue.retryAuthenticationBlocked(remaining, source.id, minAgeMs)
-    total += retried
-    remaining -= retried
-  }
-  return total
+  return retryAuthBlockedWithBudget(
+    sources,
+    limit,
+    researchSourceHasCredentials,
+    (remaining, sourceID, cooldown) => ResearchQueue.retryAuthenticationBlocked(remaining, sourceID, cooldown),
+    minAgeMs,
+  )
 }
-
 export type ResearchSyncOptions = {
   limit?: number
   pages?: number
