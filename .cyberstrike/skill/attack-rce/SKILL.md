@@ -113,7 +113,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Confirm the exact in-scope component and input boundary, then establish a harmless baseline and a negative-control value before any validation attempt.
+2. Use a non-destructive proof only in a test/lab or explicitly approved endpoint; prefer an inert marker or benign arithmetic result over shell commands, filesystem access, or network callbacks.
+3. If command execution is specifically authorized, constrain proof to a fixed benign command with a unique nonce, hard timeout, no persistence, no credential access, and no external side effect.
+4. Do not install tools, create users, read secrets, establish shells, alter files, or chain to post-exploitation. Stop immediately if impact exceeds the agreed proof.
+5. Capture the minimum sanitized request/result, establish repeatability with a negative control, and recommend the exact input-validation/API separation/patch fix with a regression test.
+
 
 ### Verdict gates
 

@@ -109,7 +109,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Capture a valid response and a known-no-match control for the same test-owned query context; normalize dynamic response fields before comparing.
+2. Use benign type mismatches and paired true/false predicates to determine whether user input affects query logic; change one predicate or field per hypothesis.
+3. Use only tightly bounded timing checks when permitted, with a small request count, explicit timeout, and a non-injection timing control to account for load and network variance.
+4. Confirm a security consequence with synthetic records and a read-only query; do not use destructive operators, enumerate production collections, or dump document contents.
+5. Record the exact input context, consistent differential, control result, and likely query boundary. Recommend schema/type validation and safe driver query APIs, then add regression tests.
+
 
 ### Verdict gates
 

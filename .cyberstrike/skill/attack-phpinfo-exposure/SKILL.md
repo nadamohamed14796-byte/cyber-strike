@@ -110,7 +110,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Request the suspected phpinfo endpoint and a random nonexistent path under the same host/session; compare normalized output to rule out soft-404 or generic debug pages.
+2. Confirm that the response is actual phpinfo output using stable PHP/build markers, then identify only the configuration values needed to characterize exposure.
+3. Redact environment variables, filesystem paths, request headers, session data, and any credentials immediately; do not use exposed values to access other services.
+4. Check whether the page is reachable anonymously, only by authenticated roles, or only from an intended administrative network; record those conditions separately.
+5. Recommend removing the diagnostic page from production or restricting it behind operational controls, then verify the endpoint no longer returns configuration data.
+
 
 ### Verdict gates
 

@@ -158,7 +158,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Establish the normal behavior of a test-owned JSON input and choose an inert marker property that cannot affect authorization or production behavior.
+2. Determine whether the input can mutate object prototypes or shared configuration, distinguishing data stored as a normal key from a prototype-level change.
+3. Check whether the change persists across requests or affects a second controlled operation; use a fresh process/session as a negative control and avoid broad recursive payloads.
+4. Do not chain to command execution or destructive gadget behavior on production. Demonstrate only a harmless behavior change in a lab or approved disposable fixture.
+5. Document the input path, affected runtime/component, persistence boundary, and safe remediation such as schema allowlists, dangerous-key filtering, and safer object construction.
+
 
 ### Verdict gates
 

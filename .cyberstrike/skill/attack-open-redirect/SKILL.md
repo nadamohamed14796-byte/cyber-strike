@@ -179,7 +179,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Establish the intended redirect behavior for a documented route and record how it handles relative paths, same-origin absolute URLs, and invalid destinations.
+2. Use a canary domain you control and vary one parser condition at a time (scheme, host boundary, encoding, slash/backslash normalization, or nested redirect parameter) only when relevant to the observed implementation.
+3. Follow the actual redirect chain and inspect the final normalized destination; a reflected URL or a redirect to an approved identity provider is not automatically unsafe.
+4. Assess token leakage or workflow impact only in a test-owned OAuth/reset/invite flow and avoid phishing, credential collection, or use of a third-party destination as a lure.
+5. Compare with an invalid-host control and document the allowlist/parser mismatch, exact route, and a regression test that enforces canonical destination validation.
+
 
 ### Verdict gates
 

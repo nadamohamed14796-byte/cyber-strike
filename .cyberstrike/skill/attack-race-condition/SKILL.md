@@ -150,7 +150,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Select a test-owned, reversible operation with a clear invariant (one-time coupon, single-use action, inventory reservation, or idempotent update) and record the normal final state.
+2. Confirm the endpoint has a meaningful concurrency window from sequential baseline behavior before testing concurrency; do not infer a race from timing alone.
+3. Use the smallest bounded parallel request set allowed by the program, with unique correlation IDs and an explicit timeout; avoid financial transactions, external notifications, or shared inventory.
+4. Verify the authoritative final state and invariants after requests complete, distinguish duplicate client retries from server-side race behavior, and clean up disposable records.
+5. Repeat once under a control condition and document request ordering, responses, final state, and mitigation such as atomic transactions, idempotency keys, or server-side locking.
+
 
 ### Verdict gates
 

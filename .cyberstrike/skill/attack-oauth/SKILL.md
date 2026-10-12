@@ -116,7 +116,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Map the actual authorization-code or other OAuth/OIDC flow using a client and accounts you control; capture state, nonce, redirect URI, PKCE parameters, issuer, audience, and scopes.
+2. Check redirect URI exact matching, state/nonce binding, PKCE enforcement, token audience, and issuer validation one at a time with controlled client configuration.
+3. Exercise login, consent, logout, and account-linking flows only with test identities. Verify that callback results are bound to the initiating browser session and intended identity.
+4. Check token leakage through redirects/referrers/logs and scope overreach using canary claims or a harmless test API; do not reuse tokens or attempt another user's account.
+5. Re-run a valid flow as a positive control and a changed-state/redirect/token control as negative evidence. Report the exact protocol invariant violated and the required provider/client fix.
+
 
 ### Verdict gates
 

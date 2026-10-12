@@ -108,7 +108,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Confirm the approved Windows host/network boundary and capture only protocol metadata necessary to identify enabled NTLM exposure; do not induce authentication from real users.
+2. Record negotiation flags, server/workstation hints, signing/sealing capability, and transport context from a controlled request or existing logs without retaining challenge-response secrets.
+3. Compare the result with policy expectations and supported alternatives (Kerberos, modern authentication, SMB signing, channel protections) for the actual service.
+4. Distinguish NTLM being enabled from a relayable or credential-theft condition; any relay/responder demonstration requires a controlled lab and separate explicit authorization.
+5. Preserve sanitized packet/event evidence, affected service, and a configuration-level remediation path; rotate/revoke any test credentials if accidentally exposed.
+
 
 ### Verdict gates
 

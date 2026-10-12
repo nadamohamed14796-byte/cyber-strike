@@ -170,7 +170,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Determine the documented action limit and establish a low-volume baseline using only a test account and test-owned endpoint; record rate-limit headers and reset window.
+2. Vary one keying dimension at a time only where the intended policy implies it (account, route, session, or client IP), staying below any threshold likely to degrade service.
+3. Check whether the limit is applied consistently across equivalent API versions or delivery paths observed in normal traffic; do not use distributed infrastructure, rotating real identities, or load generation.
+4. Use a harmless test action and stop at the first confirmed inconsistency or lockout warning. Never attempt credential stuffing or bulk OTP/password-reset activity.
+5. Report the configured policy, actual counters/headers, precise gap, and measured low-volume impact; recommend server-side shared counters, suitable keys, and regression tests.
+
 
 ### Verdict gates
 
