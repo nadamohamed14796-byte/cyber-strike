@@ -36,11 +36,11 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
       if ((params.status === "confirmed" || params.status === "disproven") && !params.evidence?.trim()) {
         return { title: "Target note not saved", output: "Confirmed/disproven notes require concrete evidence. Use observed or unverified if evidence is incomplete.", metadata: { saved: false, reason: "evidence_required" } }
       }
-      const content = redactTargetNoteSecrets(params.content.trim() + (params.evidence?.trim() ? "\n\nEvidence: " + params.evidence.trim() : ""))
       const saved = await TargetMemory.addNote(workspace.targetURL, {
         kind: params.kind as TargetNoteKind,
         title: redactTargetNoteSecrets(params.title.trim()).slice(0, 180),
-        content,
+        content: params.content.trim(),
+        evidence: params.evidence,
         source: "agent:" + redactTargetNoteSecrets(ctx.agent || "cyberstrike").slice(0, 100),
         sourceURL: params.source_url ? redactTargetNoteSecrets(params.source_url) : undefined,
         status: params.status as TargetNoteStatus,
