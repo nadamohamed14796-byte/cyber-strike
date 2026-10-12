@@ -21,7 +21,7 @@ function categoryMatchesClass(vulnerabilityClass: string, category: string) {
   const cat = category.toLowerCase().trim()
   if (!cls || !cat) return false
   const terms = VRT_CLASS_TERMS[cls]
-  return terms ? terms.some((term) => cat.includes(term) || term.includes(cat)) : cls === cat
+  return terms ? terms.some((term) => cat.includes(term)) || terms.includes(cat) : cls === cat
 }
 
 export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
