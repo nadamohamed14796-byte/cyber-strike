@@ -104,6 +104,8 @@ For a candidate advisory, record product branch, version, patch level, reachable
 
 ## References
 
+- [uphiago/recon-skills — Zimbra attack surface](https://github.com/uphiago/recon-skills/blob/main/recon/zimbra-attack/SKILL.md) — merged service-specific source.
+
 - [uphiago/recon-skills — zimbra-attack](https://github.com/uphiago/recon-skills/tree/main/recon/zimbra-attack)
 - [Zimbra Security Center](https://www.zimbra.com/security/)
 - [NIST National Vulnerability Database](https://nvd.nist.gov/)
