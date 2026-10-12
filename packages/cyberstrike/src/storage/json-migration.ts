@@ -161,7 +161,7 @@ export namespace JsonMigration {
       projectValues.length = 0
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
         if (!data?.id) {
           errs.push(`project missing id: ${projectFiles[i + j]}`)
           continue
@@ -195,7 +195,7 @@ export namespace JsonMigration {
       sessionValues.length = 0
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
         if (!data?.id || !data?.projectID) {
           errs.push(`session missing id or projectID: ${sessionFiles[i + j]}`)
           continue
@@ -252,8 +252,12 @@ export namespace JsonMigration {
       let count = 0
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
         const file = allMessageFiles[i + j]
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+          errs.push(`message is not an object: ${file}`)
+          continue
+        }
         const id = data.id ?? path.basename(file, ".json")
         if (!id) {
           errs.push(`message missing id: ${file}`)
@@ -286,8 +290,12 @@ export namespace JsonMigration {
       let count = 0
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
         const file = partFiles[i + j]
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+          errs.push(`part is not an object: ${file}`)
+          continue
+        }
         const id = data.id ?? path.basename(file, ".json")
         const messageID = data.messageID ?? path.basename(path.dirname(file))
         if (!id || !messageID) {
@@ -327,14 +335,14 @@ export namespace JsonMigration {
       const values = [] as any[]
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
+        if (!Array.isArray(data)) {
+          errs.push(`todo not an array: ${todoFiles[i + j]}`)
+          continue
+        }
         const sessionID = todoSessions[i + j]
         if (!sessionIds.has(sessionID)) {
           orphans.todos++
-          continue
-        }
-        if (!Array.isArray(data)) {
-          errs.push(`todo not an array: ${todoFiles[i + j]}`)
           continue
         }
         for (let position = 0; position < data.length; position++) {
@@ -368,7 +376,11 @@ export namespace JsonMigration {
       permValues.length = 0
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
+        if (!Array.isArray(data)) {
+          errs.push(`permission rules are not an array: ${permFiles[i + j]}`)
+          continue
+        }
         const projectID = permProjects[i + j]
         if (!projectIds.has(projectID)) {
           orphans.permissions++
@@ -393,7 +405,12 @@ export namespace JsonMigration {
       shareValues.length = 0
       for (let j = 0; j < batch.length; j++) {
         const data = batch[j]
-        if (!data) continue
+        if (data === undefined) continue
+        const file = shareFiles[i + j]
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+          errs.push(`session_share is not an object: ${file}`)
+          continue
+        }
         const sessionID = shareSessions[i + j]
         if (!sessionIds.has(sessionID)) {
           orphans.shares++
