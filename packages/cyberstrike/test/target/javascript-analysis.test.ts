@@ -109,6 +109,20 @@ test("flags dangerous JavaScript sinks for manual review without claiming a vuln
   expect(JSON.stringify(result)).not.toContain("userHtml")
 })
 
+test("keeps concatenated query values out of the inferred path and defaults fetch to GET", () => {
+  const source = [
+    'const search = (term) => fetch("/api/search?q=" + encodeURIComponent(term))',
+    'const byId = (id) => fetch("/api/items/" + id)',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const search = result.requests.find((request) => request.path === "/api/search")
+  const item = result.requests.find((request) => request.path === "/api/items/{id}")
+  expect(search?.method).toBe("GET")
+  expect(search?.pathParameters).toEqual([])
+  expect(search?.queryParameters).toContain("q")
+  expect(item?.pathParameters).toContain("id")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
