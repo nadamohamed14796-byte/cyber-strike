@@ -1,18 +1,24 @@
 import { Log } from "../util/log"
 import { Skill } from "./skill"
 import { SkillIndex } from "./index-engine"
+import { Instance } from "../project/instance"
 
 export namespace SkillContext {
   const log = Log.create({ service: "skill-context" })
 
-  const loaded = new Map<string, { content: string; tokens: number }>()
+  const loaded = new Map<string, { name: string; directory: string; content: string; tokens: number }>()
+
+  function key(name: string) {
+    return `${Instance.directory}\\0${name}`
+  }
 
   function estimateTokens(text: string): number {
     return Math.ceil(text.length / 4)
   }
 
   export async function load(name: string): Promise<string | undefined> {
-    if (loaded.has(name)) return loaded.get(name)!.content
+    const id = key(name)
+    if (loaded.has(id)) return loaded.get(id)!.content
 
     const skill = await Skill.get(name)
     if (!skill) {
@@ -21,37 +27,38 @@ export namespace SkillContext {
     }
 
     const tokens = estimateTokens(skill.content)
-    loaded.set(name, { content: skill.content, tokens })
+    loaded.set(id, { name, directory: Instance.directory, content: skill.content, tokens })
     log.info("skill loaded into context", { name, tokens })
     return skill.content
   }
 
   export function unload(name: string): boolean {
-    const had = loaded.has(name)
+    const id = key(name)
+    const had = loaded.has(id)
     if (had) {
-      log.info("skill unloaded from context", { name, tokens: loaded.get(name)!.tokens })
-      loaded.delete(name)
+      log.info("skill unloaded from context", { name, tokens: loaded.get(id)!.tokens })
+      loaded.delete(id)
     }
     return had
   }
 
   export function active(): string[] {
-    return Array.from(loaded.keys())
+    return Array.from(loaded.values()).filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name)
   }
 
   export function tokenCount(): number {
     let total = 0
-    for (const entry of loaded.values()) total += entry.tokens
+    for (const entry of loaded.values()) if (entry.directory === Instance.directory) total += entry.tokens
     return total
   }
 
   export function isLoaded(name: string): boolean {
-    return loaded.has(name)
+    return loaded.has(key(name))
   }
 
   export function clear() {
-    loaded.clear()
-    log.info("context cleared")
+    for (const [id, entry] of loaded) if (entry.directory === Instance.directory) loaded.delete(id)
+    log.info("context cleared", { directory: Instance.directory })
   }
 
   export type Suggestion = {
@@ -65,7 +72,7 @@ export namespace SkillContext {
   ): Suggestion[] {
     const result: Suggestion[] = []
     const suggested = new Set<string>()
-    const active = new Set(loaded.keys())
+    const active = new Set(loaded.values().filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name))
 
     for (const finding of findings) {
       const chains = SkillIndex.chainsFrom(finding.skill_id)
