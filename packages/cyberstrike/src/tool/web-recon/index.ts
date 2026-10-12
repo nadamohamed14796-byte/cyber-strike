@@ -1,5 +1,6 @@
 import z from "zod"
 import { Tool } from "../tool"
+import { TargetMemory } from "../../target"
 import type { Finding, WebReconResult } from "./shared"
 import {
   fullRecon,
@@ -189,12 +190,21 @@ export const WebReconTool = Tool.define("web_recon", {
             always: origins,
             metadata: { program },
           })
-        })
+        }, async (url) => (await TargetMemory.checkURLScope(url)).allowed)
       } catch (e) {
         return fail(`[-] session_scan failed: ${e instanceof Error ? e.message : String(e)}`)
       }
     } else {
       if (!params.target) return fail(`[-] target URL is required for ${program}. Only session_scan runs without a target.`)
+      const authorization = await TargetMemory.checkURLScope(params.target)
+      if (!authorization.allowed) {
+        return fail([
+          "[-] Refusing active reconnaissance: " + authorization.reason,
+          "Target: " + params.target,
+          "No network probes were sent.",
+          "Configure the official scope first with: cyberstrike target scope <url> --include <domain> --source <program> --reference <official-https-url>",
+        ].join("\n"))
+      }
       await ctx.ask({
         permission: "web_recon",
         patterns: [params.target],
