@@ -50,6 +50,8 @@ describe("AuthVault persisted data validation", () => {
     expect(isAuthVaultDataValid([{ ...validRecord(), username: "bad\nname" }])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), origin: "file:///etc/passwd" }])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), targetID: undefined }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), targetID: "target\nforged" }])).toBe(false)
+    expect(isAuthVaultDataValid([{ ...validRecord(), purpose: "research", targetID: "target_123" }])).toBe(false)
     expect(isAuthVaultDataValid([{ ...validRecord(), password: { iv: "abc", tag: "bad", ciphertext: "x" } }])).toBe(false)
   })
 
