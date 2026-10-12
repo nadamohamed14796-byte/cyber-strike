@@ -150,6 +150,7 @@ export namespace JsonMigration {
     progress?.({ current, total, label: "starting" })
 
     sqlite.exec("BEGIN TRANSACTION")
+    try {
 
     // Migrate projects first (no FK deps)
     const projectIds = new Set<string>()
@@ -426,6 +427,10 @@ export namespace JsonMigration {
     }
 
     sqlite.exec("COMMIT")
+    } catch (error) {
+      if (sqlite.inTransaction) sqlite.exec("ROLLBACK")
+      throw error
+    }
 
     log.info("json migration complete", {
       projects: stats.projects,
