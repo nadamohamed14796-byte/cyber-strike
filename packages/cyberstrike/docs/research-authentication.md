@@ -16,7 +16,7 @@ Credentials are read only from the process environment and are not stored in the
 
 ```bash
 read -rsp "PortSwigger Cookie header: " CYBERSTRIKE_RESEARCH_COOKIE_PORTSWIGGER
-printf '\\n'
+printf '\n'
 export CYBERSTRIKE_RESEARCH_COOKIE_PORTSWIGGER
 cyberstrike research sync portswigger
 ```
