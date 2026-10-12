@@ -249,8 +249,8 @@ export namespace SkillIndex {
     const state = current()
     const problems: ReferenceProblem[] = []
     const isExternalControlId = (reference: string) =>
-      /^[A-Z]{2,5}-\\d+(?:\\(\\d+\\))?$/i.test(reference.trim())
-    const isPrerequisiteStatement = (reference: string) => /\\s/.test(reference.trim())
+      /^[A-Z]{2,5}-\d+(?:\(\d+\))?$/i.test(reference.trim())
+    const isPrerequisiteStatement = (reference: string) => /\s/.test(reference.trim())
 
     for (const entry of state.entries.values()) {
       for (const field of ["chains_with", "prerequisites"] as const) {
