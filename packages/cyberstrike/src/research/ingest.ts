@@ -517,8 +517,8 @@ export function looksLikeResearchAuthenticationWall(url: string, title: string, 
   const pathname = (() => { try { return new URL(url).pathname } catch { return "" } })()
   const heading = title.toLowerCase().trim()
   const body = text.slice(0, 6000).toLowerCase()
-  if (/\/(?:login|log-in|signin|sign-in|register|signup|sign-up|auth)(?:\/|$)/i.test(pathname)) return true
-  if (/^(?:sign in|log in|login|create an account|authentication required)(?:\b|\s*[-|])/i.test(heading)) return true
+  if (/^\/(?:login|log-in|signin|sign-in|register|signup|sign-up|auth)(?:\/|$)/i.test(pathname)) return true
+  if (/^(?:sign in|log in)(?: to (?:continue|view|read|access)(?:\b|$))?$|^(?:login|required|create an account|authentication required)$/i.test(heading)) return true
   if (/(?:sign in|log in) to (?:continue|view|read|access)|login required|authentication required|you must be logged in|create an account to (?:view|read|continue)|members only/i.test(body)) return true
   return text.trim().length < 1200 && /<form\b/i.test(html) && /(?:password|sign in|log in|login|email address)/i.test(html) && /(?:login|signin|sign-in|auth|session)/i.test(html)
 }

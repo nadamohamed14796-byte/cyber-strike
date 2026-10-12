@@ -109,3 +109,13 @@ test("research auth-wall detection flags gated content without treating normal r
     "<html><body>Public write-up</body></html>",
   )).toBe(false)
 })
+
+
+test("does not mistake a public login-bypass writeup for a login wall", () => {
+  expect(looksLikeResearchAuthenticationWall(
+    "https://reports.example.test/writeups/login-bypass",
+    "Login bypass through weak account recovery",
+    "The author demonstrates a public vulnerability report with reproduction and impact details.",
+    "<html><body>Public writeup</body></html>",
+  )).toBe(false)
+})
