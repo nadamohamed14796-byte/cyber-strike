@@ -784,13 +784,13 @@ async function explorePageWithAI(
       .map((element) => element.href)
     const credentials = globalState.storedCredentials
     if (!credentials) {
-      log.warn("login page detected without saved credentials; skipping login-form planning", { url: pageUrl })
+      log.warn("login page detected without saved credentials; skipping login-form planning", { origin: new URL(pageUrl).origin })
       return visibleLinks()
     }
 
     const retryKey = normalizeUrl(pageUrl)
     if (globalState.authRetryAttempts.has(retryKey)) {
-      log.warn("login page already retried during this crawl; skipping to avoid an authentication loop", { url: pageUrl })
+      log.warn("login page already retried during this crawl; skipping to avoid an authentication loop", { origin: new URL(pageUrl).origin })
       return visibleLinks()
     }
     globalState.authRetryAttempts.add(retryKey)
@@ -810,7 +810,7 @@ async function explorePageWithAI(
     elements = filterVisitedLinks(await collectElements(page), pageUrl, globalState.visitedPages)
     const stillHasPassword = elements.some((element) => element.type === "password")
     if (stillHasPassword || isLoginLikeUrl(pageUrl)) {
-      log.warn("login page remains after recovery; generic planner skipped", { url: pageUrl })
+      log.warn("login page remains after recovery; generic planner skipped", { origin: new URL(pageUrl).origin })
       return visibleLinks()
     }
     globalState.authPhase = "authenticated"
@@ -2552,6 +2552,11 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
 
   // Single-credential mode: existing flow, unchanged
   const targetUrl = config.targetUrl
+  // Bind unscoped credentials to the requested target origin. External IdP redirects
+  // must never receive credentials implicitly.
+  const scopedCredentials = config.auth.credentials
+    ? { ...config.auth.credentials, origin: config.auth.credentials.origin ?? new URL(targetUrl).origin }
+    : undefined
   const scopePatterns = resolveScopePatterns(config)
   const inScope = makeMatcher(scopePatterns)
   const serverUrl = config.cyberstrike.serverUrl ?? "http://127.0.0.1:4096"
@@ -2675,7 +2680,7 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
     })
 
     // Login flow: --authenticated → manual login, --user/--pass → auto-login, neither → anonymous
-    const isAuthenticated = config.auth.authenticated || !!config.auth.credentials
+    const isAuthenticated = config.auth.authenticated || !!scopedCredentials
     if (config.auth.authenticated) {
       await waitForManualLogin(page)
       // Resolve label → UUID. credentialId from the launcher is a user-supplied
@@ -2691,11 +2696,11 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
           handleCapture = createIngestHandler(serverUrl, sessionID!, credentialId)
         }
       }
-    } else if (config.auth.credentials) {
-      const loginResult = await autoLogin(page, config.auth.credentials)
+    } else if (scopedCredentials) {
+      const loginResult = await autoLogin(page, scopedCredentials)
       if (!loginResult.success && loginResult.error !== "saved_login_origin_mismatch") {
         const fallback = model
-          ? await aiLogin(page, config.auth.credentials, model, usageAcc)
+          ? await aiLogin(page, scopedCredentials, model, usageAcc)
           : { success: false, error: "no_model" }
         if (!fallback.success) {
           log.warn("AI login fallback failed; waiting for operator login", { reason: fallback.error })
@@ -2711,8 +2716,8 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
 
     // Initialize global state (Aşama 13: outOfScope snapshotted from config)
     const globalState = createGlobalState({ outOfScope: config.outOfScope })
-    if (config.auth.credentials) {
-      globalState.storedCredentials = config.auth.credentials
+    if (scopedCredentials) {
+      globalState.storedCredentials = scopedCredentials
       globalState.loginHandled = true
     } else if (config.auth.authenticated) {
       globalState.loginHandled = true
