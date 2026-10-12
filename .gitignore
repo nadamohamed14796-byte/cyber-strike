@@ -39,3 +39,5 @@ packages/cyberstrike/test/proxy-eval/
 
 # Exported session transcripts and reports
 session-*.md
+# Never commit browser cookie/session exports
+/packages/cyberstrike/cookies.txt
