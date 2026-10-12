@@ -88,7 +88,7 @@
 - **Fix:** when an explicit asset is supplied, local source inventory is excluded and captured bodies are filtered by exact HTTP(S) origin and path (query variants do not change the path identity). Without an explicit asset, the normal all-captured/local-source workflow is unchanged.
 - **Regression coverage:** `matchesCapturedJavaScriptAsset` tests exact origin/path matching, query-string tolerance, unrelated paths/hosts, and invalid target URLs.
 - **Commits:** implementation `22bbdf323a5f42d23d9d95a9fb1c3b41786cdfaa`; test `192fc61a6ded45b06b8633482df51308eb6c094e`; tool-contract clarification `f4fc5d798d9abc5f7bdf94c2662ceec288b155b2`.
-- **Validation:** tests, typecheck, and build passed on `192fc61a6d`; CodeQL was still in progress. The tool-description clarification is a later metadata-only commit.
+- **Validation:** tests, typecheck, and build passed on `192fc61a6d`; CodeQL later passed on `192fc61a6d`; the tool-description clarification is a later metadata-only commit.
 
 
 ### SEC-008 — branch-only cookie artifact requires owner review
@@ -129,8 +129,8 @@ These 20 review lenses were inspected through repository source/manifest/API rev
 |---:|---|---|---|
 | 01 | Repository integrity and completeness | PASS_WITH_BLOCKERS | Reviewed repository metadata, package manifests, AGENTS instructions, README, and the prior tree inventory (19,546 entries, 11,244 blobs, not truncated). Local clone/untracked-file status remains unavailable because shell DNS failed. |
 | 02 | Architecture and dependencies | PASS_WITH_BLOCKERS | Traced root workspace/Turbo layout and imports between CLI, agent, prompt, tool registry, target memory, research and database. Local dependency-graph tooling was not run. |
-| 03 | Type safety and runtime contracts | PASS_WITH_CI_EVIDENCE | Latest code checkpoint typecheck passed on `71fe91869eb845398c4604eeaa105ce0886a4477` (run 38248616677); previous feature-specific fixes also passed their final PR-head typechecks. No local typecheck was run. |
-| 04 | Build and packaging | PASS_WITH_CI_EVIDENCE | Monorepo build passed on code checkpoint `192fc61a6ded45b06b8633482df51308eb6c094e` (run 38248616637). Local publishing and install smoke tests remain unrun. |
+| 03 | Type safety and runtime contracts | PASS_WITH_CI_EVIDENCE | Typecheck passed on implementation head `192fc61a6ded45b06b8633482df51308eb6c094e` (run 38257175471). No local typecheck was run. |
+| 04 | Build and packaging | PASS_WITH_CI_EVIDENCE | Monorepo build passed on implementation head `192fc61a6ded45b06b8633482df51308eb6c094e` (run 38257175528). Local publishing and install smoke tests remain unrun. |
 | 05 | CLI and configuration | PASS_WITH_BLOCKERS | CLI entry imports/registers TargetCommand, ResearchCommand and UpdateCommand. The commands expose target workspaces, research sync/search/queue and bounded update cycles. No local CLI help/run was possible without Bun. |
 | 06 | Agent orchestration and lifecycle | PASS_WITH_BLOCKERS | Inspected agent tool policies and prompt lifecycle/context insertion, including TargetMemory and ResearchContext. Provider-backed sessions and resume/cancel flows were not exercised end to end. |
 | 07 | Skill discovery and linkage | PASS_WITH_CI_EVIDENCE | Inspected cache confinement, bounded remote bodies, bounded gzip expansion, archive member filtering, SkillIndex, SkillContext and SkillTool. Current-main tests/typecheck/build/CodeQL all passed on code checkpoint `192fc61a6ded45b06b8633482df51308eb6c094e`; filesystem TOCTOU and full skill catalog coherence remain review items. |
@@ -143,7 +143,7 @@ These 20 review lenses were inspected through repository source/manifest/API rev
 | 14 | Authentication, authorization and secrets | PASS_WITH_BLOCKERS | Inspected web-credential public-event projection, session-owned credential lookup and target-note redaction. PR #24 previously integrated credential event redaction; AD skill gates merged in #32. The unmerged Hackbrowser PR #2 sets NODE_TLS_REJECT_UNAUTHORIZED to 0 and is unsafe to merge as a whole. No real credentials were used. |
 | 15 | Reconnaissance and discovery | PASS_WITH_BLOCKERS | Reviewed methodCheck and its test; main sends OPTIONS only and tests assert no TRACE, PUT or DELETE. The old feat/discovery-core branch sends those active methods and was not integrated. Live recon tools were not run. |
 | 16 | Events, queues and background workflows | PASS_WITH_BLOCKERS | Reviewed research queue transactions, idempotent enqueues, leases, expired-lease reclaim and lease-owner completion; queue tests cover stale workers. Full multi-worker stress test was not independently run beyond CI. |
-| 17 | Tests and CI integrity | PASS_WITH_CI_EVIDENCE | On current-main code checkpoint `71fe91869eb845398c4604eeaa105ce0886a4477`, typecheck, build, test and CodeQL passed. The test workflow reported 1,831 passed, 5 skipped, 0 failed across 1,836 tests in 152 files. Root test is intentionally disallowed by repository instructions; no local package tests were run. |
+| 17 | Tests and CI integrity | PASS_WITH_CI_EVIDENCE | On implementation head `192fc61a6ded45b06b8633482df51308eb6c094e`, unit tests, typecheck, build and CodeQL passed. The test workflow reported 1,831 passed, 5 skipped, 0 failed across 1,836 tests in 152 files (test run 38257175547). Root test is intentionally disallowed by repository instructions; no local package tests were run. |
 | 18 | Documentation and repository hygiene | PASS_WITH_BLOCKERS | Updated security methodology and audit ledger; inspected README/package metadata/AGENTS. Public upstream URL may be intentional and was left unchanged. Local git status, secret scan across untracked files, and automated formatting checks remain unavailable. |
 | 19 | End-to-end workflow validation | BLOCKED_EXTERNAL_RUNTIME | Traced CLI research update to durable queue and ResearchContext injection; target notes and JS correlation have a linked path into session context. No live provider-backed hunt, full browser multi-account crawl, or authorized target-side workflow was executable here. |
 | 20 | Independent adversarial review | PASS_WITH_BLOCKERS | Review uncovered target-memory uniqueness/index mismatch (fixed #34), IPv4-substring CIDR false match (fixed #36), and WebFetch unbounded body buffering/redirect permission gap (fixed #38). Unsafe active-method probing and disabled TLS verification were found only in unmerged branches and were not merged. Broad stale branches and local runtime remain blockers. |
@@ -217,7 +217,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** policy helper `6ad4f927421491a8715de178949b31700af12f42`; ledger integration `cac99ea90d65a928ce4f6c8d61d31485b5540d0b`; regression test `53f693a3f3cac076c919943b28143097fc0c1e30`.
 - **Validation:** GitHub contents API confirmed each write returned a commit SHA. GitHub Actions unit tests, typecheck, and build passed on the later code head `8324bd36c1883d008cd3da6c3a9b91cc6b0cd228` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL was still running when this ledger was refreshed; no local Bun runtime/checkout was used.
 - **Attempts:** one focused implementation pass; continue from actual CI feedback if checks become available.
-- **Disposition:** code change committed directly to `main`; unit tests/typecheck/build passed on later code head `8324bd36`; CodeQL passed on `192fc61a6d`. No feature branch was created for this repair.
+- **Disposition:** code change committed directly to `main`; unit tests/typecheck/build passed on later code head `8324bd36`; CodeQL was pending at the original checkpoint; a later CodeQL run passed on `192fc61a6d`. No feature branch was created for this repair.
 
 ## Follow-up checkpoint — 2026-10-12: scope-check IPv4/CIDR parsing
 
@@ -241,7 +241,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Regression coverage:** added policy tests proving only `confirmed` and `disproven` are terminal; inconclusive and unrecorded outcomes remain non-terminal.
 - **Direct commits on main:** policy `bfb35b3dd2064e4c558b43228cf501e946170665`; test `7de88c567efa1a4fafb267aa8dab4ac937bcd8e3`; ledger enforcement `afc9422633ce9244e893566ffef7d2729ecc7659`.
 - **Validation:** unit tests/typecheck/build passed on code head `8324bd36`; CodeQL remained in progress. No local Bun runtime was used.
-- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL passed on `192fc61a6d`.
+- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL was pending at that historical checkpoint; a later CodeQL run passed on `192fc61a6d`.
 
 
 ## Follow-up checkpoint — 2026-10-12: bounded remote skill registry responses
@@ -253,7 +253,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Regression coverage:** tests cover body-at-limit acceptance, streamed oversize rejection, oversized declared `Content-Length`, archive expansion bombs/manifests, plus SEC-008 destination and redirect validation.
 - **Direct commits on main:** per-response limits `a53f4ff1aa18bfe2838958a178cf2752de456a7a`; regression test `4df5373ff1d7421edd05a50b8e77268846cca10f`; test simplification `9f1cc631373d3a27f98b91c46c00da33cdf0f604`; bounded asset count, six-way concurrency, 100 MiB total download budget and archive expansion checks `7c38ea8b92aa42a4470708efe836161fa84dd817`; five-minute sync budget and concurrent extraction reservation `24bd1912ceff24406f00ed8402e3d75e2b8f620f`; archive-size regression tests `baabc4cb88e2e6e590cff97b5140d87652a5ccc1`; final formatting/deadline guards `fe2640a8ea28f9c31ab826042a4dd2b1fc35810b`; byte-accounted shared budget `21833d6442f386535ba310f7c2632c16d2160a3c`; over-budget chunk accounting and regression test `2fe4ebed7716508300617897810928225a47c420` / `14da7c3efcc78c9fccf865e454ff97187a6f3e98`.
 - **Validation:** unit tests, typecheck and build steps passed on code head `8324bd36` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL remained in progress; no local Bun run was claimed.
-- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL passed on `192fc61a6d`.
+- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL was pending at that historical checkpoint; a later CodeQL run passed on `192fc61a6d`.
 
 
 ## Follow-up checkpoint — 2026-10-12: remote skill destination and redirect guard
@@ -266,7 +266,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** implementation `3eedd98f1b00fba1c534b47ac87ae22524c502de`; initial regression tests `48492819e173b58d974782bc152dd36965580e87`; extracted redirect-policy helper `7d99c217484a0c0e136cdace4b4f82753243c805`; redirect regression tests `996c21c60fcb7aa9e3afc061cebe1712176e6145`; malformed-URL and per-entry failure handling `e0100c11695465b2770c0059b3b2a0ea83808a42`; formatting pass `9f4845bf3956c6b8b46636e1fa6d161448449038`; invalid registry URL tests `d88cf1d6019ab1a1f67a97eed14a55d354d73437`.
 - **Limitations:** host DNS is checked before each fetch, but the runtime's fetch implementation performs its own subsequent resolution; DNS rebinding between those operations is not cryptographically prevented in this implementation. Network egress controls remain the stronger defense where available.
 - **Validation:** unit tests, typecheck and build steps passed on code head `8324bd36` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL remained in progress; DNS rebinding between validation and the runtime's own resolution remains a documented limitation.
-- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL passed on `192fc61a6d`.
+- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL was pending at that historical checkpoint; a later CodeQL run passed on `192fc61a6d`.
 
 
 ## Follow-up checkpoint — 2026-10-12: DOMPurify dependency security update
@@ -277,7 +277,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Fix:** updated the UI dependency to `dompurify@3.4.16` and updated both corresponding Bun lockfile records, including the registry tarball integrity hash.
 - **Direct commits on main:** manifest `6f4f789261610903e0b0d2ed849675c4b7a8f692`; lockfile `d40d1b312a9d9a6e08467feb7da1637db5776d04`.
 - **Validation:** Bun dependency setup succeeded; unit tests passed on the lockfile-updated code head, typecheck passed, and the monorepo build step succeeded. CodeQL was still in progress; no separate lockfile-regeneration command was run.
-- **Status:** security update committed; unit tests/typecheck/build steps passed on code head `3d42bd27`; CodeQL passed on `192fc61a6d`.
+- **Status:** security update committed; unit tests/typecheck/build steps passed on code head `3d42bd27`; CodeQL was pending at that historical checkpoint; a later CodeQL run passed on `192fc61a6d`.
 
 
 ## Follow-up checkpoint — 2026-10-12: verification ledger invariants and CI regression repair
