@@ -150,6 +150,7 @@ export namespace VerificationLedger {
       attempts: decisionAttempts,
       decisiveConfirmation: input.decisiveResult === "confirmed" && Boolean(input.attempt.evidenceRef?.trim()),
       decisiveDisproof: input.decisiveResult === "disproven" && input.attempt.validConditions && Boolean(input.attempt.evidenceRef?.trim()),
+      decisiveEvidenceRef: input.attempt.evidenceRef,
       blockedReason: input.blockedReason,
     })
     Database.use((db) => db.update(VerificationAttemptTable).set({
