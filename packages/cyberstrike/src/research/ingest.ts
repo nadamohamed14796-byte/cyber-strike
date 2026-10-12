@@ -668,11 +668,15 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         const title = redactResearchSecrets(titleOf(html, current.url))
         const text = redactResearchSecrets(cleanHtml(html))
         if (looksLikeResearchAuthenticationWall(current.url, title, text, html)) {
-          ResearchQueue.blockAuthentication({
-            sourceID: source.id, sourceURL: current.url, title,
-            reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
-            payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
-          })
+          // Queue only actual report candidates for explicit auth retry. An index/login
+          // seed is re-crawled by discovery after the operator configures a valid session.
+          if (isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)) {
+            ResearchQueue.blockAuthentication({
+              sourceID: source.id, sourceURL: current.url, title,
+              reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
+              payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
+            })
+          }
           blockedAuth++
           errors.push(current.url + " — authentication required")
           continue
@@ -713,10 +717,12 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {
-          ResearchQueue.blockAuthentication({
-            sourceID: source.id, sourceURL: current.url, reason: message,
-            payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
-          })
+          if (isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)) {
+            ResearchQueue.blockAuthentication({
+              sourceID: source.id, sourceURL: current.url, reason: message,
+              payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
+            })
+          }
           blockedAuth++
           errors.push(current.url + " — authentication required (" + message + ")")
         } else if (errors.length < 5) errors.push(current.url + " — " + message)
