@@ -69,7 +69,7 @@ function isStoredProfile(value: unknown): value is StoredProfile {
   if (value.purpose === "target" && (typeof value.targetID !== "string" || !value.targetID.trim())) return false
   if (
     value.targetID !== undefined &&
-    (typeof value.targetID !== "string" || !value.targetID.trim() || value.targetID.length > 128 || /[\\r\\n\\0]/.test(value.targetID))
+    (typeof value.targetID !== "string" || !value.targetID.trim() || value.targetID.length > 128 || /[\r\n\0]/.test(value.targetID))
   ) return false
   if (value.purpose === "research" && value.targetID !== undefined) return false
   if (!isRecord(value.password)) return false
@@ -187,7 +187,7 @@ export namespace AuthVault {
       throw new Error("Account labels must be one line (maximum 120 characters) and usernames one line (maximum 320 characters).")
     }
     const targetID = input.targetID?.trim() || undefined
-    if (input.purpose === "target" && (!targetID || targetID.length > 128 || /[\\r\\n\\0]/.test(targetID))) {
+    if (input.purpose === "target" && (!targetID || targetID.length > 128 || /[\r\n\0]/.test(targetID))) {
       throw new Error("Target-purpose credentials must be bound to a valid stable targetID (maximum 128 characters, one line).")
     }
     if (input.purpose === "research" && targetID) {
