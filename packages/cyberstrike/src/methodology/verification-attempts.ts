@@ -102,6 +102,11 @@ export namespace VerificationAttempts {
     const attemptsUsed = attempts.filter((attempt) => attempt.validConditions).length
     const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
+    // Hard stops (scope, safety, or unavailable target) always win over verdicts.
+    if (input.blockedReason) {
+      return { outcome: "inconclusive", attemptsUsed, remainingAttempts, canContinue: false, reason: input.blockedReason }
+    }
+
     const hasDecisiveEvidence = Boolean(input.decisiveEvidenceRef?.trim())
 
     if (input.decisiveConfirmation && hasDecisiveEvidence && attempts[attempts.length - 1]?.validConditions) {
@@ -120,10 +125,6 @@ export namespace VerificationAttempts {
         canContinue: true,
         reason: "Direct evidence currently contradicts the hypothesis, but a false-positive verdict requires 20 distinct valid verification attempts.",
       }
-    }
-
-    if (input.blockedReason) {
-      return { outcome: "inconclusive", attemptsUsed, remainingAttempts, canContinue: false, reason: input.blockedReason }
     }
 
     if (attemptsUsed >= MAX_ATTEMPTS) {
