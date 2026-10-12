@@ -10,6 +10,10 @@ import { TodoWriteTool, TodoReadTool } from "./todo"
 import { ReportVulnerabilityTool } from "./vulnerability"
 import { VerificationAttemptTool } from "./verification-attempt"
 import { TriageVulnerabilityTool } from "./triage-vulnerability"
+import { ValidateFindingTool } from "./validate-finding"
+import { CorrelateJavaScriptTool } from "./correlate-javascript"
+import { ResearchKnowledgeTool } from "./research-knowledge"
+import { TargetNoteTool } from "./target-note"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
@@ -48,6 +52,8 @@ import { WebUpdateCredentialClaimsTool } from "./web-update-credential-claims"
 import { WebUpdateCredentialTool } from "./web-update-credential"
 import { CsrfExtractTool } from "./csrf-extract"
 import { HackbrowserTool } from "./hackbrowser"
+import { AuthManagerTool } from "./auth-manager"
+import { GmailTool } from "./gmail"
 import { AddIntelTool } from "./intel"
 import { UpdateVrtCheckTool } from "./vrt-check"
 import { RecordCoverageNoteTool, GetCoverageNotesTool } from "./coverage-note"
@@ -159,6 +165,10 @@ export namespace ToolRegistry {
       ReportVulnerabilityTool,
       VerificationAttemptTool,
       TriageVulnerabilityTool,
+      ValidateFindingTool,
+      CorrelateJavaScriptTool,
+      ResearchKnowledgeTool,
+      TargetNoteTool,
       // TodoReadTool,
       WebSearchTool,
       CodeSearchTool,
@@ -193,6 +203,10 @@ export namespace ToolRegistry {
       // Hackbrowser — autonomous crawler that produces captures the
       // proxy-analyzer ingests. Upstream of the rest of the web pipeline.
       HackbrowserTool,
+      // Shared encrypted website login profile manager (separate from target notes/research knowledge).
+      AuthManagerTool,
+      // Shared read-only Gmail connector for mailbox search, reading, and OTP workflows.
+      GmailTool,
       // Methodology Engine Tools — intelligence, coverage, chain detection
       AddIntelTool,
       UpdateVrtCheckTool,
