@@ -258,6 +258,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 | PR #40 / `docs/audit-ledger-refresh-20-pass-20261012` | Keep open; do not merge wholesale | Its useful 20-pass evidence and merged-fix summary were selectively reconciled into main. GitHub currently reports the PR as unmergeable and its baseline/branch metadata is stale. |
 | PR #6 / `improve/skill-quality-reference-audit` | Retain; selective review only | Main contains newer/reconciled skill content; the branch remains divergent and should not replace current files wholesale. |
 | PR #2 / `hackbrowser-improvement` | Retain; do not merge wholesale | The inspected branch disables TLS certificate verification. Any safe unique browser changes require isolated review and tests. |
+| `seo/readme-hero-refresh` | Selectively ported | The branch contained only two README hero lines; the provider-agnostic wording was copied to main to avoid an unsupported “first” claim. No wholesale merge or branch deletion was performed. |
 
 **Branch cleanup:** no branches were deleted. The available GitHub actions in this execution context do not provide a safe branch-delete operation; preserving unmerged divergent branches avoids accidental loss of unique work. Delete only after the remaining unique diffs are accounted for and a supported deletion action is available.
 
