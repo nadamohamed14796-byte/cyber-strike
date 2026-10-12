@@ -122,6 +122,19 @@ export namespace Discovery {
 
   type PreparedArchive = { path: string; cleanup: () => Promise<void> }
 
+  export function isArchiveChunkWithinBudget(
+    currentArchiveBytes: number,
+    totalArchiveBytes: number,
+    chunkBytes: number,
+    maxArchiveBytes = MAX_ARCHIVE_TAR_BYTES,
+    maxTotalBytes = MAX_TOTAL_ARCHIVE_TAR_BYTES,
+  ): boolean {
+    const values = [currentArchiveBytes, totalArchiveBytes, chunkBytes, maxArchiveBytes, maxTotalBytes]
+    if (values.some((value) => !Number.isSafeInteger(value) || value < 0)) return false
+    return currentArchiveBytes + chunkBytes <= maxArchiveBytes &&
+      totalArchiveBytes + chunkBytes <= maxTotalBytes
+  }
+
   /**
    * Bound gzip expansion before node-tar sees the archive. A small compressed
    * tar can otherwise contain an enormous number of empty headers and consume
@@ -155,12 +168,14 @@ export namespace Discovery {
       let expandedBytes = 0
       const limiter = new Transform({
         transform(chunk: Buffer, _encoding, callback) {
+          const withinBudget = isArchiveChunkWithinBudget(
+            expandedBytes,
+            budget.decompressedArchiveBytes,
+            chunk.byteLength,
+          )
           expandedBytes += chunk.byteLength
           budget.decompressedArchiveBytes += chunk.byteLength
-          if (
-            expandedBytes > MAX_ARCHIVE_TAR_BYTES ||
-            budget.decompressedArchiveBytes > MAX_TOTAL_ARCHIVE_TAR_BYTES
-          ) {
+          if (!withinBudget) {
             callback(new Error("Skill archive exceeds the per-archive or total decompressed tar budget"))
             return
           }
