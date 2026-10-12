@@ -4,18 +4,54 @@ import { Session } from "../../src/session"
 import { VerificationLedger } from "../../src/session/verification-ledger"
 import { tmpdir } from "../fixture/fixture"
 
-function attempt(strategyID: string, evidenceRef?: string) {
+function attempt(strategyID: string, evidenceRef?: string, validConditions = true) {
   return {
     strategyID,
     variantKey: "controlled-valid-session",
     rationale: "Verify one specific hypothesis with a distinct strategy",
     resultSummary: "Observed a controlled response",
     evidenceRef,
-    validConditions: true,
+    validConditions,
   }
 }
 
 describe("VerificationLedger terminal outcomes", () => {
+  test("invalid attempts do not exhaust the budget before valid attempts can run", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.createNext({ directory: tmp.path, title: "verification-ledger-invalid-budget-test" })
+        const common = {
+          sessionID: session.id,
+          hypothesisKey: "invalid-budget-hypothesis",
+          asset: "https://example.test",
+          endpoint: "/api/profile",
+          vulnerabilityClass: "idor",
+        }
+        for (let i = 0; i < 20; i++) {
+          const result = VerificationLedger.record({
+            ...common,
+            attempt: attempt("invalid-setup-" + i, undefined, false),
+          })
+          expect(result.decision.attemptsUsed).toBe(0)
+          expect(result.decision.remainingAttempts).toBe(20)
+        }
+        for (let i = 0; i < 20; i++) {
+          const result = VerificationLedger.record({
+            ...common,
+            attempt: attempt("valid-strategy-" + i, i === 19 ? "evidence://direct-disproof" : undefined),
+            ...(i === 19 ? { decisiveResult: "disproven" as const } : {}),
+          })
+          expect(result.decision.attemptsUsed).toBe(i + 1)
+          if (i < 19) expect(result.decision.outcome).toBe("inconclusive")
+          else expect(result.decision.outcome).toBe("disproven")
+        }
+        await Instance.dispose()
+      },
+    })
+  })
+
   test("a confirmed hypothesis cannot accept another attempt", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
