@@ -34,6 +34,7 @@
 | INT-005 | P1 | Agent workflow linkage | The root agent prompt did not call `correlate_javascript` after the crawl, and the web-application prompt did not explicitly connect the durable 20-valid-attempt gate to endpoint validation. Both prompt paths now require JS correlation after capture and evidence-driven verification; CI pending for these latest prompt commits. | 1 | integrated; latest-main CI pending |
 | TEST-001 | P2 | Regression-test contract | A new test incorrectly treated extracted function parameter names as raw JavaScript source, despite parameter extraction being intentional. The assertion now verifies parameter metadata remains available while executable source/sink expressions are not persisted; test/typecheck/build passed on `f5abcf09cc`. | 1 | fixed; tests green |
 | SEC-007 | P1 | HTTP replay TLS verification | `http_replay` and `http_replay_raw` previously treated omitted `insecure_tls` as permission to disable certificate verification. The default is now secure; invalid/self-signed certificates require explicit opt-in. Tests, typecheck, and build passed on `f5abcf09cc`; CodeQL and later prompt-only commits are still being checked. | 1 | code fix validated; latest-main CI pending |
+| SEC-008 | P1 conditional | Potential secret exposure on public branch refs | Multiple divergent branch trees contain `packages/cyberstrike/cookies.txt` (185 bytes), while current `main` does not and `.gitignore` excludes `cookies*.txt`. File contents were deliberately not opened. If it contains live session cookies or credentials, revoke them and remove the artifact from affected branch history; branch deletion/force-push was not performed. | 1 | needs owner secret review |
 | FUN-002 | P2 | JavaScript correlation filter | Supplying `javascript_url` filtered the asset list but still analyzed all captured JS bodies and local files, contradicting the tool contract. Explicit URL now narrows source analysis to the exact captured origin/path and excludes unrelated local sources; regression tests cover origin/path matching. Tests/typecheck/build passed on `192fc61a6d`; CodeQL pending. | 1 | fixed; CI partial green |
 
 | FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
@@ -88,6 +89,14 @@
 - **Regression coverage:** `matchesCapturedJavaScriptAsset` tests exact origin/path matching, query-string tolerance, unrelated paths/hosts, and invalid target URLs.
 - **Commits:** implementation `22bbdf323a5f42d23d9d95a9fb1c3b41786cdfaa`; test `192fc61a6ded45b06b8633482df51308eb6c094e`; tool-contract clarification `f4fc5d798d9abc5f7bdf94c2662ceec288b155b2`.
 - **Validation:** tests, typecheck, and build passed on `192fc61a6d`; CodeQL was still in progress. The tool-description clarification is a later metadata-only commit.
+
+
+### SEC-008 — branch-only cookie artifact requires owner review
+
+- Tree comparison found `packages/cyberstrike/cookies.txt` on several divergent public branch refs (including `feat/proxy-config`, `dev`, `feat/discovery-core`, `fix/target-memory-owner-isolation`, `fix/remove-orphan-auth-manager-typecheck-blocker`, `improve/skill-quality-reference-audit`, and `hackbrowser-improvement`) but not on current `main`.
+- The file is 185 bytes. Its contents were intentionally not fetched or reproduced. This is a **potential** secret exposure, not a confirmed credential leak.
+- If it contains real session cookies/tokens, revoke them immediately, replace them, and purge the artifact from the affected branch histories. `.gitignore` already excludes `cookies*.txt` on main, but ignore rules do not remove a tracked file from existing refs.
+- No remote branch deletion or force-push was attempted; this execution context has no verified delete-ref operation, and the branches contain unreviewed divergent work.
 
 ## Branch / PR ledger (updated during execution)
 
