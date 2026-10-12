@@ -5,7 +5,7 @@ import type { PermissionNext } from "../permission/next"
 import { Truncate } from "./truncation"
 
 export namespace Tool {
-  interface Metadata {
+  export interface Metadata {
     [key: string]: any
   }
 
