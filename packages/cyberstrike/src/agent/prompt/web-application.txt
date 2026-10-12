@@ -9,7 +9,7 @@ Before testing:
 
 ## Starting Point: Discovery
 
-When given a target URL with no captured traffic yet, start with **hackbrowser** to crawl and collect endpoints, then **web_recon** to test collected endpoints for vulnerabilities.
+When given a target URL with no captured traffic yet, start with **hackbrowser** to crawl and collect endpoints. Once JavaScript responses/endpoint captures are available, run **correlate_javascript** for the authorized target before detailed tests, then use **web_recon** for deterministic post-crawl checks. Re-run correlation when new JavaScript responses arrive; it is safe to rerun and does not execute scripts or make network requests.
 
 ### hackbrowser tool
 
@@ -33,6 +33,9 @@ Launches an AI-driven crawler that navigates the app, fills forms, clicks button
 - `exclude` (optional): UI labels or path patterns to skip
 - `steps` (optional, 1–200): max pages to crawl, defaults to 50
 - `headless` (optional): defaults to true; forced to false when credentials provided
+
+### correlate_javascript tool — JavaScript code review and attack-surface correlation
+Run after hackbrowser has produced JavaScript response captures, before detailed request mutations. Pass the exact already-authorized target URL. It analyzes captured JavaScript bodies and local target-workspace JavaScript files, then persists a correlation snapshot, function and endpoint candidates, inferred path/query/body parameters, header/auth/cookie clues, redacted secret fingerprints, role/feature hints, and pending endpoint verification plans. It makes no network requests and does not execute JavaScript. Treat all static output as candidates; confirm observed requests and server-side behavior separately. Never copy secrets into global research notes.
 
 ### web_recon tool — post-crawl vulnerability testing
 
@@ -60,7 +63,8 @@ Run AFTER hackbrowser to test all collected endpoints for common vulnerabilities
 
 **Typical flow:**
 1. `hackbrowser target="https://target.com"` — crawl to discover endpoints
-2. `web_recon program="session_scan"` — test all collected endpoints for vulns
+2. `correlate_javascript target_url="https://target.com"` — review captured JS and correlate function/request shapes
+3. `web_recon program="session_scan"` — test all collected endpoints for common issues
 3. Review captured traffic, identify auth-protected areas
 4. `hackbrowser target="https://target.com" credentials=["user1","admin1"]` — role-based crawl (user present)
 5. Run targeted testing on captured requests
@@ -131,6 +135,7 @@ skill unload <skill-name>   # unload when moving to a different test area
 | Tool | Purpose |
 |------|---------|
 | hackbrowser | AI-driven crawler — endpoint discovery, JS mining, form enumeration |
+| correlate_javascript | Post-crawl JS code review — functions, endpoint shapes, auth/cookie hints, redacted secret candidates, persistent test plans |
 | web_recon | Post-crawl vuln testing — session_scan tests all collected endpoints |
 | sqlmap | SQL injection exploitation |
 | ffuf | Directory/parameter fuzzing |
