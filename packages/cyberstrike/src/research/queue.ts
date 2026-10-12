@@ -88,6 +88,49 @@ export namespace ResearchQueue {
     return row?.payload?.crawl_page === true && now >= row.updated_at && now - row.updated_at < maxAge
   }
 
+  /**
+   * Persist a transient crawl failure as a cached discovery page. Watch-mode
+   * crawlers can then respect the normal crawl TTL instead of repeatedly
+   * hammering a failing source on every cycle. A real report row is never
+   * downgraded to a crawl marker.
+   */
+  export function markFailedCrawlPage(input: { sourceID: string; sourceURL: string; title?: string; reason: string }) {
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const existing = db.select().from(ResearchQueueTable)
+        .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
+      if (existing && existing.payload?.crawl_page !== true) return existing
+
+      const { auth_required: _authRequired, cached_text: _cachedText, crawl_error: _crawlError, ...payload } =
+        existing?.payload ?? {}
+      const updatedPayload = { ...payload, crawl_page: true, crawl_error: true }
+      if (existing) {
+        return db.update(ResearchQueueTable).set({
+          title: input.title ?? existing.title,
+          payload: updatedPayload,
+          status: "discovered",
+          last_error: input.reason.slice(0, 1000),
+          lease_owner: null,
+          lease_until: null,
+          updated_at: now,
+          completed_at: null,
+        }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      }
+
+      return db.insert(ResearchQueueTable).values({
+        source_id: input.sourceID,
+        source_url: input.sourceURL,
+        title: input.title ?? null,
+        payload: updatedPayload,
+        status: "discovered",
+        attempts: 0,
+        last_error: input.reason.slice(0, 1000),
+        discovered_at: now,
+        updated_at: now,
+      }).onConflictDoNothing().returning().get()
+    })
+  }
+
   export function markVisitedPage(input: { sourceID: string; sourceURL: string; title?: string; contentFingerprint?: string }) {
     const now = Date.now()
     return Database.transaction((db) => {
@@ -99,7 +142,12 @@ export namespace ResearchQueue {
         // A successful revisit after login must clear the auth-wall marker. Otherwise the
         // row becomes "discovered" but still carries auth_required=true, contradicting its
         // state and confusing later crawl/retry decisions. Never retain cached login text.
-        const { auth_required: _authRequired, cached_text: _cachedText, ...existingPayload } = existing.payload ?? {}
+        const {
+          auth_required: _authRequired,
+          cached_text: _cachedText,
+          crawl_error: _crawlError,
+          ...existingPayload
+        } = existing.payload ?? {}
         return db.update(ResearchQueueTable).set({
           title: input.title ?? existing.title,
           payload: {
@@ -139,7 +187,12 @@ export namespace ResearchQueue {
       if (existing?.status === "learned" || existing?.status === "rejected") return existing
       if (existing) {
         // A cached login page must never be reused after credentials are configured.
-        const { cached_text: _cachedText, auth_required: _authRequired, ...existingPayload } = existing.payload ?? {}
+        const {
+          cached_text: _cachedText,
+          auth_required: _authRequired,
+          crawl_error: _crawlError,
+          ...existingPayload
+        } = existing.payload ?? {}
         const { cached_text: _incomingCachedText, ...incomingPayload } = input.payload ?? {}
         return db.update(ResearchQueueTable).set({
           status: "blocked_auth", title: input.title ?? existing.title,
@@ -168,7 +221,12 @@ export namespace ResearchQueue {
         .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
       for (const row of rows) {
         const isCrawlPage = row.payload?.crawl_page === true
-        const { auth_required: _authRequired, cached_text: _cachedText, ...payload } = row.payload ?? {}
+        const {
+          auth_required: _authRequired,
+          cached_text: _cachedText,
+          crawl_error: _crawlError,
+          ...payload
+        } = row.payload ?? {}
         db.update(ResearchQueueTable).set({
           // Crawl/index pages must return to discovery, not be learned as if they were reports.
           status: isCrawlPage ? "discovered" : "queued",
