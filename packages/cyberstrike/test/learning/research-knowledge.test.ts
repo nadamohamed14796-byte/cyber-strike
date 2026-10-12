@@ -134,7 +134,7 @@ test("target outcomes do not relabel globally shared external research", async (
         .find((row) => row.id === report.id)
       expect(stored?.status).toBe("observed")
       expect(stored?.times_rejected).toBe(0)
-      expect(stored?.outcome).toBeNull()
+      expect(stored?.outcome).toBe("observed")
 
       const events = Database.use((db) =>
         db.select().from(ReportKnowledgeEventTable)
