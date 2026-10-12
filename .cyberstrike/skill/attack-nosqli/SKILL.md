@@ -35,6 +35,13 @@ severity_boost:
 
 Determine whether untrusted input is interpreted as query operators or executable query logic rather than an expected scalar. Keep validation limited to test accounts and synthetic documents; never enumerate unrelated users or collections.
 
+## Scope
+
+- Only test accounts and synthetic/fixture documents the tester owns or was provisioned for the engagement. Never run regex/operator probes designed to enumerate or exfiltrate real user records, even character-by-character.
+- Never submit a client-controlled `$where`, `mapReduce`, `$function`, or other server-side-JavaScript/code-execution operator outside an explicitly authorized lab — these execute attacker-supplied code inside the database process and can cause denial of service or data loss.
+- Treat any reachable internal data store (Redis, Elasticsearch, CouchDB admin UI) discovered via SSRF or direct exposure as out of scope for exploitation (`CONFIG SET`, `SLAVEOF`, scripted queries, index writes) unless the engagement explicitly authorizes that specific escalation.
+- Automated tools (`nosqlmap` or equivalent) are for lab/approved-target use only, with attack modes limited to detection, never bulk dump, against production.
+
 ## Testing Methodology
 
 ### Phase 1: Identify structured query surfaces
@@ -43,19 +50,19 @@ Map JSON bodies, nested filters, search endpoints, login forms, and GraphQL reso
 
 ### Phase 2: Compare scalar and object types
 
-On a test-only search or fixture endpoint, submit a normal scalar and then a harmless type-mismatched object or array. Observe schema errors and whether query semantics change. Do not use executable server-side JavaScript operators, regular-expression enumeration, or high-volume predicate loops.
+On a test-only search or fixture endpoint, submit a normal scalar and then a harmless type-mismatched object or array, cycling through the common operator classes one at a time: comparison (`$gt`, `$ne`, `$in`), pattern (`$regex`), and expression (`$expr`, `$text`) — each against a tester-owned record only. Also test the array-notation and encoding variants a naive denylist misses: `field[$ne]=value` in URL-encoded form data (PHP/Express bracket parsing), and a Unicode-escaped operator key (`{"$gt":""}`) where a literal `$gt` string is filtered. Observe schema errors and whether query semantics change. Do not use executable server-side JavaScript operators (`$where`, `$function`, `mapReduce`), regular-expression enumeration of real records, or high-volume predicate loops.
 
 ### Phase 3: Check authentication with test identities
 
-Use two accounts you control and credentials you created. Confirm malformed or wrong-type login input is rejected and does not issue a valid session or change identity unexpectedly. Do not attempt to log in as a named third-party user or target the first/admin record in a collection.
+Use two accounts you control and credentials you created. Confirm malformed or wrong-type login input (object-valued `username`/`password`, `$ne`/`$gt`/`$in` in place of a string) is rejected and does not issue a valid session or change identity unexpectedly. Do not attempt to log in as a named third-party user or target the first/admin record in a collection.
 
 ### Phase 4: Validate bounded data flow
 
-Use a synthetic dataset with known expected results. Compare a known-match, known-no-match, and type-mismatched filter. Stop before collection enumeration, bulk extraction, writes, server-side scripting, or SSRF-to-database command chains.
+Use a synthetic dataset with known expected results. Compare a known-match, known-no-match, and type-mismatched filter. If `$where` or another server-side-code operator appears reachable, confirm with a single short, strictly-timed delay probe in a lab/approved context only — never a data-dependent conditional against real records. Stop before collection enumeration, bulk extraction, writes, server-side scripting, or SSRF-to-database command chains (e.g., Redis `gopher://` `CONFIG SET`/`SLAVEOF`, Elasticsearch scripted queries).
 
 ### Phase 5: Trace root cause
 
-If source is available, follow the value through decoding, schema validation, query construction, and authorization. Verify strict validation and ODM sanitization on nested filters and alternate API versions.
+If source is available, follow the value through decoding, schema validation, query construction, and authorization. Verify strict validation and ODM sanitization on nested filters and alternate API versions. Treat a denylist that only string-matches a literal `$` in the serialized body as a weak control — it both false-positives on ordinary strings beginning with `$` and misses bracket-notation, nested, or encoded operators.
 
 ## What Constitutes a Finding
 
@@ -63,6 +70,17 @@ If source is available, follow the value through decoding, schema validation, qu
 - **Confirmed finding:** type/operator changes reproducibly alter query semantics on synthetic fixtures or change authentication for an account the tester controls.
 - **Impact-qualified finding:** a cross-account or authorization failure is reproduced using test-owned records and a least-privileged test account.
 - **Not a finding:** object acceptance alone, an error message, or a changed status code without a stable semantic difference.
+
+## Impact
+
+Severity tracks what the operator/query injection actually reaches, not merely that an object was accepted:
+
+- **Low:** a type-mismatched object or operator is accepted and changes a non-sensitive query's structure, but no authentication or cross-account effect is demonstrated (e.g., a filter silently returns a different, still-benign result set on a synthetic fixture).
+- **Medium:** blind confirmation of a server-side-JavaScript-capable operator (`$where`) via a lab-approved timing probe with no proven data exfiltration, or a reproducible query-semantic change that does not cross an authorization boundary.
+- **High:** operator injection reliably returns another tester-controlled or synthetic record's data beyond the authorized fixture, or a `$regex`/`$in`-based side channel is shown capable of enumerating account identifiers.
+- **Critical:** operator injection (`$gt`, `$ne`, `$regex`, `$in`) bypasses authentication and issues a valid session — especially when it authenticates as the first/admin record in a collection — or a `$where`/code-execution operator is confirmed reachable with server-side JavaScript execution, or the injection chains to an internal data store (Redis/Elasticsearch via SSRF) with write access.
+
+State the exact operator and field, whether authentication was bypassed or a session issued, and whether the result set contained only tester-owned/synthetic data.
 
 ## Evidence Requirements
 
@@ -77,18 +95,21 @@ If source is available, follow the value through decoding, schema validation, qu
 - **Burp Suite Repeater:** compare scalar, object, and invalid-type requests.
 - **curl / jq:** preserve JSON types and inspect controlled fixture results.
 - **OpenAPI/GraphQL schema viewer:** establish expected types and resolver contracts.
+- **nosqlmap (or equivalent):** lab/approved-target automation only, detection-only attack modes against production.
 - **Source review:** verify operator filtering, ODM sanitization, and authorization checks.
 
 ## NoSQL Operator and Boundary Matrix
 
 | Surface | Controlled check | Confirmation bar |
 |---|---|---|
-| Login JSON | Scalar versus invalid object on a tester-owned account | Unauthorized session or identity change is reproducible without valid credentials |
+| Login JSON | Scalar versus invalid object (`$gt`, `$ne`, `$in`, `$regex`) on a tester-owned account | Unauthorized session or identity change is reproducible without valid credentials |
 | Search/filter | Known-match, known-no-match, and type-mismatched fixture filter | Stable query-semantic change tied to the untrusted field |
+| Encoded/array-notation bypass | Bracket-form (`field[$ne]=x`) and Unicode-escaped operator key against a denylist that string-matches `$` | Confirms the sanitizer is incomplete, not merely theoretical |
 | Nested operators | Review recursive validation and strict-schema behavior | Unexpected nested keys are rejected, not silently interpreted |
-| MongoDB/Mongoose | Review filter sanitization and raw operator-enabled APIs | Reachable input affects a query; merely using MongoDB is irrelevant |
+| `$where`/server-side JS | Single lab-approved timing probe only; never a data-dependent payload against real records | Consistent delay beyond jitter in an authorized context; otherwise candidate only |
+| MongoDB/Mongoose | Review filter sanitization and raw operator-enabled APIs (e.g., `populate({match})` forwarding to `$where`) | Reachable input affects a query; merely using MongoDB is irrelevant |
 | CouchDB/document APIs | Compare selector validation with documented schema | Only synthetic documents establish impact |
-| Internal data store | Confirm reachability only unless protocol testing is specifically authorized | No writes, replication changes, data dumps, or RCE chain by default |
+| Internal data store (Redis/Elasticsearch via SSRF) | Confirm reachability only unless protocol testing is specifically authorized | No writes, `CONFIG SET`/`SLAVEOF`, scripted queries, data dumps, or RCE chain by default |
 
 **Mitigation / regression:** enforce exact input types, construct filters from allowlisted fields, reject unknown operators recursively, use supported ODM sanitization, and test the rejection of nested objects on every route.
 
@@ -98,7 +119,20 @@ If source is available, follow the value through decoding, schema validation, qu
 - Type coercion may be legitimate; use known synthetic records and repeat the baseline.
 - Login error text or status alone does not prove bypass; verify session issuance and test identity.
 - Database errors can originate in validation middleware rather than query execution.
+- A denylist that only string-matches `$` in the raw body can false-positive on ordinary user strings that happen to start with `$` (currency amounts, template placeholders) — confirm with an actual type-mismatched object, not the presence of a dollar sign.
+- An authentication bypass that logs in as a *random* existing user (rather than a targetable admin/first record) is weaker evidence than one that reliably reaches a specific privileged account — note which was demonstrated.
 - Stop before accessing another tenant's data, iterating identifiers, scripting in the DB, or modifying service configuration.
+
+## Stop Conditions
+
+- Stop before accessing another tenant's or user's real data, iterating identifiers beyond the tester's own fixtures, executing server-side scripting (`$where`, `mapReduce`), or modifying service configuration.
+- Stop immediately if a probe returns a valid session for an account the tester does not control, or returns records outside the synthetic fixture set.
+- Stop before pivoting through SSRF into an internal data store (Redis, Elasticsearch, CouchDB) for anything beyond a single reachability check, unless that escalation is explicitly authorized.
+- Stop and reconfirm scope on rate-limiting, WAF/IPS blocking, or any service instability signal from repeated operator probes.
+
+## Defensive Notes
+
+Operator injection survives "we build a query object, not a string" because an untrusted value that is itself an object (`{"$gt": ""}`) is still interpreted as an operator by the driver — type-check and allowlist every field's expected scalar type before it reaches the query builder, and reject unknown operators recursively rather than denylisting the `$` character. Disable server-side JavaScript execution (`$where`, `mapReduce` with custom functions) where the application does not require it, since it is the highest-impact variant of this class. Bind data stores (MongoDB, Redis, Elasticsearch, CouchDB) to internal interfaces only, enforce authentication and least-privileged application accounts rather than admin/root credentials, and monitor for anomalous operator usage, slow/large queries, and unauthenticated access attempts at the database layer.
 
 ## References
 
