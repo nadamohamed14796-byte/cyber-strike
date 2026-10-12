@@ -403,38 +403,38 @@ export namespace Discovery {
       list.map(async (skill) => {
         const root = path.join(cacheRoot, skill.name)
         try {
-        if ("files" in skill && Array.isArray(skill.files)) {
-          // Legacy format: array of individual files
-          await Promise.all(
-            skill.files.map(async (file) => {
-              const dest = resolveSkillFilePath(root, file)
-              if (!dest) {
-                log.warn("skipping unsafe skill file path", { skill: skill.name, file })
-                return
+          if ("files" in skill && Array.isArray(skill.files)) {
+            // Legacy format: array of individual files
+            await Promise.all(
+              skill.files.map(async (file) => {
+                const dest = resolveSkillFilePath(root, file)
+                if (!dest) {
+                  log.warn("skipping unsafe skill file path", { skill: skill.name, file })
+                  return
+                }
+                const link = new URL(file, `${host}/${skill.name}/`).href
+                await get(link, dest, root)
+              }),
+            )
+          } else if ("url" in skill && typeof skill.url === "string") {
+            const link = new URL(skill.url, base).href
+            if ("type" in skill && skill.type === "archive") {
+              // Archive format: download tar.gz and extract
+              const archive = path.join(root, `${skill.name}.tar.gz`)
+              await mkdir(root, { recursive: true })
+              if (await get(link, archive, root, true)) {
+                await extractSafeArchive(archive, root)
               }
-              const link = new URL(file, `${host}/${skill.name}/`).href
+            } else {
+              // Single file (skill-md): download as SKILL.md
+              const dest = path.join(root, "SKILL.md")
+              await mkdir(root, { recursive: true })
               await get(link, dest, root)
-            }),
-          )
-        } else if ("url" in skill && typeof skill.url === "string") {
-          const link = new URL(skill.url, base).href
-          if ("type" in skill && skill.type === "archive") {
-            // Archive format: download tar.gz and extract
-            const archive = path.join(root, `${skill.name}.tar.gz`)
-            await mkdir(root, { recursive: true })
-            if (await get(link, archive, root, true)) {
-              await extractSafeArchive(archive, root)
             }
-          } else {
-            // Single file (skill-md): download as SKILL.md
-            const dest = path.join(root, "SKILL.md")
-            await mkdir(root, { recursive: true })
-            await get(link, dest, root)
           }
-        }
 
-        const md = await safeCacheDestination(cacheRoot, path.join(root, "SKILL.md"), false)
-        if (md && (await Bun.file(md).exists())) result.push(root)
+          const md = await safeCacheDestination(cacheRoot, path.join(root, "SKILL.md"), false)
+          if (md && (await Bun.file(md).exists())) result.push(root)
         } catch (err) {
           log.error("failed to process remote skill entry", { url: index, name: skill.name, err })
         }
