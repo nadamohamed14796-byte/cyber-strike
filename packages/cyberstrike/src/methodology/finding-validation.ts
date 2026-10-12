@@ -386,13 +386,18 @@ export namespace FindingValidation {
         .limit(limit)
         .all(),
     )
-    return rows.map((row) => ({
-      ...row,
+    return rows.map((row) => {
       // Old JSON snapshots have no validConditions field and must be shown as invalid.
-      attempts: (row.attempts ?? []).map((attempt) => ({
+      const attempts = (row.attempts ?? []).map((attempt) => ({
         ...attempt,
         validConditions: attempt.validConditions === true,
-      })),
-    }))
+      }))
+      return {
+        ...row,
+        attempts,
+        // Keep history counts aligned with the current false-positive gate, not legacy totals.
+        attempt_count: attempts.filter((attempt) => attempt.validConditions).length,
+      }
+    })
   }
 }
