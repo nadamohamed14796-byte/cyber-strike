@@ -600,15 +600,15 @@ export namespace JavaScriptCorrelation {
         functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
         requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).map((item) => {
           const observedRequestIDs = relevantRequests.filter((request) => {
-            const requestURL = safeURL(request.url ?? undefined) ?? safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+            const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
             if (!requestURL) return false
             if (item.host && requestURL.host.toLowerCase() !== item.host.toLowerCase()) return false
-            if (!item.host && requestURL.hostname !== targetURL.hostname && !assets.some((asset) => safeURL(asset.url)?.hostname === requestURL.hostname)) return false
+            if (!item.host && requestURL.hostname !== targetURL.hostname && !assets.some((asset) => asset.url.hostname === requestURL.hostname)) return false
             if (item.method && request.method.toUpperCase() !== item.method) return false
             const expectedSegments = item.path.split("/").filter(Boolean)
             const actualSegments = request.normalized_path.split(/[?#]/, 1)[0]!.split("/").filter(Boolean)
             return expectedSegments.length <= actualSegments.length && expectedSegments.every((segment, index) =>
-              /^\\{[A-Za-z_$][\\w$]*\\}$/.test(segment) ? Boolean(actualSegments[index]) : segment === actualSegments[index],
+              (segment.startsWith("{") && segment.endsWith("}")) ? Boolean(actualSegments[index]) : segment === actualSegments[index],
             )
           }).map((request) => request.id)
           return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs)].slice(0, 100) }
