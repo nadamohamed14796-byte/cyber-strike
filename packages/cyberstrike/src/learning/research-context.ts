@@ -92,6 +92,16 @@ export function promptResearchSignals(input: string): string[] {
 export namespace ResearchContext {
   export function generate(sessionID: string, userSignalText = ""): string | null {
     const projectID = Instance.project.id
+    // A session ID supplied from another project must never expose its requests,
+    // Intel, or modeled workflows through the shared research briefing.
+    const rootSession = Database.use((db) =>
+      db
+        .select({ projectID: SessionTable.project_id })
+        .from(SessionTable)
+        .where(eq(SessionTable.id, sessionID))
+        .get(),
+    )
+    if (rootSession && rootSession.projectID !== projectID) return null
     const sessionIDs = new Set<string>([sessionID])
     let frontier = [sessionID]
     while (frontier.length > 0) {
