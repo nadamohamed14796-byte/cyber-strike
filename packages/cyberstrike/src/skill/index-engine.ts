@@ -1,3 +1,4 @@
+import path from "path"
 import { Log } from "../util/log"
 import { Skill } from "./skill"
 import { Instance } from "../project/instance"
@@ -8,6 +9,7 @@ export namespace SkillIndex {
   export type Entry = {
     name: string
     description: string
+    location?: string
     category?: string
     owasp_id?: string
     tags: string[]
@@ -53,6 +55,9 @@ export namespace SkillIndex {
     // never fuzzy substring/prefix matches.
     addReference(state, entry.name, entry.name)
     addReference(state, entry.owasp_id, entry.name)
+    // Imported catalogs commonly link controls by their directory slug, while
+    // the visible frontmatter name is human-readable. Index both as exact aliases.
+    if (entry.location) addReference(state, path.basename(path.dirname(entry.location)), entry.name)
 
     const nameTechnique = /^((?:T\d{4})(?:\.\d{3})?)(?:[_-]|$)/i.exec(entry.name)?.[1]
     if (nameTechnique) addReference(state, nameTechnique, entry.name)
@@ -86,6 +91,7 @@ export namespace SkillIndex {
     return {
       name: skill.name,
       description: skill.description,
+      location: skill.location,
       category: skill.category,
       owasp_id: skill.owasp_id,
       tags: skill.tags ?? [],
@@ -250,13 +256,20 @@ export namespace SkillIndex {
     const problems: ReferenceProblem[] = []
     const isExternalControlId = (reference: string) =>
       /^[A-Z]{2,5}-\d+(?:\(\d+\))?$/i.test(reference.trim())
+    const isExternalAttackTechniqueId = (reference: string) =>
+      /^T\d{4}(?:\.\d{3})?$/i.test(reference.trim())
     const isPrerequisiteStatement = (reference: string) => /\s/.test(reference.trim())
 
     for (const entry of state.entries.values()) {
       for (const field of ["chains_with", "prerequisites"] as const) {
         for (const reference of entry[field]) {
           if (resolveInState(reference, state)) continue
-          if (field === "chains_with" && isExternalControlId(reference)) continue
+          // Compliance/control and ATT&CK technique IDs may be useful external
+          // annotations, not necessarily names of locally installed skill entries.
+          // Keep unresolved prerequisites intact; this only avoids false dangling-link
+          // reports and does not mark an unknown prerequisite as satisfied.
+          if (isExternalControlId(reference)) continue
+          if (field === "chains_with" && isExternalAttackTechniqueId(reference)) continue
           if (field === "prerequisites" && isPrerequisiteStatement(reference)) continue
 
           const candidates = state.referenceIndex.get(reference.trim().toLowerCase())
