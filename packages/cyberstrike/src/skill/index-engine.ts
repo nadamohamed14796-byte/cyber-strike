@@ -19,13 +19,17 @@ export namespace SkillIndex {
     verified?: string
   }
 
+  type IndexState = { entries: Map<string, Entry>; tagIndex: Map<string, Set<string>>; techIndex: Map<string, Set<string>>; cweIndex: Map<string, Set<string>>; categoryIndex: Map<string, Set<string>> }
+  const states = new Map<string, IndexState>()
+  const builds = new Map<string, Promise<void>>()
+  const emptyState = (): IndexState => ({ entries: new Map(), tagIndex: new Map(), techIndex: new Map(), cweIndex: new Map(), categoryIndex: new Map() })
+  const current = () => states.get(Instance.directory) ?? emptyState()
   let entries = new Map<string, Entry>()
   let tagIndex = new Map<string, Set<string>>()
   let techIndex = new Map<string, Set<string>>()
   let cweIndex = new Map<string, Set<string>>()
   let categoryIndex = new Map<string, Set<string>>()
-  let initialized = false
-  let builtFor: string | undefined
+
 
   function toEntry(skill: Skill.Info): Entry {
     return {
@@ -66,28 +70,31 @@ export namespace SkillIndex {
   }
 
   export async function ensureBuilt() {
-    if (initialized && builtFor === Instance.directory) return
+    if (states.has(Instance.directory)) return
     await rebuild()
   }
 
   export async function rebuild() {
-    initialized = false
-    builtFor = undefined
-    entries = new Map()
-    tagIndex = new Map()
-    techIndex = new Map()
-    cweIndex = new Map()
-    categoryIndex = new Map()
-
-    const skills = await Skill.all()
-    for (const skill of skills) {
-      const entry = toEntry(skill)
-      entries.set(entry.name, entry)
-      indexEntry(entry)
-    }
-    log.info("skill index built", { count: entries.size })
-    builtFor = Instance.directory
-    initialized = true
+    const directory = Instance.directory
+    const pending = builds.get(directory)
+    if (pending) return pending
+    const build = (async () => {
+      entries = new Map()
+      tagIndex = new Map()
+      techIndex = new Map()
+      cweIndex = new Map()
+      categoryIndex = new Map()
+      const skills = await Skill.all()
+      for (const skill of skills) {
+        const entry = toEntry(skill)
+        entries.set(entry.name, entry)
+        indexEntry(entry)
+      }
+      states.set(directory, { entries, tagIndex, techIndex, cweIndex, categoryIndex })
+      log.info("skill index built", { directory, count: entries.size })
+    })()
+    builds.set(directory, build)
+    try { await build } finally { if (builds.get(directory) === build) builds.delete(directory) }
   }
 
   export function get(name: string): Entry | undefined {
