@@ -127,7 +127,7 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
       }
       const decisiveAttempt = attempts[attempts.length - 1]
       const outcome = decisiveAttempt?.outcome
-      if (outcome !== "disproven" || !decisiveAttempt.validConditions || !decisiveAttempt.evidenceRef?.trim()) {
+      if (outcome !== "disproven" || !decisiveAttempt?.validConditions || !decisiveAttempt?.evidenceRef?.trim()) {
         return {
           title: `VRT clean verdict blocked — ${params.vrt_category}`,
           output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome with valid conditions and direct evidence is required (current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
