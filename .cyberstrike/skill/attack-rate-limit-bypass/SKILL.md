@@ -7,7 +7,7 @@ author: "CyberStrike contributors; consolidated with upstream attribution"
 tags: [rate-limit, abuse-prevention, authentication, api]
 tech_stack: [http, api, web]
 cwe_ids: [CWE-307]
-chains_with: [attack-brute-force, attack-api-misconfig, attack-triage-validation]
+chains_with: [attack-triage-validation]
 prerequisites:
   - "Explicit authorization for rate-limit testing"
   - "Known test account, documented request budget, and stop threshold"
