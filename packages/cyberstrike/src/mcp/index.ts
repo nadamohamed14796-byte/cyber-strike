@@ -973,6 +973,22 @@ export namespace MCP {
     log.info("mcp removed", { name })
   }
 
+  /** Canonical tool IDs shared with the lazy registry; unsafe names get a stable collision-resistant suffix. */
+  function stableToolIDPart(value: string): string {
+    const sanitized = value.replace(/[^a-zA-Z0-9_-]/g, "_")
+    if (sanitized === value) return sanitized
+    let hash = 0x811c9dc5
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i)
+      hash = Math.imul(hash, 0x01000193)
+    }
+    return sanitized + "__" + (hash >>> 0).toString(16).padStart(8, "0")
+  }
+
+  export function toolID(serverName: string, toolName: string): string {
+    return stableToolIDPart(serverName) + "_" + stableToolIDPart(toolName)
+  }
+
   export async function tools() {
     const result: Record<string, Tool> = {}
     const s = await state()
@@ -1010,9 +1026,7 @@ export namespace MCP {
       const entry = isMcpConfigured(mcpConfig) ? mcpConfig : undefined
       const timeout = entry?.timeout ?? boltEntry?.timeout ?? defaultTimeout
       for (const mcpTool of toolsResult.tools) {
-        const sanitizedClientName = clientName.replace(/[^a-zA-Z0-9_-]/g, "_")
-        const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
-        result[sanitizedClientName + "_" + sanitizedToolName] = await convertMcpTool(mcpTool, client, timeout)
+        result[toolID(clientName, mcpTool.name)] = await convertMcpTool(mcpTool, client, timeout)
       }
     }
     return result
