@@ -1,8 +1,35 @@
 import { describe, test, expect } from "bun:test"
-import { Discovery } from "../../src/skill/discovery"
+import { Discovery, isSafeSkillName, resolveSkillFilePath } from "../../src/skill/discovery"
 import path from "path"
 
 const CLOUDFLARE_SKILLS_URL = "https://developers.cloudflare.com/.well-known/skills/"
+
+describe("remote skill path validation", () => {
+  const root = path.resolve("/tmp/cyberstrike-skill-cache/example")
+
+  test("accepts ordinary skill slugs and nested relative files", () => {
+    expect(isSafeSkillName("agents-sdk")).toBe(true)
+    expect(isSafeSkillName("wstg.injection_01")).toBe(true)
+    expect(resolveSkillFilePath(root, "references/guide.md")).toBe(path.join(root, "references", "guide.md"))
+  })
+
+  test("rejects names that can escape the skill cache", () => {
+    for (const name of ["../outside", "..", "nested/name", "nested\\\\name", "/tmp/outside", "C:outside", ""]) {
+      expect(isSafeSkillName(name)).toBe(false)
+    }
+  })
+
+  test("rejects parent traversal, absolute paths, and URL-like file entries", () => {
+    for (const file of ["../outside.txt", "references/../../outside.txt", "..\\\\outside.txt", "C:\\\\outside.txt", "/tmp/outside.txt", "https://example.com/outside.txt", ""]) {
+      expect(resolveSkillFilePath(root, file)).toBeUndefined()
+    }
+  })
+
+  test("rejects a resolved destination equal to or outside the skill root", () => {
+    expect(resolveSkillFilePath(root, ".")).toBeUndefined()
+    expect(resolveSkillFilePath(root, "safe/../../outside.txt")).toBeUndefined()
+  })
+})
 
 describe("Discovery.pull", () => {
   test("downloads skills from cloudflare url", async () => {
