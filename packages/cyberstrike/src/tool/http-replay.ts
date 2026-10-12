@@ -272,6 +272,14 @@ function applyAuthParams(
   return msg
 }
 
+/**
+ * TLS certificate validation is the secure default. Invalid/self-signed
+ * certificates may be accepted only when a caller explicitly opts in.
+ */
+export function shouldRejectUnauthorized(insecureTls?: boolean): boolean {
+  return insecureTls !== true
+}
+
 // ── Governed send wrapper ─────────────────────────────────────────────────────
 
 async function sendGoverned(
@@ -290,7 +298,7 @@ async function sendGoverned(
     () =>
       BackendFetch.send(msg, {
         origin,
-        rejectUnauthorized: opts.insecure_tls === false,
+        rejectUnauthorized: shouldRejectUnauthorized(opts.insecure_tls),
         totalTimeoutMs: opts.total_timeout_ms,
         followRedirects: opts.follow_redirects,
         signal: opts.signal,
@@ -527,7 +535,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
     insecure_tls: z
       .boolean()
       .optional()
-      .describe("Accept invalid/self-signed certs (default true — pentest targets often have bad certs)."),
+      .describe("Accept invalid/self-signed certificates only when explicitly true (default false)."),
     total_timeout_ms: z
       .number()
       .int()
@@ -759,7 +767,7 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
       .describe(
         "Exact raw HTTP request bytes to send. Omit to send the captured request's raw bytes unchanged (required when using target_url).",
       ),
-    insecure_tls: z.boolean().optional().describe("Accept invalid/self-signed certs (default true)."),
+    insecure_tls: z.boolean().optional().describe("Accept invalid/self-signed certificates only when explicitly true (default false)."),
     total_timeout_ms: z.number().int().positive().optional(),
   }),
   async execute(params, ctx) {
@@ -819,7 +827,7 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
       host: url.hostname,
       port,
       tls: useTls,
-      rejectUnauthorized: params.insecure_tls === false,
+      rejectUnauthorized: shouldRejectUnauthorized(params.insecure_tls),
       totalTimeoutMs: params.total_timeout_ms,
       signal: ctx.abort,
     })
