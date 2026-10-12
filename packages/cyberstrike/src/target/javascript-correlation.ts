@@ -75,6 +75,21 @@ function redact(value?: string | null, max = 320): string | null {
     .slice(0, max)
 }
 
+/** Never store JavaScript source previews in the attack-surface graph or target notes. */
+export function safeCorrelationResponsePreview(input: {
+  id: string
+  normalizedPath?: string | null
+  responseContentType?: string | null
+  processedResponse?: string | null
+}, max = 320): string | null {
+  if (!input.processedResponse) return null
+  const isJavaScript =
+    /(?:java|ecma)script|x-javascript/i.test(input.responseContentType ?? "") ||
+    /\.(?:m?js|cjs)(?:[?#]|$)/i.test(input.normalizedPath ?? "")
+  if (isJavaScript) return "[JavaScript response preview omitted; inspect captured request ID " + input.id + " on demand]"
+  return redact(input.processedResponse, max)
+}
+
 function sameHost(left: string | null | undefined, right: string | null | undefined) {
   const a = safeURL(left)
   const b = safeURL(right)
@@ -658,7 +673,12 @@ export namespace JavaScriptCorrelation {
           responseStatus: request.response_status ?? null,
           contentType: request.response_content_type ?? null,
           responseSize: request.response_size ?? null,
-          redactedPreview: redact(request.processed_response),
+          redactedPreview: safeCorrelationResponsePreview({
+            id: request.id,
+            normalizedPath: request.normalized_path,
+            responseContentType: request.response_content_type,
+            processedResponse: request.processed_response,
+          }),
         })),
       requests: relevantRequests.map((request) => {
         // Older captures may have host/page_url but no normalized origin. Build
@@ -681,7 +701,12 @@ export namespace JavaScriptCorrelation {
           responseStatus: request.response_status ?? null,
           responseContentType: request.response_content_type ?? null,
           responseSize: request.response_size ?? null,
-          responsePreview: redact(request.processed_response),
+          responsePreview: safeCorrelationResponsePreview({
+            id: request.id,
+            normalizedPath: request.normalized_path,
+            responseContentType: request.response_content_type,
+            processedResponse: request.processed_response,
+          }),
           hasRawRequest: Boolean(request.raw_request),
         }
       }),
