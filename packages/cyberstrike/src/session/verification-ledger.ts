@@ -86,7 +86,20 @@ export namespace VerificationLedger {
     let recorded: Attempt
 
     if (existing) {
-      recorded = existing
+      // A duplicate does not consume budget, but refresh its observed evidence so
+      // a corrected session/precondition result is not hidden by an older failure.
+      Database.use((db) => db.update(VerificationAttemptTable).set({
+        result_summary: input.attempt.resultSummary,
+        evidence_ref: input.attempt.evidenceRef ?? null,
+        valid_conditions: input.attempt.validConditions ? 1 : 0,
+        time_updated: Date.now(),
+      }).where(eq(VerificationAttemptTable.id, existing.id)).run())
+      recorded = {
+        ...existing,
+        resultSummary: input.attempt.resultSummary,
+        evidenceRef: input.attempt.evidenceRef,
+        validConditions: input.attempt.validConditions,
+      }
     } else {
       const now = Date.now()
       const id = Identifier.ascending("verification_attempt")
