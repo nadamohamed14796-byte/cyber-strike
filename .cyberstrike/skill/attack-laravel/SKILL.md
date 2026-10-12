@@ -65,7 +65,7 @@ Review APP_DEBUG configuration through source/owner-provided config rather than 
 
 ### Phase 6: Review query and job paths
 
-Find raw queries, dynamic order fields, queued job IDs, export results, URL-fetch endpoints, and serialization. Validate with class-specific skills or an isolated lab; no DB dump, command execution, or production file writes.
+Find raw queries, dynamic order fields, queued job IDs, export results, URL-fetch endpoints, and serialization. Validate with class-specific skills or an controlled reproduction environment; no DB dump, command execution, or production file writes.
 
 ### Phase 7: Confirm and remediate
 
@@ -101,7 +101,7 @@ Compare role/tenant behavior with test accounts, validate authoritative state an
 | Sanctum/Passport | token ability, audience/scope and revocation | Token from a test context gains unintended access |
 | Signed URLs | signature, expiry, tenant and resource binding | Altered/expired test link accesses private synthetic object |
 | Debug/storage | APP_DEBUG, storage link, upload origin | Non-public diagnostics/object exposed with evidence |
-| Query/jobs | raw SQL, dynamic order, export/job ID | Reachable input crosses a security boundary in a lab/test fixture |
+| Query/jobs | raw SQL, dynamic order, export/job ID | Reachable input crosses a security boundary on an authorized target using a controlled test case |
 
 **Mitigation:** apply per-route authorization policies, use explicit validated inputs, guard model fields, bind signed links to intended resource/expiry, disable debug output in production, and isolate uploads/exports.
 
