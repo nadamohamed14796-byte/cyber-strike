@@ -17,6 +17,18 @@ describe("VerificationAttempts", () => {
     expect(VA.canRunAttempt(attempts, { strategyID: "strategy-new", variantKey: "baseline" })).toBe(false)
   })
 
+  test("normalizes strategy and variant identity to avoid case/whitespace retry inflation", () => {
+    const first = attempt(" IDOR.Owner-Check ", "Account-A")
+    const duplicate = attempt("idor.owner-check", "account-a")
+    expect(VA.uniqueAttempts([first, duplicate])).toHaveLength(1)
+    expect(VA.canRunAttempt([first], { strategyID: "IDOR.OWNER-CHECK", variantKey: " account-a " })).toBe(false)
+  })
+
+  test("ignores malformed blank strategy identities instead of counting them", () => {
+    expect(VA.uniqueAttempts([attempt(" ", "variant"), attempt("strategy", "  ")])).toHaveLength(0)
+    expect(VA.canRunAttempt([], { strategyID: " ", variantKey: "variant" })).toBe(false)
+  })
+
   test("allows a meaningful variant as a distinct attempt", () => {
     expect(VA.canRunAttempt([attempt("idor.owner-check", "account-a")], {
       strategyID: "idor.owner-check",
@@ -31,25 +43,59 @@ describe("VerificationAttempts", () => {
     expect(result.reason).toContain("do not label this a false positive")
   })
 
-  test("disproof requires valid test conditions", () => {
+  test("disproof requires valid test conditions even when evidence is linked", () => {
     const result = VA.decide({
-      attempts: [attempt("auth-check", "expired-session", false)],
+      attempts: [{ ...attempt("auth-check", "expired-session", false), evidenceRef: "evidence://response-1" }],
+      decisiveDisproof: true,
+      decisiveEvidenceRef: "evidence://response-1",
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(true)
+  })
+
+  test("decisive disproof without direct evidence stays inconclusive", () => {
+    const result = VA.decide({
+      attempts: [attempt("auth-check", "valid-session")],
       decisiveDisproof: true,
     })
     expect(result.outcome).toBe("inconclusive")
     expect(result.canContinue).toBe(true)
   })
 
-  test("decisive confirmation stops early", () => {
-    const result = VA.decide({ attempts: [attempt("xss.execution-check", "benign-marker")], decisiveConfirmation: true })
+  test("decisive disproof with direct evidence and valid conditions can resolve", () => {
+    const result = VA.decide({
+      attempts: [{ ...attempt("auth-check", "valid-session"), evidenceRef: "evidence://response-2" }],
+      decisiveDisproof: true,
+      decisiveEvidenceRef: "evidence://response-2",
+    })
+    expect(result.outcome).toBe("disproven")
+    expect(result.canContinue).toBe(false)
+  })
+
+  test("decisive confirmation stops early only with valid conditions and direct evidence", () => {
+    const result = VA.decide({
+      attempts: [{ ...attempt("xss.execution-check", "benign-marker"), evidenceRef: "evidence://xss-proof" }],
+      decisiveConfirmation: true,
+      decisiveEvidenceRef: "evidence://xss-proof",
+    })
     expect(result.outcome).toBe("confirmed")
     expect(result.canContinue).toBe(false)
   })
 
+  test("decisive confirmation without a direct evidence reference stays inconclusive", () => {
+    const result = VA.decide({
+      attempts: [attempt("xss.execution-check", "benign-marker")],
+      decisiveConfirmation: true,
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(true)
+  })
+
   test("confirmation without valid preconditions remains inconclusive", () => {
     const result = VA.decide({
-      attempts: [attempt("xss.execution-check", "marker", false)],
+      attempts: [{ ...attempt("xss.execution-check", "marker", false), evidenceRef: "evidence://marker" }],
       decisiveConfirmation: true,
+      decisiveEvidenceRef: "evidence://marker",
     })
     expect(result.outcome).toBe("inconclusive")
     expect(result.canContinue).toBe(true)
