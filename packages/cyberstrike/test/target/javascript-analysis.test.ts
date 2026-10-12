@@ -138,6 +138,25 @@ test("normalizes static numeric and UUID path values to placeholders", () => {
   expect(JSON.stringify(result)).not.toContain("550e8400-e29b-41d4-a716-446655440000")
 })
 
+test("extracts fetch body keys without misclassifying request options", () => {
+  const source = [
+    'fetch("/api/profile", {',
+    ' method: "POST",',
+    ' headers: { "Content-Type": "application/json" },',
+    ' body: JSON.stringify({ displayName: "Ada", role: "member" })',
+    "})",
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const request = result.requests[0]!
+  expect(request.method).toBe("POST")
+  expect(request.bodyParameters).toContain("displayName")
+  expect(request.bodyParameters).toContain("role")
+  expect(request.bodyParameters).not.toContain("method")
+  expect(request.bodyParameters).not.toContain("headers")
+  expect(request.bodyParameters).not.toContain("body")
+  expect(request.bodyParameters).not.toContain("Content-Type")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
