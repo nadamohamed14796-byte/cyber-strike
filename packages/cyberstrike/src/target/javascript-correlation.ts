@@ -142,6 +142,8 @@ export interface JavaScriptSourceFile {
   sha256: string
   bytes: number
   endpointLiterals: string[]
+  /** Request identifier for the already-captured source response; raw JS is never copied to the graph. */
+  sourceRequestID?: string
   /** Sanitized static-analysis metadata; never stores raw source or literal secret values. */
   analysis?: JavaScriptSourceAnalysis
 }
@@ -197,6 +199,7 @@ export function extractCapturedJavaScriptSources(
       sha256: digest,
       bytes,
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
+      sourceRequestID: request.id,
       analysis: analyzeJavaScriptSource(body),
     })
   }
@@ -619,6 +622,7 @@ export namespace JavaScriptCorrelation {
             ...(item.pathParameters.length ? ["Compare path parameter type/boundary values using controlled test data"] : []),
             ...(item.queryParameters.length ? ["Compare omitted and altered query parameters"] : []),
             ...(item.bodyParameters.length ? ["Compare required/optional body fields and expected types"] : []),
+            ...(file.sourceRequestID ? ["Inspect the original captured JavaScript response via request-detail tooling using request ID " + file.sourceRequestID] : []),
             ...(file.analysis?.riskSignals?.some((signal) => signal.functionName === item.sourceFunction) ? ["Manually review static sink candidates in the associated function and confirm source-to-sink data flow"] : []),
             ...(item.authSignals.length || item.cookieSignals.length ? ["Compare authenticated and unauthenticated/session-cookie behavior using controlled accounts"] : ["Determine authentication requirements from captured requests and controlled account tests"]),
             "Check authorization with accounts that own only their own test data",
@@ -833,7 +837,7 @@ export namespace JavaScriptCorrelation {
       ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) => "- " + fn.name + "(" + fn.parameters.join(", ") + ") — " + fn.sourceFile + ":" + fn.line) : ["No named function candidates extracted."]),
       "",
       "## Structured request candidates",
-      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — source: " + request.sourceFile + ":" + request.sourceLine + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth: " + request.authAssessment + (request.observedRequestIDs.length ? " — captured requests: " + request.observedRequestIDs.join(", ") : " — no matching captured request") + " — review plan (not run): " + request.recommendedChecks.join("; ")) : ["No structured request candidates extracted."]),
+      ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — source: " + request.sourceFile + ":" + request.sourceLine + (mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)?.sourceRequestID ? " — source request: " + mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)!.sourceRequestID : "") + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth: " + request.authAssessment + (request.observedRequestIDs.length ? " — captured requests: " + request.observedRequestIDs.join(", ") : " — no matching captured request") + " — review plan (not run): " + request.recommendedChecks.join("; ")) : ["No structured request candidates extracted."]),
       "",
       "## Secret-like assignments (redacted)",
       ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — fingerprint " + item.fingerprint) : ["No secret-like assignments matched the static heuristics."]),
