@@ -103,13 +103,16 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const session = await iife(async () => {
         if (params.task_id) {
           const found = await Session.get(params.task_id).catch(() => {})
-          if (found) {
-            // Task IDs are model-supplied input. Only resume a child owned by this
-            // exact parent session; otherwise a stale/arbitrary ID could attach
-            // another session's private history to the current agent's task.
-            assertTaskResumeScope(found, ctx.sessionID)
-            return found
+          if (!found) {
+            // Never silently replace a requested resume with a fresh subtask: that
+            // can repeat expensive testing and lose the checkpoint the caller meant to continue.
+            throw new Error("Cannot resume task " + params.task_id + ": session not found; refusing to start a duplicate task.")
           }
+          // Task IDs are model-supplied input. Only resume a child owned by this
+          // exact parent session; otherwise a stale/arbitrary ID could attach
+          // another session's private history to the current agent's task.
+          assertTaskResumeScope(found, ctx.sessionID)
+          return found
         }
 
         return await Session.create({
