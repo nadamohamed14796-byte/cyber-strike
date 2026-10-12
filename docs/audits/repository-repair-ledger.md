@@ -25,8 +25,8 @@
 
 | ID | Priority | Category | Root cause / evidence | Attempts | Status |
 |---|---|---|---|---:|---|
-| SEC-001 | P1 | Security / path confinement | Remote skill cache paths and archive extraction are constrained in current `main`; PR #18's parser failure is historical, not the current-main state. | 5 | resolved; current-main CI green |
-| SEC-002 | P2 | Test and type contract | Tests call helpers through the `Discovery` namespace; current-main typecheck passed on code head `71fe91869eb845398c4604eeaa105ce0886a4477`. | 3 | resolved |
+| SEC-001 | P1 | Security / path confinement | Remote skill cache paths and archive extraction are constrained in current `main`; the old PR #18 parser failure is historical, not the current-main state. | 5 | resolved; current-main CI green |
+| SEC-002 | P2 | Test and type contract | Tests call helpers through the `Discovery` namespace; current-main typecheck passed on `6522bcbbb8`. | 3 | resolved |
 | INT-001 | P2 | Branch integration | PR #11 (`skills/import-phase-1-methodology-recon`) is a stale divergent snapshot. Compared its five added methodology/evidence/reporting/recon skills and migration documentation against current `main`; the reviewed files already exist on main, so no unique skill content remains to port from this snapshot. | 2 | resolved_superseded_no_merge |
 | INT-002 | P2 | Branch integration | PR #7 (`feat/target-memory-foundation`) is 311 commits ahead / 190 behind, with 77 changed files. PR #17 integrated the feature set; current `main` has newer reviewed implementations, so no wholesale merge is safe. | 2 | blocked_no_bulk_merge |
 | INT-003 | P2 | Branch integration | PR #6 (`improve/skill-quality-reference-audit`) is 159 commits ahead / 190 behind, with 99 changed files. PR #15's reconciled quality work is already merged; skill changes are out of scope for this pass and must not be merged wholesale. | 2 | blocked_out_of_scope_and_diverged |
@@ -34,7 +34,7 @@
 
 | FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
 | SEC-003 | P2 | Test/type contract | Tar entry properties are validated at runtime; current-main tests and typecheck pass. | 1 | resolved |
-| SEC-004 | P1 | Path normalization | Archive path normalization now handles single backslashes and is covered by current safe-path checks; current-main tests and typecheck pass. | 1 | resolved |
+| SEC-004 | P1 | Path normalization | Archive path normalization handles single backslashes and is covered by current safe-path checks; current-main tests/typecheck pass. | 1 | resolved |
 
 ## Baseline verification evidence
 
