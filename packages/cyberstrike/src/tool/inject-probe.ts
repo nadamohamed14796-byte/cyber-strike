@@ -5,6 +5,7 @@ import { Request } from "../session/request"
 import { WebCredential } from "../session/web/web-credential"
 import { Session } from "../session"
 import { Network } from "../network/network"
+import { TargetMemory } from "../target"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // inject_probe (v1 — XSS only) — an EVIDENCE ENGINE, NOT an oracle.
@@ -1718,6 +1719,20 @@ export const InjectProbeTool = Tool.define("inject_probe", {
     if ("error" in resolved) {
       return { title: "inject_probe", output: `Could not resolve request: ${resolved.error}`, metadata: {} }
     }
+    const targetAuthorization = await TargetMemory.checkURLScope(resolved.url.toString())
+    if (!targetAuthorization.allowed) {
+      return {
+        title: "inject_probe — refused (target scope)",
+        output: [
+          "No injection probes were sent.",
+          "URL: " + resolved.url.toString(),
+          "Reason: " + targetAuthorization.reason,
+          "A configured target workspace and persisted authorization scope are required.",
+        ].join("\n"),
+        metadata: { scopeDenied: true, reason: targetAuthorization.reason },
+      }
+    }
+
     const DELAY = 120
     const budget: SendBudget = { sent: 0, max: 120 } // hard upper bound on total sends per call
 
