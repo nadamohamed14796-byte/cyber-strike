@@ -43,6 +43,37 @@ test("cyberstrike agent has correct default properties", async () => {
   })
 })
 
+test("proxy vulnerability agents can retrieve shared global research", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const idor = await Agent.get("proxy-tester-idor")
+      const orchestrator = await Agent.get("proxy-agent")
+      const analyzer = await Agent.get("proxy-analyzer")
+      expect(idor).toBeDefined()
+      expect(orchestrator).toBeDefined()
+      expect(analyzer).toBeDefined()
+      expect(evalPerm(idor, "research_knowledge")).toBe("allow")
+      expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
+      expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
+      expect(evalPerm(idor, "validate_finding")).toBe("allow")
+      expect(evalPerm(idor, "correlate_javascript")).toBe("allow")
+      expect(evalPerm(await Agent.get("web-application"), "correlate_javascript")).toBe("allow")
+      expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
+      expect(evalPerm(await Agent.get("web-application"), "research_knowledge")).toBe("allow")
+      expect(evalPerm(await Agent.get("mobile-application"), "research_knowledge")).toBe("allow")
+      expect(evalPerm(await Agent.get("cloud-security"), "research_knowledge")).toBe("allow")
+      expect(evalPerm(await Agent.get("internal-network"), "research_knowledge")).toBe("allow")
+      expect(evalPerm(await Agent.get("general"), "research_knowledge")).toBe("allow")
+      expect(idor?.prompt).toContain("Global Research")
+      expect(idor?.prompt).toContain("correlate_javascript")
+      expect(idor?.prompt).toContain("validate_finding")
+      expect(analyzer?.prompt).toContain("research_knowledge")
+    },
+  })
+})
+
 test("explore agent denies edits", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({

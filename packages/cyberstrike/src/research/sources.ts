@@ -1,0 +1,265 @@
+export type ResearchSourceKind = "disclosure" | "academy" | "writeup" | "blog" | "reference" | "research"
+
+export type ResearchSource = {
+  id: string
+  name: string
+  kind: ResearchSourceKind
+  seedUrls: string[]
+  hosts: string[]
+  trust: number
+  /** Source-specific discovery/relevance policy. */
+  includeTerms?: string[]
+  excludeTerms?: string[]
+  includePaths?: string[]
+  excludePaths?: string[]
+}
+
+export const RESEARCH_SOURCES: ResearchSource[] = [
+  {
+    id: "hackerone-hacktivity",
+    name: "HackerOne Hacktivity",
+    kind: "disclosure",
+    seedUrls: [
+      "https://hackerone.com/hacktivity",
+      "https://hackerone.com/hacktivity/overview?pageIndex=0&queryString=disclosed%3Atrue&sortDirection=DESC&sortField=latest_disclosable_activity_at",
+    ],
+    hosts: ["hackerone.com"],
+    trust: 95,
+  },
+  {
+    id: "bugcrowd-crowdstream",
+    name: "Bugcrowd CrowdStream",
+    kind: "disclosure",
+    seedUrls: ["https://bugcrowd.com/crowdstream"],
+    hosts: ["bugcrowd.com"],
+    trust: 95,
+  },
+  {
+    id: "intigriti",
+    name: "Intigriti",
+    kind: "writeup",
+    seedUrls: ["https://www.intigriti.com/researchers/blog"],
+    hosts: ["intigriti.com"],
+    trust: 90,
+  },
+  {
+    id: "yeswehack",
+    name: "YesWeHack",
+    kind: "disclosure",
+    seedUrls: ["https://blog.yeswehack.com/"],
+    hosts: ["yeswehack.com"],
+    trust: 90,
+  },
+  {
+    id: "portswigger",
+    name: "PortSwigger Web Security Academy",
+    kind: "academy",
+    seedUrls: ["https://portswigger.net/web-security/all-labs"],
+    hosts: ["portswigger.net"],
+    trust: 100,
+  },
+  {
+    id: "pentesterland",
+    name: "PentesterLand",
+    kind: "writeup",
+    seedUrls: ["https://pentester.land/"],
+    hosts: ["pentester.land"],
+    trust: 90,
+  },
+  // The generic Medium tag crawler is intentionally omitted because it produced excessive off-topic articles.
+  {
+    id: "infosec-writeups",
+    name: "InfoSec Write-ups",
+    kind: "writeup",
+    seedUrls: ["https://infosecwriteups.com/"],
+    hosts: ["infosecwriteups.com"],
+    trust: 85,
+  },
+  {
+    id: "infosec-weekly",
+    name: "The Infosec Newsletter (Weekly InfoSec Write-ups)",
+    kind: "writeup",
+    seedUrls: ["https://weekly.infosecwriteups.com/"],
+    hosts: ["weekly.infosecwriteups.com"],
+    trust: 80,
+    includeTerms: [
+      "bug bounty",
+      "vulnerability",
+      "security research",
+      "writeup",
+      "authentication bypass",
+      "xss",
+      "ssrf",
+      "idor",
+      "injection",
+      "web security",
+      "penetration testing",
+    ],
+    excludeTerms: ["job alert", "career advice", "general news"],
+  },
+  {
+    id: "securitycipher-bounty-writeups",
+    name: "SecurityCipher Daily Bug Bounty Writeups",
+    kind: "writeup",
+    seedUrls: ["https://securitycipher.com/bounty-writeups/"],
+    hosts: ["securitycipher.com"],
+    trust: 85,
+    includeTerms: [
+      "bug bounty",
+      "writeup",
+      "vulnerability",
+      "idor",
+      "xss",
+      "ssrf",
+      "sqli",
+      "authorization",
+      "access control",
+      "account takeover",
+      "race condition",
+      "api security",
+      "recon",
+    ],
+    includePaths: ["/bounty-writeups/"],
+    excludePaths: ["/wp-admin/", "/wp-login.php"],
+  },
+  {
+    id: "hackerone-blog",
+    name: "HackerOne Blog",
+    kind: "blog",
+    seedUrls: ["https://www.hackerone.com/blog"],
+    hosts: ["hackerone.com"],
+    trust: 90,
+  },
+  {
+    id: "bugcrowd-blog",
+    name: "Bugcrowd Blog",
+    kind: "blog",
+    seedUrls: ["https://www.bugcrowd.com/blog/"],
+    hosts: ["bugcrowd.com"],
+    trust: 90,
+  },
+  {
+    id: "nahamsec",
+    name: "NahamSec Blog",
+    kind: "writeup",
+    seedUrls: ["https://nahamsec.com/"],
+    hosts: ["nahamsec.com"],
+    trust: 90,
+  },
+  {
+    id: "assetnote",
+    name: "Assetnote",
+    kind: "research",
+    seedUrls: ["https://blog.assetnote.io/"],
+    hosts: ["blog.assetnote.io", "assetnote.io"],
+    trust: 95,
+  },
+  {
+    id: "projectdiscovery",
+    name: "ProjectDiscovery Blog",
+    kind: "research",
+    seedUrls: ["https://projectdiscovery.io/blog"],
+    hosts: ["projectdiscovery.io"],
+    trust: 95,
+  },
+  {
+    id: "trickster0",
+    name: "Trickster0",
+    kind: "writeup",
+    seedUrls: ["https://trickster0.medium.com/"],
+    hosts: ["medium.com"],
+    // Medium is noisy and the host contains unrelated authors' content. Require
+    // real security/writeup language instead of accepting generic articles.
+    includeTerms: [
+      "bug bounty",
+      "responsible disclosure",
+      "security vulnerability",
+      "security research",
+      "vulnerability disclosure",
+      "proof of concept",
+      "access control",
+      "privilege escalation",
+      "account takeover",
+      "information disclosure",
+      "path traversal",
+      "request smuggling",
+      "prototype pollution",
+      "subdomain takeover",
+      "race condition",
+      "idor",
+      "xss",
+      "ssrf",
+      "csrf",
+      "sqli",
+      "xxe",
+      "rce",
+      "cve",
+    ],
+    excludeTerms: ["job alert", "career advice", "general news", "personal update"],
+    trust: 90,
+  },
+  {
+    id: "edoverflow",
+    name: "EdOverflow",
+    kind: "writeup",
+    seedUrls: ["https://edoverflow.com/"],
+    hosts: ["edoverflow.com"],
+    trust: 95,
+  },
+  {
+    id: "devcore",
+    name: "DEVCORE / Orange Tsai",
+    kind: "research",
+    seedUrls: ["https://devco.re/en/"],
+    hosts: ["devco.re"],
+    trust: 100,
+  },
+  {
+    id: "liveoverflow",
+    name: "LiveOverflow",
+    kind: "writeup",
+    seedUrls: ["https://liveoverflow.com/"],
+    hosts: ["liveoverflow.com"],
+    trust: 90,
+  },
+  {
+    id: "hacktricks",
+    name: "HackTricks",
+    kind: "reference",
+    seedUrls: ["https://book.hacktricks.xyz/"],
+    hosts: ["book.hacktricks.xyz", "hacktricks.xyz"],
+    trust: 90,
+  },
+  {
+    id: "payloadsallthethings",
+    name: "PayloadsAllTheThings",
+    kind: "reference",
+    seedUrls: ["https://github.com/swisskyrepo/PayloadsAllTheThings"],
+    hosts: ["github.com"],
+    trust: 90,
+  },
+  {
+    id: "github",
+    name: "GitHub security writeups",
+    kind: "writeup",
+    seedUrls: ["https://github.com/search?q=bug+bounty+writeup&type=repositories"],
+    hosts: ["github.com"],
+    trust: 80,
+  },
+  {
+    id: "src-hunter-skill",
+    name: "MyuriKanao src-hunter-skill",
+    kind: "reference",
+    seedUrls: [
+      "https://github.com/MyuriKanao/src-hunter-skill",
+      "https://github.com/MyuriKanao/src-hunter-skill/blob/main/SKILL.md",
+      "https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md",
+    ],
+    hosts: ["github.com"],
+    trust: 90,
+  },
+]
+
+export function getResearchSource(id: string) {
+  return RESEARCH_SOURCES.find((source) => source.id === id)
+}

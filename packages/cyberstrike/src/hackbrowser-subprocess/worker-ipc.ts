@@ -68,8 +68,12 @@ export interface WorkerOptions {
   headless: boolean
   panel: boolean
   cyberstrikeUrl: string
+  /** Optional local-server auth secret; passed only through the private stdin IPC start message, never process.env. */
+  cyberstrikePassword?: string
   model: ModelDescriptor
   credentialDispatch: CredentialDispatch
+  /** One exact-origin saved login profile; secret exists only in local IPC/process memory. Never log or persist it. */
+  savedLogin?: { username: string; password: string; origin: string; useGmailOtp?: boolean }
   cdp?: string
 }
 
@@ -77,7 +81,7 @@ export interface WorkerOptions {
 // Parent → Worker (stdin)
 // ============================================================
 
-export type ParentMessage = { type: "start"; options: WorkerOptions } | { type: "abort" }
+export type ParentMessage = { type: "start"; options: WorkerOptions } | { type: "abort" } | { type: "otp-response"; requestId: string; code?: string }
 
 // ============================================================
 // Worker → Parent (stdout)
@@ -95,3 +99,4 @@ export type WorkerMessage =
   | { type: "event"; event: CSEvent }
   | { type: "result"; pagesExplored: number; capturedEndpoints: number; errors: string[]; usage: WorkerUsage }
   | { type: "error"; message: string }
+  | { type: "otp-request"; requestId: string; siteUrl: string; after: number }

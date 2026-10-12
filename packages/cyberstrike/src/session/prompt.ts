@@ -49,6 +49,8 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { Token } from "@/util/token"
 import { MethodologyContext } from "@/methodology/context"
+import { TargetMemory } from "@/target"
+import { ResearchContext } from "@/learning/research-context"
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
@@ -778,6 +780,19 @@ export namespace SessionPrompt {
       // (non-tester) gets the full routing view.
       const methodologyCtx = MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
       if (methodologyCtx) system.push(methodologyCtx)
+
+      // Inject only project-local target memory matching observed hosts/endpoints in this session.
+      const targetMemoryCtx = TargetMemory.contextForSession(Session.root(sessionID))
+      if (targetMemoryCtx) system.push(targetMemoryCtx)
+
+      // Public research recommendations are advisory only and come from SQLite; no network fetch occurs during prompting.
+      const userSignalText = (lastUserMsg?.parts ?? [])
+        .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
+        .map((part) => part.type === "text" ? part.text : "")
+        .join(" ")
+        .slice(0, 4000)
+      const researchContext = ResearchContext.generate(Session.root(sessionID), userSignalText)
+      if (researchContext) system.push(researchContext)
 
       // Inject MCP tool availability info so the LLM knows to use tool_search
       const mcpLazyStats = LazyToolRegistry.stats()
