@@ -128,7 +128,7 @@ async function main() {
   }
 
   // Scan and sign all skills
-  const glob = new Bun.Glob("*/SKILL.md")
+  const glob = new Bun.Glob("**/SKILL.md")
   const files: string[] = []
   for await (const file of glob.scan({ cwd: skillDir, absolute: false })) {
     files.push(file)
