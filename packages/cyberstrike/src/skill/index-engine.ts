@@ -1,5 +1,6 @@
 import { Log } from "../util/log"
 import { Skill } from "./skill"
+import { Instance } from "../project/instance"
 
 export namespace SkillIndex {
   const log = Log.create({ service: "skill-index" })
@@ -24,6 +25,7 @@ export namespace SkillIndex {
   let cweIndex = new Map<string, Set<string>>()
   let categoryIndex = new Map<string, Set<string>>()
   let initialized = false
+  let builtFor: string | undefined
 
   function toEntry(skill: Skill.Info): Entry {
     return {
@@ -64,12 +66,13 @@ export namespace SkillIndex {
   }
 
   export async function ensureBuilt() {
-    if (initialized) return
+    if (initialized && builtFor === Instance.directory) return
     await rebuild()
   }
 
   export async function rebuild() {
     initialized = false
+    builtFor = undefined
     entries = new Map()
     tagIndex = new Map()
     techIndex = new Map()
@@ -83,6 +86,7 @@ export namespace SkillIndex {
       indexEntry(entry)
     }
     log.info("skill index built", { count: entries.size })
+    builtFor = Instance.directory
     initialized = true
   }
 
