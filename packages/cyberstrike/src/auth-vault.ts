@@ -48,8 +48,8 @@ function isStoredProfile(value: unknown): value is StoredProfile {
     (value.purpose !== "research" && value.purpose !== "target") ||
     typeof value.account !== "string" ||
     !value.account.trim() ||
-    if (account.length > 120 || username.length > 320 || /[\r\n\0]/.test(account) || /[\r\n\0]/.test(username)) {
-    /[\r\n\0]/.test(value.account) ||
+    value.account.length > 120 ||
+    /[\\r\\n\\0]/.test(value.account) ||
     typeof value.username !== "string" ||
     !value.username.trim() ||
     value.username.length > 320 ||
