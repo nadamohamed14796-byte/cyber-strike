@@ -65,10 +65,31 @@ export const READ_ONLY_TOOLS: ReadonlySet<string> = new Set([
 export const STATUS_WRITE_TOOLS: ReadonlySet<string> = new Set(["record_coverage_note", "update_vrt_check"])
 
 /**
- * A tool call counts as progress (resets the monologue streak) iff it is real testing —
- * i.e. neither a read-only/status read NOR a status-write. Exploit/mutating tools
- * (bash, webfetch, report_vulnerability, web_write_*, attack_script, …) are progress.
+ * Context/knowledge-management calls may read or write local state, but they do not
+ * demonstrate new target-testing progress. Keep them separate from READ_ONLY_TOOLS:
+ * their writes can still be deduplicated by toolSig, while the monologue detector
+ * should not let repeated context churn reset its progress streak.
+ */
+export const CONTEXT_ONLY_TOOLS: ReadonlySet<string> = new Set([
+  "skill",
+  "tool_search",
+  "load_tools",
+  "unload_tools",
+  "list_loaded_tools",
+  "research_knowledge",
+  "memory_search",
+  "memory_read",
+  "memory_context",
+  "memory_write",
+  "target_note",
+])
+
+/**
+ * A tool call counts as progress (resets the monologue streak) iff it is real target
+ * testing/recon, not a status read/write or context/knowledge management operation.
+ * Actual testing tools (bash, webfetch, report_vulnerability, web_write_*, attack_script,
+ * etc.) remain progress.
  */
 export function isProgressTool(tool: string): boolean {
-  return !READ_ONLY_TOOLS.has(tool) && !STATUS_WRITE_TOOLS.has(tool)
+  return !READ_ONLY_TOOLS.has(tool) && !STATUS_WRITE_TOOLS.has(tool) && !CONTEXT_ONLY_TOOLS.has(tool)
 }
