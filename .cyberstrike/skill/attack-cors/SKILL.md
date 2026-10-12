@@ -183,4 +183,4 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [elementalsouls/Claude-BugHunter — CORS hunting](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-cors/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
 - [PortSwigger: CORS](https://portswigger.net/web-security/cors)
-- [OWASP: CORS Misconfiguration](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client-side_Testing/07-Testing_Cross_Origin_Resource_Sharing)
+- [OWASP: CORS Misconfiguration](https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/11-Client-side/07-Cross_Origin_Resource_Sharing/)

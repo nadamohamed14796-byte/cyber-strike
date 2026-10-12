@@ -179,4 +179,5 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 ## References
 
 - [PortSwigger: GraphQL](https://portswigger.net/web-security/graphql)
+- [OWASP GraphQL Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html)
 - [HackerOne: GraphQL Bugs](https://www.hackerone.com/vulnerability-management/graphql-security-guide)

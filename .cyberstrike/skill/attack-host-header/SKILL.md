@@ -160,5 +160,5 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [elementalsouls/Claude-BugHunter — hunt-host-header](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-host-header/SKILL.md) — merged source.
 
 - [PortSwigger: Host Header Attacks](https://portswigger.net/web-security/host-header)
-- [OWASP WSTG: Testing for Host Header Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/17-Testing_for_Host_Header_Injection)
+- [OWASP WSTG: Testing for Host Header Injection](https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/07-Injection/17-Host_Header_Injection/)
 - [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110.html)
