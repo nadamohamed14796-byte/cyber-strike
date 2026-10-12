@@ -341,8 +341,15 @@ export namespace Discovery {
 
   export async function pull(url: string): Promise<string[]> {
     const result: string[] = []
-    const base = url.endsWith("/") ? url : `${url}/`
-    const index = new URL("index.json", base).href
+    let base: string
+    let index: string
+    try {
+      base = url.endsWith("/") ? url : `${url}/`
+      index = new URL("index.json", base).href
+    } catch (err) {
+      log.warn("invalid skill registry URL", { url, err })
+      return result
+    }
     const cache = dir()
     const host = base.slice(0, -1)
 
@@ -395,7 +402,7 @@ export namespace Discovery {
     await Promise.all(
       list.map(async (skill) => {
         const root = path.join(cacheRoot, skill.name)
-
+        try {
         if ("files" in skill && Array.isArray(skill.files)) {
           // Legacy format: array of individual files
           await Promise.all(
@@ -428,6 +435,9 @@ export namespace Discovery {
 
         const md = await safeCacheDestination(cacheRoot, path.join(root, "SKILL.md"), false)
         if (md && (await Bun.file(md).exists())) result.push(root)
+        } catch (err) {
+          log.error("failed to process remote skill entry", { url: index, name: skill.name, err })
+        }
       }),
     )
 
