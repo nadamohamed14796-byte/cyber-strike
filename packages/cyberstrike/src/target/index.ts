@@ -1167,26 +1167,32 @@ export namespace TargetMemory {
     const selected = matched[0]?.workspace
     if (!selected) return null
 
+    const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.min(Math.floor(maxNotes), 20)) : 8
     const notes = Database.use((db) =>
       db
         .select()
         .from(TargetNoteTable)
         .where(eq(TargetNoteTable.target_id, selected.id))
         .orderBy(desc(TargetNoteTable.time_created))
-        .limit(Math.max(1, Math.min(Math.floor(maxNotes), 20)))
+        .limit(noteLimit)
         .all()
         .map(mapNote),
     )
-    if (notes.length === 0) return null
 
     const sections = [
-      "## Target Memory (project-scoped; persistent notes)",
+      "## Target Workspace Context (project-scoped)",
       "",
       "Selected target: " + selected.targetURL,
+      "Workspace ID: " + selected.id,
       "Workspace: " + selected.relativePath,
-      "Use these notes as leads, not proof. Revalidate prior observations against current responses and evidence. Do not treat unverified or disproven notes as confirmed findings.",
+      "Authorization manifest: " + path.join(selected.relativePath, "scope", "scope.json"),
+      "Before any active request, verify that scope/scope.json is configured against the official program policy. If it is missing, unconfigured, ambiguous, or excluded, stop and ask the user; never infer authorization from a target URL or discovered asset.",
+      "Use scope_check with target_url set to this workspace URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe require the persisted scope and fail closed when it does not authorize the URL.",
+      "Keep artifacts in this workspace. Preserve run/session IDs and source references. A note or static JavaScript candidate is a lead, not proof; revalidate it against current responses and evidence.",
       "",
-      ...notes.flatMap((note) => [
+      "Expected artifact areas: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
+      "",
+      ...(notes.length ? ["## Target Memory (persistent notes)", "", ...notes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
         note.content.slice(0, 1800),
