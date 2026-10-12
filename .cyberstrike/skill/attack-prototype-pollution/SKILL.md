@@ -151,5 +151,7 @@ Include the exact input location, affected object/merge behavior, runtime contex
 
 ## References
 
+- [uphiago/recon-skills — redteam/hunt-prototype-pollution](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-prototype-pollution/SKILL.md) — merged source.
+
 - [PortSwigger: Prototype Pollution](https://portswigger.net/web-security/prototype-pollution)
 - [Server-Side Prototype Pollution](https://portswigger.net/research/server-side-prototype-pollution)
