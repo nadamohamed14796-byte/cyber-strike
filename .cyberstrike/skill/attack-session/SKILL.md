@@ -106,7 +106,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Record cookie and token behavior for a normal controlled login, privilege change, password reset, and logout; use browser devtools or proxy evidence without exposing credential values.
+2. Check cookie flags (Secure, HttpOnly, SameSite, Domain, Path), identifier rotation after authentication/privilege changes, and server-side invalidation after logout/reset.
+3. Test session fixation/reuse only with sessions issued to your own test account; compare a pre-login identifier with the authenticated session and use a fresh browser as a negative control.
+4. Verify authorization after session changes and token expiry/revocation using harmless protected resources; do not replay stolen or third-party session material.
+5. Capture sanitized cookie attributes and state transitions, then provide a regression test for rotation, expiry, revocation, and scope restrictions.
+
 
 ### Verdict gates
 

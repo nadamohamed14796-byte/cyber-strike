@@ -114,7 +114,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Use a random-path control while checking candidate artifacts such as source maps, repository metadata, backup files, build manifests, debug bundles, or public package registries.
+2. Confirm the artifact belongs to the in-scope application and whether it contains source code, internal route names, secrets, or personal data; distinguish a public source map from an actual credential leak.
+3. Collect only minimal sanitized snippets/metadata needed to demonstrate exposure. Never reuse a discovered credential, clone unrelated private repositories, or download full data stores.
+4. If a credential appears exposed, record provider/type, repository/file/commit, and key name without copying the value; verify validity only via a single read-only identity check when explicitly allowed.
+5. Report reproducible exposure path, real sensitivity, applicable access boundary, and removal/rotation/cache-invalidation remediation; validate the fix with the same control request.
+
 
 ### Verdict gates
 

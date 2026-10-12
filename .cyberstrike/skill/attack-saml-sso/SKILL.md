@@ -113,7 +113,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Use a dedicated test IdP/service-provider tenant and test users; capture a successful baseline assertion, audience/recipient, issuer, destination, signature, and relay state.
+2. Change one protocol property at a time in controlled fixtures: audience, recipient, issuer, timestamp/expiry, signature coverage, response/assertion pairing, or relay-state binding.
+3. Check signature validation and account/tenant binding against the service provider's expected configuration; do not modify or replay assertions belonging to real users.
+4. Validate acceptance only by signing into a test account and confirming its identity/privileges, with a fresh valid assertion as the positive control and one invalid assertion as the negative control.
+5. Capture sanitized metadata and the exact violated invariant, discard test assertions after use, and recommend strict signature/canonicalization validation, replay protection, and explicit audience/recipient checks.
+
 
 ### Verdict gates
 

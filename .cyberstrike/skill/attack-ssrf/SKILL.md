@@ -150,7 +150,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Map the URL-fetching feature and establish a baseline using a public, benign URL you control; identify redirects, DNS behavior, response handling, and the application's expected allowlist.
+2. Use a dedicated controlled callback endpoint for proof of server-side fetching and vary scheme/host/redirect/DNS behavior one at a time only when authorized.
+3. Do not probe cloud metadata endpoints, loopback/private services, internal control planes, local files, or alternate protocols unless a specific lab/rules-of-engagement explicitly authorizes that exact target.
+4. Differentiate browser-side requests, server-side fetches, link previews, and outbound validation by correlating callback evidence with the request ID and timing; absence of callbacks may reflect network egress controls.
+5. Use a benign response body and stop after confirming one server-side request; report reachable trust boundary, redirect/allowlist behavior, and a regression test for canonicalized destination validation.
+
 
 ### Verdict gates
 

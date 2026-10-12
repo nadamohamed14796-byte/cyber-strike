@@ -107,7 +107,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Identify the actual schema mechanism from normal traffic/documentation (GraphQL introspection, OpenAPI, gRPC reflection, or framework route metadata) and confirm it is in scope.
+2. Use the smallest read-only query or metadata request to learn reachable operations; bound response size, depth, and request frequency, and avoid recursively enumerating object data.
+3. Compare anonymous and test-role visibility of schema metadata separately from access to actual fields/methods; exposed documentation may be intentional and does not prove a data-access weakness.
+4. Check whether discovered sensitive operations enforce server-side authorization with a test-owned object and harmless canary, rather than calling every operation.
+5. Return normalized operation names, source/provenance, auth requirements, confidence, and relevant next-skill triggers. Redact arguments and stop if results reveal secrets or unrelated private data.
+
 
 ### Verdict gates
 

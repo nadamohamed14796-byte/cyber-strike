@@ -109,7 +109,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Capture a normal valid request, an invalid-type/control request, and a known-no-match response for a test-owned resource before interpreting any differential.
+2. Use paired benign Boolean predicates and minimal syntax-boundary values to test whether input reaches a database query; vary one parameter and one condition at a time.
+3. Only use tightly bounded time-based checks when permitted, with explicit timeouts, a small number of observations, and a non-injection timing control to account for load/network noise.
+4. Confirm the query boundary using synthetic data or a harmless predicate outcome; do not dump tables, extract credentials, modify records, or use destructive statements to demonstrate SQL injection.
+5. Record the exact parameter, DB error or repeatable logical differential, negative control, and confidence. Recommend parameterized queries/ORM-safe binding and regression tests for the affected data type.
+
 
 ### Verdict gates
 

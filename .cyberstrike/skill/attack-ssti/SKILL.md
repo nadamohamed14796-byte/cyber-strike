@@ -171,7 +171,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Identify the suspected template-rendering input and capture a normal literal-text baseline; determine whether output is HTML-escaped, rendered as a template, or simply reflected.
+2. Use a harmless arithmetic or inert string expression appropriate to the observed template engine and compare it with a plain-string control; change one delimiter/context at a time.
+3. Confirm that the server evaluates template syntax rather than merely reflecting it, while avoiding filesystem reads, shell commands, environment dumps, or external callbacks on production.
+4. Check output context and whether the result depends on user-controlled template structure; use only a controlled page or fixture to demonstrate the evaluation boundary.
+5. Capture minimal request/output and the non-evaluated control, infer the engine only from evidence, and recommend fixed templates plus context-aware escaping/variable binding with regression tests.
+
 
 ### Verdict gates
 

@@ -146,7 +146,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Only test a dedicated lab, staging system, or production endpoint explicitly approved for request-smuggling validation; shared production front ends can route a desynchronized request into another user's transaction.
+2. Capture normal requests and intermediary/protocol details first. Check documented HTTP/1.1, HTTP/2 downgrade, and proxy/backend combinations that are actually in use rather than spraying framing variants.
+3. Use the approved detection extension or a bounded single-connection test with a controlled canary route; do not send a smuggled request intended to alter another user's request or poison a shared cache.
+4. Correlate front-end and back-end interpretation using request IDs, connection behavior, and repeatable control requests. Account for timeouts, WAF normalization, and ordinary keep-alive behavior as alternative explanations.
+5. Stop at any unexpected response crossover or service instability. Preserve minimal sanitized traces and recommend consistent message framing, parser normalization, and regression tests across each proxy/backend pair.
+
 
 ### Verdict gates
 

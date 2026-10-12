@@ -118,7 +118,12 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact hypotheses supported by this skill's existing coverage matrix.
+1. Identify the exact Spring Boot deployment/version and context path using confirmed evidence, then map read-only health/info/config endpoints against a random-path control.
+2. Check which Actuator endpoints are actually exposed and whether their detail level is appropriate; distinguish a minimal health check from environment, beans, mappings, heap, or log data disclosure.
+3. Compare anonymous and authorized test-role responses and inspect network-level restrictions; do not invoke shutdown, refresh, heap dumps, loggers, or other state-changing/high-volume endpoints.
+4. Redact environment values, credentials, internal topology, and filesystem paths as soon as observed. A 200 status or endpoint name without sensitive content is not proof of impact.
+5. Recommend disabling unnecessary endpoints, securing required endpoints through Spring Security/network controls, and testing exposure again with a random-path and authorized-role control.
+
 
 ### Verdict gates
 
