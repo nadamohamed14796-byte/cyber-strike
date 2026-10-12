@@ -6,6 +6,7 @@ import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./
 
 const MAX_LINKS_PER_PAGE = 160
 const MAX_CANDIDATE_SCORE = 100
+const AUTH_RETRY_COOLDOWN_MS = 10 * 60_000
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 500
 const DEFAULT_PAGES = 250
@@ -747,7 +748,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
   const authReadySources = RESEARCH_SOURCES.filter((source) =>
     (!input.sourceID || source.id === input.sourceID) && researchSourceHasCredentials(source),
   )
-  for (const source of authReadySources) ResearchQueue.retryAuthenticationBlocked(100, source.id)
+  for (const source of authReadySources) ResearchQueue.retryAuthenticationBlocked(100, source.id, AUTH_RETRY_COOLDOWN_MS)
 
   for (let i = 0; i < limit; i++) {
     const item = ResearchQueue.claimNext(workerID, input.sourceID)

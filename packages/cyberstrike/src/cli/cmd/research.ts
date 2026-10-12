@@ -83,7 +83,7 @@ export const ResearchCommand = cmd({
           })
           let authRequeued = 0
           for (const source of authReadySources) {
-            authRequeued += ResearchQueue.retryAuthenticationBlocked(exhaustive ? 500 : args.limit, source.id)
+            authRequeued += ResearchQueue.retryAuthenticationBlocked(exhaustive ? 500 : args.limit, source.id, 10 * 60_000)
           }
           if (authRequeued > 0) prompts.log.info("auth-blocked reports resumed=" + authRequeued)
           const discoveries = await discoverResearch({

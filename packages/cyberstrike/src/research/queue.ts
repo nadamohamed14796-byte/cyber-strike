@@ -152,12 +152,14 @@ export namespace ResearchQueue {
     })
   }
 
-  export function retryAuthenticationBlocked(limit = 100, sourceID?: string) {
+  export function retryAuthenticationBlocked(limit = 100, sourceID?: string, minAgeMs = 0) {
     const now = Date.now()
     return Database.transaction((db) => {
-      const rows = db.select().from(ResearchQueueTable).where(sourceID
-        ? and(eq(ResearchQueueTable.status, "blocked_auth"), eq(ResearchQueueTable.source_id, sourceID))
-        : eq(ResearchQueueTable.status, "blocked_auth"))
+      const rows = db.select().from(ResearchQueueTable).where(and(
+          eq(ResearchQueueTable.status, "blocked_auth"),
+          ...(sourceID ? [eq(ResearchQueueTable.source_id, sourceID)] : []),
+          ...(minAgeMs > 0 ? [lt(ResearchQueueTable.updated_at, now - minAgeMs)] : []),
+        ))
         .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
       for (const row of rows) {
         const isCrawlPage = row.payload?.crawl_page === true

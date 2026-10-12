@@ -223,3 +223,20 @@ test("retry-auth sends blocked crawl pages back to discovery instead of the lear
     },
   })
 })
+
+
+test("automatic auth retry cooldown prevents every watch cycle from refetching invalid sessions", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const url = "https://research.example.test/private-report"
+      ResearchQueue.blockAuthentication({ sourceID: "auth-cooldown", sourceURL: url, reason: "HTTP 401" })
+      expect(ResearchQueue.retryAuthenticationBlocked(10, "auth-cooldown", 10 * 60_000)).toBe(0)
+      // Explicit retry-auth intentionally bypasses the cooldown after the operator changes credentials.
+      expect(ResearchQueue.retryAuthenticationBlocked(10, "auth-cooldown")).toBe(1)
+      expect(ResearchQueue.find("auth-cooldown", url)?.status).toBe("queued")
+      await Instance.dispose()
+    },
+  })
+})
