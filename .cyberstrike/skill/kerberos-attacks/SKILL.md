@@ -1,8 +1,13 @@
 ---
 name: kerberos-attacks
-description: Kerberos protocol attack techniques and exploitation
-tags: [kerberos, ad, windows, tickets]
-version: "1.0"
+description: "Assess Kerberos authentication and delegation weaknesses in an explicitly authorized AD lab or engagement"
+category: identity-security
+author: cyberstrike-official
+tags: [kerberos, ad, windows, tickets, delegation, authentication]
+tech_stack: [active-directory, kerberos, windows]
+chains_with: [ad-security, windows-postexploit]
+prerequisites: [ad-security]
+version: "1.2.0"
 ---
 
 # Kerberos Attack Techniques
@@ -260,3 +265,31 @@ KrbRelayUp.exe relay -Domain domain.local -CreateNewComputerAccount \
 | Silver Ticket     | N/A      | Direct service access      |
 | Overpass-the-Hash | 4768     | NTLM in AS-REQ             |
 | DCSync            | 4662     | DS-Replication-Get-Changes |
+
+## Authorization and Verification Gate
+
+**Scope gate:** Confirm the domain, domain controllers, account set, allowed techniques, and test window in writing. The examples below are for a lab or explicitly authorized engagement only; do not run them against a third-party domain without permission.
+
+**Evidence gate:** Prefer read-only discovery and test accounts. A Kerberoastable SPN, disabled pre-authentication, RC4 ticket, or delegation flag is a configuration signal, not proof that an account is compromised. Demonstrate only the minimum permitted impact and document the exact boundary crossed.
+
+
+- Perform Kerberos assessment only in an explicitly authorized domain or lab, with the permitted account set and test window confirmed.
+- Start with read-only domain and SPN discovery. An SPN, delegation flag, encryption type, or ticket request is a lead; verify the effective trust/permission boundary before reporting.
+- Do not export or reuse real tickets, dump password material, crack real user credentials, or access unrelated users' resources unless the engagement explicitly authorizes that activity. Prefer designated test accounts and approved test datasets.
+- For delegation or impersonation findings, demonstrate the exact permission edge using a controlled account. Do not create persistence or change directory permissions to prove a theoretical path.
+- Record sanitized configuration, account role, timestamp, and expected/observed behavior. Keep ticket material, hashes, and real usernames out of the skill library.
+
+## Kerberos Test Coverage and Evidence Matrix
+
+Separate protocol/configuration indicators from demonstrated security impact. Start with read-only domain and SPN discovery and use only designated test principals.
+
+| Area | Review | Evidence threshold |
+|---|---|---|
+| SPN/service accounts | service ownership and password policy context | configuration plus approved test-account validation |
+| Kerberoasting exposure | encryption types and service-account controls | authorized test dataset; no real ticket/hash export |
+| AS-REP behavior | pre-authentication settings | controlled test account and sanitized directory evidence |
+| Delegation | constrained/unconstrained/resource-based delegation | exact permission path with test principals |
+| Ticket lifetime/revocation | policy and behavior after session/account changes | reproducible behavior using a test identity |
+| Detection | relevant event IDs and expected telemetry | sanitized event evidence without collecting unrelated logs |
+
+A requested service ticket, SPN, or delegation flag alone is not proof of compromise. Do not crack, reuse, export, or store real users' password material or tickets; do not access unrelated users' data. Document the account role, relevant configuration, authorized test, timestamps, and practical impact.

@@ -1,0 +1,132 @@
+---
+name: attack-session
+description: "Validate session issuance, binding, renewal, fixation, and revocation across authentication state changes using controlled sessions and test accounts."
+category: "identity"
+version: "1.0.0"
+author: "cyberstrike-official"
+tags:
+  - session
+  - cookies
+  - authentication
+  - revocation
+  - web
+tech_stack:
+  - web
+  - mobile
+  - rest-api
+  - oauth
+  - oidc
+cwe_ids:
+  - CWE-384
+  - CWE-613
+  - CWE-565
+chains_with:
+  - attack-auth-bypass
+  - attack-mfa-bypass
+  - attack-ato
+prerequisites: []
+severity_boost:
+  attack-ato: "A session-lifecycle flaw may permit takeover if a stale or attacker-influenced test session remains authorized after a required state change."
+---
+
+# Session Management Assessment
+
+## Objective
+
+Assess whether session identifiers are unpredictable, rotated at trust transitions, safely stored, and revoked when required. Use only browser sessions for accounts you own.
+
+## Testing Methodology
+
+### Phase 1: Inventory session artifacts
+
+Record cookie names, token types, expiry metadata, device-trust artifacts, and server-side session identifiers. Never copy live tokens to external tools or reports. Capture a baseline session for a test account.
+
+### Phase 2: Review storage controls
+
+Check Secure, HttpOnly, SameSite, Path, Domain, expiry, issuer/audience, and refresh rotation as applicable. Inspect whether a pre-auth session ID persists after login.
+
+### Phase 3: Test rotation at trust changes
+
+Compare identifiers before/after login, privilege changes, password reset, MFA enrollment, and documented security transitions. Use owned sessions and avoid changing real identities or roles.
+
+### Phase 4: Test revocation
+
+Log out a test session or reset its test password, then use a harmless protected endpoint to check whether the prior session remains authorized. Keep the scope of this check to the test account.
+
+### Phase 5: Check fixation and scope
+
+If a pre-auth ID exists, verify login rotates it and that a test-supplied identifier cannot bind another user's session. Never try to fixate a third party. Inspect domain/path scope across sibling apps.
+
+## What Constitutes a Finding
+
+- **Candidate / lead:** cookie attributes are weak or a token remains present after logout.
+- **Confirmed finding:** a prior/attacker-influenced test session still authorizes a protected action after required invalidation, or a pre-auth ID is retained across login contrary to policy.
+- **Not a finding:** token presence alone, documented long expiry, or cached public content after logout.
+
+## Evidence Requirements
+
+- Redacted session metadata, cookie attributes, token type/expiry/issuer, and timestamp.
+- Before/after identifier and matched protected-request results.
+- Test account and exact transition being evaluated.
+- Never include full session IDs, JWTs, refresh tokens, or private account data.
+
+## Tools
+
+- **Browser DevTools:** inspect cookie lifecycle and attributes.
+- **Burp Suite:** compare requests using owned sessions.
+- **Offline JWT decoder:** inspect test-token claims locally.
+- **Source/log review:** verify rotation, expiry, and revocation.
+
+## Session Lifecycle Matrix
+
+| Transition | Expected property | Evidence |
+|---|---|---|
+| Login | Authenticated session is rotated when required | Pre-auth ID is not retained contrary to policy |
+| Privilege/assurance change | Stale privilege state is invalidated/refreshed | Old session does not keep prior permissions |
+| Logout | Server-side session/refresh token revoked as specified | Previous test session loses protected access |
+| Password reset/account disable | Existing sessions invalidated per policy | Old session cannot execute harmless protected action |
+| Refresh token | Rotation/reuse handling follows design | Reuse behavior matches the documented contract |
+| Cookie scope | Domain/path limit unintended sharing | Session is not sent to unrelated hosts/paths |
+
+**Mitigation:** rotate identifiers at trust changes, revoke server-side sessions, protect cookies, constrain token audience/scope, and test invalidation across clients.
+
+## Verification and False Positives
+
+- Stateless tokens may have a documented revocation window; assess against the contract.
+- Browser cache can show old rendered content; verify a network action that requires authentication.
+- Token existence is not proof the server trusts it.
+- Never steal, replay, or share anyone else's token.
+
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Record cookie and token behavior for a normal controlled login, privilege change, password reset, and logout; use browser devtools or proxy evidence without exposing credential values.
+2. Check cookie flags (Secure, HttpOnly, SameSite, Domain, Path), identifier rotation after authentication/privilege changes, and server-side invalidation after logout/reset.
+3. Test session fixation/reuse only with sessions issued to your own test account; compare a pre-login identifier with the authenticated session and use a fresh browser as a negative control.
+4. Verify authorization after session changes and token expiry/revocation using harmless protected resources; do not replay stolen or third-party session material.
+5. Capture sanitized cookie attributes and state transitions, then provide a regression test for rotation, expiry, revocation, and scope restrictions.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
+## References
+
+- [uphiago — hunt-session](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-session)
+- [Claude-BugHunter — hunt-session](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-session)
+- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)

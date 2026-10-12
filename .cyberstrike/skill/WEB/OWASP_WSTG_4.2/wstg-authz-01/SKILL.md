@@ -3,7 +3,7 @@ name: wstg-authz-01
 description: "Testing Directory Traversal File Include"
 category: authorization
 owasp_id: WSTG-AUTHZ-01
-version: "1.0.0"
+version: "1.0.1"
 author: cyberstrike-official
 tags: [authorization, access-control, privilege, wstg, authz]
 tech_stack: []
@@ -468,6 +468,16 @@ def download_file(file_id):
 
 
 ---
+
+
+## Verification and False-Positive Controls
+
+- Perform traversal tests only against explicitly in-scope endpoints and files. Begin with harmless, known test files or application-owned fixtures; do not read operating-system secrets or unrelated user data.
+- Establish a baseline request and compare status, response length, content type, and a stable marker. A changed status code or generic error alone is not proof of file disclosure.
+- Test path decoding and normalization one variable at a time. Record the exact raw request and the server-side interpretation when observable; avoid combining multiple encodings in one first-pass probe.
+- Distinguish path traversal from local file inclusion, authorization bypass, and ordinary file-not-found behavior. Map the demonstrated root cause to CWE only after confirming it.
+- Stop after a minimal proof of access to a harmless, authorized fixture. Redact filesystem paths, cookies, tokens, and any sensitive response content from evidence.
+- Report the vulnerable parameter, required privileges, reproducible request/response, expected versus observed behavior, and the smallest demonstrated impact. Do not claim arbitrary file read unless it is actually proven within scope.
 
 ## Checklist
 

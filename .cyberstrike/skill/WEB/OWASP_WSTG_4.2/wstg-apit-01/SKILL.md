@@ -3,7 +3,7 @@ name: wstg-apit-01
 description: "API Reconnaissance"
 category: api-testing
 owasp_id: WSTG-APIT-01
-version: "1.0.0"
+version: "1.0.1"
 author: cyberstrike-official
 tags: [api, rest, graphql, soap, wstg, apit]
 tech_stack: [rest, graphql, soap, grpc]
@@ -234,6 +234,16 @@ recon.generate_report()
 
 
 ---
+
+
+## Scope, Rate Limits, and False Positives
+
+- Confirm API hostnames, versions, environments, and permitted methods against the engagement scope. Documentation links, mobile-app endpoints, and third-party API hosts are leads, not automatic authorization.
+- Prefer passive discovery first: inspect published OpenAPI/Swagger files, application-owned JavaScript, and official documentation before sending active probes.
+- Keep endpoint enumeration rate-limited and bounded. Respect program request limits and stop if responses indicate throttling, instability, or unexpected production impact.
+- A discovered route or parameter is not itself a vulnerability. Verify authentication requirements, authorization boundaries, input handling, and business impact with a designated test account and synthetic data.
+- Treat 401, 403, 404, and differing response sizes as clues rather than proof; account for gateways, WAFs, version routing, and content negotiation.
+- Record the source of each endpoint, HTTP method, required role, sanitized request/response, and validation status. Redact API keys, bearer tokens, personal data, and internal-only hostnames where disclosure is unnecessary.
 
 ## Checklist
 
