@@ -115,6 +115,20 @@ After discovery, follow this decision-based approach — test what the attack su
 - GraphQL: introspection, batch queries, deep nesting
 - Mass assignment: extra params (`role=admin`, `isAdmin=true`)
 
+## Endpoint verification loop — evidence before verdict
+
+For each endpoint from `correlate_javascript`:
+
+1. **Resolve scope first.** Use only the exact authorized origin/path and an endpoint observed in this session or explicitly allowed by the program. Static source is a lead, not permission to test a host.
+2. **Establish a baseline.** Prefer the captured `request_id` so the original method, headers, body, and cookie context are preserved. Record status, response size, relevant safe response facts, and account/role context.
+3. **Change one thing at a time** with `http_replay` compare mode: remove one optional parameter, omit a required-looking field, change a value/type, remove one cookie or auth header, or compare two authorized test-account credentials. Use only benign values and avoid state-changing/destructive operations unless explicitly permitted.
+4. **Check server-side behavior.** Compare status and response facts, but inspect the actual authorized session evidence before deciding whether validation or authorization changed. A client-side role flag, a 200 response, or a response difference alone is not proof.
+5. **Test hidden role/feature leads carefully.** Treat admin/debug/feature-flag strings as hints; compare only with authorized accounts and endpoints. Do not promote or forge privileges based solely on client-side names.
+6. **Persist the result.** `http_replay` writes a redacted endpoint history to the existing target workspace when the target was observed in this session. Review that note after each test; record whether the test was confirmed, disproven, inconclusive, or needs manual review using the supported target-note workflow. Never store credential values, raw secret values, or unredacted request/response bodies.
+7. **Prioritize manual review** when the route is state-changing, authorization results differ across roles, the request shape is ambiguous, a static sink is present, or automation cannot prove the relevant server-side condition. Static signals remain candidates until verified.
+
+Do not infer that an endpoint is safe because a mutation did not change the response. Keep the baseline, exact mutation operation, redacted evidence, confidence, and next step linked to the endpoint.
+
 ## Decision Loop
 
 After each finding:
