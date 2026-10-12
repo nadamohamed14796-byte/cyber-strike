@@ -111,6 +111,14 @@ describe("VerificationAttempts", () => {
     expect(VA.sameHypothesisIdentity(endpointSpecific, { ...sameEndpoint, vulnerabilityClass: "xss" })).toBe(false)
   })
 
+  test("hypothesis asset identity normalizes URL hosts but preserves path case", () => {
+    const upperHost = { asset: "https://EXAMPLE.test/Admin", endpoint: "/Admin", vulnerabilityClass: "idor" }
+    const sameAsset = { ...upperHost, asset: "https://example.test/Admin" }
+    const differentPath = { ...upperHost, asset: "https://example.test/admin" }
+    expect(VA.sameHypothesisIdentity(upperHost, sameAsset)).toBe(true)
+    expect(VA.sameHypothesisIdentity(upperHost, differentPath)).toBe(false)
+  })
+
   test("confirmed and disproven outcomes are terminal", () => {
     expect(VA.isTerminalOutcome(undefined)).toBe(false)
     expect(VA.isTerminalOutcome("inconclusive")).toBe(false)
