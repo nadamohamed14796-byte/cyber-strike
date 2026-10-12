@@ -136,6 +136,59 @@ test("research URL normalization removes embedded credentials and secret query p
 })
 
 
+test("learning worker applies one global automatic auth-retry budget across sources", async () => {
+  const credentialEnvs = [
+    "CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY",
+    "CYBERSTRIKE_RESEARCH_COOKIE_INTIGRITI",
+  ]
+  const originals = new Map(credentialEnvs.map((name) => [name, process.env[name]]))
+  for (const name of credentialEnvs) process.env[name] = "session=operator-provided-test-value"
+
+  try {
+    await using dir = await tmpdir({ git: true })
+    await Instance.provide({
+      directory: dir.path,
+      fn: async () => {
+        const marker = crypto.randomUUID()
+        const blockedRows = [
+          { sourceID: "hackerone-hacktivity", sourceURL: "https://hackerone.com/hacktivity/archive-" + marker },
+          { sourceID: "hackerone-hacktivity", sourceURL: "https://hackerone.com/hacktivity/archive-2-" + marker },
+          { sourceID: "intigriti", sourceURL: "https://www.intigriti.com/researchers/blog/archive-" + marker },
+          { sourceID: "intigriti", sourceURL: "https://www.intigriti.com/researchers/blog/archive-2-" + marker },
+        ]
+        const staleUpdatedAt = Date.now() - 11 * 60_000
+        for (const row of blockedRows) {
+          ResearchQueue.blockAuthentication({
+            ...row,
+            reason: "HTTP 401",
+            payload: { crawl_page: true },
+          })
+          const saved = ResearchQueue.find(row.sourceID, row.sourceURL)
+          if (!saved) throw new Error("expected auth-blocked research row to exist")
+          Database.use((db) =>
+            db.update(ResearchQueueTable)
+              .set({ updated_at: staleUpdatedAt })
+              .where(eq(ResearchQueueTable.sequence, saved.sequence))
+              .run(),
+          )
+        }
+
+        const result = await learnResearchQueue({ limit: 1 })
+        expect(result.claimed).toBe(0)
+        const statuses = blockedRows.map((row) => ResearchQueue.find(row.sourceID, row.sourceURL)?.status)
+        expect(statuses.filter((status) => status === "discovered")).toHaveLength(1)
+        expect(statuses.filter((status) => status === "blocked_auth")).toHaveLength(3)
+        await Instance.dispose()
+      },
+    })
+  } finally {
+    for (const [name, original] of originals) {
+      if (original === undefined) delete process.env[name]
+      else process.env[name] = original
+    }
+  }
+})
+
 test("research queue resumes authenticated work and learns cached report text without a second fetch", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
