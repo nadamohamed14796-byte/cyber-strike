@@ -59,7 +59,7 @@ export namespace LazyToolRegistry {
       connectedServers.add(serverName)
       try {
         const toolsResult = await client.listTools()
-        replaceServerTools(serverName, toolsResult.tools)
+        reconcileServerTools(serverName, toolsResult.tools)
         log.info("collected tool metadata", { server: serverName, count: toolsResult.tools.length })
       } catch (err) {
         // Preserve last known metadata on transient listing failures.
@@ -90,7 +90,7 @@ export namespace LazyToolRegistry {
 
     try {
       const toolsResult = await client.listTools()
-      replaceServerTools(serverName, toolsResult.tools)
+      reconcileServerTools(serverName, toolsResult.tools)
       log.info("refreshed tools from server", {
         server: serverName,
         serverTools: toolsResult.tools.length,
@@ -126,7 +126,7 @@ export namespace LazyToolRegistry {
   }
 
   /** Replace one server's snapshot after a successful listTools call. */
-  function replaceServerTools(
+  export function reconcileServerTools(
     serverName: string,
     definitions: Array<{ name: string; description?: string }>,
   ): void {
