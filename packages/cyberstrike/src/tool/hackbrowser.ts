@@ -54,7 +54,7 @@ const HackBrowserParameters = z.object({
       .array(z.string())
       .optional()
       .describe(
-        'Optional UI labels the planner must skip (e.g. "Delete Account", "Cancel Subscription"). Semantic match.',
+        "Optional UI labels the planner must skip (e.g. \"Delete Account\", \"Cancel Subscription\"). Semantic match.",
       ),
     steps: z.number().int().min(1).max(200).optional().describe("Maximum number of pages to crawl. Defaults to 50."),
     headless: z
