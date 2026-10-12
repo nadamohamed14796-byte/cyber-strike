@@ -16,6 +16,17 @@ test("extracts and deduplicates static endpoint literals from common JavaScript 
   expect(new Set(endpoints).size).toBe(endpoints.length)
 })
 
+test("normalizes numeric identifiers from relative and absolute JS endpoint literals", () => {
+  const endpoints = extractStaticJavaScriptEndpoints([
+    'fetch("/api/users/12345")',
+    'fetch("https://api.example.com/v1/accounts/67890")',
+  ].join("\n"))
+  expect(endpoints).toContain("/api/users/{id}")
+  expect(endpoints).toContain("https://api.example.com/v1/accounts/{id}")
+  expect(endpoints).not.toContain("/api/users/12345")
+  expect(endpoints).not.toContain("https://api.example.com/v1/accounts/67890")
+})
+
 test("does not treat ordinary labels or non-path relative strings as endpoints", () => {
   const endpoints = extractStaticJavaScriptEndpoints([
     'fetch("not-a-path")',
