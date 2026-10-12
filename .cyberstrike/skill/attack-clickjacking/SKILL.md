@@ -100,7 +100,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Inspect effective CSP frame-ancestors and X-Frame-Options on the exact sensitive route, including redirects and relevant authenticated response paths.
+2. Test framing in a controlled local page and a separate unauthenticated/benign route as controls; distinguish an intentional public embed from a private authenticated action exposed to framing.
+3. Identify a meaningful victim-triggered action and test only with your own disposable account/data. Demonstrate whether a framed interaction could submit that action—not merely whether the page can be displayed in an iframe.
+4. Compare routes, browser behavior, CSP inheritance, and frame-busting scripts one at a time; do not bypass browser security controls or use third-party users as victims.
+5. Capture the response headers, controlled proof page, exact action, and before/after test state. Stop and clean up the test resource after evidence collection.
+
 
 ### Verdict gates
 

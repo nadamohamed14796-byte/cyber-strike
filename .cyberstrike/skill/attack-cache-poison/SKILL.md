@@ -328,7 +328,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Choose a low-risk, non-personal, cacheable response and capture baseline headers/body twice; record cache indicators, Vary, age, cache key clues, and whether the response is shared across sessions.
+2. Use a unique non-executable canary per run, then vary exactly one candidate unkeyed header or parameter. Do not use script, redirect, or sensitive content as the poison marker.
+3. Check whether the canary persists for a separate clean request and distinguish a genuine cache hit from origin reflection, cookies, CDN transformations, or dynamic response content.
+4. Use an isolated cache key or approved staging/test route for any persistence test. Never poison a shared authenticated response, a homepage, or content likely to be served to unrelated users.
+5. Demonstrate the key mismatch with a negative control and document cache layer, cache state, response headers, and purge/expiry cleanup. A reflected header without cross-request cache impact is not confirmed poisoning.
+
 
 ### Verdict gates
 

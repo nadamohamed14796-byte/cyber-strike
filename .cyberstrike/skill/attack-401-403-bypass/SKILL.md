@@ -123,7 +123,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Capture three baselines for the same in-scope route: no credentials, an allowed test identity, and a denied test identity. Record response semantics, redirects, and server-side effects—not just the status code.
+2. Compare only documented or observed route variants (for example, API version, trailing slash, or equivalent controller route); change one route dimension at a time and retain a known-invalid route as a negative control.
+3. Vary one authentication context at a time: absent, expired/revoked, valid low-privilege, and valid authorized session. Do not treat alternate header spelling or a 200 response as proof without a protected-resource consequence.
+4. If method-level behavior differs, check only methods supported by the application contract and use a disposable record for state-changing methods. Confirm the authorization decision is inconsistent with the expected policy.
+5. Repeat the strongest differential once with a fresh controlled session and compare with the control route. Stop when the boundary failure is decisive or contradictory evidence explains the behavior.
+
 
 ### Verdict gates
 

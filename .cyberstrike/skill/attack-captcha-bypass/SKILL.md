@@ -104,7 +104,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Use only test-owned accounts and a program-approved test flow; capture the normal challenge issuance, token submission, success/failure outcome, and retry behavior.
+2. Check server-side enforcement at each relevant step: challenge omission, empty/expired token, invalid token, token replay, and challenge/session mismatch. Change only one condition per request.
+3. Compare login, registration, password recovery, and other routes only if they exist and share the same documented security requirement; a route with no CAPTCHA requirement is not inherently vulnerable.
+4. Measure whether the challenge actually gates the protected operation using a harmless canary or test account, while respecting retry caps and avoiding account lockouts or third-party CAPTCHA-solving services.
+5. Repeat with a fresh valid challenge as a positive control and an invalid challenge as a negative control. Report the control failure only when an action proceeds without the required server-side verification.
+
 
 ### Verdict gates
 

@@ -108,7 +108,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Map the authentication boundary for one in-scope feature: expected login path, protected destination, anonymous response, and allowed test account response.
+2. Compare modern and legacy entry points only when the application exposes evidence for them (for example, a legacy protocol endpoint or alternate API version); verify each route's own access policy.
+3. Check token/session validation dimensions independently: presence, signature/issuer/audience where applicable, expiry/revocation, and binding to the intended account or client. Do not treat malformed-token acceptance as impact by itself.
+4. Test recovery, SSO callback, and alternate-channel paths only if they are present. Use two controlled identities to establish whether the path authenticates the wrong identity or skips a required factor.
+5. Confirm a protected action or private test-owned resource is accessible without the required proof, then compare with a clean unauthenticated/invalid-token control and document exact preconditions.
+
 
 ### Verdict gates
 

@@ -105,7 +105,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Inventory a small set of in-scope API routes from first-party traffic or documentation, then record unauthenticated and authenticated baselines for the same request shape.
+2. Prioritize private read-only resources first; compare no credential, expired credential, and a least-privileged test token without widening the route list into guessed endpoints.
+3. Test resource ownership and role context separately from authentication: an endpoint may accept anonymous requests yet return only public data, or authenticate correctly while missing object-level authorization.
+4. Check alternate API versions, content types, and documented transport patterns only when evidence shows they reach the same handler; vary one factor and preserve a known-public or known-denied control.
+5. Confirm exposure with a synthetic canary or a test-owned object's non-public field. Redact all secrets and stop before reading unrelated user records or attempting a write.
+
 
 ### Verdict gates
 

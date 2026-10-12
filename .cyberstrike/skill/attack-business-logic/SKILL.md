@@ -105,7 +105,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Write the business invariant before testing (for example, a workflow step may happen once, a discount cannot exceed a defined limit, or a refund cannot exceed the captured amount) and capture the normal valid transaction.
+2. Test one boundary at a time using test-owned fixtures: minimum/maximum values, repeated submission, omitted optional fields, changed ownership, and permitted versus forbidden workflow ordering.
+3. Check whether the server enforces the invariant across UI, API, and asynchronous/background routes; client-side validation is context, not proof of server-side enforcement.
+4. Use idempotency/replay checks and concurrency only when explicitly allowed, at low bounded volume, with a disposable transaction and an agreed cleanup path.
+5. Measure the business outcome in server-side state or the authoritative response, compare with a valid control, and stop immediately if real money, real users, external notifications, or production inventory may be affected.
+
 
 ### Verdict gates
 

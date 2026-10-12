@@ -105,7 +105,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Build a role-to-function matrix from application routes and normal user flows. Mark each operation as allowed, denied, or not yet known for each controlled role.
+2. Invoke one directly observed function as a low-privilege test account even when the UI hides it; compare with the administrator test account and a nonexistent-function control.
+3. Separate endpoint authorization from object authorization: hold the object constant while changing role, then hold role constant while changing only a test-owned object.
+4. Use harmless or reversible administrative actions on a disposable fixture to prove the impact; avoid user, billing, permission, or tenant changes that cannot be safely rolled back.
+5. Confirm the denied baseline is genuinely policy-denied rather than merely unsupported. Report the exact role/function pair and demonstrated capability, not a general claim of administrator access.
+
 
 ### Verdict gates
 

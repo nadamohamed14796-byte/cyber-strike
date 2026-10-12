@@ -111,7 +111,12 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 
 ### Skill-specific hypothesis order
 
-Use the matrix and acceptance criteria already defined in this skill to choose the next distinct, low-impact hypothesis; do not repeat equivalent probes.
+1. Create and baseline two accounts you control with distinct inboxes and recovery methods; verify the normal sign-in, recovery, email-change, and session-revocation behavior first.
+2. Follow one identity-binding surface at a time: password reset, email/phone change, account linking, invitation acceptance, or recovery-code handling. Use only messages and tokens issued to your test accounts.
+3. Check whether tokens are bound to the correct account, purpose, and time window; inspect replay, reuse, expiry, and session rotation with disposable test state rather than attempting another person's account.
+4. Verify whether changing an identity factor affects existing sessions and linked identities as expected. Use a harmless profile marker to prove account-boundary impact without accessing private data.
+5. Re-test the claimed path from a clean browser/session and a negative control. A weak recovery hint or unusual response alone is not account takeover; report only a reproducible ability to cross account ownership.
+
 
 ### Verdict gates
 
