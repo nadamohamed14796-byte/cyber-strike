@@ -220,7 +220,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
       ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
-    const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch || callee.endsWith(".request") ? options : ""
+    const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch ? options : ""
     const directObject = bodyArgs.trim().startsWith("{") ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
     const bodySource = options + "\n" + bodyArgs + (requestConfig ? "\n" + (args[0] ?? "") : "")
     const bodyParams = [
