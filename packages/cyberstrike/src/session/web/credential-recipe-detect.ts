@@ -75,17 +75,19 @@ export namespace CredentialRecipeDetect {
    */
   export function derive(sessionID: string, credentialID: string): Recipe | undefined {
     const cred = WebCredential.getById(credentialID)
-    if (!cred) return undefined
+    // Credential IDs are database-global. Never derive or persist a recipe for
+    // a credential owned by a different root session.
+    if (!cred || cred.session_id !== sessionID) return undefined
 
     const auth = findAuthHeader(cred.headers ?? {})
 
     const requests = Request.get(sessionID)
-    // Prefer requests tagged with this credential, then any request in the
-    // session. Most-recent first so we replay the freshest mint endpoint.
+    // Fail closed if this session has no captures explicitly correlated with
+    // this credential. Falling back to unrelated session traffic can select
+    // another account's JWT mint endpoint and bind it to the wrong credential.
     const tagged = requests.filter((r) => r.credential_id === credentialID)
-    const pool = (tagged.length > 0 ? tagged : requests)
-      .slice()
-      .sort((a, b) => b.time.created - a.time.created)
+    if (tagged.length === 0) return undefined
+    const pool = tagged.slice().sort((a, b) => b.time.created - a.time.created)
 
     for (const req of pool) {
       if (!req.raw_request || !req.processed_response) continue
