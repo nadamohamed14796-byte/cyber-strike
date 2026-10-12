@@ -27,9 +27,22 @@ export namespace VerificationAttempts {
     vulnerabilityClass: string
   }
 
+  function normalizeAssetIdentity(value: string): string {
+    const trimmed = value.trim()
+    // URL hosts are case-insensitive, but URL paths and query values may not be.
+    // Never lowercase a whole URL: /Admin and /admin can be different assets.
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed
+    try {
+      const url = new URL(trimmed)
+      return url.href
+    } catch {
+      return trimmed
+    }
+  }
+
   /** A hypothesis key cannot mix evidence across different endpoints or vulnerability classes. */
   export function sameHypothesisIdentity(a: HypothesisIdentity, b: HypothesisIdentity): boolean {
-    return a.asset.trim().toLowerCase() === b.asset.trim().toLowerCase() &&
+    return normalizeAssetIdentity(a.asset) === normalizeAssetIdentity(b.asset) &&
       (a.endpoint?.trim() ?? "") === (b.endpoint?.trim() ?? "") &&
       a.vulnerabilityClass.trim().toLowerCase() === b.vulnerabilityClass.trim().toLowerCase()
   }
