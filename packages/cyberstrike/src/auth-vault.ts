@@ -49,7 +49,7 @@ function isStoredProfile(value: unknown): value is StoredProfile {
     typeof value.account !== "string" ||
     !value.account.trim() ||
     value.account.length > 120 ||
-    /[\\r\\n\\0]/.test(value.account) ||
+    /[\r\n\0]/.test(value.account) ||
     typeof value.username !== "string" ||
     !value.username.trim() ||
     value.username.length > 320 ||
