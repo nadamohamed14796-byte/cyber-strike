@@ -41,7 +41,17 @@ describe("target memory normalization", () => {
       fn: async () => {
         const target = await TargetMemory.ensure("https://example.com")
         expect(await fs.stat(path.join(target.workspacePath, "javascript"))).toBeTruthy()
+        expect(await fs.stat(path.join(target.workspacePath, "scope"))).toBeTruthy()
+        expect(await fs.stat(path.join(target.workspacePath, "recon"))).toBeTruthy()
+        expect(await fs.stat(path.join(target.workspacePath, "runs"))).toBeTruthy()
         expect(await fs.readFile(path.join(target.workspacePath, "target.json"), "utf-8")).toContain("example.com")
+        const manifest = JSON.parse(await fs.readFile(path.join(target.workspacePath, "workspace.json"), "utf-8"))
+        expect(manifest.workspaceID).toBe(target.id)
+        expect(manifest.targetURL).toBe("https://example.com")
+        const scope = JSON.parse(await fs.readFile(path.join(target.workspacePath, "scope", "scope.json"), "utf-8"))
+        expect(scope.status).toBe("unconfigured")
+        expect(scope.scopeItems).toEqual([])
+        expect(await fs.readFile(path.join(target.workspacePath, "README.md"), "utf-8")).toContain("Active testing requires an explicitly configured")
 
         const first = await TargetMemory.addNote("https://example.com", {
           kind: "lesson",
@@ -89,6 +99,33 @@ test("does not associate an existing target workspace with a session that has no
       const workspace = await TargetMemory.ensure("https://example.com")
       expect(TargetMemory.isObservedInSession("ses_no_observations_test", workspace.targetURL)).toBe(false)
       expect(TargetMemory.contextForSession("ses_from_another_project")).toBeNull()
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("requires concrete evidence before a target note can be confirmed or disproven", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      await expect(TargetMemory.addNote("https://example.com", {
+        kind: "finding",
+        content: "A finding without any supporting evidence",
+        status: "confirmed",
+        source: "test",
+      })).rejects.toThrow(/require concrete evidence/i)
+
+      const saved = await TargetMemory.addNote("https://example.com", {
+        kind: "finding",
+        content: "A finding with a controlled result",
+        evidence: "Observed response changed from 403 to 200 for an authorized test account.",
+        status: "confirmed",
+        source: "test",
+      })
+      expect(saved.note.status).toBe("confirmed")
+      expect(saved.note.content).toContain("Evidence: Observed response changed")
       await Instance.dispose()
     },
   })
