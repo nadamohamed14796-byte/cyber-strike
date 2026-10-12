@@ -63,15 +63,7 @@ async function syncTargetProfileIndex(siteURL: string, targetID: string): Promis
     await fs.rm(temp, { force: true }).catch(() => undefined)
   }
 }
-export const AuthManagerTool = Tool.define("auth_manager", {
-  description: [
-    "Manage locally saved website login profiles shared by CyberStrike agents. Use this when a site presents a login wall or an authenticated session expires.",
-    "Profiles are matched by exact URL origin (scheme + hostname + port), never by substring. Research accounts are separate from target accounts; target accounts require the current explicit targetID.",
-    "Passwords are encrypted at rest with AES-256-GCM. Set CYBERSTRIKE_CREDENTIALS_KEY to a private secret of at least 32 characters before using this tool. The key is not stored by CyberStrike.",
-    "Actions: save, list, or forget a website login profile, or request a site-specific OTP through the shared Gmail service. Passwords are never returned by this agent-facing tool. Hackbrowser can use a saved profile for visible, exact-origin login autofill; CAPTCHA, passkeys, MFA, and consent screens may still require human interaction.",
-    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here. Gmail access uses the shared read-only gmail service and a separate OAuth grant.",
-  ].join("\n"),
-  parameters: z.object({
+const AuthManagerParameters = z.object({
     action: z.enum(["save", "list", "forget", "gmail_otp"]),
     site_url: z.string().max(2048).url().describe("Site URL; only its exact origin is used for matching."),
     purpose: z.enum(["research", "target"]),
@@ -80,7 +72,17 @@ export const AuthManagerTool = Tool.define("auth_manager", {
     after: z.number().int().positive().optional().describe("Optional Unix timestamp in milliseconds; only consider OTP messages received after this time."),
     account: z.string().min(1).max(120).refine((value) => !/[\r\n\0]/.test(value), "Account label must be one line.").optional().describe("Human-readable account label, e.g. researcher-main."),
     username: z.string().min(1).max(320).refine((value) => !/[\r\n\0]/.test(value), "Username must be one line.").optional().describe("Login username/email."),
-  }),
+  })
+
+export const AuthManagerTool = Tool.define<typeof AuthManagerParameters, Tool.Metadata>("auth_manager", {
+  description: [
+    "Manage locally saved website login profiles shared by CyberStrike agents. Use this when a site presents a login wall or an authenticated session expires.",
+    "Profiles are matched by exact URL origin (scheme + hostname + port), never by substring. Research accounts are separate from target accounts; target accounts require the current explicit targetID.",
+    "Passwords are encrypted at rest with AES-256-GCM. Set CYBERSTRIKE_CREDENTIALS_KEY to a private secret of at least 32 characters before using this tool. The key is not stored by CyberStrike.",
+    "Actions: save, list, or forget a website login profile, or request a site-specific OTP through the shared Gmail service. Passwords are never returned by this agent-facing tool. Hackbrowser can use a saved profile for visible, exact-origin login autofill; CAPTCHA, passkeys, MFA, and consent screens may still require human interaction.",
+    "For save, provide the password only through CYBERSTRIKE_AUTH_PASSWORD in the CyberStrike process environment; the tool never accepts a password argument, so secrets do not enter model tool-call history. The variable is cleared after use. Never save Google account passwords here. Gmail access uses the shared read-only gmail service and a separate OAuth grant.",
+  ].join("\n"),
+  parameters: AuthManagerParameters,
   async execute(params, ctx) {
     if (params.purpose === "target" && !params.target_id?.trim()) {
       return { title: "Target ID required", output: "Target credentials must be bound to an explicit target_id. No credentials were read or written.", metadata: { ok: false } }
