@@ -33,12 +33,15 @@ function normalizeUrl(value: string, base?: URL) {
     if (url.username || url.password) return undefined
     url.hash = ""
     for (const key of [...url.searchParams.keys()]) {
-      if (
-        /^(?:utm_source|utm_medium|utm_campaign|utm_term|utm_content|ref)$/i.test(key) ||
-        /^(?:access_token|refresh_token|csrf_token|sessionid|private_key|token|api_key|apikey|secret|password|passwd|signature|sig|auth|session|sid)$/i.test(key)
-      ) {
-        url.searchParams.delete(key)
-      }
+      const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "")
+      const trackingParameter = /^(?:utmsource|utmmedium|utmcampaign|utmterm|utmcontent|ref)$/.test(normalizedKey)
+      // Signed cloud URLs and provider-specific credentials use many key names
+      // (for example X-Amz-Signature and AWS_SECRET_ACCESS_KEY). Match sensitive
+      // concepts rather than a short exact-name list before persisting source URLs.
+      const sensitiveParameter =
+        /(?:token|secret|password|passwd|privatekey|signature|credential|apikey|authorization)/.test(normalizedKey) ||
+        /^(?:auth|sid|session|sessionid|sig)$/.test(normalizedKey)
+      if (trackingParameter || sensitiveParameter) url.searchParams.delete(key)
     }
     return url.toString()
   } catch {
@@ -60,9 +63,9 @@ export function redactResearchSecrets(input: string): string {
     .replace(/(authorization|proxy-authorization)\s*:\s*(?:bearer|basic)\s+[^\s"'<>]+/gi, "$1: [REDACTED]")
     .replace(/(cookie|set-cookie)\s*:\s*[^\s"'<>]+/gi, "$1: [REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer [REDACTED]")
-    .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})\b/g, "[API KEY REDACTED]")
+    .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|npm_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|(?:AKIA|ASIA|AIDA|AROA|AIPA|ANPA|ANVA|ASCA)[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})\b/g, "[API KEY REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
-    .replace(/((?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|csrf[_-]?token|session[_-]?id|sessionid|private[_-]?key|secret[_-]?key|password|passwd|token|secret|sid)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s"'&,;<>]+)/gi, "$1[REDACTED]")
+    .replace(/((?:aws[_-]?secret[_-]?access[_-]?key|secret[_-]?access[_-]?key|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|csrf[_-]?token|session[_-]?id|sessionid|private[_-]?key|secret[_-]?key|password|passwd|token|secret|sid)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s"'&,;<>]+)/gi, "$1[REDACTED]")
     .replace(/([?&](?:access_token|refresh_token|csrf_token|sessionid|private_key|token|api_key|apikey|secret|password|signature|sig|auth|session)=)[^&#\s"'<>]+/gi, "$1[REDACTED]")
 }
 
