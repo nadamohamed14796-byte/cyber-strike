@@ -114,7 +114,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Map NestJS controllers, routes, guards, interceptors, and validation behavior from permitted traffic/source evidence; check whether guard application differs across controller and method levels.
+2. Compare anonymous, low-privilege, and authorized test identities on one route in each relevant controller, including nested resource ownership.
+3. Test validation and property-level authorization on test-owned records using benign marker fields; compare DTO allowlisting and validation pipe behavior between create/update routes.
+4. Check deployment-specific debug, CORS, trusted proxy, and exception-filter behavior with safe negative controls rather than assuming defaults from the framework name.
+5. Confirm one server-side policy failure or unintended disclosure, then identify the missing guard/policy/DTO validation and provide a regression case.
+
 
 ### Verdict gates
 

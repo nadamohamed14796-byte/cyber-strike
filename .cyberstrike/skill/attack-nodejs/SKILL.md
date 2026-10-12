@@ -121,7 +121,12 @@ Record each attempt: hypothesis, single changed variable, control/baseline, obse
 
 ### Skill-specific hypothesis order
 
-Choose independent, low-impact verification branches already supported by this skill's coverage matrix.
+1. Identify the actual Node.js framework and entry points (Express/Koa/Fastify or custom) from confirmed evidence, and map the middleware order relevant to the candidate route.
+2. Check parsing/validation, error handling, path/host trust, cookie/session policy, and route authorization one layer at a time; use a malformed but benign request and a random-path control.
+3. Where prototype pollution, deserialization, template rendering, or file operations are plausible, begin with inert markers and a test-owned fixture rather than command execution or data extraction.
+4. Compare server-side policy across API and UI routes using controlled identities; confirm object ownership and schema validation independently of client-side controls.
+5. Report only a reproducible server-side consequence and include framework-specific safe configuration/code remediation plus the exact negative-control regression test.
+
 
 ### Verdict gates
 

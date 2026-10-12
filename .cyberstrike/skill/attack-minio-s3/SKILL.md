@@ -115,7 +115,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Confirm the authorized MinIO/S3 endpoint and test bucket, then baseline anonymous and authenticated metadata access without listing or downloading user data.
+2. Check effective bucket/object policy, ACLs, anonymous access, signed URL expiry, and tenant boundaries with a purpose-built benign canary object.
+3. Use one controlled read or write check only where explicitly authorized; do not enumerate all buckets, copy datasets, or alter/delete production objects.
+4. Distinguish a publicly reachable endpoint from a publicly accessible object and a test bucket from a production bucket; correlate policy with effective response.
+5. Record exact bucket/prefix, principal, action, and response; propose least-privilege policy, blocking public access where appropriate, and a read-only regression test.
+
 
 ### Verdict gates
 

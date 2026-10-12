@@ -121,7 +121,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Identify Laravel version and active routes from reliable evidence; use the version only to guide checks, not as proof of a vulnerability.
+2. Check exposed debug/error pages, APP_DEBUG behavior, trusted host/proxy settings, session/cookie controls, storage artifacts, and public framework endpoints with a nonexistent-path control.
+3. Review route middleware and policy behavior using controlled roles, particularly API routes and resource binding that may bypass UI-only protection.
+4. Use only test-owned records for upload, mass-assignment, serialization, or queue-related checks. Do not attempt to read .env, use APP_KEY, or invoke commands on a live target to prove a suspected misconfiguration.
+5. Confirm a concrete disclosure or permission failure and tie remediation to the applicable Laravel configuration/middleware plus a repeatable test.
+
 
 ### Verdict gates
 

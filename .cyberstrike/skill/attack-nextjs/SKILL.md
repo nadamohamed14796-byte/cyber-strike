@@ -120,7 +120,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Identify the deployed router/runtime mode (App Router or Pages Router, server/client component boundaries, API routes, and middleware) from reliable evidence; version strings alone are insufficient.
+2. Compare server-side route authorization with client-side navigation protections, including API handlers, server actions, middleware, and data-fetching endpoints relevant to the same resource.
+3. Check for accidentally exposed source maps, build artifacts, debug data, and environment values using random-file controls; redact secrets immediately.
+4. Use controlled roles and test-owned records to verify that data fetched on the server is authorized before serialization to the client; do not assume hidden components are protected APIs.
+5. Capture the exact route/runtime and proof of data/action exposure, then recommend server-side authorization, safe environment-variable exposure, and build-time regression checks.
+
 
 ### Verdict gates
 

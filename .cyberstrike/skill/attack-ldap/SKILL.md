@@ -104,7 +104,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Map the application's LDAP-backed field and expected query behavior from normal traffic, then record valid and invalid baseline inputs.
+2. Use benign metacharacter and type-boundary probes to detect whether input changes query structure; compare error, result count, and behavior against a known-no-match control.
+3. Test login/search/filter contexts separately and change one input field at a time. Do not enumerate the directory, dump entries, attempt credential guessing, or alter directory objects.
+4. Confirm only a controlled authentication/authorization or data-filtering effect using test identities and synthetic directory entries; a verbose LDAP error alone is a signal, not impact.
+5. Recommend parameterized/escaped LDAP filters and least-privilege bind accounts, then add regression cases for special characters and empty/no-match values.
+
 
 ### Verdict gates
 

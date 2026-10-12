@@ -107,7 +107,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Record the normal allowed fields and server response for a test-owned object, including the expected role/tenant/owner values.
+2. Probe only plausible extra fields supported by the application's data model (for example, status, owner, tenant, or role) one at a time with harmless marker values.
+3. Compare fields accepted by create, update, bulk, and nested operations; server-side allowlists may differ by operation and version.
+4. Use a disposable record and an inert canary field to verify whether a forbidden property truly persists or changes an authorization boundary; do not promote your own account to admin in a shared production tenant.
+5. Capture before/after state, valid-field control, and the denied policy. Recommend explicit DTO/field allowlists and separate create/update schemas.
+
 
 ### Verdict gates
 

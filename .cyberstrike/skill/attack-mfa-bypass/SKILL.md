@@ -103,7 +103,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Use two test accounts with MFA enabled and record a normal password-plus-second-factor login as the positive control.
+2. Test each alternate path separately: remembered device, recovery codes, factor reset/change, password reset, SSO, API login, mobile flow, and session reuse where those paths exist.
+3. Check binding of challenge, account, session, and time window using invalid, expired, reused, and cross-session test artifacts; honor retry caps and avoid lockout of real users.
+4. Confirm whether the protected test account reaches a sensitive feature without satisfying its configured factor; merely skipping a UI prompt is not proof if the server still enforces MFA.
+5. Capture clean and bypass-path state transitions, invalidate test sessions/recovery codes afterward, and recommend consistent server-side step-up policies and revocation.
+
 
 ### Verdict gates
 

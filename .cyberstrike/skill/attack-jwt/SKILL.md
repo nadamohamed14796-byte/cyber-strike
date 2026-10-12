@@ -164,7 +164,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Capture a token issued to a test account and document expected issuer, audience, expiry, key/algorithm, and role claims without exposing the token in logs.
+2. Establish accepted/rejected controls using a valid test token, an expired token, a malformed token, and a token with one altered claim; change one dimension at a time.
+3. Verify signature and algorithm handling, issuer/audience validation, key selection, and token-to-session binding only with tokens and signing material you control. Do not reuse captured third-party tokens or fetch attacker-controlled key URLs against production.
+4. Check whether a claim change actually grants a protected capability on a harmless test-owned resource; decoded claims or token acceptance alone are not proof.
+5. Redact tokens and keys, re-test with a fresh valid token, and recommend strict algorithm/key allowlists, issuer/audience checks, short lifetimes, revocation strategy, and a regression suite.
+
 
 ### Verdict gates
 
