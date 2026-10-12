@@ -1,7 +1,7 @@
 import type { Argv } from "yargs"
 import * as prompts from "@clack/prompts"
 import { cmd } from "./cmd"
-import { discoverResearch, learnResearchQueue } from "../../research/ingest"
+import { discoverResearch, learnResearchQueue, retryAuthenticatedResearch } from "../../research/ingest"
 import { ResearchQueue } from "../../research/queue"
 import { ReportKnowledge } from "../../learning/report-knowledge"
 
@@ -35,6 +35,8 @@ export const UpdateCommand = cmd({
     do {
       cycle++
       prompts.log.step("Cycle " + cycle + ": discovering public research")
+      const authRequeued = await retryAuthenticatedResearch({ limit: 500 })
+      if (authRequeued > 0) prompts.log.info("auth-blocked research resumed=" + authRequeued)
       const discovery = await discoverResearch({ pages, depth })
       let candidates = 0
       let added = 0

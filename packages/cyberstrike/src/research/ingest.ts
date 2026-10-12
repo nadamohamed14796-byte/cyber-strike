@@ -538,6 +538,23 @@ export function looksLikeResearchAuthenticationWall(url: string, title: string, 
   return text.trim().length < 1200 && /<form\b/i.test(html) && /(?:password|sign in|log in|login|email address)/i.test(html) && /(?:login|signin|sign-in|auth|session)/i.test(html)
 }
 
+/**
+ * Resume authentication-blocked research only for sources with an operator-provided session.
+ * Report URLs return to the learning queue; index/crawl pages return to discovery.
+ * A cooldown prevents invalid sessions from being retried on every watch cycle.
+ */
+export async function retryAuthenticatedResearch(input: { sourceID?: string; limit?: number } = {}) {
+  const { ResearchQueue } = await import("./queue")
+  const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
+  const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  return sources
+    .filter(researchSourceHasCredentials)
+    .reduce(
+      (total, source) => total + ResearchQueue.retryAuthenticationBlocked(limit, source.id, AUTH_RETRY_COOLDOWN_MS),
+      0,
+    )
+}
+
 export type ResearchSyncOptions = {
   limit?: number
   pages?: number

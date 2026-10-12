@@ -2,7 +2,7 @@ import * as prompts from "@clack/prompts"
 import { cmd } from "./cmd"
 import { ReportKnowledge } from "../../learning/report-knowledge"
 import { RESEARCH_SOURCES } from "../../research/sources"
-import { discoverResearch, learnResearchQueue } from "../../research/ingest"
+import { discoverResearch, learnResearchQueue, retryAuthenticatedResearch } from "../../research/ingest"
 import { ResearchQueue } from "../../research/queue"
 
 function knowledgeScoreLabel(row: {
@@ -76,22 +76,11 @@ export const ResearchCommand = cmd({
           prompts.intro("CyberStrike Research Learning")
           const deep = Boolean(args.deep)
           const exhaustive = Boolean(args.all)
-          // If a valid source-scoped session is configured, automatically resume
-          // blocked reports during sync rather than requiring retry-auth separately.
-          const authReadySources = (args.source
-            ? RESEARCH_SOURCES.filter((source) => source.id === args.source)
-            : RESEARCH_SOURCES
-          ).filter((source) => {
-            const suffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
-            return Boolean(
-              process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + suffix]?.trim() ||
-              process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + suffix]?.trim()
-            )
+          // Resume blocked reports and crawl pages only when this source has an operator-provided session.
+          const authRequeued = await retryAuthenticatedResearch({
+            sourceID: args.source,
+            limit: exhaustive ? 500 : args.limit,
           })
-          let authRequeued = 0
-          for (const source of authReadySources) {
-            authRequeued += ResearchQueue.retryAuthenticationBlocked(exhaustive ? 500 : args.limit, source.id, 10 * 60_000)
-          }
           if (authRequeued > 0) prompts.log.info("auth-blocked reports resumed=" + authRequeued)
           const discoveries = await discoverResearch({
             sourceID: args.source,

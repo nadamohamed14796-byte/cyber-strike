@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets } from "../../src/research/ingest"
+import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -167,6 +167,49 @@ test("learning reuses cached report text instead of fetching the same report URL
         expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("learned")
       } finally {
         globalThis.fetch = originalFetch
+        await Instance.dispose()
+      }
+    },
+  })
+})
+
+
+test("authenticated research retry resumes report and index URLs only for the selected configured source", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "hackerone-hacktivity"
+      const cookieEnv = "CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY"
+      const authorizationEnv = "CYBERSTRIKE_RESEARCH_AUTHORIZATION_HACKERONE_HACKTIVITY"
+      const originalCookie = process.env[cookieEnv]
+      const originalAuthorization = process.env[authorizationEnv]
+      const indexURL = "https://hackerone.com/hacktivity"
+      const reportURL = "https://hackerone.com/reports/123456"
+      const otherURL = "https://portswigger.net/web-security/access-control/idor"
+
+      process.env[cookieEnv] = "session=operator-provided-test-value"
+      delete process.env[authorizationEnv]
+      try {
+        ResearchQueue.blockAuthentication({
+          sourceID,
+          sourceURL: indexURL,
+          reason: "HTTP 401",
+          payload: { crawl_page: true },
+        })
+        ResearchQueue.blockAuthentication({ sourceID, sourceURL: reportURL, reason: "HTTP 401" })
+        ResearchQueue.blockAuthentication({ sourceID: "portswigger", sourceURL: otherURL, reason: "HTTP 401" })
+
+        expect(await retryAuthenticatedResearch({ sourceID, limit: 10 })).toBe(2)
+        expect(ResearchQueue.find(sourceID, indexURL)?.status).toBe("discovered")
+        expect(ResearchQueue.find(sourceID, indexURL)?.payload?.crawl_page).toBe(true)
+        expect(ResearchQueue.find(sourceID, reportURL)?.status).toBe("queued")
+        expect(ResearchQueue.find("portswigger", otherURL)?.status).toBe("blocked_auth")
+      } finally {
+        if (originalCookie === undefined) delete process.env[cookieEnv]
+        else process.env[cookieEnv] = originalCookie
+        if (originalAuthorization === undefined) delete process.env[authorizationEnv]
+        else process.env[authorizationEnv] = originalAuthorization
         await Instance.dispose()
       }
     },
