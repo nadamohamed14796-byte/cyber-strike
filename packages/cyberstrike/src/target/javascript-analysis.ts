@@ -174,8 +174,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const isXHR = callee.endsWith(".open")
     const methodSuffix = /\.(get|post|put|patch|delete|head|options)$/i.exec(callee)?.[1]?.toUpperCase() ?? null
     const axiosMethod = methodSuffix
+    const requestConfig = callee.endsWith(".request") && (args[0] ?? "").trim().startsWith("{")
     const urlExpression = isXHR ? args[1] ?? "" : args[0] ?? ""
-    const literalMatch = callee === "axios.request"
+    const literalMatch = requestConfig
       ? (args[0] ?? "").match(/\burl\s*:\s*["'\x60]([^"'\x60]{1,2048})["'\x60]/)
       : urlExpression.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
     if (!literalMatch) continue
