@@ -107,6 +107,11 @@ describe("VerificationAttempts", () => {
     expect(result.canContinue).toBe(true)
   })
 
+  test("invalid attempts do not prevent further valid verification strategies", () => {
+    const invalidAttempts = Array.from({ length: 20 }, (_, i) => attempt("invalid-" + i, "setup", false))
+    expect(VA.canRunAttempt(invalidAttempts, { strategyID: "valid-auth-check", variantKey: "fresh-session" })).toBe(true)
+  })
+
   test("decisive confirmation stops early only with valid conditions and direct evidence", () => {
     const result = VA.decide({
       attempts: [{ ...attempt("xss.execution-check", "benign-marker"), evidenceRef: "evidence://xss-proof" }],
