@@ -150,7 +150,15 @@ export namespace Storage {
     for (let index = migration; index < MIGRATIONS.length; index++) {
       log.info("running migration", { index })
       const migration = MIGRATIONS[index]
-      await migration(dir).catch(() => log.error("failed to run migration", { index }))
+      try {
+        await migration(dir)
+      } catch (error) {
+        // Do not advance the migration cursor after a failed migration. Some
+        // migrations copy legacy session data; swallowing an error here would
+        // permanently skip the remaining records on the next startup.
+        log.error("failed to run migration", { index, error })
+        throw error
+      }
       await Bun.write(path.join(dir, "migration"), (index + 1).toString())
     }
     return {
