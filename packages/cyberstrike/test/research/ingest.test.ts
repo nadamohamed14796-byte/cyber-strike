@@ -159,7 +159,7 @@ test("learning reuses cached report text instead of fetching the same report URL
       globalThis.fetch = (async () => {
         fetchCalls++
         throw new Error("cached research content must not trigger another HTTP fetch")
-      }) as typeof fetch
+      }) as unknown as typeof fetch
       try {
         const result = await learnResearchQueue({ limit: 1, sourceID })
         expect(result.learned).toBe(1)
