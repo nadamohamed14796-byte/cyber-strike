@@ -116,6 +116,7 @@ export namespace Discovery {
   }
 
   async function extractSafeArchive(archive: string, root: string, budget: ResourceBudget): Promise<boolean> {
+    if (Date.now() >= budget.deadline) return false
     await mkdir(root, { recursive: true })
     const rootStat = await lstat(root)
     if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) return false
@@ -500,44 +501,48 @@ export namespace Discovery {
     }
 
     for (let offset = 0; offset < list.length; offset += MAX_CONCURRENT_SKILL_DOWNLOADS) {
+      if (Date.now() >= budget.deadline) {
+        log.warn("stopping skill registry processing: overall time budget exhausted", { url: index })
+        break
+      }
       const batch = list.slice(offset, offset + MAX_CONCURRENT_SKILL_DOWNLOADS)
       await Promise.all(
         batch.map(async (skill) => {
-        const root = path.join(cacheRoot, skill.name)
-        try {
-          if ("files" in skill && Array.isArray(skill.files)) {
-            // Sequential per-skill downloads keep global concurrency bounded by the outer batch.
-            for (const file of skill.files) {
-              const dest = resolveSkillFilePath(root, file)
-              if (!dest) {
-                log.warn("skipping unsafe skill file path", { skill: skill.name, file })
-                continue
+          const root = path.join(cacheRoot, skill.name)
+          try {
+            if ("files" in skill && Array.isArray(skill.files)) {
+              // Sequential per-skill downloads keep global concurrency bounded by the outer batch.
+              for (const file of skill.files) {
+                const dest = resolveSkillFilePath(root, file)
+                if (!dest) {
+                  log.warn("skipping unsafe skill file path", { skill: skill.name, file })
+                  continue
+                }
+                const link = new URL(file, `${host}/${skill.name}/`).href
+                await get(link, dest, root, budget)
               }
-              const link = new URL(file, `${host}/${skill.name}/`).href
-              await get(link, dest, root, budget)
-            }
-          } else if ("url" in skill && typeof skill.url === "string") {
-            const link = new URL(skill.url, base).href
-            if ("type" in skill && skill.type === "archive") {
-              // Archive format: download tar.gz and extract
-              const archive = path.join(root, `${skill.name}.tar.gz`)
-              await mkdir(root, { recursive: true })
-              if (await get(link, archive, root, budget, true)) {
-                await extractSafeArchive(archive, root, budget)
+            } else if ("url" in skill && typeof skill.url === "string") {
+              const link = new URL(skill.url, base).href
+              if ("type" in skill && skill.type === "archive") {
+                // Archive format: download tar.gz and extract
+                const archive = path.join(root, `${skill.name}.tar.gz`)
+                await mkdir(root, { recursive: true })
+                if (await get(link, archive, root, budget, true)) {
+                  await extractSafeArchive(archive, root, budget)
+                }
+              } else {
+                // Single file (skill-md): download as SKILL.md
+                const dest = path.join(root, "SKILL.md")
+                await mkdir(root, { recursive: true })
+                await get(link, dest, root, budget)
               }
-            } else {
-              // Single file (skill-md): download as SKILL.md
-              const dest = path.join(root, "SKILL.md")
-              await mkdir(root, { recursive: true })
-              await get(link, dest, root, budget)
             }
-          }
 
-          const md = await safeCacheDestination(cacheRoot, path.join(root, "SKILL.md"), false)
-          if (md && (await Bun.file(md).exists())) result.push(root)
-        } catch (err) {
-          log.error("failed to process remote skill entry", { url: index, name: skill.name, err })
-        }
+            const md = await safeCacheDestination(cacheRoot, path.join(root, "SKILL.md"), false)
+            if (md && (await Bun.file(md).exists())) result.push(root)
+          } catch (err) {
+            log.error("failed to process remote skill entry", { url: index, name: skill.name, err })
+          }
         }),
       )
     }
