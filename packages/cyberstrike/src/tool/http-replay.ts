@@ -167,6 +167,47 @@ function buildFromTarget(t: {
 }
 
 const BODY_PREVIEW = 4096
+const SECRET_HEADER = /^(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-access-token|x-session-token|x-csrf-token)$/i
+
+function redactSensitiveText(value: string): string {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
+    .replace(/([?&](?:access[_-]?token|refresh[_-]?token|token|api[_-]?key|client[_-]?secret|password|session(?:id)?|sid|auth|code)=)[^&#\s]*/gi, "$1[REDACTED]")
+    .replace(/([\"']?(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret|session(?:id)?|csrf(?:token)?)[\"']?\s*[:=]\s*)(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^,\\s;}\\r\\n]+)/gi, "$1[REDACTED]")
+}
+
+function redactRequestForOutput(msg: HttpMessage.Request): HttpMessage.Request {
+  const headers = msg.headers.map((header) => ({
+    ...header,
+    value: SECRET_HEADER.test(header.name) ? "[REDACTED]" : redactSensitiveText(header.value),
+  }))
+  let body = msg.body
+  try {
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(msg.body)
+    if (!/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(decoded)) {
+      body = new TextEncoder().encode(redactSensitiveText(decoded))
+    } else if (msg.body.length > 0) {
+      body = new Uint8Array()
+    }
+  } catch {
+    // Do not serialize binary or malformed request bodies into agent output.
+    body = new Uint8Array()
+  }
+  if (body.length === 0) {
+    for (let i = headers.length - 1; i >= 0; i--) {
+      if (["content-length", "transfer-encoding"].includes(headers[i].name.toLowerCase())) headers.splice(i, 1)
+    }
+  } else {
+    const contentLength = headers.find((header) => header.name.toLowerCase() === "content-length")
+    if (contentLength) contentLength.value = String(body.length)
+  }
+  return { ...msg, headers, body }
+}
+
+function curlTemplate(msg: HttpMessage.Request, origin: string): string {
+  return Apply.toCurl(redactRequestForOutput(msg), origin)
+}
 
 function summarize(result: ReplayResponse.Result, marker?: string): Record<string, unknown> {
   if (result.error) {
@@ -179,9 +220,12 @@ function summarize(result: ReplayResponse.Result, marker?: string): Record<strin
     reason: res.reason,
     timing_ms: Math.round(result.timing.totalMs),
     ttfb_ms: result.timing.ttfbMs !== undefined ? Math.round(result.timing.ttfbMs) : undefined,
-    response_headers: res.headers.slice(0, 40),
+    response_headers: res.headers.slice(0, 40).map(({ name, value }) => ({
+      name,
+      value: SECRET_HEADER.test(name) ? "[REDACTED]" : redactSensitiveText(value).slice(0, 2048),
+    })),
     body_len: res.body.length,
-    body_preview: bodyText.slice(0, BODY_PREVIEW),
+    body_preview: redactSensitiveText(bodyText).slice(0, BODY_PREVIEW),
     body_truncated: res.body.length > BODY_PREVIEW,
     error_signatures: Observe.errorSignatures(res.body),
     attempts: (result as Send.Result).attempts,
@@ -289,7 +333,7 @@ function buildDiff(baseline: ReplayResponse.Result, exploit: ReplayResponse.Resu
 
 const REPLAY_DESC = `Replay a captured request with field-level mutations, sent through the structured (fetch) backend — no shell, so payloads land as request DATA byte-for-byte.
 
-Resolve request_id, apply mutations[] (set/add/remove query & header, set body/method/target, body-merge, body-set-field, body-remove-field, set-cookie, remove-cookie, set-path-param — each value optionally passed through an encode pipeline), then send once (governed: timeout, retry only on transient+idempotent, budget, circuit breaker). Returns FACTS: status, timing, response headers/body preview, error-signature hits, and (if you pass a marker) whether that marker reflected raw vs html-encoded — plus a copy-pasteable curl equivalent for your report. It never decides "vulnerable"; you judge the observations.
+Resolve request_id, apply mutations[] (set/add/remove query & header, set body/method/target, body-merge, body-set-field, body-remove-field, set-cookie, remove-cookie, set-path-param — each value optionally passed through an encode pipeline), then send once (governed: timeout, retry only on transient+idempotent, budget, circuit breaker). Returns FACTS: status, timing, response headers/body preview, error-signature hits, and (if you pass a marker) whether that marker reflected raw vs html-encoded — plus a redacted curl template; sensitive headers, tokens, and binary bodies are omitted. It never decides "vulnerable"; you judge the observations.
 
 Special modes:
 - **credential**: Swap auth headers — pass a session credential ID and the engine strips all auth headers from the captured request and injects the credential's headers. Use for cross-credential IDOR testing.
@@ -462,8 +506,8 @@ export const HttpReplayTool = Tool.define("http_replay", {
       ])
 
       const output = {
-        baseline: { ...summarize(baselineResult, params.marker), curl: Apply.toCurl(baselineMsg, origin) },
-        exploit: { ...summarize(exploitResult, params.marker), curl: Apply.toCurl(exploitMsg, origin) },
+        baseline: { ...summarize(baselineResult, params.marker), curl: curlTemplate(baselineMsg, origin) },
+        exploit: { ...summarize(exploitResult, params.marker), curl: curlTemplate(exploitMsg, origin) },
         diff: buildDiff(baselineResult, exploitResult),
       }
 
@@ -529,7 +573,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
     const output = {
       target: { method: msg.method, origin, request_target: msg.target },
       ...summarize(result, params.marker),
-      curl: Apply.toCurl(msg, origin),
+      curl: curlTemplate(msg, origin),
     }
     return { title: `http_replay ${msg.method} ${originHost}`, output: JSON.stringify(output, null, 2), metadata: {} }
   },
