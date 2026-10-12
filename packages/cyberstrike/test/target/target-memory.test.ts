@@ -70,11 +70,15 @@ describe("target memory normalization", () => {
   })
 })
 
-test("target observation matching requires the target host and scoped path", () => {
+test("target observation matching requires exact origin and scoped path", () => {
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/api/users")).toBe(true)
+  expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/")).toBe(true)
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/other-app/api/users")).toBe(false)
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://unrelated.example.net/portal/api/users")).toBe(false)
-  expect(TargetMemory.targetObservationMatches("https://app.example.com", "https://api.app.example.com/v1/users")).toBe(true)
+  expect(TargetMemory.targetObservationMatches("https://app.example.com", "https://api.app.example.com/v1/users")).toBe(false)
+  expect(TargetMemory.targetObservationMatches("https://app.example.com", "http://app.example.com/v1/users")).toBe(false)
+  expect(TargetMemory.targetObservationMatches("https://app.example.com", "https://app.example.com:8443/v1/users")).toBe(false)
+  expect(TargetMemory.targetObservationMatches("https://app.example.com", "app.example.com/v1/users")).toBe(false)
 })
 
 test("does not associate an existing target workspace with a session that has no observations", async () => {
