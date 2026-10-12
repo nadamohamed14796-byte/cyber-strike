@@ -96,10 +96,14 @@ export namespace ResearchQueue {
       // Never downgrade or overwrite a real report/auth record with an index-page marker.
       if (existing && existing.payload?.crawl_page !== true) return existing
       if (existing) {
+        // A successful revisit after login must clear the auth-wall marker. Otherwise the
+        // row becomes "discovered" but still carries auth_required=true, contradicting its
+        // state and confusing later crawl/retry decisions. Never retain cached login text.
+        const { auth_required: _authRequired, cached_text: _cachedText, ...existingPayload } = existing.payload ?? {}
         return db.update(ResearchQueueTable).set({
           title: input.title ?? existing.title,
           payload: {
-            ...existing.payload,
+            ...existingPayload,
             crawl_page: true,
             ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
           },
@@ -108,6 +112,7 @@ export namespace ResearchQueue {
           last_error: null,
           lease_owner: null,
           lease_until: null,
+          completed_at: null,
         }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
       }
       const inserted = db.insert(ResearchQueueTable).values({
