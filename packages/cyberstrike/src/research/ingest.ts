@@ -660,7 +660,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 candidate_score: candidateScore(current.url, source),
                 // Discovery already fetched and sanitized this report. Cache the bounded text
                 // so the learning worker does not issue a second HTTP request for the same page.
-                cached_text: text.slice(0, 12000),
+                cached_text: text.length <= 100_000 ? text : undefined,
                 content_fingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
               },
             })
