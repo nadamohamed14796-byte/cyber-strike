@@ -72,30 +72,71 @@ export namespace SkillContext {
   ): Suggestion[] {
     const result: Suggestion[] = []
     const suggested = new Set<string>()
-    const active = new Set(Array.from(loaded.values()).filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name))
+    const active = new Set(
+      Array.from(loaded.values()).filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name),
+    )
+
+    function addWithPrerequisites(
+      name: string,
+      reason: string,
+      priority: Suggestion["priority"],
+      visiting = new Set<string>(),
+    ) {
+      if (active.has(name) || suggested.has(name) || visiting.has(name)) return
+      visiting.add(name)
+
+      // Resolve and surface prerequisite skills before the skill that depends on
+      // them. This suggests the reading order; it does not claim the real-world
+      // prerequisite (such as credentials) exists.
+      for (const reference of SkillIndex.prerequisitesFor(name)) {
+        const prerequisite = SkillIndex.resolveReference(reference)
+        if (!prerequisite || active.has(prerequisite) || suggested.has(prerequisite)) continue
+        addWithPrerequisites(
+          prerequisite,
+          `prerequisite for ${name}`,
+          priority === "high" ? "high" : "medium",
+          visiting,
+        )
+      }
+
+      visiting.delete(name)
+      if (active.has(name) || suggested.has(name)) return
+      suggested.add(name)
+      result.push({ name, reason, priority })
+    }
 
     for (const finding of findings) {
+      const severity = finding.severity?.toLowerCase()
+      const priority: Suggestion["priority"] =
+        severity === "critical" || severity === "high" ? "high" : severity === "medium" ? "medium" : "low"
+
       const chains = SkillIndex.chainsFrom(finding.skill_id)
       for (const chain of chains) {
-        if (active.has(chain.target) || suggested.has(chain.target)) continue
-        suggested.add(chain.target)
-        result.push({
-          name: chain.target,
-          reason: chain.boost ?? `chains with ${finding.skill_id}`,
-          priority: chain.boost ? "high" : "medium",
-        })
+        addWithPrerequisites(
+          chain.target,
+          chain.boost ?? `chains with ${finding.skill_id}`,
+          chain.boost ? "high" : "medium",
+        )
+      }
+
+      if (finding.cwe_id?.trim()) {
+        for (const skill of SkillIndex.byCWE(finding.cwe_id.trim())) {
+          addWithPrerequisites(
+            skill.name,
+            `matches CWE: ${finding.cwe_id}`,
+            priority,
+          )
+        }
       }
 
       if (finding.tech_stack?.length) {
         const techSkills = SkillIndex.byTechStack(finding.tech_stack)
         for (const skill of techSkills) {
-          if (active.has(skill.name) || suggested.has(skill.name)) continue
-          suggested.add(skill.name)
-          result.push({
-            name: skill.name,
-            reason: `matches tech stack: ${finding.tech_stack.join(", ")}`,
-            priority: "low",
-          })
+          addWithPrerequisites(
+            skill.name,
+            `matches tech stack: ${finding.tech_stack.join(", ")}`,
+            "low",
+          )
         }
       }
     }
