@@ -147,6 +147,14 @@ These 20 review lenses were inspected through repository source/manifest/API rev
 | 18 | Documentation and repository hygiene | PASS_WITH_BLOCKERS | Updated security methodology and audit ledger; inspected README/package metadata/AGENTS. Public upstream URL may be intentional and was left unchanged. Local git status, secret scan across untracked files, and automated formatting checks remain unavailable. |
 | 19 | End-to-end workflow validation | BLOCKED_EXTERNAL_RUNTIME | Traced CLI research update to durable queue and ResearchContext injection; target notes and JS correlation have a linked path into session context. No live provider-backed hunt, full browser multi-account crawl, or authorized target-side workflow was executable here. |
 | 20 | Independent adversarial review | PASS_WITH_BLOCKERS | Review uncovered target-memory uniqueness/index mismatch (fixed #34), IPv4-substring CIDR false match (fixed #36), and WebFetch unbounded body buffering/redirect permission gap (fixed #38). Unsafe active-method probing and disabled TLS verification were found only in unmerged branches and were not merged. Broad stale branches and local runtime remain blockers. |
+
+### PR / branch integration follow-up — exact-head comparison
+
+- **PR #41 — docs/idor skill expansion:** added an audit comment explaining that the current diff removes over 6,100 lines while adding about 1,660, and reduces several detailed WSTG/core playbooks to short summaries. Do not integrate this wholesale until the procedure loss is reconciled and each skill catalog/load/reference test passes on the rebased head. Comment: [PR #41](https://github.com/nadamohamed14796-byte/cyber-strike/pull/41#issuecomment-6128605193).
+- **PR #42 — target memory foundation:** added an audit comment documenting the stale research-queue contract. Its queue uses `claimNext(workerID)` and a fixed lease identity; current main has source-scoped claiming and per-claim unique lease tokens. Rebase and port only missing target-memory logic; do not replace current-main queue, migration, auth, and redaction hardening. Comment: [PR #42](https://github.com/nadamohamed14796-byte/cyber-strike/pull/42#issuecomment-6128607163).
+- **PR #2 — Hackbrowser improvement:** exact-head inspection confirms the branch still uses interpolated `execSync` command strings and sets `NODE_TLS_REJECT_UNAUTHORIZED=0` for the Chromium installer. Current main instead uses argument-array `execFileSync`, provider-scoped child environment, and normal TLS verification. Comment added; port only unique browser improvements after rebase. Comment: [PR #2](https://github.com/nadamohamed14796-byte/cyber-strike/pull/2#issuecomment-6128607687).
+- These PRs remain open/unmerged. Since they are owned by the repository author, GitHub disallowed a formal `REQUEST_CHANGES` review; audit findings were posted as conversation comments instead. No branches or PRs were deleted.
+
 ## Completion policy
 
 - Do not change an issue to `fixed_verified` until the final code on the relevant branch passes the required CI and integration checks.
@@ -420,3 +428,14 @@ The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill
 - **Regression coverage:** expanded the authenticated research queue test with four blocked rows across two configured sources and asserts that `limit: 1` requeues exactly one row total.
 - **Commits:** implementation [a44142f81e1be950f1806869a2cbb07c072d4b67](https://github.com/nadamohamed14796-byte/cyber-strike/commit/a44142f81e1be950f1806869a2cbb07c072d4b67); regression test [e7d53cc41a8db6695ef5856a520681901281adfd](https://github.com/nadamohamed14796-byte/cyber-strike/commit/e7d53cc41a8db6695ef5856a520681901281adfd).
 - **Validation status:** verified on main checkpoint `fa97b3568bcd36857cf30f10f632d864c55b3512`: test [38275457808](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38275457808), typecheck [38275457814](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38275457814), build [38275457828](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38275457828), and CodeQL [38275457699](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38275457699) passed, including the new global-budget regression. Local Bun execution remains unavailable; verification is from CI.
+
+
+## Follow-up checkpoint — 2026-10-12: remove dormant generic Medium crawler path
+
+### RES-011 — stale adapter branches contradicted the curated Medium source policy
+
+- **Root cause:** the configured source catalog intentionally omits a generic `medium` source and only permits the curated `trickster0` author. However, `isResearchCandidate()` and `discoverySeeds()` still retained old `source.id === "medium"` branches that could reactivate platform-wide author/article discovery if a generic source were reintroduced.
+- **Fix on main:** removed the unused generic Medium candidate path and generic Medium adapter/priority cases. The curated `trickster0` source remains intact.
+- **Regression coverage:** added a test that passes a legacy generic source ID and verifies unrelated Medium-author pages, generic tag pages, and the curated author's URL are not accepted through that legacy path; existing tests continue to assert that the explicit `trickster0` source is accepted while unrelated authors remain rejected.
+- **Commits:** `88c77563cd7797cd47087f7406f9f81b5819ee21` (candidate logic), `503f3cc3ea8ee110bbc9ba67a49b0d5cea81399b` (adapter cleanup), `cc5605b5dc3ac099b4d1f3a12bb76aa8b1ded6e3` (regression test).
+- **Validation status:** CI is running on the code commits at this checkpoint; keep this fix pending verification until test, typecheck, build, and CodeQL report completion.
