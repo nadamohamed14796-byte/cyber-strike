@@ -470,7 +470,7 @@ describe("JSON to SQLite migration", () => {
     expect(stats.errors).toEqual([])
   })
 
-  test("continues when a JSON file is unreadable and records an error", async () => {
+  test("rolls back the entire migration when a JSON file is unreadable", async () => {
     await writeProject(storageDir, {
       id: "proj_test123abc",
       worktree: "/",
@@ -484,10 +484,10 @@ describe("JSON to SQLite migration", () => {
     expect(stats.projects).toBe(1)
     expect(stats.errors.some((x) => x.includes("failed to read") && x.includes("broken.json"))).toBe(true)
 
+    // A failed import must not leave a partial dataset behind; startup can repair
+    // the malformed file and safely retry because no completion marker is written.
     const db = drizzle({ client: sqlite })
-    const projects = db.select().from(ProjectTable).all()
-    expect(projects.length).toBe(1)
-    expect(projects[0].id).toBe("proj_test123abc")
+    expect(db.select().from(ProjectTable).all()).toHaveLength(0)
   })
 
   test("skips invalid todo entries while preserving source positions", async () => {
@@ -568,7 +568,7 @@ describe("JSON to SQLite migration", () => {
     expect(db.select().from(SessionShareTable).all().length).toBe(1)
   })
 
-  test("handles mixed corruption and partial validity in one migration run", async () => {
+  test("rolls back valid rows when mixed legacy files contain corruption", async () => {
     await writeProject(storageDir, {
       id: "proj_test123abc",
       worktree: "/ok",
@@ -677,12 +677,12 @@ describe("JSON to SQLite migration", () => {
     expect(stats.errors.length).toBeGreaterThanOrEqual(6)
 
     const db = drizzle({ client: sqlite })
-    expect(db.select().from(ProjectTable).all().length).toBe(1)
-    expect(db.select().from(SessionTable).all().length).toBe(1)
-    expect(db.select().from(MessageTable).all().length).toBe(1)
-    expect(db.select().from(PartTable).all().length).toBe(1)
-    expect(db.select().from(TodoTable).all().length).toBe(1)
-    expect(db.select().from(PermissionTable).all().length).toBe(1)
-    expect(db.select().from(SessionShareTable).all().length).toBe(1)
+    expect(db.select().from(ProjectTable).all()).toHaveLength(0)
+    expect(db.select().from(SessionTable).all()).toHaveLength(0)
+    expect(db.select().from(MessageTable).all()).toHaveLength(0)
+    expect(db.select().from(PartTable).all()).toHaveLength(0)
+    expect(db.select().from(TodoTable).all()).toHaveLength(0)
+    expect(db.select().from(PermissionTable).all()).toHaveLength(0)
+    expect(db.select().from(SessionShareTable).all()).toHaveLength(0)
   })
 })
