@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { readdir, writeFile } from "fs/promises"
-import { join, dirname } from "path"
+import { join, dirname, resolve } from "path"
 import { fileURLToPath } from "url"
 import { config } from "../src/config.js"
 import { LOCALES, route } from "../src/lib/language.js"
@@ -9,7 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const BASE_URL = config.baseUrl
 const PUBLIC_DIR = join(__dirname, "../public")
 const ROUTES_DIR = join(__dirname, "../src/routes")
-const DOCS_DIR = join(__dirname, "../../../web/src/content/docs")
+// The docs site is deployed separately. Set CYBERSTRIKE_DOCS_DIR only when local MDX sources are available.
+const DOCS_DIR = process.env.CYBERSTRIKE_DOCS_DIR ? resolve(__dirname, process.env.CYBERSTRIKE_DOCS_DIR) : undefined
 
 interface SitemapEntry {
   url: string
@@ -41,12 +42,23 @@ async function getMainRoutes(): Promise<SitemapEntry[]> {
   return routes
 }
 
-async function getDocsRoutes(): Promise<SitemapEntry[]> {
-  const routes: SitemapEntry[] = []
+function docsIndexRoutes(): SitemapEntry[] {
+  return LOCALES.map((locale) => ({
+    url: `${BASE_URL}${route(locale, "/docs/")}`,
+    priority: 0.9,
+    changefreq: "weekly",
+  }))
+}
 
+async function getDocsRoutes(): Promise<SitemapEntry[]> {
+  // Docs are proxied to docs.cyberstrike.io and their complete sitemap is owned by
+  // that deployment. Without an explicit local content directory, include only the
+  // docs index instead of scanning a deleted packages/web directory.
+  if (!DOCS_DIR) return docsIndexRoutes()
+
+  const routes: SitemapEntry[] = []
   try {
     const files = await readdir(DOCS_DIR)
-
     for (const file of files) {
       if (!file.endsWith(".mdx")) continue
 
@@ -61,11 +73,12 @@ async function getDocsRoutes(): Promise<SitemapEntry[]> {
         })
       }
     }
+    return routes
   } catch (error) {
-    console.error("Error reading docs directory:", error)
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined
+    if (code !== "ENOENT") console.warn("Unable to read local docs for sitemap; including docs index only:", error)
+    return docsIndexRoutes()
   }
-
-  return routes
 }
 
 function generateSitemapXML(entries: SitemapEntry[]): string {
