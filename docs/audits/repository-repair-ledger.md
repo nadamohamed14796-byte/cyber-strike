@@ -138,3 +138,15 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** policy `bfb35b3dd2064e4c558b43228cf501e946170665`; test `7de88c567efa1a4fafb267aa8dab4ac937bcd8e3`; ledger enforcement `afc9422633ce9244e893566ffef7d2729ecc7659`.
 - **Validation:** source writes are committed to `main`; no local Bun runtime is available. GitHub Actions status must be checked on the resulting main head before this is marked verified.
 - **Status:** implemented; automated validation pending.
+
+
+## Follow-up checkpoint — 2026-10-12: bounded remote skill registry responses
+
+### SEC-006 — P1: remote skill index and file downloads had no response-size or timeout limits
+
+- **Evidence:** `Discovery.pull()` parsed the registry index with `response.json()`, while `get()` buffered arbitrary remote skill bodies using `response.text()`/`response.arrayBuffer()`. Neither path bounded the bytes read or applied a request timeout, allowing a remote registry or compromised asset host to consume excessive memory and stall skill loading.
+- **Fix:** added incremental response-body reading with explicit caps (2 MiB for index JSON, 25 MiB per skill asset) and a 15-second abort timeout for index and asset fetches. Oversized/unreadable responses are rejected before being written or parsed.
+- **Regression coverage:** added tests for body-at-limit acceptance, streamed oversize rejection, and oversized declared `Content-Length`.
+- **Direct commits on main:** source `a53f4ff1aa18bfe2838958a178cf2752de456a7a`; regression test `4df5373ff1d7421edd05a50b8e77268846cca10f`.
+- **Validation:** committed to `main`; CI and Bun execution remain pending/unavailable in this runtime. Recheck tests and typecheck on the latest main head.
+- **Status:** implemented; automated validation pending.
