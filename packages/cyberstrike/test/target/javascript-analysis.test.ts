@@ -89,6 +89,26 @@ test("extracts class methods, single-argument arrows, and separates query from p
   expect(request?.queryParameters).toContain("limit")
 })
 
+test("flags dangerous JavaScript sinks for manual review without claiming a vulnerability", () => {
+  const source = [
+    "function renderCard(userHtml) {",
+    " document.querySelector('#card').innerHTML = userHtml",
+    "}",
+    "function runDynamicCode(input) {",
+    " return eval(input)",
+    "}",
+    "function notifyParent(payload) {",
+    " window.parent.postMessage(payload, '*')",
+    "}",
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.riskSignals.some((signal) => signal.kind === "dom-html-sink" && signal.functionName === "renderCard")).toBe(true)
+  expect(result.riskSignals.some((signal) => signal.kind === "dynamic-code-execution" && signal.functionName === "runDynamicCode")).toBe(true)
+  expect(result.riskSignals.some((signal) => signal.kind === "cross-window-message" && signal.functionName === "notifyParent")).toBe(true)
+  expect(result.riskSignals.every((signal) => signal.confidence === "candidate")).toBe(true)
+  expect(JSON.stringify(result)).not.toContain("userHtml")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
