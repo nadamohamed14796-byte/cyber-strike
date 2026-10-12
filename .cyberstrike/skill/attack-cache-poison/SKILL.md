@@ -299,13 +299,13 @@ Public research and disclosures describe patterns including `X-Forwarded-Host` i
 
 ## Related Skills and Chains
 
-- `attack-host-header` — application logic influenced by Host/forwarded-host headers; this skill owns the case where the affected response is shared through a cache.
-- `attack-open-redirect` — validate the redirect itself separately from whether a poisoned destination is stored.
-- `attack-request-smuggling` — investigate proxy desynchronization only when authorized and supported by evidence.
-- `attack-cors` — validate browser-readable cross-origin impact when Origin and cache variation interact.
-- `wstg-inpv-02` and `wstg-clnt-01` — follow up only when stored or DOM-based XSS is actually demonstrated.
-- `triage-validation` — verify the shared-cache boundary, repeatability, scope, and actual impact before reporting.
-- `evidence-hygiene` — redact cookies, tokens, private response fields, and target-sensitive artifacts before attaching evidence.
+- [`attack-host-header`](../attack-host-header/SKILL.md) — application logic influenced by Host/forwarded-host headers; this skill owns the case where the affected response is shared through a cache.
+- [`attack-open-redirect`](../attack-open-redirect/SKILL.md) — validate the redirect itself separately from whether a poisoned destination is stored.
+- [`attack-request-smuggling`](../attack-request-smuggling/SKILL.md) — investigate proxy desynchronization only when authorized and supported by evidence.
+- [`attack-cors`](../attack-cors/SKILL.md) — validate browser-readable cross-origin impact when Origin and cache variation interact.
+- [`wstg-inpv-02`](../WEB/OWASP_WSTG_4.2/wstg-inpv-02/SKILL.md) and [`wstg-clnt-01`](../WEB/OWASP_WSTG_4.2/wstg-clnt-01/SKILL.md) — follow up only when stored or DOM-based XSS is actually demonstrated.
+- [`triage-validation`](../triage-validation/SKILL.md) — verify the shared-cache boundary, repeatability, scope, and actual impact before reporting.
+- [`evidence-hygiene`](../evidence-hygiene/SKILL.md) — redact cookies, tokens, private response fields, and target-sensitive artifacts before attaching evidence.
 
 ## Cache Test Runbook, Cleanup, and Stop Conditions
 
@@ -318,6 +318,38 @@ Use an endpoint approved for active testing and a unique, non-sensitive cache ke
 5. Stop immediately after confirming shared-cache persistence or if the response could affect a public page, authentication flow, or other users.
 
 Never use destructive payloads, poison high-traffic shared URLs, or trigger repeated cached errors to demonstrate impact. Separate origin reflection, private-cache behavior, and shared-cache poisoning. Report the cache layer, key dimensions, TTL/status, clean-request reproduction, and only the minimum sanitized evidence needed.
+
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+
+Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
+
+### Skill-specific hypothesis order
+
+1. Choose a low-risk, non-personal, cacheable response and capture baseline headers/body twice; record cache indicators, Vary, age, cache key clues, and whether the response is shared across sessions.
+2. Use a unique non-executable canary per run, then vary exactly one candidate unkeyed header or parameter. Do not use script, redirect, or sensitive content as the poison marker.
+3. Check whether the canary persists for a separate clean request and distinguish a genuine cache hit from origin reflection, cookies, CDN transformations, or dynamic response content.
+4. Use an isolated cache key or approved staging/test route for any persistence test. Never poison a shared authenticated response, a homepage, or content likely to be served to unrelated users.
+5. Demonstrate the key mismatch with a negative control and document cache layer, cache state, response headers, and purge/expiry cleanup. A reflected header without cross-request cache impact is not confirmed poisoning.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture, with a relevant control and a clear trust-boundary failure.
+- **Likely / needs corroboration:** multiple independent signals support the hypothesis, but the security consequence or root cause is not yet established.
+- **Unconfirmed:** evidence is incomplete, ambiguous, cached, or indistinguishable from a generic response.
+- **Refuted / false positive:** a relevant negative control, valid authorization explanation, or repeatable contradictory evidence explains the signal. Record what was tested; do not claim that every theoretical variant was exhausted.
+- A status code, banner, stack trace, response-length difference, endpoint existence, tool alert, or visible frontend state is never sufficient on its own.
+
+### Stop and cleanup rules
+
+Stop immediately on an out-of-scope boundary, unexpected real-user data, production side effects, rate-limit/availability degradation, credential exposure, or a request to perform a prohibited action. Do not continue merely to spend the budget. Restore disposable test state, revoke temporary sessions/tokens where possible, and record cleanup status.
+
+### Agent handoff record
+
+Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, attempts used, observed impact, negative controls, confidence/verdict, related-skill signal, sanitized evidence references, and cleanup status. Invoke a chained skill only when the stated signal is independently observed; do not chain from name similarity alone.
 
 ## References
 

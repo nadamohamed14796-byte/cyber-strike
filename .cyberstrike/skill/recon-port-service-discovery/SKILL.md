@@ -89,6 +89,34 @@ For a suspected issue, capture a single benign handshake or read-only response a
 - Avoid high-rate full-range scans unless explicitly allowed; broad scanning is not a substitute for targeted validation.
 - Do not infer that all addresses within a hosting provider's ASN belong to the target.
 
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
+
+### Skill-specific next steps
+
+1. Verify exact host/IP ranges and permitted scan types before starting; treat ASN membership or a discovered address as insufficient authorization.
+2. Prefer passive service evidence first, then a narrow TCP/UDP port set with conservative timing, bounded retries, and explicit timeouts. Avoid wide high-rate scans and intrusive scripts.
+3. Record open/closed/filtered separately and preserve tool version, flags, target list, timestamp, resolver/source, and rate settings so results can be reproduced.
+4. Identify services with safe protocol handshakes or read-only banners; account for proxies, NAT, firewall filtering, rate limits, and shared-provider infrastructure before attributing a service.
+5. Stop on instability, rate-limit signals, unexpected sensitive data, or an out-of-scope address. Return a deduplicated service inventory with confidence and a narrow application-specific handoff.
+
+
+### Deduplication and stop rules
+
+Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
+
+### Handoff format
+
+Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/port-service-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/port-service-discovery/SKILL.md)

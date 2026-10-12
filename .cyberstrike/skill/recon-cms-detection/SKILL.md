@@ -97,6 +97,34 @@ Map a confirmed component/version to a credible advisory, then verify the vulner
 - Removing or genericizing generator metadata, version strings, and default admin paths raises the cost of fingerprinting but does not replace patching; attackers can still corroborate version from behavior.
 - Keeping CMS core, themes, and plugins current, and restricting admin/login routes by network or MFA, reduces both the fingerprinting surface and the exploitability of anything found.
 
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
+
+### Skill-specific next steps
+
+1. Use passive fingerprints and low-impact read-only requests to identify likely CMS, theme/plugin families, version clues, and entry points; preserve each signal and confidence separately.
+2. Confirm each fingerprint with at least one independent marker (such as distinctive assets, headers, generator metadata, route behavior, or source evidence) and use a random-path control to detect generic pages.
+3. Account for reverse proxies, caching, custom themes, removed generator tags, and patched backports before assigning a version or risk label.
+4. Consult official vendor/plugin advisories for the exact component and version; prioritize exposed login/admin, API, upload, and legacy interfaces only when in scope.
+5. Return a deduplicated component inventory with evidence, confidence, timestamp, and suggested read-only checks. A CMS fingerprint or old version clue is a lead, not a confirmed finding.
+
+
+### Deduplication and stop rules
+
+Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
+
+### Handoff format
+
+Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/cms-detection/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/cms-detection/SKILL.md)

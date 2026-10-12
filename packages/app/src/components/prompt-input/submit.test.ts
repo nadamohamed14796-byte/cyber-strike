@@ -31,6 +31,11 @@ const clientFor = (directory: string) => ({
   },
 })
 
+const createClient = (input: { directory: string }) => {
+  createdClients.push(input.directory)
+  return clientFor(input.directory)
+}
+
 beforeAll(async () => {
   const rootClient = clientFor("/repo/main")
 
@@ -40,10 +45,7 @@ beforeAll(async () => {
   }))
 
   mock.module("@cyberstrike-io/sdk/v2/client", () => ({
-    createCyberstrikeClient: (input: { directory: string }) => {
-      createdClients.push(input.directory)
-      return clientFor(input.directory)
-    },
+    createCyberstrikeClient: createClient,
   }))
 
   mock.module("@cyberstrike-io/ui/toast", () => ({
@@ -91,6 +93,7 @@ beforeAll(async () => {
     useSDK: () => ({
       directory: "/repo/main",
       client: rootClient,
+      createClient,
       url: "http://localhost:4096",
     }),
   }))

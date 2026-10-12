@@ -148,6 +148,34 @@ Treat each proposed chain as a sequence of individually verified edges: componen
 - XML-RPC response status alone is insufficient; require valid protocol structure. An outbound pingback does not prove internal data access.
 - Stop before high-volume scans, credential testing, service stress, file writes, shell uploads, internal-network access, real-data collection, or any action outside written authorization.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+
+Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Use passive/read-only evidence to identify WordPress core, active plugins/themes, REST routes, XML-RPC state, and public user disclosure; retain confidence levels because caching/CDNs can obscure versions.
+2. Map only in-scope routes and compare anonymous with controlled test-role behavior; distinguish intentional public pages/API fields from private content or administrative functions.
+3. Check plugin/theme exposures against official advisories for the exact affected version and enabled configuration; do not treat outdated version banners as a confirmed exploitable flaw.
+4. Use only test-owned content for upload, role, REST, and authentication tests. Do not brute-force passwords, enumerate private users beyond program rules, install plugins, or modify production settings.
+5. Report the verified boundary, exact component/version evidence, minimally sufficient proof, and version/configuration-specific remediation with a safe retest.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated using a controlled identity/fixture and a meaningful control.
+- **Likely / needs corroboration:** independent indicators support the candidate, but the consequence or root cause remains uncertain.
+- **Unconfirmed:** evidence is generic, ambiguous, cached, or not tied to a security property.
+- **Refuted / false positive:** a relevant negative control or valid implementation/policy explanation accounts for the observation. Document tested branches; do not claim all imaginable variants were exhausted.
+- Scanner alerts, version strings, banner text, status codes, and response length alone are not proof.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected user data, state changes, service degradation, secret exposure or prohibited behavior. Clean disposable test state and revoke temporary sessions/tokens where possible. Return scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence and cleanup status. Start a chained skill only when its trigger has been independently observed.
+
 ## References
 
 - [uphiago/recon-skills — WordPress REST authentication bypass](https://github.com/uphiago/recon-skills/blob/main/recon/wp-plugin-rest-auth-bypass/SKILL.md) — merged plugin/API access-control source.

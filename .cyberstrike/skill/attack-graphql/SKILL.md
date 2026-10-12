@@ -153,7 +153,36 @@ Use only controlled accounts and synthetic records. Keep batch size small and st
 
 A strong report contains the operation, variables, role/tenant context, expected authorization rule, observed result, and a redacted before/after response showing the exact unauthorized field or state change.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+
+Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
+
+### Skill-specific hypothesis order
+
+1. Identify the GraphQL endpoint and capture one valid query, one invalid-field query, and one unauthenticated response; bound query size/depth and preserve request IDs.
+2. Use schema introspection only within program rules and only to map attack surface; check field-level auth, node/global-ID access, aliases, batching, and nested relationships with test-owned records.
+3. Change one variable per request: principal, object ID, requested property, operation type, or API version. Compare behavior to the schema's expected access policy rather than relying on hidden UI controls.
+4. Test mutations only on disposable records with reversible, nonfinancial effects; avoid expensive recursive queries or broad enumeration that could affect availability.
+5. Confirm unauthorized data/action using a canary and compare with a denied principal/control. Report field/path, role, object ownership, and actual impact; introspection exposure alone is context, not proof.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture and a relevant control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause remains uncertain.
+- **Unconfirmed:** response is ambiguous, cached, generic, or not linked to a security boundary.
+- **Refuted / false positive:** an applicable negative control or valid policy explanation accounts for the signal. Record the attempt ledger rather than claiming every theoretical variant was exhausted.
+- A 2xx status, error difference, header, schema/documentation exposure, scanner alert, or UI-only state is not proof by itself.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected real-user data, unexpected production state changes, service degradation, credential exposure, or a prohibited action. Restore disposable state and revoke temporary tokens/sessions where possible. Handoff target and scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence pointers, linked-skill signal, and cleanup status. Invoke a related skill only when its triggering signal is observed.
+
 ## References
 
 - [PortSwigger: GraphQL](https://portswigger.net/web-security/graphql)
+- [OWASP GraphQL Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html)
 - [HackerOne: GraphQL Bugs](https://www.hackerone.com/vulnerability-management/graphql-security-guide)

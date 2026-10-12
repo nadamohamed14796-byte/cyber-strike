@@ -98,6 +98,34 @@ Review DTOs, serializer schemas, writable-field lists, nested relation binding, 
 - ORM defaults may overwrite input; inspect authoritative state.
 - Stop before changing real roles, billing, verification, or shared objects.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+
+Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
+
+### Skill-specific hypothesis order
+
+1. Record the normal allowed fields and server response for a test-owned object, including the expected role/tenant/owner values.
+2. Probe only plausible extra fields supported by the application's data model (for example, status, owner, tenant, or role) one at a time with harmless marker values.
+3. Compare fields accepted by create, update, bulk, and nested operations; server-side allowlists may differ by operation and version.
+4. Use a disposable record and an inert canary field to verify whether a forbidden property truly persists or changes an authorization boundary; do not promote your own account to admin in a shared production tenant.
+5. Capture before/after state, valid-field control, and the denied policy. Recommend explicit DTO/field allowlists and separate create/update schemas.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is shown against an in-scope resource using a tester-controlled identity or fixture, with a meaningful control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not yet established.
+- **Unconfirmed:** observations are ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control or valid policy/implementation explanation accounts for the observation; document the attempts instead of claiming all imaginable variants were exhausted.
+- Do not treat status codes, error text, response length, decoded tokens, static findings, or UI state alone as proof.
+
+### Stop, cleanup, and handoff
+
+Stop at scope uncertainty, unrelated sensitive data, unexpected production changes, service degradation, secret exposure, or prohibited actions. Restore disposable state and revoke test tokens/sessions where possible. Return the scope proof, baseline, hypothesis, attempt count, impact, controls, confidence/verdict, sanitized evidence pointers, relevant handoff signal and cleanup status. Chain into another skill only when its trigger is present.
+
 ## References
 
 - [uphiago — hunt-mass-assignment](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-mass-assignment)

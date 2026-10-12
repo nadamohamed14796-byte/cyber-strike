@@ -111,6 +111,34 @@ Compare anonymous, owner, and lower-role behavior for a synthetic record. For wr
 - CDN/cache headers may be transformed by deployment layers; compare real responses under test accounts.
 - Stop before active cache poisoning, production SSRF to internal services, or writes outside disposable test records.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+
+Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
+
+### Skill-specific hypothesis order
+
+1. Identify the deployed router/runtime mode (App Router or Pages Router, server/client component boundaries, API routes, and middleware) from reliable evidence; version strings alone are insufficient.
+2. Compare server-side route authorization with client-side navigation protections, including API handlers, server actions, middleware, and data-fetching endpoints relevant to the same resource.
+3. Check for accidentally exposed source maps, build artifacts, debug data, and environment values using random-file controls; redact secrets immediately.
+4. Use controlled roles and test-owned records to verify that data fetched on the server is authorized before serialization to the client; do not assume hidden components are protected APIs.
+5. Capture the exact route/runtime and proof of data/action exposure, then recommend server-side authorization, safe environment-variable exposure, and build-time regression checks.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is shown against an in-scope resource using a tester-controlled identity or fixture, with a meaningful control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not yet established.
+- **Unconfirmed:** observations are ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control or valid policy/implementation explanation accounts for the observation; document the attempts instead of claiming all imaginable variants were exhausted.
+- Do not treat status codes, error text, response length, decoded tokens, static findings, or UI state alone as proof.
+
+### Stop, cleanup, and handoff
+
+Stop at scope uncertainty, unrelated sensitive data, unexpected production changes, service degradation, secret exposure, or prohibited actions. Restore disposable state and revoke test tokens/sessions where possible. Return the scope proof, baseline, hypothesis, attempt count, impact, controls, confidence/verdict, sanitized evidence pointers, relevant handoff signal and cleanup status. Chain into another skill only when its trigger is present.
+
 ## References
 
 - [uphiago — hunt-nextjs](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-nextjs)

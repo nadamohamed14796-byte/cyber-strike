@@ -98,6 +98,34 @@ Inspect host-header influence on reset links, redirects, referrer leakage, token
 - Account enumeration should not be inferred from one phrase alone.
 - Stop before any account/mailbox not owned by the tester, bulk messages, or token guessing.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+
+Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
+
+### Skill-specific hypothesis order
+
+1. Baseline the reset flow for an existing test account and a synthetic nonexistent identifier; compare status/body/timing only as supporting evidence, accounting for asynchronous email and normal variance.
+2. Use only inboxes and recovery channels you control to inspect token purpose, account binding, entropy evidence available to the tester, expiry, single-use behavior, and invalidation after a successful reset.
+3. Change one factor at a time: expired token, reused token, changed account identifier, alternate host/header in generated URL, or concurrent reset requests within program limits.
+4. Confirm whether a reset actually changes the test account's credential/session state as intended; never attempt to reset real users, spam notifications, or infer takeover from an email response alone.
+5. Capture sanitized request/response and the controlled mailbox event, then retest a valid flow as a positive control and an invalid/replayed token as a negative control.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture and a relevant control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause remains uncertain.
+- **Unconfirmed:** response is ambiguous, cached, generic, or not linked to a security boundary.
+- **Refuted / false positive:** an applicable negative control or valid policy explanation accounts for the signal. Record the attempt ledger rather than claiming every theoretical variant was exhausted.
+- A 2xx status, error difference, header, schema/documentation exposure, scanner alert, or UI-only state is not proof by itself.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected real-user data, unexpected production state changes, service degradation, credential exposure, or a prohibited action. Restore disposable state and revoke temporary tokens/sessions where possible. Handoff target and scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence pointers, linked-skill signal, and cleanup status. Invoke a related skill only when its triggering signal is observed.
+
 ## References
 
 - [Claude-BugHunter — hunt-forgot-password](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-forgot-password)

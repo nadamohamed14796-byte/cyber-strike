@@ -137,6 +137,34 @@ Close dedicated connections, reset the lab/proxy, clear synthetic cache entries,
 - **triage-validation:** confirm exact scope, reproduction, and severity before writing the report.
 - **evidence-hygiene:** redact cookies, authorization headers, and any unrelated response data.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Only test a dedicated lab, staging system, or production endpoint explicitly approved for request-smuggling validation; shared production front ends can route a desynchronized request into another user's transaction.
+2. Capture normal requests and intermediary/protocol details first. Check documented HTTP/1.1, HTTP/2 downgrade, and proxy/backend combinations that are actually in use rather than spraying framing variants.
+3. Use the approved detection extension or a bounded single-connection test with a controlled canary route; do not send a smuggled request intended to alter another user's request or poison a shared cache.
+4. Correlate front-end and back-end interpretation using request IDs, connection behavior, and repeatable control requests. Account for timeouts, WAF normalization, and ordinary keep-alive behavior as alternative explanations.
+5. Stop at any unexpected response crossover or service instability. Preserve minimal sanitized traces and recommend consistent message framing, parser normalization, and regression tests across each proxy/backend pair.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## References
 
 - [uphiago/recon-skills — hunt-http-smuggling](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-http-smuggling/SKILL.md) — merged source.

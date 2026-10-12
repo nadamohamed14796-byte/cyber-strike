@@ -97,6 +97,37 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 - Organizations can reduce the value of this technique by consolidating default/placeholder pages, disabling framework and admin-panel banners on production hosts, and keeping staging/legacy interfaces off public DNS or behind authentication.
 - Consistent, informative error pages (rather than framework-default error pages) reduce fingerprinting value from screenshots and titles alone.
 
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive evidence first and perform active checks only when explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, provenance, capture time, scope proof, browser/tool and version, evidence location, corroborating signal, negative control, attribution confidence, next action and related-skill trigger. Separate asset confidence from security confidence.
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** a specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. Visual similarity or a distinctive screenshot alone cannot exceed C1/C2.
+
+### Visual signal follow-through
+
+Normalize URLs and capture conditions; compare viewport, title, DOM landmarks, favicon, branding, application routes and login state. Separate apparent clones caused by shared templates, CDN error pages, branding reuse or default hosting pages. For each high-priority visual cluster, write a falsifiable hypothesis about a distinct application or trust boundary, then route it to the relevant framework, access-control, API or technology-fingerprinting skill.
+
+### Deduplication and stop rules
+
+Deduplicate by canonical host/URL, redirect destination, title/DOM fingerprint and application identity while retaining alternate routes that can cross a different trust boundary. Stop on scope ambiguity, unexpected sensitive information, service instability, or if capture requires unapproved credentials or active behavior.
+
+### Handoff format
+
+Return normalized asset, scope/provenance, capture conditions, confidence, duplicate cluster, negative control, prioritization rationale, candidate hypothesis, safe next step and trigger for any linked attack skill. A screenshot is evidence of what rendered, not proof of a vulnerability.
+
+### Skill-specific next steps
+
+1. Collect screenshots only for confirmed in-scope live URLs and approved test roles; do not sign in using real customer identities or capture unrelated tenants.
+2. Normalize scheme, redirects, trailing slashes, viewport, locale, and authentication state before comparing images; preserve URL and timestamp with each screenshot.
+3. Deduplicate by canonical URL, page title, stable visual hash, and application identity. Treat SPA catch-alls, error pages, CDN placeholders, and generic login screens as separate clusters.
+4. Redact or avoid screenshots containing personal data, session values, API keys, internal hostnames, or customer content; store evidence in a target-scoped directory with appropriate permissions.
+5. Return an application inventory and visual-difference leads with provenance and confidence. Visual similarity/difference helps prioritization but never confirms a vulnerability without protocol-level verification.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/visual-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/visual-recon/SKILL.md)

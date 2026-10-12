@@ -48,7 +48,7 @@ Establish an owned, in-scope asset inventory and prioritize security checks with
 
 ### Ownership & Scope Triage (do this before trusting any recon output)
 
-Automated recon keyword-matches on the brand name. For any target whose name is a common or dictionary-ish word, a large share of "discovered" assets — repos, cloud buckets, mobile apps, breach combos, typosquats — belong to unrelated same-named organizations. Treat ownership as **guilty until proven**: an asset is the target's only when a concrete signal ties it to the target, never because a scanner's keyword matched.
+Automated recon often matches only a brand string. For common or dictionary-like names, many discovered repositories, cloud buckets, mobile apps, and paste hits may belong to unrelated organizations. Treat ownership as **unconfirmed until corroborated**: require a concrete signal tying the asset to the target, not just a keyword match.
 
 | Recon source | How it collides | Verify ownership by |
 |---|---|---|
@@ -64,7 +64,7 @@ Workflow:
 2. For every asset class, apply the verify-by column above. No signal → quarantine, don't test.
 3. Re-baseline severity counts against only-owned assets. "N Criticals → M after ownership + soft-404 triage" is itself a reportable finding about the ASM program's noise.
 4. Log quarantined collisions explicitly (e.g. `loot/quarantined_<source>.txt`) so the decision not to target them is auditable.
-5. If the supplied recon feed is mostly false-positive, write that up (Medium/Strategic) — it misallocates the owner's remediation budget and buries real risk.
+5. Do not report false-positive volume as a vulnerability unless the program explicitly includes asset-inventory or detection-quality assessments. Track noise as an internal quality metric and spend active-testing time only on validated assets.
 
 Anti-patterns: trusting a tool's "owned" label without verification; targeting a same-named third party because it appeared in a report (out of scope, real harm); reporting soft-404s as exposures; counting typosquats or brand-collision repos as offensive findings.
 
@@ -85,7 +85,7 @@ A real exposure has a signature that differs from the catch-all: `.git/config` s
 
 ### Prerequisites
 
-- A shell with `curl`, `jq`, `dig`, `subfinder`, `amass`, `dnsx`, `httpx`, `nmap`, and the specific optional tools used below.
+- A shell with `curl`, `jq`, `dig`, `subfinder`, `dnsx`, `httpx`, `nmap`, and the specific optional tools used below.
 - Optional for deeper subdomain work: `gotator`, `puredns`, `tldbrute`, `gungnir` or `certwatcher`.
 - Optional for content/parameter discovery: `paramspider`, `arjun`, `x8`, `qsreplace`, `anew`, `ffuf`, `feroxbuster`, `gobuster`, `dirsearch`.
 - Optional for JS/source-map work: `getJS`, `subjs`, `linkfinder`, `secretfinder`, `node` (for source-map extraction).
@@ -133,8 +133,8 @@ fi
 # Subfinder (passive)
 subfinder -d "$TARGET" -silent -timeout 30 | anew "$OUTPUT_DIR/subs.txt"
 
-# Amass (passive)
-amass enum -passive -d "$TARGET" | anew "$OUTPUT_DIR/subs.txt"
+# Optional extra passive source (if installed)
+if command -v assetfinder >/dev/null 2>&1; then assetfinder --subs-only "$TARGET" | anew "$OUTPUT_DIR/subs.txt"; fi
 
 # Merge and deduplicate everything collected so far
 cat "$OUTPUT_DIR"/crtsh.txt "$OUTPUT_DIR"/crtname.txt "$OUTPUT_DIR"/subs.txt 2>/dev/null \
@@ -185,13 +185,13 @@ dig +short MX "$TARGET"
 |---|---|---|
 | `v=spf1 ~all` (softfail) | SPF suggests blocking but doesn't enforce | Spoofed mail may still be delivered |
 | `v=spf1 ?all` (neutral) | SPF does nothing | Totally permissive |
-| `v=spf1 include:<provider> ~all` | Any account on that provider can send as the domain | Third-party send infrastructure is a trust boundary |
+| `v=spf1 include:<provider> ~all` | The provider's SPF-authorized sending infrastructure is included; account-level controls still matter | Review provider scope and approved senders |
 | `v=DMARC1; p=none` | DMARC monitoring-only | No spoofing protection |
 | `v=DMARC1; p=quarantine` | Failed mail goes to spam | Partial protection |
 | `v=DMARC1; p=reject` | Failed mail rejected | Full protection |
-| No DKIM record found | No cryptographic signature in use | Mail can be forged without detection |
+| No record for a guessed DKIM selector | Inconclusive: selectors may differ or be unpublished in this lookup | Corroborate with authorized sample mail or first-party configuration |
 
-A `p=none` or missing DMARC record is reportable as-is from DNS evidence alone. Actually demonstrating spoofed delivery (sending a test message that appears to originate from the domain) is a phishing-simulation action, not a recon action — it needs its own explicit authorization and rules of engagement, separate from this skill.
+A `p=none` or missing DMARC record is a posture observation, not automatically a bounty-eligible vulnerability; assess program scope and avoid claiming successful spoofing without separately authorized delivery testing. Actually demonstrating spoofed delivery (sending a test message that appears to originate from the domain) is a phishing-simulation action, not a recon action — it needs its own explicit authorization and rules of engagement, separate from this skill.
 
 #### Source-Code & Repository OSINT (GitHub / GitLab)
 
@@ -944,6 +944,34 @@ A result is a lead until the actual security boundary and intended policy are es
 - Do not run credential guessing, brute force, high-volume scanning, service stress, destructive operations, active user-facing cache poisoning, or internal SSRF by default.
 - If a probe reveals credentials, personal data, a production state change, service instability, or unclear third-party ownership, stop and preserve only sanitized minimum evidence.
 - Validate candidate findings against the program's accepted impact list and keep unconfirmed leads out of the final findings.
+
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
+
+### Skill-specific next steps
+
+1. Establish the written scope and exclusions, then create a reproducible workspace with a timestamped output directory, target slug, source provenance, and no secrets embedded in commands or committed to reusable skills.
+2. Collect passive names and historical URLs first. Normalize case, trailing dots, schemes, and duplicate sources; preserve each original source and observation time rather than keeping only a merged list.
+3. Prove ownership/attribution for every asset class and quarantine ambiguous SaaS, CDN, shared-hosting, common-name, and third-party assets. A discovery result is a candidate, not automatic authorization.
+4. Use wildcard DNS, random-host, random-path, redirect, soft-404, and public/private response controls before ranking live hosts. Promote only confirmed in-scope assets to bounded active checks.
+5. Route each validated lead to the most relevant skill based on observed signals (auth boundary, API schema, source artifact, service exposure). Record confidence, evidence path, next action, and explicit stop reason; never promote reconnaissance alone to a finding.
+
+
+### Deduplication and stop rules
+
+Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
+
+### Handoff format
+
+Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
 
 ## References
 

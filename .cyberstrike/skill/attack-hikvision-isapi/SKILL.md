@@ -110,6 +110,34 @@ Capture only the response headers, error code, and a short sanitized non-sensiti
 - A port or login page being reachable is not an authorization bypass.
 - Stop before default credential tests, camera feeds, audio/video, settings changes, firmware upload, internal SSRF, or any physical/operational effect.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+
+Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
+
+### Skill-specific hypothesis order
+
+1. Proceed only for explicitly authorized devices/labs; inventory reachable model, firmware, and ISAPI response behavior with read-only requests before considering any test.
+2. Compare anonymous and controlled low-privilege behavior for documented read-only device/config endpoints; avoid default-password spraying, configuration writes, firmware changes, and reboot operations.
+3. Treat firmware/version fingerprints as leads only; correlate exact model and release with vendor advisories and determine whether the affected feature is reachable in this deployment.
+4. Use a synthetic device record or harmless configuration marker to validate an access-control defect. Do not retrieve video, credentials, private feeds, or other people's camera data.
+5. Record exact endpoint, firmware evidence, expected permission, actual disclosure/action, and safe remediation such as patching, network isolation, and disabling unnecessary services.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture and a relevant control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause remains uncertain.
+- **Unconfirmed:** response is ambiguous, cached, generic, or not linked to a security boundary.
+- **Refuted / false positive:** an applicable negative control or valid policy explanation accounts for the signal. Record the attempt ledger rather than claiming every theoretical variant was exhausted.
+- A 2xx status, error difference, header, schema/documentation exposure, scanner alert, or UI-only state is not proof by itself.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected real-user data, unexpected production state changes, service degradation, credential exposure, or a prohibited action. Restore disposable state and revoke temporary tokens/sessions where possible. Handoff target and scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence pointers, linked-skill signal, and cleanup status. Invoke a related skill only when its triggering signal is observed.
+
 ## References
 
 - [uphiago/recon-skills — SCADA/Hikvision ISAPI](https://github.com/uphiago/recon-skills/blob/main/recon/scada-hikvision-isapi/SKILL.md) — merged protocol-specific source.

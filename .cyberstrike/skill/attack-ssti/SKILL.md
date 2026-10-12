@@ -162,6 +162,34 @@ Do not jump from arithmetic evaluation to RCE. Avoid filesystem reads, environme
 
 Include the exact input sink, template context, benign expression, expected literal result, actual computed result, suspected engine/version if supported, and safe remediation such as avoiding string-built templates and enforcing contextual escaping.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+
+Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Identify the suspected template-rendering input and capture a normal literal-text baseline; determine whether output is HTML-escaped, rendered as a template, or simply reflected.
+2. Use a harmless arithmetic or inert string expression appropriate to the observed template engine and compare it with a plain-string control; change one delimiter/context at a time.
+3. Confirm that the server evaluates template syntax rather than merely reflecting it, while avoiding filesystem reads, shell commands, environment dumps, or external callbacks on production.
+4. Check output context and whether the result depends on user-controlled template structure; use only a controlled page or fixture to demonstrate the evaluation boundary.
+5. Capture minimal request/output and the non-evaluated control, infer the engine only from evidence, and recommend fixed templates plus context-aware escaping/variable binding with regression tests.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated using a controlled identity/fixture and a meaningful control.
+- **Likely / needs corroboration:** independent indicators support the candidate, but the consequence or root cause remains uncertain.
+- **Unconfirmed:** evidence is generic, ambiguous, cached, or not tied to a security property.
+- **Refuted / false positive:** a relevant negative control or valid implementation/policy explanation accounts for the observation. Document tested branches; do not claim all imaginable variants were exhausted.
+- Scanner alerts, version strings, banner text, status codes, and response length alone are not proof.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected user data, state changes, service degradation, secret exposure or prohibited behavior. Clean disposable test state and revoke temporary sessions/tokens where possible. Return scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence and cleanup status. Start a chained skill only when its trigger has been independently observed.
+
 ## References
 
 - [PortSwigger: SSTI](https://portswigger.net/research/server-side-template-injection)

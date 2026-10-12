@@ -81,6 +81,34 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 - Confirm redirects do not lead to third-party SaaS or parked domains.
 - Keep host discovery separate from vulnerability claims.
 
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
+
+### Skill-specific next steps
+
+1. Confirm the destination IP/host and the parent domain are in scope; capture a normal Host/SNI response and an intentionally invalid-host response as controls.
+2. Build a small candidate list from first-party names, certificates, existing DNS, or documented naming patterns rather than an unbounded dictionary.
+3. Vary Host header and TLS SNI separately when tooling allows; preserve status, redirects, title, body hash, certificate, and server timing so front-end defaults can be distinguished from named virtual hosts.
+4. Normalize dynamic content and cluster identical fingerprints. Check for wildcard/default virtual hosts and shared CDN behavior before promoting a candidate; a different status code alone is not proof.
+5. Keep request rates low and stop at instability, unexpected sensitive data, or scope uncertainty. Return each confirmed vhost with source, control comparison, attribution confidence, and a safe next-step trigger.
+
+
+### Deduplication and stop rules
+
+Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
+
+### Handoff format
+
+Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/vhost-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/vhost-enumeration/SKILL.md)

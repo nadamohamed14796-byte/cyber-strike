@@ -105,6 +105,34 @@ Identify deployment rules, static-root mapping, archive retention, source-map pu
 - Do not use discovered credentials or keys to confirm impact.
 - Stop before downloading full private repositories, archives, databases, mail, or logs with customer data.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Use a random-path control while checking candidate artifacts such as source maps, repository metadata, backup files, build manifests, debug bundles, or public package registries.
+2. Confirm the artifact belongs to the in-scope application and whether it contains source code, internal route names, secrets, or personal data; distinguish a public source map from an actual credential leak.
+3. Collect only minimal sanitized snippets/metadata needed to demonstrate exposure. Never reuse a discovered credential, clone unrelated private repositories, or download full data stores.
+4. If a credential appears exposed, record provider/type, repository/file/commit, and key name without copying the value; verify validity only via a single read-only identity check when explicitly allowed.
+5. Report reproducible exposure path, real sensitivity, applicable access boundary, and removal/rotation/cache-invalidation remediation; validate the fix with the same control request.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## References
 
 - [elementalsouls/Claude-BugHunter — hunt-source-leak](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-source-leak/SKILL.md) — merged source.

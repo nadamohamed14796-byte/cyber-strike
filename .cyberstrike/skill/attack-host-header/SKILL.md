@@ -98,7 +98,9 @@ Trace which value controls URL generation, routing, redirects, cache keys, or or
 - **Burp Repeater / curl:** controlled one-variable header comparison on an approved endpoint.
 - **Browser / test mailbox:** verify generated links and redirects without sharing tokens.
 - **Reverse-proxy configuration review:** identify trusted forwarded headers and canonical-host settings.
-- **attack-cache-poison:** assess whether a Host-derived response is stored and served from a shared cache.
+- [**attack-cache-poison**](../attack-cache-poison/SKILL.md): assess whether a Host-derived response is stored and served from a shared cache.
+- [**attack-open-redirect**](../attack-open-redirect/SKILL.md): validate redirect behavior separately, then link it to cache impact only if a clean request receives the cached altered response.
+- [**attack-information-disclosure**](../attack-information-disclosure/SKILL.md): assess independently whether Host-derived URLs or routing expose sensitive information.
 - **Local proxy/origin lab:** reproduce ambiguous authority parsing and duplicate-header behavior safely.
 
 ## Host Trust-Boundary Matrix
@@ -121,6 +123,40 @@ Trace which value controls URL generation, routing, redirects, cache keys, or or
 - Cache headers and shared-cache behavior belong to a separate validation step; an origin-only reflection is not poisoning.
 - Do not use real-user account recovery, deliver active credentials, or test internal/third-party routing outside the declared scope. For cache interactions, use the dedicated cache skill and an approved test key.
 
+## Related Skills and Chains
+
+- [`attack-cache-poison`](../attack-cache-poison/SKILL.md) — test shared-cache persistence of Host-derived response changes; a changed first response alone is not enough.
+- [`attack-open-redirect`](../attack-open-redirect/SKILL.md) — validate attacker-controlled redirect destinations independently from Host-header trust.
+- [`attack-information-disclosure`](../attack-information-disclosure/SKILL.md) — follow up only when the Host trust issue exposes sensitive data or internal routing details.
+
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+
+Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
+
+### Skill-specific hypothesis order
+
+1. Capture a normal request and generated absolute URLs, then vary one host-related input at a time across Host, forwarded-host, original-host, and proxy headers only where that deployment accepts them.
+2. Use a canary hostname/domain you control and observe whether the application trusts the value in redirects, password-reset URLs, canonical links, or cacheable content.
+3. Distinguish application reflection from a trust-boundary failure: verify whether a generated URL is actually consumed by a controlled workflow or shared through a cache.
+4. Exercise any reset/invite flow only for test-owned accounts and mailboxes; do not send messages to third parties or poison shared authenticated cache entries.
+5. Capture the baseline, changed header, generated output, and negative-control host. Recommend trusted-proxy normalization and an allowlist of canonical hosts.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture and a relevant control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause remains uncertain.
+- **Unconfirmed:** response is ambiguous, cached, generic, or not linked to a security boundary.
+- **Refuted / false positive:** an applicable negative control or valid policy explanation accounts for the signal. Record the attempt ledger rather than claiming every theoretical variant was exhausted.
+- A 2xx status, error difference, header, schema/documentation exposure, scanner alert, or UI-only state is not proof by itself.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected real-user data, unexpected production state changes, service degradation, credential exposure, or a prohibited action. Restore disposable state and revoke temporary tokens/sessions where possible. Handoff target and scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence pointers, linked-skill signal, and cleanup status. Invoke a related skill only when its triggering signal is observed.
+
 ## References
 
 - [uphiago/recon-skills — HTTP/2 header impersonation](https://github.com/uphiago/recon-skills/blob/main/recon/http2-header-impersonation/SKILL.md) — merged protocol/header trust analysis.
@@ -129,5 +165,5 @@ Trace which value controls URL generation, routing, redirects, cache keys, or or
 - [elementalsouls/Claude-BugHunter — hunt-host-header](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-host-header/SKILL.md) — merged source.
 
 - [PortSwigger: Host Header Attacks](https://portswigger.net/web-security/host-header)
-- [OWASP WSTG: Testing for Host Header Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/17-Testing_for_Host_Header_Injection)
+- [OWASP WSTG: Testing for Host Header Injection](https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/07-Injection/17-Host_Header_Injection/)
 - [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110.html)

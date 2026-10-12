@@ -87,6 +87,34 @@ A report should identify the public asset, why it belongs to the organization, w
 - Public client-side configuration can be intended; assess what authority the value actually grants.
 - Do not trigger CI pipelines, change settings, or attempt deployment as proof.
 
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
+
+### Skill-specific next steps
+
+1. Confirm the GitLab host and organization/group attribution through first-party domains, verified group ownership, or repository metadata; a matching brand string alone is insufficient.
+2. Use read-only public metadata and bounded pagination to inventory public projects, snippets, package/container registries, CI configuration, and release artifacts that are explicitly in scope.
+3. Distinguish public-by-design content from accidental exposure; inspect a minimal file/commit context and avoid cloning unrelated projects or collecting private contributor data.
+4. If a secret-shaped value appears, record detector type, project, path, and commit without copying it. Only verify validity through a single read-only identity call if explicit authorization allows it.
+5. Return provenance, deduplication key, last-seen commit/time, ownership confidence, and safe next-step trigger. Do not treat a public project, open signup, or a code fingerprint as a vulnerability by itself.
+
+
+### Deduplication and stop rules
+
+Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
+
+### Handoff format
+
+Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/gitlab-public-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/gitlab-public-recon/SKILL.md)

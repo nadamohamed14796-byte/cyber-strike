@@ -123,6 +123,33 @@ State the exact injection point, the database engine and query context (WHERE cl
 - A WAF-block page (403/406, vendor challenge body) can resemble a database error at a glance; diff the actual body against both a clean control and a known-benign 403 before calling it a SQLi signal.
 - A validated/allowlisted identifier (sort key, column alias) that is merely unescaped is not yet a finding until a value outside the allowlist is shown to reach the query — generic table/column fuzzing against production can itself cause data loss, so confirm on a synthetic fixture first.
 
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Capture a normal valid request, an invalid-type/control request, and a known-no-match response for a test-owned resource before interpreting any differential.
+2. Use paired benign Boolean predicates and minimal syntax-boundary values to test whether input reaches a database query; vary one parameter and one condition at a time.
+3. Only use tightly bounded time-based checks when permitted, with explicit timeouts, a small number of observations, and a non-injection timing control to account for load/network noise.
+4. Confirm the query boundary using synthetic data or a harmless predicate outcome; do not dump tables, extract credentials, modify records, or use destructive statements to demonstrate SQL injection.
+5. Record the exact parameter, DB error or repeatable logical differential, negative control, and confidence. Recommend parameterized queries/ORM-safe binding and regression tests for the affected data type.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## Stop Conditions
 
 - Stop at unexpected state changes, real data exposure, service instability, rate-limit warnings, or scope uncertainty.

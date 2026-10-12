@@ -111,6 +111,34 @@ Trace the dependency and handler in source, keep a minimal sanitized request/res
 - Background jobs may be eventually consistent; compare authoritative state and owner binding.
 - Stop before internal SSRF, large uploads, queue flooding, or production file reads/writes.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+
+Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
+
+### Skill-specific hypothesis order
+
+1. Map the actual FastAPI routes and dependency declarations from permitted OpenAPI/docs or source evidence; do not assume that /docs or /openapi.json being available is itself a vulnerability.
+2. Check each sensitive route with anonymous, least-privileged, and authorized test identities, including dependency overrides that may differ between route groups or API versions.
+3. Test object/property authorization and request-model validation independently using test-owned records and benign marker fields; distinguish response filtering from the server's effective authorization.
+4. Review trusted-host, proxy-header, CORS, debug/error response, and cookie/session settings only where deployed configuration suggests they are relevant.
+5. Confirm the boundary with a protected canary and negative control; report the route, effective dependency/role, data/action impacted, and framework-specific remediation plus a regression test.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture and a relevant control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause remains uncertain.
+- **Unconfirmed:** response is ambiguous, cached, generic, or not linked to a security boundary.
+- **Refuted / false positive:** an applicable negative control or valid policy explanation accounts for the signal. Record the attempt ledger rather than claiming every theoretical variant was exhausted.
+- A 2xx status, error difference, header, schema/documentation exposure, scanner alert, or UI-only state is not proof by itself.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected real-user data, unexpected production state changes, service degradation, credential exposure, or a prohibited action. Restore disposable state and revoke temporary tokens/sessions where possible. Handoff target and scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence pointers, linked-skill signal, and cleanup status. Invoke a related skill only when its triggering signal is observed.
+
 ## References
 
 - [uphiago — hunt-fastapi](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-fastapi)

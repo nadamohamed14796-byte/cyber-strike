@@ -261,6 +261,19 @@ Apply this gate when editing an existing skill, not only when creating a new one
 - Preserve existing valuable content. Add a new section only when it provides a distinct workflow, coverage dimension, validation gate, or evidence requirement.
 - Do not mark a skill as verified or tested unless the relevant checks were actually run.
 
+### Attack and reconnaissance playbook requirements
+
+For every `attack-*` and `recon-*` skill, quality is measured by a reproducible decision process, not by the number of payloads or paragraphs.
+
+- Replace generic hypothesis-order text with a skill-specific sequence tied to that skill's threat model, coverage matrix, and expected evidence. Each branch must say what to vary, what a positive signal means, and which control can refute it.
+- Treat the “up to 20 hypotheses” limit as a hard ceiling for distinct, evidence-producing hypotheses, never as a quota. Equivalent encodings, retries, or payload permutations do not count as independent hypotheses; stop earlier when a result is decisive, a relevant branch is exhausted, safety limits apply, or authorization is ambiguous.
+- Recon must establish authorization and ownership confidence before active probing, prefer passive evidence first, deduplicate results, preserve provenance, and hand off candidates—not findings—to attack skills.
+- Attack validation must establish a baseline, vary one trust boundary at a time, use test-owned identities/data, prove impact with a harmless canary or reversible fixture, and keep a relevant negative control.
+- For every candidate, distinguish observed signal, likely cause, confirmed impact, and refuted/false-positive explanation. HTTP status, response length, tool alerts, version banners, or endpoint existence alone are not confirmation.
+- Keep commands bounded with explicit timeouts, conservative request volume, placeholders, expected outcomes, and stop/cleanup conditions. State-changing or potentially disruptive checks need explicit program authorization and a disposable test fixture.
+- Preserve the existing local skill name, directory, file type, loader expectations, and useful content. External source paths must be labeled as external; only use `chains_with`, `prerequisites`, and relative links that resolve to real local skills/files.
+- Before committing edits, validate frontmatter, local chain references, duplicate headings, unresolved placeholders, Markdown link syntax, and whether the skill's own proof criteria match its claimed impact.
+
 ### Final review checklist
 - [ ] YAML frontmatter opens and closes correctly and required fields remain present.
 - [ ] name matches the existing skill directory and remains unique.

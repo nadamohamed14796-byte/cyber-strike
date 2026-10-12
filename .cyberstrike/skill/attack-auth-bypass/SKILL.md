@@ -99,6 +99,38 @@ Review credential validation, session creation, callback state/nonce, token issu
 - Response code or timing differences do not prove bypass without an authenticated principal.
 - Stop if testing requires credential guessing, real-account recovery, or out-of-scope identity-provider access.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+
+Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
+
+### Skill-specific hypothesis order
+
+1. Map the authentication boundary for one in-scope feature: expected login path, protected destination, anonymous response, and allowed test account response.
+2. Compare modern and legacy entry points only when the application exposes evidence for them (for example, a legacy protocol endpoint or alternate API version); verify each route's own access policy.
+3. Check token/session validation dimensions independently: presence, signature/issuer/audience where applicable, expiry/revocation, and binding to the intended account or client. Do not treat malformed-token acceptance as impact by itself.
+4. Test recovery, SSO callback, and alternate-channel paths only if they are present. Use two controlled identities to establish whether the path authenticates the wrong identity or skips a required factor.
+5. Confirm a protected action or private test-owned resource is accessible without the required proof, then compare with a clean unauthenticated/invalid-token control and document exact preconditions.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture, with a relevant control and a clear trust-boundary failure.
+- **Likely / needs corroboration:** multiple independent signals support the hypothesis, but the security consequence or root cause is not yet established.
+- **Unconfirmed:** evidence is incomplete, ambiguous, cached, or indistinguishable from a generic response.
+- **Refuted / false positive:** a relevant negative control, valid authorization explanation, or repeatable contradictory evidence explains the signal. Record what was tested; do not claim that every theoretical variant was exhausted.
+- A status code, banner, stack trace, response-length difference, endpoint existence, tool alert, or visible frontend state is never sufficient on its own.
+
+### Stop and cleanup rules
+
+Stop immediately on an out-of-scope boundary, unexpected real-user data, production side effects, rate-limit/availability degradation, credential exposure, or a request to perform a prohibited action. Do not continue merely to spend the budget. Restore disposable test state, revoke temporary sessions/tokens where possible, and record cleanup status.
+
+### Agent handoff record
+
+Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, attempts used, observed impact, negative controls, confidence/verdict, related-skill signal, sanitized evidence references, and cleanup status. Invoke a chained skill only when the stated signal is independently observed; do not chain from name similarity alone.
+
 ## References
 
 - [uphiago — hunt-auth-bypass](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-auth-bypass)

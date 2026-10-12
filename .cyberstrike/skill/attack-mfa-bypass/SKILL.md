@@ -94,6 +94,34 @@ Use a harmless protected operation to confirm the assurance level is checked ser
 - MFA can be enforced by an identity provider; inspect the assurance claim and policy scope.
 - Do not brute-force OTPs, test lockout with repeated guesses, intercept another person's factor, or degrade a real account.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+
+Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
+
+### Skill-specific hypothesis order
+
+1. Use two test accounts with MFA enabled and record a normal password-plus-second-factor login as the positive control.
+2. Test each alternate path separately: remembered device, recovery codes, factor reset/change, password reset, SSO, API login, mobile flow, and session reuse where those paths exist.
+3. Check binding of challenge, account, session, and time window using invalid, expired, reused, and cross-session test artifacts; honor retry caps and avoid lockout of real users.
+4. Confirm whether the protected test account reaches a sensitive feature without satisfying its configured factor; merely skipping a UI prompt is not proof if the server still enforces MFA.
+5. Capture clean and bypass-path state transitions, invalidate test sessions/recovery codes afterward, and recommend consistent server-side step-up policies and revocation.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is shown against an in-scope resource using a tester-controlled identity or fixture, with a meaningful control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not yet established.
+- **Unconfirmed:** observations are ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control or valid policy/implementation explanation accounts for the observation; document the attempts instead of claiming all imaginable variants were exhausted.
+- Do not treat status codes, error text, response length, decoded tokens, static findings, or UI state alone as proof.
+
+### Stop, cleanup, and handoff
+
+Stop at scope uncertainty, unrelated sensitive data, unexpected production changes, service degradation, secret exposure, or prohibited actions. Restore disposable state and revoke test tokens/sessions where possible. Return the scope proof, baseline, hypothesis, attempt count, impact, controls, confidence/verdict, sanitized evidence pointers, relevant handoff signal and cleanup status. Chain into another skill only when its trigger is present.
+
 ## References
 
 - [uphiago — hunt-mfa-bypass](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-mfa-bypass)

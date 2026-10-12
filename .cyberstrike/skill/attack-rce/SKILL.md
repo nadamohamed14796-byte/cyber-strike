@@ -104,6 +104,34 @@ Record process identity, permission boundary, sandbox/container limits, and remo
 - Severity must reflect demonstrated sandbox and privilege boundaries, not hypothetical host access.
 - Do not run reverse shells, persistence, destructive commands, internal scans, or secret-reading commands as a default PoC.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Confirm the exact in-scope component and input boundary, then establish a harmless baseline and a negative-control value before any validation attempt.
+2. Use a non-destructive proof only in a test/lab or explicitly approved endpoint; prefer an inert marker or benign arithmetic result over shell commands, filesystem access, or network callbacks.
+3. If command execution is specifically authorized, constrain proof to a fixed benign command with a unique nonce, hard timeout, no persistence, no credential access, and no external side effect.
+4. Do not install tools, create users, read secrets, establish shells, alter files, or chain to post-exploitation. Stop immediately if impact exceeds the agreed proof.
+5. Capture the minimum sanitized request/result, establish repeatability with a negative control, and recommend the exact input-validation/API separation/patch fix with a regression test.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## References
 
 - [uphiago/recon-skills — hunt-rce](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-rce)

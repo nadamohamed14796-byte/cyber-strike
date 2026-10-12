@@ -81,6 +81,34 @@ A reportable issue requires a control that can be bypassed or an unintended serv
 - Do not scan broad cloud address ranges to find origins.
 - Treat exposed origin IPs as informational unless direct access changes security posture.
 
+
+## Signal Confidence, Attempt Budget, and Handoff
+
+Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+
+### Evidence record and confidence
+
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+
+Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
+
+### Skill-specific next steps
+
+1. Start from confirmed domains and passive evidence (historical DNS, certificate data, provider records, and first-party configuration) before any network probes.
+2. Correlate candidate addresses with ownership, ASN/provider, TLS/SNI certificate, application response, and current DNS. A historical A record or shared IP alone does not identify a unique origin.
+3. Use only low-impact checks within explicitly scoped address ranges; do not bypass CDN/WAF controls to attack origin services, scan neighboring tenants, or change host routing.
+4. Compare a candidate address with the normal CDN/front-door response using the expected Host/SNI and a random-host control. Distinguish genuine origin reachability from shared hosting or a provider edge.
+5. Return each candidate with source, timestamp, ownership confidence, corroborating signals, and scope decision. Discovery is not permission to probe the address and is not itself a vulnerability.
+
+
+### Deduplication and stop rules
+
+Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
+
+### Handoff format
+
+Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/origin-ip-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/origin-ip-discovery/SKILL.md)

@@ -102,6 +102,38 @@ Record whether issue affects a single test identity, role, or integration. Resto
 - Provider subject IDs can differ across tenants; confirm issuer and tenant.
 - Stop after test proof; do not access or modify real users' data or credentials.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+
+Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
+
+### Skill-specific hypothesis order
+
+1. Create and baseline two accounts you control with distinct inboxes and recovery methods; verify the normal sign-in, recovery, email-change, and session-revocation behavior first.
+2. Follow one identity-binding surface at a time: password reset, email/phone change, account linking, invitation acceptance, or recovery-code handling. Use only messages and tokens issued to your test accounts.
+3. Check whether tokens are bound to the correct account, purpose, and time window; inspect replay, reuse, expiry, and session rotation with disposable test state rather than attempting another person's account.
+4. Verify whether changing an identity factor affects existing sessions and linked identities as expected. Use a harmless profile marker to prove account-boundary impact without accessing private data.
+5. Re-test the claimed path from a clean browser/session and a negative control. A weak recovery hint or unusual response alone is not account takeover; report only a reproducible ability to cross account ownership.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture, with a relevant control and a clear trust-boundary failure.
+- **Likely / needs corroboration:** multiple independent signals support the hypothesis, but the security consequence or root cause is not yet established.
+- **Unconfirmed:** evidence is incomplete, ambiguous, cached, or indistinguishable from a generic response.
+- **Refuted / false positive:** a relevant negative control, valid authorization explanation, or repeatable contradictory evidence explains the signal. Record what was tested; do not claim that every theoretical variant was exhausted.
+- A status code, banner, stack trace, response-length difference, endpoint existence, tool alert, or visible frontend state is never sufficient on its own.
+
+### Stop and cleanup rules
+
+Stop immediately on an out-of-scope boundary, unexpected real-user data, production side effects, rate-limit/availability degradation, credential exposure, or a request to perform a prohibited action. Do not continue merely to spend the budget. Restore disposable test state, revoke temporary sessions/tokens where possible, and record cleanup status.
+
+### Agent handoff record
+
+Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, attempts used, observed impact, negative controls, confidence/verdict, related-skill signal, sanitized evidence references, and cleanup status. Invoke a chained skill only when the stated signal is independently observed; do not chain from name similarity alone.
+
 ## References
 
 - [uphiago — hunt-ato](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-ato)

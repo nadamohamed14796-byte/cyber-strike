@@ -110,8 +110,36 @@ State the exact mutation reached, the privilege level required to exploit it, an
 - Repeater is not a browser-origin context.
 - Stop before credential changes, MFA removal, payments, or irreversible actions.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+
+Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
+
+### Skill-specific hypothesis order
+
+1. Identify one state-changing endpoint and baseline its normal behavior with a test-owned account; document whether authentication uses ambient cookies, bearer headers, or another browser-sent credential.
+2. Check anti-CSRF token enforcement by omitting, invalidating, replaying, or cross-session binding the token one condition at a time; a missing token is not a finding if another robust defense applies.
+3. Evaluate Origin/Referer validation, cookie SameSite settings, content-type requirements, and CORS as separate defenses. Do not conflate CORS read restrictions with CSRF write prevention.
+4. Demonstrate the state change only against a disposable test record using a local controlled page or approved harness, then restore the record and record cleanup.
+5. Compare a legitimate request, an invalid-token request, and a cross-origin attempt. Confirm the server-side state—not merely a successful HTTP response—changed without the required user intent.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture, with a relevant control and a clear trust-boundary failure.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not established.
+- **Unconfirmed:** the signal is ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control, valid authorization explanation, or repeatable contradictory evidence explains the signal. Record the attempts; do not claim every theoretical variant was exhausted.
+- Status, banners, stack traces, response length, endpoint existence, tool alerts, or frontend state are not sufficient on their own.
+
+### Stop, cleanup, and handoff
+
+Stop at scope boundaries, unexpected real-user data, production side effects, rate-limit/availability degradation, secret exposure, or prohibited action. Clean up disposable state, revoke temporary sessions/tokens when possible, and record status. Return target/scope evidence, baseline, hypothesis, attempts used, impact, controls, verdict/confidence, sanitized evidence, handoff signal, and cleanup status. Trigger a chained skill only when its signal is observed.
+
 ## References
 
 - [uphiago — hunt-csrf](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-csrf)
 - [Claude-BugHunter — hunt-csrf](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-csrf)
-- [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [OWASP CSRF Prevention Cheat Sheet](https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.md)

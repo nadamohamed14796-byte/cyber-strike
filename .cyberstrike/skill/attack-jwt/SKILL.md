@@ -155,6 +155,34 @@ Never paste production tokens into online decoders or third-party services. Use 
 
 Record token type, issuer/audience, redacted header and claims, baseline vs modified behavior, expiry/revocation state, and the exact protected action demonstrated.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+
+Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
+
+### Skill-specific hypothesis order
+
+1. Capture a token issued to a test account and document expected issuer, audience, expiry, key/algorithm, and role claims without exposing the token in logs.
+2. Establish accepted/rejected controls using a valid test token, an expired token, a malformed token, and a token with one altered claim; change one dimension at a time.
+3. Verify signature and algorithm handling, issuer/audience validation, key selection, and token-to-session binding only with tokens and signing material you control. Do not reuse captured third-party tokens or fetch attacker-controlled key URLs against production.
+4. Check whether a claim change actually grants a protected capability on a harmless test-owned resource; decoded claims or token acceptance alone are not proof.
+5. Redact tokens and keys, re-test with a fresh valid token, and recommend strict algorithm/key allowlists, issuer/audience checks, short lifetimes, revocation strategy, and a regression suite.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is shown against an in-scope resource using a tester-controlled identity or fixture, with a meaningful control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not yet established.
+- **Unconfirmed:** observations are ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control or valid policy/implementation explanation accounts for the observation; document the attempts instead of claiming all imaginable variants were exhausted.
+- Do not treat status codes, error text, response length, decoded tokens, static findings, or UI state alone as proof.
+
+### Stop, cleanup, and handoff
+
+Stop at scope uncertainty, unrelated sensitive data, unexpected production changes, service degradation, secret exposure, or prohibited actions. Restore disposable state and revoke test tokens/sessions where possible. Return the scope proof, baseline, hypothesis, attempt count, impact, controls, confidence/verdict, sanitized evidence pointers, relevant handoff signal and cleanup status. Chain into another skill only when its trigger is present.
+
 ## References
 
 - [uphiago/recon-skills — redteam/hunt-oauth](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-oauth/SKILL.md) — JWT and token validation sources.

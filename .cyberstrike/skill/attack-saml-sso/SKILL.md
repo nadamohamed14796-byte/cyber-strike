@@ -104,6 +104,34 @@ Verify the accepted test assertion maps to the intended subject and allowed role
 - An assertion can be validly signed but intended for a different issuer/audience/recipient.
 - Do not edit production assertions to impersonate real users, test third-party IdPs, or attempt external entity file/network access.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Use a dedicated test IdP/service-provider tenant and test users; capture a successful baseline assertion, audience/recipient, issuer, destination, signature, and relay state.
+2. Change one protocol property at a time in controlled fixtures: audience, recipient, issuer, timestamp/expiry, signature coverage, response/assertion pairing, or relay-state binding.
+3. Check signature validation and account/tenant binding against the service provider's expected configuration; do not modify or replay assertions belonging to real users.
+4. Validate acceptance only by signing into a test account and confirming its identity/privileges, with a fresh valid assertion as the positive control and one invalid assertion as the negative control.
+5. Capture sanitized metadata and the exact violated invariant, discard test assertions after use, and recommend strict signature/canonicalization validation, replay protection, and explicit audience/recipient checks.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## References
 
 - [uphiago — saml-sso-attack](https://github.com/uphiago/recon-skills/tree/main/auth/saml-sso-attack)

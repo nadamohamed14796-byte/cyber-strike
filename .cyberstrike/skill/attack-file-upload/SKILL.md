@@ -101,6 +101,34 @@ Inspect archive extraction, image conversion, document preview, antivirus, XML p
 - Storage keys can be hard to guess but unguessability is not a substitute for authorization on private objects.
 - Stop if testing would overwrite non-test content, stress a processor, access other tenants, or cross into cloud resources not explicitly in scope.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+
+Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
+
+### Skill-specific hypothesis order
+
+1. Baseline upload behavior with an inert text or image canary: allowed extension, rejected extension, size boundary, and the server's final storage/retrieval path.
+2. Change one file property at a time—extension, content type, signature, filename, path/name normalization, or archive structure—and observe whether validation is server-side and consistent.
+3. Verify storage isolation and execution behavior with a harmless canary in a test-owned folder. Do not upload malware, web shells, oversized archives, or polyglot files to production.
+4. Check authorization independently for upload, view, download, replace, and delete operations using two controlled identities; opaque filenames do not substitute for access checks.
+5. Record the exact validation gap, final serving headers/origin, and a control rejected by the server; remediation should combine allowlisted types, content inspection, safe storage, randomized names, and authorization tests.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture and a relevant control.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause remains uncertain.
+- **Unconfirmed:** response is ambiguous, cached, generic, or not linked to a security boundary.
+- **Refuted / false positive:** an applicable negative control or valid policy explanation accounts for the signal. Record the attempt ledger rather than claiming every theoretical variant was exhausted.
+- A 2xx status, error difference, header, schema/documentation exposure, scanner alert, or UI-only state is not proof by itself.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected real-user data, unexpected production state changes, service degradation, credential exposure, or a prohibited action. Restore disposable state and revoke temporary tokens/sessions where possible. Handoff target and scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence pointers, linked-skill signal, and cleanup status. Invoke a related skill only when its triggering signal is observed.
+
 ## References
 
 - [uphiago/recon-skills — hunt-file-upload](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-file-upload)

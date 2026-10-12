@@ -117,6 +117,33 @@ State the exact source, the sink it reaches, whether a sanitizer/origin-check wa
 - Wildcard origin checks or string-based sinks are leads, not proof without a reachable flow.
 - Never copy OAuth fragments or real browser tokens into logs/reports.
 
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+
+Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
+
+### Skill-specific hypothesis order
+
+1. Trace attacker-influenced sources to DOM sinks in the exact page and record the rendering context; distinguish text insertion from HTML, URL, script, and attribute contexts.
+2. Begin with a unique inert marker and compare escaped versus unescaped output across the relevant source (URL, fragment, storage, postMessage, or API response).
+3. Use a harmless browser-side proof that changes only a visible test-page marker; do not read cookies, local storage, credentials, or transmit data to external hosts.
+4. Check whether sanitization/encoding is applied at the correct sink and whether framework re-rendering or Trusted Types changes the behavior; vary one source/context at a time.
+5. Repeat with a control value that should remain text and capture the DOM context, controlled browser result, affected origin, and precise input path. Reflection without executable parsing is not confirmed DOM XSS.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable security impact is demonstrated against an explicitly in-scope resource using a tester-controlled identity or fixture, with a relevant control and a clear trust-boundary failure.
+- **Likely / needs corroboration:** independent signals support the hypothesis but impact or root cause is not established.
+- **Unconfirmed:** the signal is ambiguous, cached, generic, or not tied to a security boundary.
+- **Refuted / false positive:** a relevant negative control, valid authorization explanation, or repeatable contradictory evidence explains the signal. Record the attempts; do not claim every theoretical variant was exhausted.
+- Status, banners, stack traces, response length, endpoint existence, tool alerts, or frontend state are not sufficient on their own.
+
+### Stop, cleanup, and handoff
+
+Stop at scope boundaries, unexpected real-user data, production side effects, rate-limit/availability degradation, secret exposure, or prohibited action. Clean up disposable state, revoke temporary sessions/tokens when possible, and record status. Return target/scope evidence, baseline, hypothesis, attempts used, impact, controls, verdict/confidence, sanitized evidence, handoff signal, and cleanup status. Trigger a chained skill only when its signal is observed.
+
 ## Stop Conditions
 
 - Stop if testing requires delivery to an uninvolved user, tenant crossing, or third-party payload execution.

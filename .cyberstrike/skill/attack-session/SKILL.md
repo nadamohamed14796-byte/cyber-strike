@@ -97,6 +97,34 @@ If a pre-auth ID exists, verify login rotates it and that a test-supplied identi
 - Token existence is not proof the server trusts it.
 - Never steal, replay, or share anyone else's token.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+
+Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Record cookie and token behavior for a normal controlled login, privilege change, password reset, and logout; use browser devtools or proxy evidence without exposing credential values.
+2. Check cookie flags (Secure, HttpOnly, SameSite, Domain, Path), identifier rotation after authentication/privilege changes, and server-side invalidation after logout/reset.
+3. Test session fixation/reuse only with sessions issued to your own test account; compare a pre-login identifier with the authenticated session and use a fresh browser as a negative control.
+4. Verify authorization after session changes and token expiry/revocation using harmless protected resources; do not replay stolen or third-party session material.
+5. Capture sanitized cookie attributes and state transitions, then provide a regression test for rotation, expiry, revocation, and scope restrictions.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated with a controlled fixture/identity and relevant control.
+- **Likely / needs corroboration:** multiple independent signals support the candidate but the effect or cause remains uncertain.
+- **Unconfirmed:** signal is generic, timing/cache-dependent, or not tied to a security property.
+- **Refuted / false positive:** a relevant control or valid product/security behavior explains the observation; preserve the test ledger rather than claiming all theoretical vectors were attempted.
+- A status code, banner, parser error, timing fluctuation, version string, or scanner alert alone is not proof.
+
+### Safety, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected state changes, sensitive data, service degradation, secret exposure or prohibited actions. Restore synthetic state and revoke temporary credentials/sessions where possible. Report scope proof, baseline, hypothesis, attempt count, impact, controls, verdict/confidence, sanitized evidence and cleanup status. Chain into another skill only after observing its required signal.
+
 ## References
 
 - [uphiago — hunt-session](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-session)

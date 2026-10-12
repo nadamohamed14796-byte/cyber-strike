@@ -102,6 +102,34 @@ For a candidate advisory, record product branch, version, patch level, reachable
 - A proxy endpoint is not SSRF until a controlled server-side request is confirmed.
 - Do not attempt file writes, shell uploads, internal target sweeps, default credentials, password guessing, or customer mailbox reads.
 
+
+## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+
+Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+
+Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
+
+### Skill-specific hypothesis order
+
+1. Confirm the in-scope Zimbra deployment and exact version/build using read-only evidence; keep product identification separate from exploitability.
+2. Map public login/webmail/admin surfaces and compare anonymous, regular test-user, and authorized-admin behavior using mailboxes you control.
+3. Check supported version against current vendor advisories and the exposed preconditions; do not run public exploit scripts or invoke file/command endpoints on a live deployment to validate a version match.
+4. Validate suspected disclosure with a synthetic test message or harmless account setting only when the program permits it; never access real mailboxes or export private mail.
+5. Record exact asset/version confidence, route, demonstrated impact and remediation path. Stop on unexpected mailbox/credential exposure or stability issues.
+
+
+### Verdict gates
+
+- **Confirmed:** repeatable impact at an explicit in-scope boundary is demonstrated using a controlled identity/fixture and a meaningful control.
+- **Likely / needs corroboration:** independent indicators support the candidate, but the consequence or root cause remains uncertain.
+- **Unconfirmed:** evidence is generic, ambiguous, cached, or not tied to a security property.
+- **Refuted / false positive:** a relevant negative control or valid implementation/policy explanation accounts for the observation. Document tested branches; do not claim all imaginable variants were exhausted.
+- Scanner alerts, version strings, banner text, status codes, and response length alone are not proof.
+
+### Stop, cleanup, and handoff
+
+Stop on scope ambiguity, unexpected user data, state changes, service degradation, secret exposure or prohibited behavior. Clean disposable test state and revoke temporary sessions/tokens where possible. Return scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence and cleanup status. Start a chained skill only when its trigger has been independently observed.
+
 ## References
 
 - [uphiago/recon-skills — Zimbra attack surface](https://github.com/uphiago/recon-skills/blob/main/recon/zimbra-attack/SKILL.md) — merged service-specific source.
