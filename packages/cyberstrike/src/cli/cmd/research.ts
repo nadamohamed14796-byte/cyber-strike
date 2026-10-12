@@ -113,6 +113,8 @@ export const ResearchCommand = cmd({
         async handler(args) {
           prompts.intro("CyberStrike Research Discovery Worker")
           do {
+            const authRequeued = await retryAuthenticatedResearch({ sourceID: args.source, limit: args.pages })
+            if (authRequeued > 0) prompts.log.info("auth-blocked research resumed=" + authRequeued)
             const results = await discoverResearch({ sourceID: args.source, pages: args.pages, depth: args.depth })
             for (const result of results) {
               prompts.log.info(
