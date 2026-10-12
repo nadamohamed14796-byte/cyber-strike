@@ -82,6 +82,26 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
       }
     }
 
+    if (params.status === "tested_vulnerable") {
+      const evidence = params.evidence
+      if (
+        !evidence?.requestSent?.trim() ||
+        !evidence.responseSummary?.trim() ||
+        evidence.responseSummary.trim().length < 50 ||
+        !evidence.reasoning?.trim() ||
+        evidence.reasoning.trim().length < 100 ||
+        !Number.isInteger(evidence.requestCount) ||
+        evidence.requestCount! < 1
+      ) {
+        return {
+          title: `VRT vulnerable verdict blocked — insufficient evidence`,
+          output: "Cannot mark this category tested_vulnerable without a sent request, an observed response summary (at least 50 characters), reasoning (at least 100 characters), and requestCount >= 1. No VRT check was written.",
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_missing_evidence" },
+        }
+      }
+    }
+
+    let verificationEvidenceRef: string | undefined
     if (params.status === "tested_not_vulnerable") {
       if (!params.verification_hypothesis_key?.trim()) {
         return {
@@ -105,21 +125,31 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
           metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_identity_mismatch", attemptsUsed: attempts.length },
         }
       }
-      const outcome = attempts[attempts.length - 1]?.outcome
-      if (outcome !== "disproven") {
+      const decisiveAttempt = attempts[attempts.length - 1]
+      const outcome = decisiveAttempt?.outcome
+      if (outcome !== "disproven" || !decisiveAttempt.validConditions || !decisiveAttempt.evidenceRef?.trim()) {
         return {
           title: `VRT clean verdict blocked — ${params.vrt_category}`,
-          output: `Cannot mark this category tested_not_vulnerable: verification outcome is ${outcome ?? "unrecorded"}, not DISPROVEN. Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
+          output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome with valid conditions and direct evidence is required (current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
           metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: attempts.length, outcome: outcome ?? "unrecorded" },
         }
       }
+      verificationEvidenceRef = decisiveAttempt.evidenceRef.trim()
     }
 
     Intel.updateVrtCheck(sessionID, params.entry_id, params.vrt_category, {
       status: params.status,
       technique: params.technique,
       testedBy: ctx.agent,
-      evidence: params.evidence as Record<string, unknown>,
+      evidence: {
+        ...((params.evidence ?? {}) as Record<string, unknown>),
+        ...(params.status === "tested_not_vulnerable"
+          ? {
+              verificationHypothesisKey: params.verification_hypothesis_key,
+              verificationEvidenceRef,
+            }
+          : {}),
+      },
     })
 
     const icon =
