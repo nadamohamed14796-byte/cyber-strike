@@ -156,7 +156,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** policy helper `6ad4f927421491a8715de178949b31700af12f42`; ledger integration `cac99ea90d65a928ce4f6c8d61d31485b5540d0b`; regression test `53f693a3f3cac076c919943b28143097fc0c1e30`.
 - **Validation:** GitHub contents API confirmed each write returned a commit SHA. GitHub Actions unit tests, typecheck, and build passed on the later code head `8324bd36c1883d008cd3da6c3a9b91cc6b0cd228` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL was still running when this ledger was refreshed; no local Bun runtime/checkout was used.
 - **Attempts:** one focused implementation pass; continue from actual CI feedback if checks become available.
-- **Disposition:** code change committed directly to `main`; validation pending. No feature branch was created for this repair.
+- **Disposition:** code change committed directly to `main`; unit tests/typecheck/build passed on later code head `8324bd36`; CodeQL pending. No feature branch was created for this repair.
 
 ## Follow-up checkpoint — 2026-10-12: scope-check IPv4/CIDR parsing
 
@@ -179,7 +179,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Fix:** centralized terminal-outcome detection in `VerificationAttempts.isTerminalOutcome()` and reject any further record operation for a hypothesis whose stored outcome is `confirmed` or `disproven`.
 - **Regression coverage:** added policy tests proving only `confirmed` and `disproven` are terminal; inconclusive and unrecorded outcomes remain non-terminal.
 - **Direct commits on main:** policy `bfb35b3dd2064e4c558b43228cf501e946170665`; test `7de88c567efa1a4fafb267aa8dab4ac937bcd8e3`; ledger enforcement `afc9422633ce9244e893566ffef7d2729ecc7659`.
-- **Validation:** source writes are committed to `main`; no local Bun runtime is available. GitHub Actions status must be checked on the resulting main head before this is marked verified.
+- **Validation:** unit tests/typecheck/build passed on code head `8324bd36`; CodeQL remained in progress. No local Bun runtime was used.
 - **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL pending.
 
 
@@ -192,7 +192,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Regression coverage:** tests cover body-at-limit acceptance, streamed oversize rejection, oversized declared `Content-Length`, archive expansion bombs/manifests, plus SEC-008 destination and redirect validation.
 - **Direct commits on main:** per-response limits `a53f4ff1aa18bfe2838958a178cf2752de456a7a`; regression test `4df5373ff1d7421edd05a50b8e77268846cca10f`; test simplification `9f1cc631373d3a27f98b91c46c00da33cdf0f604`; bounded asset count, six-way concurrency, 100 MiB total download budget and archive expansion checks `7c38ea8b92aa42a4470708efe836161fa84dd817`; five-minute sync budget and concurrent extraction reservation `24bd1912ceff24406f00ed8402e3d75e2b8f620f`; archive-size regression tests `baabc4cb88e2e6e590cff97b5140d87652a5ccc1`; final formatting/deadline guards `fe2640a8ea28f9c31ab826042a4dd2b1fc35810b`; byte-accounted shared budget `21833d6442f386535ba310f7c2632c16d2160a3c`; over-budget chunk accounting and regression test `2fe4ebed7716508300617897810928225a47c420` / `14da7c3efcc78c9fccf865e454ff97187a6f3e98`.
 - **Validation:** unit tests, typecheck and build steps passed on code head `8324bd36` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL remained in progress; no local Bun run was claimed.
-- **Status:** implemented; automated validation pending.
+- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL pending.
 
 
 ## Follow-up checkpoint — 2026-10-12: remote skill destination and redirect guard
@@ -205,7 +205,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** implementation `3eedd98f1b00fba1c534b47ac87ae22524c502de`; initial regression tests `48492819e173b58d974782bc152dd36965580e87`; extracted redirect-policy helper `7d99c217484a0c0e136cdace4b4f82753243c805`; redirect regression tests `996c21c60fcb7aa9e3afc061cebe1712176e6145`; malformed-URL and per-entry failure handling `e0100c11695465b2770c0059b3b2a0ea83808a42`; formatting pass `9f4845bf3956c6b8b46636e1fa6d161448449038`; invalid registry URL tests `d88cf1d6019ab1a1f67a97eed14a55d354d73437`.
 - **Limitations:** host DNS is checked before each fetch, but the runtime's fetch implementation performs its own subsequent resolution; DNS rebinding between those operations is not cryptographically prevented in this implementation. Network egress controls remain the stronger defense where available.
 - **Validation:** unit tests, typecheck and build steps passed on code head `8324bd36` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL remained in progress; DNS rebinding between validation and the runtime's own resolution remains a documented limitation.
-- **Status:** implemented; automated validation pending.
+- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL pending.
 
 
 ## Follow-up checkpoint — 2026-10-12: DOMPurify dependency security update
@@ -216,7 +216,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Fix:** updated the UI dependency to `dompurify@3.4.16` and updated both corresponding Bun lockfile records, including the registry tarball integrity hash.
 - **Direct commits on main:** manifest `6f4f789261610903e0b0d2ed849675c4b7a8f692`; lockfile `d40d1b312a9d9a6e08467feb7da1637db5776d04`.
 - **Validation:** Bun dependency setup succeeded; unit tests passed on the lockfile-updated code head, typecheck passed, and the monorepo build step succeeded. CodeQL was still in progress; no separate lockfile-regeneration command was run.
-- **Status:** security update committed; automated validation pending.
+- **Status:** security update committed; unit tests/typecheck/build steps passed on code head `3d42bd27`; CodeQL pending.
 
 
 ## Follow-up checkpoint — 2026-10-12: verification ledger invariants and CI regression repair
@@ -226,7 +226,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Evidence:** `VerificationLedger.record()` read the hypothesis history, checked identity/terminal state/attempt budget, then inserted or updated rows in separate database operations. Without one transaction around the entire decision, concurrent callers could observe inconsistent ledger state or race the uniqueness/budget checks.
 - **Fix:** wrapped the history read, identity/terminal/budget guards, attempt upsert, decision computation, and outcome update in `Database.transaction()`. Newly inserted strategy and variant identifiers are stored in normalized form to align the SQLite uniqueness key with the application-level deduplication key.
 - **Direct commit on main:** `8ef8f394feeb9deb1c50039cf22c660b868e5643`.
-- **Validation:** latest-head typecheck/build/test runs were still in progress when recorded; no local runtime was available. Keep pending until the latest main head is green.
+- **Validation:** unit tests/typecheck/build passed on code head `8324bd36`; CodeQL remained in progress.
 
 ### INT-009 — P2: URL asset identity lowercased case-sensitive path components
 
@@ -234,7 +234,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Fix:** canonicalize only explicit URL syntax through `URL.href`, which normalizes the host while preserving path case; non-URL asset identifiers remain exact after trimming.
 - **Regression coverage:** added tests proving host case normalizes but path case remains identity-significant.
 - **Direct commits on main:** implementation `52c5a3be60576970b9631d1b7e0b040eb579d8c7`; test `98ceaf0ea6228acb25c42d7b703f651477de0b2d`.
-- **Validation:** latest-head typecheck/build/test runs were in progress when recorded.
+- **Validation:** unit tests/typecheck/build passed on code head `8324bd36`; CodeQL remained in progress.
 
 ### CI-001 — P2: archive fixture no longer satisfied the hardened DNS policy
 
