@@ -62,7 +62,7 @@
 - **No merge needed:** scope-check IPv4/CIDR, bounded WebFetch, non-mutating WebRecon probes, target-workspace owner-index reconciliation, and remote skill cache confinement are already represented on main with later hardening.
 - **No unique commits relative to main:** `ci/monorepo-build-validation-20261012`, `fix/pr-management-fork-label-guard`, `fix/remote-skill-cache-confinement-main-20261012`, `improve/skill-quality-reference-audit-reconciled`, `feat/spa-nav-discovery`, and `stage` were reported as behind-only in the inspected comparisons.
 - **Dependency branches:** the DOMPurify proposal was ported with its lockfile; the mysql2 proposal was superseded by a safer 3.23.1 update; the provider-utils branch's manifest versions already match main, while its lockfile snapshot is stale relative to main.
-- **Retain for selective review:** `docs/idor-skill-expansion`, `skills/import-phase-1-methodology-recon`, `feat/discovery-core`, `feat/proxy-config`, `dev`, `fix/target-memory-owner-isolation`, and `fix/remove-orphan-auth-manager-typecheck-blocker` are divergent or contain older versions of code that main has since extended. Do not merge these branches wholesale.
+- **Retain for selective review:** `feat/discovery-core`, `feat/proxy-config`, `dev`, `fix/target-memory-owner-isolation`, and `fix/remove-orphan-auth-manager-typecheck-blocker` are divergent or contain older versions of code that main has since extended. `docs/idor-skill-expansion` and `skills/import-phase-1-methodology-recon` were rechecked against main; the reviewed skill additions already exist on main, so no further cherry-pick is required. Do not merge any of these branches wholesale.
 - **Branch deletion:** no branches were deleted. The available GitHub actions in this execution context do not expose a safe branch-delete operation; unmerged divergent branches remain preserved to avoid losing unreviewed unique work.
 
 ## Branch / PR ledger (snapshot at baseline)
@@ -155,7 +155,7 @@ These 20 review lenses were inspected through repository source/manifest/API rev
 ### Branch cleanup guarantee
 
 - No remote branch was deleted in this checkpoint. The connected GitHub tool set did not expose a verified delete-ref operation in this workflow, and no local clone was available to inspect worktrees/uncommitted changes.
-- PR #2 remains open as Draft after the audit found `NODE_TLS_REJECT_UNAUTHORIZED=0`; do not merge it wholesale. PR #6 remains Draft and is out of scope for this pass because it changes skill files. PR #7 is closed unmerged; its 77 changed paths have zero branch-only paths (58 blobs identical, 19 differing and generally older/smaller on the branch), so no wholesale merge is needed. PR #11 remains closed unmerged and preserved for unique-diff accounting.
+- PR #2 remains open as Draft after the audit found `NODE_TLS_REJECT_UNAUTHORIZED=0`; do not merge it wholesale. PR #6 remains Draft and is out of scope for this pass because it changes skill files. PR #7 is closed unmerged; its 77 changed paths have zero branch-only paths (58 blobs identical, 19 differing and generally older/smaller on the branch), so no wholesale merge is needed. PR #11 remains closed unmerged; the reviewed unique-diff accounting is complete and the relevant skills are already present on main.
 - The merged fixes above are integrated and CI-verified; branch-ref deletion is not claimed.
 - Current `main` was confirmed equal to merge commit `49a5387c6fdee0913b495f04ddbf1ad4a0721156` by GitHub compare.
 
