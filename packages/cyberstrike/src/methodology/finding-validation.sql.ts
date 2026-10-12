@@ -24,6 +24,7 @@ export type FindingValidationAttemptStrategy =
 
 export interface FindingValidationAttemptRecord {
   strategy: FindingValidationAttemptStrategy
+  checkID: string
   variation: string
   hypothesis: string
   outcome: "supports" | "contradicts" | "inconclusive"
