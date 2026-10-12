@@ -561,6 +561,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
     let baseMsg: HttpMessage.Request
     let origin: string
+    let authorizationURL: string
     if (hasRid) {
       const request = Request.get(sessionID).find((r) => r.id === params.request_id)
       if (!request) return err(`Request "${params.request_id}" not found.`)
@@ -570,14 +571,16 @@ export const HttpReplayTool = Tool.define("http_replay", {
       origin = o
       try {
         baseMsg = HttpMessage.parse(request.raw_request)
+        authorizationURL = new URL(request.normalized_path, origin).href
       } catch (e) {
-        return err(`Could not parse request: ${e instanceof Error ? e.message : String(e)}`)
+        return err(`Could not parse captured request path: ${e instanceof Error ? e.message : String(e)}`)
       }
     } else {
       const built = buildFromTarget(params.target!)
       if ("error" in built) return err(built.error)
       baseMsg = built.baseMsg
       origin = built.origin
+      authorizationURL = params.target!
     }
 
     // Scope guard applies to BOTH sources — a constructed target must resolve to a
@@ -588,6 +591,19 @@ export const HttpReplayTool = Tool.define("http_replay", {
         title: "http_replay — refused (out of scope)",
         output: `Refusing origin "${origin}": not among this session's captured in-scope origins.`,
         metadata: {},
+      }
+    }
+
+    const targetAuthorization = await TargetMemory.checkURLScope(authorizationURL)
+    if (!targetAuthorization.allowed) {
+      return {
+        title: "http_replay — refused (target scope)",
+        output: [
+          `Refusing URL "${authorizationURL}": ${targetAuthorization.reason}.`,
+          "No request was sent.",
+          "A configured target workspace and persisted authorization scope are required for active replay.",
+        ].join("\n"),
+        metadata: { scopeDenied: true, reason: targetAuthorization.reason },
       }
     }
 
@@ -787,6 +803,7 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
 
     let url: URL
     let raw: string | undefined
+    let authorizationURL: string
     if (hasRid) {
       const request = Request.get(sessionID).find((r) => r.id === params.request_id)
       if (!request) return err(`Request "${params.request_id}" not found.`)
@@ -795,11 +812,13 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
       const u = safeURL(o)
       if (!u) return err(`Invalid origin "${o}".`)
       url = u
+      authorizationURL = new URL(request.normalized_path, o).href
       raw = params.raw ?? request.raw_request
     } else {
       const u = safeURL(params.target_url!)
       if (!u) return err(`Invalid target_url "${params.target_url}".`)
       url = u
+      authorizationURL = params.target_url!
       raw = params.raw
     }
 
@@ -815,6 +834,19 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
         title: "http_replay_raw — refused (out of scope)",
         output: `Refusing origin "${url.origin}": not among this session's captured in-scope origins.`,
         metadata: {},
+      }
+    }
+
+    const targetAuthorization = await TargetMemory.checkURLScope(authorizationURL)
+    if (!targetAuthorization.allowed) {
+      return {
+        title: "http_replay_raw — refused (target scope)",
+        output: [
+          `Refusing URL "${authorizationURL}": ${targetAuthorization.reason}.`,
+          "No request was sent.",
+          "A configured target workspace and persisted authorization scope are required for active replay.",
+        ].join("\n"),
+        metadata: { scopeDenied: true, reason: targetAuthorization.reason },
       }
     }
 
