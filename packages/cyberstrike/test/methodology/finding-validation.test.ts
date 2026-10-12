@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { assessFindingChecks, FINDING_VALIDATION_CHECKS, type FindingValidationInputCheck } from "../../src/methodology/finding-validation"
+import { assessFindingChecks, FINDING_VALIDATION_CHECKS, recommendValidationStrategies, type FindingValidationInputCheck } from "../../src/methodology/finding-validation"
 import { FindingValidation } from "../../src/methodology/finding-validation"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
@@ -230,4 +230,25 @@ test("does not count duplicate variation keys as additional attempts across asse
       await Session.remove(session.id)
     },
   })
+})
+
+
+test("recommends validation strategies based on finding signals", () => {
+  const idor = recommendValidationStrategies("IDOR: cross-account order object authorization bypass")
+  expect(idor).toContain("identity_role")
+  expect(idor).toContain("object_identifier")
+  expect(idor).toContain("permission_boundary")
+  const xss = recommendValidationStrategies("Reflected XSS in search parameter")
+  expect(xss).toContain("content_type")
+  expect(xss).not.toEqual(idor)
+})
+
+test("does not allow one variation to count twice under different strategy labels", () => {
+  const checks = checklist({
+    reproducible: { status: "fail", reason: "Observed behavior contradicts the claim", evidence: "A controlled response did not reproduce the claimed behavior" },
+    unexpected_behavior: { status: "fail", reason: "Response matched the benign baseline", evidence: "The response matched the baseline comparison" },
+  })
+  const attempts = makeAttempts(20)
+  attempts[1] = { ...attempts[1]!, strategy: "other", variation: attempts[0]!.variation }
+  expect(() => assessFindingChecks(checks, attempts)).toThrow("Duplicate validation attempt variation")
 })
