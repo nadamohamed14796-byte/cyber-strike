@@ -57,7 +57,7 @@ export const VerificationAttemptTool = Tool.define("verification_attempt", {
         strategyID: params.strategy_id,
         variantKey: params.variant_key,
         rationale: params.rationale,
-        resultSummary: params.result_summary,
+        resultSummary: params.blocked_reason ? `${params.result_summary} [Blocked: ${params.blocked_reason}]` : params.result_summary,
         evidenceRef: params.evidence_ref,
         validConditions: params.valid_conditions,
       },
