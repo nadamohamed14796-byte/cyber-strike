@@ -94,6 +94,8 @@ jobs:
           fi
 
   add-contributor-label:
+    # The pull_request token for fork PRs is read-only; only label same-repo branches.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
