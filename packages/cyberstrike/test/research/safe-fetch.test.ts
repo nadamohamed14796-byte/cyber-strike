@@ -1,5 +1,10 @@
 import { expect, spyOn, test } from "bun:test"
-import { fetchResearchText } from "../../src/research/safe-fetch"
+
+const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }]
+function fetchTest(url: string, selectedSource: typeof source = source, resolveHost = publicLookup) {
+  return fetchResearchText(url, selectedSource, resolveHost)
+}
+import { fetchResearchText, isPublicResearchAddress } from "../../src/research/safe-fetch"
 
 const source = {
   id: "test",
@@ -34,7 +39,7 @@ test("blocks a redirect outside the configured HTTPS source hosts", async () => 
       })
     }) as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/start", source)).rejects.toThrow(
+      await expect(fetchTest("https://research.example/start", source)).rejects.toThrow(
         "blocked research redirect",
       )
     },
@@ -62,7 +67,7 @@ test("follows same-host HTTPS redirects and returns the bounded response body", 
       })
     }) as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/start", source)).resolves.toBe(
+      await expect(fetchTest("https://research.example/start", source)).resolves.toBe(
         "A useful public security research article.",
       )
     },
@@ -84,7 +89,7 @@ test("rejects oversized responses even when Content-Length is absent", async () 
       })
     }) as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/large", source)).rejects.toThrow(
+      await expect(fetchTest("https://research.example/large", source)).rejects.toThrow(
         "research document too large",
       )
     },
@@ -102,7 +107,7 @@ test("rejects an initially out-of-scope URL without making a request", async () 
       return new Response("should not be fetched")
     }) as unknown as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://untrusted.example/private", source)).rejects.toThrow(
+      await expect(fetchTest("https://untrusted.example/private", source)).rejects.toThrow(
         "blocked research host",
       )
     },
@@ -127,7 +132,7 @@ test("cancels bodies from unsupported content types", async () => {
         { status: 200, headers: { "content-type": "application/octet-stream" } },
       )) as unknown as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/binary", source)).rejects.toThrow(
+      await expect(fetchTest("https://research.example/binary", source)).rejects.toThrow(
         "unsupported content type",
       )
     },
@@ -147,7 +152,7 @@ test("retries transient server failures but succeeds once the source recovers", 
       })
     }) as unknown as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/retry", source)).resolves.toBe(
+      await expect(fetchTest("https://research.example/retry", source)).resolves.toBe(
         "Recovered public report.",
       )
     },
@@ -168,7 +173,7 @@ test("stops at the configured redirect budget", async () => {
       })
     }) as unknown as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/0", source)).rejects.toThrow(
+      await expect(fetchTest("https://research.example/0", source)).rejects.toThrow(
         "too many research redirects",
       )
     },
@@ -188,7 +193,7 @@ test("does not retry terminal client errors", async () => {
       })
     }) as unknown as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://research.example/missing", source)).rejects.toThrow("HTTP 404")
+      await expect(fetchTest("https://research.example/missing", source)).rejects.toThrow("HTTP 404")
     },
   )
   expect(requests).toBe(1)
@@ -202,7 +207,7 @@ test("rejects source URLs containing embedded credentials", async () => {
       return new Response("should not be fetched")
     }) as unknown as typeof fetch,
     async () => {
-      await expect(fetchResearchText("https://user:password@research.example/private", source)).rejects.toThrow(
+      await expect(fetchTest("https://user:password@research.example/private", source)).rejects.toThrow(
         "blocked research host",
       )
     },
@@ -228,7 +233,7 @@ test("enforces the total fetch deadline across redirects without sleeping", asyn
         })
       }) as unknown as typeof fetch,
       async () => {
-        await expect(fetchResearchText("https://research.example/start", source)).rejects.toThrow(
+        await expect(fetchTest("https://research.example/start", source)).rejects.toThrow(
           "research fetch exceeded total time budget",
         )
       },
@@ -237,4 +242,55 @@ test("enforces the total fetch deadline across redirects without sleeping", asyn
   } finally {
     clock.mockRestore()
   }
+})
+
+
+test("rejects private, local, link-local, reserved and documentation IP literals", () => {
+  for (const address of [
+    "0.1.2.3",
+    "10.1.2.3",
+    "100.64.0.1",
+    "127.0.0.1",
+    "169.254.10.20",
+    "172.16.2.3",
+    "192.168.1.2",
+    "192.0.2.5",
+    "198.18.1.2",
+    "203.0.113.9",
+    "224.0.0.1",
+    "240.0.0.1",
+    "::",
+    "::1",
+    "fc00::1",
+    "fe80::1",
+    "2001:db8::1",
+  ]) {
+    expect(isPublicResearchAddress(address)).toBe(false)
+  }
+  expect(isPublicResearchAddress("93.184.216.34")).toBe(true)
+  expect(isPublicResearchAddress("2606:4700:4700::1111")).toBe(true)
+})
+
+test("blocks an allowlisted-looking hostname when DNS resolves to a private address", async () => {
+  const resolver = async () => [{ address: "10.0.0.7", family: 4 }]
+  await expect(fetchTest("https://research.example/private", source, resolver)).rejects.toThrow(
+    "blocked research host resolving to a non-public address",
+  )
+})
+
+test("revalidates DNS answers after a redirect", async () => {
+  let resolution = 0
+  const resolver = async () => {
+    resolution++
+    return [{ address: resolution === 1 ? "93.184.216.34" : "127.0.0.1", family: 4 }]
+  }
+  await withFetch(
+    (async () => new Response(null, { status: 302, headers: { location: "/next" } })) as typeof fetch,
+    async () => {
+      await expect(fetchTest("https://research.example/start", source, resolver)).rejects.toThrow(
+        "blocked research host resolving to a non-public address",
+      )
+    },
+  )
+  expect(resolution).toBe(2)
 })
