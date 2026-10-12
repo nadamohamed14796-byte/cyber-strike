@@ -102,6 +102,8 @@ If source is available, follow the value through decoding, schema validation, qu
 
 ## References
 
+- [elementalsouls/Claude-BugHunter — skills/hunt-nosqli](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-nosqli/SKILL.md) — merged source.
+
 - [uphiago/recon-skills — hunt-nosqli](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-nosqli)
 - [elementalsouls/Claude-BugHunter — hunt-sqli (adjacent NoSQL content)](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-sqli)
 - [OWASP — NoSQL Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/NoSQL_Security_Cheat_Sheet.html)
