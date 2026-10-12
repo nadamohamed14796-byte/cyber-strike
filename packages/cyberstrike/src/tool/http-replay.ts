@@ -346,6 +346,21 @@ function mutationLabels(mutations?: ReplayNoteMutation[]) {
   ).slice(0, 30)
 }
 
+function sanitizeEndpointPath(value: string): string {
+  return value.split("/").map((segment) => {
+    if (!segment) return segment
+    let decoded = segment
+    try { decoded = decodeURIComponent(segment) } catch { /* retain the encoded segment */ }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded)) return "{uuid}"
+    if (/^\d{4,}$/.test(decoded)) return "{id}"
+    if (/^[^/@\s]+@[^/@\s]+\.[^/@\s]+$/.test(decoded)) return "{email}"
+    if (/^eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(decoded)) return "{token}"
+    if (decoded.length >= 48 && /^[A-Za-z0-9_-]+$/.test(decoded)) return "{value}"
+    return segment
+  }).join("/")
+}
+
+
 /**
  * Keep a redacted per-endpoint history in the existing target workspace.
  * This records observation facts only: never request/response bodies, header values,
@@ -367,6 +382,7 @@ async function recordReplayObservation(input: {
     const originURL = safeURL(input.origin)
     if (!originURL) return false
     const requestPath = (input.requestTarget.split("?", 1)[0] ?? "/").split("#", 1)[0] || "/"
+    const endpointPath = sanitizeEndpointPath(requestPath)
     const eligible = TargetMemory.list().filter((workspace) => {
       const target = safeURL(workspace.targetURL)
       if (!target || target.origin !== originURL.origin) return false
@@ -380,7 +396,7 @@ async function recordReplayObservation(input: {
     const workspace = eligible[0]
     if (!workspace || !TargetMemory.isObservedInSession(input.sessionID, workspace.targetURL)) return false
     const now = new Date().toISOString()
-    const endpoint = input.method.toUpperCase() + " " + requestPath
+    const endpoint = input.method.toUpperCase() + " " + endpointPath
     const content = [
       "Test execution time: " + now,
       "Endpoint: " + endpoint,
@@ -599,7 +615,10 @@ export const HttpReplayTool = Tool.define("http_replay", {
           ...(compare.exploit.credential ? ["exploit:credential-switch"] : []),
         ],
         summary: { baseline: resultFacts(baselineResult), exploit: resultFacts(exploitResult), diff },
-        manualReview: behaviorDiffers || Boolean(baselineResult.error || exploitResult.error),
+        manualReview: behaviorDiffers || Boolean(baselineResult.error || exploitResult.error
+          || compare.baseline?.mutations?.length || compare.exploit.mutations?.length
+          || compare.baseline?.unauthenticated || compare.exploit.unauthenticated
+          || compare.baseline?.credential || compare.exploit.credential),
       })
       const output = {
         baseline: { ...summarize(baselineResult, params.marker), curl: curlTemplate(baselineMsg, origin) },
@@ -652,7 +671,8 @@ export const HttpReplayTool = Tool.define("http_replay", {
         sourceRequestID: params.request_id, mode: "sweep",
         mutationLabels: mutationLabels([sweep.mutation]),
         summary: { cases: safeResults.length, results: safeResults },
-        manualReview: safeResults.some((result) => result.error !== null),
+        manualReview: new Set(safeResults.map((result) => JSON.stringify([result.status, result.body_len, result.error]))).size > 1
+          || safeResults.some((result) => result.error !== null),
       })
       return {
         title: `http_replay sweep (${sweep.values.length} values) ${originHost}`,
