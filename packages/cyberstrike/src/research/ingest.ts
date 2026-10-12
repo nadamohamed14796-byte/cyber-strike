@@ -658,6 +658,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 source_trust: source.trust,
                 crawl_depth: current.depth,
                 candidate_score: candidateScore(current.url, source),
+                // Discovery already fetched and sanitized this report. Cache the bounded text
+                // so the learning worker does not issue a second HTTP request for the same page.
+                cached_text: text.slice(0, 12000),
+                content_fingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
               },
             })
             if (row.created) added++
@@ -699,9 +703,17 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
       continue
     }
     try {
-      const html = await fetchText(item.source_url, source)
-      const text = redactResearchSecrets(cleanHtml(html))
-      const title = redactResearchSecrets(titleOf(html, item.source_url))
+      const cachedText = typeof item.payload.cached_text === "string" ? item.payload.cached_text : undefined
+      let html = ""
+      let title = redactResearchSecrets(item.title ?? item.source_url)
+      let text: string
+      if (cachedText) {
+        text = cachedText
+      } else {
+        html = await fetchText(item.source_url, source)
+        text = redactResearchSecrets(cleanHtml(html))
+        title = redactResearchSecrets(titleOf(html, item.source_url))
+      }
       if (looksLikeResearchAuthenticationWall(item.source_url, title, text, html)) {
         ResearchQueue.complete(item.sequence, item.lease_owner, "blocked_auth", "authentication wall detected; configure a source-scoped session, then run research retry-auth")
         result.blocked_auth++
