@@ -430,6 +430,16 @@ export namespace ReportKnowledge {
       row.title, row.vulnerability_class, row.cwe_id, row.lesson, row.attack_vector,
       row.impact, row.reproduction, row.poc, JSON.stringify(metadata),
     ].filter(Boolean).join(" ")
+    const concreteClasses = requested.filter((signal) => signal !== "access-control" && signal !== "auth-bypass")
+    // If the query names a concrete class (IDOR, SSRF, XSS, etc.), require the
+    // record's primary class or title to agree. A passing mention buried in a
+    // long excerpt is not enough to make an unrelated article a match.
+    if (concreteClasses.length) {
+      return concreteClasses.some((signal) => {
+        const pattern = SPECIFIC_QUERY_PATTERNS.find(([name]) => name === signal)?.[1]
+        return normalize(row.vulnerability_class) === signal || Boolean(pattern?.test(row.title))
+      })
+    }
     return requested.some((signal) => {
       if (storedSignals.has(signal)) return true
       const pattern = SPECIFIC_QUERY_PATTERNS.find(([name]) => name === signal)?.[1]
