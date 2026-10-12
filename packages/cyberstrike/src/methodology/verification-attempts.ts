@@ -27,6 +27,8 @@ export namespace VerificationAttempts {
     decisiveConfirmation?: boolean
     /** Evidence directly contradicts the stated hypothesis under valid conditions. */
     decisiveDisproof?: boolean
+    /** Durable reference to the direct request/response evidence that justifies either verdict. */
+    decisiveEvidenceRef?: string
     /** A hard stop such as out-of-scope, unsafe, or unavailable target. */
     blockedReason?: string
   }
@@ -65,11 +67,13 @@ export namespace VerificationAttempts {
     const attemptsUsed = attempts.length
     const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
-    if (input.decisiveConfirmation && attempts[attempts.length - 1]?.validConditions) {
+    const hasDecisiveEvidence = Boolean(input.decisiveEvidenceRef?.trim())
+
+    if (input.decisiveConfirmation && hasDecisiveEvidence && attempts[attempts.length - 1]?.validConditions) {
       return { outcome: "confirmed", attemptsUsed, remainingAttempts, canContinue: false, reason: "Decisive evidence supports the vulnerability hypothesis." }
     }
 
-    const hasValidDisproof = input.decisiveDisproof && attempts[attempts.length - 1]?.validConditions
+    const hasValidDisproof = input.decisiveDisproof && hasDecisiveEvidence && attempts[attempts.length - 1]?.validConditions
     if (hasValidDisproof) {
       return { outcome: "disproven", attemptsUsed, remainingAttempts, canContinue: false, reason: "Direct evidence contradicts the hypothesis under valid test conditions." }
     }
