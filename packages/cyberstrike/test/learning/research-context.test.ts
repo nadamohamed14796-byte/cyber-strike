@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
 import { Instance } from "../../src/project/instance"
+import { Database } from "../../src/storage/db"
+import { RequestTable, SessionTable } from "../../src/session/session.sql"
+import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchContext, promptResearchSignals, researchClassForSignalTags } from "../../src/learning/research-context"
 import { tmpdir } from "../fixture/fixture"
 
@@ -71,4 +74,79 @@ test("maps request patterns to broad research classes without treating them as f
   expect(researchClassForSignalTags(["authorization-boundary"])).toBe("access-control")
   expect(researchClassForSignalTags(["server-side-request"])).toBe("ssrf")
   expect(researchClassForSignalTags(["javascript-client"])).toBeUndefined()
+})
+
+test("explicit current research intent is not starved by recent generic API traffic", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sessionID = "ses_research_priority_" + marker
+      const now = Date.now()
+      Database.use((db) =>
+        db.insert(SessionTable).values({
+          id: sessionID,
+          project_id: Instance.project.id,
+          slug: "research-priority",
+          directory: dir.path,
+          title: "Research priority test",
+          version: "1",
+          time_created: now,
+          time_updated: now,
+        }).run(),
+      )
+
+      // Populate enough recent generic API signals to exhaust the context's
+      // recommendation budget if the explicit user request is processed last.
+      Database.use((db) =>
+        db.insert(RequestTable).values(
+          Array.from({ length: 12 }, (_, index) => ({
+            id: "req_" + marker + "_" + index,
+            session_id: sessionID,
+            method: "GET",
+            normalized_path: "/api/v1/metrics-" + index,
+            status: "complete",
+            response_status: 200,
+            response_content_type: "application/json",
+            time_created: now + index,
+            time_updated: now + index,
+          })),
+        ).run(),
+      )
+
+      for (let index = 0; index < 6; index++) {
+        ReportKnowledge.ingestExternalDetailed({
+          title: "Generic API endpoint note " + marker + " " + index,
+          severity: "unknown",
+          sourceURL: "https://research.example.test/" + marker + "/api-note-" + index,
+          lesson: "Map observed API routes and record their response behavior.",
+          sourceTrust: 80,
+          tags: ["api-endpoint"],
+          metadata: { source_trust: 80, extracted: { retrieval_signals: ["api-endpoint"] } },
+        })
+      }
+      const explicitTitle = "Explicit IDOR verification method " + marker
+      const explicit = ReportKnowledge.ingestExternalDetailed({
+        title: explicitTitle,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL: "https://research.example.test/" + marker + "/idor-method",
+        lesson: "Compare the owner baseline with the same request from a second controlled account.",
+        sourceTrust: 90,
+        tags: ["idor", "object-identifier", "authorization-boundary"],
+        metadata: { source_trust: 90, extracted: { retrieval_signals: ["idor", "object-identifier"] } },
+      })
+      expect(explicit).not.toBeNull()
+
+      const context = ResearchContext.generate(
+        sessionID,
+        "Please investigate IDOR and object-level authorization in the API; compare owner-account and non-owner behavior",
+      )
+      expect(context).toContain(explicitTitle)
+      expect(context).toContain("Compare the owner baseline")
+
+      await Instance.dispose()
+    },
+  })
 })
