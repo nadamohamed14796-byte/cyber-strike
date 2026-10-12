@@ -17,6 +17,18 @@ describe("VerificationAttempts", () => {
     expect(VA.canRunAttempt(attempts, { strategyID: "strategy-new", variantKey: "baseline" })).toBe(false)
   })
 
+  test("normalizes strategy and variant identity to avoid case/whitespace retry inflation", () => {
+    const first = attempt(" IDOR.Owner-Check ", "Account-A")
+    const duplicate = attempt("idor.owner-check", "account-a")
+    expect(VA.uniqueAttempts([first, duplicate])).toHaveLength(1)
+    expect(VA.canRunAttempt([first], { strategyID: "IDOR.OWNER-CHECK", variantKey: " account-a " })).toBe(false)
+  })
+
+  test("ignores malformed blank strategy identities instead of counting them", () => {
+    expect(VA.uniqueAttempts([attempt(" ", "variant"), attempt("strategy", "  ")])).toHaveLength(0)
+    expect(VA.canRunAttempt([], { strategyID: " ", variantKey: "variant" })).toBe(false)
+  })
+
   test("allows a meaningful variant as a distinct attempt", () => {
     expect(VA.canRunAttempt([attempt("idor.owner-check", "account-a")], {
       strategyID: "idor.owner-check",
