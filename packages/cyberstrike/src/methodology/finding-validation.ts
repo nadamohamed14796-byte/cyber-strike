@@ -112,7 +112,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     if (variation.length > 160 || attempt.hypothesis.length > 800 || attempt.evidence.length > 2000) {
       throw new Error("Validation attempt fields exceed safe length limits.")
     }
-    const key = strategy + ":" + variation
+    const key = variation
     if (attemptKeys.has(key)) throw new Error("Duplicate validation attempt variation: " + key)
     attemptKeys.add(key)
   }
@@ -249,13 +249,13 @@ export namespace FindingValidation {
     const newAttempts = input.attempts ?? []
     const currentKeys = new Set<string>()
     for (const attempt of newAttempts) {
-      const key = attempt.strategy + ":" + attempt.variation.trim().toLowerCase()
+      const key = attempt.variation.trim().toLowerCase().replace(/\\s+/g, " ")
       if (currentKeys.has(key)) throw new Error("Duplicate validation attempt variation in this assessment: " + key)
       currentKeys.add(key)
     }
     const accumulated = new Map<string, FindingValidationAttemptRecord>()
     for (const attempt of [...priorAttempts, ...newAttempts]) {
-      const key = attempt.strategy + ":" + attempt.variation.trim().toLowerCase()
+      const key = attempt.variation.trim().toLowerCase().replace(/\\s+/g, " ")
       if (!accumulated.has(key)) accumulated.set(key, attempt)
     }
     const allAttempts = [...accumulated.values()]
@@ -350,7 +350,7 @@ export namespace FindingValidation {
 
     const strategyPlan = recommendValidationStrategies([finding.title, finding.description, finding.endpoint].join(" "))
     const strategyGuidance = assessment.attemptsRemaining > 0
-      ? "\\nCase-specific strategy suggestions (choose only relevant, safe tests; do not blindly run all): " + strategyPlan.join(", ")
+      ? "\nCase-specific strategy suggestions (choose only relevant, safe tests; do not blindly run all): " + strategyPlan.join(", ")
       : ""
     return {
       ...assessment,
