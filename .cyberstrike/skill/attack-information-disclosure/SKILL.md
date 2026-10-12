@@ -109,6 +109,8 @@ Where source/config is available, identify which serializer, error handler, stor
 
 ## References
 
+- [uphiago/recon-skills — redteam/hunt-information-disclosure](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-information-disclosure/SKILL.md) — Information disclosure source.
+
 - [OWASP — Information Exposure Through Error Messages](https://owasp.org/www-community/Improper_Error_Handling)
 - [OWASP — Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
 - [CWE-200 — Exposure of Sensitive Information](https://cwe.mitre.org/data/definitions/200.html)
