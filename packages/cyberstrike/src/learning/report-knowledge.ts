@@ -383,14 +383,14 @@ export namespace ReportKnowledge {
   // A query that names a concrete vulnerability class must not be satisfied by
   // generic words such as "authorization", "API", or "security" in unrelated articles.
   const SPECIFIC_QUERY_PATTERNS: Array<[string, RegExp]> = [
-    ["idor", /\\bidor\\b|insecure direct object|broken object level authorization|\\bbola\\b/i],
-    ["xss", /cross[- ]site scripting|\\bxss\\b/i],
-    ["ssrf", /\\bssrf\\b|server[- ]side request forgery/i],
-    ["csrf", /\\bcsrf\\b|cross[- ]site request forgery/i],
-    ["sqli", /\\bsqli\\b|sql injection/i],
-    ["xxe", /\\bxxe\\b|xml external entity/i],
-    ["ssti", /\\bssti\\b|server[- ]side template injection/i],
-    ["race-condition", /race condition|time[- ]of[- ]check|\\btoctou\\b/i],
+    ["idor", /\bidor\b|insecure direct object|broken object level authorization|\bbola\b/i],
+    ["xss", /cross[- ]site scripting|\bxss\b/i],
+    ["ssrf", /\bssrf\b|server[- ]side request forgery/i],
+    ["csrf", /\bcsrf\b|cross[- ]site request forgery/i],
+    ["sqli", /\bsqli\b|sql injection/i],
+    ["xxe", /\bxxe\b|xml external entity/i],
+    ["ssti", /\bssti\b|server[- ]side template injection/i],
+    ["race-condition", /race condition|time[- ]of[- ]check|\btoctou\b/i],
     ["open-redirect", /open redirect|unvalidated redirect/i],
     ["auth-bypass", /authentication bypass|auth bypass/i],
     ["access-control", /access control|authorization bypass|authorisation bypass|broken access control/i],
@@ -400,12 +400,12 @@ export namespace ReportKnowledge {
     ["request-smuggling", /request smuggling|http desynchronization/i],
     ["cache-poisoning", /cache poisoning/i],
     ["file-upload", /file upload/i],
-    ["graphql", /\\bgraphql\\b/i],
-    ["jwt", /\\bjwt\\b|json web token/i],
+    ["graphql", /\bgraphql\b/i],
+    ["jwt", /\bjwt\b|json web token/i],
     ["command-injection", /command injection|os command injection/i],
     ["path-traversal", /path traversal|directory traversal/i],
     ["subdomain-takeover", /subdomain takeover|dangling cname/i],
-    ["oauth", /\\boauth\\b|open authorization/i],
+    ["oauth", /\boauth\b|open authorization/i],
     ["web-cache", /web cache|cache deception/i],
   ]
 
