@@ -67,7 +67,7 @@ const Parameters = z.object({
 
 export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadata>("update_vrt_check", {
   description:
-    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN with valid conditions and evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
+    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN after 20 distinct valid attempts, with direct evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
   parameters: Parameters,
   async execute(params, ctx) {
     // Lane discipline: a proxy-tester may only record VRT checks in its own
@@ -132,7 +132,7 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
         return {
           title: `VRT clean verdict blocked — mismatched verification identity`,
           output: "The verification ledger belongs to a different asset or vulnerability class than this VRT check. Use a hypothesis_key bound to this entry and category; no clean verdict was written.",
-          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_identity_mismatch", attemptsUsed: attempts.length },
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_identity_mismatch", attemptsUsed: attempts.filter((attempt) => attempt.validConditions).length },
         }
       }
       const decisiveAttempt = attempts[attempts.length - 1]
@@ -140,8 +140,8 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
       if (outcome !== "disproven" || !decisiveAttempt?.validConditions || !decisiveAttempt?.evidenceRef?.trim()) {
         return {
           title: `VRT clean verdict blocked — ${params.vrt_category}`,
-          output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome with valid conditions and direct evidence is required (current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
-          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: attempts.length, outcome: outcome ?? "unrecorded" },
+          output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome after 20 distinct valid attempts with direct evidence is required (current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: attempts.filter((attempt) => attempt.validConditions).length, outcome: outcome ?? "unrecorded" },
         }
       }
       verificationEvidenceRef = decisiveAttempt.evidenceRef.trim()
