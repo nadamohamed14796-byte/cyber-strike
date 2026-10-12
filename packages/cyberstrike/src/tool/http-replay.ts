@@ -340,6 +340,17 @@ function resultFacts(result: ReplayResponse.Result) {
     send_error: result.error ? result.error.kind : null,
   }
 }
+
+function redactedDiffFacts(diff: Record<string, unknown>) {
+  const allowed = [
+    "comparable", "status_match", "baseline_status", "exploit_status",
+    "body_length_match", "baseline_body_len", "exploit_body_len",
+    "body_content_match", "timing_delta_ms",
+  ]
+  return Object.fromEntries(allowed
+    .filter((key) => typeof diff[key] === "boolean" || (typeof diff[key] === "number" && Number.isFinite(diff[key])))
+    .map((key) => [key, diff[key]]))
+}
 function mutationLabels(mutations?: ReplayNoteMutation[]) {
   return (mutations ?? []).map((mutation) =>
     mutation.op + (mutation.name ? "(" + mutation.name.slice(0, 100) + ")" : ""),
@@ -352,7 +363,7 @@ function sanitizeEndpointPath(value: string): string {
     let decoded = segment
     try { decoded = decodeURIComponent(segment) } catch { /* retain the encoded segment */ }
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded)) return "{uuid}"
-    if (/^\d{4,}$/.test(decoded)) return "{id}"
+    if (/^\d+$/.test(decoded)) return "{id}"
     if (/^[^/@\s]+@[^/@\s]+\.[^/@\s]+$/.test(decoded)) return "{email}"
     if (/^eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(decoded)) return "{token}"
     if (decoded.length >= 48 && /^[A-Za-z0-9_-]+$/.test(decoded)) return "{value}"
@@ -614,7 +625,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
           ...(compare.baseline?.credential ? ["baseline:credential-switch"] : []),
           ...(compare.exploit.credential ? ["exploit:credential-switch"] : []),
         ],
-        summary: { baseline: resultFacts(baselineResult), exploit: resultFacts(exploitResult), diff },
+        summary: { baseline: resultFacts(baselineResult), exploit: resultFacts(exploitResult), diff: redactedDiffFacts(diff) },
         manualReview: behaviorDiffers || Boolean(baselineResult.error || exploitResult.error
           || compare.baseline?.mutations?.length || compare.exploit.mutations?.length
           || compare.baseline?.unauthenticated || compare.exploit.unauthenticated
