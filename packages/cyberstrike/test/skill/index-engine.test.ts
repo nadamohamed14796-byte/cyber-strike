@@ -40,6 +40,12 @@ Skill body for ${name}.
       'tags: ["t1552.005"]\ncwe_ids: ["CWE-522"]\ntech_stack: ["aws"]',
     )
     await addSkill("target-workflow", 'chains_with: ["aws-postexploit"]')
+    await addSkill("triage-validation", 'tags: ["triage"]')
+    await addSkill("prefixed-workflow", 'chains_with: ["attack-triage-validation"]')
+    await addSkill(
+      "external-control-metadata",
+      'chains_with: ["PE-18"]\\nprerequisites: ["An explicitly authorized test account is required"]',
+    )
 
     await Instance.provide({
       directory: tmp.path,
@@ -49,6 +55,10 @@ Skill body for ${name}.
         expect(SkillIndex.resolveReference("T1078.004")).toBe("T1078.004_cloud-accounts")
         expect(SkillIndex.resolveReference("T1552.005")).toBe("T1552.005_cloud-instance-metadata-api")
         expect(SkillIndex.resolveReference("AWS-POSTEXPLOIT")).toBe("aws-postexploit")
+        expect(SkillIndex.resolveReference("attack-triage-validation")).toBe("triage-validation")
+        expect(SkillIndex.chainsFrom("prefixed-workflow").map((item) => item.target)).toEqual(["triage-validation"])
+        expect(SkillIndex.chainsFrom("external-control-metadata")).toEqual([])
+        expect(SkillIndex.validateReferences()).toEqual([])
         expect(SkillIndex.chainsFrom("target-workflow").map((item) => item.target)).toEqual(["aws-postexploit"])
         expect(SkillIndex.chainsFrom("aws-postexploit").map((item) => item.target)).toEqual([
           "T1078.004_cloud-accounts",
