@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { extractResearchDetails, looksLikeResearchAuthenticationWall, redactResearchSecrets } from "../../src/research/ingest"
+import { extractResearchDetails, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets } from "../../src/research/ingest"
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
   const extracted = extractResearchDetails(
@@ -118,4 +118,13 @@ test("does not mistake a public login-bypass writeup for a login wall", () => {
     "The author demonstrates a public vulnerability report with reproduction and impact details.",
     "<html><body>Public writeup</body></html>",
   )).toBe(false)
+})
+
+
+test("research URL normalization removes embedded credentials and secret query parameters", () => {
+  expect(normalizeResearchUrl("https://user:pass@reports.example.test/report?id=42")).toBeUndefined()
+  expect(normalizeResearchUrl("https://reports.example.test/report?id=42&token=secret-value&signature=sig-value#section"))
+    .toBe("https://reports.example.test/report?id=42")
+  expect(normalizeResearchUrl("https://reports.example.test/report?access_token=abc&Page=2"))
+    .toBe("https://reports.example.test/report?Page=2")
 })

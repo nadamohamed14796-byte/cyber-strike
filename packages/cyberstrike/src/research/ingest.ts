@@ -25,14 +25,27 @@ function hostAllowed(url: URL, source: ResearchSource) {
 function normalizeUrl(value: string, base?: URL) {
   try {
     const url = new URL(value, base)
+    // Never persist or request URLs carrying embedded credentials. Query-based
+    // secrets are stripped before URLs enter the queue, logs, or knowledge records;
+    // authenticated research should use the source-scoped environment session.
+    if (url.username || url.password) return undefined
     url.hash = ""
-    for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref"]) {
-      url.searchParams.delete(key)
+    for (const key of [...url.searchParams.keys()]) {
+      if (
+        /^(?:utm_source|utm_medium|utm_campaign|utm_term|utm_content|ref)$/i.test(key) ||
+        /^(?:access_token|refresh_token|csrf_token|sessionid|private_key|token|api_key|apikey|secret|password|passwd|signature|sig|auth|session|sid)$/i.test(key)
+      ) {
+        url.searchParams.delete(key)
+      }
     }
     return url.toString()
   } catch {
     return undefined
   }
+}
+
+export function normalizeResearchUrl(value: string, base?: URL) {
+  return normalizeUrl(value, base)
 }
 
 /**
