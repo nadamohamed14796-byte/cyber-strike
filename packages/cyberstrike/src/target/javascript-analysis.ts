@@ -55,6 +55,43 @@ function lineNumber(lineStarts: number[], index: number): number {
   }
   return low
 }
+
+/** Normalize potentially identifying values embedded in route literals without storing query values. */
+export function normalizeJavaScriptEndpointPath(inputPath: string): { path: string; pathParameters: string[] } {
+  const pathParameters: string[] = []
+  const path = inputPath.split("/").map((segment) => {
+    if (!segment) return segment
+    let decoded = segment
+    try { decoded = decodeURIComponent(segment) } catch { /* retain an undecodable segment */ }
+    const placeholder = decoded.match(/^\{([A-Za-z_$][\w$]*)\}$/)
+    if (placeholder) {
+      pathParameters.push(placeholder[1]!)
+      return "{" + placeholder[1]! + "}"
+    }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded)) {
+      pathParameters.push("uuid")
+      return "{uuid}"
+    }
+    if (/^\d+$/.test(decoded) || /^[a-f0-9]{24,}$/i.test(decoded)) {
+      pathParameters.push("id")
+      return "{id}"
+    }
+    if (/^[^/@\s]+@[^/@\s]+\.[^/@\s]+$/.test(decoded)) {
+      pathParameters.push("email")
+      return "{email}"
+    }
+    if (/^eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/.test(decoded)) {
+      pathParameters.push("token")
+      return "{token}"
+    }
+    if (decoded.length >= 48 && /^[A-Za-z0-9_-]+$/.test(decoded)) {
+      pathParameters.push("value")
+      return "{value}"
+    }
+    return segment
+  }).join("/")
+  return { path, pathParameters: cleanUnique(pathParameters).slice(0, 80) }
+}
 const fieldNames = (value: string) => cleanUnique(
   Array.from(value.matchAll(/(?:^|[,{\n])\s*["']?([A-Za-z_$][\w$-]{0,99})["']?\s*:/g), (m) => m[1]!),
 ).slice(0, 100)
@@ -85,7 +122,9 @@ function normalizeEndpoint(value: string) {
     } catch { return undefined }
   } else if (!path.startsWith("/")) return undefined
   path = path.replace(/\/{2,}/g, "/")
-  const pathParameters = cleanUnique([...dynamic, ...Array.from(path.matchAll(/\{([A-Za-z_$][\w$]*)\}/g), (m) => m[1]!)]).slice(0, 80)
+  const normalizedPath = normalizeJavaScriptEndpointPath(path)
+  path = normalizedPath.path
+  const pathParameters = cleanUnique([...dynamic, ...normalizedPath.pathParameters]).slice(0, 80)
   return { host, path, urlTemplate: (host ? "https://" + host : "") + path, pathParameters, queryParameters }
 }
 
