@@ -17,13 +17,13 @@ describe("remote skill path validation", () => {
   })
 
   test("rejects names that can escape the skill cache", () => {
-    for (const name of ["../outside", "..", "nested/name", "nested\\\\name", "/tmp/outside", "C:outside", ""]) {
+    for (const name of ["../outside", "..", "nested/name", "nested\\name", "/tmp/outside", "C:outside", ""]) {
       expect(Discovery.isSafeSkillName(name)).toBe(false)
     }
   })
 
   test("rejects parent traversal, absolute paths, and URL-like file entries", () => {
-    for (const file of ["../outside.txt", "references/../../outside.txt", "..\\\\outside.txt", "C:\\\\outside.txt", "/tmp/outside.txt", "https://example.com/outside.txt", ""]) {
+    for (const file of ["../outside.txt", "references/../../outside.txt", "..\\outside.txt", "C:\\outside.txt", "/tmp/outside.txt", "https://example.com/outside.txt", ""]) {
       expect(Discovery.resolveSkillFilePath(root, file)).toBeUndefined()
     }
   })
