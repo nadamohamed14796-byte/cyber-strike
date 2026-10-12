@@ -9,7 +9,7 @@
 
 ## Latest-main verification checkpoint — 2026-10-12
 
-- **Verified main head:** `6522bcbbb8cdaa13016bab33145ebd27fbef2997`.
+- **Verified code head (CI):** `6522bcbbb8cdaa13016bab33145ebd27fbef2997`. Current `main` is `d35fff41f9341cf95194604ce2363256f749dd27`; the commits after the verified code head only update this audit ledger.
 - **GitHub Actions:** typecheck run [38240947275](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947275), unit/integration test run [38240947314](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947314), build run [38240947281](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947281), and CodeQL run [38240947166](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38240947166) all completed successfully on this exact commit.
 - **Test detail:** 1,799 passed, 5 skipped, 0 failed across 1,804 tests in 148 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
 - **Scope of claim:** this confirms automated CI on the recorded commit. It does not claim live Gmail/OAuth, external target validation, browser MFA, or manual runtime scenarios were exercised.
@@ -261,6 +261,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 | `fix/skill-runtime-linkage-audit` | No merge required | The skill context/tool/test files match main; its differing index-engine implementation and tests are older/smaller than the main versions. |
 | `fix/remove-orphan-auth-manager-typecheck-blocker` | Retain; do not merge wholesale | Its diff removes `packages/cyberstrike/src/tool/auth-manager.ts`; current main contains the auth manager used by auth-vault, Gmail and target-memory functionality. |
 | `fix/copilot-token-exchange` | No cherry-pick | Main already has shared `provider/copilot-session.ts` logic used by the plugin and browser worker, including token invalidation/retry behavior; the branch is heavily stale and duplicates token-exchange code. |
+| `feat/spa-nav-discovery`, `ci/monorepo-build-validation-20261012`, and `improve/skill-quality-reference-audit-reconciled` | No merge required | These refs are behind `main` with no unique commits in the current comparison. |
 | `skills/ad-security-verification-gates-20261012` and `integration/ad-security-verification-gates-main-20261012` | No merge required | The reviewed AD security skill file blob is identical to main. |
 | `feat/discovery-core` | Retain; do not merge wholesale | It is heavily divergent and includes active mutating-method probes that are not appropriate for the current conservative reconnaissance path. |
 | `feat/proxy-config` / `dev` | Retain; selective review only | Both contain broad, highly divergent networking/replay/browser changes; there is no safe evidence for a wholesale merge. |
