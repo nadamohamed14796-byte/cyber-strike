@@ -21,6 +21,23 @@ function checklist(
   }))
 }
 
+
+const ATTEMPT_STRATEGIES = [
+  "baseline_control", "identity_role", "object_identifier", "http_method", "content_type",
+  "session_state", "permission_boundary", "endpoint_variant", "business_logic",
+  "cache_waf_environment", "timing_race", "negative_control", "response_comparison", "state_change", "other",
+] as const
+
+function makeAttempts(count = 20) {
+  return Array.from({ length: count }, (_, index) => ({
+    strategy: ATTEMPT_STRATEGIES[index % ATTEMPT_STRATEGIES.length],
+    variation: "controlled-variation-" + (index + 1),
+    hypothesis: "Test a distinct condition for variation " + (index + 1),
+    outcome: index < 2 ? "contradicts" as const : "inconclusive" as const,
+    evidence: "Observed controlled response comparison for variation " + (index + 1),
+  }))
+}
+
 test("requires all ten unique checks", () => {
   const checks = checklist()
   expect(() => assessFindingChecks(checks.slice(0, 9))).toThrow("Exactly 10")
@@ -37,8 +54,11 @@ test("false positive requires multiple evidence-backed contradictions and explai
     reproducible: { status: "fail", reason: "Repeated controlled attempts did not reproduce the claim", evidence: "Three replays returned the expected owner-bound record" },
     unexpected_behavior: { status: "fail", reason: "Observed response matches intended owner-only behavior", evidence: "Response body and status match the same-account baseline" },
   })
-  const result = assessFindingChecks(checks)
+  expect(assessFindingChecks(checks, makeAttempts(19)).verdict).toBe("inconclusive")
+  const result = assessFindingChecks(checks, makeAttempts(20))
   expect(result.verdict).toBe("false_positive")
+  expect(result.attemptCount).toBe(20)
+  expect(result.attemptsRemaining).toBe(0)
   expect(result.output).toContain("#1")
   expect(result.output).toContain("#3")
 })
@@ -97,6 +117,7 @@ test("records validation history and removes false positives from confirmed find
         sessionID: session.id,
         vulnerabilityID: finding.id,
         checks,
+        attempts: makeAttempts(20),
       })
       const updated = Vulnerability.get(session.id).find((row) => row.id === finding.id)
       const history = FindingValidation.history({ sessionID: session.id, vulnerabilityID: finding.id })
@@ -172,6 +193,7 @@ test("persists validation summaries into notes for the uniquely observed target 
             evidence: "Owner and non-owner control responses contained no unauthorized object data.",
           },
         }),
+        attempts: makeAttempts(20),
       })
       expect(result.targetNoteID).toBeTruthy()
       const notes = TargetMemory.allNotes(workspace.id)
@@ -180,6 +202,30 @@ test("persists validation summaries into notes for the uniquely observed target 
       expect(note?.content).toContain("false_positive")
       expect(note?.content).toContain("reproducible, unexpected_behavior")
       expect(note?.content).not.toContain("Three replays returned")
+      await Session.remove(session.id)
+    },
+  })
+})
+
+
+test("does not count duplicate variation keys as additional attempts across assessments", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      const finding = Vulnerability.add({
+        sessionID: session.id,
+        data: { severity: "medium", title: "Candidate", description: "Candidate", endpoint: "GET /api/item", status: "approved" },
+      })
+      const first = makeAttempts(10)
+      const one = await FindingValidation.record({ sessionID: session.id, vulnerabilityID: finding.id, checks: checklist(), attempts: first })
+      expect(one.attemptCount).toBe(10)
+      const repeated = first.slice(0, 5).map((attempt) => ({ ...attempt, evidence: attempt.evidence + " repeated observation" }))
+      const two = await FindingValidation.record({ sessionID: session.id, vulnerabilityID: finding.id, checks: checklist(), attempts: repeated })
+      expect(two.attemptCount).toBe(10)
+      expect(two.attemptsRemaining).toBe(10)
+      expect(two.verdict).not.toBe("false_positive")
       await Session.remove(session.id)
     },
   })
