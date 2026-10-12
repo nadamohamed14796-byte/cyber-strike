@@ -1,5 +1,6 @@
 import path from "path"
-import { mkdir } from "fs/promises"
+import { lstat, mkdir, realpath } from "node:fs/promises"
+import * as tar from "tar"
 import { Log } from "../util/log"
 import { Global } from "../global"
 
@@ -56,15 +57,122 @@ export namespace Discovery {
     return path.join(Global.Path.cache, "skills")
   }
 
-  async function get(url: string, dest: string): Promise<boolean> {
-    if (await Bun.file(dest).exists()) return true
+  const safeArchiveTypes = new Set(["File", "Directory", "OldFile", "ContiguousFile"])
+
+  /** Reject archive paths outside the skill root and all archive-created links. */
+  export function isSafeArchiveEntry(root: string, file: unknown, type: string): boolean {
+    if (!safeArchiveTypes.has(type)) return false
+    if ((file === "." || file === "./") && type === "Directory") return true
+    return Boolean(resolveSkillFilePath(root, file))
+  }
+
+  async function safeCacheDestination(
+    root: string,
+    destination: string,
+    createParents: boolean,
+  ): Promise<string | undefined> {
+    try {
+      const lexicalRoot = path.resolve(root)
+      const relative = path.relative(lexicalRoot, path.resolve(destination))
+      if (!relative || relative === ".." || relative.startsWith(\`..\${path.sep}\`) || path.isAbsolute(relative)) return undefined
+      await mkdir(lexicalRoot, { recursive: true })
+      const realRoot = await realpath(lexicalRoot)
+      const finalPath = path.resolve(realRoot, relative)
+      const realRelative = path.relative(realRoot, finalPath)
+      if (!realRelative || realRelative === ".." || realRelative.startsWith(\`..\${path.sep}\`) || path.isAbsolute(realRelative)) return undefined
+
+      const parts = realRelative.split(path.sep)
+      let current = realRoot
+      for (const part of parts.slice(0, -1)) {
+        current = path.join(current, part)
+        let stat
+        try {
+          stat = await lstat(current)
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") return undefined
+          if (!createParents) return finalPath
+          try { await mkdir(current) } catch (mkdirError) {
+            if ((mkdirError as NodeJS.ErrnoException).code !== "EEXIST") return undefined
+          }
+          try { stat = await lstat(current) } catch { return undefined }
+        }
+        if (stat.isSymbolicLink() || !stat.isDirectory()) return undefined
+      }
+      try {
+        const stat = await lstat(finalPath)
+        if (stat.isSymbolicLink() || !stat.isFile()) return undefined
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") return undefined
+      }
+      return finalPath
+    } catch {
+      return undefined
+    }
+  }
+
+  async function extractSafeArchive(archive: string, root: string): Promise<boolean> {
+    await mkdir(root, { recursive: true })
+    const realRoot = await realpath(root)
+    const entries: Array<{ path: string; type: string }> = []
+    try {
+      await tar.t({
+        file: archive,
+        strict: true,
+        onReadEntry(entry) { entries.push({ path: entry.path, type: entry.type }) },
+      })
+    } catch (err) {
+      log.error("failed to inspect skill archive", { archive, err })
+      return false
+    }
+
+    const permitted = new Set<string>()
+    for (const entry of entries) {
+      if (!isSafeArchiveEntry(realRoot, entry.path, entry.type)) {
+        log.warn("refusing unsafe skill archive entry", { path: entry.path, type: entry.type })
+        return false
+      }
+      if (entry.path === "." || entry.path === "./") continue
+      const destination = resolveSkillFilePath(realRoot, entry.path)
+      if (!destination || !(await safeCacheDestination(realRoot, destination, false))) {
+        log.warn("refusing archive write through unsafe cache path", { path: entry.path })
+        return false
+      }
+      permitted.add(path.normalize(entry.path.replace(/\\/g, "/")))
+    }
+
+    try {
+      await tar.x({
+        file: archive,
+        cwd: realRoot,
+        strict: true,
+        preservePaths: false,
+        filter(entryPath, entry) {
+          return isSafeArchiveEntry(realRoot, entryPath, entry.type) &&
+            permitted.has(path.normalize(entryPath.replace(/\\/g, "/")))
+        },
+      })
+      return true
+    } catch (err) {
+      log.error("failed to safely extract skill archive", { archive, err })
+      return false
+    }
+  }
+
+
+  async function get(url: string, dest: string, root: string): Promise<boolean> {
+    const safeDest = await safeCacheDestination(root, dest, true)
+    if (!safeDest) {
+      log.warn("refusing skill download to unsafe cache path", { dest })
+      return false
+    }
+    if (await Bun.file(safeDest).exists()) return true
     return fetch(url)
       .then(async (response) => {
         if (!response.ok) {
           log.error("failed to download", { url, status: response.status })
           return false
         }
-        await Bun.write(dest, await response.text())
+        await Bun.write(safeDest, await response.text())
         return true
       })
       .catch((err) => {
@@ -134,7 +242,7 @@ export namespace Discovery {
               }
               const link = new URL(file, `${host}/${skill.name}/`).href
               await mkdir(path.dirname(dest), { recursive: true })
-              await get(link, dest)
+              await get(link, dest, root)
             }),
           )
         } else if ("url" in skill && typeof skill.url === "string") {
@@ -143,8 +251,8 @@ export namespace Discovery {
             // Archive format: download tar.gz and extract
             const archive = path.join(root, `${skill.name}.tar.gz`)
             await mkdir(root, { recursive: true })
-            if (await get(link, archive)) {
-              await Bun.$`tar xzf ${archive} -C ${root} 2>/dev/null`.quiet().nothrow()
+            if (await get(link, archive, root)) {
+              await extractSafeArchive(archive, root)
             }
           } else {
             // Single file (skill-md): download as SKILL.md
