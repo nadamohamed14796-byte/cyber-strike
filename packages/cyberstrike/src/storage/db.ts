@@ -86,7 +86,8 @@ export namespace Database {
     return (row?.c ?? 0) > 0
   }
 
-  function reconcile(sqlite: BunDatabase) {
+  /** Reconcile an existing SQLite file with current schemas; exported for migration regression tests. */
+  export function reconcile(sqlite: BunDatabase) {
     // Phase 1: Structural repairs (table reshaping that can't be handled by ADD COLUMN)
     // web_credential: old schema had type/value columns → new schema uses headers JSON
     if (tableExists(sqlite, "web_credential")) {
