@@ -724,8 +724,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       )) continue
       if (
         existing?.payload?.crawl_page === true &&
-        !primarySeeds.has(current.url) &&
-        ResearchQueue.isFreshCrawlPage(source.id, current.url)
+        ResearchQueue.isFreshCrawlPage(source.id, current.url) &&
+        // Successful seed/index pages may be refreshed each cycle, but failures
+        // (including primary seeds) get the same cooldown as pagination pages.
+        (existing.payload?.crawl_error === true || !primarySeeds.has(current.url))
       ) continue
       pages++
       try {
@@ -803,7 +805,17 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           })
           blockedAuth++
           errors.push(current.url + " — authentication required (" + message + ")")
-        } else if (errors.length < 5) errors.push(current.url + " — " + message)
+        } else {
+          // Persist transient/network failures so watch mode does not refetch the
+          // same broken page every cycle. Failed records stay in discovery, not
+          // the learning queue, and become eligible again after the crawl TTL.
+          ResearchQueue.markFailedCrawlPage({
+            sourceID: source.id,
+            sourceURL: current.url,
+            reason: message,
+          })
+          if (errors.length < 5) errors.push(current.url + " — " + message)
+        }
       }
       if (current.depth >= maxDepth) continue
     }
