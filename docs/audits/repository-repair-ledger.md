@@ -98,3 +98,16 @@ The 20 distinct passes have **not** yet been completed. Record each pass only af
 - **Validation status:** source-level change and test were authored on `fix/target-workspace-owner-index-reconciliation-20261012`; GitHub Actions must pass on its PR head before this issue can be marked verified. Local Bun execution is unavailable in this environment. This is not a claim that the test passed.
 - **Branch disposition:** `fix/target-memory-owner-isolation` is not safe to merge wholesale: the inspected branch's target implementation lacks current `ensureSafeDirectoryPath` and note-secret-redaction paths. The necessary owner-index behavior is being ported selectively.
 
+
+
+## Follow-up checkpoint — 2026-10-12: scope-check IPv4/CIDR parsing
+
+### SEC-005 — P1: scope-check could report an IPv4-looking hostname substring as in scope
+
+- **Evidence:** before the fix, `extractIP()` used a regex search over the entire target string instead of parsing the URL host; `ipToNum()` accepted out-of-range octets and CIDR prefixes were not range-checked. For example, a target URL whose hostname starts with `10.20.30.40.attacker.example` could yield `10.20.30.40` as a substring and be reported inside `10.20.30.0/24`.
+- **Fix branch:** `fix/scope-check-ipv4-cidr-host-validation-20261012`; issue #35.
+- **Changes:** CIDR inputs are now recognized before domain matching, all CIDR prefix lengths must be integers in 0..32, IPv4 octets must be four canonical decimal components in 0..255, and CIDR comparisons use the parsed hostname from a valid HTTP(S) URL or bare host. Userinfo and unsupported URL protocols fail closed. Domain and wildcard matching now operate on the parsed hostname rather than raw URL text.
+- **Regression tests authored:** `packages/cyberstrike/test/tool/scope-check.test.ts` covers embedded-IP hostnames/query values, valid in-range bare IP/URL, out-of-range/malformed addresses, invalid CIDR prefixes, URL userinfo, and domain/wildcard regressions.
+- **Validation:** code and test added remotely; await CI on the final PR head. No local Bun execution was possible in this runtime.
+- **Scope note:** this tool communicates scope decisions; it does not replace independent authorization and network guards at execution boundaries.
+
