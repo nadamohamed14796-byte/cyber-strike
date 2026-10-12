@@ -162,4 +162,71 @@ describe("VerificationLedger terminal outcomes", () => {
       },
     })
   })
+  test("a duplicate invalid retry cannot downgrade valid evidence or reopen the budget", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.createNext({ directory: tmp.path, title: "verification-ledger-no-downgrade-test" })
+        const common = {
+          sessionID: session.id,
+          hypothesisKey: "no-downgrade-hypothesis",
+          asset: "https://example.test",
+          endpoint: "/api/profile",
+          vulnerabilityClass: "idor",
+        }
+        for (let i = 0; i < 20; i++) {
+          VerificationLedger.record({
+            ...common,
+            attempt: attempt("valid-strategy-" + i, "evidence://valid-" + i),
+          })
+        }
+        const duplicate = VerificationLedger.record({
+          ...common,
+          attempt: attempt("valid-strategy-0", undefined, false),
+        })
+        expect(duplicate.duplicate).toBe(true)
+        expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
+          .find((item) => item.strategyID === "valid-strategy-0")?.validConditions).toBe(true)
+        expect(() => VerificationLedger.record({
+          ...common,
+          attempt: attempt("valid-strategy-20", "evidence://late-valid"),
+        })).toThrow(/20-valid-distinct-attempt budget is exhausted/i)
+        await Instance.dispose()
+      },
+    })
+  })
+
+  test("an invalid attempt cannot be upgraded into a 21st valid attempt", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.createNext({ directory: tmp.path, title: "verification-ledger-no-upgrade-test" })
+        const common = {
+          sessionID: session.id,
+          hypothesisKey: "no-upgrade-hypothesis",
+          asset: "https://example.test",
+          endpoint: "/api/profile",
+          vulnerabilityClass: "idor",
+        }
+        for (let i = 0; i < 20; i++) {
+          VerificationLedger.record({
+            ...common,
+            attempt: attempt("valid-strategy-" + i, "evidence://valid-" + i),
+          })
+        }
+        VerificationLedger.record({
+          ...common,
+          attempt: attempt("invalid-candidate", undefined, false),
+        })
+        expect(() => VerificationLedger.record({
+          ...common,
+          attempt: attempt("invalid-candidate", "evidence://late-valid", true),
+        })).toThrow(/20-valid-distinct-attempt budget is exhausted/i)
+        await Instance.dispose()
+      },
+    })
+  })
+
 })
