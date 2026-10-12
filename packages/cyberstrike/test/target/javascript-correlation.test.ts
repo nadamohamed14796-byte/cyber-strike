@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, safeCorrelationResponsePreview } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -25,6 +25,31 @@ test("normalizes numeric identifiers from relative and absolute JS endpoint lite
   expect(endpoints).toContain("https://api.example.com/v1/accounts/{id}")
   expect(endpoints).not.toContain("/api/users/12345")
   expect(endpoints).not.toContain("https://api.example.com/v1/accounts/67890")
+})
+
+test("never persists JavaScript source in correlation response previews", () => {
+  const source = [
+    "[Status: 200, Type: application/javascript, Size: 1.0 KB]",
+    'const api_key = "this-is-a-secret-value-that-must-not-be-saved";',
+    'fetch("/api/users")',
+  ].join("\n")
+  const preview = safeCorrelationResponsePreview({
+    id: "request-script-1",
+    normalizedPath: "/assets/app.js",
+    responseContentType: "application/javascript",
+    processedResponse: source,
+  })
+  expect(preview).toContain("request-script-1")
+  expect(preview).not.toContain("this-is-a-secret-value")
+  expect(preview).not.toContain("const api_key")
+
+  const jsonPreview = safeCorrelationResponsePreview({
+    id: "request-json-1",
+    normalizedPath: "/api/profile",
+    responseContentType: "application/json",
+    processedResponse: '{"api_key":"this-is-a-secret-value-that-must-not-be-saved"}',
+  })
+  expect(jsonPreview).not.toContain("this-is-a-secret-value")
 })
 
 test("does not treat ordinary labels or non-path relative strings as endpoints", () => {
