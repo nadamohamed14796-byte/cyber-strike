@@ -111,6 +111,13 @@ describe("VerificationAttempts", () => {
     expect(VA.sameHypothesisIdentity(endpointSpecific, { ...sameEndpoint, vulnerabilityClass: "xss" })).toBe(false)
   })
 
+  test("confirmed and disproven outcomes are terminal", () => {
+    expect(VA.isTerminalOutcome(undefined)).toBe(false)
+    expect(VA.isTerminalOutcome("inconclusive")).toBe(false)
+    expect(VA.isTerminalOutcome("confirmed")).toBe(true)
+    expect(VA.isTerminalOutcome("disproven")).toBe(true)
+  })
+
   test("blocked prerequisites stop safely without false-positive verdict", () => {
     const result = VA.decide({
       attempts: [attempt("auth-check", "missing-credential", false)],
