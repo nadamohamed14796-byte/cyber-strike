@@ -34,7 +34,7 @@ type VrtCheckMetadata = {
 
 const Parameters = z.object({
     entry_id: z.string().describe("The intel entry ID to update the VRT check for"),
-    vrt_category: z.string().describe("The VRT category being tested (e.g., IDOR, XSS, SQLi, SSRF, Auth Bypass)"),
+    vrt_category: z.string().trim().min(1).describe("The VRT category being tested (e.g., IDOR, XSS, SQLi, SSRF, Auth Bypass)"),
     status: z.enum(["tested_vulnerable", "tested_not_vulnerable", "not_applicable"]).describe("Result of the test"),
     verification_hypothesis_key: z.string().optional().describe("Required when marking tested_not_vulnerable; must match a ledger hypothesis whose evidence-backed outcome is disproven."),
     technique: z
