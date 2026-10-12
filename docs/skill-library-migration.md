@@ -74,3 +74,17 @@ These are the first consolidation batch: 29 existing CyberStrike skill files exp
 - Related-skill links resolve to existing paths.
 - All evidence and test examples are safe for the authorized context.
 - Loader, registry, and end-to-end runtime behavior are verified separately from documentation quality.
+
+
+## Additional methodology, validation, evidence, and reporting batch
+
+A second, reviewable batch adds CyberStrike-native drafts for:
+- `attack-bb-methodology`
+- `attack-web-recon`
+- `attack-triage-validation`
+- `attack-evidence-hygiene`
+- `attack-report-writing`
+
+These are supplementary skills; the canonical IDOR/BOLA file remains the newer `main` version, including its runtime verification-ledger discipline and bounded distinct-attempt policy. The new drafts do not by themselves prove dynamic selection, tool execution, or end-to-end runtime integration.
+
+Before declaring the library fully consolidated, verify all prerequisite and `chains_with` references against loaded skill paths, confirm each command against the real tool registry, test relevant trigger/routing behavior, and finish the source-path-to-canonical-path inventory described above.
