@@ -490,6 +490,41 @@ describe("JSON to SQLite migration", () => {
     expect(db.select().from(ProjectTable).all()).toHaveLength(0)
   })
 
+  test("rejects valid JSON with invalid record shapes and rolls back", async () => {
+    await writeProject(storageDir, {
+      id: "proj_test123abc",
+      worktree: "/test/path",
+      time: { created: Date.now(), updated: Date.now() },
+      sandboxes: [],
+    })
+    await writeSession(storageDir, "proj_test123abc", { ...fixtures.session })
+
+    // These files are valid JSON, but not valid records for their respective stores.
+    // They must not be silently skipped or accepted as a successful migration.
+    await Bun.write(path.join(storageDir, "message", "ses_test456def", "msg_null.json"), "null")
+    await Bun.write(path.join(storageDir, "part", "msg_null", "prt_null.json"), "null")
+    await Bun.write(path.join(storageDir, "todo", "ses_test456def.json"), "null")
+    await Bun.write(path.join(storageDir, "permission", "proj_test123abc.json"), "null")
+    await Bun.write(path.join(storageDir, "session_share", "ses_test456def.json"), "null")
+
+    const stats = await JsonMigration.run(sqlite)
+
+    expect(stats.errors.some((error) => error.includes("message is not an object") && error.includes("msg_null.json"))).toBe(true)
+    expect(stats.errors.some((error) => error.includes("part is not an object") && error.includes("prt_null.json"))).toBe(true)
+    expect(stats.errors.some((error) => error.includes("todo not an array"))).toBe(true)
+    expect(stats.errors.some((error) => error.includes("permission rules are not an array"))).toBe(true)
+    expect(stats.errors.some((error) => error.includes("session_share is not an object"))).toBe(true)
+
+    const db = drizzle({ client: sqlite })
+    expect(db.select().from(ProjectTable).all()).toHaveLength(0)
+    expect(db.select().from(SessionTable).all()).toHaveLength(0)
+    expect(db.select().from(MessageTable).all()).toHaveLength(0)
+    expect(db.select().from(PartTable).all()).toHaveLength(0)
+    expect(db.select().from(TodoTable).all()).toHaveLength(0)
+    expect(db.select().from(PermissionTable).all()).toHaveLength(0)
+    expect(db.select().from(SessionShareTable).all()).toHaveLength(0)
+  })
+
   test("skips invalid todo entries while preserving source positions", async () => {
     await writeProject(storageDir, {
       id: "proj_test123abc",
