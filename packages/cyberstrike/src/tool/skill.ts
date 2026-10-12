@@ -10,6 +10,7 @@ import { PermissionNext } from "../permission/next"
 import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
 import { Agent } from "../agent/agent"
+import { Instance } from "../project/instance"
 
 const accessibleCache = new Map<string, Skill.Info[]>()
 
@@ -59,7 +60,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     async execute(params: z.infer<typeof parameters>, ctx) {
       await SkillIndex.ensureBuilt()
 
-      const agentKey = ctx.agent ?? ""
+      const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
       if (!accessibleCache.has(agentKey)) {
         const skills = await Skill.all()
         const agentInfo = await Agent.get(ctx.agent)
@@ -201,10 +202,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       // Default: load action
       if (!params.name) throw new Error("Skill name required for load action")
 
-      const skill = await Skill.get(params.name)
+      // Allow exact technique IDs from skill metadata to resolve to the one
+      // canonical catalog entry; ambiguous aliases deliberately do not resolve.
+      const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
+      const skill = await Skill.get(canonicalName)
       if (!skill) {
         const available = accessibleSkills.map((s) => s.name).join(", ")
-        throw new Error(`Skill "${params.name}" not found. Available: ${available || "none"}`)
+        throw new Error(`Skill "${params.name}" not found or has an ambiguous metadata reference. Available: ${available || "none"}`)
       }
 
       await ctx.ask({
@@ -214,7 +218,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         metadata: {} as { name?: string; dir?: string },
       })
 
-      SkillContext.load(params.name)
+      await SkillContext.load(params.name)
 
       const dir = path.dirname(skill.location)
       const base = pathToFileURL(dir).href
@@ -235,7 +239,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         return arr
       }).then((f) => f.map((file) => `<file>${file}</file>`).join("\n"))
 
-      const chains = SkillIndex.chainsFrom(params.name)
+      const chains = SkillIndex.chainsFrom(skill.name)
       const chainInfo =
         chains.length > 0
           ? [
@@ -243,6 +247,23 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
               "<kill_chain_links>",
               ...chains.map((c) => `  <chain target="${c.target}"${c.boost ? ` boost="${c.boost}"` : ""} />`),
               "</kill_chain_links>",
+            ].join("\n")
+          : ""
+
+      const rawPrerequisites = SkillIndex.prerequisitesFor(skill.name)
+      const prerequisiteInfo =
+        rawPrerequisites.length > 0
+          ? [
+              "",
+              "<prerequisites>",
+              ...rawPrerequisites.map((reference) => {
+                const resolved = SkillIndex.resolveReference(reference)
+                if (!resolved) return `  <prerequisite reference="${reference}" status="unresolved-catalog-reference" />`
+                const loaded = SkillContext.isLoaded(resolved)
+                return `  <prerequisite skill="${resolved}" status="${loaded ? "loaded" : "not-loaded"}" />`
+              }),
+              "  Verify real-world prerequisites independently; loading a prerequisite skill is not proof that access, credentials, or target conditions exist.",
+              "</prerequisites>",
             ].join("\n")
           : ""
 
@@ -262,6 +283,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           files,
           "</skill_files>",
           chainInfo,
+          prerequisiteInfo,
           "</skill_content>",
         ].join("\n"),
         metadata: { name: skill.name, dir },
