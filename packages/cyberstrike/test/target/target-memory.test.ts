@@ -3,7 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
-import { TargetMemory, targetObservationMatches } from "../../src/target"
+import { TargetMemory } from "../../src/target"
 import { targetWorkspaceOwnerKey } from "../../src/target/project-key"
 
 describe("target memory normalization", () => {
@@ -71,7 +71,7 @@ describe("target memory normalization", () => {
 })
 
 test("target observation matching requires the target host and scoped path", () => {
-  expect(targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/api/users")).toBe(true)
+  expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/api/users")).toBe(true)
   expect(targetObservationMatches("https://app.example.com/portal", "https://app.example.com/other-app/api/users")).toBe(false)
   expect(targetObservationMatches("https://app.example.com/portal", "https://unrelated.example.net/portal/api/users")).toBe(false)
   expect(targetObservationMatches("https://app.example.com", "https://api.app.example.com/v1/users")).toBe(true)
