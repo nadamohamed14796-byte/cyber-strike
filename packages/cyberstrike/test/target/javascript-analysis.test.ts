@@ -106,7 +106,8 @@ test("flags dangerous JavaScript sinks for manual review without claiming a vuln
   expect(result.riskSignals.some((signal) => signal.kind === "dynamic-code-execution" && signal.functionName === "runDynamicCode")).toBe(true)
   expect(result.riskSignals.some((signal) => signal.kind === "cross-window-message" && signal.functionName === "notifyParent")).toBe(true)
   expect(result.riskSignals.every((signal) => signal.confidence === "candidate")).toBe(true)
-  expect(JSON.stringify(result)).not.toContain("userHtml")
+  expect(JSON.stringify(result)).not.toContain("document.querySelector")
+  expect(JSON.stringify(result)).not.toContain("innerHTML = userHtml")
 })
 
 test("keeps concatenated query values out of the inferred path and defaults fetch to GET", () => {
