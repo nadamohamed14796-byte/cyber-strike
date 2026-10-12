@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthenticatedResearch } from "../../src/research/ingest"
+import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -209,10 +210,16 @@ test("research queue resumes authenticated work and learns cached report text wi
   await Instance.provide({
     directory: dir.path,
     fn: async () => {
-      const sourceID = "portswigger"
+      // Use a unique temporary source ID so claimNext cannot consume older queued
+      // PortSwigger work from the shared database instead of the row this test inserted.
+      const marker = crypto.randomUUID()
+      const sourceID = "portswigger-test-" + marker
+      const academySource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
+      if (!academySource) throw new Error("PortSwigger test source is not configured")
+      const isolatedSource = { ...academySource, id: sourceID }
+      RESEARCH_SOURCES.push(isolatedSource)
       // The shared knowledge store may outlive the temporary project database. Keep both
       // URL identity and content fingerprint unique so this test proves a fresh ingestion.
-      const marker = crypto.randomUUID()
       const sourceURL = "https://portswigger.net/web-security/access-control/idor?test_id=" + marker
       ResearchQueue.enqueue({
         sourceID,
@@ -305,6 +312,8 @@ test("research queue resumes authenticated work and learns cached report text wi
         }
       } finally {
         globalThis.fetch = originalFetch
+        const sourceIndex = RESEARCH_SOURCES.indexOf(isolatedSource)
+        if (sourceIndex >= 0) RESEARCH_SOURCES.splice(sourceIndex, 1)
         await Instance.dispose()
       }
     },
