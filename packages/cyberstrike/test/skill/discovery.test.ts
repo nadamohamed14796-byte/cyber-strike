@@ -1,4 +1,7 @@
 import { describe, test, expect } from "bun:test"
+import * as tar from "tar"
+import fs from "node:fs/promises"
+import { tmpdir } from "../fixture/fixture"
 import { Discovery } from "../../src/skill/discovery"
 import path from "path"
 
@@ -95,4 +98,36 @@ test("rejects unsafe archive traversal and links", () => {
   expect(Discovery.isSafeArchiveEntry(root, "/etc/passwd", "File")).toBe(false)
   expect(Discovery.isSafeArchiveEntry(root, "escape", "SymbolicLink")).toBe(false)
   expect(Discovery.isSafeArchiveEntry(root, "escape", "Link")).toBe(false)
+})
+
+test("downloads and extracts archive bytes without UTF-8 corruption", async () => {
+  await using tmp = await tmpdir()
+  const sourceFile = path.join(tmp.path, "SKILL.md")
+  const archiveFile = path.join(tmp.path, "fixture.tar.gz")
+  await fs.writeFile(sourceFile, "# Binary archive fixture\\n\\narchive bytes must be preserved\\n")
+  await tar.c({ gzip: true, file: archiveFile, cwd: tmp.path }, ["SKILL.md"])
+  const archiveBytes = await fs.readFile(archiveFile)
+  const skillName = "archive-fixture-" + process.pid + "-" + Date.now()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = input instanceof Request ? input.url : String(input)
+    if (url.endsWith("/index.json")) {
+      return new Response(JSON.stringify({
+        skills: [{ name: skillName, description: "binary fixture", type: "archive", url: "fixture.tar.gz" }],
+      }), { headers: { "content-type": "application/json" } })
+    }
+    if (url.endsWith("/fixture.tar.gz")) return new Response(archiveBytes)
+    return new Response("not found", { status: 404 })
+  }) as typeof fetch
+
+  try {
+    const dirs = await Discovery.pull("https://skill-fixture.invalid/")
+    expect(dirs).toContain(path.join(Discovery.dir(), skillName))
+    expect(await fs.readFile(path.join(Discovery.dir(), skillName, "SKILL.md"), "utf8")).toContain(
+      "archive bytes must be preserved",
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+    await fs.rm(path.join(Discovery.dir(), skillName), { recursive: true, force: true })
+  }
 })
