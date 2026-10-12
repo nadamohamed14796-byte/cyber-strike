@@ -112,6 +112,8 @@ Capture only the response headers, error code, and a short sanitized non-sensiti
 
 ## References
 
+- [uphiago/recon-skills — SCADA/Hikvision ISAPI](https://github.com/uphiago/recon-skills/blob/main/recon/scada-hikvision-isapi/SKILL.md) — merged protocol-specific source.
+
 - [uphiago/recon-skills — scada-hikvision-isapi](https://github.com/uphiago/recon-skills/tree/main/recon/scada-hikvision-isapi)
 - [Hikvision support and security advisories](https://www.hikvision.com/en/support/)
 - [ONVIF specifications](https://www.onvif.org/profiles/)
