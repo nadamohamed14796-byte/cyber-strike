@@ -105,6 +105,38 @@ test("does not associate an existing target workspace with a session that has no
 })
 
 
+test("persists an explicit target scope with authorization provenance and exclusions", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://example.com", {
+        include: ["*.Example.com", "example.com"],
+        exclude: ["admin.example.com"],
+        authorizationSource: "Example disclosure program",
+        authorizationReference: "https://hackerone.com/example?secret=must-not-persist",
+      })
+      expect(configured.scope.status).toBe("configured")
+      expect(configured.scope.scopeItems).toEqual(["*.example.com", "example.com"])
+      expect(configured.scope.excludedItems).toEqual(["admin.example.com"])
+      expect(configured.scope.authorizationReference).toBe("https://hackerone.com/example")
+      const saved = await TargetMemory.getScope("https://example.com")
+      expect(saved?.scopeItems).toEqual(["*.example.com", "example.com"])
+      expect(saved?.authorizationSource).toBe("Example disclosure program")
+      const disk = await fs.readFile(path.join(configured.workspace.workspacePath, "scope", "scope.json"), "utf-8")
+      expect(disk).not.toContain("must-not-persist")
+      await expect(TargetMemory.configureScope("https://example.com", {
+        include: ["example.com"],
+        exclude: ["example.com"],
+        authorizationSource: "Example disclosure program",
+        authorizationReference: "https://hackerone.com/example",
+      })).rejects.toThrow(/both included and excluded/i)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("requires concrete evidence before a target note can be confirmed or disproven", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
