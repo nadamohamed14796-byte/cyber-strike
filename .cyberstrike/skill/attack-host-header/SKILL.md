@@ -98,7 +98,9 @@ Trace which value controls URL generation, routing, redirects, cache keys, or or
 - **Burp Repeater / curl:** controlled one-variable header comparison on an approved endpoint.
 - **Browser / test mailbox:** verify generated links and redirects without sharing tokens.
 - **Reverse-proxy configuration review:** identify trusted forwarded headers and canonical-host settings.
-- **attack-cache-poison:** assess whether a Host-derived response is stored and served from a shared cache.
+- [**attack-cache-poison**](../attack-cache-poison/SKILL.md): assess whether a Host-derived response is stored and served from a shared cache.
+- [**attack-open-redirect**](../attack-open-redirect/SKILL.md): validate redirect behavior separately, then link it to cache impact only if a clean request receives the cached altered response.
+- [**attack-information-disclosure**](../attack-information-disclosure/SKILL.md): assess independently whether Host-derived URLs or routing expose sensitive information.
 - **Local proxy/origin lab:** reproduce ambiguous authority parsing and duplicate-header behavior safely.
 
 ## Host Trust-Boundary Matrix
@@ -120,6 +122,12 @@ Trace which value controls URL generation, routing, redirects, cache keys, or or
 - A response that echoes a hostname, an email-sent confirmation, or a status-code change alone does not demonstrate link poisoning or access bypass.
 - Cache headers and shared-cache behavior belong to a separate validation step; an origin-only reflection is not poisoning.
 - Do not use real-user account recovery, deliver active credentials, or test internal/third-party routing outside the declared scope. For cache interactions, use the dedicated cache skill and an approved test key.
+
+## Related Skills and Chains
+
+- [`attack-cache-poison`](../attack-cache-poison/SKILL.md) — test shared-cache persistence of Host-derived response changes; a changed first response alone is not enough.
+- [`attack-open-redirect`](../attack-open-redirect/SKILL.md) — validate attacker-controlled redirect destinations independently from Host-header trust.
+- [`attack-information-disclosure`](../attack-information-disclosure/SKILL.md) — follow up only when the Host trust issue exposes sensitive data or internal routing details.
 
 ## References
 
