@@ -27,7 +27,19 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
       output.push(`[+] Sitemap index found: ${foundAt} (${locs.length} child sitemaps)`)
       let fetched = 0
       for (const child of locs.slice(0, MAX_CHILD_SITEMAPS)) {
-        const childResp = await safeFetch(child, { timeout })
+        let childUrl: URL
+        try {
+          childUrl = new URL(child, origin)
+        } catch {
+          continue
+        }
+        if (
+          (childUrl.protocol !== "http:" && childUrl.protocol !== "https:") ||
+          childUrl.origin !== origin ||
+          childUrl.username ||
+          childUrl.password
+        ) continue
+        const childResp = await safeFetch(childUrl.href, { timeout })
         if (!childResp || childResp.status !== 200) continue
         for (const loc of extractLocs(childResp.text)) pages.add(loc)
         fetched++
