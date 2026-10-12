@@ -154,7 +154,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Fix:** centralized identity comparison in `VerificationAttempts.sameHypothesisIdentity` and made the ledger reject endpoint mismatches consistently, including when exactly one endpoint is absent.
 - **Regression coverage:** added unit coverage for same endpoint, missing endpoint, different asset, and different vulnerability class in `packages/cyberstrike/test/methodology/verification-attempts.test.ts`.
 - **Direct commits on main:** policy helper `6ad4f927421491a8715de178949b31700af12f42`; ledger integration `cac99ea90d65a928ce4f6c8d61d31485b5540d0b`; regression test `53f693a3f3cac076c919943b28143097fc0c1e30`.
-- **Validation:** GitHub contents API confirmed each write returned a commit SHA. The available combined-status query returned no status entries, and the available workflow-run query returned no PR-triggered runs for this direct main commit. Therefore the new regression test and typecheck are **not yet verified as passing**; no local Bun runtime/checkout is available here.
+- **Validation:** GitHub contents API confirmed each write returned a commit SHA. GitHub Actions unit tests, typecheck, and build passed on the later code head `8324bd36c1883d008cd3da6c3a9b91cc6b0cd228` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL was still running when this ledger was refreshed; no local Bun runtime/checkout was used.
 - **Attempts:** one focused implementation pass; continue from actual CI feedback if checks become available.
 - **Disposition:** code change committed directly to `main`; validation pending. No feature branch was created for this repair.
 
@@ -180,7 +180,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Regression coverage:** added policy tests proving only `confirmed` and `disproven` are terminal; inconclusive and unrecorded outcomes remain non-terminal.
 - **Direct commits on main:** policy `bfb35b3dd2064e4c558b43228cf501e946170665`; test `7de88c567efa1a4fafb267aa8dab4ac937bcd8e3`; ledger enforcement `afc9422633ce9244e893566ffef7d2729ecc7659`.
 - **Validation:** source writes are committed to `main`; no local Bun runtime is available. GitHub Actions status must be checked on the resulting main head before this is marked verified.
-- **Status:** implemented; automated validation pending.
+- **Status:** implemented; unit tests/typecheck/build passed on `8324bd36`; CodeQL pending.
 
 
 ## Follow-up checkpoint — 2026-10-12: bounded remote skill registry responses
@@ -191,7 +191,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Fix:** added incremental response-body reading with explicit caps (2 MiB for index JSON, 25 MiB per asset, 100 MiB total downloaded bytes), a 15-second per-request timeout, and a five-minute overall sync deadline. Registry entries/assets are capped and processed with at most six concurrent skills; legacy files are fetched sequentially per skill. Archives are limited to 10,000 entries, 25 MiB per expanded member, 100 MiB per archive, and a 250 MiB total declared extraction budget.
 - **Regression coverage:** tests cover body-at-limit acceptance, streamed oversize rejection, oversized declared `Content-Length`, archive expansion bombs/manifests, plus SEC-008 destination and redirect validation.
 - **Direct commits on main:** per-response limits `a53f4ff1aa18bfe2838958a178cf2752de456a7a`; regression test `4df5373ff1d7421edd05a50b8e77268846cca10f`; test simplification `9f1cc631373d3a27f98b91c46c00da33cdf0f604`; bounded asset count, six-way concurrency, 100 MiB total download budget and archive expansion checks `7c38ea8b92aa42a4470708efe836161fa84dd817`; five-minute sync budget and concurrent extraction reservation `24bd1912ceff24406f00ed8402e3d75e2b8f620f`; archive-size regression tests `baabc4cb88e2e6e590cff97b5140d87652a5ccc1`; final formatting/deadline guards `fe2640a8ea28f9c31ab826042a4dd2b1fc35810b`; byte-accounted shared budget `21833d6442f386535ba310f7c2632c16d2160a3c`; over-budget chunk accounting and regression test `2fe4ebed7716508300617897810928225a47c420` / `14da7c3efcc78c9fccf865e454ff97187a6f3e98`.
-- **Validation:** committed to `main`; CI and Bun execution remain pending/unavailable in this runtime. Recheck tests and typecheck on the latest main head.
+- **Validation:** unit tests, typecheck and build steps passed on code head `8324bd36` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL remained in progress; no local Bun run was claimed.
 - **Status:** implemented; automated validation pending.
 
 
@@ -204,7 +204,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Regression coverage:** tests cover HTTP/file schemes, loopback and internal destinations, URL credentials, nonstandard ports, representative private/reserved IPv4 ranges, loopback/link-local/ULA/documentation IPv6 ranges, and public IPv4/IPv6 examples.
 - **Direct commits on main:** implementation `3eedd98f1b00fba1c534b47ac87ae22524c502de`; initial regression tests `48492819e173b58d974782bc152dd36965580e87`; extracted redirect-policy helper `7d99c217484a0c0e136cdace4b4f82753243c805`; redirect regression tests `996c21c60fcb7aa9e3afc061cebe1712176e6145`; malformed-URL and per-entry failure handling `e0100c11695465b2770c0059b3b2a0ea83808a42`; formatting pass `9f4845bf3956c6b8b46636e1fa6d161448449038`; invalid registry URL tests `d88cf1d6019ab1a1f67a97eed14a55d354d73437`.
 - **Limitations:** host DNS is checked before each fetch, but the runtime's fetch implementation performs its own subsequent resolution; DNS rebinding between those operations is not cryptographically prevented in this implementation. Network egress controls remain the stronger defense where available.
-- **Validation:** committed to `main`; CI/typecheck/Bun test execution has not been verified in this environment. Keep this item pending until the latest main head passes.
+- **Validation:** unit tests, typecheck and build steps passed on code head `8324bd36` (runs `38239376249`, `38239376204`, `38239376508`). CodeQL remained in progress; DNS rebinding between validation and the runtime's own resolution remains a documented limitation.
 - **Status:** implemented; automated validation pending.
 
 
@@ -215,7 +215,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Evidence:** `packages/ui/package.json` and the root `bun.lock` resolved DOMPurify 3.4.13. The published advisory identifies versions `>=3.4.13 <3.4.16` as affected by an XSS issue and recommends 3.4.16 or later. See [Snyk advisory](https://security.snyk.io/vuln/SNYK-JS-DOMPURIFY-20361471) and [DOMPurify 3.4.16 release](https://github.com/cure53/DOMPurify/releases/tag/3.4.16).
 - **Fix:** updated the UI dependency to `dompurify@3.4.16` and updated both corresponding Bun lockfile records, including the registry tarball integrity hash.
 - **Direct commits on main:** manifest `6f4f789261610903e0b0d2ed849675c4b7a8f692`; lockfile `d40d1b312a9d9a6e08467feb7da1637db5776d04`.
-- **Validation:** manifest and lockfile now agree on 3.4.16 and the published integrity value; package installation, lockfile regeneration, UI tests and full CI have not yet been run in this runtime.
+- **Validation:** Bun dependency setup succeeded; unit tests passed on the lockfile-updated code head, typecheck passed, and the monorepo build step succeeded. CodeQL was still in progress; no separate lockfile-regeneration command was run.
 - **Status:** security update committed; automated validation pending.
 
 
@@ -240,7 +240,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 
 - **Evidence:** the archive-byte regression test used `.invalid` as its mocked registry hostname. The new remote URL policy correctly rejects `.invalid` before the mocked fetch runs, so the test received no skill directory.
 - **Fix:** changed the fixture to use the publicly resolvable `example.com` hostname while continuing to mock all HTTP responses. GitHub Actions on commit `b4acb0869937355b654cd8b7d1bb07654349bc61` reported unit tests and typecheck successful.
-- **Current validation state:** subsequent ledger fixes were pushed after that passing run; verify the newest main commit before marking the full set green.
+- **Current validation state:** unit tests and typecheck/build steps subsequently passed on code head `3d42bd27`; CodeQL remained in progress. The latest `main` commit after that is documentation-only.
 
 ## Additional branch disposition audit — 2026-10-12
 
@@ -269,7 +269,7 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Evidence:** `packages/console/core/package.json` and `bun.lock` resolved `mysql2@3.14.4`. The driver was affected by the authentication downgrade/plaintext credential disclosure fixed in 3.22.0, and the later compressed-protocol unbounded-inflate DoS affected versions through 3.23.0. References: [GHSA-3f6p-5ww8-9rcr](https://advisories.gitlab.com/npm/mysql2/GHSA-3f6p-5ww8-9rcr/) and [GHSA-rgwj-5xj2-c3m3](https://github.com/advisories/GHSA-rgwj-5xj2-c3m3).
 - **Fix:** updated the direct dependency and matching Bun lockfile records to `mysql2@3.23.1`, the first release in the inspected advisory range that includes both fixes. The compatible dependency ranges resolve to package versions already represented in the lockfile.
 - **Direct commits on main:** manifest `1ef50d6b46a7badc2a79c5ba2db858eb3eb3581f`; lockfile `1868a66688302ff328b1cc62bce3203d8eb2ceb7`.
-- **Validation:** verify the new lockfile with Bun's frozen-lockfile install and wait for latest-main build/test/typecheck. These checks are not yet confirmed on this commit.
+- **Validation:** Bun setup succeeded; unit tests passed on lockfile commit `1868a66688302ff328b1cc62bce3203d8eb2ceb7` (run `38239527739`), typecheck passed on that commit (run `38239527726`), and the monorepo build step succeeded on its child code head `3d42bd27d161f0260fc0d7505d2c2b9aa30a46d5` (run `38239543376`). CodeQL remained in progress.
 
 ### Dependency branch disposition update
 
