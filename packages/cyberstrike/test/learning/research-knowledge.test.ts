@@ -12,6 +12,7 @@ test("shared research retrieval uses signal tags and excludes target-specific re
   await Instance.provide({
     directory: dir.path,
     fn: async () => {
+      const marker = crypto.randomUUID()
       const shared = ReportKnowledge.ingestExternalDetailed({
         title: "JavaScript source map reveals API endpoints",
         severity: "medium",
