@@ -141,15 +141,17 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const args = splitTopLevelArguments(source.slice(open + 1, close))
     const isXHR = callee.endsWith(".open")
     const axiosMethod = callee.startsWith("axios.") && !callee.endsWith(".request") ? callee.slice(6).toUpperCase() : null
-    const urlExpression = isXHR ? args[1] ?? "" : callee === "axios.request" ? firstLiteral(args[0] ?? "") ?? "" : args[0] ?? ""
-    const literalMatch = urlExpression.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
+    const urlExpression = isXHR ? args[1] ?? "" : args[0] ?? ""
+    const literalMatch = callee === "axios.request"
+      ? (args[0] ?? "").match(/\burl\s*:\s*["'\x60]([^"'\x60]{1,2048})["'\x60]/)
+      : urlExpression.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
     if (!literalMatch) continue
     const endpoint = normalizeEndpoint(literalMatch[1]!)
     if (!endpoint) continue
     const options = isXHR ? "" : callee === "axios.request" ? args[0] ?? "" : callee.startsWith("axios.") ? args.slice(2).join(",") : args.slice(1).join(",")
     const optionText = options + "\n" + source.slice(index, Math.min(close + 1, index + 7000))
     const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
-    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? firstLiteral(args[0] ?? "") : undefined) ?? "").toUpperCase() || null
+    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : undefined) ?? "").toUpperCase() || null
     const headers = [
       ...Array.from(optionText.matchAll(/\bheaders\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1]!)).flat(),
       ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
