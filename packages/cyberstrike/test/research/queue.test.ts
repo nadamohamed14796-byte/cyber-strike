@@ -35,7 +35,7 @@ test("research queue only accepts completion from the current lease owner", asyn
     directory: dir.path,
     fn: async () => {
       const item = ResearchQueue.enqueue({ sourceID: "test", sourceURL: "https://research.example.test/one" })
-      const claim = ResearchQueue.claimNext("worker-a")
+      const claim = ResearchQueue.claimNext("worker-a", "test")
       expect(claim?.sequence).toBe(item.sequence)
       const leaseOwner = claim?.lease_owner
       expect(leaseOwner?.startsWith("worker-a:")).toBe(true)
@@ -62,7 +62,7 @@ test("research queue reclaims legacy studying rows with no lease expiry", async 
           .run(),
       )
 
-      const reclaimed = ResearchQueue.claimNext("recovery-worker")
+      const reclaimed = ResearchQueue.claimNext("recovery-worker", "test")
       expect(reclaimed?.sequence).toBe(item.sequence)
       expect(reclaimed?.lease_owner?.startsWith("recovery-worker:")).toBe(true)
       expect(reclaimed?.lease_until).toBeGreaterThan(Date.now())
@@ -77,7 +77,7 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
     directory: dir.path,
     fn: async () => {
       const item = ResearchQueue.enqueue({ sourceID: "test", sourceURL: "https://research.example.test/stale-worker" })
-      const firstClaim = ResearchQueue.claimNext("same-worker")
+      const firstClaim = ResearchQueue.claimNext("same-worker", "test")
       expect(firstClaim?.sequence).toBe(item.sequence)
       const firstLease = firstClaim?.lease_owner
       expect(firstLease?.startsWith("same-worker:")).toBe(true)
@@ -89,7 +89,7 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
           .where(eq(ResearchQueueTable.sequence, item.sequence))
           .run(),
       )
-      const reclaimed = ResearchQueue.claimNext("same-worker")
+      const reclaimed = ResearchQueue.claimNext("same-worker", "test")
       expect(reclaimed?.sequence).toBe(item.sequence)
       const reclaimedLease = reclaimed?.lease_owner
       expect(reclaimedLease?.startsWith("same-worker:")).toBe(true)
@@ -120,10 +120,10 @@ test("research queue records auth-blocked work and only retries it explicitly", 
       })
       expect(blocked?.status).toBe("blocked_auth")
       expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.last_error).toBe("HTTP 401")
-      expect(ResearchQueue.claimNext("worker-auth")).toBeNull()
+      expect(ResearchQueue.claimNext("worker-auth", "test-auth")).toBeNull()
       expect(ResearchQueue.retryAuthenticationBlocked(10, "test-auth")).toBe(1)
       expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.status).toBe("queued")
-      const claimed = ResearchQueue.claimNext("worker-auth")
+      const claimed = ResearchQueue.claimNext("worker-auth", "test-auth")
       expect(claimed?.status).toBe("studying")
       expect(claimed?.attempts).toBe(1)
       ResearchQueue.complete(claimed!.sequence, claimed!.lease_owner, "blocked_auth", "HTTP 401")
