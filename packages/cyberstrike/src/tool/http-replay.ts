@@ -337,7 +337,7 @@ function resultFacts(result: ReplayResponse.Result) {
     status: result.response?.status ?? null,
     response_bytes: result.response?.body.length ?? null,
     duration_ms: Math.round(result.timing.totalMs ?? 0),
-    send_error: result.error ? (result.error.name || "send-error") : null,
+    send_error: result.error ? result.error.kind : null,
   }
 }
 function mutationLabels(mutations?: ReplayNoteMutation[]) {
