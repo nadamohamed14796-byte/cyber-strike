@@ -6,6 +6,7 @@ import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { redactTargetNoteLine, redactTargetNoteSecrets } from "./redact"
 import { targetWorkspaceOwnerKey } from "./project-key"
+import { checkMatch } from "./scope-match"
 import { Instance } from "../project/instance"
 import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
@@ -674,6 +675,69 @@ export namespace TargetMemory {
     }
     await writeWorkspaceFile(workspace, "scope/scope.json", JSON.stringify(scope, null, 2) + "\n")
     return { workspace, scope }
+  }
+
+  /**
+   * Authorize a concrete URL against the most specific target workspace and its
+   * persisted scope. Missing, ambiguous, unconfigured, or excluded targets fail closed.
+   */
+  export async function checkURLScope(candidateURL: string): Promise<{
+    allowed: boolean
+    reason: string
+    workspace?: Workspace
+    scope?: TargetScope
+    includeMatches: string[]
+    excludeMatches: string[]
+  }> {
+    let candidate: URL
+    try {
+      candidate = new URL(candidateURL)
+    } catch {
+      return { allowed: false, reason: "invalid URL", includeMatches: [], excludeMatches: [] }
+    }
+    if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) {
+      return { allowed: false, reason: "only credential-free HTTP(S) URLs are eligible", includeMatches: [], excludeMatches: [] }
+    }
+
+    const candidates = list().map((workspace) => {
+      const base = new URL(workspace.targetURL)
+      const basePath = base.pathname.replace(/\/+$/, "") || "/"
+      const candidatePath = candidate.pathname.replace(/\/+$/, "") || "/"
+      const pathMatches = basePath === "/" || candidatePath === basePath || candidatePath.startsWith(basePath + "/")
+      const originClassMatches = base.protocol === candidate.protocol && base.port === candidate.port
+      return {
+        workspace,
+        base,
+        pathMatches,
+        originClassMatches,
+        exactHost: base.hostname === candidate.hostname,
+        pathScore: basePath === "/" ? 0 : basePath.length,
+      }
+    }).filter((item) => item.pathMatches && item.originClassMatches)
+      .sort((a, b) => Number(b.exactHost) - Number(a.exactHost) || b.pathScore - a.pathScore)
+
+    const selected = candidates[0]
+    if (!selected) {
+      return { allowed: false, reason: "no target workspace matches the URL's protocol, port, and path boundary", includeMatches: [], excludeMatches: [] }
+    }
+    if (candidates.length > 1 && Number(candidates[0].exactHost) === Number(candidates[1].exactHost) &&
+      candidates[0].pathScore === candidates[1].pathScore) {
+      return { allowed: false, reason: "multiple equally specific target workspaces match; refusing ambiguous scope", includeMatches: [], excludeMatches: [] }
+    }
+
+    const scope = await getScope(selected.workspace.targetURL)
+    if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
+      return { allowed: false, reason: "the most specific target workspace has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
+    }
+    const includeMatches = scope.scopeItems.filter((item) => checkMatch(candidate.href, item).matches)
+    const excludeMatches = scope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+    if (excludeMatches.length) {
+      return { allowed: false, reason: "URL matches explicit scope exclusion: " + excludeMatches.join(", "), workspace: selected.workspace, scope, includeMatches, excludeMatches }
+    }
+    if (!includeMatches.length) {
+      return { allowed: false, reason: "URL does not match any persisted in-scope item", workspace: selected.workspace, scope, includeMatches, excludeMatches }
+    }
+    return { allowed: true, reason: "URL matches the persisted scope and target workspace boundary", workspace: selected.workspace, scope, includeMatches, excludeMatches }
   }
 
   /**
