@@ -29,7 +29,7 @@ const HackBrowserParameters = z.object({
       .string()
       .url()
       .describe(
-        "Target URL to crawl. Used both as the start of navigation and as the basis for the auto-derived network scope (*.{eTLD+1}).",
+        "Target URL to crawl. Used both as the start of navigation and as the basis for the network scope from the persisted target authorization manifest.",
       ),
     credentials: z
       .array(z.string())
@@ -48,7 +48,7 @@ const HackBrowserParameters = z.object({
       .array(z.string())
       .optional()
       .describe(
-        'Optional network scope override. Hostname patterns ("*.example.com") that bound which requests get captured. Replaces the auto-derived default.',
+        'Optional narrowing scope. Every entry must exactly match a persisted authorized scope entry; this option can never expand the target's saved authorization.',
       ),
     exclude: z
       .array(z.string())
@@ -76,6 +76,51 @@ export const HackbrowserTool = Tool.define<typeof HackBrowserParameters, Tool.Me
       return { title: "Conflicting authentication options", output: "Use either auth_profile_id for a saved login or credentials for manual identity-tagged login, not both.", metadata: { started: false, reason: "conflicting_auth" } }
     }
 
+    // The persisted scope is authoritative. Never launch a crawler from a target
+    // whose workspace is missing, ambiguous, unconfigured, or excluded.
+    const authorization = await TargetMemory.checkURLScope(args.target)
+    if (!authorization.allowed || !authorization.scope || !authorization.workspace) {
+      return {
+        title: "Hackbrowser refused — target scope is not authorized",
+        output: [
+          "No browser crawl was started.",
+          "Target: " + args.target,
+          "Reason: " + authorization.reason,
+          "Create/open the target workspace and configure its official scope first:",
+          "  cyberstrike target init <url>",
+          "  cyberstrike target scope <url> --include <domain> --source <program> --reference <official-https-url>",
+        ].join("\n"),
+        metadata: { started: false, reason: "scope_denied" },
+      }
+    }
+    const persistedScope = authorization.scope
+    if (args.scope?.some((entry) => !persistedScope.scopeItems.includes(entry.trim().toLowerCase()))) {
+      return {
+        title: "Hackbrowser refused — scope override exceeds authorization",
+        output: "The requested crawler scope is not an exact subset of the persisted authorization entries. Update the target scope explicitly instead of widening it in a tool call.",
+        metadata: { started: false, reason: "scope_override_denied" },
+      }
+    }
+    if (persistedScope.scopeItems.some((entry) => entry.startsWith("*.")) && persistedScope.excludedItems.length > 0) {
+      return {
+        title: "Hackbrowser refused — crawler cannot enforce this exclusion safely",
+        output: "This crawler cannot reliably apply explicit excluded hostnames inside a wildcard scope. Narrow the persisted include list to explicit hosts or remove the wildcard only after reviewing the official program policy.",
+        metadata: { started: false, reason: "scope_exclusion_not_enforceable" },
+      }
+    }
+    const targetHostname = new URL(args.target).hostname
+    const crawlerScope = persistedScope.scopeItems.filter((entry) => !entry.includes("/"))
+    if (persistedScope.scopeItems.some((entry) => entry.includes("/")) && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(targetHostname)) {
+      crawlerScope.push(targetHostname)
+    }
+    if (!crawlerScope.length) {
+      return {
+        title: "Hackbrowser refused — scope cannot be represented by crawler",
+        output: "The configured scope does not contain a hostname pattern the browser crawler can enforce safely.",
+        metadata: { started: false, reason: "unsupported_crawler_scope" },
+      }
+    }
+
     // Permission gate — opening a browser + outbound network is high-risk;
     // require explicit consent. Pattern is the target URL so the user can
     // grant blanket permission for a host on first use.
@@ -83,7 +128,7 @@ export const HackbrowserTool = Tool.define<typeof HackBrowserParameters, Tool.Me
       permission: "hackbrowser",
       patterns: [args.target],
       always: [args.target],
-      metadata: { scope: args.scope, exclude: args.exclude },
+      metadata: { scope: crawlerScope, exclude: args.exclude, targetWorkspaceID: authorization.workspace.id },
     })
 
     let savedLogin: { username: string; password: string; origin: string; useGmailOtp?: boolean } | undefined
@@ -116,7 +161,7 @@ export const HackbrowserTool = Tool.define<typeof HackBrowserParameters, Tool.Me
     const kickOff = await launchHackbrowser({
       target: args.target,
       sessionID: ctx.sessionID,
-      scope: args.scope,
+      scope: crawlerScope,
       exclude: args.exclude,
       credentials: args.credentials,
       savedLogin,
