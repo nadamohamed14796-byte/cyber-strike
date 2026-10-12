@@ -252,3 +252,43 @@ test("does not allow one variation to count twice under different strategy label
   attempts[1] = { ...attempts[1]!, strategy: "other", variation: attempts[0]!.variation }
   expect(() => assessFindingChecks(checks, attempts)).toThrow("Duplicate validation attempt variation")
 })
+
+
+test("accumulates 20 distinct attempts across separate validation calls before false-positive classification", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      const finding = Vulnerability.add({
+        sessionID: session.id,
+        data: { severity: "medium", title: "Candidate authorization finding", description: "Candidate", endpoint: "GET /api/items/{id}", status: "approved" },
+      })
+      const checks = checklist({
+        reproducible: { status: "fail", reason: "Controlled tests did not reproduce the claim", evidence: "Observed response matched the owner-authorized baseline" },
+        unexpected_behavior: { status: "fail", reason: "Observed behavior matched intended access control", evidence: "Owner and non-owner control responses exposed no unauthorized data" },
+      })
+      const first = await FindingValidation.record({
+        sessionID: session.id,
+        vulnerabilityID: finding.id,
+        checks,
+        attempts: makeAttempts(10),
+      })
+      expect(first.verdict).toBe("inconclusive")
+      expect(first.attemptCount).toBe(10)
+      const nextAttempts = makeAttempts(10).map((attempt, index) => ({
+        ...attempt,
+        variation: "second-batch-variation-" + (index + 1),
+      }))
+      const second = await FindingValidation.record({
+        sessionID: session.id,
+        vulnerabilityID: finding.id,
+        checks,
+        attempts: nextAttempts,
+      })
+      expect(second.attemptCount).toBe(20)
+      expect(second.verdict).toBe("false_positive")
+      await Session.remove(session.id)
+    },
+  })
+})
