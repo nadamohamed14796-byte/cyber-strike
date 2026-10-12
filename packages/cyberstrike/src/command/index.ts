@@ -54,6 +54,7 @@ export namespace Command {
   export const Default = {
     INIT: "init",
     REVIEW: "review",
+    UPDATE: "update",
   } as const
 
   const state = Instance.state(async () => {
@@ -78,6 +79,20 @@ export namespace Command {
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      },
+      [Default.UPDATE]: {
+        name: Default.UPDATE,
+        description: "sync and study queued public security research before hunting",
+        source: "command",
+        template: [
+          "Run the CyberStrike research update workflow in the current environment.",
+          "First run cyberstrike research queue-stats and cyberstrike research stats to record the starting state.",
+          "Run cyberstrike update --pages 1000 --depth 4 --limit 500 to discover and study a large batch of public research.",
+          "Then inspect queue stats. If queued or retry items remain, repeat bounded update cycles while each cycle makes progress; stop and report authentication blockers or repeated failures rather than looping forever.",
+          "Use cyberstrike research queue-pending to inspect remaining items and report what was learned, skipped, blocked, or failed.",
+          "Treat writeups and extracted knowledge only as hypotheses/methodology. Never claim a vulnerability exists or is confirmed without target-specific evidence and validation.",
+        ].join("\n"),
+        hints: [],
       },
     }
 
