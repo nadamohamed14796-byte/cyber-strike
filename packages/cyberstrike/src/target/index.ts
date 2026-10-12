@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { redactTargetNoteLine, redactTargetNoteSecrets } from "./redact"
+import { targetWorkspaceOwnerKey } from "./project-key"
 import { Instance } from "../project/instance"
 import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
@@ -71,6 +72,10 @@ export interface TargetNote {
 
 function projectRoot(): string {
   return Instance.worktree === "/" ? Instance.directory : Instance.worktree
+}
+
+function currentOwnerKey(): string {
+  return targetWorkspaceOwnerKey(Instance.project.id, projectRoot())
 }
 
 function normalizedSourceURL(input?: string): string | undefined {
@@ -286,6 +291,7 @@ export namespace TargetMemory {
   export async function ensure(input: string): Promise<Workspace> {
     const normalized = normalizeTarget(input)
     const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     const relativePath = path.join(".cyberstrike", "targets", normalized.slug)
     const now = Date.now()
 
@@ -293,7 +299,11 @@ export namespace TargetMemory {
       const existing = db
         .select()
         .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.target_key, normalized.targetKey)))
+        .where(and(
+          eq(TargetWorkspaceTable.project_id, projectID),
+          eq(TargetWorkspaceTable.owner_key, ownerKey),
+          eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+        ))
         .get()
       if (existing) return existing
 
@@ -315,7 +325,11 @@ export namespace TargetMemory {
       const insertedOrRaced = db
         .select()
         .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.target_key, normalized.targetKey)))
+        .where(and(
+          eq(TargetWorkspaceTable.project_id, projectID),
+          eq(TargetWorkspaceTable.owner_key, ownerKey),
+          eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+        ))
         .get()
       if (!insertedOrRaced) throw new Error("Target workspace could not be persisted.")
       return insertedOrRaced
@@ -330,11 +344,12 @@ export namespace TargetMemory {
 
   export function list(): Workspace[] {
     const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     return Database.use((db) =>
       db
         .select()
         .from(TargetWorkspaceTable)
-        .where(eq(TargetWorkspaceTable.project_id, projectID))
+        .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
         .orderBy(desc(TargetWorkspaceTable.time_updated))
         .all()
         .map((row) => {
@@ -361,11 +376,12 @@ export namespace TargetMemory {
     }
 
     const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     const workspace = Database.use((db) =>
       db
         .select({ targetURL: TargetWorkspaceTable.target_url })
         .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.id, targetID), eq(TargetWorkspaceTable.project_id, projectID)))
+        .where(and(eq(TargetWorkspaceTable.id, targetID), eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
         .get(),
     )
     if (!workspace) return false
@@ -380,11 +396,16 @@ export namespace TargetMemory {
   export async function get(input: string): Promise<Workspace | null> {
     const normalized = normalizeTarget(input)
     const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     const row = Database.use((db) =>
       db
         .select()
         .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.target_key, normalized.targetKey)))
+        .where(and(
+          eq(TargetWorkspaceTable.project_id, projectID),
+          eq(TargetWorkspaceTable.owner_key, ownerKey),
+          eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+        ))
         .get(),
     )
     if (!row) return null
@@ -396,12 +417,13 @@ export namespace TargetMemory {
   /** Ensure a target ID belongs to the currently active project before reading its notes. */
   function targetIsInCurrentProject(targetID: string): boolean {
     const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     return Boolean(
       Database.use((db) =>
         db
           .select({ id: TargetWorkspaceTable.id })
           .from(TargetWorkspaceTable)
-          .where(and(eq(TargetWorkspaceTable.id, targetID), eq(TargetWorkspaceTable.project_id, projectID)))
+          .where(and(eq(TargetWorkspaceTable.id, targetID), eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
           .get(),
       ),
     )
@@ -549,12 +571,13 @@ export namespace TargetMemory {
    */
   export async function writeWorkspaceFile(workspace: Workspace, relativeFilePath: string, content: string): Promise<string> {
     const activeProjectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     const normalizedTarget = normalizeTarget(workspace.targetURL)
     const workspaceRecord = Database.use((db) =>
       db
         .select({ targetKey: TargetWorkspaceTable.target_key })
         .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.id, workspace.id), eq(TargetWorkspaceTable.project_id, activeProjectID)))
+        .where(and(eq(TargetWorkspaceTable.id, workspace.id), eq(TargetWorkspaceTable.project_id, activeProjectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
         .get(),
     )
     const expectedRelativePath = path.join(".cyberstrike", "targets", normalizedTarget.slug)
@@ -690,6 +713,7 @@ export namespace TargetMemory {
    */
   export function contextForSession(sessionID: string, maxNotes = 8): string | null {
     const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
     const rootSessionExists = Database.use((db) =>
       db
         .select({ id: SessionTable.id })
@@ -741,7 +765,7 @@ export namespace TargetMemory {
       db
         .select()
         .from(TargetWorkspaceTable)
-        .where(eq(TargetWorkspaceTable.project_id, projectID))
+        .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
         .all(),
     )
 
