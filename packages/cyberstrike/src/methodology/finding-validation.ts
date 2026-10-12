@@ -70,8 +70,9 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
   const attemptKeys = new Set<string>()
   for (const attempt of attempts) {
     const strategy = String(attempt.strategy).trim()
+    const checkID = String(attempt.checkID).trim()
     const variation = String(attempt.variation).trim().toLowerCase()
-    if (!strategy || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
+    if (!strategy || !checkID || !FINDING_VALIDATION_CHECKS.some((check) => check.id === checkID) || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
       throw new Error("Every validation attempt requires a strategy, unique variation, hypothesis, and concrete observed evidence.")
     }
     if (variation.length > 160 || attempt.hypothesis.length > 800 || attempt.evidence.length > 2000) {
@@ -113,8 +114,10 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     (check) => CONTRADICTION_CHECKS.has(check.id) && Boolean(check.reason && check.evidence),
   )
   const hasPrimaryContradiction = contradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
+  const attemptContradictions = attempts.filter((attempt) => attempt.outcome === "contradicts")
+  const attemptPrimaryContradiction = attemptContradictions.some((attempt) => PRIMARY_CONTRADICTION_CHECKS.has(attempt.checkID))
   const enoughDistinctAttempts = attempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
-  const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction
+  const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction && attemptContradictions.length >= 2 && attemptPrimaryContradiction
 
   const requiredPasses = [
     "reproducible",
