@@ -321,6 +321,8 @@ Never use destructive payloads, poison high-traffic shared URLs, or trigger repe
 
 ## References
 
+- [uphiago/recon-skills — recon/cache-attack](https://github.com/uphiago/recon-skills/blob/main/recon/cache-attack/SKILL.md) — merged cache discovery source.
+
 - [uphiago/recon-skills — cache attack methodology](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-cache-poison/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 - [elementalsouls/Claude-BugHunter — cache poisoning methodology](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-cache-poison/SKILL.md) (external research reference; not a local Cyber Strike skill path).
 
