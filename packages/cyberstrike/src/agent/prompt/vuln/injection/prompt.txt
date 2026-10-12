@@ -545,3 +545,6 @@ poc: Exact request and response showing exploitation
 6. **Check for WAF/filters** - if blocked, note in findings
 7. **Use time-based tests carefully** - ensure delays are from injection, not network latency
 8. **Test authenticated and unauthenticated** - use session credentials when available
+
+### Verification verdict override — shared policy
+Apply the shared `verification_attempt` ledger rules from the common prompt even if a class-specific example suggests otherwise. One failed probe, blocked response, scanner candidate, or absent signal does not by itself prove the hypothesis false. Keep unresolved leads as INCONCLUSIVE / NEEDS REVIEW after 20 distinct evidence-driven attempts; do not silently discard them or mark coverage clean. A candidate that is not yet reportable as confirmed must still be preserved in the ledger for resumption.
