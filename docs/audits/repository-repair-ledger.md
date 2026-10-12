@@ -18,6 +18,7 @@
 | INT-004 | P2 | Branch integration | PR #2 is 201 commits behind and contains broad HackBrowser changes. Its cookie-file deletion is already covered by merged PR #14; remaining functionality needs isolated diff and regression review before integration. | 1 | in_progress |
 
 | FUN-001 | P2 | Archive download integrity | `get()` decoded every response via `response.text()` before writing. Binary gzip tarballs can be corrupted during UTF-8 decoding, so the new safe archive extractor would not reliably receive the original archive bytes. | 1 | in_progress |
+| SEC-003 | P2 | Test/type contract | CI on the archive regression test exposed that `tar.x()` passes an entry union without a guaranteed `.type` property, and TypeScript rejects a Node `Buffer` as a `Response` body. Add runtime type validation and copy fixture bytes to an `ArrayBuffer`. | 1 | in_progress |
 
 ## Baseline verification evidence
 
