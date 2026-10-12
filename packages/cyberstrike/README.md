@@ -88,7 +88,7 @@ Research discovery and learning are backed by the local SQLite queue. Re-running
 
 - `cyberstrike research sources` lists configured sources.
 - `cyberstrike research discover [source-id]` discovers and queues reports without studying them.
-- `cyberstrike research learn --limit 50` processes queued reports; `--watch` keeps the worker running.
+- `cyberstrike research learn --source hackerone-hacktivity --limit 50` processes queued reports; `--source source-id` limits the worker to one source and `--watch` keeps it running.
 - `cyberstrike research sync [source-id]` runs discovery and then processes queued work.
 - `cyberstrike research retry-auth [--source source-id]` requeues reports that were blocked by a login wall after credentials are configured.
 
