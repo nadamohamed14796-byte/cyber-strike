@@ -9,7 +9,7 @@ Before testing:
 
 ## Starting Point: Discovery
 
-When given a target URL with no captured traffic yet, start with **hackbrowser** to crawl and collect endpoints. Once JavaScript responses/endpoint captures are available, run **correlate_javascript** for the authorized target before detailed tests, then use **web_recon** for deterministic post-crawl checks. Re-run correlation when new JavaScript responses arrive; it is safe to rerun and does not execute scripts or make network requests.
+When given a target URL with no captured traffic yet, start with **hackbrowser** to crawl and collect endpoints. The crawler is asynchronous; use **web_get_session_context** to inspect the current session for completed captures rather than launching it again just to wait. After JavaScript responses and endpoint captures are available, run **correlate_javascript** for the same authorized target, then use **web_recon** for deterministic post-crawl checks. Re-run correlation only when new JavaScript captures arrive; it does not download or execute scripts.
 
 ### hackbrowser tool
 
@@ -39,7 +39,7 @@ Run after hackbrowser has produced JavaScript response captures, before detailed
 
 ### web_recon tool — post-crawl vulnerability testing
 
-Run AFTER hackbrowser to test all collected endpoints for common vulnerabilities. Reads captured requests from the session and runs deterministic HTTP checks — no browser needed.
+Run after hackbrowser has produced usable captures and after JavaScript correlation when JavaScript responses are present. It reads captured requests from the session and runs deterministic HTTP checks — no browser needed.
 
 **Primary program: `session_scan`** (no target needed)
 - Fingerprints technology stack per origin (tech_detect)
@@ -62,12 +62,13 @@ Run AFTER hackbrowser to test all collected endpoints for common vulnerabilities
 - `sitemap_scan`, `robots_scan`, `openapi_scan`, `graphql_probe` — discovery
 
 **Typical flow:**
-1. `hackbrowser target="https://target.com"` — crawl to discover endpoints
-2. `correlate_javascript target_url="https://target.com"` — review captured JS and correlate function/request shapes
-3. `web_recon program="session_scan"` — test all collected endpoints for common issues
-3. Review captured traffic, identify auth-protected areas
-4. `hackbrowser target="https://target.com" credentials=["user1","admin1"]` — role-based crawl (user present)
-5. Run targeted testing on captured requests
+1. `hackbrowser target="https://target.com"` — crawl to discover endpoints; it returns asynchronously.
+2. Use `web_get_session_context` to confirm relevant captures have arrived. Do not relaunch the crawl just to wait.
+3. `correlate_javascript target_url="https://target.com"` — analyze captured JS and correlate function/request shapes.
+4. `web_recon program="session_scan"` — run deterministic checks over collected traffic.
+5. Review captured traffic and target-memory notes; identify auth-protected areas and prioritize endpoint-specific tests.
+6. When a human is present for manual login, run `hackbrowser target="https://target.com" credentials=["user1","admin1"]` for role-based captures, then rerun correlation only if new JS responses were observed.
+7. Run targeted testing on captured requests; treat all static candidates and response differences as leads until independently verified.
 
 ## Testing Workflow
 
