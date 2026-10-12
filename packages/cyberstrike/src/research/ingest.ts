@@ -146,8 +146,11 @@ export function sourceRelevance(url: string, title: string, text: string, source
   const included = source.includeTerms?.filter((term) => matchesTerm(haystack, term)).length ?? 0
   const pathBoost = source.includePaths?.some((value) => path.includes(value.toLowerCase())) ? 25 : 0
 
-  // Sources without a policy keep the generic crawler behaviour.
-  if (!source.includeTerms?.length) return { accepted: true, score: pathBoost }
+  // Sources without include terms keep generic relevance, but explicit exclusions
+  // remain policy: never let this early return bypass an exclusion-only source config.
+  if (!source.includeTerms?.length) {
+    return { accepted: excluded === 0, score: pathBoost - excluded * 20 }
+  }
 
   // For noisy sources such as Medium, require real security relevance.
   // A title/path hit alone is not enough unless it is a highly specific vuln term.
