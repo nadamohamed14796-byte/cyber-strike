@@ -43,23 +43,25 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
     const sessionID = Session.root(ctx.sessionID)
     if (params.action === "status") {
       const attempts = VerificationLedger.list({ sessionID, hypothesisKey: params.hypothesis_key })
+      const uniqueAttempts = Policy.uniqueAttempts(attempts)
+      const attemptsUsed = uniqueAttempts.filter((attempt) => attempt.validConditions).length
       const last = attempts[attempts.length - 1]
       const outcome = last?.outcome ?? "inconclusive"
       const lines = attempts.map((a, i) =>
         `${i + 1}. [${a.strategyID} / ${a.variantKey}] valid=${a.validConditions} — why: ${a.rationale} — result: ${a.resultSummary}${a.evidenceRef ? ` (evidence: ${a.evidenceRef})` : ""}`,
       )
       return {
-        title: `Verification: ${attempts.length}/${Policy.MAX_ATTEMPTS} — ${outcome.toUpperCase()}`,
+        title: `Verification: ${attemptsUsed}/${Policy.MAX_ATTEMPTS} valid attempts — ${outcome.toUpperCase()}`,
         output: attempts.length
-          ? `Hypothesis: ${params.hypothesis_key}\nOutcome: ${outcome}\nAttempts: ${attempts.length}/${Policy.MAX_ATTEMPTS}\n${lines.join("\n")}${attempts.length >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nBudget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
+          ? `Hypothesis: ${params.hypothesis_key}\nOutcome: ${outcome}\nValid attempts used: ${attemptsUsed}/${Policy.MAX_ATTEMPTS}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}${attemptsUsed >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nValid-attempt budget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
           : `No verification attempts recorded for hypothesis ${params.hypothesis_key}.`,
         metadata: {
           hypothesisKey: params.hypothesis_key,
-          attemptsUsed: attempts.length,
+          attemptsUsed,
           maxAttempts: Policy.MAX_ATTEMPTS,
           outcome,
-          remainingAttempts: Math.max(0, Policy.MAX_ATTEMPTS - attempts.length),
-          canContinue: outcome === "inconclusive" && attempts.length < Policy.MAX_ATTEMPTS,
+          remainingAttempts: Math.max(0, Policy.MAX_ATTEMPTS - attemptsUsed),
+          canContinue: outcome === "inconclusive" && attemptsUsed < Policy.MAX_ATTEMPTS,
           duplicate: false,
         },
       }
