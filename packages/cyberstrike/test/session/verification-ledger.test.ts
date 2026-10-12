@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { Database, and, eq } from "../../src/storage/db"
+import { VerificationAttemptTable } from "../../src/methodology/methodology.sql"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { VerificationLedger } from "../../src/session/verification-ledger"
@@ -47,6 +49,43 @@ describe("VerificationLedger terminal outcomes", () => {
           if (i < 19) expect(result.decision.outcome).toBe("inconclusive")
           else expect(result.decision.outcome).toBe("disproven")
         }
+        await Instance.dispose()
+      },
+    })
+  })
+
+  test("legacy disproven verdicts with fewer than 20 valid attempts are downgraded and resumable", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.createNext({ directory: tmp.path, title: "verification-ledger-legacy-disproof-test" })
+        const common = {
+          sessionID: session.id,
+          hypothesisKey: "legacy-disproven-hypothesis",
+          asset: "https://example.test",
+          endpoint: "/api/profile",
+          vulnerabilityClass: "idor",
+        }
+        VerificationLedger.record({
+          ...common,
+          attempt: attempt("legacy-single-check", "evidence://old-disproof"),
+        })
+        Database.use((db) => db.update(VerificationAttemptTable).set({
+          outcome: "disproven",
+        }).where(and(
+          eq(VerificationAttemptTable.session_id, session.id),
+          eq(VerificationAttemptTable.hypothesis_key, common.hypothesisKey),
+        )).run())
+
+        const resumed = VerificationLedger.record({
+          ...common,
+          attempt: attempt("new-valid-check"),
+        })
+        expect(resumed.decision.outcome).toBe("inconclusive")
+        expect(resumed.decision.attemptsUsed).toBe(2)
+        expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
+          .every((item) => item.outcome === "inconclusive")).toBe(true)
         await Instance.dispose()
       },
     })
