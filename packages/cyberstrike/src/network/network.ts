@@ -52,7 +52,7 @@ export namespace Network {
     let url: URL
     try { url = new URL(value) } catch { throw new Error("network.proxy.url must be a valid HTTP(S) proxy URL.") }
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("network.proxy.url must use http:// or https://. SOCKS proxies are not supported for replay requests.")
+      throw new Error("network.proxy.url must use HTTP(S) (http:// or https://). SOCKS proxies are not supported for replay requests.")
     }
     if (!url.hostname || (url.pathname !== "/" && url.pathname !== "")) {
       throw new Error("network.proxy.url must be a proxy origin without a path.")
@@ -71,9 +71,10 @@ export namespace Network {
     const parsed = parseProxy(value, username, password)
     if (!parsed.username && !parsed.password) return parsed.url
     const result = new URL(parsed.url)
-    // URL setters encode credentials themselves; pre-encoding would double-encode '%'.
-    if (parsed.username) result.username = parsed.username
-    if (parsed.password) result.password = parsed.password
+    // URL setters encode spaces and reserved characters, but leave literal percent signs
+    // untouched. Encode those first so a credential containing '%' round-trips exactly once.
+    if (parsed.username) result.username = parsed.username.replace(/%/g, "%25")
+    if (parsed.password) result.password = parsed.password.replace(/%/g, "%25")
     return result.toString()
   }
 
