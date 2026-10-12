@@ -150,6 +150,9 @@ Treat each proposed chain as a sequence of individually verified edges: componen
 
 ## References
 
+- [uphiago/recon-skills — WordPress REST authentication bypass](https://github.com/uphiago/recon-skills/blob/main/recon/wp-plugin-rest-auth-bypass/SKILL.md) — merged plugin/API access-control source.
+- [uphiago/recon-skills — XML-RPC testing](https://github.com/uphiago/recon-skills/blob/main/recon/xmlrpc-exploitation/SKILL.md) — merged WordPress protocol source.
+
 - [uphiago/recon-skills — wordpress-plugin-hunt](https://github.com/uphiago/recon-skills/tree/main/recon/wordpress-plugin-hunt)
 - [uphiago/recon-skills — wp-mass-recon](https://github.com/uphiago/recon-skills/tree/main/recon/wp-mass-recon)
 - [uphiago/recon-skills — wp-plugin-automation](https://github.com/uphiago/recon-skills/tree/main/redteam/wp-plugin-automation)
