@@ -126,3 +126,15 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Validation:** code and test added remotely; await CI on the final PR head. No local Bun execution was possible in this runtime.
 - **Scope note:** this tool communicates scope decisions; it does not replace independent authorization and network guards at execution boundaries.
 
+
+
+## Follow-up checkpoint — 2026-10-12: terminal verification verdict enforcement
+
+### INT-007 — P1: terminal verification outcomes could be reopened by another attempt
+
+- **Evidence:** `VerificationLedger.record()` rejected a post-verdict attempt only when its `decisiveResult` differed from the stored terminal outcome. A caller could submit another attempt with the same `confirmed`/`disproven` result and mutate the ledger after the hypothesis was supposed to be final.
+- **Fix:** centralized terminal-outcome detection in `VerificationAttempts.isTerminalOutcome()` and reject any further record operation for a hypothesis whose stored outcome is `confirmed` or `disproven`.
+- **Regression coverage:** added policy tests proving only `confirmed` and `disproven` are terminal; inconclusive and unrecorded outcomes remain non-terminal.
+- **Direct commits on main:** policy `bfb35b3dd2064e4c558b43228cf501e946170665`; test `7de88c567efa1a4fafb267aa8dab4ac937bcd8e3`; ledger enforcement `afc9422633ce9244e893566ffef7d2729ecc7659`.
+- **Validation:** source writes are committed to `main`; no local Bun runtime is available. GitHub Actions status must be checked on the resulting main head before this is marked verified.
+- **Status:** implemented; automated validation pending.
