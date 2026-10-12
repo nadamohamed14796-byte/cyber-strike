@@ -8,7 +8,7 @@ import { Session } from "../session"
 import { SessionTable, RequestTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
-import { analyzeJavaScriptSource, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint } from "./javascript-analysis"
+import { analyzeJavaScriptSource, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal } from "./javascript-analysis"
 
 function safeURL(input?: string | null): URL | undefined {
   if (!input?.trim()) return undefined
@@ -337,6 +337,7 @@ export interface JavaScriptCorrelationGraph {
     requestCandidates: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[]; recommendedChecks: string[] }>
     secretCandidates: Array<JavaScriptSecretCandidate & { sourceFile: string }>
     roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
+    riskSignals: Array<JavaScriptRiskSignal & { sourceFile: string }>
   }
   endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
@@ -616,6 +617,7 @@ export namespace JavaScriptCorrelation {
             ...(item.pathParameters.length ? ["Compare path parameter type/boundary values using controlled test data"] : []),
             ...(item.queryParameters.length ? ["Compare omitted and altered query parameters"] : []),
             ...(item.bodyParameters.length ? ["Compare required/optional body fields and expected types"] : []),
+            ...(file.analysis?.riskSignals?.some((signal) => signal.functionName === item.sourceFunction) ? ["Manually review static sink candidates in the associated function and confirm source-to-sink data flow"] : []),
             ...(item.authSignals.length || item.cookieSignals.length ? ["Compare authenticated and unauthenticated/session-cookie behavior using controlled accounts"] : ["Determine authentication requirements from captured requests and controlled account tests"]),
             "Check authorization with accounts that own only their own test data",
             "Manually confirm server-side validation; static JavaScript alone is not proof",
@@ -624,6 +626,7 @@ export namespace JavaScriptCorrelation {
         })).slice(0, 1500),
         secretCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
+        riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
       },
       endpointCandidates: [],
       evidence: relevantRequests
@@ -811,6 +814,7 @@ export namespace JavaScriptCorrelation {
       "- Structured request candidates: " + graph.javascriptAnalysis.requestCandidates.length,
       "- Secret-like assignments (values redacted): " + graph.javascriptAnalysis.secretCandidates.length,
       "- Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
+      "- Static JavaScript sink candidates (not confirmed findings): " + graph.javascriptAnalysis.riskSignals.length,
       "- Unique endpoint candidates: " + graph.endpointCandidates.length,
       "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
       "- Captured response evidence nodes: " + graph.evidence.length,
@@ -831,6 +835,9 @@ export namespace JavaScriptCorrelation {
       "",
       "## Secret-like assignments (redacted)",
       ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — fingerprint " + item.fingerprint) : ["No secret-like assignments matched the static heuristics."]),
+      "",
+      "## Static JavaScript risk-sink candidates (not confirmed findings)",
+      ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) => "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — function: " + (item.functionName ?? "unknown") + " — candidate only") : ["No configured static sink patterns matched."]),
       "",
       "## Role and hidden-feature hints",
       ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) => "- " + item.kind + " — " + item.value + " — " + item.sourceFile + ":" + item.line) : ["No role/feature hints matched the static heuristics."]),
