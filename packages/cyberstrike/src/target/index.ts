@@ -687,17 +687,20 @@ export namespace TargetMemory {
     )
   }
 
-  /** Exact host plus path-prefix matching for session observations; never fetches or authorizes a target. */
+  /** Exact HTTP(S) origin plus path-prefix matching for session observations; never fetches or authorizes a target. */
   export function targetObservationMatches(targetURL: string, observedURL: string): boolean {
     const target = normalizeTarget(targetURL)
     try {
       const raw = observedURL.trim()
-      const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : "https://" + raw
-      const observed = new URL(candidate)
+      // A scheme-less host is ambiguous (protocol and port are unknown), so it
+      // must not be used to attach session evidence to a target workspace.
+      if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) return false
+      const observed = new URL(raw)
       if ((observed.protocol !== "http:" && observed.protocol !== "https:") || observed.username || observed.password) return false
-      const host = observed.hostname.toLowerCase()
-      if (host !== target.hostname && !host.endsWith("." + target.hostname)) return false
-      const targetPath = new URL(target.targetURL).pathname.replace(/\/$/, "") || "/"
+      const expected = new URL(target.targetURL)
+      // Exact origin prevents subdomain, scheme, and non-default-port cross-contamination.
+      if (observed.origin !== expected.origin) return false
+      const targetPath = expected.pathname.replace(/\/$/, "") || "/"
       if (targetPath === "/") return true
       const observedPath = observed.pathname.replace(/\/$/, "") || "/"
       return observedPath === targetPath || observedPath.startsWith(targetPath + "/")
@@ -842,37 +845,24 @@ export namespace TargetMemory {
 
     if (observedHosts.size === 0) return null
 
+    // Match by exact origin and target path, never by hostname suffix. A
+    // request for api.example.com must not inherit example.com's target memory.
     const matched = workspaces
       .map((row) => {
         const normalized = normalizeTarget(row.target_url)
-        const hostMatch = [...observedHosts].some(
-          (host) => host === normalized.hostname || host.endsWith("." + normalized.hostname),
+        const matchingObservation = [...observedURLs].some((candidate) =>
+          targetObservationMatches(normalized.targetURL, candidate),
         )
-        if (!hostMatch) return undefined
-
+        if (!matchingObservation) return undefined
         const targetPath = new URL(normalized.targetURL).pathname.replace(/\/$/, "") || "/"
-        if (targetPath !== "/") {
-          const pathMatch = [...observedURLs].some((candidate) => {
-            try {
-              const url = new URL(candidate)
-              const hostMatches = url.hostname === normalized.hostname || url.hostname.endsWith("." + normalized.hostname)
-              const path = url.pathname.replace(/\/$/, "") || "/"
-              return hostMatches && (path === targetPath || path.startsWith(targetPath + "/"))
-            } catch {
-              return false
-            }
-          })
-          if (!pathMatch) return undefined
-        }
-
         return {
           workspace: mapWorkspace(row, path.join(".cyberstrike", "targets", normalized.slug)),
-          hostScore: normalized.hostname.length,
+          hostScore: new URL(normalized.targetURL).origin.length,
           pathScore: targetPath === "/" ? 0 : targetPath.length,
         }
       })
       .filter((item): item is { workspace: Workspace; hostScore: number; pathScore: number } => !!item)
-      .sort((a, b) => b.hostScore - a.hostScore || b.pathScore - a.pathScore)
+      .sort((a, b) => b.pathScore - a.pathScore || b.hostScore - a.hostScore)
 
     const selected = matched[0]?.workspace
     if (!selected) return null
