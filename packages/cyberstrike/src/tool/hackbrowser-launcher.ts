@@ -259,6 +259,9 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
     headless: opts.headless ?? true,
     panel: opts.headless === false,
     cyberstrikeUrl,
+    // This secret is required by the worker's authenticated local ingest client.
+    // It is serialized into the private stdin start message, not inherited through env.
+    cyberstrikePassword: process.env.CYBERSTRIKE_SERVER_PASSWORD || undefined,
     model: modelDescriptor,
     credentialDispatch,
     savedLogin: opts.savedLogin,
@@ -577,7 +580,12 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
   }
 
   // Send start message — worker begins crawl on receipt.
-  workerWrite(proc, JSON.stringify({ type: "start", options: prepared.workerOptions } satisfies ParentMessage) + "\n")
+  try {
+    workerWrite(proc, JSON.stringify({ type: "start", options: prepared.workerOptions } satisfies ParentMessage) + "\n")
+  } finally {
+    // Drop the parent-side reference once the single start message has been queued.
+    prepared.workerOptions.cyberstrikePassword = undefined
+  }
 
   // Fire and forget — IPC reader runs concurrently. The chat session prompt
   // loop returns on tool completion, freeing the session for ingest queue
