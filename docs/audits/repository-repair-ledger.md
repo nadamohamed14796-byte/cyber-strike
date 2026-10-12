@@ -14,6 +14,13 @@
 - **Test detail:** 1,799 passed, 5 skipped, 0 failed across 1,804 tests in 148 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
 - **Scope of claim:** this confirms automated CI on the recorded commit. It does not claim live Gmail/OAuth, external target validation, browser MFA, or manual runtime scenarios were exercised.
 
+
+### PR disposition follow-up — 2026-10-12
+
+- **PR #40** was closed without merging because it contained only a stale audit-ledger snapshot; the current ledger already contains the newer fixes and CI evidence. Closure comment added to the PR.
+- **PR #7**: tree-level comparison found no branch-only paths among its 77 changed files. Current main already contains the paths and has newer versions of the 19 divergent blobs; no bulk merge was performed.
+- **PR #6**: tree-level comparison found no branch-only paths among its 99 changed files. 61 blobs match main; 38 differ. The branch contains much longer versions of some skills, but longer does not automatically mean better: keep main's reconciled variants until unique procedures, safety controls, and references are compared section by section.
+
 ## Confirmed issues
 
 | ID | Priority | Category | Root cause / evidence | Attempts | Status |
@@ -265,9 +272,9 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 | `skills/ad-security-verification-gates-20261012` and `integration/ad-security-verification-gates-main-20261012` | No merge required | The reviewed AD security skill file blob is identical to main. |
 | `feat/discovery-core` | Retain; do not merge wholesale | It is heavily divergent and includes active mutating-method probes that are not appropriate for the current conservative reconnaissance path. |
 | `feat/proxy-config` / `dev` | Retain; selective review only | Both contain broad, highly divergent networking/replay/browser changes; there is no safe evidence for a wholesale merge. |
-| PR #7 / `feat/target-memory-foundation` | No wholesale merge; selective review in progress | Latest compare: 311 commits ahead / 190 behind, 77 changed paths. Of eight critical files rechecked against current `main`, five blobs are identical; three differ only because main has newer owner-key persistence, richer research text correlation, or the typed/auth-parameter hardening. This supports no bulk merge, but the other changed paths still need accounting before disposition. |
+| PR #7 / `feat/target-memory-foundation` | No merge required for inspected delta; keep branch pending final disposition | Compared all 77 changed paths: 58 blobs are identical to `main`, 19 differ, and there are zero branch-only paths. The differing runtime files are generally older/smaller on the branch; key research, target-memory, finding-validation, Gmail, auth-manager, and Hackbrowser implementations match or are newer on main. Its workflow consolidation is redundant with main's dedicated typecheck/build workflows. No blind merge. |
 | PR #40 / `docs/audit-ledger-refresh-20-pass-20261012` | Closed unmerged; superseded | Its useful 20-pass evidence and merged-fix summary are already represented in the main ledger. The branch is 1 commit ahead / 64 behind and stale; no code was lost by not merging the snapshot wholesale. |
-| PR #6 / `improve/skill-quality-reference-audit` | Retain; selective review only | Main contains newer/reconciled skill content; the branch remains divergent and should not replace current files wholesale. No branch deletion until remaining unique paths are accounted for. |
+| PR #6 / `improve/skill-quality-reference-audit` | No wholesale merge; retain pending final disposition | Compared all 99 changed paths: 61 blobs are identical to `main`, 38 differ, and there are zero branch-only paths. Several differing branch skills are substantially longer, but current main has reconciled/curated variants; e.g. recon-methodology is about 5.3 KB on main versus 64 KB on the branch. Do not overwrite current skills without content-level comparison of the extra material and references. |
 | PR #2 / `hackbrowser-improvement` | Retain; do not merge wholesale | The inspected branch disables TLS certificate verification. Any safe unique browser changes require isolated review and tests. |
 | `seo/readme-hero-refresh` | Selectively ported | The branch contained only two README hero lines; the provider-agnostic wording was copied to main to avoid an unsupported “first” claim. No wholesale merge or branch deletion was performed. |
 
