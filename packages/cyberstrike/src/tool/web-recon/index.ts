@@ -150,6 +150,10 @@ export const WebReconTool = Tool.define("web_recon", {
     target: z
       .string()
       .url()
+      .refine((value) => {
+        const url = new URL(value)
+        return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password
+      }, "Target must be an HTTP(S) URL without embedded credentials")
       .optional()
       .describe("Target URL (required for all programs except session_scan). All programs resolve paths relative to this origin."),
     args: z
@@ -174,12 +178,25 @@ export const WebReconTool = Tool.define("web_recon", {
     let result: WebReconResult
     if (program === "session_scan") {
       try {
-        result = await sessionScan(ctx.sessionID, params.timeout_seconds, ctx.abort)
+        result = await sessionScan(ctx.sessionID, params.timeout_seconds, ctx.abort, async (origins) => {
+          await ctx.ask({
+            permission: "web_recon",
+            patterns: origins,
+            always: origins,
+            metadata: { program },
+          })
+        })
       } catch (e) {
         return fail(`[-] session_scan failed: ${e instanceof Error ? e.message : String(e)}`)
       }
     } else {
       if (!params.target) return fail(`[-] target URL is required for ${program}. Only session_scan runs without a target.`)
+      await ctx.ask({
+        permission: "web_recon",
+        patterns: [params.target],
+        always: [params.target],
+        metadata: { program },
+      })
       const handler = dispatch[program]
       try {
         result = await handler(params.target, params.args, params.timeout_seconds)
