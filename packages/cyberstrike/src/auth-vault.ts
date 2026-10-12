@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { Global } from "../global"
+import { Global } from "./global"
 
 const FILE = path.join(Global.Path.data, "auth-vault.json")
 const ALGORITHM = "aes-256-gcm"
