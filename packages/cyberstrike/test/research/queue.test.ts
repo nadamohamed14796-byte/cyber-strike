@@ -17,6 +17,10 @@ test("research queue enqueue is idempotent for an already-seen source URL", asyn
       expect(second.created).toBe(false)
       expect(second.sequence).toBe(first.sequence)
       expect(ResearchQueue.stats().total).toBe(1)
+      // Leave no queued work behind: other queue tests deliberately claim the oldest item.
+      const cleanupClaim = ResearchQueue.claimNext("dedupe-test-cleanup")
+      expect(cleanupClaim?.sequence).toBe(first.sequence)
+      ResearchQueue.complete(cleanupClaim!.sequence, cleanupClaim!.lease_owner, "learned")
       await Instance.dispose()
     },
   })
