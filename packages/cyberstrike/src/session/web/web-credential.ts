@@ -38,12 +38,29 @@ export namespace WebCredential {
     .meta({ ref: "WebCredential" })
   export type Info = z.infer<typeof Info>
 
+  // Browser/UI events must never carry raw passwords or reusable auth tokens.
+  // Internal get()/getById() calls remain credential-bearing for trusted auth flows.
+  export const PublicInfo = Info.omit({ password: true })
+  export type PublicInfo = z.infer<typeof PublicInfo>
+
+  function publicInfo(credential: Info): PublicInfo {
+    const headers: Record<string, string> = {}
+    for (const [name, value] of Object.entries(credential.headers ?? {})) {
+      headers[name] = COMMON_AUTH_HEADERS.includes(name.toLowerCase()) ? "[REDACTED]" : value
+    }
+    return { ...credential, password: undefined, headers }
+  }
+
+  function publicList(credentials: Info[]): PublicInfo[] {
+    return credentials.map(publicInfo)
+  }
+
   export const Event = {
     Updated: BusEvent.define(
       "web_credential.updated",
       z.object({
         sessionID: z.string(),
-        credentials: z.array(Info),
+        credentials: z.array(PublicInfo),
       }),
     ),
   }
@@ -79,7 +96,7 @@ export namespace WebCredential {
     })
 
     const list = get(input.sessionID)
-    Bus.publish(Event.Updated, { sessionID: input.sessionID, credentials: list })
+    Bus.publish(Event.Updated, { sessionID: input.sessionID, credentials: publicList(list) })
 
     return {
       id,
@@ -148,7 +165,7 @@ export namespace WebCredential {
         .get()
       if (row) {
         const list = get(row.session_id)
-        Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: list }))
+        Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: publicList(list) }))
       }
     })
   }
@@ -159,7 +176,7 @@ export namespace WebCredential {
       if (row) {
         db.delete(WebCredentialTable).where(eq(WebCredentialTable.id, id)).run()
         const list = get(row.session_id)
-        Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: list }))
+        Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: publicList(list) }))
       }
     })
   }
@@ -221,7 +238,7 @@ export namespace WebCredential {
       if (!row) return undefined
 
       const list = get(row.session_id)
-      Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: list }))
+      Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: publicList(list) }))
 
       return rowToInfo(row)
     })
@@ -269,7 +286,7 @@ export namespace WebCredential {
       if (!row) return undefined
 
       const list = get(row.session_id)
-      Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: list }))
+      Database.effect(() => Bus.publish(Event.Updated, { sessionID: row.session_id, credentials: publicList(list) }))
       return rowToInfo(row)
     })
   }
