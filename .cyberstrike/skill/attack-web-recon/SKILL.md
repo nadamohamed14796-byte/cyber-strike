@@ -46,6 +46,11 @@ For eligible hosts, record status, title, redirects, content type, technology hi
 ### Step 5 — URL and API mapping
 Combine in-scope crawl results, archives, app navigation, API specifications, permitted GraphQL schema information, JavaScript bundles, source maps, and mobile/API observations. Preserve method and content-type distinctions during deduplication.
 
+#### JavaScript code review and request correlation
+After `hackbrowser` has finished capturing relevant responses, invoke `correlate_javascript` with the already-authorized `target_url` before detailed endpoint testing. It reads captured JavaScript response bodies and existing files in the target workspace's `javascript/` directory; it does not download or execute scripts. Review its persisted attack-surface JSON and target notes for function candidates, URL templates, path/query/body parameters, header names, auth/cookie signals, secret-like candidates (fingerprint only), and role/feature hints.
+
+Treat source-derived relationships as hypotheses. An absent token/cookie signal does not prove an endpoint is public, a role name does not prove server-side authorization, and a secret-like candidate does not authorize use. Prefer a captured baseline request; test one controlled mutation at a time with `http_replay` inside scope, then review the saved redacted observation and its manual-review flag. A response difference is a lead, not a vulnerability verdict.
+
 ### Step 6 — Focused enumeration
 Only after validating scope and policy, use bounded directory or parameter discovery. Start with a small justified wordlist and increase coverage only when results warrant it.
 
