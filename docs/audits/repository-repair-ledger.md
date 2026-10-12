@@ -11,7 +11,7 @@
 | ID | Priority | Category | Root cause / evidence | Attempts | Status |
 |---|---|---|---|---:|---|
 | SEC-001 | P1 | Security / path confinement | `packages/cyberstrike/src/skill/discovery.ts` used untrusted skill names and legacy file paths to construct cache destinations; archive extraction also used an unrestricted shell `tar` command. PR #18 contains the intended mitigation but its current CI fails with actual parser errors caused by escaped backticks/interpolation (typecheck run 38202096941) and a missing argument to `get`. | 2 | in_progress |
-| SEC-002 | P2 | Test and type contract | The PR #18 test additions call `isSafeArchiveEntry` but omit it from the import list. This is covered by the same focused repair branch. | 1 | in_progress |
+| SEC-002 | P2 | Test and type contract | Helper functions are exported as members of the `Discovery` namespace, not as top-level module exports; the first repair iteration imported them incorrectly. CI typecheck exposed this. | 2 | in_progress |
 | INT-001 | P2 | Branch integration | Open PR #11's five skill additions and IDOR skill edit overlap with already merged skill-library batches (#20/#21). The PR is 91 commits behind `main`; do not merge wholesale. Verify any unique remaining content before disposition. | 1 | in_progress |
 | INT-002 | P2 | Branch integration | Open PR #7 contains a broad target-memory / research / auth feature set; PR #17 has already merged an integration branch for target memory, global research learning, and scoped auth profiles. PR #7 is 91 commits behind and 311 commits ahead at its current head, so only a unique-diff review can safely establish whether it is redundant. | 1 | in_progress |
 | INT-003 | P2 | Branch integration | Draft PR #6 is heavily diverged (159 commits ahead, 91 behind). PR #15 merged a reconciled skill-quality audit, so the original branch must not be merged wholesale. Remaining unique changes require selective comparison. | 1 | in_progress |
@@ -29,7 +29,8 @@
 
 - **Attempt 1 (reproduce/diagnose):** read the current `main` implementation and the complete PR #18 CI logs; confirmed that `skill.name` and `skill.files[]` fed filesystem paths before robust containment validation, and the PR's source contained escaped template-literal delimiters.
 - **Attempt 2 (primary repair):** ported the mitigation to a new branch from current `main`; corrected escaped template literals/interpolation, included the missing archive helper import in tests, fixed the `get(url, dest, root)` call contract, removed the pre-validation parent-directory creation, canonicalized the cache root, rejected symlink/non-directory skill roots, and constrained archive entries to safe path/type combinations. Added the required `tar@7.5.7` package and lockfile entry.
-- **Verification:** pending GitHub Actions on the repair PR. This issue must remain `in_progress` until typecheck, tests, and build have actual successful results on the repaired head.
+- **Attempt 3 (integration correction):** GitHub typecheck on PR #23 (run 38227294532) found the `tar.t()` callback is typed as `ReadEntry | Stats`, and that tests imported namespace functions as top-level exports. Guarded `onReadEntry` with property narrowing and changed tests to call `Discovery.isSafeSkillName`, `Discovery.resolveSkillFilePath`, and `Discovery.isSafeArchiveEntry`.
+- **Verification:** re-run CI after this commit. Keep the issue `in_progress` until typecheck and unit tests pass on the latest PR head.
 
 ## Branch / PR ledger (snapshot at baseline)
 
