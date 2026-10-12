@@ -29,10 +29,11 @@ describe("scope_check IPv4 CIDR matching", () => {
     expect(checkMatch("http://user:pass@10.20.30.40/path", "10.20.30.0/24").matches).toBe(false)
   })
 
-  test("keeps domain and wildcard behavior based on the parsed hostname", () => {
-    expect(checkMatch("https://api.example.com/v1", "example.com").matches).toBe(true)
+  test("requires explicit wildcard scope for subdomains", () => {
+    expect(checkMatch("https://example.com/v1", "example.com").matches).toBe(true)
+    expect(checkMatch("https://api.example.com/v1", "example.com").matches).toBe(false)
     expect(checkMatch("https://example.com.attacker.test/path", "*.example.com").matches).toBe(false)
     expect(checkMatch("https://api.example.com/path", "*.example.com").matches).toBe(true)
-    expect(checkMatch("example.com", "*.example.com").matches).toBe(true)
+    expect(checkMatch("example.com", "*.example.com").matches).toBe(false)
   })
 })
