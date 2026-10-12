@@ -274,7 +274,8 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
     const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch ? options : ""
-    const directObject = bodyArgs.trim().startsWith("{") ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
+    const directObject = isBodyMethod && bodyArgs.trim().startsWith("{")
+      ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
     const bodySource = options + "\n" + bodyArgs + (requestConfig ? "\n" + (args[0] ?? "") : "")
     const bodyParams = [
       ...fieldNames(directObject),
