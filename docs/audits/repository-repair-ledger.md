@@ -313,3 +313,18 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Regression coverage:** existing gzip archive extraction remains green; added pure budget-boundary tests for per-archive and sync-wide decompressed bytes, plus existing archive member/entry count limits.
 - **Direct commits on main:** bounded decompression `574b00986ca92a0f707652b92b5cbdcb66112edf`; extraction from the prepared tar `c0765bac0db5ef5b71dd09f833b90eb52e6cb486`; total decompressed budget `93891dc2f119db011b2bf67b77c8b92bb089a7f8`; raw tar budget `a22eb391bd263da5ad5b6de170c827b396d5d4aa`; budget helper `ad52d7160ba874f4d956ca5ca264a3a3ba0b0413`; regression test `c0919ec57aebf65d1d1956f506044b51e421212e`.
 - **Validation:** latest unit tests passed with 1,799 passing, 5 skipped, 0 failures, and typecheck and monorepo build passed on `c0919ec57a`. Python CodeQL passed; JavaScript/TypeScript CodeQL remains in progress. The archive format support is deliberately conservative: gzip and raw tar are supported; zstd is explicitly rejected and Brotli is not enabled.
+
+
+## Follow-up checkpoint — 2026-10-12: remaining branch integration re-check
+
+Compared the remaining recently updated refs against current `main` after the latest fixes. No wholesale merge was needed for these branches; their useful changes are already present in current `main`, while several branch snapshots are materially older:
+
+- `fix/audit-skill-discovery-path-confinement` and `fix/remote-skill-cache-confinement-20261012`: their `discovery.ts` implementations are older and shorter than main. Main already contains real-path/symlink-aware cache confinement, safe archive entry resolution, HTTPS redirect checks, and bounded response reads. Do not overwrite main with these stale versions.
+- `fix/scope-check-ipv4-cidr-host-validation-20261012`, `fix/webfetch-bounded-redirects-20261012`, and `fix/web-recon-no-mutating-method-probes`: the reviewed implementation blobs are identical to main, including fail-closed IPv4 CIDR validation, manual/bounded redirect handling with per-hop checks, and the conservative recon program implementation.
+- `fix/remove-tracked-cookie-file`: `packages/cyberstrike/cookies.txt` is absent from main and `.gitignore` already excludes that cookie export. No cherry-pick is required.
+- `fix/target-workspace-owner-index-reconciliation-20261012`: its target-memory test blob matches main. Main now has an additional focused legacy-schema regression test covering owner-key backfill, stale-index removal, cross-owner reuse, and within-owner uniqueness.
+- `docs/idor-skill-expansion` and `skills/import-phase-1-methodology-recon`: the reviewed added methodology/evidence/reporting/recon skills and migration documentation already exist on main. Avoid importing the older branch snapshots over the curated versions.
+- `dependabot/npm_and_yarn/packages/cyberstrike/ai-sdk/provider-utils-3.0.28`: main already pins `@ai-sdk/provider-utils@3.0.28` in both the package manifest and lockfile; no dependency change remains to port.
+- `fix/pr-management-fork-label-guard`: the ref is behind main with zero unique commits in the comparison; no merge is required.
+
+The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill-quality/reference audit), are still drafts. Keep them open as review/reference work rather than merging wholesale: #2 contains a TLS certificate-verification bypass in the inspected branch, and #6 contains divergent skill content that needs file-by-file content review before any selected material can safely replace current skills. No branches were deleted because a safe branch-delete operation is unavailable in this execution context and unmerged unique work must be preserved.
