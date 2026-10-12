@@ -38,6 +38,7 @@ import { Global } from "../global"
 import { GmailService } from "../gmail-service"
 import { buildHackbrowserWorkerEnvironment } from "../hackbrowser-subprocess/worker-environment"
 import { Network } from "../network/network"
+import { TargetMemory } from "../target"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -546,8 +547,28 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
     throw new Error(`hackbrowser already running for session ${opts.sessionID}`)
   }
 
+  // Enforce authorization at the actual launcher boundary too: CLI and slash
+  // command callers must not be able to bypass the agent-facing tool guard.
+  const authorization = await TargetMemory.checkURLScope(opts.target)
+  if (!authorization.allowed || !authorization.scope) {
+    throw new Error(`hackbrowser refused target "${opts.target}": ${authorization.reason}. Configure the official target scope first.`)
+  }
+  const savedScope = authorization.scope
+  if (opts.scope?.some((entry) => !savedScope.scopeItems.includes(entry.trim().toLowerCase()))) {
+    throw new Error("hackbrowser scope override is not an exact subset of the persisted authorization scope.")
+  }
+  if (savedScope.scopeItems.some((entry) => entry.startsWith("*.")) && savedScope.excludedItems.length > 0) {
+    throw new Error("hackbrowser cannot safely enforce excluded hostnames inside a wildcard scope; narrow the saved scope first.")
+  }
+  const targetHostname = new URL(opts.target).hostname
+  const crawlerScope = savedScope.scopeItems.filter((entry) => !entry.includes("/"))
+  if (savedScope.scopeItems.some((entry) => entry.includes("/")) && /^\d{1,3}(?:\.\d{1,3}){3}$/.test(targetHostname)) {
+    crawlerScope.push(targetHostname)
+  }
+  if (!crawlerScope.length) throw new Error("hackbrowser cannot safely represent the configured scope as hostname patterns.")
+
   // Sync prep first — fail fast on any issue before claiming the slot.
-  const prepared = await prepareCrawl(opts)
+  const prepared = await prepareCrawl({ ...opts, scope: crawlerScope })
 
   // Spawn worker with an explicit, provider-scoped environment. Model API
   // credentials are carried in the prepared WorkerOptions IPC payload; only
