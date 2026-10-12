@@ -11,6 +11,13 @@ test("Medium source follows the curated author, not unrelated Medium articles", 
   expect(isResearchCandidate("https://medium.com/tag/bug-bounty", trickster0)).toBe(false)
 })
 
+test("legacy generic Medium source IDs do not reopen platform-wide crawling", () => {
+  const legacyGenericMedium = { ...trickster0, id: "medium" }
+  expect(isResearchCandidate("https://medium.com/@anotherwriter/general-security-post", legacyGenericMedium)).toBe(false)
+  expect(isResearchCandidate("https://medium.com/tag/bug-bounty", legacyGenericMedium)).toBe(false)
+  expect(isResearchCandidate("https://medium.com/@trickster0/idor-writeup-123", legacyGenericMedium)).toBe(false)
+})
+
 test("Medium source relevance rejects off-topic content but retains bounty writeups", () => {
   expect(
     sourceRelevance(
