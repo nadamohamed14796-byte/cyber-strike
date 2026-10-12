@@ -108,6 +108,8 @@ Verify a private test object remains inaccessible anonymously and that the owner
 
 ## References
 
+- [uphiago/recon-skills — S3/MinIO content-type XSS](https://github.com/uphiago/recon-skills/blob/main/recon/s3-minio-content-type-xss/SKILL.md) — merged storage and content-type source.
+
 - [uphiago/recon-skills — s3-minio-content-type-xss](https://github.com/uphiago/recon-skills/tree/main/recon/s3-minio-content-type-xss)
 - [AWS S3 — GetObject response header overrides](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
 - [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
