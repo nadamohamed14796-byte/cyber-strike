@@ -8,6 +8,6 @@ describe("saved login origin guard", () => {
       username: "research-account",
       password: "",
       origin: "https://target.example",
-    })).rejects.toThrow("origin mismatch")
+    })).resolves.toEqual({ success: false, error: "saved_login_origin_mismatch" })
   })
 })
