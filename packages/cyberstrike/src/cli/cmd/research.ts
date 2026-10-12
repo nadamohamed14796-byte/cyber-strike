@@ -165,7 +165,7 @@ export const ResearchCommand = cmd({
         async handler(args) {
           const count = ResearchQueue.retryAuthenticationBlocked(args.limit, args.source)
           console.log("requeued_for_auth_retry=" + count)
-          console.log("Configure CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID> or CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID> before running research learn.")
+          console.log("Configure CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID> or CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID>; use research sync/discover for index pages and research learn for report pages.")
         },
       })
       .command({

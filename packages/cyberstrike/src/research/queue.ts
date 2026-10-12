@@ -160,10 +160,19 @@ export namespace ResearchQueue {
         : eq(ResearchQueueTable.status, "blocked_auth"))
         .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
       for (const row of rows) {
+        const isCrawlPage = row.payload?.crawl_page === true
         const { auth_required: _authRequired, cached_text: _cachedText, ...payload } = row.payload ?? {}
         db.update(ResearchQueueTable).set({
-          status: "queued", payload, attempts: 0, last_error: null, lease_owner: null, lease_until: null,
-          completed_at: null, updated_at: now,
+          // Crawl/index pages must return to discovery, not be learned as if they were reports.
+          status: isCrawlPage ? "discovered" : "queued",
+          payload,
+          attempts: 0,
+          last_error: null,
+          lease_owner: null,
+          lease_until: null,
+          completed_at: null,
+          // Make auth-blocked index pages eligible for immediate rediscovery after credentials change.
+          updated_at: isCrawlPage ? now - CRAWL_PAGE_TTL_MS - 1 : now,
         }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).run()
       }
       return rows.length

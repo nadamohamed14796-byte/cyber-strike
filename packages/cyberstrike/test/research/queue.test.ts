@@ -196,3 +196,30 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
     },
   })
 })
+
+
+test("retry-auth sends blocked crawl pages back to discovery instead of the learning queue", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const url = "https://research.example.test/archive"
+      ResearchQueue.markVisitedPage({ sourceID: "auth-crawl", sourceURL: url, title: "Archive" })
+      ResearchQueue.blockAuthentication({
+        sourceID: "auth-crawl",
+        sourceURL: url,
+        reason: "HTTP 401",
+        payload: { source_name: "Auth Crawl" },
+      })
+      expect(ResearchQueue.find("auth-crawl", url)?.status).toBe("blocked_auth")
+      expect(ResearchQueue.retryAuthenticationBlocked(10, "auth-crawl")).toBe(1)
+      const row = ResearchQueue.find("auth-crawl", url)
+      expect(row?.status).toBe("discovered")
+      expect(row?.payload?.crawl_page).toBe(true)
+      expect(row?.payload?.auth_required).toBeUndefined()
+      expect(ResearchQueue.isFreshCrawlPage("auth-crawl", url)).toBe(false)
+      expect(ResearchQueue.claimNext("worker-auth-crawl", "auth-crawl")).toBeNull()
+      await Instance.dispose()
+    },
+  })
+})
