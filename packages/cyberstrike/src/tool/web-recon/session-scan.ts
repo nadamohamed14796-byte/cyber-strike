@@ -80,13 +80,40 @@ export async function sessionScan(
   timeout: number,
   abort?: AbortSignal,
   authorize?: (origins: string[]) => Promise<void>,
+  scopeFilter?: (url: string) => Promise<boolean>,
 ): Promise<WebReconResult> {
   const rootID = Session.root(sessionID)
-  const requests = Request.get(rootID)
+  const captured = Request.get(rootID)
+
+  if (captured.length === 0) {
+    return {
+      output: "[-] No captured requests in session. Run hackbrowser first to collect endpoints.",
+      findings: [],
+    }
+  }
+
+  // Filter captured requests before classification so no out-of-scope path can
+  // reach the active scan programs. This is deliberately fail-closed.
+  const requests: Request.Info[] = []
+  if (scopeFilter) {
+    for (const request of captured) {
+      const origin = request.origin ?? (request.scheme && request.host ? `${request.scheme}://${request.host}` : null)
+      if (!origin) continue
+      let candidate: string
+      try {
+        candidate = new URL(request.normalized_path, origin).href
+      } catch {
+        continue
+      }
+      if (await scopeFilter(candidate)) requests.push(request)
+    }
+  } else {
+    requests.push(...captured)
+  }
 
   if (requests.length === 0) {
     return {
-      output: "[-] No captured requests in session. Run hackbrowser first to collect endpoints.",
+      output: "[-] No captured requests match an explicitly configured target scope. No network probes were sent.",
       findings: [],
     }
   }
@@ -95,11 +122,27 @@ export async function sessionScan(
   const { origins, redirectPages, templateCount } = classifyRequests(requests)
   const allFindings: Finding[] = []
   const lines: string[] = [
-    `[*] Session scan: ${requests.length} requests, ${origins.size} origins`,
+    `[*] Session scan: ${requests.length}/${captured.length} captured requests authorized, ${origins.size} origins`,
   ]
   if (templateCount > 0) lines.push(`[*] ${templateCount} template path(s) skipped — discovered endpoints with {param} placeholders (use targeted programs)`)
 
-  const originEntries = [...origins.entries()].slice(0, MAX_ORIGINS)
+  const candidateOrigins = [...origins.entries()]
+  const originEntries: [string, OriginBucket][] = []
+  for (const entry of candidateOrigins) {
+    // The scan's origin-level checks probe "/", so path-scoped targets must
+    // not be scanned at origin root even if an in-scope subpath was captured.
+    if (scopeFilter && !(await scopeFilter(entry[0] + "/"))) {
+      lines.push(`[!] Skipping origin-root checks outside configured path scope: ${entry[0]}`)
+      continue
+    }
+    if (originEntries.length < MAX_ORIGINS) originEntries.push(entry)
+  }
+  if (originEntries.length === 0) {
+    return {
+      output: lines.concat(["[-] No origin roots are authorized for session_scan. Path-scoped targets require endpoint-specific checks instead."]).join("\n"),
+      findings: [],
+    }
+  }
   // Require consent for the concrete origins that will receive active probes.
   if (originEntries.length > 0) await authorize?.(originEntries.map(([origin]) => origin))
   let apiCheckCount = 0
