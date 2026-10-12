@@ -75,6 +75,9 @@ export namespace VerificationLedger {
     const before = list({ sessionID, hypothesisKey })
     const key = Policy.attemptKey(input.attempt)
     const existing = before.find((item) => Policy.attemptKey(item) === key)
+    if (before.length >= Policy.MAX_ATTEMPTS && !existing && input.decisiveResult && input.decisiveResult !== "none") {
+      throw new Error("Attempt budget is exhausted. Finalize only using evidence attached to an already-recorded strategy/variant; do not create attempt 21.")
+    }
     let duplicate = Boolean(existing)
     let recorded: Attempt
 
