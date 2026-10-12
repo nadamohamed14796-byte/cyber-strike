@@ -5,6 +5,31 @@ import { Timestamps } from "../storage/schema.sql"
 export type FindingValidationVerdict = "confirmed" | "false_positive" | "inconclusive"
 export type FindingValidationStatus = "pass" | "fail" | "unknown" | "not_applicable"
 
+export type FindingValidationAttemptStrategy =
+  | "baseline_control"
+  | "identity_role"
+  | "object_identifier"
+  | "http_method"
+  | "content_type"
+  | "session_state"
+  | "permission_boundary"
+  | "endpoint_variant"
+  | "business_logic"
+  | "cache_waf_environment"
+  | "timing_race"
+  | "negative_control"
+  | "response_comparison"
+  | "state_change"
+  | "other"
+
+export interface FindingValidationAttemptRecord {
+  strategy: FindingValidationAttemptStrategy
+  variation: string
+  hypothesis: string
+  outcome: "supports" | "contradicts" | "inconclusive"
+  evidence: string
+}
+
 export interface FindingValidationCheckRecord {
   number: number
   id: string
@@ -27,6 +52,8 @@ export const FindingValidationTable = sqliteTable(
     verdict: text().$type<FindingValidationVerdict>().notNull(),
     confidence: integer().notNull(),
     checks: text({ mode: "json" }).$type<FindingValidationCheckRecord[]>().notNull(),
+    attempts: text({ mode: "json" }).$type<FindingValidationAttemptRecord[]>().notNull().default([]),
+    attempt_count: integer().notNull().default(0),
     failed_check_ids: text({ mode: "json" }).$type<string[]>().notNull(),
     unknown_check_ids: text({ mode: "json" }).$type<string[]>().notNull(),
     summary: text().notNull(),
