@@ -496,6 +496,9 @@ export namespace TargetMemory {
     const note = mapNote(saved.row)
     const notesPath = path.join(workspace.workspacePath, "notes.md")
     const marker = "<!-- cyberstrike-target-note:" + note.id + " -->"
+    // Refuse a symlink/non-regular notes file before reading, and use the safe
+    // atomic writer below instead of appendFile/writeFile for the generated update.
+    await assertRegularFileOrMissing(notesPath)
     let notesFile = ""
     try {
       notesFile = await fs.readFile(notesPath, "utf-8")
@@ -515,7 +518,7 @@ export namespace TargetMemory {
         ...(note.tags.length ? ["- Tags: " + note.tags.join(", ")] : []),
       ]
       const entry = "\n\n" + marker + "\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
-      await fs.appendFile(notesPath, entry, "utf-8")
+      await writeWorkspaceFile(workspace, "notes.md", notesFile + entry)
     } else {
       // Update only this generated entry's metadata and preserve all surrounding human edits.
       const provenanceStart = notesFile.indexOf("- Type: ", markerIndex)
@@ -532,7 +535,7 @@ export namespace TargetMemory {
           metadata.splice(tagsIndex, 1)
         }
         const nextFile = notesFile.slice(0, provenanceStart) + metadata.join("\n") + notesFile.slice(provenanceEnd)
-        if (nextFile !== notesFile) await fs.writeFile(notesPath, nextFile, "utf-8")
+        if (nextFile !== notesFile) await writeWorkspaceFile(workspace, "notes.md", nextFile)
       }
     }
 
