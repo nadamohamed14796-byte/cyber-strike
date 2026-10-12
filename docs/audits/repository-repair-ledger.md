@@ -100,6 +100,21 @@ The 20 distinct passes have **not** yet been completed. Record each pass only af
 
 
 
+
+## Direct-to-main repair checkpoint — 2026-10-12
+
+This checkpoint follows the instruction to make focused, verified repairs directly on `main` rather than creating another feature branch for each fix.
+
+### INT-006 — P2: verification hypothesis identity could mix endpoint-specific and endpoint-less evidence
+
+- **Evidence:** `packages/cyberstrike/src/session/verification-ledger.ts` previously rejected endpoint mismatches only when both the stored endpoint and the new endpoint were non-empty. That allowed the same `hypothesis_key` to combine an endpoint-specific record with an endpoint-less record, even though the key defines the identity boundary for one claim.
+- **Fix:** centralized identity comparison in `VerificationAttempts.sameHypothesisIdentity` and made the ledger reject endpoint mismatches consistently, including when exactly one endpoint is absent.
+- **Regression coverage:** added unit coverage for same endpoint, missing endpoint, different asset, and different vulnerability class in `packages/cyberstrike/test/methodology/verification-attempts.test.ts`.
+- **Direct commits on main:** policy helper `6ad4f927421491a8715de178949b31700af12f42`; ledger integration `cac99ea90d65a928ce4f6c8d61d31485b5540d0b`; regression test `53f693a3f3cac076c919943b28143097fc0c1e30`.
+- **Validation:** GitHub contents API confirmed each write returned a commit SHA. The available combined-status query returned no status entries, and the available workflow-run query returned no PR-triggered runs for this direct main commit. Therefore the new regression test and typecheck are **not yet verified as passing**; no local Bun runtime/checkout is available here.
+- **Attempts:** one focused implementation pass; continue from actual CI feedback if checks become available.
+- **Disposition:** code change committed directly to `main`; validation pending. No feature branch was created for this repair.
+
 ## Follow-up checkpoint — 2026-10-12: scope-check IPv4/CIDR parsing
 
 ### SEC-005 — P1: scope-check could report an IPv4-looking hostname substring as in scope
