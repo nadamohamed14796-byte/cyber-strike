@@ -14,7 +14,7 @@ describe("lazy tool registry snapshot reconciliation", () => {
       { name: "search_old", description: "old capability description" },
       { name: "keep_tool", description: "kept capability" },
     ])
-    expect(LazyToolRegistry.getAll().map((tool) => tool.id)).toContain("test_server_search_old")
+    expect(LazyToolRegistry.getAll().find((tool) => tool.mcpServer === "test.server" && tool.name === "search_old")?.id).toContain("search_old")
 
     LazyToolRegistry.reconcileServerTools("test.server", [
       { name: "keep_tool", description: "updated capability description" },
@@ -22,11 +22,26 @@ describe("lazy tool registry snapshot reconciliation", () => {
     ])
 
     const tools = LazyToolRegistry.getAll().filter((tool) => tool.mcpServer === "test.server")
-    expect(tools.map((tool) => tool.id).sort()).toEqual(["test_server_keep_tool", "test_server_new_tool"])
-    expect(tools.find((tool) => tool.id === "test_server_keep_tool")?.summary).toBe("updated capability description")
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["keep_tool", "new_tool"])
+    expect(tools.find((tool) => tool.name === "keep_tool")?.summary).toBe("updated capability description")
     expect(LazyToolRegistry.search("updated capability")).toContainEqual(
-      expect.objectContaining({ id: "test_server_keep_tool" }),
+      expect.objectContaining({ mcpServer: "test.server", name: "keep_tool" }),
     )
+  })
+
+  test("disambiguates tool names that normalize to the same readable ID", () => {
+    LazyToolRegistry.reconcileServerTools("test.server", [
+      { name: "foo.bar", description: "dotted tool" },
+      { name: "foo_bar", description: "underscored tool" },
+    ])
+    const tools = LazyToolRegistry.getAll().filter((tool) => tool.mcpServer === "test.server")
+    const dotted = tools.find((tool) => tool.name === "foo.bar")
+    const underscored = tools.find((tool) => tool.name === "foo_bar")
+    expect(dotted).toBeTruthy()
+    expect(underscored).toBeTruthy()
+    expect(dotted?.id).not.toBe(underscored?.id)
+    expect(LazyToolRegistry.search("dotted tool")).toContainEqual(expect.objectContaining({ name: "foo.bar" }))
+    expect(LazyToolRegistry.search("underscored tool")).toContainEqual(expect.objectContaining({ name: "foo_bar" }))
   })
 
   test("does not return every tool for empty queries or invalid limits", () => {
@@ -37,6 +52,6 @@ describe("lazy tool registry snapshot reconciliation", () => {
     expect(LazyToolRegistry.search("   ")).toEqual([])
     expect(LazyToolRegistry.search("search", 0)).toEqual([])
     expect(LazyToolRegistry.search("search", -1)).toEqual([])
-    expect(LazyToolRegistry.search("search").map((tool) => tool.id)).toContain("test_server_search_users")
+    expect(LazyToolRegistry.search("search").map((tool) => tool.name)).toContain("search_users")
   })
 })
