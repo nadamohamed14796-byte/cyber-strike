@@ -5,6 +5,7 @@ import type { PermissionNext } from "../../src/permission/next"
 import type { Tool } from "../../src/tool/tool"
 import { Instance } from "../../src/project/instance"
 import { SkillTool } from "../../src/tool/skill"
+import { SkillContext } from "../../src/skill/context"
 import { tmpdir } from "../fixture/fixture"
 
 const baseCtx: Omit<Tool.Context, "ask"> = {
@@ -91,6 +92,8 @@ Use this skill.
           }
 
           const result = await tool.execute({ action: "load", name: "tool-skill" }, ctx)
+          expect(SkillContext.isLoaded("tool-skill")).toBe(true)
+          SkillContext.unload("tool-skill")
           const dir = path.join(tmp.path, ".cyberstrike", "skill", "tool-skill")
           const file = path.resolve(dir, "scripts", "demo.txt")
 
