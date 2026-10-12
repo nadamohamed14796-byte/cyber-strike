@@ -5,6 +5,24 @@ import { Session } from "../session"
 import { vrtScopeViolation, offLaneMessage } from "./vuln-scope"
 import { VerificationLedger } from "../session/verification-ledger"
 
+const VRT_CLASS_TERMS: Record<string, string[]> = {
+  idor: ["idor", "bola", "insecure direct object"],
+  authz: ["privilege escalation", "auth bypass", "broken access control", "access control", "bfla", "cors", "forbidden", "authorization"],
+  authn: ["authentication", "session", "jwt", "rate limit", "brute", "password", "mfa", "2fa", "credential", "token", "auth bypass"],
+  injection: ["sqli", "sql injection", "nosqli", "xss", "cross-site scripting", "ssti", "xxe", "command injection", "ldap", "injection"],
+  ssrf: ["ssrf", "server-side request"],
+  "file-attacks": ["path traversal", "directory traversal", "lfi", "rfi", "file upload", "file inclusion", "zip slip"],
+  "mass-assignment": ["mass assignment", "over-post", "overpost"],
+  "business-logic": ["race condition", "business logic", "workflow", "negative amount", "captcha", "chain"],
+}
+
+function categoryMatchesClass(vulnerabilityClass: string, category: string) {
+  const cls = vulnerabilityClass.toLowerCase().trim()
+  const cat = category.toLowerCase().trim()
+  const terms = VRT_CLASS_TERMS[cls]
+  return terms ? terms.some((term) => cat.includes(term) || term.includes(cat)) : cls === cat
+}
+
 export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
   description:
     "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN with valid conditions and evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
@@ -53,6 +71,16 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
       }
     }
 
+    const sessionID = Session.root(ctx.sessionID)
+    const entry = Intel.get(sessionID).find((item) => item.id === params.entry_id)
+    if (!entry) {
+      return {
+        title: "VRT update rejected — intel entry not in this session",
+        output: "The entry_id does not resolve to an intel entry in the current session. No VRT check was written.",
+        metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_invalid_entry" },
+      }
+    }
+
     if (params.status === "tested_not_vulnerable") {
       if (!params.verification_hypothesis_key?.trim()) {
         return {
@@ -62,9 +90,20 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
         }
       }
       const attempts = VerificationLedger.list({
-        sessionID: Session.root(ctx.sessionID),
+        sessionID,
         hypothesisKey: params.verification_hypothesis_key,
       })
+      const identityMismatch = attempts.some((attempt) =>
+        attempt.asset.trim().toLowerCase() !== entry.asset.trim().toLowerCase() ||
+        !categoryMatchesClass(attempt.vulnerabilityClass, params.vrt_category),
+      )
+      if (identityMismatch) {
+        return {
+          title: `VRT clean verdict blocked — mismatched verification identity`,
+          output: "The verification ledger belongs to a different asset or vulnerability class than this VRT check. Use a hypothesis_key bound to this entry and category; no clean verdict was written.",
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_identity_mismatch", attemptsUsed: attempts.length },
+        }
+      }
       const outcome = attempts[attempts.length - 1]?.outcome
       if (outcome !== "disproven") {
         return {
@@ -75,7 +114,7 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
       }
     }
 
-    Intel.updateVrtCheck(Session.root(ctx.sessionID), params.entry_id, params.vrt_category, {
+    Intel.updateVrtCheck(sessionID, params.entry_id, params.vrt_category, {
       status: params.status,
       technique: params.technique,
       testedBy: ctx.agent,
