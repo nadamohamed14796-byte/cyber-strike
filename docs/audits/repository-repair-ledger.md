@@ -9,10 +9,10 @@
 
 ## Latest-main verification checkpoint — 2026-10-12
 
-- **Latest verified code head (CI):** `71fe91869eb845398c4604eeaa105ce0886a4477`. The policy requires 20 distinct valid attempts before a false-positive/disproven verdict across both the durable verification ledger and `validate_finding`, excludes invalid-precondition attempts from the budget, keeps scope/safety hard stops dominant, normalizes legacy premature DISPROVEN rows, reopens legacy false-positive findings when current evidence is inconclusive, and gates VRT clean coverage on 20 valid attempts. The agent prompt was reconciled to avoid contradictory early-disproof wording. A SQLite regression test verifies legacy `target_workspace` owner-key backfill, stale-index replacement, cross-owner duplicate allowance, and same-owner duplicate rejection. On `71fe9186`, GitHub Actions unit tests, typecheck, monorepo build, and CodeQL all passed.
-- **Latest-main GitHub Actions:** typecheck [38242067494](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067494), unit/integration tests [38242067491](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067491), build [38242067501](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067501), and CodeQL [38242067818](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38242067818) all completed successfully on current `main`.
-- **Test detail:** 1,799 passed, 5 skipped, 0 failed across 1,804 tests in 148 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
-- **Scope of claim:** this confirms automated CI on the recorded commit. It does not claim live Gmail/OAuth, external target validation, browser MFA, or manual runtime scenarios were exercised.
+- **Latest verified implementation head:** `192fc61a6ded45b06b8633482df51308eb6c094e`. GitHub Actions unit tests [38257175547](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38257175547), typecheck [38257175471](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38257175471), and build [38257175528](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38257175528) passed. CodeQL [38257175503](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38257175503) was still running when recorded.
+- **Included verified changes:** secure-by-default TLS for both HTTP replay modes; explicit JavaScript URL now filters analysis to the matching captured origin/path; agent prompts invoke JavaScript correlation after crawl and enforce the durable false-positive gate; recon method checks are documented as OPTIONS-only/passive; hypothesis-ceiling guidance is consistent with the 20-valid-attempt verdict rule.
+- **Test detail:** 1,831 passed, 5 skipped, 0 failed across 1,836 tests in 152 files; a separate package-level suite reported 225 passed and 0 failed across 47 files.
+- **Scope of claim:** this confirms automated tests/typecheck/build on the recorded implementation head. CodeQL was still in progress; later tool-description and audit-ledger commits were docs/metadata-only and had their own CI queued. No live provider-backed hunt, external target validation, browser MFA, or manual runtime scenario is claimed.
 
 
 ### PR disposition follow-up — 2026-10-12
@@ -34,6 +34,7 @@
 | INT-005 | P1 | Agent workflow linkage | The root agent prompt did not call `correlate_javascript` after the crawl, and the web-application prompt did not explicitly connect the durable 20-valid-attempt gate to endpoint validation. Both prompt paths now require JS correlation after capture and evidence-driven verification; CI pending for these latest prompt commits. | 1 | integrated; latest-main CI pending |
 | TEST-001 | P2 | Regression-test contract | A new test incorrectly treated extracted function parameter names as raw JavaScript source, despite parameter extraction being intentional. The assertion now verifies parameter metadata remains available while executable source/sink expressions are not persisted; test/typecheck/build passed on `f5abcf09cc`. | 1 | fixed; tests green |
 | SEC-007 | P1 | HTTP replay TLS verification | `http_replay` and `http_replay_raw` previously treated omitted `insecure_tls` as permission to disable certificate verification. The default is now secure; invalid/self-signed certificates require explicit opt-in. Tests, typecheck, and build passed on `f5abcf09cc`; CodeQL and later prompt-only commits are still being checked. | 1 | code fix validated; latest-main CI pending |
+| FUN-002 | P2 | JavaScript correlation filter | Supplying `javascript_url` filtered the asset list but still analyzed all captured JS bodies and local files, contradicting the tool contract. Explicit URL now narrows source analysis to the exact captured origin/path and excludes unrelated local sources; regression tests cover origin/path matching. Tests/typecheck/build passed on `192fc61a6d`; CodeQL pending. | 1 | fixed; CI partial green |
 
 | FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
 | SEC-003 | P2 | Test/type contract | Tar entry properties are validated at runtime; current-main tests and typecheck pass. | 1 | resolved |
@@ -78,6 +79,15 @@
 - The new test failed because it expected the extracted parameter name `untrustedHtml` to be absent, although function names/parameters are intentionally part of the JavaScript analysis output.
 - Corrected the test to assert that parameter metadata is preserved while raw source expressions (`document.querySelector`, `innerHTML = untrustedHtml`) are absent from the stored analysis.
 - Commit: `f5abcf09cccb217b54b76059167f4b905e86bc25`; GitHub Actions tests, typecheck, and build passed on that commit. The later root-prompt changes remain under CI.
+
+
+### FUN-002 — explicit JavaScript URL must narrow the actual source analysis
+
+- **Root cause:** `javascript_url` filtered the displayed JavaScript asset candidates but the source pipeline still analyzed every captured JavaScript response and every local `javascript/` file.
+- **Fix:** when an explicit asset is supplied, local source inventory is excluded and captured bodies are filtered by exact HTTP(S) origin and path (query variants do not change the path identity). Without an explicit asset, the normal all-captured/local-source workflow is unchanged.
+- **Regression coverage:** `matchesCapturedJavaScriptAsset` tests exact origin/path matching, query-string tolerance, unrelated paths/hosts, and invalid target URLs.
+- **Commits:** implementation `22bbdf323a5f42d23d9d95a9fb1c3b41786cdfaa`; test `192fc61a6ded45b06b8633482df51308eb6c094e`; tool-contract clarification `f4fc5d798d9abc5f7bdf94c2662ceec288b155b2`.
+- **Validation:** tests, typecheck, and build passed on `192fc61a6d`; CodeQL was still in progress. The tool-description clarification is a later metadata-only commit.
 
 ## Branch / PR ledger (updated during execution)
 
