@@ -208,8 +208,7 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
   return /[?&](page|p|offset|start|pageindex)=\d+/i.test(parsed.search)
 }
 
-function classify(text: string) {
-  const lower = text.toLowerCase()
+function classify(title: string, text: string) {
   const classes: Array<[string, RegExp]> = [
     ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
     ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
@@ -237,9 +236,25 @@ function classify(text: string) {
     ["oauth", /oauth|open authorization/],
     ["web-cache", /web cache|cache deception/],
   ]
-  return classes.find(([, pattern]) => pattern.test(lower))?.[0]
-}
+  const normalizedTitle = title.toLowerCase()
+  // Prefer an explicit title topic over incidental mentions in the article body.
+  const titleMatch = classes.find(([, pattern]) => pattern.test(normalizedTitle))
+  if (titleMatch) return titleMatch[0]
 
+  const body = text.toLowerCase()
+  const ranked = classes
+    .map(([name, pattern]) => ({
+      name,
+      count: (body.match(new RegExp(pattern.source, "g")) ?? []).length,
+    }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count)
+  if (ranked.length === 1) return ranked[0].name
+  // If the body discusses several vulnerability classes, do not label the whole
+  // article using whichever class happened to appear first in a hard-coded list.
+  if (ranked.length > 1 && ranked[0].count >= 2 && ranked[0].count > ranked[1].count) return ranked[0].name
+  return undefined
+}
 function severityOf(text: string) {
   const match = text.match(/\b(critical|high|medium|low|informational)\b/i)
   return match?.[1]?.toLowerCase() ?? "unknown"
@@ -850,7 +865,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         result.skipped++
         continue
       }
-      const vulnerabilityClass = classify(title + " " + text)
+      const vulnerabilityClass = classify(title, text)
       if (!vulnerabilityClass && source.kind !== "reference" && source.kind !== "academy") {
         ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "no recognizable security topic")
         result.skipped++
