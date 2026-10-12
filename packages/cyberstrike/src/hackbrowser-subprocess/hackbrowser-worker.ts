@@ -331,6 +331,7 @@ function buildCrawlOptions(opts: WorkerOptions, signal: AbortSignal): CrawlOptio
     headless: opts.savedLogin ? false : opts.headless,
     panel: opts.panel,
     cyberstrikeUrl: opts.cyberstrikeUrl,
+    cyberstrikePassword: opts.cyberstrikePassword,
     model,
     cdp: opts.cdp,
     logSink,
