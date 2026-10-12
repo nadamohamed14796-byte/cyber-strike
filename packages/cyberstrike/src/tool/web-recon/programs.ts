@@ -885,68 +885,43 @@ const DANGEROUS_METHODS = ["TRACE", "PUT", "DELETE"]
 
 export async function methodCheck(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
   const findings: Finding[] = []
-  const output: string[] = [`[*] Testing HTTP methods for ${target}`]
+  const output: string[] = [`[*] Checking advertised HTTP methods for ${target}`]
 
+  // Keep this passive: OPTIONS is the only method issued by default. Never send
+  // PUT or DELETE to a live resource just to see whether the server accepts it,
+  // and avoid TRACE because some servers echo request headers that may contain
+  // authentication material.
   const optResp = await safeFetch(target, { timeout, method: "OPTIONS" })
-  if (optResp) {
-    const allow = optResp.headers.get("allow")
-    if (allow) {
-      output.push(`[+] OPTIONS Allow header: ${allow}`)
-      const methods = allow.split(",").map((m) => m.trim().toUpperCase())
-      for (const m of DANGEROUS_METHODS) {
-        if (methods.includes(m)) {
-          output.push(`[!] Dangerous method advertised: ${m}`)
-        }
-      }
-    } else {
-      output.push(`[*] OPTIONS returned HTTP ${optResp.status} (no Allow header)`)
+  if (!optResp) {
+    output.push("[-] OPTIONS request failed; no active method probes were attempted")
+    return { output: output.join("\n"), findings }
+  }
+
+  const allow = optResp.headers.get("allow")
+  if (!allow) {
+    output.push(`[*] OPTIONS returned HTTP ${optResp.status} without an Allow header`)
+    output.push("[*] No PUT, DELETE, or TRACE request was sent")
+    return { output: output.join("\n"), findings }
+  }
+
+  output.push(`[+] OPTIONS Allow header: ${allow}`)
+  const methods = new Set(allow.split(",").map((method) => method.trim().toUpperCase()))
+  const advertised = DANGEROUS_METHODS.filter((method) => methods.has(method))
+
+  if (advertised.length) {
+    for (const method of advertised) {
+      output.push(
+        `[!] ${method} is advertised by OPTIONS only; this does not prove authorization bypass, and no mutating request was sent`,
+      )
     }
+  } else {
+    output.push("[*] OPTIONS did not advertise PUT or DELETE")
   }
 
-  const traceResp = await safeFetch(target, { timeout, method: "TRACE" })
-  if (traceResp && traceResp.status === 200) {
-    const ct = (traceResp.headers.get("content-type") || "").toLowerCase()
-    const reflected = ct.includes("message/http") || traceResp.text.includes("TRACE / ")
-    if (reflected) {
-      output.push(`[+] TRACE method enabled — Cross-Site Tracing (XST) possible`)
-      output.push(`    Response reflects the request including cookies and auth headers`)
-      findings.push({
-        checkId: "WEB-METHOD-001",
-        provider: "web-recon",
-        severity: "medium",
-        status: "VULNERABLE",
-        resource: target,
-        title: "TRACE method enabled (XST)",
-        details: `TRACE returns HTTP 200 with reflected request body — combined with XSS this leaks HttpOnly cookies`,
-        remediation: "Disable TRACE method in the web server configuration (TraceEnable Off for Apache)",
-        cwe: "CWE-693",
-      })
-    }
-  }
-
-  for (const method of ["PUT", "DELETE"]) {
-    const resp = await safeFetch(target, { timeout, method })
-    if (!resp) continue
-    if (resp.status < 400 && resp.status !== 301 && resp.status !== 302) {
-      output.push(`[+] ${method} method accepted (HTTP ${resp.status})`)
-      findings.push({
-        checkId: `WEB-METHOD-${method}`,
-        provider: "web-recon",
-        severity: "medium",
-        status: "VULNERABLE",
-        resource: target,
-        title: `${method} method accepted on root`,
-        details: `HTTP ${method} returned status ${resp.status} — may allow unauthorized resource modification/deletion`,
-        remediation: `Restrict ${method} method to authenticated and authorized requests only`,
-        cwe: "CWE-749",
-      })
-    }
-  }
-
-  if (findings.length === 0) {
-    output.push("[*] No dangerous HTTP methods enabled")
-  }
-
+  output.push("[*] Passive method check complete; no TRACE, PUT, or DELETE request was sent")
+  // An Allow header is inventory, not proof of exploitability. Do not emit a
+  // vulnerability finding until a separate, explicitly authorized test proves
+  // an unauthorized state change using a safe fixture.
   return { output: output.join("\n"), findings }
 }
 
