@@ -60,6 +60,7 @@ const CONTRADICTION_CHECKS = new Set([
   "benign_behavior_ruled_out",
 ])
 const PRIMARY_CONTRADICTION_CHECKS = new Set(["reproducible", "request_path", "unexpected_behavior"])
+const ATTEMPT_STRATEGIES = new Set<FindingValidationAttemptStrategy>(["baseline_control", "identity_role", "object_identifier", "http_method", "content_type", "session_state", "permission_boundary", "endpoint_variant", "business_logic", "cache_waf_environment", "timing_race", "negative_control", "response_comparison", "state_change", "other"])
 
 export function assessFindingChecks(input: FindingValidationInputCheck[], attempts: FindingValidationAttemptInput[] = []): FindingValidationAssessment {
   if (input.length !== FINDING_VALIDATION_CHECKS.length) {
@@ -72,7 +73,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     const strategy = String(attempt.strategy).trim()
     const checkID = String(attempt.checkID).trim()
     const variation = String(attempt.variation).trim().toLowerCase()
-    if (!strategy || !checkID || !FINDING_VALIDATION_CHECKS.some((check) => check.id === checkID) || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
+    if (!ATTEMPT_STRATEGIES.has(attempt.strategy) || !strategy || !checkID || !FINDING_VALIDATION_CHECKS.some((check) => check.id === checkID) || !["supports", "contradicts", "inconclusive"].includes(attempt.outcome) || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
       throw new Error("Every validation attempt requires a strategy, unique variation, hypothesis, and concrete observed evidence.")
     }
     if (variation.length > 160 || attempt.hypothesis.length > 800 || attempt.evidence.length > 2000) {
@@ -115,9 +116,11 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
   )
   const hasPrimaryContradiction = contradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
   const attemptContradictions = attempts.filter((attempt) => attempt.outcome === "contradicts")
-  const attemptPrimaryContradiction = attemptContradictions.some((attempt) => PRIMARY_CONTRADICTION_CHECKS.has(attempt.checkID))
+  const attemptContradictedCheckIDs = new Set(attemptContradictions.map((attempt) => attempt.checkID))
+  const attemptBackedContradictions = contradictions.filter((check) => attemptContradictedCheckIDs.has(check.id))
+  const attemptPrimaryContradiction = attemptBackedContradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
   const enoughDistinctAttempts = attempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
-  const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction && attemptContradictions.length >= 2 && attemptPrimaryContradiction
+  const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction && attemptBackedContradictions.length >= 2 && attemptPrimaryContradiction
 
   const requiredPasses = [
     "reproducible",
