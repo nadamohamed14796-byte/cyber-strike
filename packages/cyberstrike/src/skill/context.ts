@@ -72,7 +72,7 @@ export namespace SkillContext {
   ): Suggestion[] {
     const result: Suggestion[] = []
     const suggested = new Set<string>()
-    const active = new Set(loaded.values().filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name))
+    const active = new Set(Array.from(loaded.values()).filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name))
 
     for (const finding of findings) {
       const chains = SkillIndex.chainsFrom(finding.skill_id)
