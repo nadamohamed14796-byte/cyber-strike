@@ -19,6 +19,7 @@ const VRT_CLASS_TERMS: Record<string, string[]> = {
 function categoryMatchesClass(vulnerabilityClass: string, category: string) {
   const cls = vulnerabilityClass.toLowerCase().trim()
   const cat = category.toLowerCase().trim()
+  if (!cls || !cat) return false
   const terms = VRT_CLASS_TERMS[cls]
   return terms ? terms.some((term) => cat.includes(term) || term.includes(cat)) : cls === cat
 }
