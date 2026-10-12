@@ -15,7 +15,7 @@ const TargetInitCommand = cmd({
         console.log("Target: " + target.targetURL)
         console.log("Workspace: " + target.workspacePath)
         console.log("Notes: " + target.workspacePath + "/notes.md")
-        console.log("Created or verified target directories: assets, endpoints, javascript, findings, evidence, sessions, research")
+        console.log("Created or verified target directories: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research")
       },
     })
   },
@@ -88,6 +88,7 @@ const TargetNoteCommand = cmd({
       })
       .option("source", { type: "string", default: "manual" })
       .option("source-url", { type: "string", describe: "public/source URL; credentials and query parameters are removed" })
+      .option("evidence", { type: "string", describe: "concrete evidence required for confirmed/disproven status" })
       .option("tags", { type: "string", describe: "comma-separated tags" }),
   async handler(args) {
     await Instance.provide({
@@ -95,6 +96,7 @@ const TargetNoteCommand = cmd({
       async fn() {
         const result = await TargetMemory.addNote(args.url, {
           content: args.content,
+          evidence: args.evidence,
           title: args.title,
           kind: args.kind as TargetNoteKind,
           status: args.status as TargetNoteStatus,
