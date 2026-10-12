@@ -359,7 +359,13 @@ export namespace Discovery {
         const { done, value } = await reader.read()
         if (done) break
         const nextTotal = total + value.byteLength
-        if (nextTotal > maxBytes || (acceptChunk && !acceptChunk(value.byteLength))) {
+        // Account for bytes already delivered by the stream even if this chunk
+        // crosses a limit, before cancelling the rest of the response.
+        if (acceptChunk && !acceptChunk(value.byteLength)) {
+          await reader.cancel().catch(() => {})
+          return undefined
+        }
+        if (nextTotal > maxBytes) {
           await reader.cancel().catch(() => {})
           return undefined
         }
