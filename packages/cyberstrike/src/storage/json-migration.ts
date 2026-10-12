@@ -412,6 +412,19 @@ export namespace JsonMigration {
       log.warn("skipped orphaned session shares", { count: orphans.shares })
     }
 
+    // Do not commit a partial import. The caller can retry after the malformed
+    // legacy files are repaired; the transaction keeps successfully inserted
+    // rows from being mixed with an incomplete migration.
+    if (stats.errors.length > 0) {
+      sqlite.exec("ROLLBACK")
+      log.error("json migration rolled back because input or insert errors were found", {
+        errorCount: stats.errors.length,
+        errors: stats.errors.slice(0, 20),
+      })
+      progress?.({ current: total, total, label: "failed" })
+      return stats
+    }
+
     sqlite.exec("COMMIT")
 
     log.info("json migration complete", {
