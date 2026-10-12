@@ -31,6 +31,7 @@
 | INT-002 | P2 | Branch integration | PR #7 (`feat/target-memory-foundation`) is 311 commits ahead / 190 behind, with 77 changed files. PR #17 integrated the feature set; current `main` has newer reviewed implementations, so no wholesale merge is safe. | 2 | blocked_no_bulk_merge |
 | INT-003 | P2 | Branch integration | PR #6 (`improve/skill-quality-reference-audit`) is 159 commits ahead / 190 behind, with 99 changed files. PR #15's reconciled quality work is already merged; skill changes are out of scope for this pass and must not be merged wholesale. | 2 | blocked_out_of_scope_and_diverged |
 | INT-004 | P1 | Branch integration / TLS safety | PR #2 (`hackbrowser-improvement`) is 44 commits ahead / 300 behind, with 36 changed files. Its launcher disables TLS certificate verification (`NODE_TLS_REJECT_UNAUTHORIZED=0`); do not merge wholesale. Review only isolated safe changes. | 2 | blocked_unsafe_to_merge_wholesale |
+| SEC-007 | P1 | HTTP replay TLS verification | `http_replay` and `http_replay_raw` treated an omitted `insecure_tls` flag as permission to disable certificate verification. The transport now verifies certificates by default and accepts invalid/self-signed certificates only after explicit opt-in; a regression test covers both cases. | 1 | fix committed; CI pending |
 
 | FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
 | SEC-003 | P2 | Test/type contract | Tar entry properties are validated at runtime; current-main tests and typecheck pass. | 1 | resolved |
@@ -51,6 +52,15 @@
 - **Attempt 3 (integration correction):** GitHub typecheck on PR #23 (run 38227294532) found the `tar.t()` callback is typed as `ReadEntry | Stats`, and that tests imported namespace functions as top-level exports. Changed tests to call `Discovery.isSafeSkillName`, `Discovery.resolveSkillFilePath`, and `Discovery.isSafeArchiveEntry`.
 - **Attempt 4 (alternative diagnosis):** the next typecheck (run 38227486303) still rejected `'type' in entry` narrowing for `ReadEntry | Stats`. Replaced the guard with runtime checks on a narrow `{ path?: unknown; type?: unknown }` view, requiring both fields to be strings before adding a tar member to the allow-list.
 - **Historical verification note:** the earlier PR head failed typecheck/tests because of malformed template-literal escaping and incorrect helper imports. Those failures were corrected in subsequent commits; the current-main implementation has since passed unit tests, typecheck, build, and CodeQL. Do not use the historical PR-head failure as the current-main status.
+
+
+### SEC-007 — HTTP replay must verify TLS by default
+
+- **Root cause:** both replay tools passed `rejectUnauthorized: params.insecure_tls === false`; `undefined` therefore disabled TLS verification even though callers had not opted into insecure mode.
+- **Fix:** added `shouldRejectUnauthorized(insecureTls)` with secure-by-default semantics and applied it to governed and raw-socket replay. Updated both parameter descriptions to state that invalid/self-signed certificates are accepted only when `insecure_tls: true` is explicitly provided.
+- **Regression test:** `packages/cyberstrike/test/tool/http-replay.test.ts` asserts omitted/false values keep certificate verification enabled and only explicit `true` disables it.
+- **Commits:** source `57799471a3df6686d19cd3db1b886385d714f4d5`; tests `84d36043b3341205ee2969c0813f0dae310216e1`.
+- **Validation:** waiting for GitHub Actions on the current main head; do not mark fully verified until test, typecheck, build, and CodeQL conclude.
 
 ## Branch / PR ledger (updated during execution)
 
