@@ -43,6 +43,7 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
     id: z.string().min(1).describe("Finding ID returned by report_vulnerability"),
     attempts: z.array(z.object({
       strategy: ATTEMPT_STRATEGY,
+      checkID: CHECK_ID.describe("Which of the ten validation checks this attempt tests"),
       variation: z.string().trim().min(3).max(160).describe("Unique case-specific test variation, not a renamed duplicate"),
       hypothesis: z.string().trim().min(8).max(800),
       outcome: ATTEMPT_OUTCOME,
