@@ -1198,6 +1198,7 @@ export namespace TargetMemory {
         note.content.slice(0, 1800),
         "",
       ]),
+    ] : []),
     ]
     return sections.join("\n").slice(0, 14_000)
   }
