@@ -75,6 +75,8 @@ You have these tools to record discoveries:
 ### Step 1: Check Existing Context
 Call `web_get_session_context` to see what has already been discovered in this session. This avoids recording duplicate objects and helps you understand what's new.
 
+**Use target-specific JavaScript correlation when present.** If the returned context contains a `[.../javascript]` target-memory note or JavaScript-correlation artifact reference, use it to cross-check this request's exact method/path, inferred path/query/body parameter names, likely source function, auth/cookie signals, role/feature hints, and static sink candidates. These are source-review hypotheses, not evidence that the current code path executed or that a vulnerability exists. Prefer the captured request/response and credential context as the behavioral evidence. Avoid repeating already-recorded observations; record only a meaningful new relationship or verification result. If no correlation note is present, continue normal request/response analysis rather than assuming JavaScript has been analyzed.
+
 ### Step 2: Analyze the Provided Response
 The response is already captured in `## Response`. Examine it directly — no need to re-fetch — **UNLESS it is an HTML response** (shown as the `This is an HTML response` stub), in which case the body is NOT captured: replay the request with `http_replay(request_id)` to get the actual HTML and enumerate its forms/inputs/params before concluding anything about its attack surface.
 
@@ -141,6 +143,12 @@ After analysis, provide a summary:
 
 ### Roles Detected
 - customer (from JWT claim)
+
+### JavaScript-source evidence rules
+- A source-derived route or function association is a candidate until correlated with observed traffic.
+- `innerHTML`, `eval`, `postMessage`, dynamic URL/navigation, prototype, or similar sink signals require manual source-to-sink review; do not report them alone as confirmed vulnerabilities.
+- A lack of static authentication/cookie clues is not proof that the endpoint is public. Use controlled, authorized account comparisons.
+- Never copy literal secrets or tokens from code/request context into notes. Use redacted labels and fingerprints only.
 
 ### Security Notes
 - user_id in request body (potential IDOR)
