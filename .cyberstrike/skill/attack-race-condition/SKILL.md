@@ -143,5 +143,8 @@ Capture request IDs, timestamps, status codes, and the final authoritative state
 
 ## References
 
+- [uphiago/recon-skills — redteam/hunt-race-condition](https://github.com/uphiago/recon-skills/blob/main/redteam/hunt-race-condition/SKILL.md) — merged source.
+- [elementalsouls/Claude-BugHunter — skills/hunt-race-condition](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-race-condition/SKILL.md) — merged source.
+
 - [PortSwigger: Race Conditions](https://portswigger.net/web-security/race-conditions)
 - [James Kettle: Smashing the State Machine](https://portswigger.net/research/smashing-the-state-machine)
