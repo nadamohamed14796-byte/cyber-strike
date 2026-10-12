@@ -24,12 +24,6 @@ export namespace SkillIndex {
   const builds = new Map<string, Promise<void>>()
   const emptyState = (): IndexState => ({ entries: new Map(), tagIndex: new Map(), techIndex: new Map(), cweIndex: new Map(), categoryIndex: new Map() })
   const current = () => states.get(Instance.directory) ?? emptyState()
-  let entries = new Map<string, Entry>()
-  let tagIndex = new Map<string, Set<string>>()
-  let techIndex = new Map<string, Set<string>>()
-  let cweIndex = new Map<string, Set<string>>()
-  let categoryIndex = new Map<string, Set<string>>()
-
 
   function toEntry(skill: Skill.Info): Entry {
     return {
@@ -94,17 +88,19 @@ export namespace SkillIndex {
   }
 
   export function get(name: string): Entry | undefined {
-    return entries.get(name)
+    return current().entries.get(name)
   }
 
   export function all(): Entry[] {
-    return Array.from(entries.values())
+    return Array.from(current().entries.values())
   }
 
   export function search(query: string, limit = 50): Entry[] {
-    const q = query.toLowerCase()
+    const state = current()
+    const q = query.toLowerCase().trim()
+    if (!q) return []
     const scored: Array<{ entry: Entry; score: number }> = []
-    for (const entry of entries.values()) {
+    for (const entry of state.entries.values()) {
       let score = 0
       if (entry.name.toLowerCase() === q) score += 100
       else if (entry.name.toLowerCase().startsWith(q)) score += 50
@@ -123,46 +119,50 @@ export namespace SkillIndex {
   }
 
   export function byTechStack(stack: string[], limit = 50): Entry[] {
+    const state = current()
     const names = new Set<string>()
     for (const tech of stack) {
-      const set = techIndex.get(tech.toLowerCase())
+      const set = state.techIndex.get(tech.toLowerCase())
       if (set) for (const name of set) names.add(name)
     }
     const results = Array.from(names)
-      .map((n) => entries.get(n)!)
+      .map((n) => state.entries.get(n)!)
       .filter(Boolean)
     return results.slice(0, limit)
   }
 
   export function byCWE(cweId: string, limit = 50): Entry[] {
-    const set = cweIndex.get(cweId.toUpperCase())
+    const state = current()
+    const set = state.cweIndex.get(cweId.toUpperCase())
     if (!set) return []
     return Array.from(set)
       .slice(0, limit)
-      .map((n) => entries.get(n)!)
+      .map((n) => state.entries.get(n)!)
       .filter(Boolean)
   }
 
   export function byCategory(cat: string, limit = 50): Entry[] {
-    const set = categoryIndex.get(cat.toLowerCase())
+    const state = current()
+    const set = state.categoryIndex.get(cat.toLowerCase())
     if (!set) return []
     return Array.from(set)
       .slice(0, limit)
-      .map((n) => entries.get(n)!)
+      .map((n) => state.entries.get(n)!)
       .filter(Boolean)
   }
 
   export function byTag(tag: string, limit = 50): Entry[] {
-    const set = tagIndex.get(tag.toLowerCase())
+    const state = current()
+    const set = state.tagIndex.get(tag.toLowerCase())
     if (!set) return []
     return Array.from(set)
       .slice(0, limit)
-      .map((n) => entries.get(n)!)
+      .map((n) => state.entries.get(n)!)
       .filter(Boolean)
   }
 
   export function chainsFrom(skillName: string): Array<{ target: string; boost?: string }> {
-    const entry = entries.get(skillName)
+    const entry = current().entries.get(skillName)
     if (!entry) return []
     return entry.chains_with.map((target) => ({
       target,
@@ -171,7 +171,7 @@ export namespace SkillIndex {
   }
 
   export function prerequisitesFor(skillName: string): string[] {
-    const entry = entries.get(skillName)
+    const entry = current().entries.get(skillName)
     if (!entry) return []
     return entry.prerequisites
   }
