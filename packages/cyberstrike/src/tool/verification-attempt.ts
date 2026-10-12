@@ -36,7 +36,7 @@ export const VerificationAttemptTool = Tool.define("verification_attempt", {
       const last = attempts[attempts.length - 1]
       const outcome = last?.outcome ?? "inconclusive"
       const lines = attempts.map((a, i) =>
-        `${i + 1}. [${a.strategyID} / ${a.variantKey}] valid=${a.validConditions} — ${a.resultSummary}${a.evidenceRef ? ` (evidence: ${a.evidenceRef})` : ""}`,
+        `${i + 1}. [${a.strategyID} / ${a.variantKey}] valid=${a.validConditions} — why: ${a.rationale} — result: ${a.resultSummary}${a.evidenceRef ? ` (evidence: ${a.evidenceRef})` : ""}`,
       )
       return {
         title: `Verification: ${attempts.length}/${Policy.MAX_ATTEMPTS} — ${outcome.toUpperCase()}`,
