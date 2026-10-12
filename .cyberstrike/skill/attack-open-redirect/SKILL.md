@@ -163,6 +163,13 @@ Use only test clients and accounts. Do not send real authorization codes or toke
 
 Include the original URL, sanitized redirect chain, final destination, normalization behavior, test account context, and minimal reproducible evidence.
 
+## Related Skills and Chains
+
+- [`attack-cache-poison`](../attack-cache-poison/SKILL.md) — link only when a redirect response is stored in a shared cache and a clean request receives it without the injected input.
+- [`attack-host-header`](../attack-host-header/SKILL.md) — assess whether Host/forwarded-host trust controls the generated redirect destination.
+- [`attack-cors`](../attack-cors/SKILL.md) — validate CORS separately when redirect flows cross origins; do not infer CORS impact from a redirect alone.
+- [`attack-jwt`](../attack-jwt/SKILL.md) — assess token exposure only when the OAuth/redirect flow and test evidence establish it.
+
 ## References
 
 - [PortSwigger: Open Redirect](https://portswigger.net/kb/issues/00500100_open-redirection-reflected)
