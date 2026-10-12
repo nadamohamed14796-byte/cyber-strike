@@ -380,6 +380,63 @@ export namespace ReportKnowledge {
     )
   }
 
+  // A query that names a concrete vulnerability class must not be satisfied by
+  // generic words such as "authorization", "API", or "security" in unrelated articles.
+  const SPECIFIC_QUERY_PATTERNS: Array<[string, RegExp]> = [
+    ["idor", /\\bidor\\b|insecure direct object|broken object level authorization|\\bbola\\b/i],
+    ["xss", /cross[- ]site scripting|\\bxss\\b/i],
+    ["ssrf", /\\bssrf\\b|server[- ]side request forgery/i],
+    ["csrf", /\\bcsrf\\b|cross[- ]site request forgery/i],
+    ["sqli", /\\bsqli\\b|sql injection/i],
+    ["xxe", /\\bxxe\\b|xml external entity/i],
+    ["ssti", /\\bssti\\b|server[- ]side template injection/i],
+    ["race-condition", /race condition|time[- ]of[- ]check|\\btoctou\\b/i],
+    ["open-redirect", /open redirect|unvalidated redirect/i],
+    ["auth-bypass", /authentication bypass|auth bypass/i],
+    ["access-control", /access control|authorization bypass|authorisation bypass|broken access control/i],
+    ["business-logic", /business logic/i],
+    ["prototype-pollution", /prototype pollution/i],
+    ["deserialization", /deserialization/i],
+    ["request-smuggling", /request smuggling|http desynchronization/i],
+    ["cache-poisoning", /cache poisoning/i],
+    ["file-upload", /file upload/i],
+    ["graphql", /\\bgraphql\\b/i],
+    ["jwt", /\\bjwt\\b|json web token/i],
+    ["command-injection", /command injection|os command injection/i],
+    ["path-traversal", /path traversal|directory traversal/i],
+    ["subdomain-takeover", /subdomain takeover|dangling cname/i],
+    ["oauth", /\\boauth\\b|open authorization/i],
+    ["web-cache", /web cache|cache deception/i],
+  ]
+
+  function specificQuerySignals(query?: string) {
+    if (!query) return []
+    return SPECIFIC_QUERY_PATTERNS.filter(([, pattern]) => pattern.test(query)).map(([signal]) => signal)
+  }
+
+  function matchesSpecificQuery(row: typeof ReportKnowledgeTable.$inferSelect, requested: string[]) {
+    if (!requested.length) return true
+    const metadata = row.metadata ?? {}
+    const extracted = metadata.extracted && typeof metadata.extracted === "object"
+      ? metadata.extracted as Record<string, unknown>
+      : {}
+    const storedSignals = new Set([
+      ...((Array.isArray(extracted.retrieval_signals) ? extracted.retrieval_signals : []) as unknown[])
+        .filter((value): value is string => typeof value === "string").map(normalize),
+      ...(row.tags ?? []).map(normalize),
+      normalize(row.vulnerability_class),
+    ])
+    const corpus = [
+      row.title, row.vulnerability_class, row.cwe_id, row.lesson, row.attack_vector,
+      row.impact, row.reproduction, row.poc, JSON.stringify(metadata),
+    ].filter(Boolean).join(" ")
+    return requested.some((signal) => {
+      if (storedSignals.has(signal)) return true
+      const pattern = SPECIFIC_QUERY_PATTERNS.find(([name]) => name === signal)?.[1]
+      return Boolean(pattern?.test(corpus))
+    })
+  }
+
   function relevanceScore(row: typeof ReportKnowledgeTable.$inferSelect, tokens: string[], signals: string[] = []) {
     if (!tokens.length && !signals.length) return 0
     const title = normalize(row.title)
@@ -450,6 +507,7 @@ export namespace ReportKnowledge {
 
         const tokens = queryTokens(input.query)
         const signals = canonicalSignals(input.query)
+        const specificSignals = specificQuerySignals(input.query)
         if (tokens.length || signals.length) {
           const candidateConditions = [
             ...tokens.flatMap((token) => {
@@ -482,6 +540,10 @@ export namespace ReportKnowledge {
           .all()
 
         return rows
+          // Enforce explicit vulnerability intent before scoring. Broad secondary
+          // signals like authorization-boundary must not pull unrelated XSS/SSRF posts
+          // into an IDOR-specific result set.
+          .filter((row) => matchesSpecificQuery(row, specificSignals))
           .map((row) => ({ row, score: relevanceScore(row, tokens, signals) }))
           .filter(({ score }) => (!(tokens.length || signals.length) || score >= 20))
           .sort(
