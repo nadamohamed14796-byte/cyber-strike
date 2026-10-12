@@ -80,7 +80,7 @@ export const ResearchCommand = cmd({
             for (const error of result.errors) prompts.log.warn(error)
           }
           const limit = exhaustive ? 500 : Math.min(500, (deep ? 200 : args.limit) * discoveries.length)
-          const learned = await learnResearchQueue({ limit })
+          const learned = await learnResearchQueue({ limit, sourceID: args.source })
           prompts.log.info("queue worker: claimed=" + learned.claimed + " learned=" + learned.learned +
             " skipped=" + learned.skipped + " failed=" + learned.failed + " blocked_auth=" + learned.blocked_auth)
           for (const error of learned.errors) prompts.log.warn(error)
