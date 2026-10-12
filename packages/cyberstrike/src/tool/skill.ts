@@ -10,6 +10,7 @@ import { PermissionNext } from "../permission/next"
 import { Ripgrep } from "../file/ripgrep"
 import { iife } from "@/util/iife"
 import { Agent } from "../agent/agent"
+import { Instance } from "../project/instance"
 
 const accessibleCache = new Map<string, Skill.Info[]>()
 
@@ -59,7 +60,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     async execute(params: z.infer<typeof parameters>, ctx) {
       await SkillIndex.ensureBuilt()
 
-      const agentKey = ctx.agent ?? ""
+      const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
       if (!accessibleCache.has(agentKey)) {
         const skills = await Skill.all()
         const agentInfo = await Agent.get(ctx.agent)
