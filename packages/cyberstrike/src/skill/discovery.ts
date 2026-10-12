@@ -229,6 +229,39 @@ export namespace Discovery {
     return true
   }
 
+  function parseIPv6Hextets(address: string): number[] | undefined {
+    const normalized = address.toLowerCase().split("%")[0]
+    const separator = normalized.indexOf("::")
+    let parts: string[]
+    if (separator >= 0) {
+      const left = normalized.slice(0, separator).split(":").filter(Boolean)
+      const right = normalized.slice(separator + 2).split(":").filter(Boolean)
+      const missing = 8 - left.length - right.length
+      if (missing < 1) return undefined
+      parts = [...left, ...Array.from({ length: missing }, () => "0"), ...right]
+    } else {
+      parts = normalized.split(":")
+    }
+    if (parts.length !== 8) return undefined
+    const values = parts.map((part) => /^[0-9a-f]{1,4}$/.test(part) ? Number.parseInt(part, 16) : Number.NaN)
+    return values.every(Number.isInteger) ? values : undefined
+  }
+
+  function ipv6HasPrefix(address: string, prefix: number[], prefixBits: number): boolean {
+    const parts = parseIPv6Hextets(address)
+    if (!parts) return false
+    const fullHextets = Math.floor(prefixBits / 16)
+    for (let i = 0; i < fullHextets; i++) {
+      if (parts[i] !== prefix[i]) return false
+    }
+    const remainingBits = prefixBits % 16
+    if (remainingBits > 0) {
+      const mask = (0xffff << (16 - remainingBits)) & 0xffff
+      if ((parts[fullHextets] & mask) !== (prefix[fullHextets] & mask)) return false
+    }
+    return true
+  }
+
   export function isPublicAddress(address: string): boolean {
     const family = isIP(address)
     if (family === 4) {
@@ -244,10 +277,13 @@ export namespace Discovery {
       return true
     }
     if (family === 6) {
-      const normalized = address.toLowerCase().split("%")[0]
-      // Remote skill sources should resolve only to global-unicast IPv6
-      // addresses (2000::/3), excluding the documentation prefix.
-      if (!/^[23]/.test(normalized) || normalized.startsWith("2001:db8:")) return false
+      // Allow only global-unicast IPv6, rejecting special-purpose, transition,
+      // and documentation prefixes that are not suitable remote fetch targets.
+      if (!ipv6HasPrefix(address, [0x2000], 3)) return false
+      if (ipv6HasPrefix(address, [0x2001, 0x0000], 23)) return false // IANA special-purpose block
+      if (ipv6HasPrefix(address, [0x2001, 0x0db8], 32)) return false // documentation
+      if (ipv6HasPrefix(address, [0x2002], 16)) return false // 6to4 transition
+      if (ipv6HasPrefix(address, [0x3fff], 16)) return false // documentation/reserved block
       return true
     }
     return false
