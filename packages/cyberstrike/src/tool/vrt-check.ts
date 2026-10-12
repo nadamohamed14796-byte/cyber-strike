@@ -3,6 +3,7 @@ import { Tool } from "./tool"
 import { Intel } from "../methodology/intel"
 import { Session } from "../session"
 import { vrtScopeViolation, offLaneMessage } from "./vuln-scope"
+import { VerificationLedger } from "../session/verification-ledger"
 
 export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
   description:
@@ -48,6 +49,28 @@ export const UpdateVrtCheckTool = Tool.define("update_vrt_check", {
         title: `VRT rejected — ${params.vrt_category} out of ${violation.cls} scope`,
         output: offLaneMessage(violation.cls, violation.allowed, params.vrt_category),
         metadata: { entryID: params.entry_id, category: params.vrt_category, status: params.status },
+      }
+    }
+
+    if (params.status === "tested_not_vulnerable") {
+      if (!params.verification_hypothesis_key?.trim()) {
+        return {
+          title: `VRT clean verdict blocked — ${params.vrt_category}`,
+          output: "Cannot mark this category tested_not_vulnerable without verification_hypothesis_key. Record adaptive attempts in verification_attempt first; failed probes or exhausted budget are not proof of absence.",
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_missing_verification" },
+        }
+      }
+      const attempts = VerificationLedger.list({
+        sessionID: Session.root(ctx.sessionID),
+        hypothesisKey: params.verification_hypothesis_key,
+      })
+      const outcome = attempts[attempts.length - 1]?.outcome
+      if (outcome !== "disproven") {
+        return {
+          title: `VRT clean verdict blocked — ${params.vrt_category}`,
+          output: `Cannot mark this category tested_not_vulnerable: verification outcome is ${outcome ?? "unrecorded"}, not DISPROVEN. Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: attempts.length, outcome: outcome ?? "unrecorded" },
+        }
       }
     }
 
