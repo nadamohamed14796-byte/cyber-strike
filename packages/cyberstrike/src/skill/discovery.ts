@@ -321,7 +321,6 @@ export namespace Discovery {
 
   type ResourceBudget = {
     downloadedBytes: number
-    reservedDownloadBytes: number
     expandedBytes: number
     reservedExpandedBytes: number
     deadline: number
@@ -340,7 +339,11 @@ export namespace Discovery {
   }
 
   /** Read a response incrementally so an untrusted registry cannot exhaust memory with an oversized body. */
-  export async function readBoundedBody(response: Response, maxBytes: number): Promise<Uint8Array | undefined> {
+  export async function readBoundedBody(
+    response: Response,
+    maxBytes: number,
+    acceptChunk?: (byteLength: number) => boolean,
+  ): Promise<Uint8Array | undefined> {
     if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) return undefined
     const declaredLength = response.headers.get("content-length")
     if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
@@ -355,11 +358,12 @@ export namespace Discovery {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        total += value.byteLength
-        if (total > maxBytes) {
+        const nextTotal = total + value.byteLength
+        if (nextTotal > maxBytes || (acceptChunk && !acceptChunk(value.byteLength))) {
           await reader.cancel().catch(() => {})
           return undefined
         }
+        total = nextTotal
         chunks.push(value)
       }
     } catch {
@@ -388,14 +392,10 @@ export namespace Discovery {
     if (await Bun.file(safeDest).exists()) return true
 
     const remainingMs = budget.deadline - Date.now()
-    if (remainingMs <= 0) return false
-    const remaining = MAX_TOTAL_DOWNLOAD_BYTES - budget.downloadedBytes - budget.reservedDownloadBytes
-    const reservation = Math.min(MAX_SKILL_DOWNLOAD_BYTES, remaining)
-    if (reservation <= 0) {
-      log.warn("refusing skill download: total download budget exhausted", { url })
+    if (remainingMs <= 0 || budget.downloadedBytes >= MAX_TOTAL_DOWNLOAD_BYTES) {
+      log.warn("refusing skill download: total byte or time budget exhausted", { url })
       return false
     }
-    budget.reservedDownloadBytes += reservation
     try {
       const response = await fetchRemoteURL(url, AbortSignal.timeout(Math.min(DOWNLOAD_TIMEOUT_MS, remainingMs)))
       if (!response.ok) {
@@ -403,19 +403,22 @@ export namespace Discovery {
         log.error("failed to download", { url, status: response.status })
         return false
       }
-      const bytes = await readBoundedBody(response, reservation)
+      const bytes = await readBoundedBody(response, MAX_SKILL_DOWNLOAD_BYTES, (byteLength) => {
+        if (budget.downloadedBytes + byteLength > MAX_TOTAL_DOWNLOAD_BYTES) return false
+        // Count chunks as they arrive so concurrent downloads cannot overshoot
+        // the pull-wide budget and small assets do not reserve 25 MiB each.
+        budget.downloadedBytes += byteLength
+        return true
+      })
       if (!bytes) {
-        log.warn("refusing oversized or unreadable skill download", { url, maxBytes: reservation })
+        log.warn("refusing oversized, unreadable, or over-budget skill download", { url, maxBytes: MAX_SKILL_DOWNLOAD_BYTES })
         return false
       }
-      budget.downloadedBytes += bytes.byteLength
       await Bun.write(safeDest, binary ? bytes : new TextDecoder().decode(bytes))
       return true
     } catch (err) {
       log.error("failed to download", { url, err })
       return false
-    } finally {
-      budget.reservedDownloadBytes -= reservation
     }
   }
 
@@ -423,7 +426,6 @@ export namespace Discovery {
     const result: string[] = []
     const budget: ResourceBudget = {
       downloadedBytes: 0,
-      reservedDownloadBytes: 0,
       expandedBytes: 0,
       reservedExpandedBytes: 0,
       deadline: Date.now() + MAX_TOTAL_PULL_MS,
