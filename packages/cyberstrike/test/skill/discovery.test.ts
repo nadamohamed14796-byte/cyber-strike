@@ -21,6 +21,16 @@ describe("remote skill path validation", () => {
     expect(await Discovery.pull("")).toEqual([])
   })
 
+  test("bounded response reader accounts for the chunk that exhausts a shared budget", async () => {
+    let received = 0
+    const result = await Discovery.readBoundedBody(new Response("1234"), 10, (size) => {
+      received += size
+      return received <= 3
+    })
+    expect(result).toBeUndefined()
+    expect(received).toBe(4)
+  })
+
   test("remote skill URL policy rejects local, literal-IP, credentialed, and non-HTTPS destinations", () => {
     expect(Discovery.isSafeRemoteURLShape("https://developers.cloudflare.com/.well-known/skills/index.json")).toBe(true)
     for (const url of [
