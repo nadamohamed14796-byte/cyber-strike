@@ -119,7 +119,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Proceed only for explicitly authorized devices/labs; inventory reachable model, firmware, and ISAPI response behavior with read-only requests before considering any test.
+2. Compare anonymous and controlled low-privilege behavior for documented read-only device/config endpoints; avoid default-password spraying, configuration writes, firmware changes, and reboot operations.
+3. Treat firmware/version fingerprints as leads only; correlate exact model and release with vendor advisories and determine whether the affected feature is reachable in this deployment.
+4. Use a synthetic device record or harmless configuration marker to validate an access-control defect. Do not retrieve video, credentials, private feeds, or other people's camera data.
+5. Record exact endpoint, firmware evidence, expected permission, actual disclosure/action, and safe remediation such as patching, network isolation, and disabling unnecessary services.
+
 
 ### Verdict gates
 

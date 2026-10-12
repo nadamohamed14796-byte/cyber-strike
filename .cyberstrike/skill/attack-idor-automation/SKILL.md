@@ -188,7 +188,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Create two test users and a minimal fixture matrix where each user owns different records; record role, tenant, owner, and expected policy before sending requests.
+2. Compare one identifier at a time across path, query, JSON body, nested relationship, GraphQL/global ID, bulk, export, and download references that are actually present in captured traffic.
+3. Test each operation independently—read, update, delete, share, and export—using only reversible test-owned resources. A read-only result does not imply write access.
+4. Check authorization at both object and parent/tenant boundaries, and use a third negative-control object or explicitly public/shared resource to detect intended sharing and generic responses.
+5. Confirm the actual returned field or state change, sanitize evidence, and stop before enumerating other users' identifiers. Record whether each of the distinct hypotheses was confirmed, refuted, or untested.
+
 
 ### Verdict gates
 

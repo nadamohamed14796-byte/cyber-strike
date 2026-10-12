@@ -107,7 +107,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Baseline the reset flow for an existing test account and a synthetic nonexistent identifier; compare status/body/timing only as supporting evidence, accounting for asynchronous email and normal variance.
+2. Use only inboxes and recovery channels you control to inspect token purpose, account binding, entropy evidence available to the tester, expiry, single-use behavior, and invalidation after a successful reset.
+3. Change one factor at a time: expired token, reused token, changed account identifier, alternate host/header in generated URL, or concurrent reset requests within program limits.
+4. Confirm whether a reset actually changes the test account's credential/session state as intended; never attempt to reset real users, spam notifications, or infer takeover from an email response alone.
+5. Capture sanitized request/response and the controlled mailbox event, then retest a valid flow as a positive control and an invalid/replayed token as a negative control.
+
 
 ### Verdict gates
 

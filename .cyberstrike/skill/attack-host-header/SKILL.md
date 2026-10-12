@@ -138,7 +138,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Capture a normal request and generated absolute URLs, then vary one host-related input at a time across Host, forwarded-host, original-host, and proxy headers only where that deployment accepts them.
+2. Use a canary hostname/domain you control and observe whether the application trusts the value in redirects, password-reset URLs, canonical links, or cacheable content.
+3. Distinguish application reflection from a trust-boundary failure: verify whether a generated URL is actually consumed by a controlled workflow or shared through a cache.
+4. Exercise any reset/invite flow only for test-owned accounts and mailboxes; do not send messages to third parties or poison shared authenticated cache entries.
+5. Capture the baseline, changed header, generated output, and negative-control host. Recommend trusted-proxy normalization and an allowlist of canonical hosts.
+
 
 ### Verdict gates
 

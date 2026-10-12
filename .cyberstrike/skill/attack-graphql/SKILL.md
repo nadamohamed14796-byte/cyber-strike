@@ -162,7 +162,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Identify the GraphQL endpoint and capture one valid query, one invalid-field query, and one unauthenticated response; bound query size/depth and preserve request IDs.
+2. Use schema introspection only within program rules and only to map attack surface; check field-level auth, node/global-ID access, aliases, batching, and nested relationships with test-owned records.
+3. Change one variable per request: principal, object ID, requested property, operation type, or API version. Compare behavior to the schema's expected access policy rather than relying on hidden UI controls.
+4. Test mutations only on disposable records with reversible, nonfinancial effects; avoid expensive recursive queries or broad enumeration that could affect availability.
+5. Confirm unauthorized data/action using a canary and compare with a denied principal/control. Report field/path, role, object ownership, and actual impact; introspection exposure alone is context, not proof.
+
 
 ### Verdict gates
 

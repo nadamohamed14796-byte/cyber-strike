@@ -116,7 +116,12 @@ Track each attempt as: hypothesis, one changed variable, baseline/control, obser
 
 ### Skill-specific hypothesis order
 
-Use the skill's existing matrix to choose independent, low-impact branches; do not repeat equivalent probes.
+1. Capture the candidate response and a random nonexistent-path/control response from the same host, session, and cache context; normalize dynamic IDs, timestamps, and request IDs before comparing.
+2. Check the exact exposed artifact class (stack trace, source map, config, metadata, backup, debug endpoint, or response field) and whether the content includes data that should be private.
+3. Establish whether the artifact is public by design, generated sample data, a soft-404, or shared-cache content before escalating its significance.
+4. Read only the minimum benign evidence needed to establish sensitivity; never bulk-download files, follow exposed secrets into other services, or retain credentials in logs.
+5. Report the precise sensitive field/artifact, unauthenticated or over-privileged access path, control response, and remediation; redact secrets and use a safe regression test.
+
 
 ### Verdict gates
 

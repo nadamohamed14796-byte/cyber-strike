@@ -114,7 +114,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Verify the deployed Flask/Werkzeug stack and environment from reliable evidence, then baseline normal errors, redirects, cookies, and route behavior.
+2. Check whether debug mode, interactive debugger, development server, verbose tracebacks, or source artifacts are reachable; use a deliberately invalid benign request and compare a random-path control.
+3. Review proxy trust, host validation, secure cookie flags, session signing configuration, and route authorization only where the deployed topology makes the setting relevant.
+4. Use controlled accounts to test route and object access; do not attempt debugger-console execution or forge production session secrets as a way to demonstrate impact.
+5. Report verified configuration or authorization behavior, not a guessed framework version. Include the precise production-safe setting change and a regression check.
+
 
 ### Verdict gates
 

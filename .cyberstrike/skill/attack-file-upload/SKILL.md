@@ -110,7 +110,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Baseline upload behavior with an inert text or image canary: allowed extension, rejected extension, size boundary, and the server's final storage/retrieval path.
+2. Change one file property at a time—extension, content type, signature, filename, path/name normalization, or archive structure—and observe whether validation is server-side and consistent.
+3. Verify storage isolation and execution behavior with a harmless canary in a test-owned folder. Do not upload malware, web shells, oversized archives, or polyglot files to production.
+4. Check authorization independently for upload, view, download, replace, and delete operations using two controlled identities; opaque filenames do not substitute for access checks.
+5. Record the exact validation gap, final serving headers/origin, and a control rejected by the server; remediation should combine allowlisted types, content inspection, safe storage, randomized names, and authorization tests.
+
 
 ### Verdict gates
 

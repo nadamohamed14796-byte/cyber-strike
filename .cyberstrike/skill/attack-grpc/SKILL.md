@@ -107,7 +107,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Confirm the in-scope host, transport (TLS/plaintext), and gRPC service/method names from allowed client traffic or published protos; do not scan unrelated ports.
+2. Establish valid and unauthenticated baselines for one read-only method, then compare an expired token and a least-privileged test identity.
+3. Check method-level authorization and object ownership using only synthetic identifiers; when reflection is enabled, distinguish intentional development discovery from exposed sensitive capability.
+4. Validate input constraints with benign type/length boundary values and low request volume; do not send oversized messages or high-rate streams that could exhaust resources.
+5. Capture sanitized status/trailers, method, principal, request schema/version, and control result. Confirm the denied operation is genuinely forbidden and propose a method-level policy regression test.
+
 
 ### Verdict gates
 
