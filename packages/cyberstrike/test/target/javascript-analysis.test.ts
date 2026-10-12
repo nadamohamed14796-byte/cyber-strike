@@ -124,6 +124,20 @@ test("keeps concatenated query values out of the inferred path and defaults fetc
   expect(item?.pathParameters).toContain("id")
 })
 
+test("normalizes static numeric and UUID path values to placeholders", () => {
+  const source = [
+    'fetch("/api/users/12345")',
+    'fetch("/api/invoices/550e8400-e29b-41d4-a716-446655440000")',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.requests.find((item) => item.path.includes("/api/users/"))?.path).toBe("/api/users/{id}")
+  expect(result.requests.find((item) => item.path.includes("/api/invoices/"))?.path).toBe("/api/invoices/{uuid}")
+  expect(result.requests.some((item) => item.pathParameters.includes("id"))).toBe(true)
+  expect(result.requests.some((item) => item.pathParameters.includes("uuid"))).toBe(true)
+  expect(JSON.stringify(result)).not.toContain("12345")
+  expect(JSON.stringify(result)).not.toContain("550e8400-e29b-41d4-a716-446655440000")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
