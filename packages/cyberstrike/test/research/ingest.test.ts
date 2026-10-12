@@ -76,6 +76,8 @@ test("research PoC extraction recognizes HTTPie and Python HTTP-client examples"
 })
 
 test("research ingestion redacts credentials and secret-bearing URLs before persistence", () => {
+  const slackTokenFixture = "xoxb-test-" + crypto.randomUUID().replace(/-/g, "")
+  const gitlabTokenFixture = "glpat-" + crypto.randomUUID().replace(/-/g, "").repeat(2)
   const raw = [
     "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
     "Cookie: sessionid=live-session-value",
@@ -83,6 +85,10 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
     "csrf_token=live-csrf-token sessionid=live-session-id",
     "ghp_123456789012345678901234567890123456",
     "AKIA1234567890ABCDEF",
+    "ASIA1234567890ABCDEF",
+    "AWS_SECRET_ACCESS_KEY=aws-secret-key-value",
+    slackTokenFixture,
+    gitlabTokenFixture,
     "https://example.test/callback?token=live-query-token&next=%2Fhome",
     "eyJabcdefghijk.abcdefghijk.abcdefghijk",
     "-----BEGIN PRIVATE KEY-----private-key-material-----END PRIVATE KEY-----",
@@ -95,6 +101,10 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
   expect(safe).not.toContain("live-session-id")
   expect(safe).not.toContain("ghp_123456789012345678901234567890123456")
   expect(safe).not.toContain("AKIA1234567890ABCDEF")
+  expect(safe).not.toContain("ASIA1234567890ABCDEF")
+  expect(safe).not.toContain("aws-secret-key-value")
+  expect(safe).not.toContain(slackTokenFixture)
+  expect(safe).not.toContain(gitlabTokenFixture)
   expect(safe).not.toContain("live-query-token")
   expect(safe).not.toContain("eyJabcdefghijk.abcdefghijk.abcdefghijk")
   expect(safe).not.toContain("private-key-material")
@@ -134,6 +144,14 @@ test("research URL normalization removes embedded credentials and secret query p
     .toBe("https://reports.example.test/report?id=42")
   expect(normalizeResearchUrl("https://reports.example.test/report?access_token=abc&Page=2"))
     .toBe("https://reports.example.test/report?Page=2")
+})
+
+test("research URL normalization strips provider-specific signed and secret query keys", () => {
+  expect(
+    normalizeResearchUrl(
+      "https://reports.example.test/download?X-Amz-Signature=signed-value&AWS_SECRET_ACCESS_KEY=secret-value&client_secret=client-value&Page=2",
+    ),
+  ).toBe("https://reports.example.test/download?Page=2")
 })
 
 
