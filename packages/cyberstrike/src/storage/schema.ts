@@ -24,4 +24,5 @@ export {
   ChainCandidateTable,
   AgentPerformanceTable,
   ValidationViolationTable,
+  VerificationAttemptTable,
 } from "../methodology/methodology.sql"
