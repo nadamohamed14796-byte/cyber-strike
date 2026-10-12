@@ -372,6 +372,17 @@ export namespace ProviderTransform {
         high: { reasoningEffort: "high" },
       }
     }
+
+    // xAI Chat Completions does not accept reasoningEffort for these models.
+    // Keep them out of the generic provider mapping below.
+    const xaiModelID = model.api.id.toLowerCase()
+    if (
+      model.api.npm === "@ai-sdk/xai" &&
+      ["grok-3", "grok-4", "grok-4-fast-reasoning"].includes(xaiModelID)
+    ) {
+      return {}
+    }
+
     switch (model.api.npm) {
       case "@openrouter/ai-sdk-provider":
         if (!model.id.includes("gpt") && !model.id.includes("gemini-3") && !model.id.includes("claude")) return {}

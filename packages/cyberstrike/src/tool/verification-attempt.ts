@@ -25,7 +25,17 @@ const StatusAction = z.object({
 })
 const Parameters = z.discriminatedUnion("action", [RecordAction, StatusAction])
 
-export const VerificationAttemptTool = Tool.define("verification_attempt", {
+type VerificationAttemptMetadata = {
+  hypothesisKey: string
+  attemptsUsed: number
+  maxAttempts: number
+  outcome: Policy.Outcome
+  remainingAttempts?: number
+  canContinue?: boolean
+  duplicate?: boolean
+}
+
+export const VerificationAttemptTool = Tool.define<typeof Parameters, VerificationAttemptMetadata>("verification_attempt", {
   description:
     "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. Up to 20 distinct strategy_id + variant_key combinations per hypothesis; duplicate retries do not consume budget. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, WAF response, or exhausted budget alone NEVER proves false positive. Use decisive_result=confirmed only with decisive evidence_ref. Use decisive_result=disproven only with direct contradictory evidence_ref and valid_conditions=true. If unresolved at 20, status is INCONCLUSIVE/NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
   parameters: Parameters,
@@ -80,7 +90,7 @@ export const VerificationAttemptTool = Tool.define("verification_attempt", {
         `Reason: ${d.reason}`,
         next,
       ].join("\n"),
-      metadata: { hypothesisKey: params.hypothesis_key, attemptsUsed: d.attemptsUsed, remainingAttempts: d.remainingAttempts, outcome: d.outcome, canContinue: d.canContinue, duplicate: result.duplicate },
+      metadata: { hypothesisKey: params.hypothesis_key, attemptsUsed: d.attemptsUsed, maxAttempts: Policy.MAX_ATTEMPTS, remainingAttempts: d.remainingAttempts, outcome: d.outcome, canContinue: d.canContinue, duplicate: result.duplicate },
     }
   },
 })

@@ -1933,19 +1933,20 @@ describe("ProviderTransform.variants", () => {
   })
 
   describe("@ai-sdk/xai", () => {
-    test("grok-3 returns empty object", () => {
-      const model = createMockModel({
-        id: "xai/grok-3",
-        providerID: "xai",
-        api: {
-          id: "grok-3",
-          url: "https://api.x.ai",
-          npm: "@ai-sdk/xai",
-        },
+    for (const modelID of ["grok-3", "grok-4", "grok-4-fast-reasoning"]) {
+      test(`${modelID} returns empty object when reasoningEffort is unsupported`, () => {
+        const model = createMockModel({
+          id: `xai/${modelID}`,
+          providerID: "xai",
+          api: {
+            id: modelID,
+            url: "https://api.x.ai",
+            npm: "@ai-sdk/xai",
+          },
+        })
+        expect(ProviderTransform.variants(model)).toEqual({})
       })
-      const result = ProviderTransform.variants(model)
-      expect(result).toEqual({})
-    })
+    }
 
     test("grok-3-mini returns low and high with reasoningEffort", () => {
       const model = createMockModel({
