@@ -24,6 +24,7 @@ import { ReplayResponse } from "../replay/response"
 import { Observe } from "../replay/observe"
 import { Mutate } from "../replay/mutate"
 import { Batch } from "../replay/batch"
+import { TargetMemory } from "../target"
 
 // Encode codecs mirrored as a zod enum for the tool schema (kept in sync with
 // Encode.Codec in ../replay/encode.ts).
@@ -330,6 +331,84 @@ function buildDiff(baseline: ReplayResponse.Result, exploit: ReplayResponse.Resu
   }
 }
 
+type ReplayNoteMutation = { op: string; name?: string }
+function resultFacts(result: ReplayResponse.Result) {
+  return {
+    status: result.response?.status ?? null,
+    response_bytes: result.response?.body.length ?? null,
+    duration_ms: Math.round(result.timing.totalMs ?? 0),
+    send_error: result.error ? (result.error.name || "send-error") : null,
+  }
+}
+function mutationLabels(mutations?: ReplayNoteMutation[]) {
+  return (mutations ?? []).map((mutation) =>
+    mutation.op + (mutation.name ? "(" + mutation.name.slice(0, 100) + ")" : ""),
+  ).slice(0, 30)
+}
+
+/**
+ * Keep a redacted per-endpoint history in the existing target workspace.
+ * This records observation facts only: never request/response bodies, header values,
+ * query values, mutation values, or credential IDs. Out-of-scope/path-unmatched
+ * workspaces are not created as a side effect of replay.
+ */
+async function recordReplayObservation(input: {
+  sessionID: string
+  origin: string
+  method: string
+  requestTarget: string
+  sourceRequestID?: string
+  mode: "single" | "compare" | "sweep"
+  mutationLabels: string[]
+  summary: Record<string, unknown>
+  manualReview: boolean
+}): Promise<boolean> {
+  try {
+    const originURL = safeURL(input.origin)
+    if (!originURL) return false
+    const requestPath = (input.requestTarget.split("?", 1)[0] ?? "/").split("#", 1)[0] || "/"
+    const eligible = TargetMemory.list().filter((workspace) => {
+      const target = safeURL(workspace.targetURL)
+      if (!target || target.origin !== originURL.origin) return false
+      const prefix = target.pathname.replace(/\/+$/, "") || "/"
+      return prefix === "/" || requestPath === prefix || requestPath.startsWith(prefix + "/")
+    }).sort((a, b) => {
+      const aPath = safeURL(a.targetURL)?.pathname.replace(/\/+$/, "").length ?? 0
+      const bPath = safeURL(b.targetURL)?.pathname.replace(/\/+$/, "").length ?? 0
+      return bPath - aPath
+    })
+    const workspace = eligible[0]
+    if (!workspace || !TargetMemory.isObservedInSession(input.sessionID, workspace.targetURL)) return false
+    const now = new Date().toISOString()
+    const endpoint = input.method.toUpperCase() + " " + requestPath
+    const content = [
+      "Test execution time: " + now,
+      "Endpoint: " + endpoint,
+      "Origin: " + originURL.origin,
+      "Mode: " + input.mode,
+      "Captured request ID: " + (input.sourceRequestID ?? "constructed request (same captured origin)"),
+      "Mutation operations (values deliberately omitted): " + (input.mutationLabels.length ? input.mutationLabels.join(", ") : "none"),
+      "Result facts: " + JSON.stringify(input.summary),
+      "Assessment: observation only; this record is not a vulnerability verdict or proof the endpoint is safe.",
+      "Follow-up: " + (input.manualReview
+        ? "Manual review required: compare against the baseline and verify server-side validation/authorization with controlled test accounts."
+        : "Review the recorded response facts against a baseline; absence of a difference is not proof of safety."),
+    ].join("\n")
+    await TargetMemory.addNote(workspace.targetURL, {
+      kind: "endpoint",
+      title: ("HTTP replay: " + endpoint).slice(0, 180),
+      content,
+      source: "http-replay:" + input.sessionID,
+      status: "observed",
+      tags: ["http-replay", "endpoint-test", input.mode, ...(input.manualReview ? ["manual-review"] : [])],
+    })
+    return true
+  } catch {
+    // A note-write error must not hide the actual request/response from the caller.
+    return false
+  }
+}
+
 // ── http_replay (structured) ─────────────────────────────────────────────────
 
 const REPLAY_DESC = `Replay a captured request with field-level mutations, sent through the structured (fetch) backend — no shell, so payloads land as request DATA byte-for-byte.
@@ -506,16 +585,33 @@ export const HttpReplayTool = Tool.define("http_replay", {
         sendGoverned(exploitMsg, origin, sendOpts),
       ])
 
+      const diff = buildDiff(baselineResult, exploitResult)
+      const behaviorDiffers = diff.comparable === true && (diff.status_match === false || diff.body_length_match === false || diff.body_content_match === false)
+      const noteSaved = await recordReplayObservation({
+        sessionID, origin, method: exploitMsg.method, requestTarget: exploitMsg.target,
+        sourceRequestID: params.request_id, mode: "compare",
+        mutationLabels: [
+          ...mutationLabels(compare.baseline?.mutations).map((x) => "baseline:" + x),
+          ...mutationLabels(compare.exploit.mutations).map((x) => "exploit:" + x),
+          ...(compare.baseline?.unauthenticated ? ["baseline:remove-auth-headers"] : []),
+          ...(compare.exploit.unauthenticated ? ["exploit:remove-auth-headers"] : []),
+          ...(compare.baseline?.credential ? ["baseline:credential-switch"] : []),
+          ...(compare.exploit.credential ? ["exploit:credential-switch"] : []),
+        ],
+        summary: { baseline: resultFacts(baselineResult), exploit: resultFacts(exploitResult), diff },
+        manualReview: behaviorDiffers || Boolean(baselineResult.error || exploitResult.error),
+      })
       const output = {
         baseline: { ...summarize(baselineResult, params.marker), curl: curlTemplate(baselineMsg, origin) },
         exploit: { ...summarize(exploitResult, params.marker), curl: curlTemplate(exploitMsg, origin) },
-        diff: buildDiff(baselineResult, exploitResult),
+        diff,
+        observation_note_saved: noteSaved,
       }
 
       return {
         title: `http_replay compare ${originHost}`,
         output: JSON.stringify(output, null, 2),
-        metadata: {},
+        metadata: { observation_note_saved: noteSaved },
       }
     }
 
@@ -546,10 +642,22 @@ export const HttpReplayTool = Tool.define("http_replay", {
         { concurrency: 3 },
       )
 
+      const safeResults = results.filter(Boolean).map((entry) => {
+        if (!entry || typeof entry !== "object") return { status: null, body_len: null, error: "unknown" }
+        const row = entry as Record<string, unknown>
+        return { status: row.status ?? null, body_len: row.body_len ?? null, error: row.error ? "send-error" : null }
+      })
+      const noteSaved = await recordReplayObservation({
+        sessionID, origin, method: sharedMsg.method, requestTarget: sharedMsg.target,
+        sourceRequestID: params.request_id, mode: "sweep",
+        mutationLabels: mutationLabels([sweep.mutation]),
+        summary: { cases: safeResults.length, results: safeResults },
+        manualReview: safeResults.some((result) => result.error !== null),
+      })
       return {
         title: `http_replay sweep (${sweep.values.length} values) ${originHost}`,
-        output: JSON.stringify(results.filter(Boolean), null, 2),
-        metadata: {},
+        output: JSON.stringify({ results: results.filter(Boolean), observation_note_saved: noteSaved }, null, 2),
+        metadata: { observation_note_saved: noteSaved },
       }
     }
 
@@ -571,12 +679,25 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
     const result = await sendGoverned(msg, origin, sendOpts)
 
+    const facts = resultFacts(result)
+    const noteSaved = await recordReplayObservation({
+      sessionID, origin, method: msg.method, requestTarget: msg.target,
+      sourceRequestID: params.request_id, mode: "single",
+      mutationLabels: [
+        ...mutationLabels(params.mutations),
+        ...(params.unauthenticated ? ["remove-auth-headers"] : []),
+        ...(params.credential ? ["credential-switch"] : []),
+      ],
+      summary: facts,
+      manualReview: Boolean(params.mutations?.length || params.unauthenticated || params.credential || result.error),
+    })
     const output = {
       target: { method: msg.method, origin, request_target: msg.target },
       ...summarize(result, params.marker),
       curl: curlTemplate(msg, origin),
+      observation_note_saved: noteSaved,
     }
-    return { title: `http_replay ${msg.method} ${originHost}`, output: JSON.stringify(output, null, 2), metadata: {} }
+    return { title: `http_replay ${msg.method} ${originHost}`, output: JSON.stringify(output, null, 2), metadata: { observation_note_saved: noteSaved } }
   },
 })
 
