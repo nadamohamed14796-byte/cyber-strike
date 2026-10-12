@@ -82,6 +82,33 @@ CyberStrike isn't just a wrapper around an LLM. It's an intelligence layer that 
 
 ---
 
+### Persistent Research Queue & Authentication
+
+Research discovery and learning are backed by the local SQLite queue. Re-running `cyberstrike research sync` does not intentionally re-learn reports already marked `learned` or `rejected`; discovered URLs are normalized and deduplicated per source, and unfinished `queued`/`retry` items remain available to the learner. Use `cyberstrike research queue-stats` and `cyberstrike research queue-pending` to inspect progress.
+
+- `cyberstrike research sources` lists configured sources.
+- `cyberstrike research discover [source-id]` discovers and queues reports without studying them.
+- `cyberstrike research learn --limit 50` processes queued reports; `--watch` keeps the worker running.
+- `cyberstrike research sync [source-id]` runs discovery and then processes queued work.
+- `cyberstrike research retry-auth [--source source-id]` requeues reports that were blocked by a login wall after credentials are configured.
+
+Most sources are read anonymously where their public pages allow it. For a source that legitimately requires your own authenticated session, supply a session cookie or Authorization value in a source-scoped environment variable. The variable suffix is the source ID uppercased with non-alphanumeric characters replaced by underscores. For example:
+
+```bash
+# Enter the cookie without echoing it to the terminal; do not commit it or put it in source files.
+read -rsp 'HackerOne session cookie: ' CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY
+echo
+export CYBERSTRIKE_RESEARCH_COOKIE_HACKERONE_HACKTIVITY
+
+# Retry only reports blocked for this source, then process the queue.
+cyberstrike research retry-auth --source hackerone-hacktivity
+cyberstrike research learn --limit 50
+```
+
+Alternatively use `CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID>` for a supported Authorization header. Credentials are read from the process environment at fetch time and are not stored in the research queue or knowledge records. CyberStrike does not create accounts automatically, defeat CAPTCHA/MFA, or bypass access controls. If a site requires registration, interactive login, or terms acceptance, complete that step yourself and provide a permitted session; otherwise the report remains marked `blocked_auth` until retried.
+
+---
+
 ### Skills System — 7,300+ Actionable Security Tests
 
 CyberStrike doesn't just give agents generic security knowledge — it loads domain-specific skills on-demand with zero context pollution.
