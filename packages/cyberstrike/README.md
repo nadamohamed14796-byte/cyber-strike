@@ -322,3 +322,27 @@ CyberStrike is the core platform. These MCP servers extend its capabilities:
 <p align="center">
   <sub>Built by hackers who got tired of copy-pasting between terminals.</sub>
 </p>
+
+
+## Research report queue and authenticated sources
+
+Research sync uses a persistent queue. Re-running discovery can revisit source indexes to find newly published reports, but report URLs already stored in the queue are not enqueued or fetched again just because sync was restarted. Reports fetched during discovery are cached in the queue for the learning worker, so the same report page is not immediately downloaded a second time. Use `research queue-stats` and `research queue-pending` to inspect progress; `research learn` resumes queued/retry work after a stop or restart.
+
+Public pages are fetched without login first. If a source genuinely requires an account, create/use an account yourself and configure a short-lived session cookie or an authorization value in the local process environment. The suffix is the source ID uppercased with non-alphanumeric characters replaced by underscores (check `research sources` for IDs):
+
+```sh
+# Examples only — replace the suffix with a real source ID and keep values local.
+export CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID>='session-cookie-value'
+export CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID>='Bearer token-value'
+```
+
+Only use credentials for accounts and sources you are authorized to access. Keep these values out of Git, reports, logs, screenshots, and shared shell history; prefer a local secret manager or a temporary shell session. Credentials are only attached to requests to the original source host, not forwarded to a different redirect host. CyberStrike does not automatically register accounts, bypass MFA/CAPTCHA, or defeat access controls.
+
+Items detected as login-gated are retained with `blocked_auth` status rather than being repeatedly fetched. After setting a valid source session, run:
+
+```sh
+cyberstrike research retry-auth --source <SOURCE_ID>
+cyberstrike research learn --limit 50
+```
+
+If the source offers the report publicly, no session is needed. A `403` can also mean a policy or anti-bot denial rather than a login requirement; do not attempt to bypass it—leave the item blocked or skip that source.
