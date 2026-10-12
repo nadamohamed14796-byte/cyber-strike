@@ -65,6 +65,13 @@ export namespace VerificationLedger {
       throw new Error("strategy_id and variant_key must not be empty")
     }
 
+    if (input.decisiveResult === "confirmed" && !input.attempt.evidenceRef?.trim()) {
+      throw new Error("A decisive confirmed verdict requires evidence_ref")
+    }
+    if (input.decisiveResult === "disproven" && (!input.attempt.validConditions || !input.attempt.evidenceRef?.trim())) {
+      throw new Error("A disproven verdict requires valid_conditions=true and evidence_ref")
+    }
+
     const before = list({ sessionID, hypothesisKey })
     const key = Policy.attemptKey(input.attempt)
     const existing = before.find((item) => Policy.attemptKey(item) === key)
@@ -99,7 +106,7 @@ export namespace VerificationLedger {
       }).run())
       recorded = {
         ...input.attempt, id, sessionID, hypothesisKey, asset: input.asset,
-        endpoint: input.endpoint, vulnerabilityClass, outcome: "inconclusive", timeCreated: now,
+        endpoint: input.endpoint, vulnerabilityClass: input.vulnerabilityClass, outcome: "inconclusive", timeCreated: now,
       }
     }
 
@@ -110,12 +117,6 @@ export namespace VerificationLedger {
       decisiveDisproof: input.decisiveResult === "disproven" && Boolean(input.attempt.evidenceRef?.trim()),
       blockedReason: input.blockedReason,
     })
-    if (input.decisiveResult === "confirmed" && !input.attempt.evidenceRef?.trim()) {
-      throw new Error("A decisive confirmed verdict requires evidence_ref")
-    }
-    if (input.decisiveResult === "disproven" && (!input.attempt.validConditions || !input.attempt.evidenceRef?.trim())) {
-      throw new Error("A disproven verdict requires valid_conditions=true and evidence_ref")
-    }
     Database.use((db) => db.update(VerificationAttemptTable).set({
       outcome: decision.outcome,
       time_updated: Date.now(),
