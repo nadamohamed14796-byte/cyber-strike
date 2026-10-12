@@ -441,6 +441,7 @@ for (const item of targets) {
       CYBERSTRIKE_WORKER_PATH: workerPath,
       CYBERSTRIKE_CHANNEL: `'${Script.channel}'`,
       CYBERSTRIKE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
+    },
 rm -rf ./dist/${name}/bin/tui`
   await Bun.file(`dist/${name}/package.json`).write(
     JSON.stringify(
