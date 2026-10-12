@@ -84,16 +84,6 @@ const COMPARE_SIDE = z.object({
   mutations: z.array(MUTATION).optional().describe("Mutations specific to this side"),
 })
 
-// Derive a sendable origin (scheme://host[:port]) from a captured request.
-function originOf(request: Request.Info): string | { error: string } {
-  const host = request.host ?? (request.origin ? safeURL(request.origin)?.host : undefined)
-  if (!host) return { error: "request has no host/origin — cannot resolve a sendable origin" }
-  if (request.origin) return request.origin.replace(/\/+$/, "")
-  const scheme = request.scheme ?? "http"
-  const port = request.port ? `:${request.port}` : ""
-  return `${scheme}://${host}${port}`
-}
-
 function safeURL(u: string): URL | undefined {
   try {
     return new URL(u)
@@ -102,16 +92,46 @@ function safeURL(u: string): URL | undefined {
   }
 }
 
-// Every attack request must target a host the crawl already captured — closes
-// the SSRF-shaped hole where a mutated Host/target could aim at an arbitrary
-// host. Empty allowlist is refused, not waved through.
-function inScope(sessionID: string, host: string): boolean {
+function httpOrigin(value: string): string | undefined {
+  const url = safeURL(value)
+  if (
+    !url ||
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username ||
+    url.password
+  ) return undefined
+  return url.origin
+}
+
+// Derive and validate the actual HTTP(S) origin from a captured request.
+function originOf(request: Request.Info): string | { error: string } {
+  if (request.origin) {
+    const origin = httpOrigin(request.origin)
+    if (origin) return origin
+    return { error: "captured request has an invalid or unsupported HTTP origin" }
+  }
+  const host = request.host
+  if (!host) return { error: "request has no host/origin — cannot resolve a sendable origin" }
+  const scheme = request.scheme ?? "http"
+  const port = request.port ? \`:\${request.port}\` : ""
+  const origin = httpOrigin(\`\${scheme}://\${host}\${port}\`)
+  if (!origin) return { error: "captured request has an invalid or unsupported HTTP origin" }
+  return origin
+}
+
+// Exact-origin allowlisting avoids turning a captured hostname into permission
+// to probe arbitrary services on another port or via another scheme.
+function inScope(sessionID: string, destination: string): boolean {
+  const wanted = httpOrigin(destination)
+  if (!wanted) return false
   const allowed = new Set(
     Request.get(sessionID)
-      .map((r) => r.host)
-      .filter((h): h is string => Boolean(h)),
+      .map((request) => originOf(request))
+      .filter((origin): origin is string => typeof origin === "string")
+      .map((origin) => httpOrigin(origin))
+      .filter((origin): origin is string => Boolean(origin)),
   )
-  return allowed.size > 0 && allowed.has(host)
+  return allowed.has(wanted)
 }
 
 // Build a base message + origin from a constructed target (the FALLBACK source
@@ -125,6 +145,11 @@ function buildFromTarget(t: {
 }): { baseMsg: HttpMessage.Request; origin: string } | { error: string } {
   const url = safeURL(t.url)
   if (!url) return { error: `Invalid target url "${t.url}".` }
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username ||
+    url.password
+  ) return { error: "Target URL must be HTTP(S) and must not contain embedded credentials." }
   const headers: HttpMessage.Header[] = [{ name: "Host", value: url.host }]
   if (t.headers) for (const [name, value] of Object.entries(t.headers)) headers.push({ name, value: String(value) })
   const body = t.body != null ? new TextEncoder().encode(t.body) : new Uint8Array(0)
@@ -138,7 +163,7 @@ function buildFromTarget(t: {
     headers,
     body,
   }
-  return { baseMsg, origin: `${url.protocol}//${url.host}` }
+  return { baseMsg, origin: url.origin }
 }
 
 const BODY_PREVIEW = 4096
@@ -175,9 +200,15 @@ function stripAuthHeaders(msg: HttpMessage.Request): HttpMessage.Request {
   return out
 }
 
-function applyCredential(msg: HttpMessage.Request, credentialID: string): HttpMessage.Request | { error: string } {
+function applyCredential(
+  msg: HttpMessage.Request,
+  credentialID: string,
+  sessionID: string,
+): HttpMessage.Request | { error: string } {
   const cred = WebCredential.getById(credentialID)
-  if (!cred) return { error: `Credential "${credentialID}" not found in this session.` }
+  if (!cred || cred.session_id !== sessionID) {
+    return { error: `Credential "${credentialID}" not found in this session or belongs to another session.` }
+  }
   let out = stripAuthHeaders(msg)
   for (const [name, value] of Object.entries(cred.headers)) {
     out = Mutate.setHeader(out, name, value)
@@ -188,9 +219,10 @@ function applyCredential(msg: HttpMessage.Request, credentialID: string): HttpMe
 function applyAuthParams(
   msg: HttpMessage.Request,
   opts: { credential?: string; unauthenticated?: boolean },
+  sessionID: string,
 ): HttpMessage.Request | { error: string } {
   if (opts.unauthenticated) return stripAuthHeaders(msg)
-  if (opts.credential) return applyCredential(msg, opts.credential)
+  if (opts.credential) return applyCredential(msg, opts.credential, sessionID)
   return msg
 }
 
@@ -387,10 +419,10 @@ export const HttpReplayTool = Tool.define("http_replay", {
     // Scope guard applies to BOTH sources — a constructed target must resolve to a
     // host the crawl already captured (it can reach an un-captured PATH, not a new host).
     const originHost = safeURL(origin)?.hostname ?? ""
-    if (!inScope(sessionID, originHost)) {
+    if (!inScope(sessionID, origin)) {
       return {
         title: "http_replay — refused (out of scope)",
-        output: `Refusing host "${originHost}": not among this session's captured in-scope hosts.`,
+        output: `Refusing origin "${origin}": not among this session's captured in-scope origins.`,
         metadata: {},
       }
     }
@@ -408,7 +440,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
       // Build baseline
       let baselineMsg = baseMsg
-      const baseAuth = applyAuthParams(baselineMsg, compare.baseline ?? {})
+      const baseAuth = applyAuthParams(baselineMsg, compare.baseline ?? {}, sessionID)
       if (typeof baseAuth !== "object" || "error" in baseAuth)
         return { title: "http_replay compare", output: (baseAuth as { error: string }).error, metadata: {} }
       baselineMsg = baseAuth
@@ -417,7 +449,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
       // Build exploit
       let exploitMsg = baseMsg
-      const expAuth = applyAuthParams(exploitMsg, compare.exploit)
+      const expAuth = applyAuthParams(exploitMsg, compare.exploit, sessionID)
       if (typeof expAuth !== "object" || "error" in expAuth)
         return { title: "http_replay compare", output: (expAuth as { error: string }).error, metadata: {} }
       exploitMsg = expAuth
@@ -448,7 +480,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
 
       // Apply auth + shared mutations to base
       let sharedMsg = baseMsg
-      const authResult = applyAuthParams(sharedMsg, params)
+      const authResult = applyAuthParams(sharedMsg, params, sessionID)
       if (typeof authResult !== "object" || "error" in authResult)
         return { title: "http_replay sweep", output: (authResult as { error: string }).error, metadata: {} }
       sharedMsg = authResult
@@ -479,7 +511,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
     // ── Single send mode ──────────────────────────────────────────────────
     let msg = baseMsg
     try {
-      const authResult = applyAuthParams(msg, params)
+      const authResult = applyAuthParams(msg, params, sessionID)
       if (typeof authResult !== "object" || "error" in authResult)
         return { title: "http_replay", output: (authResult as { error: string }).error, metadata: {} }
       msg = authResult
@@ -561,12 +593,17 @@ export const HttpReplayRawTool = Tool.define("http_replay_raw", {
       raw = params.raw
     }
 
-    // Scope guard applies to BOTH sources — a constructed target_url must resolve to
-    // a host the crawl already captured.
-    if (!inScope(sessionID, url.hostname)) {
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:") ||
+      url.username ||
+      url.password
+    ) return err("target_url must use HTTP(S) and must not contain embedded credentials.")
+
+    // Scope guard applies to BOTH sources and includes exact scheme and port.
+    if (!inScope(sessionID, url.origin)) {
       return {
         title: "http_replay_raw — refused (out of scope)",
-        output: `Refusing host "${url.hostname}": not among this session's captured in-scope hosts.`,
+        output: `Refusing origin "${url.origin}": not among this session's captured in-scope origins.`,
         metadata: {},
       }
     }
