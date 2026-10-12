@@ -723,33 +723,62 @@ export namespace TargetMemory {
       return { allowed: false, reason: "only credential-free HTTP(S) URLs are eligible", includeMatches: [], excludeMatches: [] }
     }
 
-    const candidates = list().map((workspace) => {
+    const candidates: Array<{
+      workspace: Workspace
+      scope?: TargetScope
+      exactHost: boolean
+      domainScore: number
+      pathScore: number
+    }> = []
+    for (const workspace of list()) {
       const base = new URL(workspace.targetURL)
       const basePath = base.pathname.replace(/\/+$/, "") || "/"
       const candidatePath = candidate.pathname.replace(/\/+$/, "") || "/"
       const pathMatches = basePath === "/" || candidatePath === basePath || candidatePath.startsWith(basePath + "/")
-      const originClassMatches = base.protocol === candidate.protocol && base.port === candidate.port
-      return {
-        workspace,
-        base,
-        pathMatches,
-        originClassMatches,
-        exactHost: base.hostname === candidate.hostname,
-        pathScore: basePath === "/" ? 0 : basePath.length,
+      if (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port) continue
+
+      const exactHost = base.hostname === candidate.hostname
+      let scope: TargetScope | null = null
+      try {
+        scope = await getScope(workspace.targetURL)
+      } catch (error) {
+        if (exactHost) {
+          return { allowed: false, reason: "the exact target workspace scope manifest is invalid: " + (error instanceof Error ? error.message : String(error)), workspace, includeMatches: [], excludeMatches: [] }
+        }
+        continue
       }
-    }).filter((item) => item.pathMatches && item.originClassMatches)
-      .sort((a, b) => Number(b.exactHost) - Number(a.exactHost) || b.pathScore - a.pathScore)
+      const hasScopeMatch = Boolean(scope && scope.status === "configured" &&
+        [...scope.scopeItems, ...scope.excludedItems].some((item) => checkMatch(candidate.href, item).matches))
+      // Exact-host workspaces always take precedence, including when unconfigured:
+      // a different workspace must not authorize around a missing exact-host scope.
+      if (!exactHost && !hasScopeMatch) continue
+      const domainScore = exactHost ? 10_000 : candidate.hostname.endsWith("." + base.hostname) ? base.hostname.length : 0
+      candidates.push({
+        workspace,
+        scope: scope ?? undefined,
+        exactHost,
+        domainScore,
+        pathScore: basePath === "/" ? 0 : basePath.length,
+      })
+    }
+    candidates.sort((a, b) =>
+      Number(b.exactHost) - Number(a.exactHost) ||
+      b.domainScore - a.domainScore ||
+      b.pathScore - a.pathScore,
+    )
 
     const selected = candidates[0]
     if (!selected) {
-      return { allowed: false, reason: "no target workspace matches the URL's protocol, port, and path boundary", includeMatches: [], excludeMatches: [] }
+      return { allowed: false, reason: "no target workspace and persisted scope match this URL's protocol, port, host, and path boundary", includeMatches: [], excludeMatches: [] }
     }
-    if (candidates.length > 1 && Number(candidates[0].exactHost) === Number(candidates[1].exactHost) &&
+    if (candidates.length > 1 &&
+      Number(candidates[0].exactHost) === Number(candidates[1].exactHost) &&
+      candidates[0].domainScore === candidates[1].domainScore &&
       candidates[0].pathScore === candidates[1].pathScore) {
       return { allowed: false, reason: "multiple equally specific target workspaces match; refusing ambiguous scope", includeMatches: [], excludeMatches: [] }
     }
 
-    const scope = await getScope(selected.workspace.targetURL)
+    const scope = selected.scope ?? null
     if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
       return { allowed: false, reason: "the most specific target workspace has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
     }
