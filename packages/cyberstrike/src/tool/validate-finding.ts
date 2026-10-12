@@ -81,6 +81,7 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
           rubric_confidence: result.confidence,
           distinct_attempts: result.attemptCount,
           attempts_remaining_before_false_positive: result.attemptsRemaining,
+          recommended_strategies: result.strategyPlan,
           failed_checks: result.failedCheckIDs,
           unknown_checks: result.unknownCheckIDs,
         },
