@@ -47,6 +47,28 @@ Skill body for ${name}.
       'chains_with: ["PE-18"]\nprerequisites: ["An explicitly authorized test account is required"]',
     )
 
+    await addSkill(
+      "external-id-metadata",
+      'chains_with: ["T1053.001"]\\nprerequisites: ["SC-8"]',
+    )
+    const nestedControl = path.join(
+      tmp.path,
+      ".cyberstrike",
+      "skill",
+      "CIS_benchmarks",
+      "Demo_Benchmark",
+      "cis-demo-control-v1-1",
+    )
+    await fs.mkdir(nestedControl, { recursive: true })
+    await Bun.write(
+      path.join(nestedControl, "SKILL.md"),
+      `---\\nname: Demo benchmark control 1.1\\ndescription: Nested benchmark control\\n---\\nControl body.\\n`,
+    )
+    await addSkill(
+      "control-dependent",
+      'chains_with: ["cis-demo-control-v1-1"]\\nprerequisites: ["cis-demo-control-v1-1"]',
+    )
+
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
@@ -58,6 +80,13 @@ Skill body for ${name}.
         expect(SkillIndex.resolveReference("attack-triage-validation")).toBe("triage-validation")
         expect(SkillIndex.chainsFrom("prefixed-workflow").map((item) => item.target)).toEqual(["triage-validation"])
         expect(SkillIndex.chainsFrom("external-control-metadata")).toEqual([])
+        expect(SkillIndex.resolveReference("cis-demo-control-v1-1")).toBe("Demo benchmark control 1.1")
+        expect(SkillIndex.chainsFrom("control-dependent").map((item) => item.target)).toEqual([
+          "Demo benchmark control 1.1",
+        ])
+        expect(SkillIndex.prerequisitesFor("control-dependent")).toEqual(["Demo benchmark control 1.1"])
+        expect(SkillIndex.chainsFrom("external-id-metadata")).toEqual([])
+        expect(SkillIndex.prerequisitesFor("external-id-metadata")).toEqual(["SC-8"])
         expect(SkillIndex.validateReferences()).toEqual([])
         expect(SkillIndex.chainsFrom("target-workflow").map((item) => item.target)).toEqual(["aws-postexploit"])
         expect(SkillIndex.chainsFrom("aws-postexploit").map((item) => item.target)).toEqual([
