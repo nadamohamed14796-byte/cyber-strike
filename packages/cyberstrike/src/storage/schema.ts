@@ -25,5 +25,4 @@ export {
   AgentPerformanceTable,
   ValidationViolationTable,
   VerificationAttemptTable,
-  VerificationAttemptTable,
 } from "../methodology/methodology.sql"
