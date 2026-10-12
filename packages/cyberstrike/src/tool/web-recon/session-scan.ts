@@ -79,6 +79,7 @@ export async function sessionScan(
   sessionID: string,
   timeout: number,
   abort?: AbortSignal,
+  authorize?: (origins: string[]) => Promise<void>,
 ): Promise<WebReconResult> {
   const rootID = Session.root(sessionID)
   const requests = Request.get(rootID)
@@ -99,6 +100,8 @@ export async function sessionScan(
   if (templateCount > 0) lines.push(`[*] ${templateCount} template path(s) skipped — discovered endpoints with {param} placeholders (use targeted programs)`)
 
   const originEntries = [...origins.entries()].slice(0, MAX_ORIGINS)
+  // Require consent for the concrete origins that will receive active probes.
+  if (originEntries.length > 0) await authorize?.(originEntries.map(([origin]) => origin))
   let apiCheckCount = 0
   let redirCheckCount = 0
 
