@@ -166,6 +166,26 @@ test("extracts fetch body keys without misclassifying request options", () => {
   expect(request.bodyParameters).not.toContain("Content-Type")
 })
 
+test("flags browser token storage, cookie writes, and wildcard postMessage as candidates", () => {
+  const source = [
+    "function persistToken(token) {",
+    ' localStorage.setItem("access_token", token)',
+    "}",
+    "function writeCookie(value) {",
+    " document.cookie = value",
+    "}",
+    "function sendToParent(payload) {",
+    ' window.parent.postMessage(payload, "*")',
+    "}",
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.riskSignals.some((signal) => signal.kind === "client-side-token-storage")).toBe(true)
+  expect(result.riskSignals.some((signal) => signal.kind === "document-cookie-write")).toBe(true)
+  expect(result.riskSignals.some((signal) => signal.kind === "wildcard-postmessage-origin")).toBe(true)
+  expect(result.riskSignals.every((signal) => signal.confidence === "candidate")).toBe(true)
+  expect(JSON.stringify(result)).not.toContain("access_token")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
