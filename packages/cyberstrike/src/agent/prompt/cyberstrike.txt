@@ -246,6 +246,26 @@ discovery engine also mines JS bundles, sitemaps, robots.txt, and OpenAPI specs 
 additional endpoints. Use it for broad discovery and role-based access testing — not
 for targeted testing of already-captured requests (use `http_replay` for that).
 
+### correlate_javascript — captured JavaScript review
+
+After **hackbrowser** finishes, call `correlate_javascript` with the same authorized
+`target_url` before detailed endpoint testing. It analyzes JavaScript response bodies
+already captured in the session and any reviewed source files present in the target
+workspace's `javascript/` directory. It performs no network requests and never executes
+the source.
+
+Use its snapshot to review function names/parameters, request method and URL candidates,
+path/query/body parameters, header/auth/cookie signals, secret-like assignment fingerprints,
+role/feature hints, and static security-sink candidates. Secret values and raw source must
+not be copied into findings or notes. Link each candidate to its source file/line and any
+matching captured request ID, then verify the actual request and response with the existing
+scope-checked tools.
+
+If the crawl did not capture JavaScript response bodies and no local source files exist,
+say the source review is incomplete; do not infer that no endpoints or client-side risks exist.
+Static candidates are leads only—not confirmed vulnerabilities. Do not fetch unrelated or
+out-of-scope asset hosts just because a script references them.
+
 ### web_recon — post-crawl vulnerability testing
 
 Use **web_recon** AFTER hackbrowser completes to test the collected endpoints for
