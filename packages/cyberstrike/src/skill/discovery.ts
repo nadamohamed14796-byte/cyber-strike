@@ -239,6 +239,15 @@ export namespace Discovery {
   }
 
   /** Fetch over HTTPS without allowing redirects to bypass destination checks. */
+  export function safeRemoteRedirectURL(currentValue: string, location: string): string | undefined {
+    try {
+      const target = new URL(location, currentValue)
+      return isSafeRemoteURLShape(target.href) ? target.href : undefined
+    } catch {
+      return undefined
+    }
+  }
+
   async function fetchRemoteURL(value: string, signal: AbortSignal): Promise<Response> {
     let current: URL
     try {
@@ -257,14 +266,9 @@ export namespace Discovery {
       await response.body?.cancel().catch(() => {})
       if (!location) throw new Error("Remote skill redirect has no Location header")
       if (redirects >= MAX_REDIRECTS) throw new Error("Remote skill redirect limit exceeded")
-      try {
-        current = new URL(location, current)
-      } catch {
-        throw new Error("Remote skill redirect has an invalid Location")
-      }
-      if (!isSafeRemoteURLShape(current.href)) {
-        throw new Error("Remote skill redirect attempted to leave the safe HTTPS destination policy")
-      }
+      const redirectURL = safeRemoteRedirectURL(current.href, location)
+      if (!redirectURL) throw new Error("Remote skill redirect attempted to leave the safe HTTPS destination policy")
+      current = new URL(redirectURL)
     }
   }
 
