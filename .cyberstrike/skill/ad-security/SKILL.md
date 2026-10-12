@@ -174,6 +174,30 @@ Local Admin on Workstation
 | lookupsid.py   | SID enumeration                 |
 | samrdump.py    | SAM Remote interface dump       |
 
+## Authorization and Verification Gate
+
+- Run Active Directory enumeration and attack-path tests only in an explicitly authorized domain/lab. Confirm the permitted hosts, accounts, time window, and whether credential-access or lateral-movement validation is allowed.
+- Start with read-only enumeration and least-privileged test accounts. Treat a tool finding, SPN, ACL, delegation flag, or exposed share as a lead; verify the effective permission and practical impact before reporting.
+- Do not dump hashes, extract credentials, alter group membership, create persistence, or move laterally on production systems unless the written engagement explicitly authorizes that action. Prefer lab fixtures and designated test accounts.
+- For privilege escalation, prove the exact permission edge and the resulting access using a controlled account. Avoid modifying domain objects just to demonstrate a theoretical path.
+- Keep captured directory data and credentials outside the reusable skill and report only redacted evidence. Do not include real usernames, hashes, tickets, or internal host inventories in committed files.
+
+## Attack-Path Verification and Reporting
+
+Model Active Directory findings as a chain of specific edges, not as a list of tool alerts. For every edge, record the principal, object, effective right, and resulting security boundary.
+
+| Edge | Verify | Safe evidence |
+|---|---|---|
+| Principal to object | effective ACL, group membership, delegated right | read-only ACL output and controlled account context |
+| Credential to service | whether a designated test identity can authenticate | approved test account; never reuse captured user credentials |
+| Service to host | permitted access level and host scope | minimum access proof on an authorized lab endpoint |
+| Host to domain privilege | exact group/ACL/delegation path | configuration evidence plus controlled non-destructive validation |
+| Trust/delegation | actual impersonation or delegation boundary | test principals only; no access to unrelated mailboxes or files |
+
+A SPN, unconstrained delegation flag, writable ACL, or graph path is not automatically exploitable. Confirm effective rights and practical impact while avoiding password spraying, credential dumping, persistence, and lateral movement unless each action is explicitly authorized.
+
+Reports should include sanitized domain/host context, the exact relationship or permission, expected policy, observed access, impact, timestamps, and remediation. Keep tickets, hashes, passwords, and private directory exports out of committed evidence.
+
 ## Detection Evasion Considerations
 
 | Action        | Detection             | Evasion                      |
