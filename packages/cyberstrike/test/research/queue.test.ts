@@ -1,3 +1,27 @@
+test("research queue enqueue is idempotent for an already-seen source URL", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const first = ResearchQueue.enqueue({
+        sourceID: "test-dedupe",
+        sourceURL: "https://research.example.test/report?id=123",
+        title: "First title",
+      })
+      const second = ResearchQueue.enqueue({
+        sourceID: "test-dedupe",
+        sourceURL: "https://research.example.test/report?id=123",
+        title: "Updated title should not create a duplicate",
+      })
+      expect(first.created).toBe(true)
+      expect(second.created).toBe(false)
+      expect(second.sequence).toBe(first.sequence)
+      expect(ResearchQueue.stats().total).toBe(1)
+      await Instance.dispose()
+    },
+  })
+})
+
 import { expect, test } from "bun:test"
 import { ResearchQueue } from "../../src/research/queue"
 import { Database, eq } from "../../src/storage/db"

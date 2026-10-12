@@ -358,9 +358,11 @@ Research sync uses a persistent queue. Re-running discovery can revisit source i
 Public pages are fetched without login first. If a source genuinely requires an account, create/use an account yourself and configure a short-lived session cookie or an authorization value in the local process environment. The suffix is the source ID uppercased with non-alphanumeric characters replaced by underscores (check `research sources` for IDs):
 
 ```sh
-# Examples only — replace the suffix with a real source ID and keep values local.
-export CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID>='session-cookie-value'
-export CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID>='Bearer token-value'
+# Example: hackerone-hacktivity becomes HACKERONE_HACKTIVITY.
+# Replace this suffix with your source ID, normalized the same way.
+SOURCE_SUFFIX='HACKERONE_HACKTIVITY'
+export "CYBERSTRIKE_RESEARCH_COOKIE_${SOURCE_SUFFIX}=session-cookie-value"
+export "CYBERSTRIKE_RESEARCH_AUTHORIZATION_${SOURCE_SUFFIX}=Bearer-token-value"
 ```
 
 Only use credentials for accounts and sources you are authorized to access. Keep these values out of Git, reports, logs, screenshots, and shared shell history; prefer a local secret manager or a temporary shell session. Credentials are only attached to requests to the original source host, not forwarded to a different redirect host. CyberStrike does not automatically register accounts, bypass MFA/CAPTCHA, or defeat access controls.
