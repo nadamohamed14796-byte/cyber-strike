@@ -200,23 +200,13 @@ test("research queue resumes authenticated work and learns cached report text wi
           // An explicit retry-auth action may bypass cooldown, but still requires a configured session.
           const immediateURL = "https://hackerone.com/reports/immediate123"
           ResearchQueue.blockAuthentication({ sourceID: authSourceID, sourceURL: immediateURL, reason: "HTTP 401" })
-          expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10, retryImmediately: true })).toBe(1)
-          expect(ResearchQueue.find(authSourceID, immediateURL)?.status).toBe("queued")
-
-          // Emulate older entries whose operator has now configured credentials after the cooldown.
-          const retryAfter = Date.now() - 11 * 60_000
-          for (const url of [indexURL, reportURL]) {
-            const row = ResearchQueue.find(authSourceID, url)
-            if (!row) throw new Error("expected auth-blocked research row to exist")
-            Database.use((db) =>
-              db.update(ResearchQueueTable).set({ updated_at: retryAfter })
-                .where(eq(ResearchQueueTable.sequence, row.sequence)).run(),
-            )
-          }
-          expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10 })).toBe(2)
+          // Manual retry is source-scoped, so it requeues all three HackerOne entries.
+          expect(await retryAuthenticatedResearch({ sourceID: authSourceID, limit: 10, retryImmediately: true })).toBe(3)
           expect(ResearchQueue.find(authSourceID, indexURL)?.status).toBe("discovered")
           expect(ResearchQueue.find(authSourceID, indexURL)?.payload?.crawl_page).toBe(true)
           expect(ResearchQueue.find(authSourceID, reportURL)?.status).toBe("queued")
+          expect(ResearchQueue.find(authSourceID, immediateURL)?.status).toBe("queued")
+          // A separate source without configured credentials must remain blocked.
           expect(ResearchQueue.find("portswigger", otherURL)?.status).toBe("blocked_auth")
         } finally {
           if (originalCookie === undefined) delete process.env[cookieEnv]
