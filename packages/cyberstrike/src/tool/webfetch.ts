@@ -6,6 +6,7 @@ import { abortAfterAny } from "../util/abort"
 import { Identifier } from "../id/id"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_REDIRECTS = 5
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
 
