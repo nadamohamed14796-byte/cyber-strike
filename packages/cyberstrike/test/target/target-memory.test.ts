@@ -166,6 +166,55 @@ test("refuses symlinked generated workspace outputs", async () => {
 })
 
 
+
+test("isolates persisted target memory across non-Git directories sharing the global project ID", async () => {
+  await using firstDir = await tmpdir()
+  await using secondDir = await tmpdir()
+  const targetURL = "https://owner-isolation.example.test/account"
+
+  const first = await Instance.provide({
+    directory: firstDir.path,
+    fn: async () => {
+      const workspace = await TargetMemory.ensure(targetURL)
+      await TargetMemory.addNote(targetURL, {
+        kind: "lesson",
+        title: "Private first-project note",
+        content: "This note must remain confined to the first project directory.",
+        source: "test",
+      })
+      const result = {
+        id: workspace.id,
+        projectID: workspace.projectID,
+        workspacePath: workspace.workspacePath,
+      }
+      await Instance.dispose()
+      return result
+    },
+  })
+
+  const second = await Instance.provide({
+    directory: secondDir.path,
+    fn: async () => {
+      const workspace = await TargetMemory.ensure(targetURL)
+      const notes = TargetMemory.allNotes(workspace.id)
+      const result = {
+        id: workspace.id,
+        projectID: workspace.projectID,
+        workspacePath: workspace.workspacePath,
+        notes,
+      }
+      await Instance.dispose()
+      return result
+    },
+  })
+
+  expect(first.projectID).toBe("global")
+  expect(second.projectID).toBe("global")
+  expect(second.id).not.toBe(first.id)
+  expect(second.workspacePath).not.toBe(first.workspacePath)
+  expect(second.notes).toEqual([])
+})
+
 describe("target workspace owner keys", () => {
   test("isolates non-Git project directories that share the global Project ID", () => {
     const first = targetWorkspaceOwnerKey("global", "/tmp/cyberstrike-project-a")
