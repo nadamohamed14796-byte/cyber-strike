@@ -152,8 +152,9 @@ export namespace Discovery {
     }
 
     const expandedSize = entries.reduce((total, entry) => total + entry.size, 0)
-    if (budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
-      log.warn("refusing archive: total extraction budget exceeded", { archive, expandedSize })
+    if (Date.now() >= budget.deadline ||
+      budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
+      log.warn("refusing archive: total extraction or time budget exceeded", { archive, expandedSize })
       return false
     }
 
@@ -172,6 +173,12 @@ export namespace Discovery {
       permitted.add(path.normalize(entry.path.replace(/\\/g, "/")))
     }
 
+    // Path checks above await filesystem operations. Recheck and reserve here
+    // without yielding so concurrently processed archives cannot oversubscribe.
+    if (budget.expandedBytes + budget.reservedExpandedBytes + expandedSize > MAX_TOTAL_EXPANDED_BYTES) {
+      log.warn("refusing archive: concurrent extraction budget exhausted", { archive, expandedSize })
+      return false
+    }
     budget.reservedExpandedBytes += expandedSize
     try {
       await tar.x({
@@ -308,6 +315,7 @@ export namespace Discovery {
   const MAX_ARCHIVE_MEMBER_BYTES = 25 * 1024 * 1024
   const MAX_ARCHIVE_EXPANDED_BYTES = 100 * 1024 * 1024
   const MAX_TOTAL_EXPANDED_BYTES = 250 * 1024 * 1024
+  const MAX_TOTAL_PULL_MS = 5 * 60 * 1000
   const DOWNLOAD_TIMEOUT_MS = 15_000
 
   type ResourceBudget = {
@@ -315,6 +323,7 @@ export namespace Discovery {
     reservedDownloadBytes: number
     expandedBytes: number
     reservedExpandedBytes: number
+    deadline: number
   }
 
   /** Reject archive manifests that can expand beyond bounded entry or size limits. */
@@ -366,6 +375,10 @@ export namespace Discovery {
   }
 
   async function get(url: string, dest: string, root: string, budget: ResourceBudget, binary = false): Promise<boolean> {
+    if (Date.now() >= budget.deadline) {
+      log.warn("stopping skill download: overall time budget exhausted", { url })
+      return false
+    }
     const safeDest = await safeCacheDestination(root, dest, true)
     if (!safeDest) {
       log.warn("refusing skill download to unsafe cache path", { dest })
@@ -373,6 +386,8 @@ export namespace Discovery {
     }
     if (await Bun.file(safeDest).exists()) return true
 
+    const remainingMs = budget.deadline - Date.now()
+    if (remainingMs <= 0) return false
     const remaining = MAX_TOTAL_DOWNLOAD_BYTES - budget.downloadedBytes - budget.reservedDownloadBytes
     const reservation = Math.min(MAX_SKILL_DOWNLOAD_BYTES, remaining)
     if (reservation <= 0) {
@@ -381,7 +396,7 @@ export namespace Discovery {
     }
     budget.reservedDownloadBytes += reservation
     try {
-      const response = await fetchRemoteURL(url, AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS))
+      const response = await fetchRemoteURL(url, AbortSignal.timeout(Math.min(DOWNLOAD_TIMEOUT_MS, remainingMs)))
       if (!response.ok) {
         await response.body?.cancel().catch(() => {})
         log.error("failed to download", { url, status: response.status })
@@ -405,6 +420,13 @@ export namespace Discovery {
 
   export async function pull(url: string): Promise<string[]> {
     const result: string[] = []
+    const budget: ResourceBudget = {
+      downloadedBytes: 0,
+      reservedDownloadBytes: 0,
+      expandedBytes: 0,
+      reservedExpandedBytes: 0,
+      deadline: Date.now() + MAX_TOTAL_PULL_MS,
+    }
     let base: string
     let index: string
     try {
@@ -418,7 +440,9 @@ export namespace Discovery {
     const host = base.slice(0, -1)
 
     log.info("fetching index", { url: index })
-    const data = await fetchRemoteURL(index, AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS))
+    const indexRemainingMs = budget.deadline - Date.now()
+    if (indexRemainingMs <= 0) return result
+    const data = await fetchRemoteURL(index, AbortSignal.timeout(Math.min(DOWNLOAD_TIMEOUT_MS, indexRemainingMs)))
       .then(async (response) => {
         if (!response.ok) {
           log.error("failed to fetch index", { url: index, status: response.status })
@@ -475,12 +499,6 @@ export namespace Discovery {
       return result
     }
 
-    const budget: ResourceBudget = {
-      downloadedBytes: 0,
-      reservedDownloadBytes: 0,
-      expandedBytes: 0,
-      reservedExpandedBytes: 0,
-    }
     for (let offset = 0; offset < list.length; offset += MAX_CONCURRENT_SKILL_DOWNLOADS) {
       const batch = list.slice(offset, offset + MAX_CONCURRENT_SKILL_DOWNLOADS)
       await Promise.all(
