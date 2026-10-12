@@ -67,6 +67,16 @@ describe("remote skill path validation", () => {
     }
   })
 
+  test("archive expansion limits reject decompression bombs and excessive manifests", () => {
+    const mebibyte = 1024 * 1024
+    expect(Discovery.isSafeArchiveExpansion([1, 2, 3])).toBe(true)
+    expect(Discovery.isSafeArchiveExpansion([25 * mebibyte + 1])).toBe(false)
+    expect(Discovery.isSafeArchiveExpansion([50 * mebibyte, 50 * mebibyte, 1])).toBe(false)
+    expect(Discovery.isSafeArchiveExpansion([-1])).toBe(false)
+    expect(Discovery.isSafeArchiveExpansion([Number.NaN])).toBe(false)
+    expect(Discovery.isSafeArchiveExpansion(Array.from({ length: 10_001 }, () => 0))).toBe(false)
+  })
+
   test("accepts ordinary skill slugs and nested relative files", () => {
     expect(Discovery.isSafeSkillName("agents-sdk")).toBe(true)
     expect(Discovery.isSafeSkillName("wstg.injection_01")).toBe(true)
