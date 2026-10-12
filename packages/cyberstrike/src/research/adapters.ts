@@ -68,9 +68,6 @@ export function discoverySeeds(source: ResearchSource, maxPages: number) {
       addPathPages(source.seedUrls)
       addQueryPages(source.seedUrls)
       break
-    case "medium":
-      addQueryPages(source.seedUrls)
-      break
     case "github":
       addQueryPages(source.seedUrls)
       break
@@ -92,8 +89,6 @@ export function sourceDocumentPriority(source: ResearchSource, url: string) {
       return /blog|writeup|research/.test(path) ? 25 : 0
     case "yeswehack":
       return /blog|writeup|research/.test(path) ? 25 : 0
-    case "medium":
-      return /tag\/bug-bounty|bug-bounty-hunting/.test(path) ? 35 : 0
     case "github":
       return /search|issues|blob|tree/.test(path) ? 20 : 0
     default:
