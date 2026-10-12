@@ -19,11 +19,55 @@ export namespace SkillIndex {
     verified?: string
   }
 
-  type IndexState = { entries: Map<string, Entry>; tagIndex: Map<string, Set<string>>; techIndex: Map<string, Set<string>>; cweIndex: Map<string, Set<string>>; categoryIndex: Map<string, Set<string>> }
+  type IndexState = {
+    entries: Map<string, Entry>
+    tagIndex: Map<string, Set<string>>
+    techIndex: Map<string, Set<string>>
+    cweIndex: Map<string, Set<string>>
+    categoryIndex: Map<string, Set<string>>
+    referenceIndex: Map<string, Set<string>>
+  }
   const states = new Map<string, IndexState>()
   const builds = new Map<string, Promise<void>>()
-  const emptyState = (): IndexState => ({ entries: new Map(), tagIndex: new Map(), techIndex: new Map(), cweIndex: new Map(), categoryIndex: new Map() })
+  const emptyState = (): IndexState => ({
+    entries: new Map(),
+    tagIndex: new Map(),
+    techIndex: new Map(),
+    cweIndex: new Map(),
+    categoryIndex: new Map(),
+    referenceIndex: new Map(),
+  })
   const current = () => states.get(Instance.directory) ?? emptyState()
+
+  const TECHNIQUE_ID = /^t\\d{4}(?:\\.\\d{3})?$/i
+
+  function addReference(state: IndexState, reference: string | undefined, skillName: string) {
+    const key = reference?.trim().toLowerCase()
+    if (!key) return
+    if (!state.referenceIndex.has(key)) state.referenceIndex.set(key, new Set())
+    state.referenceIndex.get(key)!.add(skillName)
+  }
+
+  function indexReferences(entry: Entry, state: IndexState) {
+    // Exact name aliases are case-insensitive; technique aliases are explicit IDs,
+    // never fuzzy substring/prefix matches.
+    addReference(state, entry.name, entry.name)
+    addReference(state, entry.owasp_id, entry.name)
+
+    const nameTechnique = /^((?:T\\d{4})(?:\\.\\d{3})?)(?:[_-]|$)/i.exec(entry.name)?.[1]
+    if (nameTechnique) addReference(state, nameTechnique, entry.name)
+    for (const tag of entry.tags) {
+      if (TECHNIQUE_ID.test(tag.trim())) addReference(state, tag, entry.name)
+    }
+  }
+
+  function resolveInState(reference: string, state: IndexState): string | undefined {
+    const normalized = reference.trim().toLowerCase()
+    if (!normalized) return undefined
+    const candidates = state.referenceIndex.get(normalized)
+    if (!candidates || candidates.size !== 1) return undefined
+    return candidates.values().next().value
+  }
 
   function toEntry(skill: Skill.Info): Entry {
     return {
@@ -61,6 +105,7 @@ export namespace SkillIndex {
       if (!state.categoryIndex.has(key)) state.categoryIndex.set(key, new Set())
       state.categoryIndex.get(key)!.add(entry.name)
     }
+    indexReferences(entry, state)
   }
 
   export async function ensureBuilt() {
@@ -161,18 +206,58 @@ export namespace SkillIndex {
       .filter(Boolean)
   }
 
+  /** Resolve an exact skill name or exact metadata alias (for example T1078.004). */
+  export function resolveReference(reference: string): string | undefined {
+    return resolveInState(reference, current())
+  }
+
+  export type ReferenceProblem = {
+    skill: string
+    field: "chains_with" | "prerequisites"
+    reference: string
+    reason: "unresolved" | "ambiguous"
+  }
+
+  /** Audit metadata links against the current catalogue without guessing aliases. */
+  export function validateReferences(): ReferenceProblem[] {
+    const state = current()
+    const problems: ReferenceProblem[] = []
+    for (const entry of state.entries.values()) {
+      for (const field of ["chains_with", "prerequisites"] as const) {
+        for (const reference of entry[field]) {
+          if (resolveInState(reference, state)) continue
+          const candidates = state.referenceIndex.get(reference.trim().toLowerCase())
+          problems.push({
+            skill: entry.name,
+            field,
+            reference,
+            reason: candidates && candidates.size > 1 ? "ambiguous" : "unresolved",
+          })
+        }
+      }
+    }
+    return problems
+  }
+
   export function chainsFrom(skillName: string): Array<{ target: string; boost?: string }> {
-    const entry = current().entries.get(skillName)
+    const state = current()
+    const canonical = resolveInState(skillName, state)
+    const entry = canonical ? state.entries.get(canonical) : undefined
     if (!entry) return []
-    return entry.chains_with.map((target) => ({
-      target,
-      boost: entry.severity_boost[target],
-    }))
+    return entry.chains_with.flatMap((reference) => {
+      const target = resolveInState(reference, state)
+      if (!target) return []
+      return [{ target, boost: entry.severity_boost[reference] ?? entry.severity_boost[target] }]
+    })
   }
 
   export function prerequisitesFor(skillName: string): string[] {
-    const entry = current().entries.get(skillName)
+    const state = current()
+    const canonical = resolveInState(skillName, state)
+    const entry = canonical ? state.entries.get(canonical) : undefined
     if (!entry) return []
-    return entry.prerequisites
+    // Preserve unresolved values so callers can report them instead of silently
+    // treating an incomplete catalogue reference as a satisfied prerequisite.
+    return entry.prerequisites.map((reference) => resolveInState(reference, state) ?? reference)
   }
 }
