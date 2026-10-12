@@ -55,7 +55,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   if (/^\d+(?:\.\d+){3}\/.+$/.test(allowed) || /^\d+(?:\.\d+){3}\/$/.test(allowed)) {
     const [range, prefixText] = allowed.split("/", 2)
     const rangeNumber = ipv4ToNumber(range)
-    if (!/^(?:0|[1-9]\\d?)$/.test(prefixText)) {
+    if (!/^(?:0|[1-9]\d?)$/.test(prefixText)) {
       return { matches: false, reason: "invalid IPv4 CIDR" }
     }
     const prefix = Number(prefixText)
