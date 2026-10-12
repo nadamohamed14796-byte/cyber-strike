@@ -86,3 +86,22 @@ Skill body for ${name}.
     else process.env.CYBERSTRIKE_TEST_HOME = priorTestHome
   }
 })
+
+test("full repository skill catalog has no unresolved chain or prerequisite references", async () => {
+  const repoRoot = path.resolve(import.meta.dir, "../../../..")
+  const previousTestHome = process.env.CYBERSTRIKE_TEST_HOME
+  delete process.env.CYBERSTRIKE_TEST_HOME
+
+  try {
+    await Instance.provide({
+      directory: repoRoot,
+      fn: async () => {
+        await SkillIndex.rebuild()
+        expect(SkillIndex.validateReferences()).toEqual([])
+      },
+    })
+  } finally {
+    if (previousTestHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousTestHome
+  }
+}, 60000)
