@@ -85,7 +85,9 @@ const cli = yargs(hideBin(process.argv))
       args: process.argv.slice(2),
     })
 
-    const marker = path.join(Global.Path.data, "cyberstrike.db")
+    // Keep migration completion separate from the database file: opening SQLite
+    // creates cyberstrike.db before the legacy JSON import has actually succeeded.
+    const marker = path.join(Global.Path.data, "cyberstrike.json-migration.complete")
     if (!(await Bun.file(marker).exists())) {
       console.log("Performing one time database migration, may take a few minutes...")
       const tty = process.stdout.isTTY
@@ -96,7 +98,7 @@ const cli = yargs(hideBin(process.argv))
       let last = -1
       if (tty) process.stdout.write("\x1b[?25l")
       try {
-        await JsonMigration.run(Database.Client().$client, {
+        const stats = await JsonMigration.run(Database.Client().$client, {
           progress: (event) => {
             const percent = Math.floor((event.current / event.total) * 100)
             if (percent === last && event.current !== event.total) return
@@ -113,6 +115,15 @@ const cli = yargs(hideBin(process.argv))
             }
           },
         })
+        if (stats.errors.length > 0) {
+          throw new Error(
+            `Legacy JSON migration failed with ${stats.errors.length} error(s); completion marker was not written so the migration can be retried.`,
+          )
+        }
+        await Bun.write(
+          marker,
+          JSON.stringify({ completedAt: new Date().toISOString(), ...stats, errors: undefined }, null, 2),
+        )
       } finally {
         if (tty) process.stdout.write("\x1b[?25h")
         else {
