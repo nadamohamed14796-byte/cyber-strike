@@ -278,3 +278,22 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 
 - `dependabot/npm_and_yarn/packages/console/core/mysql2-3.22.0` was **not merged wholesale**: its proposed 3.22.0 fixes the earlier credential advisory but is still within the later affected range `<=3.23.0`. The safer selective update to 3.23.1 is now on main.
 - `dependabot/npm_and_yarn/packages/ui/dompurify-3.4.16` was **not merged wholesale** because it only changed the package manifest and left the Bun lockfile stale. The 3.4.16 manifest and lock records were updated directly on main.
+
+
+## Follow-up checkpoint — 2026-10-12: IPv6 special-purpose destinations and archive decompression
+
+### SEC-011 — P1: IPv6 SSRF filter allowed special-purpose and transition prefixes
+
+- **Evidence:** the prior check allowed most addresses under `2000::/3` and excluded only `2001:db8::/32`. It did not reject the IANA special-purpose `2001::/23` block, 6to4 `2002::/16`, or the newer `3fff::/20` documentation range. The [IANA IPv6 Special-Purpose Address Registry](https://www.iana.org/assignments/iana-ipv6-special-registry) identifies these ranges and their non-general-purpose routing properties.
+- **Fix:** added parsed-hextet prefix checks for `2001::/23`, `2001:db8::/32`, `2002::/16`, and the reserved/documentation `3fff::/16) block. The broader `3fff::/16` rejection is intentionally conservative.
+- **Regression coverage:** tests reject IETF special-purpose/benchmarking addresses, 6to4, and documentation addresses, while preserving a public `2001:200::/23) example.
+- **Direct commits on main:** implementation `01b39e526b3c0072dc6c4d11338fe4febc18e42f`; tests `71cf19e8a5d4dae6d9aa8bbbc252f398c19cf3e5`.
+- **Validation:** unit tests passed with 1,798 passing, 5 skipped, and 0 failures on the preceding code head; the latest suite including this test passed with 1,799 passing, 5 skipped, 0 failures (run `38240648583`). Typecheck passed on `c0919ec57a); monorepo build and CodeQL remain in progress.
+
+### SEC-012 — P1: compressed tar archives could expand beyond declared member-size limits
+
+- **Evidence:** member-size and entry-count checks happened after node-tar had already parsed the archive. A highly compressed tar containing many empty headers could consume substantial CPU even when declared file sizes were tiny.
+- **Fix:** gzip archives are now decompressed through a streaming byte limiter into a private temporary directory before parsing/extraction. The limit is 125 MiB per tar stream and 300 MiB total per sync; raw tar bytes count against the same total. node-tar is forced to parse raw tar data, and zstd-compressed archives are rejected until a bounded decompression path is implemented.
+- **Regression coverage:** existing gzip archive extraction remains green; added pure budget-boundary tests for per-archive and sync-wide decompressed bytes, plus existing archive member/entry count limits.
+- **Direct commits on main:** bounded decompression `574b00986ca92a0f707652b92b5cbdcb66112edf`; extraction from the prepared tar `c0765bac0db5ef5b71dd09f833b90eb52e6cb486`; total decompressed budget `93891dc2f119db011b2bf67b77c8b92bb089a7f8`; raw tar budget `a22eb391bd263da5ad5b6de170c827b396d5d4aa`; budget helper `ad52d7160ba874f4d956ca5ca264a3a3ba0b0413`; regression test `c0919ec57aebf65d1d1956f506044b51e421212e`.
+- **Validation:** latest unit tests passed with 1,799 passing, 5 skipped, 0 failures, and typecheck passed on `c0919ec57a). Monorepo build and CodeQL are still in progress. The archive format support is deliberately conservative: gzip and raw tar are supported; zstd is explicitly rejected and Brotli is not enabled.
