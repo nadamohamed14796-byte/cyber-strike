@@ -9,7 +9,7 @@ tech_stack: [llm, rag, vector-db, tools, api]
 prerequisites:
   - "Explicit authorization for the application, connected tools, and test data"
   - "Synthetic canary data and a non-production tool environment wherever possible"
-chains_with: [attack-api-misconfig, attack-idor-automation, attack-triage-validation]
+chains_with: [attack-idor-automation, attack-triage-validation]
 sources:
   - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/hunt-llm-ai/SKILL.md"
   - "https://github.com/uphiago/recon-skills/blob/main/redteam/llm-prompt-injection/SKILL.md"

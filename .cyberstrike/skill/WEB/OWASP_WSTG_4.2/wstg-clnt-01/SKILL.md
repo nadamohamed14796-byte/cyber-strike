@@ -3,7 +3,7 @@ name: wstg-clnt-01
 description: "Testing for DOM-Based Cross Site Scripting"
 category: client-side
 owasp_id: WSTG-CLNT-01
-version: "1.0.0"
+version: "1.0.1"
 author: cyberstrike-official
 tags: [client-side, javascript, dom, cors, wstg, clnt]
 tech_stack: []
@@ -348,6 +348,16 @@ element.textContent = userInput // For text
 
 
 ---
+
+
+## Safe Validation and False-Positive Controls
+
+- Confirm a source-to-sink flow: identify attacker-influenced data (such as location, query, fragment, storage, or message events) and show that it reaches an executable DOM sink without safe handling.
+- A dangerous API reference in source code is only a lead. Verify the reachable data flow and observable browser behavior in a controlled test account.
+- Use harmless proof-of-execution markers. Do not read or transmit cookies, local/session storage, tokens, or page contents, and do not trigger actions against other users.
+- For `postMessage`, document the sender origin, receiver origin checks, message schema, and sink. Test origin validation using origins you control; do not rely on a wildcard assumption without reproducing the flow.
+- Retest with encoding and sanitization controls enabled where possible, and distinguish DOM XSS from reflected/stored XSS and benign HTML injection.
+- Preserve the URL, browser context, minimal reproduction steps, and a redacted screenshot or console trace. State the required victim interaction and affected users; do not infer session theft from JavaScript execution alone.
 
 ## Checklist
 

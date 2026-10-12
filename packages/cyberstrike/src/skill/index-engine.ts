@@ -1,3 +1,4 @@
+import path from "path"
 import { Log } from "../util/log"
 import { Skill } from "./skill"
 import { Instance } from "../project/instance"
@@ -8,6 +9,7 @@ export namespace SkillIndex {
   export type Entry = {
     name: string
     description: string
+    location?: string
     category?: string
     owasp_id?: string
     tags: string[]
@@ -53,6 +55,9 @@ export namespace SkillIndex {
     // never fuzzy substring/prefix matches.
     addReference(state, entry.name, entry.name)
     addReference(state, entry.owasp_id, entry.name)
+    // Imported catalogs commonly link controls by their directory slug, while
+    // the visible frontmatter name is human-readable. Index both as exact aliases.
+    if (entry.location) addReference(state, path.basename(path.dirname(entry.location)), entry.name)
 
     const nameTechnique = /^((?:T\d{4})(?:\.\d{3})?)(?:[_-]|$)/i.exec(entry.name)?.[1]
     if (nameTechnique) addReference(state, nameTechnique, entry.name)
@@ -64,15 +69,29 @@ export namespace SkillIndex {
   function resolveInState(reference: string, state: IndexState): string | undefined {
     const normalized = reference.trim().toLowerCase()
     if (!normalized) return undefined
-    const candidates = state.referenceIndex.get(normalized)
-    if (!candidates || candidates.size !== 1) return undefined
-    return candidates.values().next().value
+
+    const resolveExact = (key: string) => {
+      const candidates = state.referenceIndex.get(key)
+      if (!candidates || candidates.size !== 1) return undefined
+      return candidates.values().next().value
+    }
+
+    const exact = resolveExact(normalized)
+    if (exact) return exact
+
+    // A documented alias convention: metadata sometimes prefixes workflow links
+    // with "attack-" while the canonical skill is named without that prefix.
+    // Resolve only when the remaining full name is an exact unique skill name;
+    // never perform substring or token similarity matching.
+    if (normalized.startsWith("attack-")) return resolveExact(normalized.slice("attack-".length))
+    return undefined
   }
 
   function toEntry(skill: Skill.Info): Entry {
     return {
       name: skill.name,
       description: skill.description,
+      location: skill.location,
       category: skill.category,
       owasp_id: skill.owasp_id,
       tags: skill.tags ?? [],
@@ -226,14 +245,33 @@ export namespace SkillIndex {
     reason: "unresolved" | "ambiguous"
   }
 
-  /** Audit metadata links against the current catalogue without guessing aliases. */
+  /**
+   * Audit skill-to-skill links. Some imported catalog entries use external control
+   * IDs (for example NIST "PE-18") in chains_with, and prerequisites may contain
+   * human-readable authorization/precondition statements. These are not skill
+   * names and must not be reported as dangling skill links.
+   */
   export function validateReferences(): ReferenceProblem[] {
     const state = current()
     const problems: ReferenceProblem[] = []
+    const isExternalControlId = (reference: string) =>
+      /^[A-Z]{2,5}-\d+(?:\(\d+\))?$/i.test(reference.trim())
+    const isExternalAttackTechniqueId = (reference: string) =>
+      /^T\d{4}(?:\.\d{3})?$/i.test(reference.trim())
+    const isPrerequisiteStatement = (reference: string) => /\s/.test(reference.trim())
+
     for (const entry of state.entries.values()) {
       for (const field of ["chains_with", "prerequisites"] as const) {
         for (const reference of entry[field]) {
           if (resolveInState(reference, state)) continue
+          // Compliance/control and ATT&CK technique IDs may be useful external
+          // annotations, not necessarily names of locally installed skill entries.
+          // Keep unresolved prerequisites intact; this only avoids false dangling-link
+          // reports and does not mark an unknown prerequisite as satisfied.
+          if (isExternalControlId(reference)) continue
+          if (field === "chains_with" && isExternalAttackTechniqueId(reference)) continue
+          if (field === "prerequisites" && isPrerequisiteStatement(reference)) continue
+
           const candidates = state.referenceIndex.get(reference.trim().toLowerCase())
           problems.push({
             skill: entry.name,
