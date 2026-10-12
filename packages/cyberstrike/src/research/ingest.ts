@@ -66,7 +66,7 @@ export function redactResearchSecrets(input: string): string {
     .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|npm_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|(?:AKIA|ASIA|AIDA|AROA|AIPA|ANPA|ANVA|ASCA)[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})\b/g, "[API KEY REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
     .replace(/((?:aws[_-]?secret[_-]?access[_-]?key|secret[_-]?access[_-]?key|api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|auth[_-]?token|csrf[_-]?token|session[_-]?id|sessionid|private[_-]?key|secret[_-]?key|password|passwd|token|secret|sid)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s"'&,;<>]+)/gi, "$1[REDACTED]")
-    .replace(/([?&](?:access_token|refresh_token|csrf_token|sessionid|private_key|token|api_key|apikey|secret|password|signature|sig|auth|session)=)[^&#\s"'<>]+/gi, "$1[REDACTED]")
+    .replace(/([?&][A-Za-z0-9_.%-]*(?:token|secret|password|passwd|private[_-]?key|signature|credential|api[_-]?key|authorization|csrf|session|auth|sig)[A-Za-z0-9_.%-]*=)[^&#\s"'<>]+/gi, "$1[REDACTED]")
 }
 
 function cleanHtml(html: string) {
