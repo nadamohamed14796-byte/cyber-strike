@@ -168,7 +168,7 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
   if (source.id === "trickster0") {
     const host = parsed.hostname.toLowerCase()
     if (host === "trickster0.medium.com") return path !== "/"
-    return host === "medium.com" && /^\\/@trickster0(?:\\/|$)/i.test(path)
+    return host === "medium.com" && /^\/@trickster0(?:\/|$)/i.test(path)
   }
   // These editorial sites publish individual posts at varied URL shapes (slugs or dates),
   // so their article links cannot be identified reliably by generic path keywords alone.
