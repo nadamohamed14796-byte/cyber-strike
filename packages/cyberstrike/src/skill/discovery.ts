@@ -135,7 +135,18 @@ export namespace Discovery {
       log.warn("refusing zstd-compressed skill archive without a bounded decompression path", { archive })
       return undefined
     }
-    if (!isGzip) return { path: archive, cleanup: async () => {} }
+    if (!isGzip) {
+      const rawTarBytes = Bun.file(archive).size
+      if (
+        rawTarBytes > MAX_ARCHIVE_TAR_BYTES ||
+        budget.decompressedArchiveBytes + rawTarBytes > MAX_TOTAL_ARCHIVE_TAR_BYTES
+      ) {
+        log.warn("refusing raw skill archive: total tar-byte budget exceeded", { archive, rawTarBytes })
+        return undefined
+      }
+      budget.decompressedArchiveBytes += rawTarBytes
+      return { path: archive, cleanup: async () => {} }
+    }
 
     let tempDir: string | undefined
     try {
