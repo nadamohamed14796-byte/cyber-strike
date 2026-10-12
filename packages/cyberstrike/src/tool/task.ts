@@ -17,6 +17,7 @@ import { Observation } from "../session/observation"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
+import { assertTaskResumeScope } from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
 // Raised 16KB→48KB: validation showed weak models (o4-mini) do NOT follow the
@@ -102,7 +103,13 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const session = await iife(async () => {
         if (params.task_id) {
           const found = await Session.get(params.task_id).catch(() => {})
-          if (found) return found
+          if (found) {
+            // Task IDs are model-supplied input. Only resume a child owned by this
+            // exact parent session; otherwise a stale/arbitrary ID could attach
+            // another session's private history to the current agent's task.
+            assertTaskResumeScope(found, ctx.sessionID)
+            return found
+          }
         }
 
         return await Session.create({
