@@ -142,17 +142,21 @@ test("research queue resumes authenticated work and learns cached report text wi
     directory: dir.path,
     fn: async () => {
       const sourceID = "portswigger"
-      const sourceURL = "https://portswigger.net/web-security/access-control/idor"
+      // The shared knowledge store may outlive the temporary project database. Keep both
+      // URL identity and content fingerprint unique so this test proves a fresh ingestion.
+      const marker = crypto.randomUUID()
+      const sourceURL = "https://portswigger.net/web-security/access-control/idor?test_id=" + marker
       ResearchQueue.enqueue({
         sourceID,
         sourceURL,
-        title: "IDOR report",
+        title: "IDOR report " + marker,
         payload: {
           cached_text: [
             "Insecure direct object reference (IDOR) occurs when an application does not check object-level authorization.",
             "An authenticated user can change the object ID in GET /api/users/123 and read another user's private account data.",
             "Reproduction: use two controlled accounts, capture the owner's request, then repeat it with the second account and compare the response.",
             "Impact: unauthorized access to private records. Verify the result against an owner-account baseline and do not infer a vulnerability from an identifier alone.",
+            "Unique test marker: " + marker,
           ].join(" ").repeat(4),
         },
       })
