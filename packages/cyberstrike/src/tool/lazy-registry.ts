@@ -112,22 +112,7 @@ export namespace LazyToolRegistry {
     })
   }
 
-  function stableHash(value: string): string {
-    // FNV-1a, used only to disambiguate IDs after normalization (not for security).
-    let hash = 0x811c9dc5
-    for (let i = 0; i < value.length; i++) {
-      hash ^= value.charCodeAt(i)
-      hash = Math.imul(hash, 0x01000193)
-    }
-    return (hash >>> 0).toString(16).padStart(8, "0")
-  }
 
-  function sanitizeID(value: string): string {
-    const sanitized = value.replace(/[^a-zA-Z0-9_-]/g, "_")
-    // Preserve readable legacy IDs for safe names. Unsafe names get a stable
-    // suffix so distinct names cannot silently overwrite each other.
-    return sanitized === value ? sanitized : sanitized + "__" + stableHash(value)
-  }
 
   function removeServerTools(serverName: string): void {
     for (const [id, tool] of lazyTools) {
@@ -143,10 +128,9 @@ export namespace LazyToolRegistry {
     serverName: string,
     definitions: Array<{ name: string; description?: string }>,
   ): void {
-    const sanitizedServerName = sanitizeID(serverName)
     const next = new Map<string, LazyTool>()
     for (const mcpTool of definitions) {
-      const id = sanitizedServerName + "_" + sanitizeID(mcpTool.name)
+      const id = MCP.toolID(serverName, mcpTool.name)
       const keywords = extractKeywords(mcpTool.name, mcpTool.description || "")
       next.set(id, {
         id,
