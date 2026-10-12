@@ -44,7 +44,7 @@ Skill body for ${name}.
     await addSkill("prefixed-workflow", 'chains_with: ["attack-triage-validation"]')
     await addSkill(
       "external-control-metadata",
-      'chains_with: ["PE-18"]\\nprerequisites: ["An explicitly authorized test account is required"]',
+      'chains_with: ["PE-18"]\nprerequisites: ["An explicitly authorized test account is required"]',
     )
 
     await Instance.provide({
