@@ -49,6 +49,7 @@ export interface NoteInput {
   kind?: TargetNoteKind
   title?: string
   content: string
+  evidence?: string
   source?: string
   sourceURL?: string
   status?: TargetNoteStatus
@@ -536,10 +537,16 @@ export namespace TargetMemory {
   ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
     const rawContent = input.content?.trim()
     if (!rawContent) throw new Error("Note content cannot be empty.")
-    if (rawContent.length > 100_000) throw new Error("Note content is too large (maximum 100,000 characters).")
+    const rawEvidence = input.evidence?.trim()
+    const requestedStatus = input.status ?? "observed"
+    if ((requestedStatus === "confirmed" || requestedStatus === "disproven") && !rawEvidence) {
+      throw new Error("Confirmed/disproven target notes require concrete evidence. Use observed or unverified when evidence is incomplete.")
+    }
+    const combinedContent = rawContent + (rawEvidence ? "\n\nEvidence: " + rawEvidence : "")
+    if (combinedContent.length > 100_000) throw new Error("Note content and evidence are too large (maximum 100,000 characters).")
     // Redact at the persistence boundary, not only in the agent-facing tool:
     // the CLI and future callers must not be able to write secrets to disk.
-    const content = redactTargetNoteSecrets(rawContent)
+    const content = redactTargetNoteSecrets(combinedContent)
 
     const workspace = await ensure(targetURL, { reconcileNotes: false })
     const kind = input.kind ?? "manual"
