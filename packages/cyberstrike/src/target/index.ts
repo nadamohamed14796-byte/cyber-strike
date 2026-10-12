@@ -642,6 +642,30 @@ export namespace TargetMemory {
     ) {
       throw new Error("Target scope manifest identity or schema does not match this workspace.")
     }
+    if (scope.status === "configured") {
+      if (
+        scope.scopeItems.length === 0 ||
+        !scope.authorizationSource?.trim() ||
+        !scope.authorizationReference?.startsWith("https://") ||
+        !scope.configuredAt ||
+        !Number.isFinite(Date.parse(scope.configuredAt))
+      ) {
+        throw new Error("Configured target scope is missing authorization provenance or a valid configuredAt timestamp.")
+      }
+      const normalizedInclude = scope.scopeItems.map(normalizeScopeItem)
+      const normalizedExclude = scope.excludedItems.map(normalizeScopeItem)
+      if (
+        normalizedInclude.some((item, index) => item !== scope.scopeItems![index]) ||
+        normalizedExclude.some((item, index) => item !== scope.excludedItems![index]) ||
+        normalizedInclude.some((item) => normalizedExclude.includes(item))
+      ) {
+        throw new Error("Target scope manifest contains non-canonical or contradictory entries.")
+      }
+      const reference = normalizedSourceURL(scope.authorizationReference)
+      if (!reference || reference !== scope.authorizationReference) {
+        throw new Error("Target scope authorization reference is invalid or contains unsafe URL data.")
+      }
+    }
     return scope as TargetScope
   }
 
