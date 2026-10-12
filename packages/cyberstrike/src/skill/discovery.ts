@@ -15,6 +15,43 @@ export namespace Discovery {
     skills: IndexSkill[]
   }
 
+  /**
+   * Skill names become cache-directory names. Keep them to a single portable
+   * path component so a registry cannot redirect writes outside the skill cache.
+   */
+  export function isSafeSkillName(name: unknown): name is string {
+    return typeof name === "string" && /^[a-z0-9][a-z0-9._-]{0,127}$/i.test(name)
+  }
+
+  /**
+   * Resolve an untrusted file name under its skill root. Registry file entries
+   * must be relative paths, never URLs, drive paths, absolute paths, or paths
+   * containing parent-directory components.
+   */
+  export function resolveSkillFilePath(root: string, file: unknown): string | undefined {
+    if (typeof file !== "string" || file.length === 0 || file.includes("\\0")) return undefined
+
+    // Treat Windows separators as separators on every host OS; otherwise a
+    // Windows-style traversal string could pass validation on Unix.
+    const normalized = file.replace(/\\/g, "/")
+    if (
+      normalized.startsWith("/") ||
+      /^[a-z][a-z0-9+.-]*:/i.test(normalized) ||
+      normalized.split("/").some((part) => part === "..")
+    ) {
+      return undefined
+    }
+
+    const resolvedRoot = path.resolve(root)
+    const destination = path.resolve(resolvedRoot, normalized)
+    const relative = path.relative(resolvedRoot, destination)
+    if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      return undefined
+    }
+
+    return destination
+  }
+
   export function dir() {
     return path.join(Global.Path.cache, "skills")
   }
@@ -69,8 +106,8 @@ export namespace Discovery {
     }
 
     const list = data.skills.filter((skill) => {
-      if (!skill?.name) {
-        log.warn("invalid skill entry", { url: index, skill })
+      if (!skill || !isSafeSkillName(skill.name)) {
+        log.warn("invalid skill entry: unsafe skill name", { url: index, name: skill?.name })
         return false
       }
       const hasFiles = "files" in skill && Array.isArray(skill.files)
@@ -90,8 +127,12 @@ export namespace Discovery {
           // Legacy format: array of individual files
           await Promise.all(
             skill.files.map(async (file) => {
+              const dest = resolveSkillFilePath(root, file)
+              if (!dest) {
+                log.warn("skipping unsafe skill file path", { skill: skill.name, file })
+                return
+              }
               const link = new URL(file, `${host}/${skill.name}/`).href
-              const dest = path.join(root, file)
               await mkdir(path.dirname(dest), { recursive: true })
               await get(link, dest)
             }),
