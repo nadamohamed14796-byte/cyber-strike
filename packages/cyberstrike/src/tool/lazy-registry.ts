@@ -130,12 +130,12 @@ export namespace LazyToolRegistry {
     serverName: string,
     definitions: Array<{ name: string; description?: string }>,
   ): void {
-    removeServerTools(serverName)
     const sanitizedServerName = sanitizeID(serverName)
+    const next = new Map<string, LazyTool>()
     for (const mcpTool of definitions) {
       const id = sanitizedServerName + "_" + sanitizeID(mcpTool.name)
       const keywords = extractKeywords(mcpTool.name, mcpTool.description || "")
-      lazyTools.set(id, {
+      next.set(id, {
         id,
         name: mcpTool.name,
         summary: (mcpTool.description || mcpTool.name).slice(0, 100),
@@ -145,6 +145,29 @@ export namespace LazyToolRegistry {
         mcpServer: serverName,
       })
     }
+
+    // Preserve loaded executable definitions when metadata is unchanged. The
+    // registry is refreshed during each turn, so dropping every loaded entry
+    // here would make load_tools appear to work for only one turn.
+    for (const [id, existing] of lazyTools) {
+      if (existing.mcpServer !== serverName) continue
+      const updated = next.get(id)
+      const unchanged = updated &&
+        existing.name === updated.name &&
+        existing.summary === updated.summary &&
+        existing.category === updated.category &&
+        existing.keywords.length === updated.keywords.length &&
+        existing.keywords.every((keyword, index) => keyword === updated.keywords[index])
+      if (unchanged) {
+        next.set(id, existing)
+        continue
+      }
+      lazyTools.delete(id)
+      loadedTools.delete(id)
+      loadedToolIds.delete(id)
+    }
+
+    for (const [id, tool] of next) lazyTools.set(id, tool)
   }
 
   export function search(query: string, limit = 10): LazyTool[] {
