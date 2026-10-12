@@ -129,6 +129,24 @@ For each endpoint from `correlate_javascript`:
 
 Do not infer that an endpoint is safe because a mutation did not change the response. Keep the baseline, exact mutation operation, redacted evidence, confidence, and next step linked to the endpoint.
 
+### Mandatory adaptive-verification ledger
+
+For each plausible vulnerability hypothesis, record every meaningful test with
+`verification_attempt` using one stable `hypothesis_key`. Select the next strategy
+from the previous evidence and vulnerability class; use distinct `strategy_id` and
+`variant_key` values only for genuinely different tests. Identical retries, renamed
+payloads, planned-but-unrun tests, and attempts with invalid scope/identity/setup do not
+count toward the budget.
+
+A final **disproven / false-positive** verdict requires **20 distinct attempts executed
+under valid preconditions**, direct contradictory evidence, and multiple evidence-backed
+contradictions including a primary contradiction through `validate_finding`. A decisive
+confirmation may stop early when direct evidence proves impact. Scope, authorization, or
+safety blockers stop testing and leave the result inconclusive; reaching 20 attempts
+without decisive evidence also means `INCONCLUSIVE / NEEDS REVIEW`, never an automatic
+false positive. Do not run 20 mechanical permutations just to satisfy a counter.
+
+
 ## Decision Loop
 
 After each finding:
