@@ -1,5 +1,7 @@
 import path from "path"
 import { lstat, mkdir, realpath } from "node:fs/promises"
+import { lookup } from "node:dns/promises"
+import { isIP } from "node:net"
 import * as tar from "tar"
 import { Log } from "../util/log"
 import { Global } from "../global"
@@ -171,6 +173,101 @@ export namespace Discovery {
   }
 
 
+  const MAX_REDIRECTS = 4
+
+  /**
+   * Reject URL shapes that should never be used as remote skill sources.
+   * DNS results are checked separately before every request and redirect.
+   */
+  export function isSafeRemoteURLShape(value: string): boolean {
+    let url: URL
+    try {
+      url = new URL(value)
+    } catch {
+      return false
+    }
+    if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return false
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "")
+    if (!hostname || isIP(hostname) !== 0 || !hostname.includes(".")) return false
+    const localSuffixes = [".localhost", ".local", ".internal", ".test", ".invalid", ".home.arpa"]
+    if (["localhost", "local", "internal", "test", "invalid", "home.arpa"].includes(hostname)) return false
+    if (localSuffixes.some((suffix) => hostname.endsWith(suffix))) return false
+    return true
+  }
+
+  export function isPublicAddress(address: string): boolean {
+    const family = isIP(address)
+    if (family === 4) {
+      const octets = address.split(".").map(Number)
+      const [a, b, c] = octets
+      if (a === 0 || a === 10 || a === 127 || a >= 224) return false
+      if (a === 100 && b >= 64 && b <= 127) return false
+      if (a === 169 && b === 254) return false
+      if (a === 172 && b >= 16 && b <= 31) return false
+      if (a === 192 && (b === 168 || (b === 0 && c <= 2) || (b === 88 && c === 99) || (b === 0 && c === 2))) return false
+      if (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) return false
+      if (a === 203 && b === 0 && c === 113) return false
+      return true
+    }
+    if (family === 6) {
+      const normalized = address.toLowerCase().split("%")[0]
+      // Remote skill sources should resolve only to global-unicast IPv6
+      // addresses (2000::/3), excluding the documentation prefix.
+      if (!/^[23]/.test(normalized) || normalized.startsWith("2001:db8:")) return false
+      return true
+    }
+    return false
+  }
+
+  async function isSafeRemoteDestination(value: string): Promise<boolean> {
+    if (!isSafeRemoteURLShape(value)) return false
+    const url = new URL(value)
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      const addresses = await Promise.race([
+        lookup(url.hostname, { all: true, verbatim: true }),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("DNS lookup timed out")), 3_000)
+        }),
+      ])
+      return addresses.length > 0 && addresses.every((item) => isPublicAddress(item.address))
+    } catch {
+      return false
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+  }
+
+  /** Fetch over HTTPS without allowing redirects to bypass destination checks. */
+  async function fetchRemoteURL(value: string, signal: AbortSignal): Promise<Response> {
+    let current: URL
+    try {
+      current = new URL(value)
+    } catch {
+      throw new Error("Invalid remote skill URL")
+    }
+    for (let redirects = 0; ; redirects++) {
+      if (!(await isSafeRemoteDestination(current.href))) {
+        throw new Error("Remote skill URL resolves to an unsafe or non-public destination")
+      }
+      const response = await fetch(current, { signal, redirect: "manual" })
+      const isRedirect = [301, 302, 303, 307, 308].includes(response.status)
+      if (!isRedirect) return response
+      const location = response.headers.get("location")
+      await response.body?.cancel().catch(() => {})
+      if (!location) throw new Error("Remote skill redirect has no Location header")
+      if (redirects >= MAX_REDIRECTS) throw new Error("Remote skill redirect limit exceeded")
+      try {
+        current = new URL(location, current)
+      } catch {
+        throw new Error("Remote skill redirect has an invalid Location")
+      }
+      if (!isSafeRemoteURLShape(current.href)) {
+        throw new Error("Remote skill redirect attempted to leave the safe HTTPS destination policy")
+      }
+    }
+  }
+
   const MAX_INDEX_BYTES = 2 * 1024 * 1024
   const MAX_SKILL_DOWNLOAD_BYTES = 25 * 1024 * 1024
   const DOWNLOAD_TIMEOUT_MS = 15_000
@@ -218,7 +315,7 @@ export namespace Discovery {
       return false
     }
     if (await Bun.file(safeDest).exists()) return true
-    return fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+    return fetchRemoteURL(url, AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS))
       .then(async (response) => {
         if (!response.ok) {
           log.error("failed to download", { url, status: response.status })
@@ -246,7 +343,7 @@ export namespace Discovery {
     const host = base.slice(0, -1)
 
     log.info("fetching index", { url: index })
-    const data = await fetch(index, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+    const data = await fetchRemoteURL(index, AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS))
       .then(async (response) => {
         if (!response.ok) {
           log.error("failed to fetch index", { url: index, status: response.status })
