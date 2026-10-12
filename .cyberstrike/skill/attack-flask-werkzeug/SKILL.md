@@ -107,6 +107,8 @@ Disable debug mode in production, use a production WSGI server, avoid detailed e
 
 ## References
 
+- [uphiago/recon-skills — Flask/Werkzeug assessment](https://github.com/uphiago/recon-skills/blob/main/recon/flask-werkzeug-attack/SKILL.md) — merged framework-specific source.
+
 - [uphiago/recon-skills — flask-werkzeug-attack](https://github.com/uphiago/recon-skills/tree/main/recon/flask-werkzeug-attack)
 - [Flask — Debugging Application Errors](https://flask.palletsprojects.com/en/stable/debugging/)
 - [Werkzeug — Debugger](https://werkzeug.palletsprojects.com/en/stable/debug/)
