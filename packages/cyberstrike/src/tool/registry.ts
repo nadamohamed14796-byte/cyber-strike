@@ -8,6 +8,7 @@ import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { TodoWriteTool, TodoReadTool } from "./todo"
 import { ReportVulnerabilityTool } from "./vulnerability"
+import { VerificationAttemptTool } from "./verification-attempt"
 import { TriageVulnerabilityTool } from "./triage-vulnerability"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
@@ -155,6 +156,7 @@ export namespace ToolRegistry {
       WebFetchTool,
       TodoWriteTool,
       ReportVulnerabilityTool,
+      VerificationAttemptTool,
       TriageVulnerabilityTool,
       // TodoReadTool,
       WebSearchTool,
