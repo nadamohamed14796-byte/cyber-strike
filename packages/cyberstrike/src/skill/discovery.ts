@@ -171,6 +171,46 @@ export namespace Discovery {
   }
 
 
+  const MAX_INDEX_BYTES = 2 * 1024 * 1024
+  const MAX_SKILL_DOWNLOAD_BYTES = 25 * 1024 * 1024
+  const DOWNLOAD_TIMEOUT_MS = 15_000
+
+  /** Read a response incrementally so an untrusted registry cannot exhaust memory with an oversized body. */
+  export async function readBoundedBody(response: Response, maxBytes: number): Promise<Uint8Array | undefined> {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) return undefined
+    const declaredLength = response.headers.get("content-length")
+    if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
+      await response.body?.cancel().catch(() => {})
+      return undefined
+    }
+    if (!response.body) return new Uint8Array()
+    const reader = response.body.getReader()
+    const chunks: Uint8Array[] = []
+    let total = 0
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        total += value.byteLength
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => {})
+          return undefined
+        }
+        chunks.push(value)
+      }
+    } catch {
+      await reader.cancel().catch(() => {})
+      return undefined
+    }
+    const result = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+      result.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return result
+  }
+
   async function get(url: string, dest: string, root: string, binary = false): Promise<boolean> {
     const safeDest = await safeCacheDestination(root, dest, true)
     if (!safeDest) {
@@ -178,14 +218,18 @@ export namespace Discovery {
       return false
     }
     if (await Bun.file(safeDest).exists()) return true
-    return fetch(url)
+    return fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
       .then(async (response) => {
         if (!response.ok) {
           log.error("failed to download", { url, status: response.status })
           return false
         }
-        const content = binary ? new Uint8Array(await response.arrayBuffer()) : await response.text()
-        await Bun.write(safeDest, content)
+        const bytes = await readBoundedBody(response, MAX_SKILL_DOWNLOAD_BYTES)
+        if (!bytes) {
+          log.warn("refusing oversized or unreadable skill download", { url, maxBytes: MAX_SKILL_DOWNLOAD_BYTES })
+          return false
+        }
+        await Bun.write(safeDest, binary ? bytes : new TextDecoder().decode(bytes))
         return true
       })
       .catch((err) => {
@@ -202,19 +246,23 @@ export namespace Discovery {
     const host = base.slice(0, -1)
 
     log.info("fetching index", { url: index })
-    const data = await fetch(index)
+    const data = await fetch(index, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
       .then(async (response) => {
         if (!response.ok) {
           log.error("failed to fetch index", { url: index, status: response.status })
           return undefined
         }
-        return response
-          .json()
-          .then((json) => json as Index)
-          .catch((err) => {
-            log.error("failed to parse index", { url: index, err })
-            return undefined
-          })
+        const bytes = await readBoundedBody(response, MAX_INDEX_BYTES)
+        if (!bytes) {
+          log.warn("refusing oversized or unreadable skill index", { url: index, maxBytes: MAX_INDEX_BYTES })
+          return undefined
+        }
+        try {
+          return JSON.parse(new TextDecoder().decode(bytes)) as Index
+        } catch (err) {
+          log.error("failed to parse index", { url: index, err })
+          return undefined
+        }
       })
       .catch((err) => {
         log.error("failed to fetch index", { url: index, err })
