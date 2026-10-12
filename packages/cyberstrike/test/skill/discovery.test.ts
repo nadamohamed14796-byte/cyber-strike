@@ -32,6 +32,24 @@ describe("remote skill path validation", () => {
     }
   })
 
+  test("remote skill redirects cannot downgrade HTTPS or target local hosts", () => {
+    expect(Discovery.safeRemoteRedirectURL(
+      "https://developers.cloudflare.com/.well-known/skills/index.json",
+      "../catalog.json",
+    )).toBe("https://developers.cloudflare.com/.well-known/catalog.json")
+    expect(Discovery.safeRemoteRedirectURL("https://example.com/index.json", "https://cdn.example.net/skills.tar.gz"))
+      .toBe("https://cdn.example.net/skills.tar.gz")
+    for (const location of [
+      "http://example.com/index.json",
+      "https://127.0.0.1/metadata",
+      "https://localhost/private",
+      "file:///etc/passwd",
+    ]) {
+      expect(Discovery.safeRemoteRedirectURL("https://example.com/index.json", location)).toBeUndefined()
+    }
+    expect(Discovery.safeRemoteRedirectURL("https://example.com/index.json", "http://[")).toBeUndefined()
+  })
+
   test("remote DNS destinations must resolve only to public addresses", () => {
     expect(Discovery.isPublicAddress("8.8.8.8")).toBe(true)
     expect(Discovery.isPublicAddress("2606:4700:4700::1111")).toBe(true)
