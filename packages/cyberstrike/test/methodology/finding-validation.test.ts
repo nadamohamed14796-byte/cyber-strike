@@ -137,6 +137,17 @@ test("records validation history and removes false positives from confirmed find
       expect(invalidAttemptResult.verdict).toBe("inconclusive")
       expect(invalidAttemptResult.attemptCount).toBe(0)
 
+      // Simulate an old finding status written by a version that counted invalid attempts.
+      Vulnerability.update({ sessionID: session.id, id: finding.id, status: "false_positive", candidate: null })
+      const reopened = await FindingValidation.record({
+        sessionID: session.id,
+        vulnerabilityID: finding.id,
+        checks,
+      })
+      expect(reopened.verdict).toBe("inconclusive")
+      expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
+      expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.candidate).toBe("medium")
+
       const result = await FindingValidation.record({
         sessionID: session.id,
         vulnerabilityID: finding.id,
@@ -152,10 +163,11 @@ test("records validation history and removes false positives from confirmed find
       expect(updated?.status).toBe("false_positive")
       expect(updated?.description).toContain("[Latest finding validation]")
       expect(Vulnerability.confirmed(session.id).some((row) => row.id === finding.id)).toBe(false)
-      expect(history).toHaveLength(2)
-      expect(history[0]?.attempt_count).toBe(0)
-      expect(history[1]?.attempt_count).toBe(20)
-      expect(history[1]?.failed_check_ids).toEqual(["reproducible", "unexpected_behavior"])
+      expect(history).toHaveLength(3)
+      expect(history[0]?.attempt_count).toBe(20)
+      expect(history[1]?.attempt_count).toBe(0)
+      expect(history[2]?.attempt_count).toBe(0)
+      expect(history[0]?.failed_check_ids).toEqual(["reproducible", "unexpected_behavior"])
       await Session.remove(session.id)
     },
   })
