@@ -31,7 +31,9 @@
 | INT-002 | P2 | Branch integration | PR #7 (`feat/target-memory-foundation`) is 311 commits ahead / 190 behind, with 77 changed files. PR #17 integrated the feature set; current `main` has newer reviewed implementations, so no wholesale merge is safe. | 2 | blocked_no_bulk_merge |
 | INT-003 | P2 | Branch integration | PR #6 (`improve/skill-quality-reference-audit`) is 159 commits ahead / 190 behind, with 99 changed files. PR #15's reconciled quality work is already merged; skill changes are out of scope for this pass and must not be merged wholesale. | 2 | blocked_out_of_scope_and_diverged |
 | INT-004 | P1 | Branch integration / TLS safety | PR #2 (`hackbrowser-improvement`) is 44 commits ahead / 300 behind, with 36 changed files. Its launcher disables TLS certificate verification (`NODE_TLS_REJECT_UNAUTHORIZED=0`); do not merge wholesale. Review only isolated safe changes. | 2 | blocked_unsafe_to_merge_wholesale |
-| SEC-007 | P1 | HTTP replay TLS verification | `http_replay` and `http_replay_raw` treated an omitted `insecure_tls` flag as permission to disable certificate verification. The transport now verifies certificates by default and accepts invalid/self-signed certificates only after explicit opt-in; a regression test covers both cases. | 1 | fix committed; CI pending |
+| INT-005 | P1 | Agent workflow linkage | The root agent prompt did not call `correlate_javascript` after the crawl, and the web-application prompt did not explicitly connect the durable 20-valid-attempt gate to endpoint validation. Both prompt paths now require JS correlation after capture and evidence-driven verification; CI pending for these latest prompt commits. | 1 | integrated; latest-main CI pending |
+| TEST-001 | P2 | Regression-test contract | A new test incorrectly treated extracted function parameter names as raw JavaScript source, despite parameter extraction being intentional. The assertion now verifies parameter metadata remains available while executable source/sink expressions are not persisted; test/typecheck/build passed on `f5abcf09cc`. | 1 | fixed; tests green |
+| SEC-007 | P1 | HTTP replay TLS verification | `http_replay` and `http_replay_raw` previously treated omitted `insecure_tls` as permission to disable certificate verification. The default is now secure; invalid/self-signed certificates require explicit opt-in. Tests, typecheck, and build passed on `f5abcf09cc`; CodeQL and later prompt-only commits are still being checked. | 1 | code fix validated; latest-main CI pending |
 
 | FUN-001 | P2 | Archive download integrity | Remote downloads use bounded byte streaming and binary archives are written without text decoding. Current-main tests and build pass. | 1 | resolved |
 | SEC-003 | P2 | Test/type contract | Tar entry properties are validated at runtime; current-main tests and typecheck pass. | 1 | resolved |
@@ -61,6 +63,21 @@
 - **Regression test:** `packages/cyberstrike/test/tool/http-replay.test.ts` asserts omitted/false values keep certificate verification enabled and only explicit `true` disables it.
 - **Commits:** source `57799471a3df6686d19cd3db1b886385d714f4d5`; tests `84d36043b3341205ee2969c0813f0dae310216e1`.
 - **Validation:** waiting for GitHub Actions on the current main head; do not mark fully verified until test, typecheck, build, and CodeQL conclude.
+
+
+### INT-005 — connect JavaScript review and the false-positive gate to agent prompts
+
+- Added a post-crawl `correlate_javascript` step to the root agent prompt. It explicitly says the tool analyzes captured JavaScript/local reviewed files without fetching or executing code, and that absent captures mean review is incomplete—not that no risks exist.
+- Added a mandatory adaptive-verification section to `web-application.txt`: `verification_attempt` for each meaningful attempt; 20 distinct valid attempts plus direct contradictory evidence and the `validate_finding` gate for false-positive/disproven outcomes; hard stops and exhausted budgets remain inconclusive.
+- Propagated the same rule into the root agent's operating principles so orchestration does not contradict the specialist prompt.
+- Commits: `2068a6c58e94b2d351521d28c0d32954e27a1265`, `3fdd0c94c504193eecbe4fc85c8f7629bb469bc8`, `c4dc4edff8d38fd4b6b0036871a5832cbcd658f2`.
+- Validation: waiting for current-main CI.
+
+### TEST-001 — keep function metadata while excluding raw JavaScript source
+
+- The new test failed because it expected the extracted parameter name `untrustedHtml` to be absent, although function names/parameters are intentionally part of the JavaScript analysis output.
+- Corrected the test to assert that parameter metadata is preserved while raw source expressions (`document.querySelector`, `innerHTML = untrustedHtml`) are absent from the stored analysis.
+- Commit: `f5abcf09cccb217b54b76059167f4b905e86bc25`; GitHub Actions tests, typecheck, and build passed on that commit. The later root-prompt changes remain under CI.
 
 ## Branch / PR ledger (updated during execution)
 
