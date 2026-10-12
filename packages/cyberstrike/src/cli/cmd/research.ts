@@ -2,7 +2,7 @@ import * as prompts from "@clack/prompts"
 import { cmd } from "./cmd"
 import { ReportKnowledge } from "../../learning/report-knowledge"
 import { RESEARCH_SOURCES } from "../../research/sources"
-import { discoverResearch, learnResearchQueue, syncResearch } from "../../research/ingest"
+import { discoverResearch, learnResearchQueue } from "../../research/ingest"
 import { ResearchQueue } from "../../research/queue"
 
 function knowledgeScoreLabel(row: {
@@ -69,31 +69,21 @@ export const ResearchCommand = cmd({
           prompts.intro("CyberStrike Research Learning")
           const deep = Boolean(args.deep)
           const exhaustive = Boolean(args.all)
-          const results = await syncResearch({
+          const discoveries = await discoverResearch({
             sourceID: args.source,
-            limit: deep ? 200 : args.limit,
             pages: exhaustive ? 1000 : deep ? 750 : args.pages,
             depth: exhaustive ? 4 : deep ? 3 : args.depth,
-            all: exhaustive,
           })
-          for (const result of results) {
-            prompts.log.info(
-              result.source +
-                ": fetched=" +
-                result.fetched +
-                " learned=" +
-                result.learned +
-                " skipped=" +
-                result.skipped +
-                " failed=" +
-                result.failed +
-                " pages=" +
-                result.pages_crawled +
-                " candidates=" +
-                result.candidates_discovered,
-            )
-            for (const error of result.error_samples) prompts.log.warn(error)
+          for (const result of discoveries) {
+            prompts.log.info(result.source + ": pages=" + result.pages + " candidates=" + result.candidates +
+              " queued_new=" + result.added + " blocked_auth=" + result.blocked_auth)
+            for (const error of result.errors) prompts.log.warn(error)
           }
+          const limit = exhaustive ? 500 : Math.min(500, (deep ? 200 : args.limit) * discoveries.length)
+          const learned = await learnResearchQueue({ limit })
+          prompts.log.info("queue worker: claimed=" + learned.claimed + " learned=" + learned.learned +
+            " skipped=" + learned.skipped + " failed=" + learned.failed + " blocked_auth=" + learned.blocked_auth)
+          for (const error of learned.errors) prompts.log.warn(error)
           prompts.outro(exhaustive ? "Exhaustive research sync complete" : "Research sync complete")
         },
       })
@@ -155,12 +145,26 @@ export const ResearchCommand = cmd({
                 " skipped=" +
                 result.skipped +
                 " failed=" +
-                result.failed,
+                result.failed +
+                " blocked_auth=" +
+                result.blocked_auth,
             )
             for (const error of result.errors) prompts.log.warn(error)
             if (!args.watch) break
             if (result.claimed === 0 || result.failed > 0) await Bun.sleep(Math.max(2, args.interval) * 1000)
           } while (true)
+        },
+      })
+      .command({
+        command: "retry-auth",
+        describe: "requeue authentication-blocked reports after configuring a valid source session",
+        builder: (yargs) => yargs
+          .option("source", { type: "string", describe: "optional source ID to retry" })
+          .option("limit", { type: "number", default: 100, describe: "maximum blocked reports to requeue" }),
+        async handler(args) {
+          const count = ResearchQueue.retryAuthenticationBlocked(args.limit, args.source)
+          console.log("requeued_for_auth_retry=" + count)
+          console.log("Configure CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_ID> or CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_ID> before running research learn.")
         },
       })
       .command({

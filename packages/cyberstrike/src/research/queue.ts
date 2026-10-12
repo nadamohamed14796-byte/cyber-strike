@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, isNull, lt, or } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
 
-export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected"
+export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth"
 
 const LEASE_MS = 5 * 60_000
 
@@ -56,6 +56,45 @@ export namespace ResearchQueue {
     })
   }
 
+  export function find(sourceID: string, sourceURL: string) {
+    return Database.use((db) => db.select().from(ResearchQueueTable)
+      .where(and(eq(ResearchQueueTable.source_id, sourceID), eq(ResearchQueueTable.source_url, sourceURL))).get())
+  }
+
+  export function blockAuthentication(input: { sourceID: string; sourceURL: string; title?: string; reason: string; payload?: Record<string, unknown> }) {
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const existing = db.select().from(ResearchQueueTable)
+        .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
+      if (existing?.status === "learned" || existing?.status === "rejected") return existing
+      if (existing) return db.update(ResearchQueueTable).set({
+        status: "blocked_auth", title: input.title ?? existing.title,
+        payload: { ...(existing.payload ?? {}), ...(input.payload ?? {}), auth_required: true },
+        last_error: input.reason.slice(0, 1000), lease_owner: null, lease_until: null,
+        updated_at: now, completed_at: now,
+      }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      return db.insert(ResearchQueueTable).values({
+        source_id: input.sourceID, source_url: input.sourceURL, title: input.title ?? null,
+        payload: { ...(input.payload ?? {}), auth_required: true }, status: "blocked_auth", attempts: 0,
+        last_error: input.reason.slice(0, 1000), discovered_at: now, updated_at: now, completed_at: now,
+      }).returning().get()
+    })
+  }
+
+  export function retryAuthenticationBlocked(limit = 100, sourceID?: string) {
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const rows = db.select().from(ResearchQueueTable).where(sourceID
+        ? and(eq(ResearchQueueTable.status, "blocked_auth"), eq(ResearchQueueTable.source_id, sourceID))
+        : eq(ResearchQueueTable.status, "blocked_auth"))
+        .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
+      for (const row of rows) db.update(ResearchQueueTable).set({
+        status: "queued", last_error: null, lease_owner: null, lease_until: null, completed_at: null, updated_at: now,
+      }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).run()
+      return rows.length
+    })
+  }
+
   export function claimNext(workerID: string) {
     const now = Date.now()
     // Lease identity must be unique per claim, not just per configured worker label.
@@ -106,7 +145,7 @@ export namespace ResearchQueue {
   export function complete(
     sequence: number,
     leaseOwner: string,
-    outcome: "learned" | "retry" | "rejected",
+    outcome: "learned" | "retry" | "rejected" | "blocked_auth",
     error?: string,
   ) {
     const now = Date.now()
@@ -118,7 +157,7 @@ export namespace ResearchQueue {
           last_error: error ?? null,
           lease_owner: null,
           lease_until: null,
-          completed_at: outcome === "learned" || outcome === "rejected" ? now : null,
+          completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" ? now : null,
           updated_at: now,
         })
         .where(
@@ -144,6 +183,7 @@ export namespace ResearchQueue {
         learned: 0,
         retry: 0,
         rejected: 0,
+        blocked_auth: 0,
       }
       for (const row of rows) counts[row.status] = (counts[row.status] ?? 0) + 1
       return counts
@@ -155,7 +195,7 @@ export namespace ResearchQueue {
       db
         .select()
         .from(ResearchQueueTable)
-        .where(inArray(ResearchQueueTable.status, ["queued", "retry", "studying"]))
+        .where(inArray(ResearchQueueTable.status, ["queued", "retry", "studying", "blocked_auth"]))
         .orderBy(asc(ResearchQueueTable.sequence))
         .limit(Math.max(1, Math.min(500, Math.floor(limit))))
         .all()

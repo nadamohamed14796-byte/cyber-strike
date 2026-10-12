@@ -176,14 +176,17 @@ export async function fetchResearchText(url: string, source: ResearchSource, res
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), Math.min(REQUEST_TIMEOUT_MS, remainingMs))
         try {
-          const response = await fetch(current, {
-            signal: controller.signal,
-            redirect: "manual",
-            headers: {
-              accept: "text/html,application/xhtml+xml,text/plain,application/xml;q=0.9,*/*;q=0.8",
-              "user-agent": "CyberStrike-Research/2.0 (+public-security-research)",
-            },
-          })
+          const sourceSuffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
+          const headers: Record<string, string> = {
+            accept: "text/html,application/xhtml+xml,text/plain,application/xml;q=0.9,*/*;q=0.8",
+            "user-agent": "CyberStrike-Research/2.0 (+public-security-research)",
+          }
+          // Optional source-scoped operator credentials are never persisted. Do not auto-register or bypass MFA/CAPTCHA.
+          const cookie = process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + sourceSuffix]
+          const authorization = process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + sourceSuffix]
+          if (cookie?.trim()) headers.cookie = cookie.trim()
+          if (authorization?.trim()) headers.authorization = authorization.trim()
+          const response = await fetch(current, { signal: controller.signal, redirect: "manual", headers })
 
           if (response.status >= 300 && response.status < 400) {
             const location = response.headers.get("location")

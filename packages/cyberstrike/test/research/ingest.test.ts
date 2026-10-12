@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { extractResearchDetails, redactResearchSecrets } from "../../src/research/ingest"
+import { extractResearchDetails, looksLikeResearchAuthenticationWall, redactResearchSecrets } from "../../src/research/ingest"
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
   const extracted = extractResearchDetails(
@@ -92,4 +92,20 @@ test("research ingestion redacts credentials and secret-bearing URLs before pers
   expect(safe).not.toContain("eyJabcdefghijk.abcdefghijk.abcdefghijk")
   expect(safe).not.toContain("private-key-material")
   expect(safe).toContain("next=%2Fhome")
+})
+
+
+test("research auth-wall detection flags gated content without treating normal reports as login walls", () => {
+  expect(looksLikeResearchAuthenticationWall(
+    "https://reports.example.test/report/123",
+    "Sign in to continue",
+    "Please sign in to continue reading this report.",
+    "<html><body>Please sign in to continue reading this report.</body></html>",
+  )).toBe(true)
+  expect(looksLikeResearchAuthenticationWall(
+    "https://reports.example.test/report/123",
+    "IDOR exposes private API data",
+    "The issue allows another user to read a private object when authorization is missing.",
+    "<html><body>Public write-up</body></html>",
+  )).toBe(false)
 })

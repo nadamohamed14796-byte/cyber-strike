@@ -82,3 +82,25 @@ test("an expired lease can be reclaimed and the stale worker cannot complete it"
     },
   })
 })
+
+
+test("research queue records auth-blocked work and only retries it explicitly", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const blocked = ResearchQueue.blockAuthentication({
+        sourceID: "test-auth",
+        sourceURL: "https://research.example.test/private-report",
+        reason: "HTTP 401",
+      })
+      expect(blocked?.status).toBe("blocked_auth")
+      expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.last_error).toBe("HTTP 401")
+      expect(ResearchQueue.claimNext("worker-auth")).toBeNull()
+      expect(ResearchQueue.retryAuthenticationBlocked(10, "test-auth")).toBe(1)
+      expect(ResearchQueue.find("test-auth", "https://research.example.test/private-report")?.status).toBe("queued")
+      expect(ResearchQueue.claimNext("worker-auth")?.status).toBe("studying")
+      await Instance.dispose()
+    },
+  })
+})

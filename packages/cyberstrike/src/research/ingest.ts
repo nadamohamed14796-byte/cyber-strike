@@ -507,9 +507,20 @@ export type ResearchIngestResult = {
   learned: number
   skipped: number
   failed: number
+  blocked_auth: number
   pages_crawled: number
   candidates_discovered: number
   error_samples: string[]
+}
+
+export function looksLikeResearchAuthenticationWall(url: string, title: string, text: string, html = "") {
+  const pathname = (() => { try { return new URL(url).pathname } catch { return "" } })()
+  const heading = title.toLowerCase().trim()
+  const body = text.slice(0, 6000).toLowerCase()
+  if (/\/(?:login|log-in|signin|sign-in|register|signup|sign-up|auth)(?:\/|$)/i.test(pathname)) return true
+  if (/^(?:sign in|log in|login|create an account|authentication required)(?:\b|\s*[-|])/i.test(heading)) return true
+  if (/(?:sign in|log in) to (?:continue|view|read|access)|login required|authentication required|you must be logged in|create an account to (?:view|read|continue)|members only/i.test(body)) return true
+  return text.trim().length < 1200 && /<form\b/i.test(html) && /(?:password|sign in|log in|login|email address)/i.test(html) && /(?:login|signin|sign-in|auth|session)/i.test(html)
 }
 
 export type ResearchSyncOptions = {
@@ -534,6 +545,7 @@ export async function syncResearchSource(
     learned: 0,
     skipped: 0,
     failed: 0,
+    blocked_auth: 0,
     pages_crawled: 0,
     candidates_discovered: 0,
     error_samples: [],
@@ -726,7 +738,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
   if (!sources.length) throw new Error("unknown research source: " + input.sourceID)
   const maxPages = Math.max(1, Math.min(input.pages ?? 100, MAX_PAGES))
   const maxDepth = Math.max(0, Math.min(input.depth ?? 2, MAX_DEPTH))
-  const results: Array<{ source: string; pages: number; candidates: number; added: number; errors: string[] }> = []
+  const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; errors: string[] }> = []
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
@@ -736,6 +748,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     let pages = 0
     let candidates = 0
     let added = 0
+    let blockedAuth = 0
     const add = (value: string, depth: number) => {
       const url = normalizeUrl(value)
       if (!url || depth > maxDepth || queued.has(url) || visited.has(url)) return
@@ -758,11 +771,22 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       const current = queue.shift()!
       if (visited.has(current.url)) continue
       visited.add(current.url)
+      if (current.depth > 0 && isResearchCandidate(current.url, source) && ResearchQueue.find(source.id, current.url)) continue
       pages++
       try {
         const html = await fetchText(current.url, source)
         const title = redactResearchSecrets(titleOf(html, current.url))
         const text = redactResearchSecrets(cleanHtml(html))
+        if (looksLikeResearchAuthenticationWall(current.url, title, text, html)) {
+          ResearchQueue.blockAuthentication({
+            sourceID: source.id, sourceURL: current.url, title,
+            reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
+            payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
+          })
+          blockedAuth++
+          errors.push(current.url + " — authentication required")
+          continue
+        }
         for (const link of linksOf(html, new URL(current.url), source)) {
           candidates++
           add(link, current.depth + 1)
@@ -787,12 +811,19 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           }
         }
       } catch (error) {
-        if (errors.length < 5)
-          errors.push(current.url + " — " + (error instanceof Error ? error.message : String(error)))
+        const message = error instanceof Error ? error.message : String(error)
+        if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {
+          ResearchQueue.blockAuthentication({
+            sourceID: source.id, sourceURL: current.url, reason: message,
+            payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
+          })
+          blockedAuth++
+          errors.push(current.url + " — authentication required (" + message + ")")
+        } else if (errors.length < 5) errors.push(current.url + " — " + message)
       }
       if (current.depth >= maxDepth) continue
     }
-    results.push({ source: source.id, pages, candidates, added, errors })
+    results.push({ source: source.id, pages, candidates, added, blocked_auth: blockedAuth, errors })
   }
   return results
 }
@@ -802,7 +833,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
   const { ResearchQueue } = await import("./queue")
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
   const limit = Math.max(1, Math.min(input.limit ?? 50, MAX_LIMIT))
-  const result = { worker: workerID, claimed: 0, learned: 0, skipped: 0, failed: 0, errors: [] as string[] }
+  const result = { worker: workerID, claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
 
   for (let i = 0; i < limit; i++) {
     const item = ResearchQueue.claimNext(workerID)
@@ -818,6 +849,11 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
       const html = await fetchText(item.source_url, source)
       const text = redactResearchSecrets(cleanHtml(html))
       const title = redactResearchSecrets(titleOf(html, item.source_url))
+      if (looksLikeResearchAuthenticationWall(item.source_url, title, text, html)) {
+        ResearchQueue.complete(item.sequence, item.lease_owner, "blocked_auth", "authentication wall detected; configure a source-scoped session, then run research retry-auth")
+        result.blocked_auth++
+        continue
+      }
       if (text.length < 250) {
         ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "page content too short")
         result.skipped++
@@ -920,7 +956,9 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
       ResearchQueue.complete(item.sequence, item.lease_owner, "learned")
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      ResearchQueue.complete(item.sequence, item.lease_owner, item.attempts >= 3 ? "rejected" : "retry", message)
+      const authRequired = /\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)
+      ResearchQueue.complete(item.sequence, item.lease_owner, authRequired ? "blocked_auth" : item.attempts >= 3 ? "rejected" : "retry", message)
+      if (authRequired) result.blocked_auth++
       result.failed++
       if (result.errors.length < 5) result.errors.push(item.public_id + " " + item.source_url + " — " + message)
       // Do not immediately reclaim the same failing item repeatedly in one batch.
