@@ -285,7 +285,7 @@ test("revalidates DNS answers after a redirect", async () => {
     return [{ address: resolution === 1 ? "93.184.216.34" : "127.0.0.1", family: 4 }]
   }
   await withFetch(
-    (async () => new Response(null, { status: 302, headers: { location: "/next" } })) as typeof fetch,
+    (async () => new Response(null, { status: 302, headers: { location: "/next" } })) as unknown as typeof fetch,
     async () => {
       await expect(fetchTest("https://research.example/start", source, resolver)).rejects.toThrow(
         "blocked research host resolving to a non-public address",
