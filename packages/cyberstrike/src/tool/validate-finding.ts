@@ -37,9 +37,7 @@ const DESCRIPTION = [
   "The result is a conservative rubric, not a statistical probability or replacement for human review. Do not run actions outside the existing approved scope; this tool does not change scope enforcement.",
 ].join("\n")
 
-export const ValidateFindingTool = Tool.define("validate_finding", {
-  description: DESCRIPTION,
-  parameters: z.object({
+const ValidateFindingParameters = z.object({
     id: z.string().min(1).describe("Finding ID returned by report_vulnerability"),
     attempts: z.array(z.object({
       strategy: ATTEMPT_STRATEGY,
@@ -57,7 +55,11 @@ export const ValidateFindingTool = Tool.define("validate_finding", {
         evidence: z.string().optional().describe("Concrete observed response/test result, required for fail"),
       }),
     ).length(10).describe("Exactly ten unique validation checks; use unknown rather than omit a check"),
-  }),
+  })
+
+export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters, Tool.Metadata>("validate_finding", {
+  description: DESCRIPTION,
+  parameters: ValidateFindingParameters,
   async execute(params, ctx) {
     try {
       const result = await FindingValidation.record({
