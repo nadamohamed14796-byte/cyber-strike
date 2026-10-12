@@ -123,7 +123,9 @@ export namespace Discovery {
       await tar.t({
         file: archive,
         strict: true,
-        onReadEntry(entry) { entries.push({ path: entry.path, type: entry.type }) },
+        onReadEntry(entry) {
+          if ("path" in entry && "type" in entry) entries.push({ path: entry.path, type: entry.type })
+        },
       })
     } catch (err) {
       log.error("failed to inspect skill archive", { archive, err })
