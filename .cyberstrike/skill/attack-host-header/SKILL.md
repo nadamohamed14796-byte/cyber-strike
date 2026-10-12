@@ -2,7 +2,7 @@
 name: attack-host-header
 description: "Assess Host and forwarded-host trust for absolute URL generation, routing, redirect, and cache boundaries using controlled test domains and identities."
 category: "web-application"
-version: "1.2.0"
+version: "1.3.0"
 author: "cyberstrike-official"
 tags:
   - host-header
@@ -34,14 +34,7 @@ severity_boost:
 
 Determine whether an application or intermediary trusts client-controlled Host-related headers for security-sensitive decisions such as absolute URL generation, routing, redirects, cache variation, or origin checks. Use a hostname you control and accounts you own. A reflected hostname or a changed status code is only a lead, not proof of impact.
 
-## Scope and Safety Preconditions
-
-- Confirm the target hostname, route, and permitted test type are explicitly in scope.
-- Use only a test email inbox and test account for password-reset, email-verification, invitation, and OAuth-related flows.
-- Use a domain or subdomain controlled by the tester for harmless canaries; never route real reset tokens or user traffic to an external collector.
-- Test one header per request. Avoid duplicate Host headers and parser-confusion variants on shared production infrastructure unless the program explicitly permits them; prefer a local proxy/origin lab.
-- Do not try to reach unrelated internal virtual hosts, admin panels, metadata endpoints, or third-party services through Host manipulation.
-- If an email or response unexpectedly contains a live token or private data, stop and redact it.
+Authorization is governed by the engagement scope and the library's central scope policy. Use controlled accounts/domains for account-flow checks; retain only sanitized evidence. The workflow below is not restricted to labs when the target and test class are expressly authorized.
 
 ## Testing Methodology
 
@@ -51,9 +44,9 @@ Identify the front door (CDN/load balancer/reverse proxy), canonical host, origi
 
 Check whether the application is behind a proxy and whether documentation specifies trusted forwarded headers. Do not assume that X-Forwarded-Host or X-Host is trusted just because it is accepted by the HTTP parser.
 
-### Phase 2: Test a controlled Host-derived reflection
+### Phase 2: Enumerate Host-derived sinks and test trust assumptions
 
-Use a harmless endpoint where Host-derived values may appear, such as a canonical link or a redirect generated for a synthetic route. Change one value at a time in an approved environment, using an owned controlled domain. Compare the normal request with the candidate request and confirm that the response actually changes in a security-relevant sink.
+Inventory sinks including absolute URL generation, canonical links, redirects, password-reset and invitation links, tenant routing, origin checks, cache variation, CSP/reporting URLs, and proxy-generated error pages. Change one authority-related input at a time (Host, Forwarded host, X-Forwarded-Host, X-Host, X-Forwarded-Server) and compare the exact sink against a baseline. Record which layer consumes each header; acceptance by the HTTP parser does not mean the application trusts it.
 
 A value that appears only in an error message or in a body reflecting the original request is not enough. Inspect HTML/JSON context, Location, absolute URL, and cache behavior separately.
 
@@ -63,9 +56,9 @@ Perform this only when the program permits auth-flow testing and only with a tes
 
 Do not submit reset requests for real users, change a real account's recovery email, forward live tokens, or redeem a token after changing state beyond the test account. If the host is wrong but the token is still scoped to a controlled test account, redact the token completely in retained evidence.
 
-### Phase 4: Review proxy-header behavior and routing
+### Phase 4: Compare proxy-header precedence, normalization, and routing
 
-In a lab first, compare canonical Host handling with one forwarded header at a time (X-Forwarded-Host, Forwarded, X-Host, or X-Forwarded-Server) and document which layer consumes each value. For production checks, use a harmless route and do not target internal/admin route names as a bypass attempt.
+Compare canonical Host handling with one forwarded header at a time and test precedence when multiple trusted-proxy headers are present. Where the application exposes a documented route, compare normalization of case, trailing dots, ports, IDNA/punycode hostnames, comma-separated Forwarded values, and conflicting proxy headers. Confirm the backend selected and the security decision affected; do not infer a bypass from status codes alone.
 
 For path-rewrite headers such as X-Original-URL or X-Rewrite-URL, use only an approved benign test path and verify policy before probing. A proxy's 404/403/200 difference is not confirmation unless the expected handler and authorization boundary are independently demonstrated.
 
@@ -75,9 +68,9 @@ If the altered host-derived response may be cached, coordinate with the attack-c
 
 Never poison a homepage, login/reset route, static asset used by real users, or any shared high-traffic URL. Do not create a persistent entry or repeatedly refresh/re-poison production content.
 
-### Phase 6: Check absolute-form request-target and duplicate-header parsing only in a lab
+### Phase 6: Assess authority parsing and protocol edge cases
 
-If evidence suggests a front proxy and origin disagree about authority, reproduce with a local proxy/origin or a program-provided lab. Duplicate Host headers, absolute-form request targets, unusual ports, and malformed authority syntax can cause parser inconsistencies; testing these on a shared live connection can affect unrelated requests. Do not conduct such probes on production absent explicit written permission and a dedicated test path.
+If evidence suggests a front proxy and origin disagree about authority, compare documented parser behavior across client, edge, and origin. Review absolute-form request-target handling, duplicate/conflicting Host values, unusual ports, malformed authority syntax, and HTTP/2-to-HTTP/1 translation where supported. Use a dedicated test route and connection for live validation; if the request could affect unrelated traffic, reproduce the parser discrepancy in an isolated harness.
 
 ### Phase 7: Confirm root cause and remediation
 
@@ -126,7 +119,7 @@ Trace which value controls URL generation, routing, redirects, cache keys, or or
 - The application may intentionally use a trusted canonical host rather than the incoming header.
 - A response that echoes a hostname, an email-sent confirmation, or a status-code change alone does not demonstrate link poisoning or access bypass.
 - Cache headers and shared-cache behavior belong to a separate validation step; an origin-only reflection is not poisoning.
-- Stop before production cache poisoning, internal routing probes, real-user account recovery, active credential delivery, or ambiguous duplicate-header tests.
+- Do not use real-user account recovery, deliver active credentials, or test internal/third-party routing outside the declared scope. For cache interactions, use the dedicated cache skill and an approved test key.
 
 ## References
 
