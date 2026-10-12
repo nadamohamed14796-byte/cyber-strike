@@ -121,7 +121,7 @@ function matchesTerm(text: string, term: string) {
   return new RegExp("(^|[^\\p{L}\\p{N}_])" + escaped + "([^\\p{L}\\p{N}_]|$)", "iu").test(text)
 }
 
-function sourceRelevance(url: string, title: string, text: string, source: ResearchSource) {
+export function sourceRelevance(url: string, title: string, text: string, source: ResearchSource) {
   const haystack = (title + " " + text).toLowerCase()
   const path = new URL(url).pathname.toLowerCase()
   const excludedPath = source.excludePaths?.some((value) => path.includes(value.toLowerCase()))
@@ -144,11 +144,14 @@ function sourceRelevance(url: string, title: string, text: string, source: Resea
   return { accepted: accepted && excluded === 0, score: included * 12 + pathBoost - excluded * 20 }
 }
 
-function isIndexLikeResearchUrl(url: string) {
+export function isIndexLikeResearchUrl(url: string) {
   try {
     const parsed = new URL(url)
     const path = parsed.pathname.toLowerCase().replace(/\/+$/, "") || "/"
+    // Root landing pages are discovery seeds, not automatically learnable articles.
+    if (path === "/") return true
     if (/[?&](page|p|offset|start|pageindex)=\d+/i.test(parsed.search)) return true
+    if (/\/(all-labs|all-topics|all-courses|all-resources|latest|popular)(\/)?$/.test(path)) return true
     if (/\/(category|categories|topic|topics|tag|tags|archives?|search|help|docs|documentation)(\/|$)/i.test(path))
       return true
     if (/\/(blog|research|hacktivity|writeups?|articles?|news|resources)(\/)?$/.test(path)) return true
@@ -158,9 +161,15 @@ function isIndexLikeResearchUrl(url: string) {
   }
 }
 
-function isResearchCandidate(url: string, source: ResearchSource) {
+export function isResearchCandidate(url: string, source: ResearchSource) {
   const parsed = new URL(url)
   const path = parsed.pathname.toLowerCase()
+  // This curated Medium source is one researcher, not permission to ingest the whole platform.
+  if (source.id === "trickster0") {
+    const host = parsed.hostname.toLowerCase()
+    if (host === "trickster0.medium.com") return path !== "/"
+    return host === "medium.com" && /^\\/@trickster0(?:\\/|$)/i.test(path)
+  }
   // These editorial sites publish individual posts at varied URL shapes (slugs or dates),
   // so their article links cannot be identified reliably by generic path keywords alone.
   if (source.id === "infosec-weekly" || source.id === "securitycipher-bounty-writeups") {
