@@ -4,15 +4,34 @@ import { BackendFetch } from "../../src/replay/backend-fetch"
 
 const CRLF = "\r\n"
 let server: ReturnType<typeof Bun.serve>
+let crossServer: ReturnType<typeof Bun.serve>
 let origin: string
+let crossOrigin: string
+let crossOriginHits = 0
 
 // Echo server: reflects method, path, and raw body so we can assert exactly what
 // landed on the wire. /slow delays; /big streams a large body.
 beforeAll(() => {
+  crossServer = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch() {
+      crossOriginHits++
+      return new Response("cross-origin destination reached")
+    },
+  })
+  crossOrigin = `http://127.0.0.1:${crossServer.port}`
   server = Bun.serve({
+    hostname: "127.0.0.1",
     port: 0,
     async fetch(req) {
       const url = new URL(req.url)
+      if (url.pathname === "/redirect-same") {
+        return new Response(null, { status: 302, headers: { location: "/hello" } })
+      }
+      if (url.pathname === "/redirect-cross") {
+        return new Response(null, { status: 302, headers: { location: `${crossOrigin}/secret` } })
+      }
       if (url.pathname === "/slow") {
         await Bun.sleep(300)
         return new Response("late")
@@ -32,7 +51,10 @@ beforeAll(() => {
   origin = `http://127.0.0.1:${server.port}`
 })
 
-afterAll(() => server.stop(true))
+afterAll(() => {
+  server.stop(true)
+  crossServer.stop(true)
+})
 
 function reqLine(line: string, headers: string[] = [], body = ""): HttpMessage.Request {
   return HttpMessage.parse([line, `Host: 127.0.0.1`, ...headers, ``, body].join(CRLF))
@@ -80,6 +102,42 @@ describe("BackendFetch.send", () => {
     expect(r.response).toBeUndefined()
     expect(r.error?.kind).toBe("timeout")
     expect(r.timing.totalMs).toBeGreaterThan(0) // elapsed ms survives — time-based signal
+  })
+
+
+  test("follows same-origin redirects when explicitly enabled", async () => {
+    const r = await BackendFetch.send(reqLine("GET /redirect-same HTTP/1.1"), {
+      origin,
+      followRedirects: true,
+    })
+    expect(r.error).toBeUndefined()
+    expect(r.response?.status).toBe(200)
+    const echoed = JSON.parse(new TextDecoder().decode(r.response!.body))
+    expect(echoed.path).toBe("/hello")
+  })
+
+  test("does not follow a redirect to a different origin even when enabled", async () => {
+    crossOriginHits = 0
+    const r = await BackendFetch.send(reqLine("GET /redirect-cross HTTP/1.1"), {
+      origin,
+      followRedirects: true,
+    })
+    expect(r.error).toBeUndefined()
+    expect(r.response?.status).toBe(302)
+    expect(r.response?.headers.find((h) => h.name.toLowerCase() === "location")?.value).toBe(
+      `${crossOrigin}/secret`,
+    )
+    expect(crossOriginHits).toBe(0)
+  })
+
+  test("refuses an absolute-form request target that changes the approved origin", async () => {
+    const r = await BackendFetch.send(
+      reqLine(`GET ${crossOrigin}/secret HTTP/1.1`),
+      { origin },
+    )
+    expect(r.response).toBeUndefined()
+    expect(r.error?.message).toContain("escaped its approved origin")
+    expect(crossOriginHits).toBe(0)
   })
 
   test("caps an oversized response body", async () => {
