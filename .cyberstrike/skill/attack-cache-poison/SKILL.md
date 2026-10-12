@@ -299,13 +299,13 @@ Public research and disclosures describe patterns including `X-Forwarded-Host` i
 
 ## Related Skills and Chains
 
-- `attack-host-header` — application logic influenced by Host/forwarded-host headers; this skill owns the case where the affected response is shared through a cache.
-- `attack-open-redirect` — validate the redirect itself separately from whether a poisoned destination is stored.
-- `attack-request-smuggling` — investigate proxy desynchronization only when authorized and supported by evidence.
-- `attack-cors` — validate browser-readable cross-origin impact when Origin and cache variation interact.
-- `wstg-inpv-02` and `wstg-clnt-01` — follow up only when stored or DOM-based XSS is actually demonstrated.
-- `triage-validation` — verify the shared-cache boundary, repeatability, scope, and actual impact before reporting.
-- `evidence-hygiene` — redact cookies, tokens, private response fields, and target-sensitive artifacts before attaching evidence.
+- [`attack-host-header`](../attack-host-header/SKILL.md) — application logic influenced by Host/forwarded-host headers; this skill owns the case where the affected response is shared through a cache.
+- [`attack-open-redirect`](../attack-open-redirect/SKILL.md) — validate the redirect itself separately from whether a poisoned destination is stored.
+- [`attack-request-smuggling`](../attack-request-smuggling/SKILL.md) — investigate proxy desynchronization only when authorized and supported by evidence.
+- [`attack-cors`](../attack-cors/SKILL.md) — validate browser-readable cross-origin impact when Origin and cache variation interact.
+- [`wstg-inpv-02`](../WEB/OWASP_WSTG_4.2/wstg-inpv-02/SKILL.md) and [`wstg-clnt-01`](../WEB/OWASP_WSTG_4.2/wstg-clnt-01/SKILL.md) — follow up only when stored or DOM-based XSS is actually demonstrated.
+- [`triage-validation`](../triage-validation/SKILL.md) — verify the shared-cache boundary, repeatability, scope, and actual impact before reporting.
+- [`evidence-hygiene`](../evidence-hygiene/SKILL.md) — redact cookies, tokens, private response fields, and target-sensitive artifacts before attaching evidence.
 
 ## Cache Test Runbook, Cleanup, and Stop Conditions
 
