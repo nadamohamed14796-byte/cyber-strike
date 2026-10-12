@@ -29,7 +29,7 @@ export namespace Discovery {
    * containing parent-directory components.
    */
   export function resolveSkillFilePath(root: string, file: unknown): string | undefined {
-    if (typeof file !== "string" || file.length === 0 || file.includes("\\0")) return undefined
+    if (typeof file !== "string" || file.length === 0 || file.includes(String.fromCharCode(0))) return undefined
 
     // Treat Windows separators as separators on every host OS; otherwise a
     // Windows-style traversal string could pass validation on Unix.
