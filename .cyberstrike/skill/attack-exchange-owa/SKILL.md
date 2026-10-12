@@ -113,7 +113,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Verify product identity and version through an approved, read-only endpoint or reliable deployment evidence, then map OWA/ECP and related authentication entry points that are actually in scope.
+2. Compare anonymous, ordinary test-mailbox, and authorized-admin behavior using accounts you control; keep discovery, authentication, and mailbox authorization as separate claims.
+3. Prioritize safe configuration signals such as exposed management interfaces, transport/TLS configuration, and unintended information disclosure; correlate with vendor advisories rather than testing an exploit solely because a banner matches.
+4. Validate any suspected mailbox access or administrative capability with a synthetic test message/resource only. Do not access employee mailboxes, harvest tokens, or alter tenant settings.
+5. Capture evidence and build recommendations around supported versions, patch state, and least-privilege exposure; stop on sensitive mailbox content or a possible service-stability issue.
+
 
 ### Verdict gates
 

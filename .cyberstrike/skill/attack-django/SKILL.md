@@ -119,7 +119,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Establish the deployed Django version and application entry points from reliable response or approved source/config evidence; do not infer patch level from a banner alone.
+2. Check deployment controls relevant to the observed stack: DEBUG leakage, ALLOWED_HOSTS handling, secure cookie/HTTPS settings, CSRF origin policy, admin exposure, and debug/static artifact publication.
+3. Use controlled test identities to compare route authorization, object ownership, and form/API validation; verify that model-level policy holds when requests bypass the UI.
+4. Exercise host-header and password-reset URL behavior only with an inbox and controlled domain you own; do not send reset flows to third-party addresses.
+5. Confirm a concrete exposed setting or authorization failure with a harmless control, and pair it with the exact Django setting/code-level fix plus a regression test.
+
 
 ### Verdict gates
 

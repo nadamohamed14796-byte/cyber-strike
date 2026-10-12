@@ -120,7 +120,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Confirm written authorization for the host/container and whether host-level validation is permitted; record container ID, image digest, namespace, and role without broadening to neighboring systems.
+2. Use read-only inspection to inventory effective user, Linux capabilities, mounts, namespaces, privileged mode, exposed container-runtime sockets, and secret mounts.
+3. Compare the observed configuration against the workload's intended requirement. A privileged setting is a risk indicator, but impact depends on effective isolation, mount permissions, and available host interfaces.
+4. Demonstrate only the smallest capability in an isolated lab or approved disposable container. Do not attempt host escape, persistence, credential harvesting, or modification of production host files.
+5. Provide a least-privilege remediation (drop capabilities, remove unnecessary mounts/socket access, run as non-root, enforce runtime policy) and a read-only regression check.
+
 
 ### Verdict gates
 

@@ -163,7 +163,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Capture a baseline request and preflight from the application origin, then compare a clearly untrusted controlled origin with a known-allowed origin; preserve ACAO, ACAC, Vary, status, redirects, and cache headers.
+2. Vary one Origin condition at a time (ordinary origin, controlled sibling, null only when relevant) and check whether the server reflects it, normalizes it incorrectly, or allows credentials unexpectedly.
+3. Separate preflight permission from actual response readability. Confirm whether a browser would expose the response under the credential context used by the real feature.
+4. Use only a test account and a non-sensitive canary endpoint to prove readable authenticated data; do not infer impact from wildcard ACAO alone when credentials are disallowed or the resource is public.
+5. Re-test with an allowed-origin positive control and a denied-origin negative control, accounting for SameSite cookies, browser behavior, CDN caching, and the Vary: Origin policy.
+
 
 ### Verdict gates
 

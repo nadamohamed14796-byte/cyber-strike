@@ -105,7 +105,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Trace attacker-influenced sources to DOM sinks in the exact page and record the rendering context; distinguish text insertion from HTML, URL, script, and attribute contexts.
+2. Begin with a unique inert marker and compare escaped versus unescaped output across the relevant source (URL, fragment, storage, postMessage, or API response).
+3. Use a harmless browser-side proof that changes only a visible test-page marker; do not read cookies, local storage, credentials, or transmit data to external hosts.
+4. Check whether sanitization/encoding is applied at the correct sink and whether framework re-rendering or Trusted Types changes the behavior; vary one source/context at a time.
+5. Repeat with a control value that should remain text and capture the DOM context, controlled browser result, affected origin, and precise input path. Reflection without executable parsing is not confirmed DOM XSS.
+
 
 ### Verdict gates
 

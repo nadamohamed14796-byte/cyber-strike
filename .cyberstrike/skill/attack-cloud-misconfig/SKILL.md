@@ -122,7 +122,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Define the authorized cloud account, subscription/project, region, and role before running checks; inventory only resources visible to that approved identity and preserve account/resource IDs as provenance.
+2. Start with read-only posture checks for identity policy, public access settings, network exposure, audit logging, encryption, and secret-handling configuration; compare each result with vendor guidance and the intended architecture.
+3. Where public data access is suspected, use a purpose-built benign canary object or metadata-only permission check. Do not list or download unrelated customer data to prove exposure.
+4. Validate effective permissions from the actual test principal and resource policy together; inherited organization controls, public-but-empty resources, and intentionally public assets are important alternative explanations.
+5. Record the smallest reproducible misconfiguration, effective reachability, exact exposed capability, and least-change remediation; re-run the same read-only check to establish the remediation regression test.
+
 
 ### Verdict gates
 

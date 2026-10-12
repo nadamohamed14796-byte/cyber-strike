@@ -119,7 +119,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Identify one state-changing endpoint and baseline its normal behavior with a test-owned account; document whether authentication uses ambient cookies, bearer headers, or another browser-sent credential.
+2. Check anti-CSRF token enforcement by omitting, invalidating, replaying, or cross-session binding the token one condition at a time; a missing token is not a finding if another robust defense applies.
+3. Evaluate Origin/Referer validation, cookie SameSite settings, content-type requirements, and CORS as separate defenses. Do not conflate CORS read restrictions with CSRF write prevention.
+4. Demonstrate the state change only against a disposable test record using a local controlled page or approved harness, then restore the record and record cleanup.
+5. Compare a legitimate request, an invalid-token request, and a cross-origin attempt. Confirm the server-side state—not merely a successful HTTP response—changed without the required user intent.
+
 
 ### Verdict gates
 

@@ -111,7 +111,12 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact hypotheses from this skill's coverage matrix; avoid repeating equivalent probes.
+1. Identify the exact serialized input boundary and format from application traffic or documentation; capture a valid request and establish the normal parse/validation response first.
+2. Use benign malformed types and inert marker values to learn parser behavior without invoking operating-system commands, filesystem access, or external callbacks.
+3. Test whether type selection, object construction, or nested fields bypass validation or authorization, changing one structural feature per hypothesis.
+4. Confirm a security consequence using a harmless property/value in a test-owned fixture; parser exceptions, library fingerprints, and stack traces alone do not prove unsafe deserialization.
+5. Preserve sanitized input/output and the affected component/version only when verified. Stop before execution-oriented gadget chains or data access unless a controlled lab and explicit rules of engagement specifically authorize them.
+
 
 ### Verdict gates
 

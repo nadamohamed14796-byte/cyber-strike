@@ -120,7 +120,12 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 
 ### Skill-specific hypothesis order
 
-Select distinct, low-impact branches from the skill's existing coverage matrix and do not repeat equivalent probes.
+1. Map the actual FastAPI routes and dependency declarations from permitted OpenAPI/docs or source evidence; do not assume that /docs or /openapi.json being available is itself a vulnerability.
+2. Check each sensitive route with anonymous, least-privileged, and authorized test identities, including dependency overrides that may differ between route groups or API versions.
+3. Test object/property authorization and request-model validation independently using test-owned records and benign marker fields; distinguish response filtering from the server's effective authorization.
+4. Review trusted-host, proxy-header, CORS, debug/error response, and cookie/session settings only where deployed configuration suggests they are relevant.
+5. Confirm the boundary with a protected canary and negative control; report the route, effective dependency/role, data/action impacted, and framework-specific remediation plus a regression test.
+
 
 ### Verdict gates
 
