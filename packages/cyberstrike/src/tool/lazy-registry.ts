@@ -51,42 +51,25 @@ export namespace LazyToolRegistry {
     const allStatus = { ...mcpStatus, ...boltStatusMap }
     const clients = await MCP.clients()
 
+    const connectedServers = new Set<string>()
     for (const [serverName, status] of Object.entries(allStatus)) {
       if (status.status !== "connected") continue
-
       const client = clients[serverName]
       if (!client) continue
-
+      connectedServers.add(serverName)
       try {
         const toolsResult = await client.listTools()
-
-        for (const mcpTool of toolsResult.tools) {
-          const sanitizedServerName = serverName.replace(/[^a-zA-Z0-9_-]/g, "_")
-          const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
-          const id = `${sanitizedServerName}_${sanitizedToolName}`
-
-          const keywords = extractKeywords(mcpTool.name, mcpTool.description || "")
-          const summary = (mcpTool.description || mcpTool.name).slice(0, 100)
-          const category = categorize(keywords)
-
-          lazyTools.set(id, {
-            id,
-            name: mcpTool.name,
-            summary,
-            keywords,
-            category,
-            source: "mcp",
-            mcpServer: serverName,
-          })
-        }
-
-        log.info("collected tool metadata", {
-          server: serverName,
-          count: toolsResult.tools.length,
-        })
+        replaceServerTools(serverName, toolsResult.tools)
+        log.info("collected tool metadata", { server: serverName, count: toolsResult.tools.length })
       } catch (err) {
+        // Preserve last known metadata on transient listing failures.
         log.error("failed to collect tool metadata", { server: serverName, error: err })
       }
+    }
+
+    // A disconnected server can no longer provide callable tools.
+    for (const serverName of new Set([...lazyTools.values()].map((tool) => tool.mcpServer).filter(Boolean) as string[])) {
+      if (!connectedServers.has(serverName)) removeServerTools(serverName)
     }
 
     log.info("lazy tool registry initialized", {
@@ -107,31 +90,10 @@ export namespace LazyToolRegistry {
 
     try {
       const toolsResult = await client.listTools()
-      const sanitizedServerName = serverName.replace(/[^a-zA-Z0-9_-]/g, "_")
-
-      for (const mcpTool of toolsResult.tools) {
-        const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, "_")
-        const id = `${sanitizedServerName}_${sanitizedToolName}`
-
-        if (lazyTools.has(id)) continue
-
-        const keywords = extractKeywords(mcpTool.name, mcpTool.description || "")
-        const summary = (mcpTool.description || mcpTool.name).slice(0, 100)
-        const category = categorize(keywords)
-
-        lazyTools.set(id, {
-          id,
-          name: mcpTool.name,
-          summary,
-          keywords,
-          category,
-          source: "mcp",
-          mcpServer: serverName,
-        })
-      }
-
+      replaceServerTools(serverName, toolsResult.tools)
       log.info("refreshed tools from server", {
         server: serverName,
+        serverTools: toolsResult.tools.length,
         totalTools: lazyTools.size,
       })
     } catch (err) {
@@ -150,8 +112,44 @@ export namespace LazyToolRegistry {
     })
   }
 
+  function sanitizeID(value: string): string {
+    return value.replace(/[^a-zA-Z0-9_-]/g, "_")
+  }
+
+  function removeServerTools(serverName: string): void {
+    for (const [id, tool] of lazyTools) {
+      if (tool.mcpServer !== serverName) continue
+      lazyTools.delete(id)
+      loadedTools.delete(id)
+      loadedToolIds.delete(id)
+    }
+  }
+
+  /** Replace one server's snapshot after a successful listTools call. */
+  function replaceServerTools(
+    serverName: string,
+    definitions: Array<{ name: string; description?: string }>,
+  ): void {
+    removeServerTools(serverName)
+    const sanitizedServerName = sanitizeID(serverName)
+    for (const mcpTool of definitions) {
+      const id = sanitizedServerName + "_" + sanitizeID(mcpTool.name)
+      const keywords = extractKeywords(mcpTool.name, mcpTool.description || "")
+      lazyTools.set(id, {
+        id,
+        name: mcpTool.name,
+        summary: (mcpTool.description || mcpTool.name).slice(0, 100),
+        keywords,
+        category: categorize(keywords),
+        source: "mcp",
+        mcpServer: serverName,
+      })
+    }
+  }
+
   export function search(query: string, limit = 10): LazyTool[] {
-    const queryLower = query.toLowerCase()
+    const queryLower = query.trim().toLowerCase()
+    if (!queryLower || !Number.isFinite(limit) || limit <= 0) return []
     const queryWords = queryLower.split(/\s+/)
 
     const scored: Array<{ tool: LazyTool; score: number }> = []
