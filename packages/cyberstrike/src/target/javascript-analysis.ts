@@ -341,7 +341,10 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     { kind: "string-timer-execution", regex: /\b(?:setTimeout|setInterval)\s*\(\s*["'`]/gi },
     { kind: "navigation-or-redirect-sink", regex: /\b(?:window\.)?location(?:\.href)?\s*(?:=|\.assign\s*\(|\.replace\s*\()/gi },
     { kind: "cross-window-message", regex: /\bpostMessage\s*\(/gi },
+    { kind: "wildcard-postmessage-origin", regex: /\bpostMessage\s*\([^,]{1,1000},\s*["']\*["']\s*\)/gi },
     { kind: "message-event-handler", regex: /\baddEventListener\s*\(\s*["']message["']/gi },
+    { kind: "client-side-token-storage", regex: /\b(?:localStorage|sessionStorage)\.setItem\s*\(\s*["'][^"']{1,120}(?:token|auth|session|secret|key)[^"']*["']/gi },
+    { kind: "document-cookie-write", regex: /\bdocument\.cookie\s*=/gi },
     { kind: "dynamic-regexp", regex: /\bnew\s+RegExp\s*\(\s*[A-Za-z_$]/gi },
     { kind: "prototype-mutation", regex: /\b(?:__proto__|prototype)\s*(?:\[|\.)/gi },
   ]
