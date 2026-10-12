@@ -256,3 +256,18 @@ For every plausible vulnerability hypothesis that remains unconfirmed, use up to
 - If 20 distinct attempts are exhausted without decisive evidence, classify the result as **INCONCLUSIVE / NEEDS REVIEW**, not false positive. Attempt count alone never proves absence.
 - Record why any strategy was skipped and why the final verdict follows from evidence. Preserve unresolved candidates so a later session can resume; never silently discard them.
 - Use only in-scope assets and authorized accounts. Prefer non-destructive proofs, do not extract real user secrets, and stop if testing risks service degradation.
+
+### Mandatory Durable Verification Ledger (ALL vulnerability specialists)
+
+Use the `verification_attempt` tool for every plausible vulnerability hypothesis that is not decisively resolved:
+1. Choose one stable `hypothesis_key` for the claim (same target + endpoint + vulnerability class + relevant parameter/sink). Reuse it for all attempts against that claim.
+2. Before or immediately after each actual test, call `verification_attempt(action="record")` with a meaningful `strategy_id`, `variant_key`, rationale, actual result, evidence reference when available, and whether prerequisites were valid.
+3. Before resuming work or finalizing, call `verification_attempt(action="status")` to read the durable ledger. Never assume prior attempts were not run simply because they are not in the current prompt.
+4. Make the next attempt adaptive: use the previous result, request/response signals, credential and role context, target behavior, and relevant loaded skills/research to choose a different test angle. Repeating identical strategy+variant is deduplicated and does not count toward the 20.
+5. Use up to 20 distinct attempts. Stop earlier for decisive evidence, invalid prerequisites that cannot be obtained, out-of-scope activity, service instability, safety, or program rate limits. Never probe just to fill the count.
+6. Mark `decisive_result="confirmed"` only with concrete evidence and valid test conditions. Mark `decisive_result="disproven"` only when concrete evidence directly contradicts the hypothesis under valid conditions.
+7. At 20 unresolved attempts, the required outcome is INCONCLUSIVE / NEEDS REVIEW. This is not a false positive. Preserve the candidate and the gap for a later session.
+8. A single 401/403/404/429, timeout, WAF response, empty response, or failed payload is not by itself a valid disproof. Diagnose auth/session, resource validity, preconditions, rate limits, and environment first.
+9. Do not use `record_coverage_note` or `update_vrt_check(status="tested_not_vulnerable")` to bypass this verification policy. Coverage is marked clean only when evidence supports the conclusion; if unresolved, record the gap rather than a clean verdict.
+
+The ledger is session-persistent and is the source of truth for attempt count and prior results. It caps a hypothesis at 20 distinct strategy/variant attempts and keeps unresolved findings visible.
