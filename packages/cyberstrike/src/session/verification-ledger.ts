@@ -27,7 +27,7 @@ export namespace VerificationLedger {
         .orderBy(asc(VerificationAttemptTable.time_created))
         .all(),
     )
-    return rows.map((row) => ({
+    const attempts = rows.map((row) => ({
       id: row.id,
       sessionID: row.session_id,
       hypothesisKey: row.hypothesis_key,
@@ -43,6 +43,15 @@ export namespace VerificationLedger {
       outcome: (row.outcome as Policy.Outcome) ?? "inconclusive",
       timeCreated: row.time_created,
     }))
+    // Older versions could persist DISPROVEN after one attempt. Never expose that
+    // stale terminal state to the agent or to VRT coverage consumers.
+    const validDistinctAttempts = Policy.uniqueAttempts(attempts).filter((item) => item.validConditions).length
+    if (validDistinctAttempts < Policy.MAX_ATTEMPTS) {
+      for (const attempt of attempts) {
+        if (attempt.outcome === "disproven") attempt.outcome = "inconclusive"
+      }
+    }
+    return attempts
   }
 
   export function record(input: {
