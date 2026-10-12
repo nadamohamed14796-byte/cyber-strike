@@ -38,12 +38,15 @@ export const UpdateCommand = cmd({
       const discovery = await discoverResearch({ pages, depth })
       let candidates = 0
       let added = 0
+      let blockedAuth = 0
       let errors = 0
       for (const result of discovery) {
         candidates += result.candidates
         added += result.added
+        blockedAuth += result.blocked_auth
         errors += result.errors.length
-        prompts.log.info(result.source + ": pages=" + result.pages + " candidates=" + result.candidates + " queued=" + result.added)
+        prompts.log.info(result.source + ": pages=" + result.pages + " candidates=" + result.candidates +
+          " queued=" + result.added + " blocked_auth=" + result.blocked_auth)
         for (const error of result.errors) prompts.log.warn(error)
       }
 
@@ -61,6 +64,7 @@ export const UpdateCommand = cmd({
           " learned=" + learned.learned +
           " skipped=" + learned.skipped +
           " failed=" + learned.failed +
+          " blocked_auth=" + (blockedAuth + learned.blocked_auth) +
           " discovery_errors=" + errors,
       )
       prompts.log.info(
@@ -68,6 +72,7 @@ export const UpdateCommand = cmd({
           " queued=" + queueStats.queued +
           " studying=" + queueStats.studying +
           " retry=" + queueStats.retry +
+          " blocked_auth=" + queueStats.blocked_auth +
           " learned=" + queueStats.learned +
           " rejected=" + queueStats.rejected,
       )
