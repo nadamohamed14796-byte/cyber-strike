@@ -113,8 +113,8 @@ function originOf(request: Request.Info): string | { error: string } {
   const host = request.host
   if (!host) return { error: "request has no host/origin — cannot resolve a sendable origin" }
   const scheme = request.scheme ?? "http"
-  const port = request.port ? \`:\${request.port}\` : ""
-  const origin = httpOrigin(\`\${scheme}://\${host}\${port}\`)
+  const port = request.port ? `:${request.port}` : ""
+  const origin = httpOrigin(`${scheme}://${host}${port}`)
   if (!origin) return { error: "captured request has an invalid or unsupported HTTP origin" }
   return origin
 }
