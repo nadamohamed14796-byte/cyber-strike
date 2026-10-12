@@ -157,7 +157,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Use passive/read-only evidence to identify WordPress core, active plugins/themes, REST routes, XML-RPC state, and public user disclosure; retain confidence levels because caching/CDNs can obscure versions.
+2. Map only in-scope routes and compare anonymous with controlled test-role behavior; distinguish intentional public pages/API fields from private content or administrative functions.
+3. Check plugin/theme exposures against official advisories for the exact affected version and enabled configuration; do not treat outdated version banners as a confirmed exploitable flaw.
+4. Use only test-owned content for upload, role, REST, and authentication tests. Do not brute-force passwords, enumerate private users beyond program rules, install plugins, or modify production settings.
+5. Report the verified boundary, exact component/version evidence, minimally sufficient proof, and version/configuration-specific remediation with a safe retest.
+
 
 ### Verdict gates
 

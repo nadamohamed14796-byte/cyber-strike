@@ -111,7 +111,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Confirm the in-scope Zimbra deployment and exact version/build using read-only evidence; keep product identification separate from exploitability.
+2. Map public login/webmail/admin surfaces and compare anonymous, regular test-user, and authorized-admin behavior using mailboxes you control.
+3. Check supported version against current vendor advisories and the exposed preconditions; do not run public exploit scripts or invoke file/command endpoints on a live deployment to validate a version match.
+4. Validate suspected disclosure with a synthetic test message or harmless account setting only when the program permits it; never access real mailboxes or export private mail.
+5. Record exact asset/version confidence, route, demonstrated impact and remediation path. Stop on unexpected mailbox/credential exposure or stability issues.
+
 
 ### Verdict gates
 

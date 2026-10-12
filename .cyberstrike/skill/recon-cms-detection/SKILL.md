@@ -110,7 +110,12 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 
 ### Skill-specific next steps
 
-undefined
+1. Use passive fingerprints and low-impact read-only requests to identify likely CMS, theme/plugin families, version clues, and entry points; preserve each signal and confidence separately.
+2. Confirm each fingerprint with at least one independent marker (such as distinctive assets, headers, generator metadata, route behavior, or source evidence) and use a random-path control to detect generic pages.
+3. Account for reverse proxies, caching, custom themes, removed generator tags, and patched backports before assigning a version or risk label.
+4. Consult official vendor/plugin advisories for the exact component and version; prioritize exposed login/admin, API, upload, and legacy interfaces only when in scope.
+5. Return a deduplicated component inventory with evidence, confidence, timestamp, and suggested read-only checks. A CMS fingerprint or old version clue is a lead, not a confirmed finding.
+
 
 ### Deduplication and stop rules
 

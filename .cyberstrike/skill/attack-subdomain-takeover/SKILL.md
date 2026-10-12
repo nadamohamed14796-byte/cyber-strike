@@ -136,7 +136,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Confirm the hostname is explicitly in scope and establish its current DNS/CNAME chain, provider, and application response; keep the timestamp because DNS state can change.
+2. Verify that the destination is genuinely unclaimed using provider-specific evidence and an ordinary random-host control; a dangling-looking CNAME or generic error page alone is not enough.
+3. Check whether the service belongs to the target or a third-party SaaS tenant, and whether the program permits testing takeover conditions. Do not register, claim, provision, or modify an orphaned resource.
+4. Correlate DNS, provider error signature, certificate/HTTP behavior, and ownership evidence; distinguish stale DNS, intentional decommissioning, and provider-wide outages from a reachable claimable resource.
+5. Report the verified dangling binding and impact potential with sanitized DNS evidence. Recommend removing the stale record or restoring the service, then re-query DNS and confirm the dangling mapping is gone.
+
 
 ### Verdict gates
 

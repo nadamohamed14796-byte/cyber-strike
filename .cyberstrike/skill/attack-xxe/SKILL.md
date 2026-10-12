@@ -181,7 +181,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Identify the XML parser and endpoint from approved traffic or source evidence, then capture a normal valid XML request and malformed-XML control.
+2. Use a benign, tester-controlled DTD/callback or isolated lab fixture to determine whether external entities are resolved; do not request local files, cloud metadata, internal services, or secrets from production.
+3. Change one property at a time—DOCTYPE handling, external general/parameter entity behavior, content type, or parser path—and bound time and response size.
+4. Distinguish parser errors and XML reflection from actual entity resolution using callback evidence or a harmless test fixture; stop immediately if unexpected sensitive data appears.
+5. Recommend disabling external entity resolution/DTD features, applying safe parser defaults and allowlists, and add a regression test proving external entities are not fetched.
+
 
 ### Verdict gates
 

@@ -110,7 +110,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Identify the input source and rendering context (HTML text, attribute, URL, script, DOM sink, or stored content); record a literal baseline and a random nonexistent/benign control.
+2. Start with a unique inert canary to find encoding/reflection boundaries, then use only a harmless browser proof on an authorized test page to distinguish text reflection from script execution.
+3. Test stored, reflected, and DOM flows separately, using controlled accounts for storage/visibility boundaries and changing one parser/context dimension per hypothesis.
+4. Do not read cookies/local storage, capture credentials, beacon private data, or create a payload intended to affect third-party users. Keep demonstrations self-contained and non-persistent where possible.
+5. Confirm execution in the relevant browser context and document origin, victim/role preconditions, sanitizer/encoding failure, control behavior, and a context-specific output-encoding regression test.
+
 
 ### Verdict gates
 

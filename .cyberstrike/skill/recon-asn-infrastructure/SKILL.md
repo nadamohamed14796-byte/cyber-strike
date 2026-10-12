@@ -95,7 +95,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Anchor discovery to verified organization names, registered entities, known domains, and current RIR/ASN evidence; a matching company string or IP hostname is not sufficient ownership proof.
+2. Collect passive ASN, prefix, BGP, reverse-DNS, certificate, and provider metadata first; preserve source URLs and observation timestamps for each candidate.
+3. Normalize prefixes and hostnames, deduplicate shared CDN/cloud edges, and separate directly registered infrastructure from reseller, SaaS, shared hosting, and third-party service providers.
+4. Promote a prefix to active testing only when written scope clearly covers it; do not sweep every IP in an ASN or infer permission from routing/WHOIS ownership.
+5. Return candidate prefixes with attribution confidence, evidence provenance, explicit exclusions, validation status, and narrow next steps; hand confirmed web assets to the relevant recon/attack skill rather than claiming a vulnerability.
+
 
 ### Verdict gates
 

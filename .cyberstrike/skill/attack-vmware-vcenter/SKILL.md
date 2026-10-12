@@ -131,7 +131,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Confirm exact in-scope vCenter/vSphere management assets and version/build from an approved read-only source; avoid expanding discovery to neighboring hypervisors.
+2. Check management-plane exposure, TLS/configuration posture, and documented read-only endpoints first; compare anonymous, operator, and admin behavior using only controlled accounts.
+3. Correlate a version/build finding with the exact vendor advisory and preconditions (feature enabled, reachable interface, role, and deployment topology) rather than treating a version match as an exploit.
+4. Validate authorization using a harmless test object or approved lab instance; do not run exploit code, alter VM/network/storage state, export secrets, or disrupt management services on production.
+5. Record asset/build confidence, exposed capability, controls, and safe remediation/patch guidance. Use a lab regression test to verify any suspected high-impact behavior.
+
 
 ### Verdict gates
 

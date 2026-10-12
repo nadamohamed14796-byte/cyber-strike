@@ -177,7 +177,12 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 ### Skill-specific hypothesis order
 
-Choose distinct low-impact checks supported by the skill's existing matrix and avoid equivalent probes.
+1. Capture the normal HTTP Upgrade handshake and record origin checks, authentication mechanism, cookie/token context, subprotocol, and expected close/error behavior.
+2. Compare missing, invalid, expired, and valid test credentials; change Origin or role one dimension at a time and use a known-allowed client as the positive control.
+3. After connection establishment, test message-level authorization on a small set of documented message types with two controlled users and test-owned objects; handshake authentication does not prove every message is authorized.
+4. Use harmless marker messages and low message volume. Avoid flooding, oversized frames, production broadcasts, or actions affecting other users.
+5. Confirm server-side data/action boundaries and collect sanitized handshake plus message/response correlation. Recommend authorization on every sensitive message and an Origin allowlist appropriate to the application.
+
 
 ### Verdict gates
 
