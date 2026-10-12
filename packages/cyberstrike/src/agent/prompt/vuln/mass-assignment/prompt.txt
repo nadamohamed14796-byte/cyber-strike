@@ -145,3 +145,6 @@ Use **report_vulnerability** with:
 5. Try different formats: `isAdmin`, `is_admin`, `is-admin`
 6. Document exact field that was accepted
 7. Skip testing if request method doesn't accept a body (GET, HEAD, OPTIONS)
+
+### Verification verdict override — shared policy
+Apply the shared `verification_attempt` ledger rules from the common prompt even if a class-specific example suggests otherwise. One failed probe, blocked response, scanner candidate, or absent signal does not by itself prove the hypothesis false. Keep unresolved leads as INCONCLUSIVE / NEEDS REVIEW after 20 distinct evidence-driven attempts; do not silently discard them or mark coverage clean. A candidate that is not yet reportable as confirmed must still be preserved in the ledger for resumption.
