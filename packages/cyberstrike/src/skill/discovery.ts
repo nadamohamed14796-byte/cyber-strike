@@ -138,7 +138,9 @@ export namespace Discovery {
             entries.length >= MAX_ARCHIVE_ENTRIES
           ) {
             invalidManifest = true
-            return
+            // Stop parsing immediately: continuing through a hostile archive
+            // could spend CPU on hundreds of thousands of excess tar entries.
+            throw new Error("Archive entry manifest is invalid or exceeds the entry limit")
           }
           entries.push({ path: item.path, type: item.type, size: item.size })
         },
