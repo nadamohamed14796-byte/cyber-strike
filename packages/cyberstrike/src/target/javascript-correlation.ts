@@ -27,6 +27,26 @@ function safeURL(input?: string | null): URL | undefined {
   }
 }
 
+/** Match a captured request to one explicit JavaScript asset by exact origin and path. */
+export function matchesCapturedJavaScriptAsset(input: {
+  origin?: string | null
+  pageURL?: string | null
+  host?: string | null
+  normalizedPath?: string | null
+}, target: string | URL): boolean {
+  const targetURL = target instanceof URL ? target : safeURL(target)
+  if (!targetURL) return false
+  const base = safeURL(input.origin) ?? safeURL(input.pageURL) ?? safeURL(input.host)
+  if (!base || !input.normalizedPath?.trim()) return false
+  let observed: URL
+  try {
+    observed = new URL(input.normalizedPath, base)
+  } catch {
+    return false
+  }
+  return observed.origin === targetURL.origin && observed.pathname === targetURL.pathname
+}
+
 function javascriptAssetURL(input: { type?: string | null; title?: string | null; detail?: string | null; asset?: string | null; tags?: string[] | null }): URL | undefined {
   const base = safeURL(input.asset)
   if (base && /\.m?js$/i.test(base.pathname)) return base
@@ -437,7 +457,8 @@ export namespace JavaScriptCorrelation {
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     if (input.javascriptURL && !explicitJS) throw new Error("javascriptURL must be a valid HTTP(S) URL without embedded credentials.")
     const workspace = await TargetMemory.ensure(input.targetURL)
-    const sourceFiles = await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
+    // An explicit asset URL must narrow source analysis, not merely the asset list.
+    const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
 
     const projectID = Instance.project.id
     const sessionIDsSet = new Set<string>([rootSessionID])
@@ -553,8 +574,16 @@ export namespace JavaScriptCorrelation {
     })
     // Analyze bodies that were already captured as JavaScript, but never save the
     // source body to disk or the graph. The graph retains only hashes and route literals.
+    const sourceRequests = explicitJS
+      ? relevantRequests.filter((request) => matchesCapturedJavaScriptAsset({
+          origin: request.origin,
+          pageURL: request.page_url,
+          host: request.host,
+          normalizedPath: request.normalized_path,
+        }, explicitJS))
+      : relevantRequests
     const capturedSources = extractCapturedJavaScriptSources(
-      relevantRequests.map((request) => ({
+      sourceRequests.map((request) => ({
         id: request.id,
         url: (request.origin ?? "") + request.normalized_path,
         origin: request.origin,
