@@ -7,8 +7,7 @@ author: "cyberstrike-official"
 tags: [recon, CMS, WordPress, Drupal, Joomla, fingerprinting]
 tech_stack: [HTTP, HTML, JavaScript, DNS]
 chains_with: [recon-methodology, attack-wordpress, attack-source-leak, attack-information-disclosure]
-prerequisites:
-  - "A confirmed organization-owned web application"
+prerequisites: []
 severity_boost: {}
 ---
 
@@ -17,6 +16,12 @@ severity_boost: {}
 ## Objective
 
 Identify the content-management platform and relevant extensions accurately enough to prioritize version-specific security review, while distinguishing fingerprints from confirmed vulnerabilities.
+
+## Scope
+
+- Requires a confirmed, organization-owned web application (output of `recon-methodology` or a program-provided target list). Do not fingerprint third-party widgets, embedded SaaS login providers, or CDN infrastructure that only happens to be reachable from the target.
+- Passive and low-impact active checks only: normal page loads, published readme/changelog files, and documented API endpoints. No credential guessing against login or admin routes — that belongs to a dedicated authentication-testing skill.
+- Component-inventory brute forcing (large wordlists against plugin/theme directories) is a last resort; prefer passive evidence first and keep any active enumeration low-rate and clearly logged.
 
 ## Methodology
 
@@ -80,6 +85,17 @@ Map a confirmed component/version to a credible advisory, then verify the vulner
 - Treat plugin names and version strings as leads until confirmed.
 - Check the advisory's prerequisites and reachable code path.
 - Do not claim RCE or data exposure solely from an outdated version banner.
+
+## Stop Conditions
+
+- Stop active probing of a specific path if it triggers account lockouts, CAPTCHA, or visible rate-limiting; that behavior itself is evidence enough and further requests risk denial-of-service.
+- Stop and confirm attribution before continuing if a discovered CMS instance appears to be a third party's staging environment, a reseller/demo install, or otherwise not clearly owned by the target organization.
+- Do not proceed from "outdated version identified" to exploitation without first confirming the advisory's vulnerable code path is actually reachable; version-matching alone is not authorization to run an exploit.
+
+## Defensive Notes
+
+- Removing or genericizing generator metadata, version strings, and default admin paths raises the cost of fingerprinting but does not replace patching; attackers can still corroborate version from behavior.
+- Keeping CMS core, themes, and plugins current, and restricting admin/login routes by network or MFA, reduces both the fingerprinting surface and the exploitability of anything found.
 
 ## References
 
