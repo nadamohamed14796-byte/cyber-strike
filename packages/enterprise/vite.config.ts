@@ -26,6 +26,10 @@ export default defineConfig({
       baseURL: process.env.CYBERSTRIKE_BASE_URL,
     }),
   ],
+  // Keep Shiki’s Node-targeted WebAssembly engine external; Vite cannot bundle its raw ESM WASM import in the SSR build.
+  ssr: {
+    external: ["shiki"],
+  },
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
