@@ -93,7 +93,7 @@ export const WebFetchTool = Tool.define("webfetch", {
         } else {
           if (!response.ok) {
             await response.body?.cancel().catch(() => undefined)
-            throw new Error(\`Request failed with status code: \${response.status}\`)
+            throw new Error(`Request failed with status code: ${response.status}`)
           }
 
           // Fail early when a trustworthy length is provided, but always enforce the
@@ -108,7 +108,7 @@ export const WebFetchTool = Tool.define("webfetch", {
           const bytes = await readBoundedBytes(response.body, MAX_RESPONSE_SIZE)
           const contentType = response.headers.get("content-type") || ""
           const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
-          const title = \`\${current.href} (\${contentType})\`
+          const title = `${current.href} (${contentType})`
 
           // Check if response is an image
           const isImage = mime.startsWith("image/") && mime !== "image/svg+xml" && mime !== "image/vnd.fastbidsheet"
@@ -126,7 +126,7 @@ export const WebFetchTool = Tool.define("webfetch", {
                   messageID: ctx.messageID,
                   type: "file",
                   mime,
-                  url: \`data:\${mime};base64,\${base64Content}\`,
+                  url: `data:${mime};base64,${base64Content}`,
                 },
               ],
             }
@@ -178,7 +178,6 @@ export const WebFetchTool = Tool.define("webfetch", {
       current = nextURL
       redirects++
     }
-  },
   },
 })
 
