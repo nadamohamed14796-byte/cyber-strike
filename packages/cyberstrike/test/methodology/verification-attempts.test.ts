@@ -1,0 +1,48 @@
+import { describe, expect, test } from "bun:test"
+import { VerificationAttempts as VA } from "../../src/methodology/verification-attempts"
+
+const attempt = (strategyID: string, variantKey: string, validConditions = true): VA.Attempt => ({
+  strategyID,
+  variantKey,
+  rationale: "Test a distinct hypothesis path",
+  resultSummary: "No decisive signal observed",
+  validConditions,
+})
+
+describe("VerificationAttempts", () => {
+  test("caps distinct strategies at 20 and does not count exact duplicates", () => {
+    const attempts = Array.from({ length: 20 }, (_, i) => attempt("strategy-" + i, "baseline"))
+    expect(VA.uniqueAttempts([...attempts, attempts[0]]).length).toBe(20)
+    expect(VA.canRunAttempt(attempts, { strategyID: "strategy-0", variantKey: "baseline" })).toBe(false)
+    expect(VA.canRunAttempt(attempts, { strategyID: "strategy-new", variantKey: "baseline" })).toBe(false)
+  })
+
+  test("allows a meaningful variant as a distinct attempt", () => {
+    expect(VA.canRunAttempt([attempt("idor.owner-check", "account-a")], {
+      strategyID: "idor.owner-check",
+      variantKey: "account-b",
+    })).toBe(true)
+  })
+
+  test("budget exhaustion is inconclusive, never automatic false positive", () => {
+    const result = VA.decide({ attempts: Array.from({ length: 20 }, (_, i) => attempt("strategy-" + i, "v1")) })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(false)
+    expect(result.reason).toContain("do not label this a false positive")
+  })
+
+  test("disproof requires valid test conditions", () => {
+    const result = VA.decide({
+      attempts: [attempt("auth-check", "expired-session", false)],
+      decisiveDisproof: true,
+    })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.canContinue).toBe(true)
+  })
+
+  test("decisive confirmation stops early", () => {
+    const result = VA.decide({ attempts: [attempt("xss.execution-check", "benign-marker")], decisiveConfirmation: true })
+    expect(result.outcome).toBe("confirmed")
+    expect(result.canContinue).toBe(false)
+  })
+})
