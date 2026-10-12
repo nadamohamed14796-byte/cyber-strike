@@ -35,6 +35,8 @@ import { Identifier } from "../id/id"
 import { Session } from "../session"
 import { HackbrowserStatus } from "../session/hackbrowser-status"
 import { Global } from "../global"
+import { GmailService } from "../gmail-service"
+import { buildHackbrowserWorkerEnvironment } from "../hackbrowser-subprocess/worker-environment"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -90,6 +92,8 @@ export interface LauncherOptions {
   // honor the abort signal yet, so Esc / /hackbrowser-stop cannot cancel
   // during the login wait phase.
   credentials?: string[]
+  /** Decrypted only for the lifetime of this local crawl; never log this object. */
+  savedLogin?: { username: string; password: string; origin: string }
   steps?: number
   headless?: boolean
   // Connect to user's real Chrome via CDP instead of Playwright's Chromium.
@@ -170,18 +174,22 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
   // .../node_modules/playwright/cli.js" while chromium was actually present.
   const playwrightDir = path.dirname(playwrightEntry)
   try {
-    const { execSync } = await import("child_process")
+    const { execFileSync } = await import("child_process")
     const fullScript = `process.stdout.write(require(${JSON.stringify(playwrightDir.replace(/\\/g, "/"))}).chromium.executablePath())`
-    const chromiumPath = execSync(`${runtime} -e ${JSON.stringify(fullScript)}`, {
+    const chromiumPath = execFileSync(runtime, ["-e", fullScript], {
       encoding: "utf-8",
       timeout: 5000,
+      env: buildHackbrowserWorkerEnvironment(process.env, ""),
     }).trim()
     if (!chromiumPath || !existsSync(chromiumPath)) {
       log.info("chromium not found, attempting auto-install", { chromiumPath })
-      execSync(`${runtime} ${path.join(playwrightDir, "cli.js")} install chromium`, {
+      // The installer is a separate subprocess too: use argument-array execution,
+      // a minimal environment, and normal TLS verification. Never disable TLS
+      // verification to download executable browser binaries.
+      execFileSync(runtime, [path.join(playwrightDir, "cli.js"), "install", "chromium"], {
         timeout: 300000,
         stdio: "pipe",
-        env: { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: "0" },
+        env: buildHackbrowserWorkerEnvironment(process.env, ""),
       })
       log.info("chromium auto-install completed")
     }
@@ -227,6 +235,8 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
   // 5. Credential dispatch — translate cyberstrike credential IDs into the
   //    serializable CredentialDispatch union the worker sends to runCrawl.
   const ids = opts.credentials ?? []
+  if (opts.savedLogin && ids.length > 0) throw new Error("Use either a saved login profile or manual credential IDs, not both.")
+  if (opts.savedLogin && opts.headless !== false) throw new Error("Saved login profiles require headless=false for visible, user-supervised authentication.")
   if (ids.length >= 1 && opts.headless !== false) {
     throw new Error(
       `Crawling with credentials requires headless=false so the user can log in manually. ` +
@@ -249,8 +259,12 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
     headless: opts.headless ?? true,
     panel: opts.headless === false,
     cyberstrikeUrl,
+    // This secret is required by the worker's authenticated local ingest client.
+    // It is serialized into the private stdin start message, not inherited through env.
+    cyberstrikePassword: process.env.CYBERSTRIKE_SERVER_PASSWORD || undefined,
     model: modelDescriptor,
     credentialDispatch,
+    savedLogin: opts.savedLogin,
     cdp: opts.cdp,
   }
 
@@ -328,6 +342,27 @@ async function backgroundRun(
         }
 
         switch (msg.type) {
+          case "otp-request": {
+            // Keep the sole IPC reader responsive even if Google stalls. GmailService
+            // also accepts this AbortSignal and applies its own network deadline.
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 15_000)
+            try {
+              const otp = await GmailService.latestOtp({
+                siteUrl: msg.siteUrl,
+                after: msg.after,
+                signal: controller.signal,
+              })
+              workerWrite(proc, JSON.stringify({ type: "otp-response", requestId: msg.requestId, code: otp?.code } satisfies ParentMessage) + "\n")
+              if (!otp) log.warn("no matching Gmail OTP; browser will request human input", { sessionID })
+            } catch {
+              workerWrite(proc, JSON.stringify({ type: "otp-response", requestId: msg.requestId } satisfies ParentMessage) + "\n")
+              log.warn("Gmail OTP lookup unavailable or timed out; browser will request human input", { sessionID })
+            } finally {
+              clearTimeout(timeout)
+            }
+            break
+          }
           case "log": {
             const csLog = Log.create({ service: msg.service })
             csLog[msg.level](msg.message, msg.extra as Record<string, unknown> | undefined)
@@ -508,15 +543,15 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
   // Sync prep first — fail fast on any issue before claiming the slot.
   const prepared = await prepareCrawl(opts)
 
-  // Spawn worker subprocess. stdin/stdout are pipes for JSON IPC.
-  // Inherits full parent env so AWS/GCP/other provider credentials
-  // (AWS_ACCESS_KEY_ID, GOOGLE_APPLICATION_CREDENTIALS, etc.) are
-  // available to the worker without explicit forwarding.
+  // Spawn worker with an explicit, provider-scoped environment. Model API
+  // credentials are carried in the prepared WorkerOptions IPC payload; only
+  // Bedrock/Vertex ambient credential-chain variables are forwarded when
+  // required. Never inherit the parent process's unrelated secrets.
   const proc = Bun.spawn([prepared.runtime, prepared.workerPath], {
     stdin: "pipe",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env },
+    env: buildHackbrowserWorkerEnvironment(process.env, prepared.workerOptions.model.npm),
   })
 
   activeRuns.set(opts.sessionID, { proc, modelInfo: prepared.modelInfo })
@@ -545,7 +580,12 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
   }
 
   // Send start message — worker begins crawl on receipt.
-  workerWrite(proc, JSON.stringify({ type: "start", options: prepared.workerOptions } satisfies ParentMessage) + "\n")
+  try {
+    workerWrite(proc, JSON.stringify({ type: "start", options: prepared.workerOptions } satisfies ParentMessage) + "\n")
+  } finally {
+    // Drop the parent-side reference once the single start message has been queued.
+    prepared.workerOptions.cyberstrikePassword = undefined
+  }
 
   // Fire and forget — IPC reader runs concurrently. The chat session prompt
   // loop returns on tool completion, freeing the session for ingest queue

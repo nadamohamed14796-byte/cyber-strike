@@ -52,7 +52,7 @@ export async function waitForHuman(prompt: string): Promise<string> {
 /**
  * Detect if a 2FA / MFA / OTP page is shown and pause for user input.
  */
-export async function handle2FA(page: Page): Promise<boolean> {
+export async function handle2FA(page: Page, otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>, siteOrigin?: string): Promise<boolean> {
   const mfaSelectors = [
     'input[name*="otp"]',
     'input[name*="mfa"]',
@@ -70,7 +70,18 @@ export async function handle2FA(page: Page): Promise<boolean> {
     const el = await page.$(sel)
     if (el) {
       log.info("2FA detected", { selector: sel })
-      const code = await waitForHuman("Enter your 2FA code and press Enter:")
+      let code: string | undefined
+      if (otpProvider && siteOrigin) {
+        try { code = await otpProvider(siteOrigin, Date.now() - 15 * 60_000) } catch {
+          log.warn("Gmail OTP lookup failed; falling back to human MFA input")
+        }
+      }
+      if (!code && otpProvider) {
+        // Worker stdin is reserved for IPC, so use the visible browser for manual MFA.
+        await waitForManualLogin(page, "MFA")
+        return true
+      }
+      if (!code) code = await waitForHuman("Enter your 2FA code and press Enter:")
       await el.fill(code)
       const form = await page.$("form")
       if (form) {
@@ -407,12 +418,17 @@ export async function waitForManualLogin(
  */
 export async function autoLogin(
   page: Page,
-  credentials: { username: string; password: string; usernameSelector?: string; passwordSelector?: string },
+  credentials: { username: string; password: string; origin?: string; otpProvider?: (siteUrl: string, after: number) => Promise<string | undefined>; usernameSelector?: string; passwordSelector?: string },
 ): Promise<void> {
   const userSel =
     credentials.usernameSelector ??
     'input[type="text"], input[type="email"], input[name*="user"], input[name*="email"], input[id*="user"], input[id*="email"]'
   const passSel = credentials.passwordSelector ?? 'input[type="password"]'
+
+  // Saved credentials are origin-bound. Fail closed before filling anything if navigation redirected elsewhere.
+  if (credentials.origin && new URL(page.url()).origin !== credentials.origin) {
+    throw new Error("Saved login origin mismatch; refusing to autofill credentials on a different origin.")
+  }
 
   try {
     await page.waitForSelector(userSel, { timeout: 5000 })
@@ -427,11 +443,11 @@ export async function autoLogin(
     }
 
     await page.waitForLoadState("domcontentloaded").catch(() => {})
-    log.info("auto-login attempted", { username: credentials.username })
+    log.info("auto-login attempted", { origin: credentials.origin ?? "unspecified" })
 
-    await handle2FA(page)
+    await handle2FA(page, credentials.otpProvider ?? (async () => undefined), credentials.origin)
   } catch (err) {
-    log.warn("auto-login failed, falling back to manual login", { err: String(err) })
+    log.warn("auto-login failed, falling back to manual login")
     await waitForManualLogin(page)
   }
 }

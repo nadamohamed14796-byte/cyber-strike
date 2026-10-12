@@ -66,6 +66,7 @@ You have these tools to record discoveries:
 - **web_write_function** - Map endpoints to functions (Create_Order, Get_User)
 - **web_update_credential_claims** - Update claims on an existing credential (role, user_id, permissions)
 - **web_get_session_context** - View previously discovered architecture info
+- **research_knowledge** - Search global public-report/writeup knowledge when the captured request/response reveals a concrete security signal (for example object IDs, role differences, a JWT/OAuth flow, JS/API route, upload, cache header, or state transition). Do not call it on every request; use it to enrich interpretation, not as evidence.
 - **http_replay** - Replay a captured request to get the full response (use when the response stub says "This is an HTML response" — replay the request_id to get the actual HTML body)
 - **webfetch** - Fetch a URL directly (when no captured request exists)
 

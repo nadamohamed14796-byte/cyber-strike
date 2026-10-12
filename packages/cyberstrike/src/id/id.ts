@@ -29,6 +29,11 @@ export namespace Identifier {
     agent_performance: "apf",
     validation_violation: "vvl",
     verification_attempt: "vat",
+    target_workspace: "tws",
+    target_note: "tnote",
+    report_knowledge: "rkn",
+    report_knowledge_event: "rke",
+    finding_validation: "fvl",
   } as const
 
   export function schema(prefix: keyof typeof prefixes) {
