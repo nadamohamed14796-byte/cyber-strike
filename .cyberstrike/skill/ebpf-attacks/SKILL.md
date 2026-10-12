@@ -5,9 +5,16 @@ category: post-exploitation
 tags: [ebpf, bpf, kernel, post-exploitation, credential-access, defense-evasion, persistence, linux, rootkit]
 tech_stack: [linux, ebpf, kernel, bcc]
 cwe_ids: [CWE-269, CWE-522, CWE-693]
-chains_with: [T1014, T1055, T1556, T1205.002, T1003, T1059.004]
-prerequisites: [T1068, T1548]
-version: "1.0"
+chains_with:
+  - T1014
+  - T1055
+  - T1556
+  - T1205.002
+  - T1003
+  - T1059.004
+prerequisites:
+  - T1548
+version: "1.1"
 ---
 
 # eBPF Post-Exploitation Methodology
@@ -30,6 +37,15 @@ cat /proc/config.gz | zcat | grep CONFIG_BPF  # BPF config
 ls /sys/fs/bpf/                             # BPF filesystem mounted
 python3 -c "from bcc import BPF; print('OK')" # BCC available
 ```
+
+## Authorization and Verification Gate
+
+- Treat eBPF kernel-level testing as high risk. Run it only in an explicitly authorized lab or dedicated test host with a defined kernel version and rollback/recovery plan.
+- Do not attach programs that hide processes, intercept credentials, alter network traffic, or bypass security controls on production systems unless the engagement explicitly authorizes that exact behavior.
+- Begin with read-only inspection of kernel capabilities, loaded programs, verifier logs, and policy configuration. A capability or kernel feature being present is not proof of a vulnerability.
+- Demonstrate a finding with a harmless test program or synthetic event and verify the relevant privilege boundary. Do not collect real credentials, payload contents, or unrelated network traffic.
+- Keep program lifetime short, bound event volume, and detach only programs created by the test. Stop if kernel instability, unexpected packet loss, or resource pressure occurs.
+- Preserve sanitized verifier output, kernel/version context, exact commands, timestamps, and the minimum evidence required to reproduce the issue.
 
 ## Kill Chain Phases
 
@@ -147,6 +163,21 @@ eBPF programs are detectable by:
 - `/sys/kernel/debug/tracing/uprobe_events` — shows registered uprobes
 - `auditd` rules on `bpf()` syscall — `auditctl -a always,exit -F arch=b64 -S bpf`
 - EDR agents with BPF LSM hooks (Falco, Tracee, Tetragon)
+
+## Kernel Safety and Validation Matrix
+
+Use an isolated, recoverable lab host. eBPF and kernel-level experiments can destabilize a system, so establish kernel version, privileges, verifier limits, and rollback access before running any test.
+
+| Area | Safe validation | Stop condition |
+|---|---|---|
+| Capabilities | read-only capability and sysctl review | unexpected privilege boundary |
+| Program loading | minimal harmless program in a test namespace/host | verifier anomaly or kernel instability |
+| Attach points | approved tracepoint with synthetic event | unexpected production telemetry capture |
+| Policy enforcement | compare allowed vs denied test action | any bypass affecting real users |
+| Resource bounds | tiny bounded event volume | CPU, memory, or latency increase |
+| Cleanup | detach only test-created program | ownership of an existing program is unclear |
+
+Do not hide processes, intercept credentials, tamper with network traffic, or disable defenses. Record sanitized verifier output, kernel/config context, exact minimal test, and observed security boundary. A loaded program or available capability alone is not a vulnerability.
 
 ## Program Reference
 
