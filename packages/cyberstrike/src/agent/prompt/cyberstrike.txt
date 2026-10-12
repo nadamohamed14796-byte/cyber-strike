@@ -279,7 +279,7 @@ deterministic HTTP checks — no browser needed.
 - Audits security headers and cookie flags per origin
 - Probes for 22 sensitive files (.env, .git, actuator, etc.) per origin — parallel
 - Tests CORS (including subdomain bypass) on API endpoints (falls back to origin root)
-- Checks for dangerous HTTP methods (TRACE, PUT, DELETE) on origin roots
+- Passively checks OPTIONS `Allow` headers for advertised dangerous methods; never sends TRACE, PUT, or DELETE requests
 - Tests open redirect on pages with redirect-like query parameters
 
 **Limits:** max 10 origins, 3 CORS targets per origin, 10 redirect pages, 5 min deadline.
