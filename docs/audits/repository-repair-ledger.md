@@ -150,3 +150,16 @@ This checkpoint follows the instruction to make focused, verified repairs direct
 - **Direct commits on main:** source `a53f4ff1aa18bfe2838958a178cf2752de456a7a`; regression test `4df5373ff1d7421edd05a50b8e77268846cca10f`.
 - **Validation:** committed to `main`; CI and Bun execution remain pending/unavailable in this runtime. Recheck tests and typecheck on the latest main head.
 - **Status:** implemented; automated validation pending.
+
+
+## Follow-up checkpoint — 2026-10-12: remote skill destination and redirect guard
+
+### SEC-007 — P1: registry-controlled URLs could reach unsafe hosts or redirect to them
+
+- **Evidence:** `Discovery.pull()` accepts URL values from remote skill registry entries. The previous fetch path used normal redirect-following fetch behavior and did not restrict protocols, local hostnames, literal IP destinations, or DNS results. A compromised registry/index could try to make the agent fetch local services or cloud metadata endpoints, including through redirects.
+- **Fix:** introduced a remote-URL shape policy requiring HTTPS, no URL credentials, no nonstandard ports, FQDN hostnames rather than literal IPs, and rejection of local/internal suffixes. Before each request and each redirect hop, resolve the hostname and reject it unless every resolved address is public. Redirects are handled manually, revalidated, and capped at four hops; unsafe or downgrade redirects fail closed.
+- **Regression coverage:** tests cover HTTP/file schemes, loopback and internal destinations, URL credentials, nonstandard ports, representative private/reserved IPv4 ranges, loopback/link-local/ULA/documentation IPv6 ranges, and public IPv4/IPv6 examples.
+- **Direct commits on main:** implementation `3eedd98f1b00fba1c534b47ac87ae22524c502de`; regression tests `48492819e173b58d974782bc152dd36965580e87`.
+- **Limitations:** host DNS is checked before each fetch, but the runtime's fetch implementation performs its own subsequent resolution; DNS rebinding between those operations is not cryptographically prevented in this implementation. Network egress controls remain the stronger defense where available.
+- **Validation:** committed to `main`; CI/typecheck/Bun test execution has not been verified in this environment. Keep this item pending until the latest main head passes.
+- **Status:** implemented; automated validation pending.
