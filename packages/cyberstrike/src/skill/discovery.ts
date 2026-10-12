@@ -169,7 +169,7 @@ export namespace Discovery {
   }
 
 
-  async function get(url: string, dest: string, root: string): Promise<boolean> {
+  async function get(url: string, dest: string, root: string, binary = false): Promise<boolean> {
     const safeDest = await safeCacheDestination(root, dest, true)
     if (!safeDest) {
       log.warn("refusing skill download to unsafe cache path", { dest })
@@ -182,7 +182,8 @@ export namespace Discovery {
           log.error("failed to download", { url, status: response.status })
           return false
         }
-        await Bun.write(safeDest, await response.text())
+        const content = binary ? new Uint8Array(await response.arrayBuffer()) : await response.text()
+        await Bun.write(safeDest, content)
         return true
       })
       .catch((err) => {
@@ -263,7 +264,7 @@ export namespace Discovery {
             // Archive format: download tar.gz and extract
             const archive = path.join(root, `${skill.name}.tar.gz`)
             await mkdir(root, { recursive: true })
-            if (await get(link, archive, root)) {
+            if (await get(link, archive, root, true)) {
               await extractSafeArchive(archive, root)
             }
           } else {
