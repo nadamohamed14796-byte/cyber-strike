@@ -653,6 +653,9 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       visited.add(current.url)
       const existing = ResearchQueue.find(source.id, current.url)
       const isReportURL = isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)
+      // Auth-blocked report and index URLs stay parked until the source session is ready
+      // and the retry cooldown allows them. Otherwise every sync/watch cycle hammers login walls.
+      if (existing?.status === "blocked_auth") continue
       // Never fetch a known report again, including legacy reports already in knowledge.
       // Refresh primary index pages every cycle; cache pagination/sitemap pages for six hours.
       if (isReportURL && (
@@ -670,15 +673,20 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         const title = redactResearchSecrets(titleOf(html, current.url))
         const text = redactResearchSecrets(cleanHtml(html))
         if (looksLikeResearchAuthenticationWall(current.url, title, text, html)) {
-          // Queue only actual report candidates for explicit auth retry. An index/login
-          // seed is re-crawled by discovery after the operator configures a valid session.
-          if (isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)) {
-            ResearchQueue.blockAuthentication({
-              sourceID: source.id, sourceURL: current.url, title,
-              reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
-              payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
-            })
-          }
+          // Persist both gated reports and gated index pages. This prevents repeat login-wall
+          // fetches; retry-auth returns index pages to discovery, never to the learning queue.
+          ResearchQueue.blockAuthentication({
+            sourceID: source.id,
+            sourceURL: current.url,
+            title,
+            reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
+            payload: {
+              source_name: source.name,
+              source_kind: source.kind,
+              crawl_depth: current.depth,
+              ...(isReportURL ? {} : { crawl_page: true }),
+            },
+          })
           blockedAuth++
           errors.push(current.url + " — authentication required")
           continue
@@ -722,12 +730,17 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {
-          if (isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)) {
-            ResearchQueue.blockAuthentication({
-              sourceID: source.id, sourceURL: current.url, reason: message,
-              payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.depth },
-            })
-          }
+          ResearchQueue.blockAuthentication({
+            sourceID: source.id,
+            sourceURL: current.url,
+            reason: message,
+            payload: {
+              source_name: source.name,
+              source_kind: source.kind,
+              crawl_depth: current.depth,
+              ...(isReportURL ? {} : { crawl_page: true }),
+            },
+          })
           blockedAuth++
           errors.push(current.url + " — authentication required (" + message + ")")
         } else if (errors.length < 5) errors.push(current.url + " — " + message)
