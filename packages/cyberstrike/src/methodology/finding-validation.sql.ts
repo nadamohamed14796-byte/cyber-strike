@@ -29,6 +29,8 @@ export interface FindingValidationAttemptRecord {
   hypothesis: string
   outcome: "supports" | "contradicts" | "inconclusive"
   evidence: string
+  /** Only true when this test ran with valid scope, identity, session, and other preconditions. */
+  validConditions: boolean
 }
 
 export interface FindingValidationCheckRecord {
