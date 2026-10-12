@@ -215,6 +215,55 @@ test("isolates persisted target memory across non-Git directories sharing the gl
   expect(second.notes).toEqual([])
 })
 
+test("serializes concurrent target-note writes and rebuilds notes.md from SQLite", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://notes-recovery.example.test"
+      const workspace = await TargetMemory.ensure(targetURL)
+      const added = await Promise.all(
+        Array.from({ length: 12 }, (_, index) =>
+          TargetMemory.addNote(targetURL, {
+            kind: "asset",
+            title: "Concurrent observation " + index,
+            content: "Persisted note body " + index,
+            source: "concurrency-regression-test",
+          }),
+        ),
+      )
+
+      expect(added.every((result) => result.created)).toBe(true)
+      expect(TargetMemory.allNotes(workspace.id)).toHaveLength(12)
+
+      const notesPath = path.join(workspace.workspacePath, "notes.md")
+      let notesFile = await fs.readFile(notesPath, "utf-8")
+      expect(notesFile.match(/<!-- cyberstrike-target-note:/g) ?? []).toHaveLength(12)
+      for (let index = 0; index < 12; index++) {
+        expect(notesFile).toContain("Concurrent observation " + index)
+      }
+
+      // A normal workspace open must preserve manual annotations and avoid duplicate generated entries.
+      notesFile += "\n\nManual annotation preserved across reconciliation.\n"
+      await fs.writeFile(notesPath, notesFile, "utf-8")
+      await TargetMemory.ensure(targetURL)
+      notesFile = await fs.readFile(notesPath, "utf-8")
+      expect(notesFile).toContain("Manual annotation preserved across reconciliation.")
+      expect(notesFile.match(/<!-- cyberstrike-target-note:/g) ?? []).toHaveLength(12)
+
+      // SQLite remains the source of truth if the human-readable companion is lost.
+      await fs.rm(notesPath)
+      await TargetMemory.ensure(targetURL)
+      notesFile = await fs.readFile(notesPath, "utf-8")
+      expect(notesFile.match(/<!-- cyberstrike-target-note:/g) ?? []).toHaveLength(12)
+      for (let index = 0; index < 12; index++) {
+        expect(notesFile).toContain("Concurrent observation " + index)
+      }
+      await Instance.dispose()
+    },
+  })
+})
+
 describe("target workspace owner keys", () => {
   test("isolates non-Git project directories that share the global Project ID", () => {
     const first = targetWorkspaceOwnerKey("global", "/tmp/cyberstrike-project-a")
