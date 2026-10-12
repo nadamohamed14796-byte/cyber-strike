@@ -82,7 +82,6 @@ Skill body for ${name}.
       },
     })
   } finally {
-    SkillContext.clear()
     if (priorTestHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
     else process.env.CYBERSTRIKE_TEST_HOME = priorTestHome
   }
