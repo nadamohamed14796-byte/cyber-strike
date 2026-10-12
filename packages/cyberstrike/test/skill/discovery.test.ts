@@ -80,6 +80,13 @@ describe("remote skill path validation", () => {
     }
   })
 
+  test("archive chunk budgets enforce per-archive and pull-wide decompression limits", () => {
+    expect(Discovery.isArchiveChunkWithinBudget(4, 4, 1, 5, 10)).toBe(true)
+    expect(Discovery.isArchiveChunkWithinBudget(5, 4, 1, 5, 10)).toBe(false)
+    expect(Discovery.isArchiveChunkWithinBudget(1, 10, 1, 20, 10)).toBe(false)
+    expect(Discovery.isArchiveChunkWithinBudget(-1, 0, 1, 20, 20)).toBe(false)
+  })
+
   test("archive expansion limits reject decompression bombs and excessive manifests", () => {
     const mebibyte = 1024 * 1024
     expect(Discovery.isSafeArchiveExpansion([1, 2, 3])).toBe(true)
