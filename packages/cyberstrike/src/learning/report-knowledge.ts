@@ -1,4 +1,4 @@
-import { and, desc, eq, or, like, count, sql } from "drizzle-orm"
+import { and, desc, eq, or, like, count, sql, isNull, notInArray } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "./report-knowledge.sql"
@@ -513,6 +513,8 @@ export namespace ReportKnowledge {
       cweID?: string
       targetPattern?: string
       sourceKind?: string
+      /** Filter target-scoped and terminally rejected rows before ranking/slicing. */
+      publicReferencesOnly?: boolean
       limit?: number
     } = {},
   ) {
@@ -529,6 +531,11 @@ export namespace ReportKnowledge {
         if (input.targetPattern)
           conditions.push(eq(ReportKnowledgeTable.target_pattern, normalize(input.targetPattern)))
         if (input.sourceKind) conditions.push(eq(ReportKnowledgeTable.source_kind, input.sourceKind))
+        if (input.publicReferencesOnly) {
+          conditions.push(isNull(ReportKnowledgeTable.session_id))
+          conditions.push(or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!)
+          conditions.push(notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]))
+        }
 
         const tokens = queryTokens(input.query)
         const signals = canonicalSignals(input.query)
@@ -642,6 +649,7 @@ export namespace ReportKnowledge {
       vulnerabilityClass: input.vulnerabilityClass,
       cweID: input.cweID,
       sourceKind: "external_report",
+      publicReferencesOnly: true,
       limit: Math.min(limit * 3, 100),
     })
     return (
