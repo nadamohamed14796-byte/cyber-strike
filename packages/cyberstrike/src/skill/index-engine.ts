@@ -126,6 +126,14 @@ export namespace SkillIndex {
         indexEntry(entry, next)
       }
       states.set(directory, next)
+      const referenceProblems = validateReferences()
+      if (referenceProblems.length) {
+        log.warn("skill index contains unresolved metadata references", {
+          directory,
+          count: referenceProblems.length,
+          examples: referenceProblems.slice(0, 10),
+        })
+      }
       log.info("skill index built", { directory, count: next.entries.size })
     })()
     builds.set(directory, build)
