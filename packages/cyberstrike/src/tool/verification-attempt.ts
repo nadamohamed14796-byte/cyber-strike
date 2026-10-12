@@ -90,7 +90,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
         `Reason: ${d.reason}`,
         next,
       ].join("\n"),
-      metadata: { hypothesisKey: params.hypothesis_key, attemptsUsed: d.attemptsUsed, remainingAttempts: d.remainingAttempts, outcome: d.outcome, canContinue: d.canContinue, duplicate: result.duplicate },
+      metadata: { hypothesisKey: params.hypothesis_key, attemptsUsed: d.attemptsUsed, maxAttempts: Policy.MAX_ATTEMPTS, remainingAttempts: d.remainingAttempts, outcome: d.outcome, canContinue: d.canContinue, duplicate: result.duplicate },
     }
   },
 })
