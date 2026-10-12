@@ -404,11 +404,10 @@ export namespace Discovery {
         return false
       }
       const bytes = await readBoundedBody(response, MAX_SKILL_DOWNLOAD_BYTES, (byteLength) => {
-        if (budget.downloadedBytes + byteLength > MAX_TOTAL_DOWNLOAD_BYTES) return false
-        // Count chunks as they arrive so concurrent downloads cannot overshoot
-        // the pull-wide budget and small assets do not reserve 25 MiB each.
+        // Count each received chunk, including the one that crosses the global
+        // cap, so other concurrent downloads stop rather than reusing the bytes.
         budget.downloadedBytes += byteLength
-        return true
+        return budget.downloadedBytes <= MAX_TOTAL_DOWNLOAD_BYTES
       })
       if (!bytes) {
         log.warn("refusing oversized, unreadable, or over-budget skill download", { url, maxBytes: MAX_SKILL_DOWNLOAD_BYTES })
