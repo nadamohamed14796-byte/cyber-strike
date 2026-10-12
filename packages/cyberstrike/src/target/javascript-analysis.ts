@@ -72,6 +72,40 @@ function normalizeEndpoint(value: string) {
   return { host, path, urlTemplate: (host ? "https://" + host : "") + path, pathParameters, queryParameters }
 }
 
+function findCallEnd(source: string, start: number): number {
+  let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i]!, next = source[i + 1]
+    if (lineComment) { if (ch === "\n") lineComment = false; continue }
+    if (blockComment) { if (ch === "*" && next === "/") { blockComment = false; i++ }; continue }
+    if (quote) { if (escaped) escaped = false; else if (ch === "\\") escaped = true; else if (ch === quote) quote = ""; continue }
+    if (ch === "/" && next === "/") { lineComment = true; i++; continue }
+    if (ch === "/" && next === "*") { blockComment = true; i++; continue }
+    if (ch === "'" || ch === '"' || ch === "\x60") { quote = ch; continue }
+    if (ch === "(") depth++
+    if (ch === ")" && --depth === 0) return i
+  }
+  return -1
+}
+function splitTopLevelArguments(value: string): string[] {
+  const out: string[] = []
+  let start = 0, quote = "", escaped = false, round = 0, square = 0, curly = 0
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i]!
+    if (quote) { if (escaped) escaped = false; else if (ch === "\\") escaped = true; else if (ch === quote) quote = ""; continue }
+    if (ch === "'" || ch === '"' || ch === "\x60") quote = ch
+    else if (ch === "(") round++
+    else if (ch === ")") round--
+    else if (ch === "[") square++
+    else if (ch === "]") square--
+    else if (ch === "{") curly++
+    else if (ch === "}") curly--
+    else if (ch === "," && round === 0 && square === 0 && curly === 0) { out.push(value.slice(start, i).trim()); start = i + 1 }
+  }
+  if (value.slice(start).trim()) out.push(value.slice(start).trim())
+  return out
+}
+
 /**
  * Bounded static heuristics only: never evaluates source or returns hard-coded secret values.
  * Results are candidates. Runtime requests and server-side authorization require separate verification.
@@ -98,30 +132,36 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   functions.sort((a, b) => a.line - b.line)
 
   const requests: JavaScriptRequestCandidate[] = []
-  const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.open)\s*\(([^)]{0,7000})\)/gi
+  const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.open)\s*\(/gi
   for (const match of source.matchAll(callPattern)) {
-    const call = match[2] ?? "", callee = (match[1] ?? "").toLowerCase()
-    const isXhr = callee.endsWith(".open")
-    const firstArg = isXhr ? call.split(",", 2)[1] ?? "" : call.split(",", 1)[0] ?? ""
-    const literalMatch = firstArg.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
+    const index = match.index ?? 0, callee = (match[1] ?? "").toLowerCase()
+    const open = index + match[0].lastIndexOf("(")
+    const close = findCallEnd(source, open)
+    if (close < 0 || close - open > 7000) continue
+    const args = splitTopLevelArguments(source.slice(open + 1, close))
+    const isXHR = callee.endsWith(".open")
+    const axiosMethod = callee.startsWith("axios.") && !callee.endsWith(".request") ? callee.slice(6).toUpperCase() : null
+    const urlExpression = isXHR ? args[1] ?? "" : callee === "axios.request" ? firstLiteral(args[0] ?? "") ?? "" : args[0] ?? ""
+    const literalMatch = urlExpression.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
     if (!literalMatch) continue
     const endpoint = normalizeEndpoint(literalMatch[1]!)
     if (!endpoint) continue
-    const tail = call.slice(literalMatch.index! + literalMatch[0].length)
-    const methodArg = isXhr ? call.split(",", 1)[0] ?? "" : ""
-    const methodOption = (tail + call).match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
-    const axiosMethod = callee.startsWith("axios.") && !callee.endsWith(".request") ? callee.slice("axios.".length).toUpperCase() : null
-    const method = (axiosMethod ?? methodOption?.[1] ?? (isXhr ? methodArg.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : undefined) ?? "").toUpperCase() || null
+    const options = isXHR ? "" : callee === "axios.request" ? args[0] ?? "" : callee.startsWith("axios.") ? args.slice(2).join(",") : args.slice(1).join(",")
+    const optionText = options + "\n" + source.slice(index, Math.min(close + 1, index + 7000))
+    const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
+    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? firstLiteral(args[0] ?? "") : undefined) ?? "").toUpperCase() || null
     const headers = [
-      ...Array.from(call.matchAll(/\bheaders\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1]!)).flat(),
-      ...Array.from(call.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
-      ...Array.from(call.matchAll(/\b(Authorization|Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
+      ...Array.from(optionText.matchAll(/\bheaders\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1]!)).flat(),
+      ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
+      ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
+    const bodyArgs = callee.startsWith("axios.") && !callee.endsWith(".request") ? args[1] ?? "" : options
+    const directObject = bodyArgs.trim().startsWith("{") ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
     const bodyParams = [
-      ...fieldNames(firstArg.startsWith("{") ? firstArg : ""),
-      ...Array.from(call.matchAll(/\b(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1] ?? "")).flat(),
+      ...fieldNames(directObject),
+      ...Array.from(bodyArgs.matchAll(/\b(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1] ?? "")).flat(),
     ]
-    const all = call + "\n" + tail
+    const all = optionText + "\n" + bodyArgs
     const authSignals: string[] = [], cookieSignals: string[] = []
     if (/\bAuthorization\b/i.test(all)) authSignals.push("authorization-header")
     if (/\bBearer\b/i.test(all)) authSignals.push("bearer-token")
@@ -134,12 +174,15 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     }
     if (/\bdocument\.cookie\b/i.test(all)) cookieSignals.push("document-cookie-access")
     if (/\bCookie\b|\bcookie\s*:/i.test(all)) cookieSignals.push("cookie-header-signal")
-    const line = lineNumber(source, match.index ?? 0)
+    if (/\b(?:searchParams|URLSearchParams)\b/i.test(all)) {
+      for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']{1,100})["']/gi)) endpoint.queryParameters.push(m[1]!)
+    }
+    const line = lineNumber(source, index)
     const sourceFunction = [...functions].reverse().find((fn) => fn.line <= line)?.name ?? null
     const item: JavaScriptRequestCandidate = {
       id: "js-request:" + createHash("sha256").update(line + ":" + endpoint.urlTemplate + ":" + (method ?? "?")).digest("hex").slice(0, 16),
       sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, path: endpoint.path,
-      pathParameters: endpoint.pathParameters, queryParameters: endpoint.queryParameters,
+      pathParameters: endpoint.pathParameters, queryParameters: cleanUnique(endpoint.queryParameters),
       bodyParameters: cleanUnique(bodyParams).slice(0, 100), headerNames: cleanUnique(headers).slice(0, 100),
       authSignals: cleanUnique(authSignals), cookieSignals: cleanUnique(cookieSignals),
       authAssessment: authSignals.length || cookieSignals.length ? "signals-present" : "no-static-auth-signal",
