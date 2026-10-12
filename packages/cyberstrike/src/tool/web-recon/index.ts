@@ -151,8 +151,12 @@ export const WebReconTool = Tool.define("web_recon", {
       .string()
       .url()
       .refine((value) => {
-        const url = new URL(value)
-        return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password
+        try {
+          const url = new URL(value)
+          return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password
+        } catch {
+          return false
+        }
       }, "Target must be an HTTP(S) URL without embedded credentials")
       .optional()
       .describe("Target URL (required for all programs except session_scan). All programs resolve paths relative to this origin."),
