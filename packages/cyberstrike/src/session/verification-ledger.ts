@@ -75,18 +75,14 @@ export namespace VerificationLedger {
     const before = list({ sessionID, hypothesisKey })
     const key = Policy.attemptKey(input.attempt)
     const existing = before.find((item) => Policy.attemptKey(item) === key)
-    if (before.length >= Policy.MAX_ATTEMPTS && !existing && input.decisiveResult && input.decisiveResult !== "none") {
-      throw new Error("Attempt budget is exhausted. Finalize only using evidence attached to an already-recorded strategy/variant; do not create attempt 21.")
+    if (before.length >= Policy.MAX_ATTEMPTS && !existing) {
+      throw new Error("The 20-distinct-attempt budget is exhausted. Do not create attempt 21; use action=status and preserve unresolved cases as INCONCLUSIVE / NEEDS REVIEW.")
     }
     let duplicate = Boolean(existing)
     let recorded: Attempt
 
     if (existing) {
       recorded = existing
-    } else if (before.length >= Policy.MAX_ATTEMPTS) {
-      // Do not create attempt 21. Still allow decisive evidence from the final
-      // attempt to be attached as a verdict update without consuming more budget.
-      recorded = before[before.length - 1]
     } else {
       const now = Date.now()
       const id = Identifier.ascending("verification_attempt")
