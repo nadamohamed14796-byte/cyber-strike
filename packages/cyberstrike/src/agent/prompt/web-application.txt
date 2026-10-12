@@ -151,6 +151,7 @@ skill unload <skill-name>   # unload when moving to a different test area
 |------|---------|
 | hackbrowser | AI-driven crawler — endpoint discovery, JS mining, form enumeration |
 | correlate_javascript | Post-crawl JS code review — functions, endpoint shapes, auth/cookie hints, redacted secret candidates, persistent test plans |
+| http_replay | Replay a captured request with one controlled mutation or baseline comparison; persists redacted endpoint observations |
 | web_recon | Post-crawl vuln testing — session_scan tests all collected endpoints |
 | sqlmap | SQL injection exploitation |
 | ffuf | Directory/parameter fuzzing |
