@@ -50,6 +50,26 @@ test("extracts axios methods and request body field names", () => {
   expect(result.requests[0]?.bodyParameters).toContain("visibility")
 })
 
+test("handles custom API clients and concatenated path parameters", () => {
+  const source = [
+    'async function getInvoice(invoiceId) {',
+    ' return api.get("/api/invoices/" + invoiceId + "/items", { headers: { "X-Client": "web" } })',
+    '}',
+    'const createUser = (userId, input) => client.post("/api/users/" + userId, { displayName: input.name, active: true }, { headers: { "X-Trace": "trace" } })',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const get = result.requests.find((request) => request.method === "GET")
+  const post = result.requests.find((request) => request.method === "POST")
+  expect(get?.path).toBe("/api/invoices/{invoiceId}/items")
+  expect(get?.pathParameters).toContain("invoiceId")
+  expect(get?.headerNames).toContain("X-Client")
+  expect(post?.path).toBe("/api/users/{userId}")
+  expect(post?.pathParameters).toContain("userId")
+  expect(post?.bodyParameters).toContain("displayName")
+  expect(post?.bodyParameters).toContain("active")
+  expect(post?.headerNames).toContain("X-Trace")
+})
+
 test("records hard-coded secret-like assignments as fingerprints only", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
