@@ -100,7 +100,7 @@ Trace the route, middleware, schema, service, and sink. Document a minimal faili
 | Proxy headers | trust proxy, Host and forwarded header use | A security-relevant destination/policy changes in controlled test |
 | Sessions/cookies | flags, rotation, tenant binding | Prior test session retains access contrary to policy |
 | File/URL inputs | path normalization, URL fetch, upload storage | Test-owned canary crosses intended file/network/origin boundary |
-| Child process/eval | attacker input reaches an executable sink | Lab-only harmless proof and reachable source-to-sink |
+| Child process/eval | attacker input reaches an executable sink | restricted-to-lab harmless proof and reachable source-to-sink |
 | Async jobs | owner/tenant binding on job creation/result | Another test identity accesses only synthetic job output |
 
 **Mitigation:** validate schemas explicitly, use framework-native safe APIs, secure middleware ordering, restrict proxy trust, rotate sessions, sandbox job workers, and add route-level authorization regression tests.
@@ -110,7 +110,7 @@ Trace the route, middleware, schema, service, and sink. Document a minimal faili
 - Parser/WAF errors can precede authentication; use a valid minimal request to map middleware order.
 - A dependency vulnerability is not exploitable unless the vulnerable code path is reachable and prerequisites apply.
 - Request URL/Host variations may be normalized by a proxy; confirm the origin's actual interpretation.
-- Do not use prototype pollution, command execution, deserialization gadgets, file writes, or SSRF payloads on production when lab proof is available.
+- Do not use prototype pollution, command execution, deserialization gadgets, file writes, or SSRF payloads on production when a non-destructive validation is sufficient.
 
 ## References
 
