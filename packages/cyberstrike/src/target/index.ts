@@ -219,7 +219,110 @@ async function createIfMissing(filePath: string, content: string): Promise<void>
   await assertRegularFileOrMissing(filePath)
 }
 
-async function prepareWorkspace(workspace: Workspace): Promise<void> {
+const notesMarkdownQueues = new Map<string, Promise<void>>()
+
+/** Serialize Markdown read/modify/write cycles so concurrent note additions cannot overwrite one another. */
+async function withNotesMarkdownLock<T>(notesPath: string, task: () => Promise<T>): Promise<T> {
+  const previous = notesMarkdownQueues.get(notesPath) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  notesMarkdownQueues.set(notesPath, current)
+  await previous.catch(() => undefined)
+  try {
+    return await task()
+  } finally {
+    release()
+    if (notesMarkdownQueues.get(notesPath) === current) notesMarkdownQueues.delete(notesPath)
+  }
+}
+
+function defaultTargetNotes(workspace: Workspace): string {
+  return [
+    "# Target Notes",
+    "",
+    "> Human-readable notes for this target. Entries added through the target note command are also persisted in SQLite.",
+    "",
+    "## Target",
+    "",
+    "- URL: " + workspace.targetURL,
+    "- Hostname: " + workspace.hostname,
+    "",
+    "## Known Facts",
+    "",
+    "## Assets and Endpoints",
+    "",
+    "## JavaScript and Client-Side Behavior",
+    "",
+    "## Findings and Evidence",
+    "",
+    "## Lessons and Follow-ups",
+    "",
+  ].join("\n")
+}
+
+function applyTargetNoteToMarkdown(notesFile: string, note: TargetNote): string {
+  const marker = "<!-- cyberstrike-target-note:" + note.id + " -->"
+  const markerIndex = notesFile.indexOf(marker)
+  if (markerIndex < 0) {
+    const timestamp = new Date(note.timeCreated).toISOString()
+    const heading = note.title ? "### " + note.title : "### " + timestamp
+    const provenance = [
+      "- Type: " + note.kind,
+      "- Status: " + note.status,
+      "- Source: " + note.source,
+      ...(note.sourceURL ? ["- Source URL: " + note.sourceURL] : []),
+      ...(note.tags.length ? ["- Tags: " + note.tags.join(", ")] : []),
+    ]
+    const entry = "\n\n" + marker + "\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
+    return notesFile + entry
+  }
+
+  // Update only generated metadata and preserve all surrounding human edits.
+  const provenanceStart = notesFile.indexOf("- Type: ", markerIndex)
+  const provenanceEnd = provenanceStart >= 0 ? notesFile.indexOf("\n\n", provenanceStart) : -1
+  if (provenanceStart < 0 || provenanceEnd <= provenanceStart) return notesFile
+  const metadata = notesFile.slice(provenanceStart, provenanceEnd).split("\n")
+  const statusIndex = metadata.findIndex((line) => line.startsWith("- Status: "))
+  if (statusIndex >= 0) metadata[statusIndex] = "- Status: " + note.status
+  const tagsIndex = metadata.findIndex((line) => line.startsWith("- Tags: "))
+  if (note.tags.length) {
+    if (tagsIndex >= 0) metadata[tagsIndex] = "- Tags: " + note.tags.join(", ")
+    else metadata.push("- Tags: " + note.tags.join(", "))
+  } else if (tagsIndex >= 0) {
+    metadata.splice(tagsIndex, 1)
+  }
+  return notesFile.slice(0, provenanceStart) + metadata.join("\n") + notesFile.slice(provenanceEnd)
+}
+
+/** Reconcile SQLite notes into notes.md without replacing user-authored text. */
+async function syncTargetNotesMarkdown(workspace: Workspace): Promise<void> {
+  const notesPath = path.join(workspace.workspacePath, "notes.md")
+  await withNotesMarkdownLock(notesPath, async () => {
+    await assertRegularFileOrMissing(notesPath)
+    let notesFile = ""
+    try {
+      notesFile = await fs.readFile(notesPath, "utf-8")
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+
+    const base = notesFile || defaultTargetNotes(workspace)
+    const rows = Database.use((db) =>
+      db
+        .select()
+        .from(TargetNoteTable)
+        .where(eq(TargetNoteTable.target_id, workspace.id))
+        .orderBy(asc(TargetNoteTable.time_created))
+        .all(),
+    )
+    const nextFile = rows.map(mapNote).reduce(applyTargetNoteToMarkdown, base)
+    if (nextFile !== notesFile) await TargetMemory.writeWorkspaceFile(workspace, "notes.md", nextFile)
+  })
+}
+
+async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Promise<void> {
   const root = projectRoot()
   workspace.workspacePath = await ensureSafeDirectoryPath(root, workspace.relativePath)
   for (const directory of TARGET_DIRECTORIES) {
@@ -239,30 +342,11 @@ async function prepareWorkspace(workspace: Workspace): Promise<void> {
       2,
     ) + "\n",
   )
-  await createIfMissing(
-    path.join(workspace.workspacePath, "notes.md"),
-    [
-      "# Target Notes",
-      "",
-      "> Human-readable notes for this target. Entries added through the target note command are also persisted in SQLite.",
-      "",
-      "## Target",
-      "",
-      "- URL: " + workspace.targetURL,
-      "- Hostname: " + workspace.hostname,
-      "",
-      "## Known Facts",
-      "",
-      "## Assets and Endpoints",
-      "",
-      "## JavaScript and Client-Side Behavior",
-      "",
-      "## Findings and Evidence",
-      "",
-      "## Lessons and Follow-ups",
-      "",
-    ].join("\n"),
-  )
+  const notesPath = path.join(workspace.workspacePath, "notes.md")
+  await createIfMissing(notesPath, defaultTargetNotes(workspace))
+  // Normal workspace opens repair missing generated entries from the authoritative DB.
+  // The note writer opts out before persisting its new record, then reconciles after commit.
+  if (reconcileNotes) await syncTargetNotesMarkdown(workspace)
 }
 
 function mapNote(row: typeof TargetNoteTable.$inferSelect): TargetNote {
@@ -288,7 +372,7 @@ export namespace TargetMemory {
   }
 
   /** Create or load a target workspace, persist its identity, and create missing workspace files. */
-  export async function ensure(input: string): Promise<Workspace> {
+  export async function ensure(input: string, options: { reconcileNotes?: boolean } = {}): Promise<Workspace> {
     const normalized = normalizeTarget(input)
     const projectID = Instance.project.id
     const ownerKey = currentOwnerKey()
@@ -339,7 +423,7 @@ export namespace TargetMemory {
     // Never trust a persisted path as an arbitrary filesystem path. Re-derive it from a sanitized slug.
     const safeRelativePath = path.join(".cyberstrike", "targets", normalized.slug)
     const workspace = mapWorkspace(row, safeRelativePath)
-    await prepareWorkspace(workspace)
+    await prepareWorkspace(workspace, options.reconcileNotes ?? true)
     return workspace
   }
 
@@ -457,7 +541,7 @@ export namespace TargetMemory {
     // the CLI and future callers must not be able to write secrets to disk.
     const content = redactTargetNoteSecrets(rawContent)
 
-    const workspace = await ensure(targetURL)
+    const workspace = await ensure(targetURL, { reconcileNotes: false })
     const kind = input.kind ?? "manual"
     const rawTitle = input.title?.trim()
     const title = rawTitle ? redactTargetNoteLine(rawTitle, 180) || null : null
@@ -517,50 +601,9 @@ export namespace TargetMemory {
     })
 
     const note = mapNote(saved.row)
-    const notesPath = path.join(workspace.workspacePath, "notes.md")
-    const marker = "<!-- cyberstrike-target-note:" + note.id + " -->"
-    // Refuse a symlink/non-regular notes file before reading, and use the safe
-    // atomic writer below instead of appendFile/writeFile for the generated update.
-    await assertRegularFileOrMissing(notesPath)
-    let notesFile = ""
-    try {
-      notesFile = await fs.readFile(notesPath, "utf-8")
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-    }
-
-    const markerIndex = notesFile.indexOf(marker)
-    if (markerIndex < 0) {
-      const timestamp = new Date(note.timeCreated).toISOString()
-      const heading = note.title ? "### " + note.title : "### " + timestamp
-      const provenance = [
-        "- Type: " + note.kind,
-        "- Status: " + note.status,
-        "- Source: " + note.source,
-        ...(note.sourceURL ? ["- Source URL: " + note.sourceURL] : []),
-        ...(note.tags.length ? ["- Tags: " + note.tags.join(", ")] : []),
-      ]
-      const entry = "\n\n" + marker + "\n" + heading + "\n\n" + provenance.join("\n") + "\n\n" + note.content + "\n"
-      await writeWorkspaceFile(workspace, "notes.md", notesFile + entry)
-    } else {
-      // Update only this generated entry's metadata and preserve all surrounding human edits.
-      const provenanceStart = notesFile.indexOf("- Type: ", markerIndex)
-      const provenanceEnd = provenanceStart >= 0 ? notesFile.indexOf("\n\n", provenanceStart) : -1
-      if (provenanceStart >= 0 && provenanceEnd > provenanceStart) {
-        const metadata = notesFile.slice(provenanceStart, provenanceEnd).split("\n")
-        const statusIndex = metadata.findIndex((line) => line.startsWith("- Status: "))
-        if (statusIndex >= 0) metadata[statusIndex] = "- Status: " + note.status
-        const tagsIndex = metadata.findIndex((line) => line.startsWith("- Tags: "))
-        if (note.tags.length) {
-          if (tagsIndex >= 0) metadata[tagsIndex] = "- Tags: " + note.tags.join(", ")
-          else metadata.push("- Tags: " + note.tags.join(", "))
-        } else if (tagsIndex >= 0) {
-          metadata.splice(tagsIndex, 1)
-        }
-        const nextFile = notesFile.slice(0, provenanceStart) + metadata.join("\n") + notesFile.slice(provenanceEnd)
-        if (nextFile !== notesFile) await writeWorkspaceFile(workspace, "notes.md", nextFile)
-      }
-    }
+    // Reconcile every persisted note under one lock: this both prevents lost updates under
+    // concurrent additions and repairs entries missed by an interrupted previous write.
+    await syncTargetNotesMarkdown(workspace)
 
     return { workspace, note, created: saved.created, updated: saved.updated }
   }
