@@ -72,6 +72,7 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
   const cacheHome = path.join(root, "xdg-cache")
   const stateHome = path.join(root, "xdg-state")
   const secret = "auth-vault-test-password-not-for-storage"
+  const replacement = "auth-vault-replacement-password-not-for-storage"
   const key = "test-only-vault-key-with-more-than-thirty-two-characters"
   const env = Object.fromEntries(Object.entries(process.env).filter(
     (entry): entry is [string, string] => typeof entry[1] === "string",
@@ -93,8 +94,16 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
       password: ${JSON.stringify(secret)},
       targetID: "target_test_123",
     })
+    const updated = await AuthVault.save({
+      origin: "https://example.test",
+      purpose: "target",
+      account: "primary",
+      username: "tester@example.test",
+      password: ${JSON.stringify(replacement)},
+      targetID: "target_test_123",
+    })
     const decoded = await AuthVault.getSecret({
-      id: profile.id, origin: profile.origin, purpose: "target", targetID: "target_test_123",
+      id: updated.id, origin: updated.origin, purpose: "target", targetID: "target_test_123",
     })
     const wrongTarget = await AuthVault.getSecret({
       id: profile.id, origin: profile.origin, purpose: "target", targetID: "other_target",
@@ -113,6 +122,7 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
     })
     console.log(JSON.stringify({
       profile,
+      updatedSameID: updated.id === profile.id,
       decodedPassword: decoded?.password,
       wrongTarget: wrongTarget ?? null,
       listedCount: listed.length,
@@ -136,6 +146,7 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
     expect(exitCode).toBe(0)
     const result = JSON.parse(stdout) as {
       profile: { id: string; origin: string; purpose: string; targetID?: string }
+      updatedSameID: boolean
       decodedPassword: string
       wrongTarget: unknown
       listedCount: number
@@ -145,7 +156,8 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
     expect(result.profile.origin).toBe("https://example.test")
     expect(result.profile.purpose).toBe("target")
     expect(result.profile.targetID).toBe("target_test_123")
-    expect(result.decodedPassword).toBe(secret)
+    expect(result.updatedSameID).toBe(true)
+    expect(result.decodedPassword).toBe(replacement)
     expect(result.wrongTarget).toBeNull()
     expect(result.listedCount).toBe(7)
     expect(result.removed).toBe(true)
@@ -154,6 +166,7 @@ test("AuthVault encrypts secrets at rest, scopes reads, and serializes concurren
     const vaultPath = path.join(dataHome, "cyberstrike", "auth-vault.json")
     const raw = await readFile(vaultPath, "utf8")
     expect(raw).not.toContain(secret)
+    expect(raw).not.toContain(replacement)
     expect(raw).toContain("ciphertext")
     expect((await stat(vaultPath)).mode & 0o777).toBe(0o600)
     expect((await stat(path.dirname(vaultPath))).mode & 0o777).toBe(0o700)
