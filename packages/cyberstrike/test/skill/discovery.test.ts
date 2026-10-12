@@ -85,3 +85,14 @@ describe("Discovery.pull", () => {
     expect(second.sort()).toEqual(first.sort())
   }, 60_000)
 })
+
+
+test("rejects unsafe archive traversal and links", () => {
+  const root = "/tmp/cyberstrike-safe-skill-cache"
+  expect(isSafeArchiveEntry(root, "SKILL.md", "File")).toBe(true)
+  expect(isSafeArchiveEntry(root, "references/guide.md", "File")).toBe(true)
+  expect(isSafeArchiveEntry(root, "../../outside.txt", "File")).toBe(false)
+  expect(isSafeArchiveEntry(root, "/etc/passwd", "File")).toBe(false)
+  expect(isSafeArchiveEntry(root, "escape", "SymbolicLink")).toBe(false)
+  expect(isSafeArchiveEntry(root, "escape", "Link")).toBe(false)
+})
