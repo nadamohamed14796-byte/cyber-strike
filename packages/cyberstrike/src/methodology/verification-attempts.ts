@@ -95,7 +95,10 @@ export namespace VerificationAttempts {
 
   export function decide(input: DecisionInput): Decision {
     const attempts = uniqueAttempts(input.attempts)
-    const attemptsUsed = attempts.length
+    // Only attempts executed under valid preconditions count toward the 20-attempt
+    // false-positive gate. Invalid setup, wrong identity, or out-of-scope attempts
+    // must not consume the verification budget.
+    const attemptsUsed = attempts.filter((attempt) => attempt.validConditions).length
     const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
     const hasDecisiveEvidence = Boolean(input.decisiveEvidenceRef?.trim())
@@ -105,8 +108,17 @@ export namespace VerificationAttempts {
     }
 
     const hasValidDisproof = input.decisiveDisproof && hasDecisiveEvidence && attempts[attempts.length - 1]?.validConditions
-    if (hasValidDisproof) {
-      return { outcome: "disproven", attemptsUsed, remainingAttempts, canContinue: false, reason: "Direct evidence contradicts the hypothesis under valid test conditions." }
+    if (hasValidDisproof && attemptsUsed >= MAX_ATTEMPTS) {
+      return { outcome: "disproven", attemptsUsed, remainingAttempts, canContinue: false, reason: "Direct evidence contradicts the hypothesis after 20 distinct valid verification attempts." }
+    }
+    if (hasValidDisproof && attemptsUsed < MAX_ATTEMPTS) {
+      return {
+        outcome: "inconclusive",
+        attemptsUsed,
+        remainingAttempts,
+        canContinue: true,
+        reason: "Direct evidence currently contradicts the hypothesis, but a false-positive verdict requires 20 distinct valid verification attempts.",
+      }
     }
 
     if (input.blockedReason) {
