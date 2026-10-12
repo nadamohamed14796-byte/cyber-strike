@@ -112,6 +112,9 @@ async function assertPublicDestination(url: URL, resolveHost: ResearchLookup) {
 function hostAllowed(url: URL, source: ResearchSource) {
   return (
     url.protocol === "https:" &&
+    // Research adapters should fetch normal web pages, not arbitrary HTTPS services
+    // exposed on alternate ports by a source hostname.
+    (!url.port || url.port === "443") &&
     !url.username &&
     !url.password &&
     source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))

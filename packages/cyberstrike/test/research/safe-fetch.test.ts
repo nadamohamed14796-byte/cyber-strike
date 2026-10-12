@@ -98,6 +98,22 @@ test("rejects oversized responses even when Content-Length is absent", async () 
   expect(requested).toEqual(["https://research.example/large"])
 })
 
+test("rejects an allowlisted source hostname on a non-standard HTTPS port before fetching", async () => {
+  let requests = 0
+  await withFetch(
+    (async () => {
+      requests++
+      return new Response("must not be fetched")
+    }) as unknown as typeof fetch,
+    async () => {
+      await expect(fetchTest("https://research.example:8443/private", source)).rejects.toThrow(
+        "blocked research host",
+      )
+    },
+  )
+  expect(requests).toBe(0)
+})
+
 test("rejects an initially out-of-scope URL without making a request", async () => {
   let requests = 0
 
