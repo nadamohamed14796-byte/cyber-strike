@@ -10,6 +10,14 @@ const MAX_RETRIES = 2
 
 class NonRetryableResearchError extends Error {}
 
+export function researchSourceHasCredentials(source: Pick<ResearchSource, "id">): boolean {
+  const suffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
+  return Boolean(
+    process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + suffix]?.trim() ||
+    process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + suffix]?.trim(),
+  )
+}
+
 export type ResearchLookup = (hostname: string) => Promise<Array<{ address: string; family: number }>>
 
 const systemRanges: Array<[string, number]> = [

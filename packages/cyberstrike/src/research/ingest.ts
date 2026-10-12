@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { ReportKnowledge } from "../learning/report-knowledge"
 import { RESEARCH_SOURCES, type ResearchSource } from "./sources"
 import { discoverySeeds, sourceDocumentPriority } from "./adapters"
-import { fetchResearchText as fetchText } from "./safe-fetch"
+import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
 const MAX_LINKS_PER_PAGE = 160
 const MAX_CANDIDATE_SCORE = 100
@@ -740,6 +740,14 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
   const limit = Math.max(1, Math.min(input.limit ?? 50, MAX_LIMIT))
   const result = { worker: workerID, claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
+
+  // If the operator has configured a valid source-scoped session since a prior
+  // run, resume only that source's blocked reports automatically. Without credentials,
+  // auth-blocked items remain parked and are never pointlessly fetched on every run.
+  const authReadySources = RESEARCH_SOURCES.filter((source) =>
+    (!input.sourceID || source.id === input.sourceID) && researchSourceHasCredentials(source),
+  )
+  for (const source of authReadySources) ResearchQueue.retryAuthenticationBlocked(100, source.id)
 
   for (let i = 0; i < limit; i++) {
     const item = ResearchQueue.claimNext(workerID, input.sourceID)

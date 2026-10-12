@@ -1,5 +1,5 @@
 import { expect, spyOn, test } from "bun:test"
-import { fetchResearchText, isPublicResearchAddress } from "../../src/research/safe-fetch"
+import { fetchResearchText, isPublicResearchAddress, researchSourceHasCredentials } from "../../src/research/safe-fetch"
 
 const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }]
 function fetchTest(url: string, selectedSource: typeof source = source, resolveHost = publicLookup) {
@@ -320,6 +320,21 @@ test("does not forward source credentials across a same-policy subdomain redirec
     )
     expect(seen[0]?.cookie).toBe("session=private")
     expect(seen[1]?.cookie).toBeNull()
+  } finally {
+    if (prior === undefined) delete process.env[envKey]
+    else process.env[envKey] = prior
+  }
+})
+
+
+test("detects configured source-scoped auth without exposing the credential value", () => {
+  const envKey = "CYBERSTRIKE_RESEARCH_COOKIE_TEST"
+  const prior = process.env[envKey]
+  try {
+    delete process.env[envKey]
+    expect(researchSourceHasCredentials(source)).toBe(false)
+    process.env[envKey] = "  session=private  "
+    expect(researchSourceHasCredentials(source)).toBe(true)
   } finally {
     if (prior === undefined) delete process.env[envKey]
     else process.env[envKey] = prior
