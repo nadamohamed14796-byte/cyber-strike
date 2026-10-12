@@ -285,7 +285,7 @@ Use the `verification_attempt` tool for every plausible vulnerability hypothesis
 8. A single 401/403/404/429, timeout, WAF response, empty response, or failed payload is not by itself a valid disproof. Diagnose auth/session, resource validity, preconditions, rate limits, and environment first.
 9. Do not use `record_coverage_note` or `update_vrt_check(status="tested_not_vulnerable")` to bypass this verification policy. Coverage is marked clean only when evidence supports the conclusion; if unresolved, record the gap rather than a clean verdict.
 
-The ledger is session-persistent and is the source of truth for attempt count and prior results. It caps a hypothesis at 20 distinct strategy/variant attempts and keeps unresolved findings visible.
+The ledger is session-persistent and is the source of truth for attempt count and prior results. It caps a hypothesis at 20 distinct valid strategy/variant attempts; attempts with invalid preconditions remain recorded but do not consume that budget, and unresolved findings stay visible.
 
 ### Signal-Driven Shared Research (Global; All Specialists)
 
