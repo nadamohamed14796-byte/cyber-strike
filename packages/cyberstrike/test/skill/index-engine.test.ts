@@ -49,7 +49,7 @@ Skill body for ${name}.
 
     await addSkill(
       "external-id-metadata",
-      'chains_with: ["T1053.001"]\\nprerequisites: ["SC-8"]',
+      'chains_with: ["T1053.001"]\nprerequisites: ["SC-8"]',
     )
     const nestedControl = path.join(
       tmp.path,
@@ -73,7 +73,7 @@ Skill body for ${name}.
     )
     await addSkill(
       "control-dependent",
-      'chains_with: ["cis-demo-control-v1-1"]\\nprerequisites: ["cis-demo-control-v1-1"]',
+      'chains_with: ["cis-demo-control-v1-1"]\nprerequisites: ["cis-demo-control-v1-1"]',
     )
 
     await Instance.provide({
