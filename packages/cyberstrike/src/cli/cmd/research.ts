@@ -31,7 +31,14 @@ export const ResearchCommand = cmd({
         command: "sources",
         describe: "list configured public research sources",
         async handler() {
-          for (const source of RESEARCH_SOURCES) console.log(source.id + " — " + source.name)
+          for (const source of RESEARCH_SOURCES) {
+            const suffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
+            const cookieEnv = "CYBERSTRIKE_RESEARCH_COOKIE_" + suffix
+            const authEnv = "CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + suffix
+            const configured = Boolean(process.env[cookieEnv]?.trim() || process.env[authEnv]?.trim())
+            console.log(source.id + " — " + source.name + " — session=" + (configured ? "configured" : "not-configured"))
+            if (!configured) console.log("  optional auth: " + cookieEnv + " or " + authEnv)
+          }
         },
       })
       .command({
