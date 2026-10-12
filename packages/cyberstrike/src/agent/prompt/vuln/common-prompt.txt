@@ -243,3 +243,16 @@ Each agent should self-assess applicability:
 - Focus on high-probability vulnerabilities based on request characteristics
 
 Agents are expected to use intelligence and context-awareness, not blindly execute all tests.
+
+### Adaptive Verification Budget — False-Positive Guard
+
+For every plausible vulnerability hypothesis that remains unconfirmed, use up to **20 distinct, evidence-driven verification attempts** before closing it as disproven. This is a maximum budget, not a requirement to waste 20 attempts after decisive proof.
+
+- Maintain a per-hypothesis attempt ledger in your working context: attempt number, strategy ID, input/context variant, rationale, observed signal, evidence reference, and conclusion.
+- Choose each next attempt from the vulnerability class, prerequisites, prior responses, account/role context, and relevant learned knowledge. Every attempt must test a meaningful new angle; do not count identical retries or payload permutations that do not test a different hypothesis.
+- After each result, update the hypothesis and choose the next most informative safe test. Examples include baseline/control comparison, valid-vs-invalid session checks, owner-vs-non-owner authorization comparisons, context-aware execution checks, or bounded timing/concurrency checks when authorized.
+- A 401/403/404/429, timeout, WAF response, empty response, or one failed payload is not sufficient by itself to conclude false positive. First determine whether preconditions were valid and whether the result actually contradicts the hypothesis.
+- Stop early on decisive confirmation, decisive disproof under valid conditions, missing prerequisites, scope/policy limits, target instability, or any safety/rate-limit concern.
+- If 20 distinct attempts are exhausted without decisive evidence, classify the result as **INCONCLUSIVE / NEEDS REVIEW**, not false positive. Attempt count alone never proves absence.
+- Record why any strategy was skipped and why the final verdict follows from evidence. Preserve unresolved candidates so a later session can resume; never silently discard them.
+- Use only in-scope assets and authorized accounts. Prefer non-destructive proofs, do not extract real user secrets, and stop if testing risks service degradation.
