@@ -67,7 +67,11 @@ function isStoredProfile(value: unknown): value is StoredProfile {
   }
 
   if (value.purpose === "target" && (typeof value.targetID !== "string" || !value.targetID.trim())) return false
-  if (value.targetID !== undefined && typeof value.targetID !== "string") return false
+  if (
+    value.targetID !== undefined &&
+    (typeof value.targetID !== "string" || !value.targetID.trim() || value.targetID.length > 128 || /[\\r\\n\\0]/.test(value.targetID))
+  ) return false
+  if (value.purpose === "research" && value.targetID !== undefined) return false
   if (!isRecord(value.password)) return false
   const iv = value.password.iv
   const tag = value.password.tag
@@ -182,12 +186,15 @@ export namespace AuthVault {
     if (account.length > 120 || username.length > 320 || /[\r\n\0]/.test(account) || /[\r\n\0]/.test(username)) {
       throw new Error("Account labels must be one line (maximum 120 characters) and usernames one line (maximum 320 characters).")
     }
-    if (input.purpose === "target" && !input.targetID?.trim()) {
-      throw new Error("Target-purpose credentials must be bound to an explicit targetID to prevent cross-target reuse.")
+    const targetID = input.targetID?.trim() || undefined
+    if (input.purpose === "target" && (!targetID || targetID.length > 128 || /[\\r\\n\\0]/.test(targetID))) {
+      throw new Error("Target-purpose credentials must be bound to a valid stable targetID (maximum 128 characters, one line).")
+    }
+    if (input.purpose === "research" && targetID) {
+      throw new Error("Research profiles cannot be bound to a targetID; use purpose=target for target-scoped accounts.")
     }
     return serializeMutation(async () => {
       const rows = await read()
-      const targetID = input.targetID?.trim()
       const existing = rows.find((row) => row.origin === origin && row.purpose === input.purpose &&
         row.account.toLowerCase() === account.toLowerCase() && row.targetID === targetID)
       const now = Date.now()
