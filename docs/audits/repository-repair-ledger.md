@@ -10,7 +10,7 @@
 
 | ID | Priority | Category | Root cause / evidence | Attempts | Status |
 |---|---|---|---|---:|---|
-| SEC-001 | P1 | Security / path confinement | `packages/cyberstrike/src/skill/discovery.ts` used untrusted skill names and legacy file paths to construct cache destinations; archive extraction also used an unrestricted shell `tar` command. PR #18 contains the intended mitigation but its current CI fails with actual parser errors caused by escaped backticks/interpolation (typecheck run 38202096941) and a missing argument to `get`. | 2 | in_progress |
+| SEC-001 | P1 | Security / path confinement | `packages/cyberstrike/src/skill/discovery.ts` used untrusted skill names and legacy file paths to construct cache destinations; archive extraction also used an unrestricted shell `tar` command. PR #18 contains the intended mitigation but its current CI fails with actual parser errors caused by escaped backticks/interpolation (typecheck run 38202096941) and a missing argument to `get`. | 5 | in_progress |
 | SEC-002 | P2 | Test and type contract | Helper functions are exported as members of the `Discovery` namespace, not as top-level module exports; the first repair iteration imported them incorrectly. CI typecheck exposed this. | 3 | in_progress |
 | INT-001 | P2 | Branch integration | Open PR #11's five skill additions and IDOR skill edit overlap with already merged skill-library batches (#20/#21). The PR is 91 commits behind `main`; do not merge wholesale. Verify any unique remaining content before disposition. | 1 | in_progress |
 | INT-002 | P2 | Branch integration | Open PR #7 contains a broad target-memory / research / auth feature set; PR #17 has already merged an integration branch for target memory, global research learning, and scoped auth profiles. PR #7 is 91 commits behind and 311 commits ahead at its current head, so only a unique-diff review can safely establish whether it is redundant. | 1 | in_progress |
@@ -19,6 +19,7 @@
 
 | FUN-001 | P2 | Archive download integrity | `get()` decoded every response via `response.text()` before writing. Binary gzip tarballs can be corrupted during UTF-8 decoding, so the new safe archive extractor would not reliably receive the original archive bytes. | 1 | in_progress |
 | SEC-003 | P2 | Test/type contract | CI on the archive regression test exposed that `tar.x()` passes an entry union without a guaranteed `.type` property, and TypeScript rejects a Node `Buffer` as a `Response` body. Add runtime type validation and copy fixture bytes to an `ArrayBuffer`. | 1 | in_progress |
+| SEC-004 | P1 | Path normalization | The `tar.x()` filter callback had an over-escaped backslash regex that normalized pairs of backslashes rather than a single Windows path separator. The main resolver's `path.resolve` containment check also protects against escapes, but this defense-in-depth mismatch and single-backslash coverage needed correction. | 1 | in_progress |
 
 ## Baseline verification evidence
 
@@ -52,7 +53,7 @@ The 20 distinct passes have **not** yet been completed. Record each pass only af
 
 | Pass | Audit lens | Status | Evidence / notes |
 |---:|---|---|---|
-| 01 | Repository integrity and completeness | PENDING | Not yet audited in this checkpoint. |
+| 01 | Repository integrity and completeness | PASS_WITH_BLOCKERS | Queried the complete baseline Git tree (`truncated=false`, 19,546 entries, 11,244 blobs). Required `AGENTS.md` and `.gitignore` are present. The local clone is blocked by DNS and no local test runtime is installed. The skill manifest lists 125 WSTG items at flat paths not present in the tree, but runtime skill discovery scans nested `SKILL.md` files and does not consume this manifest; publish-time intent remains unresolved, not mislabeled a runtime defect. |
 | 02 | Architecture and dependency graph | PENDING | Not yet audited in this checkpoint. |
 | 03 | Type safety and runtime contracts | IN_PROGRESS | Full monorepo typecheck has been run on PR #23 heads; two successive CI failures exposed incorrect namespace imports and a tar callback union. Each is recorded as a separate repair attempt; re-run remains pending on the next commit. |
 | 04 | Build and packaging | PENDING | Not yet audited in this checkpoint. |
