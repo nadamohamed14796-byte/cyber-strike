@@ -294,3 +294,34 @@ test("revalidates DNS answers after a redirect", async () => {
   )
   expect(resolution).toBe(2)
 })
+
+
+test("does not forward source credentials across a same-policy subdomain redirect", async () => {
+  const envKey = "CYBERSTRIKE_RESEARCH_COOKIE_TEST"
+  const prior = process.env[envKey]
+  process.env[envKey] = "session=private"
+  const seen: Array<{ url: string; cookie: string | null }> = []
+  const multiHostSource = { ...source, hosts: ["research.example", "sub.research.example"] }
+  try {
+    await withFetch(
+      (async (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : String(input))
+        const headers = new Headers(init?.headers)
+        seen.push({ url: url.toString(), cookie: headers.get("cookie") })
+        if (url.hostname === "research.example") {
+          return new Response(null, { status: 302, headers: { location: "https://sub.research.example/article" } })
+        }
+        return new Response("public report", { status: 200, headers: { "content-type": "text/plain" } })
+      }) as typeof fetch,
+      async () => {
+        await expect(fetchResearchText("https://research.example/start", multiHostSource, publicLookup))
+          .resolves.toBe("public report")
+      },
+    )
+    expect(seen[0]?.cookie).toBe("session=private")
+    expect(seen[1]?.cookie).toBeNull()
+  } finally {
+    if (prior === undefined) delete process.env[envKey]
+    else process.env[envKey] = prior
+  }
+})

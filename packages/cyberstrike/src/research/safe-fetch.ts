@@ -184,8 +184,11 @@ export async function fetchResearchText(url: string, source: ResearchSource, res
           // Optional source-scoped operator credentials are never persisted. Do not auto-register or bypass MFA/CAPTCHA.
           const cookie = process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + sourceSuffix]
           const authorization = process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + sourceSuffix]
-          if (cookie?.trim()) headers.cookie = cookie.trim()
-          if (authorization?.trim()) headers.authorization = authorization.trim()
+          // Do not forward credentials to a different host reached through an allowlisted redirect.
+          if (current.hostname === initial.hostname) {
+            if (cookie?.trim()) headers.cookie = cookie.trim()
+            if (authorization?.trim()) headers.authorization = authorization.trim()
+          }
           const response = await fetch(current, { signal: controller.signal, redirect: "manual", headers })
 
           if (response.status >= 300 && response.status < 400) {
