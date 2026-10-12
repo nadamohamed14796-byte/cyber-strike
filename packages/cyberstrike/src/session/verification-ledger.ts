@@ -85,8 +85,8 @@ export namespace VerificationLedger {
       )
     }
     const priorOutcome = before[before.length - 1]?.outcome
-    if ((priorOutcome === "confirmed" || priorOutcome === "disproven") && input.decisiveResult !== priorOutcome) {
-      throw new Error(`This hypothesis is already ${priorOutcome}; do not continue testing it. Start a new hypothesis_key only for a genuinely different claim.`)
+    if (Policy.isTerminalOutcome(priorOutcome)) {
+      throw new Error(`This hypothesis is already ${priorOutcome}; terminal hypotheses cannot accept more attempts. Start a new hypothesis_key only for a genuinely different claim.`)
     }
     const key = Policy.attemptKey(input.attempt)
     const existing = before.find((item) => Policy.attemptKey(item) === key)
