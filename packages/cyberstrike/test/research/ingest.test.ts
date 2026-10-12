@@ -179,6 +179,8 @@ test("research queue resumes authenticated work and learns cached report text wi
         const authorizationEnv = "CYBERSTRIKE_RESEARCH_AUTHORIZATION_HACKERONE_HACKTIVITY"
         const originalCookie = process.env[cookieEnv]
         const originalAuthorization = process.env[authorizationEnv]
+        const intigritiCookieEnv = "CYBERSTRIKE_RESEARCH_COOKIE_INTIGRITI"
+        const originalIntigritiCookie = process.env[intigritiCookieEnv]
         const indexURL = "https://hackerone.com/hacktivity"
         const reportURL = "https://hackerone.com/reports/123456"
         const otherURL = "https://portswigger.net/web-security/access-control/idor"
@@ -208,11 +210,30 @@ test("research queue resumes authenticated work and learns cached report text wi
           expect(ResearchQueue.find(authSourceID, immediateURL)?.status).toBe("queued")
           // A separate source without configured credentials must remain blocked.
           expect(ResearchQueue.find("portswigger", otherURL)?.status).toBe("blocked_auth")
+
+          // The requested limit is global across authenticated sources, not repeated per source.
+          process.env[intigritiCookieEnv] = "session=operator-provided-test-value"
+          const budgetRows = [
+            { sourceID: authSourceID, sourceURL: "https://hackerone.com/reports/budget-a-" + marker },
+            { sourceID: authSourceID, sourceURL: "https://hackerone.com/reports/budget-b-" + marker },
+            { sourceID: "intigriti", sourceURL: "https://intigriti.com/reports/budget-a-" + marker },
+            { sourceID: "intigriti", sourceURL: "https://intigriti.com/reports/budget-b-" + marker },
+          ]
+          for (const row of budgetRows) {
+            ResearchQueue.blockAuthentication({ ...row, reason: "HTTP 401" })
+          }
+          expect(await retryAuthenticatedResearch({ limit: 1, retryImmediately: true })).toBe(1)
+          const retriedRows = budgetRows.filter((row) =>
+            ResearchQueue.find(row.sourceID, row.sourceURL)?.status !== "blocked_auth",
+          )
+          expect(retriedRows).toHaveLength(1)
         } finally {
           if (originalCookie === undefined) delete process.env[cookieEnv]
           else process.env[cookieEnv] = originalCookie
           if (originalAuthorization === undefined) delete process.env[authorizationEnv]
           else process.env[authorizationEnv] = originalAuthorization
+          if (originalIntigritiCookie === undefined) delete process.env[intigritiCookieEnv]
+          else process.env[intigritiCookieEnv] = originalIntigritiCookie
         }
       } finally {
         globalThis.fetch = originalFetch
