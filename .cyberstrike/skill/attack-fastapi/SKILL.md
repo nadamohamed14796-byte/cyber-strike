@@ -99,7 +99,7 @@ Trace the dependency and handler in source, keep a minimal sanitized request/res
 | Response model | Sensitive fields excluded from response | Non-public field leaks to unauthorized test user |
 | OpenAPI/docs | Policy for schema visibility | Actual secret/private data exposure, not schema alone |
 | Background task | Enqueue and result retrieval authorization | Another test identity can access synthetic job output |
-| SSRF/upload sink | URL allowlist, file handling, parser | Controlled safe lab/test case proves boundary crossed |
+| SSRF/upload sink | URL allowlist, file handling, parser | Controlled safe, minimal test case proves boundary crossed |
 
 **Mitigation:** centralize dependencies, enforce object/tenant authorization in services, use strict request models, constrain response fields, protect diagnostics, and bind background job IDs to owners.
 
