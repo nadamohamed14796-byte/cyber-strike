@@ -101,6 +101,16 @@ describe("VerificationAttempts", () => {
     expect(result.canContinue).toBe(true)
   })
 
+  test("hypothesis identity rejects endpoint mismatches, including missing endpoints", () => {
+    const endpointSpecific = { asset: "https://example.test", endpoint: "/api/profile", vulnerabilityClass: "idor" }
+    const endpointless = { asset: "https://example.test", endpoint: undefined, vulnerabilityClass: "idor" }
+    const sameEndpoint = { ...endpointSpecific, endpoint: "/api/profile" }
+    expect(VA.sameHypothesisIdentity(endpointSpecific, endpointless)).toBe(false)
+    expect(VA.sameHypothesisIdentity(endpointSpecific, sameEndpoint)).toBe(true)
+    expect(VA.sameHypothesisIdentity(endpointSpecific, { ...sameEndpoint, asset: "https://other.test" })).toBe(false)
+    expect(VA.sameHypothesisIdentity(endpointSpecific, { ...sameEndpoint, vulnerabilityClass: "xss" })).toBe(false)
+  })
+
   test("blocked prerequisites stop safely without false-positive verdict", () => {
     const result = VA.decide({
       attempts: [attempt("auth-check", "missing-credential", false)],
