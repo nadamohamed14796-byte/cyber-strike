@@ -240,3 +240,42 @@ test("automatic auth retry cooldown prevents every watch cycle from refetching i
     },
   })
 })
+
+
+test("research queue survives an application restart and resumes cached report work", async () => {
+  await using dir = await tmpdir({ git: true })
+  const sourceID = "portswigger"
+  const sourceURL = "https://portswigger.net/web-security/access-control/idor"
+  let sequence = 0
+
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const row = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Persisted IDOR report",
+        payload: { cached_text: "sanitized report body", content_fingerprint: "stable-fingerprint" },
+      })
+      sequence = row.sequence
+      expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("queued")
+      await Instance.dispose()
+    },
+  })
+
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const resumed = ResearchQueue.find(sourceID, sourceURL)
+      expect(resumed?.sequence).toBe(sequence)
+      expect(resumed?.status).toBe("queued")
+      expect(resumed?.payload?.cached_text).toBe("sanitized report body")
+      expect(resumed?.payload?.content_fingerprint).toBe("stable-fingerprint")
+      const claimed = ResearchQueue.claimNext("restart-worker", sourceID)
+      expect(claimed?.sequence).toBe(sequence)
+      expect(claimed?.status).toBe("studying")
+      expect(claimed?.payload?.cached_text).toBe("sanitized report body")
+      await Instance.dispose()
+    },
+  })
+})
