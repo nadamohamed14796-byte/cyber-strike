@@ -196,16 +196,6 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
     }
     return true
   }
-  if (source.id === "medium") {
-    const segments = path.split("/").filter(Boolean)
-    if (
-      path.startsWith("/@") ||
-      (segments.length >= 2 &&
-        !/^(tag|me|membership|about|help|search|plans|topics|media|home|latest)$/i.test(segments[0]))
-    ) {
-      return true
-    }
-  }
   if (
     /\/reports?\b|\/hacktivity\b|\/writeups?\b|\/research\b|\/blog\b|\/articles?\b|\/labs?\b|\/disclos|\/advisories?\b|\/learn\b|\/academy\b|\/techniques?\b|\/payloads?\b|\/cheats?heets?\b|\/blob\/|\/tree\//.test(
       path,
