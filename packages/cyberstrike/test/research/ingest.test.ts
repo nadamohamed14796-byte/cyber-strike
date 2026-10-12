@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
-import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthenticatedResearch } from "../../src/research/ingest"
+import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
@@ -169,63 +169,54 @@ test("learning queue floors non-integer item limits instead of exceeding the req
   })
 })
 
-test("authenticated research retries enforce one global budget across configured sources", async () => {
-  const marker = crypto.randomUUID()
-  const templateIDs = ["hackerone-hacktivity", "intigriti"]
-  const templates = templateIDs.map((id) => RESEARCH_SOURCES.find((source) => source.id === id))
-  if (templates.some((source) => !source)) throw new Error("required authenticated research source is not configured")
-  const syntheticSources = templates.map((source, index) => ({
-    ...source!,
-    id: templateIDs[index] + "-budget-test-" + marker,
-    name: source!.name + " budget test",
-    seedUrls: [],
-  }))
-  const credentialEnvs = syntheticSources.map((source) =>
-    "CYBERSTRIKE_RESEARCH_COOKIE_" + source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_"),
-  )
-  const originals = new Map(credentialEnvs.map((name) => [name, process.env[name]]))
-  for (const name of credentialEnvs) process.env[name] = "session=operator-provided-test-value"
-  RESEARCH_SOURCES.push(...syntheticSources)
-
-  try {
-    const urls = syntheticSources.map((source) => ({
-      sourceID: source.id,
-      url: "https://" + source.hosts[0] + "/budget-test/" + marker,
-    }))
-    for (const item of urls) {
-      ResearchQueue.blockAuthentication({
-        sourceID: item.sourceID,
-        sourceURL: item.url,
-        title: "Auth retry budget " + marker,
-        reason: "HTTP 401",
-        payload: { crawl_page: true },
-      })
-      const row = ResearchQueue.find(item.sourceID, item.url)
-      if (!row) throw new Error("failed to create auth-blocked research fixture")
-      Database.use((db) =>
-        db.update(ResearchQueueTable)
-          .set({ updated_at: Date.now() - 15 * 60_000 })
-          .where(eq(ResearchQueueTable.sequence, row.sequence))
-          .run(),
-      )
-    }
-
-    // Call the real retry coordinator directly: a worker call could also claim an
-    // unrelated queued report from the shared test database after retries finish.
-    expect(await retryAuthenticatedResearch({ limit: 1 })).toBe(1)
-    const statuses = urls.map((item) => ResearchQueue.find(item.sourceID, item.url)?.status)
-    expect(statuses.filter((status) => status === "discovered")).toHaveLength(1)
-    expect(statuses.filter((status) => status === "blocked_auth")).toHaveLength(1)
-  } finally {
-    for (const source of syntheticSources) {
-      const index = RESEARCH_SOURCES.indexOf(source)
-      if (index >= 0) RESEARCH_SOURCES.splice(index, 1)
-    }
-    for (const [name, original] of originals) {
-      if (original === undefined) delete process.env[name]
-      else process.env[name] = original
-    }
+test("authenticated research retries enforce one global budget across configured sources", () => {
+  const sources = [
+    { id: "hackerone-hacktivity", hasCredentials: true },
+    { id: "intigriti", hasCredentials: true },
+    { id: "portswigger", hasCredentials: false },
+  ]
+  const calls: Array<{ limit: number; sourceID: string; minAgeMs: number }> = []
+  const retry = (limit: number, sourceID: string, minAgeMs: number) => {
+    calls.push({ limit, sourceID, minAgeMs })
+    return 1
   }
+
+  const total = retryAuthBlockedWithBudget(
+    sources,
+    1,
+    (source) => source.hasCredentials,
+    retry,
+    10 * 60_000,
+  )
+
+  expect(total).toBe(1)
+  expect(calls).toEqual([
+    { limit: 1, sourceID: "hackerone-hacktivity", minAgeMs: 10 * 60_000 },
+  ])
+})
+
+test("authenticated research retry budget continues when an eligible source has nothing to retry", () => {
+  const sources = [
+    { id: "source-empty", hasCredentials: true },
+    { id: "source-with-work", hasCredentials: true },
+  ]
+  const calls: Array<{ limit: number; sourceID: string }> = []
+  const total = retryAuthBlockedWithBudget(
+    sources,
+    1,
+    (source) => source.hasCredentials,
+    (limit, sourceID) => {
+      calls.push({ limit, sourceID })
+      return sourceID === "source-with-work" ? 1 : 0
+    },
+    10 * 60_000,
+  )
+
+  expect(total).toBe(1)
+  expect(calls).toEqual([
+    { limit: 1, sourceID: "source-empty" },
+    { limit: 1, sourceID: "source-with-work" },
+  ])
 })
 test("research queue resumes authenticated work and learns cached report text without a second fetch", async () => {
   await using dir = await tmpdir({ git: true })
