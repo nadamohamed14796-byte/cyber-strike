@@ -41,6 +41,8 @@ test("shared research retrieval uses signal tags and excludes target-specific re
 
       expect(shared).not.toBeNull()
       expect(targetSpecific).not.toBeNull()
+      expect(ReportKnowledge.externalSourceURLs()).toContain("https://research.example.test/reports/js-api-sourcemap")
+      expect(ReportKnowledge.externalSourceURLs()).toContain("https://research.example.test/reports/private-route")
 
       const matches = ReportKnowledge.recommendations({ signal: "javascript-client", limit: 5 })
       expect(matches.some((row) => row.id === shared?.id)).toBe(true)

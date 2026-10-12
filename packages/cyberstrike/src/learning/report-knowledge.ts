@@ -183,6 +183,17 @@ export namespace ReportKnowledge {
 
   export type IngestExternalResult = { id: string; created: boolean }
 
+  /** Return URLs already represented in the global external-report knowledge store. */
+  export function externalSourceURLs(): string[] {
+    return Database.use((db) =>
+      db.select({ source_url: ReportKnowledgeTable.source_url })
+        .from(ReportKnowledgeTable)
+        .where(eq(ReportKnowledgeTable.source_kind, "external_report"))
+        .all()
+        .flatMap((row) => row.source_url ? [row.source_url] : []),
+    )
+  }
+
   export function ingestExternalDetailed(input: {
     title: string
     severity: string

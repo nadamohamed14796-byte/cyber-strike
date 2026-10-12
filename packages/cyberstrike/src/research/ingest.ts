@@ -606,6 +606,15 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
   if (!sources.length) throw new Error("unknown research source: " + input.sourceID)
   const maxPages = Math.max(1, Math.min(input.pages ?? 100, MAX_PAGES))
   const maxDepth = Math.max(0, Math.min(input.depth ?? 2, MAX_DEPTH))
+  // Backfill-aware dedupe: older versions learned reports directly into ReportKnowledge
+  // before the durable queue existed. Do not download those URLs again just because
+  // they have no corresponding queue row.
+  const knownKnowledgeURLs = new Set(
+    ReportKnowledge.externalSourceURLs().flatMap((value) => {
+      const normalized = normalizeUrl(value)
+      return normalized ? [normalized] : []
+    }),
+  )
   const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; errors: string[] }> = []
 
   for (const source of sources) {
@@ -639,7 +648,9 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       const current = queue.shift()!
       if (visited.has(current.url)) continue
       visited.add(current.url)
-      if (current.depth > 0 && isResearchCandidate(current.url, source) && ResearchQueue.find(source.id, current.url)) continue
+      if (current.depth > 0 && isResearchCandidate(current.url, source)) {
+        if (ResearchQueue.find(source.id, current.url) || knownKnowledgeURLs.has(current.url)) continue
+      }
       pages++
       try {
         const html = await fetchText(current.url, source)
