@@ -13,6 +13,7 @@ import { Tool } from "./tool"
 import { Session } from "../session"
 import { Request } from "../session/request"
 import { WebCredential, COMMON_AUTH_HEADERS } from "../session/web/web-credential"
+import { credentialForSession } from "../session/web/credential-scope"
 import { HttpMessage } from "../replay/message"
 import { Apply } from "../replay/apply"
 import { Send } from "../replay/send"
@@ -249,8 +250,8 @@ function applyCredential(
   credentialID: string,
   sessionID: string,
 ): HttpMessage.Request | { error: string } {
-  const cred = WebCredential.getById(credentialID)
-  if (!cred || cred.session_id !== sessionID) {
+  const cred = credentialForSession(WebCredential.getById(credentialID), sessionID)
+  if (!cred) {
     return { error: `Credential "${credentialID}" not found in this session or belongs to another session.` }
   }
   let out = stripAuthHeaders(msg)
