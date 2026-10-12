@@ -562,6 +562,8 @@ export async function syncResearchSource(
   }
 }
 
+const RESEARCH_SOURCE_CONCURRENCY = 4
+
 export async function syncResearch(input: { sourceID?: string } & ResearchSyncOptions = {}) {
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   if (sources.length === 0) throw new Error("unknown research source: " + input.sourceID)
