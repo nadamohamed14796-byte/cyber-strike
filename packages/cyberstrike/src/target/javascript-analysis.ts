@@ -95,6 +95,8 @@ function addConcatenatedPathParameters(
 ): NonNullable<ReturnType<typeof normalizeEndpoint>> {
   const first = expression.match(/(['"\x60])([^'"\x60]{1,2048})\1/)
   if (!first || first.index === undefined) return endpoint
+  // A concatenation after ? or # belongs to query/fragment data, not the route path.
+  if (first[2]!.includes("?") || first[2]!.includes("#")) return endpoint
   let path = endpoint.path
   let rest = expression.slice(first.index + first[0].length)
   const pathParameters = [...endpoint.pathParameters]
@@ -102,7 +104,9 @@ function addConcatenatedPathParameters(
     const dynamic = rest.match(/^\s*\+\s*(?:(?:encodeURIComponent|String|Number)\s*\(\s*)?([A-Za-z_$][\w$]*)(?:\s*\))?/)
     if (!dynamic) break
     const name = dynamic[1]!
-    path = path.endsWith("/") ? path + "{" + name + "}" : path + "/{" + name + "}"
+    // Infer a new path segment only when the source explicitly includes its separator.
+    if (!path.endsWith("/")) break
+    path += "{" + name + "}"
     pathParameters.push(name)
     rest = rest.slice(dynamic[0].length)
     const staticPart = rest.match(/^\s*\+\s*(['"\x60])([^'"\x60]{0,500})\1/)
@@ -121,9 +125,10 @@ function addConcatenatedPathParameters(
   }
 }
 
-function findCallEnd(source: string, start: number): number {
+function findCallEnd(source: string, start: number, maxLength = 7000): number {
   let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false
-  for (let i = start; i < source.length; i++) {
+  const limit = Math.min(source.length, start + maxLength)
+  for (let i = start; i < limit; i++) {
     const ch = source[i]!, next = source[i + 1]
     if (lineComment) { if (ch === "\n") lineComment = false; continue }
     if (blockComment) { if (ch === "*" && next === "/") { blockComment = false; i++ }; continue }
@@ -223,7 +228,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       : isFetch ? args.slice(1).join(",") : /\.(?:get|head|options|delete)$/i.test(callee) ? args.slice(1).join(",") : args.slice(2).join(",")
     const optionText = options + "\n" + source.slice(index, Math.min(close + 1, index + 7000))
     const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
-    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : undefined) ?? "").toUpperCase() || null
+    const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : isFetch ? "GET" : undefined) ?? "").toUpperCase() || null
     const headers = [
       ...Array.from(optionText.matchAll(/\bheaders\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1]!)).flat(),
       ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
