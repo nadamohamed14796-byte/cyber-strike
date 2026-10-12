@@ -28,6 +28,9 @@ export class RepeatDetector {
    * reaches the limit again after a nudge (backstop). "ok" otherwise.
    */
   observe(signatures: string[]): RepeatVerdict {
+    // A nudge triggered by this step must not turn another signature in the same
+    // step into an abort. Only a nudge from a prior step permits aborting now.
+    const wasNudgedBefore = this.nudged
     let verdict: RepeatVerdict = "ok"
     // Count each distinct signature at most ONCE per step: this detector measures
     // CROSS-turn repetition, so a within-turn burst of k identical calls (already
@@ -36,11 +39,11 @@ export class RepeatDetector {
       const n = (this.counts.get(sig) ?? 0) + 1
       this.counts.set(sig, n)
       if (n >= this.limit) {
-        if (this.nudged) {
+        if (wasNudgedBefore) {
           verdict = "abort"
-        } else if (verdict !== "abort") {
+        } else {
           this.nudged = true
-          verdict = "nudge"
+          if (verdict !== "abort") verdict = "nudge"
         }
       }
     }
