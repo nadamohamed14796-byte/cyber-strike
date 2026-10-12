@@ -127,8 +127,14 @@ export namespace VerificationLedger {
     }
 
     const all = list({ sessionID, hypothesisKey })
+    // Put the evidence-bearing attempt last for the policy's precondition gate,
+    // without changing the distinct-attempt count.
+    const decisionAttempts = [
+      ...all.filter((item) => Policy.attemptKey(item) !== key),
+      input.attempt,
+    ]
     const decision = Policy.decide({
-      attempts: all,
+      attempts: decisionAttempts,
       decisiveConfirmation: input.decisiveResult === "confirmed" && Boolean(input.attempt.evidenceRef?.trim()),
       decisiveDisproof: input.decisiveResult === "disproven" && input.attempt.validConditions && Boolean(input.attempt.evidenceRef?.trim()),
       blockedReason: input.blockedReason,
