@@ -65,8 +65,8 @@ export namespace VerificationLedger {
       throw new Error("strategy_id and variant_key must not be empty")
     }
 
-    if (input.decisiveResult === "confirmed" && !input.attempt.evidenceRef?.trim()) {
-      throw new Error("A decisive confirmed verdict requires evidence_ref")
+    if (input.decisiveResult === "confirmed" && (!input.attempt.validConditions || !input.attempt.evidenceRef?.trim())) {
+      throw new Error("A decisive confirmed verdict requires valid_conditions=true and evidence_ref")
     }
     if (input.decisiveResult === "disproven" && (!input.attempt.validConditions || !input.attempt.evidenceRef?.trim())) {
       throw new Error("A disproven verdict requires valid_conditions=true and evidence_ref")
