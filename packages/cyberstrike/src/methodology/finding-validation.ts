@@ -105,7 +105,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
   for (const attempt of attempts) {
     const strategy = String(attempt.strategy).trim()
     const checkID = String(attempt.checkID).trim()
-    const variation = String(attempt.variation).trim().toLowerCase()
+    const variation = String(attempt.variation).trim().toLowerCase().replace(/\s+/g, " ")
     if (!ATTEMPT_STRATEGIES.has(attempt.strategy) || !strategy || !checkID || !FINDING_VALIDATION_CHECKS.some((check) => check.id === checkID) || !["supports", "contradicts", "inconclusive"].includes(attempt.outcome) || !variation || !attempt.hypothesis.trim() || !attempt.evidence.trim()) {
       throw new Error("Every validation attempt requires a strategy, unique variation, hypothesis, and concrete observed evidence.")
     }
