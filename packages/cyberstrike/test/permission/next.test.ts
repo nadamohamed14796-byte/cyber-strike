@@ -687,3 +687,13 @@ test("ask - allows all patterns when all match allow rules", async () => {
     },
   })
 })
+
+
+test("disabled - warns about unmatched permission keys without changing decisions", () => {
+  const result = PermissionNext.disabled(["bash", "read"], [
+    { permission: "unused-test-tool-key", pattern: "*", action: "deny" },
+    { permission: "bash", pattern: "*", action: "deny" },
+  ])
+  expect(result.has("bash")).toBe(true)
+  expect(result.has("read")).toBe(false)
+})
