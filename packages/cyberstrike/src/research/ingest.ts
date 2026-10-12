@@ -393,7 +393,9 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
       2400,
     ),
     affectedComponents: matchingSentences(
-      text,
+      // Include title metadata too: the article may name "API" only in its title
+      // while the body contains a lowercase URL path such as /api/objects/123.
+      fullText,
       /endpoint|route|parameter|header|cookie|token|API|function|component|feature|source map|javascript|upload|workflow/i,
       5,
       1400,
