@@ -47,6 +47,33 @@ test("Medium source relevance rejects off-topic content but retains bounty write
   ).toBe(false)
 })
 
+test("source exclusions apply even when a source has no include-term policy", () => {
+  const { includeTerms: _includeTerms, ...base } = trickster0
+  const exclusionOnlySource = {
+    ...base,
+    id: "exclusion-only-test",
+    excludeTerms: ["career advice"],
+  }
+
+  expect(
+    sourceRelevance(
+      "https://example.test/articles/post",
+      "Career advice for beginners",
+      "A general career advice article with no vulnerability research.",
+      exclusionOnlySource,
+    ).accepted,
+  ).toBe(false)
+
+  expect(
+    sourceRelevance(
+      "https://example.test/articles/post",
+      "A technical article",
+      "A technical article with no excluded terms.",
+      exclusionOnlySource,
+    ).accepted,
+  ).toBe(true)
+})
+
 test("does not classify root landing pages or all-labs indexes as learnable articles", () => {
   expect(isIndexLikeResearchUrl("https://trickster0.medium.com/")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/all-labs")).toBe(true)
