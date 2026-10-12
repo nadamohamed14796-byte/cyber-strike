@@ -124,7 +124,10 @@ export namespace Discovery {
         file: archive,
         strict: true,
         onReadEntry(entry) {
-          if ("path" in entry && "type" in entry) entries.push({ path: entry.path, type: entry.type })
+          const item = entry as { path?: unknown; type?: unknown }
+          if (typeof item.path === "string" && typeof item.type === "string") {
+            entries.push({ path: item.path, type: item.type })
+          }
         },
       })
     } catch (err) {
