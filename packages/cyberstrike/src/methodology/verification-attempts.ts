@@ -65,7 +65,7 @@ export namespace VerificationAttempts {
     const attemptsUsed = attempts.length
     const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
-    if (input.decisiveConfirmation) {
+    if (input.decisiveConfirmation && attempts.some((attempt) => attempt.validConditions)) {
       return { outcome: "confirmed", attemptsUsed, remainingAttempts, canContinue: false, reason: "Decisive evidence supports the vulnerability hypothesis." }
     }
 
