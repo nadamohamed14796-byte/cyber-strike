@@ -34,6 +34,11 @@ export namespace VerificationAttempts {
       a.vulnerabilityClass.trim().toLowerCase() === b.vulnerabilityClass.trim().toLowerCase()
   }
 
+  /** Confirmed/disproven hypotheses are terminal and cannot accept more attempts. */
+  export function isTerminalOutcome(outcome: Outcome | undefined): boolean {
+    return outcome === "confirmed" || outcome === "disproven"
+  }
+
   export interface DecisionInput {
     attempts: Attempt[]
     /** Evidence directly supports the stated vulnerability hypothesis. */
