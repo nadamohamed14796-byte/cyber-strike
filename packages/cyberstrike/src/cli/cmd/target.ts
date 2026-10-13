@@ -1,6 +1,7 @@
 import type { Argv } from "yargs"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { parseScopeFileContents } from "../../target/scope-file"
 import { cmd } from "./cmd"
 import { Instance } from "../../project/instance"
 import { TargetMemory, type TargetAssetType, type TargetNoteKind, type TargetNoteStatus } from "../../target"
@@ -100,15 +101,11 @@ const TargetScopeCommand = cmd({
             } catch (error) {
               throw new Error("Cannot read scope file " + filePath + ": " + (error instanceof Error ? error.message : String(error)))
             }
-            fileEntries = contents
-              .split(/\r?\n/)
-              .map((line, index) => ({ line: index + 1, value: line.trim() }))
-              .filter(({ value }) => value.length > 0 && !value.startsWith("#") && !value.startsWith("//"))
-              .map(({ line, value }) => {
-                if (/\s/.test(value)) throw new Error("Invalid scope file entry at line " + line + ": entries must be one domain, wildcard, or IPv4 CIDR per line.")
-                return value
-              })
-            if (!fileEntries.length) throw new Error("Scope file contains no usable entries: " + filePath)
+            try {
+              fileEntries = parseScopeFileContents(contents)
+            } catch (error) {
+              throw new Error((error instanceof Error ? error.message : String(error)) + " File: " + filePath)
+            }
           }
           const includeEntries = [...(args.include ?? []), ...fileEntries]
           const result = await TargetMemory.configureScope(args.url, {
