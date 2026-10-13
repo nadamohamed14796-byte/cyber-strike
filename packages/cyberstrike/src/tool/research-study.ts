@@ -339,27 +339,20 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
       continue
     }
 
-    const excerpt = typeof metadata.excerpt === "string"
+    const storedExcerpt = typeof metadata.excerpt === "string"
       ? redactResearchSecrets(metadata.excerpt).slice(0, 100_000)
       : ""
-    if (excerpt.trim().length < 250) {
-      result.skipped++
-      ReportKnowledge.markModelStudyCompleted({
-        id: row.id,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "skipped",
-        reason: "no sufficiently long sanitized source excerpt is stored",
-      })
-      continue
-    }
-
-    const contentLength = typeof metadata.content_length === "number" && Number.isFinite(metadata.content_length)
+    const hasCachedExcerpt = storedExcerpt.trim().length >= 250
+    // Empty/short legacy excerpts trigger the existing source-scoped safe fetch
+    // on action=next; stale partial text must not suppress that refetch.
+    const excerpt = hasCachedExcerpt ? storedExcerpt : ""
+    const contentLength = hasCachedExcerpt && typeof metadata.content_length === "number" && Number.isFinite(metadata.content_length)
       ? Math.max(excerpt.length, metadata.content_length)
       : excerpt.length
     const storedFingerprint = metadata.content_fingerprint
-    const contentFingerprint = typeof storedFingerprint === "string" && /^[a-f0-9]{40}$/i.test(storedFingerprint)
+    const contentFingerprint = hasCachedExcerpt && typeof storedFingerprint === "string" && /^[a-f0-9]{40}$/i.test(storedFingerprint)
       ? storedFingerprint
-      : createHash("sha256").update(excerpt).digest("hex").slice(0, 40)
+      : ""
 
     const queued = ResearchQueue.enqueueForModelStudy({
       sourceID: source.id,
@@ -373,7 +366,7 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
         cached_text: excerpt,
         content_length: contentLength,
         content_fingerprint: contentFingerprint,
-        cached_text_truncated: metadata.content_truncated_for_learning === true || contentLength > excerpt.length,
+        cached_text_truncated: hasCachedExcerpt && (metadata.content_truncated_for_learning === true || contentLength > excerpt.length),
         crawl_depth: typeof metadata.crawl_depth === "number" ? metadata.crawl_depth : 0,
         legacy_knowledge_id: row.id,
       },
