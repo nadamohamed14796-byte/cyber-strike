@@ -22,7 +22,11 @@ After receiving the report output:
 1. Read the compiled Markdown carefully
 2. Write all three AI sections based on the actual findings data
 3. Replace each `<!-- AI: ... -->` placeholder with your written content
-4. Save the final report using the `write` tool to `.cyberstrike/reports/report-<timestamp>.md`
+4. Resolve the canonical workspace with `cyberstrike target tree <parent-url>` and save the final report using the `write` tool:
+   - A report containing only one child asset's findings belongs in that child's `reports/report-<timestamp>.md`.
+   - A program-wide or multi-asset report belongs in the parent workspace's `reports/report-<timestamp>.md`; keep each finding's affected host/endpoint explicit.
+   - Use `.cyberstrike/reports/report-<timestamp>.md` only when no canonical target workspace exists.
+   Do not put a child-only report in the parent folder or mix several assets into one child report. The generated data is session-level unless the included content has been explicitly scoped to a single asset.
 
 Do NOT skip the AI sections. They are the most valuable part of the report — the deterministic data is compiled automatically, but the executive analysis requires your reasoning.
 
