@@ -520,6 +520,7 @@ export namespace Agent {
             web_get_detail: "allow",
             web_get_vulnerabilities: "allow",
             web_get_vuln_detail: "allow",
+            triage_vulnerability: "allow",
             research_knowledge: "allow",
             target_note: "allow",
             get_coverage_notes: "allow",
