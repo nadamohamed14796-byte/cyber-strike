@@ -72,6 +72,14 @@ IMPORTANT:
 
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
+const TARGET_WORKSPACE_WORKFLOW_PROMPT = [
+  "MANDATORY TARGET WORKSPACE AND PERSISTENCE RULES:",
+  "When the task involves a named target/program, scope file, domains/subdomains, reconnaissance, vulnerability hunting, or target-specific artifacts, first inspect target_workspace(action=\"show\", target_url=...) or target_workspace(action=\"list\"). If the root workspace does not exist, call target_workspace(action=\"init\", target_url=\"<stable root/program target>\") before recon or active testing.",
+  "Use only the exact absolute workspace path returned by target_workspace. Do not invent /root/targets, a random output folder, or rely on the current shell directory. Save text/JSON/CSV outputs with target_artifact in the root workspace or the matching asset workspace; save durable semantic notes with target_note. Do not claim a save succeeded unless the tool confirms it and the output path is verified.",
+  "Initialization is not authorization. Inspect the official policy and configure the persisted scope only with target_workspace(action=\"configure_scope\", include=[...], exclude=[...], authorization_source=..., authorization_reference=\"https://...\"). If policy/scope is unknown, leave it unconfigured and do not perform active tests. Call scope_check with target_url for every candidate before active requests.",
+  "For large scope files, preserve the input in the root workspace, process bounded chunks, and checkpoint run progress in runs/. Keep the root workspace as the parent; create child workspaces nested under assets/ only as hosts are validated/processed, not for every unvalidated input line.",
+  "Keep target-specific facts, evidence, notes and reports inside the relevant workspace. Global writeup methodology belongs in global research storage, not target notes. Keep exclusions, provenance and secrets redacted. Record failures/partial runs honestly.",
+].join(\"\\n\")
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
 
@@ -785,14 +793,19 @@ export namespace SessionPrompt {
       const targetMemoryCtx = TargetMemory.contextForSession(Session.root(sessionID))
       if (targetMemoryCtx) system.push(targetMemoryCtx)
 
-      // Public research recommendations are advisory only and come from SQLite; no network fetch occurs during prompting.
-      const userSignalText = (lastUserMsg?.parts ?? [])
+      // Keep the contract available even when the engagement runs from a directory without
+      // an AGENTS.md. Search recent user turns so terse follow-ups still retain target intent.
+      const targetTaskText = msgs
+        .filter((msg) => msg.info.role === "user")
+        .flatMap((msg) => msg.parts)
         .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
         .map((part) => part.type === "text" ? part.text : "")
         .join(" ")
-        .slice(0, 4000)
-      const researchContext = ResearchContext.generate(Session.root(sessionID), userSignalText)
-      if (researchContext) system.push(researchContext)
+        .slice(-12000)
+      const targetWorkflowRequested =
+        /\b(target|scope|subdomains?|hosts?|recon(?:naissance)?|bug\s*bounty|pentest|penetration\s*test|hunting|asset\s*inventory|evidence|finding|report)\b/i.test(targetTaskText) ||
+        (/\.(?:txt|list|csv)\b/i.test(targetTaskText) && /\b(domain|host|scope|subdomain)\b/i.test(targetTaskText))
+      if (targetWorkflowRequested || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
 
       // Inject MCP tool availability info so the LLM knows to use tool_search
       const mcpLazyStats = LazyToolRegistry.stats()
