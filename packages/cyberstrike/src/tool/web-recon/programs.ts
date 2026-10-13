@@ -1,5 +1,7 @@
-import { safeFetch, extractLocs } from "./shared"
+import { safeFetch, extractLocs, type ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
+
+type FetchOptions = NonNullable<Parameters<typeof safeFetch>[1]>
 
 // ---------------------------------------------------------------------------
 // sitemap_scan
@@ -7,7 +9,9 @@ import type { Finding, WebReconResult } from "./shared"
 
 const MAX_CHILD_SITEMAPS = 20
 
-export async function sitemapScan(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function sitemapScan(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Scanning sitemaps for ${target}`]
   const origin = new URL(target).origin
@@ -17,7 +21,7 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
   let foundAt = ""
 
   for (const path of candidates) {
-    const resp = await safeFetch(origin + path, { timeout })
+    const resp = await fetchScoped(origin + path, { timeout })
     if (!resp || resp.status !== 200 || !resp.text.includes("<")) continue
 
     foundAt = origin + path
@@ -39,7 +43,7 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
           childUrl.username ||
           childUrl.password
         ) continue
-        const childResp = await safeFetch(childUrl.href, { timeout })
+        const childResp = await fetchScoped(childUrl.href, { timeout })
         if (!childResp || childResp.status !== 200) continue
         for (const loc of extractLocs(childResp.text)) pages.add(loc)
         fetched++
@@ -82,12 +86,14 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
 // robots_scan
 // ---------------------------------------------------------------------------
 
-export async function robotsScan(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function robotsScan(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Scanning robots.txt for ${target}`]
   const origin = new URL(target).origin
 
-  const resp = await safeFetch(origin + "/robots.txt", { timeout })
+  const resp = await fetchScoped(origin + "/robots.txt", { timeout })
   if (!resp || resp.status !== 200) {
     output.push("[-] No robots.txt found")
     return { output: output.join("\n"), findings }
@@ -154,13 +160,15 @@ const SPEC_CANDIDATES = [
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "head", "options"])
 
-export async function openapiScan(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function openapiScan(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Probing for OpenAPI/Swagger specs at ${target}`]
   const origin = new URL(target).origin
 
   for (const path of SPEC_CANDIDATES) {
-    const resp = await safeFetch(origin + path, { timeout })
+    const resp = await fetchScoped(origin + path, { timeout })
     if (!resp || resp.status !== 200) continue
 
     let spec: Record<string, unknown>
@@ -234,14 +242,16 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
 const GQL_CANDIDATES = ["/graphql", "/api/graphql", "/query", "/v1/graphql", "/gql"]
 const TYPENAME_BODY = JSON.stringify({ query: "{__typename}" })
 
-export async function graphqlProbe(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function graphqlProbe(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Probing for GraphQL endpoints at ${target}`]
   const origin = new URL(target).origin
 
   for (const path of GQL_CANDIDATES) {
     const url = origin + path
-    const resp = await safeFetch(url, {
+    const resp = await fetchScoped(url, {
       timeout,
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -266,7 +276,7 @@ export async function graphqlProbe(target: string, _args: string[], timeout: num
       query:
         "{ __schema { queryType { name } mutationType { name } subscriptionType { name } types { name kind } } }",
     })
-    const intrResp = await safeFetch(url, {
+    const intrResp = await fetchScoped(url, {
       timeout,
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -359,11 +369,13 @@ const HTML_FINGERPRINTS: [string, string, string][] = [
   ["_blazor", "Framework", "Blazor"],
 ]
 
-export async function techDetect(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function techDetect(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Detecting technology stack for ${target}`]
 
-  const resp = await safeFetch(target, { timeout })
+  const resp = await fetchScoped(target, { timeout })
   if (!resp) {
     output.push("[-] Target unreachable")
     return { output: output.join("\n"), findings }
@@ -505,11 +517,13 @@ const HEADER_CHECKS: HeaderCheck[] = [
   },
 ]
 
-export async function headerAudit(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function headerAudit(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Auditing security headers for ${target}`]
 
-  const resp = await safeFetch(target, { timeout })
+  const resp = await fetchScoped(target, { timeout })
   if (!resp) {
     output.push("[-] Target unreachable")
     return { output: output.join("\n"), findings }
@@ -744,13 +758,15 @@ const SENSITIVE_PROBES: SensitiveProbe[] = [
   },
 ]
 
-export async function sensitiveFiles(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function sensitiveFiles(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Probing for sensitive files at ${target}`]
   const origin = new URL(target).origin
 
   const results = await Promise.allSettled(
-    SENSITIVE_PROBES.map((probe) => safeFetch(origin + probe.path, { timeout })),
+    SENSITIVE_PROBES.map((probe) => fetchScoped(origin + probe.path, { timeout })),
   )
 
   for (let i = 0; i < SENSITIVE_PROBES.length; i++) {
@@ -789,7 +805,9 @@ export async function sensitiveFiles(target: string, _args: string[], timeout: n
 // cors_check
 // ---------------------------------------------------------------------------
 
-export async function corsCheck(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function corsCheck(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Testing CORS configuration for ${target}`]
 
@@ -802,7 +820,7 @@ export async function corsCheck(target: string, _args: string[], timeout: number
   ]
 
   for (const test of origins) {
-    const resp = await safeFetch(target, {
+    const resp = await fetchScoped(target, {
       timeout,
       headers: { Origin: test.origin },
     })
@@ -865,7 +883,7 @@ export async function corsCheck(target: string, _args: string[], timeout: number
   }
 
   if (findings.length === 0) {
-    const baseline = await safeFetch(target, { timeout })
+    const baseline = await fetchScoped(target, { timeout })
     const acao = baseline?.headers.get("access-control-allow-origin")
     if (!acao) {
       output.push("[*] No CORS headers present — same-origin policy enforced")
@@ -883,7 +901,9 @@ export async function corsCheck(target: string, _args: string[], timeout: number
 
 const DANGEROUS_METHODS = ["TRACE", "PUT", "DELETE"]
 
-export async function methodCheck(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function methodCheck(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Checking advertised HTTP methods for ${target}`]
 
@@ -891,7 +911,7 @@ export async function methodCheck(target: string, _args: string[], timeout: numb
   // PUT or DELETE to a live resource just to see whether the server accepts it,
   // and avoid TRACE because some servers echo request headers that may contain
   // authentication material.
-  const optResp = await safeFetch(target, { timeout, method: "OPTIONS" })
+  const optResp = await fetchScoped(target, { timeout, method: "OPTIONS" })
   if (!optResp) {
     output.push("[-] OPTIONS request failed; no active method probes were attempted")
     return { output: output.join("\n"), findings }
@@ -937,7 +957,9 @@ const REDIRECT_PARAMS = [
 
 const CANARY_DOMAIN = "https://evil.example.com"
 
-export async function openRedirect(target: string, _args: string[], timeout: number): Promise<WebReconResult> {
+export async function openRedirect(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
+  const fetchScoped = (url: string, options: FetchOptions = {}) =>
+    safeFetch(url, scopeCheck ? { ...options, scopeCheck } : options)
   const findings: Finding[] = []
   const output: string[] = [`[*] Testing open redirect parameters at ${target}`]
 
@@ -948,7 +970,7 @@ export async function openRedirect(target: string, _args: string[], timeout: num
     const testUrl = new URL(target)
     testUrl.searchParams.set(param, CANARY_DOMAIN)
 
-    const resp = await safeFetch(testUrl.href, {
+    const resp = await fetchScoped(testUrl.href, {
       timeout,
       redirect: "manual",
     })
@@ -1022,7 +1044,7 @@ export async function openRedirect(target: string, _args: string[], timeout: num
 // full_recon
 // ---------------------------------------------------------------------------
 
-type ProgramFn = (target: string, args: string[], timeout: number) => Promise<WebReconResult>
+type ProgramFn = (target: string, args: string[], timeout: number, scopeCheck?: ScopeCheck) => Promise<WebReconResult>
 
 const RECON_SUITE: { label: string; fn: ProgramFn }[] = [
   { label: "Technology Detection", fn: techDetect },
@@ -1037,14 +1059,14 @@ const RECON_SUITE: { label: string; fn: ProgramFn }[] = [
   { label: "GraphQL", fn: graphqlProbe },
 ]
 
-export async function fullRecon(target: string, args: string[], timeout: number): Promise<WebReconResult> {
+export async function fullRecon(target: string, args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
   const findings: Finding[] = []
   const output: string[] = [`=== FULL WEB RECONNAISSANCE: ${target} ===`]
 
   for (const suite of RECON_SUITE) {
     output.push(`\n--- ${suite.label} ---`)
     try {
-      const result = await suite.fn(target, args, timeout)
+      const result = await suite.fn(target, args, timeout, scopeCheck)
       output.push(result.output)
       findings.push(...result.findings)
     } catch (err) {
