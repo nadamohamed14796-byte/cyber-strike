@@ -268,8 +268,27 @@ export function classifyResearchTopic(title: string, text: string) {
   return undefined
 }
 function severityOf(text: string) {
-  const match = text.match(/\b(critical|high|medium|low|informational)\b/i)
-  return match?.[1]?.toLowerCase() ?? "unknown"
+  // Avoid turning incidental words ("high-level", "low-level", "medium-sized")
+  // into severity labels. Prefer explicit source labels, then a stated CVSS score.
+  const labelled = text.match(
+    /\b(?:severity|risk(?:\s+level)?|priority)\b\s*(?:(?:is|of|rating)\s*)?[:=-]?\s*(critical|high|medium|low|informational|info)\b/i,
+  )
+  if (labelled) return labelled[1].toLowerCase() === "info" ? "informational" : labelled[1].toLowerCase()
+
+  const cvss = text.match(/\bCVSS(?:\s+v?[0-9]+(?:\.[0-9]+)?)?(?:\s+score)?\s*[:=]\s*(10(?:\.0)?|[0-9](?:\.[0-9])?)\b/i)
+  if (cvss) {
+    const score = Number(cvss[1])
+    if (score >= 9) return "critical"
+    if (score >= 7) return "high"
+    if (score >= 4) return "medium"
+    if (score > 0) return "low"
+  }
+  return "unknown"
+}
+
+function cweOf(text: string): string | undefined {
+  const match = text.match(/\bCWE\s*[-:#]?\s*(\d{1,5})\b/i)
+  return match ? "CWE-" + match[1] : undefined
 }
 
 function firstMatchingSentence(text: string, pattern: RegExp) {
@@ -330,6 +349,8 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
   const lower = text.toLowerCase()
   const signals = new Set<string>()
   if (vulnerabilityClass) signals.add(vulnerabilityClass)
+  const cwe = text.match(/\bCWE\s*[-:#]?\s*(\d{1,5})\b/i)
+  if (cwe) signals.add("CWE-" + cwe[1])
   const patterns: Array<[string, RegExp]> = [
     ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
     ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
@@ -367,6 +388,7 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
 
 export interface ExtractedResearchDetails {
   severity: string
+  cweID?: string
   lesson?: string
   attackVector?: string
   impact?: string
@@ -391,6 +413,7 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
   const fullText = title + " " + text
   return {
     severity: severityOf(fullText),
+    cweID: cweOf(fullText),
     lesson: lessonOf(text, vulnerabilityClass),
     attackVector: attackVectorOf(text),
     impact: impactOf(text),
@@ -930,6 +953,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         title,
         severity: extracted.severity,
         vulnerabilityClass,
+        cweID: extracted.cweID,
         sourceURL: item.source_url,
         attackVector: extracted.attackVector,
         impact: extracted.impact,
@@ -952,12 +976,13 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           content_truncated_for_learning: cachedTextTruncated,
           stored_excerpt_length: Math.min(text.length, 12000),
           queue_id: item.public_id,
-          extraction_version: 6,
+          extraction_version: 7,
           study_method: "bounded-heuristic-extraction",
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
             classification_method: "title-first-dominant-body-v2",
             severity: extracted.severity,
+            cwe_id: extracted.cweID ?? null,
             attack_vector: extracted.attackVector ?? null,
             impact: extracted.impact ?? null,
             reproduction_steps: extracted.reproduction ?? null,
