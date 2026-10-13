@@ -208,7 +208,8 @@ export namespace ResearchQueue {
         ...(sourceID ? [eq(ResearchQueueTable.source_id, sourceID)] : []),
       )).orderBy(asc(ResearchQueueTable.sequence)).all().filter((row) => {
         if (row.payload?.crawl_page === true) return false
-        if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
+        // Missing excerpts are recoverable: the model-led claim path fetches via
+        // the source-scoped allowlisted fetcher when cached_text is absent.
         const studied = row.payload.model_study_version
         // A request marker alone is not completion: an older heuristic worker may
         // have reclaimed the row after scheduling. Only the model's completion
@@ -480,7 +481,9 @@ export namespace ResearchQueue {
           if (row.payload?.crawl_page === true) return false
           const previousVersion = row.payload?.learning_version
           if (typeof previousVersion === "number" && previousVersion >= RESEARCH_LEARNING_VERSION) return false
-          if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
+          // The model-study claim path can safely refetch an empty excerpt from
+          // the exact configured source. Do not strand older rejected rows merely
+          // because the former heuristic worker did not cache their text.
           return row.last_error === "no recognizable security topic" ||
             row.last_error === "page failed research relevance gate"
         })
