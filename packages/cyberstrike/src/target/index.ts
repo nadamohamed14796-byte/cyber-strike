@@ -1129,10 +1129,11 @@ export namespace TargetMemory {
       }
       const normalizedInclude = scope.scopeItems.map(normalizeScopeItem)
       const normalizedExclude = scope.excludedItems.map(normalizeScopeItem)
+      const normalizedExcludeSet = new Set(normalizedExclude)
       if (
         normalizedInclude.some((item, index) => item !== scope.scopeItems![index]) ||
         normalizedExclude.some((item, index) => item !== scope.excludedItems![index]) ||
-        normalizedInclude.some((item) => normalizedExclude.includes(item))
+        normalizedInclude.some((item) => normalizedExcludeSet.has(item))
       ) {
         throw new Error("Target scope manifest contains non-canonical or contradictory entries.")
       }
@@ -1166,8 +1167,9 @@ export namespace TargetMemory {
     if (!reference || !reference.startsWith("https://")) {
       throw new Error("An HTTPS authorization reference is required; do not use a private or credential-bearing URL.")
     }
-    const overlap = include.filter((item) => exclude.includes(item))
-    if (overlap.length) throw new Error("The same entry cannot be both included and excluded: " + overlap.join(", "))
+    const excludeSet = new Set(exclude)
+    const overlap = include.filter((item) => excludeSet.has(item))
+    if (overlap.length) throw new Error("The same entry cannot be both included and excluded: " + overlap.slice(0, 20).join(", ") + (overlap.length > 20 ? ", ... (showing first 20)" : ""))
 
     const workspace = await ensure(input)
     const scope: TargetScope = {
