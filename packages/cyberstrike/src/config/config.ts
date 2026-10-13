@@ -1425,6 +1425,20 @@ export namespace Config {
 
   async function loadFile(filepath: string): Promise<Info> {
     log.info("loading", { path: filepath })
+    // Do not attempt to read FIFOs, sockets, devices, or directories as config.
+    // Reading a FIFO with Bun.file(...).text() can wait forever and stall startup.
+    let stat
+    try {
+      stat = await fs.stat(filepath)
+    } catch (err: any) {
+      if (err.code === "ENOENT" || err.code === "EACCES") return {}
+      throw new JsonError({ path: filepath }, { cause: err })
+    }
+    if (!stat.isFile()) {
+      log.warn("skipping config path that is not a regular file", { path: filepath })
+      return {}
+    }
+
     let text = await Bun.file(filepath)
       .text()
       .catch((err) => {
@@ -1432,6 +1446,7 @@ export namespace Config {
         throw new JsonError({ path: filepath }, { cause: err })
       })
     if (!text) return {}
+    log.debug("read config file", { path: filepath, bytes: stat.size })
     return load(text, filepath)
   }
 
@@ -1456,20 +1471,32 @@ export namespace Config {
           filePath = path.join(os.homedir(), filePath.slice(2))
         }
         const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(configDir, filePath)
+        const errMsg = `bad file reference: "${match}"`
+        let referencedStat
+        try {
+          referencedStat = await fs.stat(resolvedPath)
+        } catch (error: any) {
+          if (error.code === "ENOENT") {
+            throw new InvalidError(
+              {
+                path: configFilepath,
+                message: errMsg + ` ${resolvedPath} does not exist`,
+              },
+              { cause: error },
+            )
+          }
+          throw new InvalidError({ path: configFilepath, message: errMsg }, { cause: error })
+        }
+        if (!referencedStat.isFile()) {
+          throw new InvalidError({
+            path: configFilepath,
+            message: errMsg + ` ${resolvedPath} is not a regular file`,
+          })
+        }
         const fileContent = (
           await Bun.file(resolvedPath)
             .text()
             .catch((error) => {
-              const errMsg = `bad file reference: "${match}"`
-              if (error.code === "ENOENT") {
-                throw new InvalidError(
-                  {
-                    path: configFilepath,
-                    message: errMsg + ` ${resolvedPath} does not exist`,
-                  },
-                  { cause: error },
-                )
-              }
               throw new InvalidError({ path: configFilepath, message: errMsg }, { cause: error })
             })
         ).trim()
