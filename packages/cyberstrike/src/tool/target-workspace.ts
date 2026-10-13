@@ -128,6 +128,9 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
             throw new Error("Scope file exceeds the 32 MB import limit.")
           }
           bytes = await fs.readFile(sourcePath)
+          if (bytes.byteLength > 32 * 1024 * 1024) {
+            throw new Error("Scope file grew beyond the 32 MB import limit while being read.")
+          }
         } catch (error) {
           throw new Error("Could not read scope file " + sourcePath + ": " + (error instanceof Error ? error.message : String(error)))
         }
