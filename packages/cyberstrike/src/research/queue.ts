@@ -272,7 +272,13 @@ export namespace ResearchQueue {
     })
   }
 
-  export function markVisitedPage(input: { sourceID: string; sourceURL: string; title?: string; contentFingerprint?: string }) {
+  export function markVisitedPage(input: {
+    sourceID: string
+    sourceURL: string
+    title?: string
+    contentFingerprint?: string
+    discoveredLinks?: string[]
+  }) {
     const now = Date.now()
     return Database.transaction((db) => {
       const existing = db.select().from(ResearchQueueTable)
@@ -295,6 +301,7 @@ export namespace ResearchQueue {
             ...existingPayload,
             crawl_page: true,
             ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
+            ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks)].slice(0, 160) } : {}),
           },
           status: "discovered",
           updated_at: now,
@@ -308,7 +315,11 @@ export namespace ResearchQueue {
         source_id: input.sourceID,
         source_url: input.sourceURL,
         title: input.title ?? null,
-        payload: { crawl_page: true, ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}) },
+        payload: {
+          crawl_page: true,
+          ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
+          ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks)].slice(0, 160) } : {}),
+        },
         status: "discovered",
         attempts: 0,
         discovered_at: now,
