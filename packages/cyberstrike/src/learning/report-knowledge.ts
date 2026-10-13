@@ -236,9 +236,9 @@ export namespace ReportKnowledge {
           const metadata = row.metadata ?? {}
           const requested = metadata.model_study_requested_version
           const studied = metadata.model_study_version
-          return typeof metadata.excerpt === "string" &&
-            metadata.excerpt.trim().length >= 250 &&
-            !(typeof studied === "number" && studied >= currentVersion) &&
+          // A stored excerpt is optional: the agent-study worker can safely fetch
+          // missing/short excerpts from a currently configured source host.
+          return !(typeof studied === "number" && studied >= currentVersion) &&
             !(typeof requested === "number" && requested >= currentVersion) &&
             metadata.study_method !== "llm-assisted-agent-command-v1"
         })
