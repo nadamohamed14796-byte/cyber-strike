@@ -315,7 +315,10 @@ export namespace Config {
 
   export async function installDependencies(dir: string) {
     const pkg = path.join(dir, "package.json")
-    const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
+    // Main-channel binaries use timestamped versions that are not published to npm.
+    // Use the published plugin range for these builds instead of requesting an
+    // impossible @cyberstrike-io/plugin@0.0.0-main-... version.
+    const targetVersion = Installation.isLocal() || Installation.CHANNEL === "main" ? "*" : Installation.VERSION
 
     const json = await Bun.file(pkg)
       .json()
@@ -374,7 +377,9 @@ export namespace Config {
     const depVersion = dependencies["@cyberstrike-io/plugin"]
     if (!depVersion) return true
 
-    const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
+    // Local and main-channel builds install the latest published plugin because
+    // their own timestamped build versions are not published as plugin versions.
+    const targetVersion = Installation.isLocal() || Installation.CHANNEL === "main" ? "latest" : Installation.VERSION
     if (targetVersion === "latest") {
       const isOutdated = await PackageRegistry.isOutdated("@cyberstrike-io/plugin", depVersion, dir)
       if (!isOutdated) return false
