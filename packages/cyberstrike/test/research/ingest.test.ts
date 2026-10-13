@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
-import { extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
+import { classifyResearchTopic, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
@@ -355,3 +355,12 @@ test("research queue resumes authenticated work and learns cached report text wi
   })
 })
 
+
+
+test("research topic classification covers CORS, information disclosure, privilege escalation, misconfiguration, and account takeover", () => {
+  expect(classifyResearchTopic("CORS policy exposes a private API", "A report about CORS.")).toBe("cors")
+  expect(classifyResearchTopic("Information disclosure through debug logs", "Sensitive values appear in application logs.")).toBe("information-disclosure")
+  expect(classifyResearchTopic("Privilege escalation through role assignment", "A role check is missing.")).toBe("privilege-escalation")
+  expect(classifyResearchTopic("Security misconfiguration exposes an admin panel", "The application has an insecure configuration.")).toBe("security-misconfiguration")
+  expect(classifyResearchTopic("Account takeover through password recovery", "An account can be compromised.")).toBe("account-takeover")
+})
