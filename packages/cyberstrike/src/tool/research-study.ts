@@ -113,9 +113,9 @@ function output(title: string, text: string, metadata: Record<string, unknown> =
   return { title, output: text, metadata }
 }
 
-function statistics() {
+function statistics(sourceID?: string) {
   return {
-    queue: ResearchQueue.stats(),
+    queue: ResearchQueue.stats(sourceID),
     knowledge: ReportKnowledge.stats(),
   }
 }
@@ -443,7 +443,11 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
     }
 
     if (params.action === "stats") {
-      const summary = { ...statistics(), configured_sources: configuredSources() }
+      const summary = {
+        ...statistics(params.source),
+        queue_source_filter: params.source ?? null,
+        configured_sources: configuredSources(),
+      }
       return output("Research study status", JSON.stringify(summary, null, 2), summary)
     }
 
