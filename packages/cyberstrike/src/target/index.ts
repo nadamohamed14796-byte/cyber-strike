@@ -209,7 +209,7 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
 function matchingScopeItems(candidate: URL | string, items: string[]): string[] {
   const url = typeof candidate === "string" ? new URL(candidate) : candidate
   const index = compileScopeItems(items)
-  const hostname = url.hostname.toLowerCase().replace(/\\.$/, "")
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "")
   const matches: string[] = []
   if (index.exactHosts.has(hostname)) matches.push(hostname)
 
