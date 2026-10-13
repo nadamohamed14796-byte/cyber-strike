@@ -317,7 +317,7 @@ export const ResearchCommand = cmd({
                   classification_method: "title-first-dominant-body-v2",
                   ...(extracted.severity !== "unknown" ? { severity: extracted.severity } : {}),
                   ...(cweID ? { cwe_id: cweID } : {}),
-                  ...(extracted.lesson ? { lesson: extracted.lesson } : {}),
+                  lesson: extracted.lesson ?? existingExtracted.lesson ?? row.lesson ?? null,
                   ...(extracted.attackVector ? { attack_vector: extracted.attackVector } : {}),
                   ...(extracted.impact ? { impact: extracted.impact } : {}),
                   ...(extracted.reproduction ? { reproduction_steps: extracted.reproduction } : {}),
