@@ -1,7 +1,7 @@
 import type { Argv } from "yargs"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { parseScopeFileContents } from "../../target/scope-file"
+import { parseScopeFileContents, resolveScopeFilePath } from "../../target/scope-file"
 import { cmd } from "./cmd"
 import { Instance } from "../../project/instance"
 import { TargetMemory, type TargetAssetType, type TargetNoteKind, type TargetNoteStatus } from "../../target"
@@ -106,7 +106,7 @@ const TargetScopeCommand = cmd({
         if (requestedChange) {
           let fileEntries: string[] = []
           if (args.file) {
-            const filePath = path.resolve(process.cwd(), args.file)
+            const filePath = resolveScopeFilePath(args.file)
             let contents: string
             try {
               contents = await fs.readFile(filePath, "utf-8")
@@ -144,7 +144,7 @@ const TargetScopeCommand = cmd({
           console.log("Authorization source: " + result.scope.authorizationSource)
           console.log("Reference: " + result.scope.authorizationReference)
           console.log("Included entries: " + result.scope.scopeItems.length)
-          if (args.file) console.log("Imported from: " + path.resolve(process.cwd(), args.file))
+          if (args.file) console.log("Imported from: " + resolveScopeFilePath(args.file))
           console.log("Included: " + result.scope.scopeItems.slice(0, 20).join(", ") + (result.scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
           console.log("Existing workspaces newly linked/reorganized: " + result.associatedAssets.length)
