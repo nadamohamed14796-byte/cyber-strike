@@ -84,3 +84,52 @@ test("a fresh database keeps the owner migration ADD COLUMN statement", () => {
     sqlite.close()
   }
 })
+
+
+const HIERARCHY_MIGRATION = "20261013010000_target-asset-hierarchy"
+
+function hierarchyMigrationSQL() {
+  return readFileSync(
+    new URL("../../migration/20261013010000_target-asset-hierarchy/migration.sql", import.meta.url),
+    "utf-8",
+  )
+}
+
+test("asset hierarchy migration skips columns already reconciled by an older runtime", () => {
+  const sqlite = new BunDatabase(":memory:")
+  try {
+    sqlite.exec("CREATE TABLE target_workspace (" +
+      "id TEXT PRIMARY KEY NOT NULL, " +
+      "project_id TEXT NOT NULL, " +
+      "owner_key TEXT, " +
+      "target_key TEXT NOT NULL, " +
+      "target_url TEXT NOT NULL, " +
+      "hostname TEXT NOT NULL, " +
+      "slug TEXT NOT NULL, " +
+      "parent_target_id TEXT, " +
+      "asset_type TEXT NOT NULL DEFAULT 'target', " +
+      "workspace_path TEXT NOT NULL, " +
+      "time_created INTEGER NOT NULL, " +
+      "time_updated INTEGER NOT NULL)")
+    const entry = { name: HIERARCHY_MIGRATION, timestamp: Date.UTC(2026, 9, 13, 1), sql: hierarchyMigrationSQL() }
+    const prepared = Database.prepareMigrations(sqlite, [entry])
+    expect(prepared[0]?.sql).not.toContain("ALTER TABLE target_workspace ADD COLUMN parent_target_id")
+    expect(prepared[0]?.sql).not.toContain("ALTER TABLE target_workspace ADD COLUMN asset_type")
+    expect(prepared[0]?.sql).toContain("SELECT 1;")
+    expect(prepared[0]?.sql).toContain("target_workspace_parent_idx")
+  } finally {
+    sqlite.close()
+  }
+})
+
+test("fresh asset hierarchy migration contains both parent and asset type columns", () => {
+  const sqlite = new BunDatabase(":memory:")
+  try {
+    const entry = { name: HIERARCHY_MIGRATION, timestamp: Date.UTC(2026, 9, 13, 1), sql: hierarchyMigrationSQL() }
+    const prepared = Database.prepareMigrations(sqlite, [entry])
+    expect(prepared[0]?.sql).toContain("ADD COLUMN parent_target_id TEXT REFERENCES target_workspace(id) ON DELETE SET NULL")
+    expect(prepared[0]?.sql).toContain("ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'target'")
+  } finally {
+    sqlite.close()
+  }
+})
