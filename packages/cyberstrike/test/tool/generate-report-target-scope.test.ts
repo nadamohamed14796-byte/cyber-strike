@@ -105,7 +105,7 @@ test("target-scoped reports include authorized descendants but not unrelated wor
         expect(programReport.metadata.includedWorkspaceIDs).toContain(api!.id)
 
         const apiReport = await tool.execute({
-          target_url: "https://api.example.com",
+          target_url: api!.targetURL,
           include_children: false,
           include_sections: ["findings", "coverage", "attack_surface"],
         }, toolContext(session.id))
