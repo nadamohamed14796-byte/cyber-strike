@@ -183,20 +183,23 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            if (/authentication required|login wall|HTTP\s+(?:401|403)/i.test(message)) {
-              ResearchQueue.blockAuthentication({
-                sourceID: claim.source_id,
-                sourceURL: claim.source_url,
-                title,
-                reason: message,
-                payload: { source_name: source.name, source_kind: source.kind, crawl_depth: claim.payload.crawl_depth },
-                claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
-              })
-            } else {
-              ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message)
+            const authRequired = /authentication required|login wall|HTTP\s+(?:401|403)/i.test(message)
+            const handled = authRequired
+              ? ResearchQueue.blockAuthentication({
+                  sourceID: claim.source_id,
+                  sourceURL: claim.source_url,
+                  title,
+                  reason: message,
+                  payload: { source_name: source.name, source_kind: source.kind, crawl_depth: claim.payload.crawl_depth },
+                  claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
+                })?.status === "blocked_auth"
+              : Boolean(ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message))
+            if (!handled) {
+              issues.push(claim.public_id + ": lease lost before fetch failure could be recorded")
+              continue
             }
             issues.push(claim.public_id + ": " + message)
-            // Do not immediately reclaim the same failed row in this batch.
+            // Do not immediately reclaim the same failed row repeatedly in this batch.
             break
           }
         }
@@ -218,7 +221,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             : contentFingerprint
 
         if (looksLikeResearchAuthenticationWall(claim.source_url, title, text)) {
-          ResearchQueue.blockAuthentication({
+          const blocked = ResearchQueue.blockAuthentication({
             sourceID: claim.source_id,
             sourceURL: claim.source_url,
             title,
@@ -226,7 +229,9 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.payload.crawl_depth },
             claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
           })
-          issues.push(claim.public_id + ": authentication wall")
+          issues.push(blocked?.status === "blocked_auth"
+            ? claim.public_id + ": authentication wall"
+            : claim.public_id + ": lease lost before authentication block could be recorded")
           continue
         }
         if (text.trim().length < 250 || isIndexLikeResearchUrl(claim.source_url)) {
