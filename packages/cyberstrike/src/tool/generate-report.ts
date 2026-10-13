@@ -10,7 +10,7 @@ import { Chain } from "../methodology/chain"
 import { Validation } from "../methodology/validation"
 import { Request } from "../session/request"
 import { AgentPerformance } from "../methodology/performance"
-import { TargetMemory } from "../target"
+import { TargetMemory, type Workspace } from "../target"
 
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
