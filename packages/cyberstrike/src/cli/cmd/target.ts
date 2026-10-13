@@ -22,8 +22,8 @@ const TargetInitCommand = cmd({
           path.join(target.workspacePath, "notes.md"),
         ]
         for (const requiredFile of requiredFiles) {
-          const info = await fs.stat(requiredFile).catch(() => undefined)
-          if (!info?.isFile()) {
+          const info = await fs.lstat(requiredFile).catch(() => undefined)
+          if (!info?.isFile() || info.isSymbolicLink()) {
             throw new Error("Target workspace initialization failed: required file is missing: " + requiredFile)
           }
         }
@@ -173,8 +173,8 @@ const TargetScopeCommand = cmd({
             path.join(result.workspace.workspacePath, "notes.md"),
           ]
           for (const expectedFile of expectedFiles) {
-            const info = await fs.stat(expectedFile).catch(() => undefined)
-            if (!info?.isFile()) {
+            const info = await fs.lstat(expectedFile).catch(() => undefined)
+            if (!info?.isFile() || info.isSymbolicLink()) {
               throw new Error("Scope was written but workspace integrity verification failed: required file is missing: " + expectedFile)
             }
           }
