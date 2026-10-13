@@ -921,6 +921,9 @@ export namespace TargetMemory {
       throw new Error("Asset URL must be credential-free HTTP(S).")
     }
     if (candidate.hostname === parent.hostname) throw new Error("A same-host path belongs in the existing target workspace, not a child asset.")
+    if (candidate.pathname !== "/" || candidate.search || candidate.hash) {
+      throw new Error("Asset registration is host-level: pass only the origin (scheme and host). Store endpoint paths under that asset.")
+    }
     const matchingParent = await findAuthorizedParent(candidate.origin)
     if (!matchingParent || matchingParent.id !== parent.id) {
       throw new Error("The asset is not unambiguously authorized by this parent's saved scope; check includes, exclusions, protocol, and port.")
