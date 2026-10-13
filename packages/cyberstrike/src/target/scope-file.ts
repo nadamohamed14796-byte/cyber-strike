@@ -3,7 +3,7 @@ import path from "node:path"
 /** Parse a plain-text scope list without inferring authorization or broadening entries. */
 export function parseScopeFileContents(contents: string): string[] {
   const entries: string[] = []
-  for (const [index, rawLine] of contents.split(/\r?\n/).entries()) {
+  for (const [index, rawLine] of contents.replace(/^\uFEFF/, "").split(/\r?\n/).entries()) {
     const value = rawLine.trim()
     if (!value || value.startsWith("#") || value.startsWith("//")) continue
     if (/\s/.test(value)) {
