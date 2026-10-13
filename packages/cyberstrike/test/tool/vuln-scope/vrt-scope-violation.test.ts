@@ -97,6 +97,12 @@ describe("vrtScopeViolation", () => {
       expect(result).not.toBeNull()
       expect(result!.cls).toBe("file-attacks")
     })
+
+    test("LLM tester recording IDOR", () => {
+      const result = vrtScopeViolation("proxy-tester-llm", "IDOR")
+      expect(result).not.toBeNull()
+      expect(result!.cls).toBe("llm")
+    })
   })
 
   describe("substring matching — bidirectional", () => {
