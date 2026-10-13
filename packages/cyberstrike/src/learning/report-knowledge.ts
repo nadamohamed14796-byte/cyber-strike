@@ -207,17 +207,28 @@ export namespace ReportKnowledge {
    * The study marker is independent of heuristic extraction_version so older records
    * can be revisited once without repeatedly flooding the durable queue.
    */
-  export function externalRecordsForModelStudy(limit = 100, modelStudyVersion = 1) {
+  export function externalRecordsForModelStudy(limit = 100, modelStudyVersion = 1, sourceHosts?: string[]) {
     const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
     const currentVersion = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : 1))
-    return Database.use((db) =>
-      db.select().from(ReportKnowledgeTable)
-        .where(and(
-          eq(ReportKnowledgeTable.source_kind, "external_report"),
-          isNull(ReportKnowledgeTable.session_id),
-          or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
-          notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]),
-        ))
+    return Database.use((db) => {
+      const conditions = [
+        eq(ReportKnowledgeTable.source_kind, "external_report"),
+        isNull(ReportKnowledgeTable.session_id),
+        or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
+        notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]),
+      ]
+      const hosts = Array.from(new Set((sourceHosts ?? []).map((host) => host.trim().toLowerCase()).filter(Boolean)))
+      if (hosts.length) {
+        const hostConditions = hosts.flatMap((host) => [
+          like(ReportKnowledgeTable.source_url, "https://" + host + "/%"),
+          like(ReportKnowledgeTable.source_url, "https://%." + host + "/%"),
+          like(ReportKnowledgeTable.source_url, "https://" + host),
+          like(ReportKnowledgeTable.source_url, "https://%." + host),
+        ])
+        conditions.push(or(...hostConditions)!)
+      }
+      return db.select().from(ReportKnowledgeTable)
+        .where(and(...conditions))
         .orderBy(asc(ReportKnowledgeTable.time_updated))
         .all()
         .filter((row) => {
@@ -231,8 +242,8 @@ export namespace ReportKnowledge {
             !(typeof requested === "number" && requested >= currentVersion) &&
             metadata.study_method !== "llm-assisted-agent-command-v1"
         })
-        .slice(0, bounded),
-    )
+        .slice(0, bounded)
+    })
   }
 
   /**
