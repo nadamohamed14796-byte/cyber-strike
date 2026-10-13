@@ -460,7 +460,7 @@ export namespace ReportKnowledge {
     reportID: string
     sessionID: string
     outcome: "observed" | "useful"
-    hook?: "research-context" | "research_knowledge" | "finding-validation"
+    hook?: "research-context" | "research_knowledge" | "research-study" | "finding-validation"
     signal?: string
     metadata?: Record<string, unknown>
   }): boolean {
@@ -498,6 +498,7 @@ export namespace ReportKnowledge {
               or(
                 eq(ReportKnowledgeEventTable.hook, "research-context"),
                 eq(ReportKnowledgeEventTable.hook, "research_knowledge"),
+                eq(ReportKnowledgeEventTable.hook, "research-study"),
               ),
             ))
             .get()
