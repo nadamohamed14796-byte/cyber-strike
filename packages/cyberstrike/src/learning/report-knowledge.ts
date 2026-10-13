@@ -713,7 +713,15 @@ export namespace ReportKnowledge {
 
     if (row.vulnerability_class && tokens.includes(normalize(row.vulnerability_class))) score += 70
     if (row.cwe_id && tokens.includes(normalize(row.cwe_id))) score += 70
-    if (row.source_kind === "external_report") score += 5
+    if (row.source_kind === "external_report") {
+      score += 5
+      // Source reputation is a small tie-breaker, never a substitute for signal
+      // relevance or independent verification.
+      const sourceTrust = metadataValue.source_trust
+      if (typeof sourceTrust === "number" && Number.isFinite(sourceTrust) && sourceTrust >= 0 && sourceTrust <= 100) {
+        score += Math.round(sourceTrust / 20)
+      }
+    }
     score += Math.min(row.times_useful * 4, 20)
     return score
   }
