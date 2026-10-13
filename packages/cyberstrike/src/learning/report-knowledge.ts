@@ -235,6 +235,47 @@ export namespace ReportKnowledge {
     )
   }
 
+  /**
+   * Mark a shared public source as model-studied (or not safely studyable) without
+   * changing its global truth/status. One target's verdict must never reclassify the
+   * source report itself.
+   */
+  export function markModelStudyCompleted(input: {
+    id: string
+    version?: number
+    decision: "learned" | "rejected" | "skipped"
+    reason?: string
+  }): boolean {
+    const version = Math.max(1, Math.floor(Number.isFinite(input.version) ? input.version ?? 1 : 1))
+    try {
+      return Database.transaction((db) => {
+        const row = db.select().from(ReportKnowledgeTable)
+          .where(eq(ReportKnowledgeTable.id, input.id)).get()
+        if (
+          !row ||
+          row.source_kind !== "external_report" ||
+          row.session_id ||
+          normalize(row.target_pattern)
+        ) return false
+        const metadata = row.metadata ?? {}
+        db.update(ReportKnowledgeTable).set({
+          metadata: {
+            ...metadata,
+            model_study_version: version,
+            model_study_decision: input.decision,
+            model_study_reason: input.reason?.slice(0, 800),
+            model_study_completed_at: Date.now(),
+          },
+          time_updated: Date.now(),
+        }).where(eq(ReportKnowledgeTable.id, row.id)).run()
+        return true
+      })
+    } catch (error) {
+      console.warn("[cyberstrike] model-study completion marker persistence failed:", error)
+      return false
+    }
+  }
+
   /** Mark a legacy reference as queued for model study, without changing its truth state. */
   export function markModelStudyRequested(input: { id: string; version?: number }): boolean {
     const version = Math.max(1, Math.floor(Number.isFinite(input.version) ? input.version ?? 1 : 1))
