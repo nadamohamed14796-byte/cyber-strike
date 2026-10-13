@@ -251,6 +251,128 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
       return result
 }
 
+async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
+  const rows = ReportKnowledge.externalRecordsForModelStudy(500, RESEARCH_MODEL_STUDY_VERSION)
+  const result = { examined: 0, queued: 0, skipped: 0, errors: [] as string[] }
+  for (const row of rows) {
+    if (result.queued >= 100) break
+    result.examined++
+
+    const rawURL = typeof row.source_url === "string" ? row.source_url : ""
+    const sourceURL = normalizeResearchUrl(rawURL)
+    if (!sourceURL) {
+      result.skipped++
+      ReportKnowledge.markModelStudyCompleted({
+        id: row.id,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "skipped",
+        reason: "source URL could not be safely normalized",
+      })
+      continue
+    }
+
+    let parsed: URL
+    try {
+      parsed = new URL(sourceURL)
+    } catch {
+      result.skipped++
+      ReportKnowledge.markModelStudyCompleted({
+        id: row.id,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "skipped",
+        reason: "source URL is invalid",
+      })
+      continue
+    }
+    if (parsed.protocol !== "https:") {
+      result.skipped++
+      ReportKnowledge.markModelStudyCompleted({
+        id: row.id,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "skipped",
+        reason: "only configured HTTPS research sources may be studied",
+      })
+      continue
+    }
+
+    const metadata = row.metadata ?? {}
+    const matchingSources = RESEARCH_SOURCES.filter((source) =>
+      source.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
+    )
+    const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
+    const preferred = matchingSources.find((source) => source.id === preferredID)
+    const source = preferred ?? matchingSources[0]
+    if (!source) {
+      result.skipped++
+      ReportKnowledge.markModelStudyCompleted({
+        id: row.id,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "skipped",
+        reason: "no currently configured source permits safe fetching from this host",
+      })
+      continue
+    }
+    if (sourceFilter && source.id !== sourceFilter) continue
+
+    const excerpt = typeof metadata.excerpt === "string"
+      ? redactResearchSecrets(metadata.excerpt).slice(0, 100_000)
+      : ""
+    if (excerpt.trim().length < 250) {
+      result.skipped++
+      ReportKnowledge.markModelStudyCompleted({
+        id: row.id,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "skipped",
+        reason: "no sufficiently long sanitized source excerpt is stored",
+      })
+      continue
+    }
+
+    const contentLength = typeof metadata.content_length === "number" && Number.isFinite(metadata.content_length)
+      ? Math.max(excerpt.length, metadata.content_length)
+      : excerpt.length
+    const storedFingerprint = metadata.content_fingerprint
+    const contentFingerprint = typeof storedFingerprint === "string" && /^[a-f0-9]{40}$/i.test(storedFingerprint)
+      ? storedFingerprint
+      : createHash("sha256").update(excerpt).digest("hex").slice(0, 40)
+
+    const queued = ResearchQueue.enqueueForModelStudy({
+      sourceID: source.id,
+      sourceURL,
+      title: redactResearchSecrets(row.title).slice(0, 500),
+      modelStudyVersion: RESEARCH_MODEL_STUDY_VERSION,
+      payload: {
+        source_name: source.name,
+        source_kind: source.kind,
+        source_trust: source.trust,
+        cached_text: excerpt,
+        content_length: contentLength,
+        content_fingerprint: contentFingerprint,
+        cached_text_truncated: metadata.content_truncated_for_learning === true || contentLength > excerpt.length,
+        crawl_depth: typeof metadata.crawl_depth === "number" ? metadata.crawl_depth : 0,
+        legacy_knowledge_id: row.id,
+      },
+    })
+    if (!queued.queued) {
+      if (queued.reason === "already-model-studied") {
+        ReportKnowledge.markModelStudyCompleted({
+          id: row.id,
+          version: RESEARCH_MODEL_STUDY_VERSION,
+          decision: "learned",
+          reason: "already completed model-led study for this version",
+        })
+      } else if (result.errors.length < 5 && queued.reason) {
+        result.errors.push(row.id + ": " + queued.reason)
+      }
+      continue
+    }
+    if (ReportKnowledge.markModelStudyRequested({ id: row.id, version: RESEARCH_MODEL_STUDY_VERSION })) {
+      result.queued++
+    }
+  }
+  return result
+}
+
 export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Tool.Metadata>("research_study", {
   description: [
     "Agent-led public research discovery and learning. This tool lets the model study sanitized queued source text and persist structured lessons into shared SQLite knowledge; it does not perform target testing.",
