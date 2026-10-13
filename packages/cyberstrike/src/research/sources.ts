@@ -354,7 +354,11 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
     for (const seed of source.seedUrls) {
       try {
         const seedURL = new URL(seed)
-        if (!matchesHost(source) || seedURL.pathname === "/") continue
+        const seedHost = seedURL.hostname.toLowerCase()
+        const seedHostAllowed = source.hosts.some((host) =>
+          seedHost === host || seedHost.endsWith("." + host),
+        )
+        if (!seedHostAllowed || seedURL.pathname === "/") continue
         const prefix = seedURL.pathname.toLowerCase().replace(/\/+$/, "")
         if (pathname === prefix || pathname.startsWith(prefix + "/")) {
           score = Math.max(score, prefix.length)
