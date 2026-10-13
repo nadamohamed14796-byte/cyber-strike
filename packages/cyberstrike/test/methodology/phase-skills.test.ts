@@ -16,4 +16,11 @@ describe("Methodology phase skill routing", () => {
     expect(Phase.get("mobile_application_testing")?.appliesTo).toContain("mobile")
     expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
   })
+
+  test("scope detection distinguishes mobile artifacts from domain names", () => {
+    expect(Phase.detectScopeType(["app.apk"])).toBe("mobile")
+    expect(Phase.detectScopeType(["package:com.example.app"])).toBe("mobile")
+    expect(Phase.detectScopeType(["com.example.com"])).toBe("single")
+    expect(Phase.detectScopeType(["*.example.com"])).toBe("wildcard")
+  })
 })
