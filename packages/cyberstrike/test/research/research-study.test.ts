@@ -146,13 +146,13 @@ test("agent-led research study persists model analysis and completes its queue l
 })
 
 
-test("legacy model-study backfill drains more than 100 eligible records in one cycle", async () => {
+test("legacy model-study backfill drains multiple 500-row batches", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
     directory: dir.path,
     fn: async () => {
       const marker = crypto.randomUUID().replace(/-/g, "")
-      const legacyCount = 101
+      const legacyCount = 501
       for (let index = 0; index < legacyCount; index++) {
         const row = ReportKnowledge.ingestExternalDetailed({
           title: "Legacy IDOR model-study backfill " + marker + "-" + index,
