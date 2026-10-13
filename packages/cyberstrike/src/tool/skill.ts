@@ -218,8 +218,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       await ctx.ask({
         permission: "skill",
-        patterns: [params.name],
-        always: [params.name],
+        patterns: [canonicalName],
+        always: [canonicalName],
         metadata: {} as { name?: string; dir?: string },
       })
 
