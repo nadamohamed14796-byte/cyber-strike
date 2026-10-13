@@ -32,6 +32,10 @@ describe("dispatchScopeViolation", () => {
     test("authn tester dispatched for auth objective", () => {
       expect(dispatchScopeViolation("proxy-tester-authn", "Test brute force on login")).toBeNull()
     })
+
+    test("LLM tester dispatched for prompt-injection objective", () => {
+      expect(dispatchScopeViolation("proxy-tester-llm", "Test indirect prompt injection in chatbot")).toBeNull()
+    })
   })
 
   describe("wrong dispatch — returns violation", () => {
