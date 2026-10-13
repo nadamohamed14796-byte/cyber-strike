@@ -175,8 +175,13 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
         sourceURL: url,
         title: "Archive page",
         contentFingerprint: "fingerprint-1",
+        discoveredLinks: ["https://research.example.test/archive?page=3", "https://research.example.test/writeup/idor"],
       })
       expect(visited?.status).toBe("discovered")
+      expect(visited?.payload?.discovered_links).toEqual([
+        "https://research.example.test/archive?page=3",
+        "https://research.example.test/writeup/idor",
+      ])
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url)).toBe(true)
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url, Date.now() + 7 * 60 * 60_000)).toBe(false)
       expect(ResearchQueue.stats("test-crawl-cache").total).toBe(0)
