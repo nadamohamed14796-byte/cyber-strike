@@ -766,7 +766,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       return normalized ? [normalized] : []
     }),
   )
-  const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; errors: string[] }> = []
+  const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; error_count: number; errors: string[] }> = []
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
@@ -778,6 +778,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     let candidates = 0
     let added = 0
     let blockedAuth = 0
+    let errorCount = 0
     const add = (value: string, depth: number) => {
       const url = normalizeUrl(value)
       if (!url || url.length > 4096 || depth > maxDepth || queued.has(url) || visited.has(url)) return
@@ -861,7 +862,8 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
             },
           })
           blockedAuth++
-          errors.push(current.url + " — authentication required")
+          errorCount++
+          if (errors.length < 5) errors.push(current.url + " — authentication required")
           continue
         }
         const discoveredLinks = linksOf(html, new URL(current.url), source)
@@ -907,6 +909,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           discoveredLinks,
         })
       } catch (error) {
+        errorCount++
         const message = error instanceof Error ? error.message : String(error)
         if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {
           ResearchQueue.blockAuthentication({
@@ -921,7 +924,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
             },
           })
           blockedAuth++
-          errors.push(current.url + " — authentication required (" + message + ")")
+          if (errors.length < 5) errors.push(current.url + " — authentication required (" + message + ")")
         } else {
           // Persist transient/network failures so watch mode does not refetch the
           // same broken page every cycle. Failed records stay in discovery, not
@@ -936,7 +939,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       }
       if (current.depth >= maxDepth) continue
     }
-    results.push({ source: source.id, pages, candidates, added, blocked_auth: blockedAuth, errors })
+    results.push({ source: source.id, pages, candidates, added, blocked_auth: blockedAuth, error_count: errorCount, errors })
   }
   return results
 }
