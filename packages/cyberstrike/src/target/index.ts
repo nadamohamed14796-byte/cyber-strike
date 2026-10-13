@@ -210,10 +210,6 @@ function normalizedSourceURL(input?: string): string | undefined {
   }
 }
 
-type ScopeManifestCacheEntry = { signature: string; scope: TargetScope }
-const scopeManifestCache = new Map<string, ScopeManifestCacheEntry>()
-
-
 /**
  * Canonicalizes a target identifier without retaining query strings, fragments, or credentials.
  * Bare hosts default to HTTPS. This function only normalizes identifiers; it performs no requests.
