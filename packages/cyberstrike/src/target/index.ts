@@ -605,6 +605,68 @@ export namespace TargetMemory {
     return "subdomain"
   }
 
+  /** Detach an asset that is no longer authorized by its former parent, preserving its data. */
+  async function detachWorkspace(
+    row: typeof TargetWorkspaceTable.$inferSelect,
+    parent: Workspace,
+  ): Promise<Workspace> {
+    if (row.parent_target_id !== parent.id) throw new Error("Cannot detach an asset from a different parent.")
+    const oldRelative = workspaceRelativePath(row)
+    const standaloneRelative = path.join(".cyberstrike", "targets", normalizeTarget(row.target_url).slug)
+    if (path.normalize(oldRelative) !== path.normalize(standaloneRelative)) {
+      const oldAbsolute = path.resolve(projectRoot(), oldRelative)
+      const standaloneParent = await ensureSafeDirectoryPath(projectRoot(), ".cyberstrike/targets")
+      const destination = path.join(standaloneParent, normalizeTarget(row.target_url).slug)
+      let oldExists = true
+      try {
+        const oldInfo = await fs.lstat(oldAbsolute)
+        if (oldInfo.isSymbolicLink() || !oldInfo.isDirectory()) throw new Error("Unsafe nested workspace during detach.")
+        await ensureSafeDirectoryPath(projectRoot(), oldRelative)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") oldExists = false
+        else throw error
+      }
+      let destinationExists = true
+      try {
+        const destinationInfo = await fs.lstat(destination)
+        if (destinationInfo.isSymbolicLink() || !destinationInfo.isDirectory()) throw new Error("Unsafe standalone workspace destination.")
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") destinationExists = false
+        else throw error
+      }
+      if (oldExists && destinationExists) throw new Error("Cannot detach asset because both nested and standalone workspace directories exist; no data was overwritten.")
+      if (destinationExists && !oldExists) {
+        let manifest: { workspaceID?: string } = {}
+        try { manifest = JSON.parse(await fs.readFile(path.join(destination, "workspace.json"), "utf-8")) }
+        catch { throw new Error("Existing standalone directory cannot be verified as the detached workspace.") }
+        if (manifest.workspaceID !== row.id) throw new Error("Standalone destination belongs to another workspace; refusing to overwrite it.")
+      }
+      if (oldExists && !destinationExists) await fs.rename(oldAbsolute, destination)
+    }
+    Database.use((db) => db.update(TargetWorkspaceTable).set({
+      parent_target_id: null,
+      asset_type: "target",
+      workspace_path: standaloneRelative,
+      time_updated: Date.now(),
+    }).where(eq(TargetWorkspaceTable.id, row.id)).run())
+    const updated = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.id)).get())
+    if (!updated) throw new Error("Detached target workspace disappeared.")
+    const workspace = mapWorkspace(updated, standaloneRelative)
+    await prepareWorkspace(workspace, false)
+    await TargetMemory.writeWorkspaceFile(workspace, "target.json", JSON.stringify({
+      schemaVersion: 2, targetURL: workspace.targetURL, hostname: workspace.hostname,
+      slug: workspace.slug, parentTargetID: null, assetType: "target",
+      createdAt: new Date(workspace.timeCreated).toISOString(),
+    }, null, 2) + "\n")
+    await TargetMemory.writeWorkspaceFile(workspace, "workspace.json", JSON.stringify({
+      schemaVersion: 3, workspaceID: workspace.id, projectID: workspace.projectID,
+      targetURL: workspace.targetURL, targetKey: workspace.targetKey, hostname: workspace.hostname,
+      slug: workspace.slug, parentTargetID: null, assetType: "target",
+      relativePath: workspace.relativePath, createdAt: new Date(workspace.timeCreated).toISOString(),
+    }, null, 2) + "\n")
+    return workspace
+  }
+
   /** Move an existing workspace beneath a parent without overwriting or merging its data. */
   async function reparentWorkspace(
     row: typeof TargetWorkspaceTable.$inferSelect,
@@ -665,7 +727,7 @@ export namespace TargetMemory {
     const updated = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.id)).get())
     if (!updated) throw new Error("Nested target workspace disappeared during reparenting.")
     const workspace = mapWorkspace(updated, destinationRelative)
-    await prepareWorkspace(workspace)
+    await prepareWorkspace(workspace, false)
     await TargetMemory.writeWorkspaceFile(workspace, "target.json", JSON.stringify({
       schemaVersion: 2, targetURL: workspace.targetURL, hostname: workspace.hostname,
       slug: workspace.slug, parentTargetID: workspace.parentTargetID, assetType: workspace.assetType,
@@ -832,6 +894,8 @@ export namespace TargetMemory {
   export async function refreshScopedAssets(parentURL: string): Promise<Workspace[]> {
     const parent = await get(parentURL)
     if (!parent) throw new Error("Parent workspace not found.")
+    const scope = await getScope(parent.targetURL)
+    if (!scope || scope.status !== "configured") throw new Error("Cannot reconcile child assets without a configured parent scope.")
     const candidates = list().filter((item) => item.id !== parent.id && !item.parentTargetID)
     const attached: Workspace[] = []
     for (const candidate of candidates) {
@@ -841,6 +905,18 @@ export namespace TargetMemory {
         parentTargetURL: parent.targetURL,
         assetType: guessAssetType(candidate.hostname, candidate.assetType),
       }))
+    }
+
+    // A previously attached child must not remain under the parent after scope is narrowed.
+    // Detach it to its own target root without deleting its notes or evidence.
+    for (const child of children(parent.id)) {
+      const origin = new URL(child.targetURL).origin
+      const excluded = scope.excludedItems.some((item) => checkMatch(origin, item).matches)
+      const included = scope.scopeItems.some((item) => checkMatch(origin, item).matches)
+      if (!included || excluded) await detachWorkspace(
+        Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, child.id)).get())!,
+        parent,
+      )
     }
     await syncAssetRegistry(parent)
     return attached
