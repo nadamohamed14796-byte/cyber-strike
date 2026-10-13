@@ -158,7 +158,7 @@ export function sourceRelevance(url: string, title: string, text: string, source
   // For noisy sources such as Medium, require real security relevance.
   // A title/path hit alone is not enough unless it is a highly specific vuln term.
   const specificVulnerability =
-    /\b(idor|xss|ssrf|csrf|sqli|ssti|xxe|cve|account takeover|prototype pollution|request smuggling|race condition|subdomain takeover|path traversal)\b/i.test(
+    /\b(idor|xss|ssrf|csrf|sqli|ssti|xxe|cve|cors|account takeover|information disclosure|privilege escalation|security misconfiguration|prototype pollution|request smuggling|race condition|subdomain takeover|path traversal)\b/i.test(
       title + " " + path,
     )
   const accepted = specificVulnerability || included >= 2 || (included >= 1 && pathBoost > 0)
