@@ -34,6 +34,10 @@ describe("testerClass", () => {
     test("proxy-tester-business-logic returns business-logic", () => {
       expect(testerClass("proxy-tester-business-logic")).toBe("business-logic")
     })
+
+    test("proxy-tester-llm returns llm", () => {
+      expect(testerClass("proxy-tester-llm")).toBe("llm")
+    })
   })
 
   describe("non-tester agents return undefined", () => {
