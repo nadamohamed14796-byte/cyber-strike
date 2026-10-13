@@ -182,8 +182,7 @@ type CompiledScopeItems = {
   wildcardDomains: Set<string>
   cidrs: string[]
 }
-type CompiledTargetScope = { include: CompiledScopeItems; exclude: CompiledScopeItems }
-const compiledTargetScopeCache = new WeakMap<TargetScope, CompiledTargetScope>()
+const compiledScopeItemsCache = new WeakMap<string[], CompiledScopeItems>()
 
 function scopeFileSignature(info: Awaited<ReturnType<typeof fs.stat>>): string {
   return [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(":")
@@ -191,6 +190,8 @@ function scopeFileSignature(info: Awaited<ReturnType<typeof fs.stat>>): string {
 
 /** Compile large scope manifests once; common exact-host checks then use O(1) set lookups. */
 function compileScopeItems(items: string[]): CompiledScopeItems {
+  const cached = compiledScopeItemsCache.get(items)
+  if (cached) return cached
   const exactHosts = new Set<string>()
   const wildcardDomains = new Set<string>()
   const cidrs: string[] = []
@@ -199,17 +200,8 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
     else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2))
     else exactHosts.add(item)
   }
-  return { exactHosts, wildcardDomains, cidrs }
-}
-
-function compiledTargetScope(scope: TargetScope): CompiledTargetScope {
-  const existing = compiledTargetScopeCache.get(scope)
-  if (existing) return existing
-  const compiled = {
-    include: compileScopeItems(scope.scopeItems),
-    exclude: compileScopeItems(scope.excludedItems),
-  }
-  compiledTargetScopeCache.set(scope, compiled)
+  const compiled = { exactHosts, wildcardDomains, cidrs }
+  compiledScopeItemsCache.set(items, compiled)
   return compiled
 }
 
