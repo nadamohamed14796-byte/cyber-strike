@@ -35,7 +35,7 @@ export namespace Network {
     const rule = pattern.trim().toLowerCase()
     if (!rule || (rule.includes("*") && !rule.startsWith("*."))) return false
     const base = normalizeHost(rule.startsWith("*.") ? rule.slice(2) : rule)
-    return candidate === base || candidate.endsWith("." + base)
+    return candidate === base || (rule.startsWith("*.") && candidate.endsWith("." + base))
   }
 
   export function isLoopback(host: string): boolean {
