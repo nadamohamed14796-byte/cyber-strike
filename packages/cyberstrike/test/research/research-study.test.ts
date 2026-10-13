@@ -6,7 +6,7 @@ import { SessionTable } from "../../src/session/session.sql"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
-import { ResearchStudyTool } from "../../src/tool/research-study"
+import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
 import { tmpdir } from "../fixture/fixture"
 
 test("agent-led research study persists model analysis and completes its queue lease", async () => {
