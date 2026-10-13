@@ -1,4 +1,5 @@
 import z from "zod"
+import path from "node:path"
 import { Tool } from "../tool"
 import { TargetMemory, type Workspace } from "../../target"
 import { redactTargetNoteSecrets } from "../../target/redact"
@@ -289,7 +290,7 @@ export const WebReconTool = Tool.define("web_recon", {
             status: "observed",
             tags: ["recon", program],
           })
-          notesSaved = note.created || note.updated || !note.created
+          notesSaved = true
           finalOutput += "\n\n[+] Target artifact saved: " + artifactPath
           finalOutput += "\n[+] Target notes synchronized: " + targetWorkspace.workspacePath + "/notes.md"
         } catch (error) {
