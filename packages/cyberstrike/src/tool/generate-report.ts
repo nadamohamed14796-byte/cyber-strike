@@ -56,21 +56,62 @@ export const GenerateReportTool = Tool.define("generate_report", {
   description: DESCRIPTION,
   parameters: z.object({
     include_sections: z.array(z.enum(ALL_SECTIONS)).optional().describe("Sections to include (default: all)"),
+    target_url: z.string().url().optional().describe("Optional saved target workspace URL. When supplied, only findings attributed to this workspace and its selected descendants are included."),
+    include_children: z.boolean().optional().describe("For target_url reports, include all nested child assets (default: true). Set false for only this one workspace."),
   }),
   async execute(params, ctx) {
     const rootSession = Session.root(ctx.sessionID)
     const session = await Session.get(rootSession)
+    const allWorkspaces = TargetMemory.list()
+    const targetURLs = new Map(allWorkspaces.map((target) => [target.id, target.targetURL]))
+    const reportTarget = params.target_url ? await TargetMemory.get(params.target_url) : undefined
+    if (params.target_url && !reportTarget) {
+      throw new Error("Report target workspace was not found. Initialize the target and configure its saved scope first.")
+    }
 
-    const vulns = Vulnerability.confirmed(rootSession)
-    const intel = Intel.get(rootSession)
-    const coverage = Intel.computeCoverage(rootSession)
-    const assetCoverage = Intel.computePerAssetCoverage(rootSession)
-    const coverageNotes = CoverageNote.listBySession(rootSession)
+    const includeChildren = Boolean(reportTarget && params.include_children !== false)
+    const selectedWorkspaces = reportTarget
+      ? selectReportWorkspaces(reportTarget, allWorkspaces, includeChildren)
+      : allWorkspaces
+    const selectedTargetIDs = new Set(selectedWorkspaces.map((target) => target.id))
+    const assetInReport = (asset: string) =>
+      !reportTarget || selectedWorkspaces.some((target) => assetMatchesWorkspace(asset, target))
+    const requestInReport = (request: Request.Info) =>
+      !reportTarget || selectedWorkspaces.some((target) => requestMatchesWorkspace(request, target))
+
+    const allVulns = Vulnerability.confirmed(rootSession)
+    const vulns = reportTarget
+      ? allVulns.filter((v) => Boolean(v.target_id && selectedTargetIDs.has(v.target_id)))
+      : allVulns
+    const excludedFindingCount = reportTarget ? allVulns.length - vulns.length : 0
+    const unattributedFindingCount = reportTarget ? allVulns.filter((v) => !v.target_id).length : 0
+
+    const intel = Intel.get(rootSession).filter((entry) => assetInReport(entry.asset))
+    const coverage = Intel.computeCoverage(rootSession, (entry) => assetInReport(entry.asset))
+    const assetCoverage = Intel.computePerAssetCoverage(rootSession, (entry) => assetInReport(entry.asset))
+    const coverageNotes = CoverageNote.listBySession(rootSession).filter((note) => assetInReport(note.asset))
     const state = Methodology.computeState(rootSession)
-    const chains = Chain.load(rootSession)
-    const requests = Request.get(rootSession)
-    const gates = Validation.runAllGates(rootSession, [])
-    const targetURLs = new Map(TargetMemory.list().map((target) => [target.id, target.targetURL]))
+    const chains = Chain.load(rootSession).filter((chain) =>
+      !reportTarget || chain.assets.some((asset) => assetInReport(asset)),
+    )
+    const requests = Request.get(rootSession).filter(requestInReport)
+
+    // The target-limited report must not present the session-wide validation result as
+    // if it validated only the selected assets. Full-session reports use saved scopes
+    // instead of passing an empty scope list (which silently skipped the scope gate).
+    let gates: ReturnType<typeof Validation.runAllGates> | undefined
+    if (!reportTarget) {
+      const scopeItems = new Set<string>()
+      for (const workspace of allWorkspaces) {
+        try {
+          const scope = await TargetMemory.getScope(workspace.targetURL)
+          if (scope?.status === "configured") for (const item of scope.scopeItems) scopeItems.add(item)
+        } catch {
+          // A broken manifest must not widen a scope. Other valid scopes still participate.
+        }
+      }
+      gates = Validation.runAllGates(rootSession, [...scopeItems])
+    }
 
     const breakdown = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
     for (const v of vulns) {
@@ -81,10 +122,20 @@ export const GenerateReportTool = Tool.define("generate_report", {
     const uniqueAssets = [...new Set(intel.map((e) => e.asset))]
     const duration = session.time.updated - session.time.created
     const sections = params.include_sections ?? [...ALL_SECTIONS]
+    const reportLabel = reportTarget
+      ? reportTarget.targetURL + (includeChildren ? ` (including ${Math.max(0, selectedWorkspaces.length - 1)} descendant workspaces)` : " (single workspace)")
+      : session.title
+    const draftTimestamp = new Date().toISOString().replace(/[:.]/g, "-")
+    const recommendedReportPath = reportTarget
+      ? reportTarget.workspacePath + "/reports/report-" + draftTimestamp + ".md"
+      : undefined
 
     const parts: string[] = []
+    parts.push(formatHeader(session, vulns, breakdown, coverage, state, duration, reportLabel))
 
-    parts.push(formatHeader(session, vulns, breakdown, coverage, state, duration))
+    if (reportTarget) {
+      parts.push(formatReportScope(reportTarget.targetURL, selectedWorkspaces, includeChildren, excludedFindingCount, unattributedFindingCount, reportTarget.workspacePath))
+    }
 
     if (sections.includes("executive_summary")) {
       parts.push("---\n\n<!-- AI: executive_summary -->\n\n---\n\n<!-- AI: risk_assessment -->")
@@ -94,7 +145,7 @@ export const GenerateReportTool = Tool.define("generate_report", {
 
     if (sections.includes("coverage")) parts.push(formatCoverage(coverage, assetCoverage, coverageNotes))
 
-    if (sections.includes("methodology")) parts.push(formatMethodologySection(state))
+    if (sections.includes("methodology")) parts.push(formatMethodologySection(state, Boolean(reportTarget)))
 
     if (sections.includes("chains")) parts.push(formatChains(chains))
 
@@ -102,9 +153,13 @@ export const GenerateReportTool = Tool.define("generate_report", {
 
     if (sections.includes("timeline")) parts.push(formatTimeline(vulns, session))
 
-    if (sections.includes("agent_performance")) parts.push(formatAgentPerformance(rootSession))
+    if (sections.includes("agent_performance")) parts.push(formatAgentPerformance(rootSession, Boolean(reportTarget)))
 
-    if (sections.includes("validation")) parts.push(formatValidationSection(gates))
+    if (sections.includes("validation")) {
+      parts.push(reportTarget
+        ? formatScopedValidationNotice()
+        : formatValidationSection(gates!))
+    }
 
     parts.push(
       "---\n\n<!-- AI: remediation_priorities -->\n\n---\n\n*Generated by CyberStrike (cyberstrike.io) — AI-Powered Offensive Security Platform*",
@@ -115,17 +170,136 @@ export const GenerateReportTool = Tool.define("generate_report", {
       output: parts.join("\n\n"),
       metadata: {
         findingCount: vulns.length,
+        excludedFindingCount,
+        unattributedFindingCount,
         criticalCount: breakdown.critical,
         highCount: breakdown.high,
         coveragePercent: coverage.coveragePercent,
         methodologyPercent: state.completionPercent,
         activeChains: chains.filter((c) => c.status !== "disproven").length,
+        reportTargetURL: reportTarget?.targetURL,
+        reportTargetID: reportTarget?.id,
+        includedWorkspaceIDs: reportTarget ? [...selectedTargetIDs] : undefined,
+        includeChildren: reportTarget ? includeChildren : undefined,
+        recommendedReportPath,
       },
     }
   },
 })
 
 // --- Helper Functions ---
+
+function selectReportWorkspaces(
+  root: Workspace,
+  allWorkspaces: Workspace[],
+  includeChildren: boolean,
+): Workspace[] {
+  const byParent = new Map<string, Workspace[]>()
+  const byID = new Map(allWorkspaces.map((workspace) => [workspace.id, workspace]))
+  for (const workspace of allWorkspaces) {
+    if (!workspace.parentTargetID) continue
+    const siblings = byParent.get(workspace.parentTargetID) ?? []
+    siblings.push(workspace)
+    byParent.set(workspace.parentTargetID, siblings)
+  }
+
+  const selected: Workspace[] = []
+  const seen = new Set<string>()
+  const visit = (id: string) => {
+    if (seen.has(id)) return
+    seen.add(id)
+    const workspace = byID.get(id)
+    if (!workspace) return
+    selected.push(workspace)
+    if (includeChildren) for (const child of byParent.get(id) ?? []) visit(child.id)
+  }
+  visit(root.id)
+  return selected
+}
+
+function pathIsWithin(basePath: string, candidatePath: string): boolean {
+  const base = basePath.replace(/\/+$/, "") || "/"
+  const candidate = candidatePath.replace(/\/+$/, "") || "/"
+  return base === "/" || candidate === base || candidate.startsWith(base + "/")
+}
+
+/** Match an intelligence asset to an exact workspace host and path, not a substring. */
+function assetMatchesWorkspace(
+  asset: string,
+  workspace: { targetURL: string },
+): boolean {
+  const raw = asset?.trim()
+  if (!raw || /[\u0000-\u001f]/.test(raw)) return false
+  const explicitScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(raw)
+  let candidate: URL
+  try {
+    candidate = new URL(explicitScheme ? raw : "https://" + raw)
+  } catch {
+    return false
+  }
+  if (candidate.username || candidate.password || !["http:", "https:"].includes(candidate.protocol)) return false
+
+  const base = new URL(workspace.targetURL)
+  if (candidate.hostname.toLowerCase() !== base.hostname.toLowerCase()) return false
+  if (explicitScheme && (candidate.protocol !== base.protocol || candidate.port !== base.port)) return false
+  if (!explicitScheme && candidate.port && candidate.port !== base.port) return false
+  return pathIsWithin(base.pathname, candidate.pathname)
+}
+
+/** Filter captured request records by exact origin and the target's saved path boundary. */
+function requestMatchesWorkspace(
+  request: Request.Info,
+  workspace: { targetURL: string },
+): boolean {
+  const base = new URL(workspace.targetURL)
+  const origin = request.origin ?? (request.scheme && request.host
+    ? request.scheme + "://" + request.host + (request.port ? ":" + request.port : "")
+    : undefined)
+  if (!origin) return request.page_url ? assetMatchesWorkspace(request.page_url, workspace) : false
+  try {
+    const parsedOrigin = new URL(origin)
+    if ((parsedOrigin.protocol !== "http:" && parsedOrigin.protocol !== "https:") ||
+      parsedOrigin.username || parsedOrigin.password || parsedOrigin.origin !== base.origin) return false
+    const requestPath = request.normalized_path || request.canonical_path || "/"
+    const parsedPath = new URL(requestPath, parsedOrigin).pathname
+    return pathIsWithin(base.pathname, parsedPath)
+  } catch {
+    return false
+  }
+}
+
+function formatReportScope(
+  targetURL: string,
+  workspaces: Workspace[],
+  includeChildren: boolean,
+  excludedFindingCount: number,
+  unattributedFindingCount: number,
+  workspacePath: string,
+): string {
+  const lines = [
+    "## Report Scope",
+    "",
+    `- Selected target: ${targetURL}`,
+    `- Included workspaces: ${workspaces.length}${includeChildren ? " (target plus authorized descendants)" : " (selected workspace only)"}`,
+    `- Findings excluded because they belong to another workspace or have no target attribution: ${excludedFindingCount}`,
+    `- Unattributed findings among those excluded: ${unattributedFindingCount}`,
+    `- Final report location: ${workspacePath}/reports/`,
+    "",
+    "| Workspace | Type |",
+    "|---|---|",
+    ...workspaces.map((workspace) => `| ${workspace.targetURL.replace(/\|/g, "%7C")} | ${workspace.assetType} |`),
+  ]
+  return lines.join("\n")
+}
+
+function formatScopedValidationNotice(): string {
+  return [
+    "## Validation Status",
+    "",
+    "Not computed for this target-limited report. The validation gates operate on session-wide methodology and finding records; presenting that global result here would misstate the validation of the selected asset subset.",
+    "Run a program-wide report to see the session-level validation gate.",
+  ].join("\n")
+}
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000)
@@ -145,13 +319,14 @@ function formatHeader(
   coverage: Intel.CoverageReport,
   state: Methodology.State,
   duration: number,
+  targetLabel = session.title,
 ): string {
   const date = new Date(session.time.created).toISOString().split("T")[0]
-  const openCount = vulns.filter((v) => v.status === "open").length
+  const openCount = vulns.filter((v) => v.status !== "fixed" && v.status !== "ignored").length
   return [
     "# Security Assessment Report",
     "",
-    `**Target:** ${session.title}`,
+    `**Target:** ${targetLabel}`,
     `**Date:** ${date}`,
     `**Duration:** ${formatDuration(duration)}`,
     `**Findings:** ${vulns.length} total (${openCount} open) — ${breakdown.critical} Critical, ${breakdown.high} High, ${breakdown.medium} Medium, ${breakdown.low} Low, ${breakdown.info} Info`,
@@ -270,9 +445,10 @@ function formatCoverage(
   return lines.join("\n")
 }
 
-function formatMethodologySection(state: Methodology.State): string {
+function formatMethodologySection(state: Methodology.State, targetScoped = false): string {
   const lines: string[] = [
-    "## Methodology Progress",
+    targetScoped ? "## Methodology Progress (session-wide)" : "## Methodology Progress",
+    ...(targetScoped ? ["", "*This phase progress covers the full session, not only the selected target workspaces.*"] : []),
     "",
     "| Phase | Status | Deliverables |",
     "|-------|--------|-------------|",
@@ -398,9 +574,10 @@ function formatTimeline(vulns: Vulnerability.Info[], session: { time: { created:
   return lines.join("\n")
 }
 
-function formatAgentPerformance(rootSession: string): string {
+function formatAgentPerformance(rootSession: string, targetScoped = false): string {
   const lines: string[] = [
-    "## Agent Performance",
+    targetScoped ? "## Agent Performance (session-wide)" : "## Agent Performance",
+    ...(targetScoped ? ["", "*Performance metrics are session-level and are not attributed to only the selected workspaces.*"] : []),
     "",
     "| Agent | Codename | Missions | Findings | Chains | Score | Morale |",
     "|-------|----------|----------|----------|--------|-------|--------|",

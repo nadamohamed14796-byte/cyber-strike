@@ -31,3 +31,10 @@ After receiving the report output:
 Do NOT skip the AI sections. They are the most valuable part of the report — the deterministic data is compiled automatically, but the executive analysis requires your reasoning.
 
 The `include_sections` parameter allows generating partial reports. Default includes all sections.
+
+### Target-specific report behavior
+- For one program or target tree, pass `target_url` as the saved parent URL. Descendant assets are included by default.
+- For one asset only, pass its `target_url` with `include_children: false`.
+- Target-limited reports filter findings by their persisted target workspace IDs, filter intelligence/coverage/requests to the selected workspace host/path boundaries, and explicitly count findings excluded because they belong to another workspace or were never attributed. Do not re-add excluded findings manually.
+- The report metadata includes `recommendedReportPath`. Fill the three AI placeholders, then write the completed report to that exact path so the parent report goes in the parent `reports/` directory and child reports stay under the child workspace.
+- Methodology and agent-performance values remain session-wide; the target report labels them accordingly. The target-limited validation section intentionally does not claim a session-wide gate result is asset-specific.

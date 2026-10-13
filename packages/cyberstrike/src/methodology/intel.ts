@@ -382,9 +382,13 @@ export namespace Intel {
     asset: string
   }
 
-  export function computeCoverage(sessionID: string): CoverageReport {
-    const entries = get(sessionID)
-    const allChecks = getVrtChecks(sessionID)
+  export function computeCoverage(
+    sessionID: string,
+    includeEntry?: (entry: Entry) => boolean,
+  ): CoverageReport {
+    const entries = get(sessionID).filter((entry) => includeEntry?.(entry) ?? true)
+    const entryIDs = new Set(entries.map((entry) => entry.id))
+    const allChecks = getVrtChecks(sessionID).filter((check) => entryIDs.has(check.entryID))
 
     const entriesWithChecklist = new Set(allChecks.map((c) => c.entryID)).size
     const completed = allChecks.filter((c) => c.status !== "pending")
@@ -522,9 +526,13 @@ export namespace Intel {
     coveragePercent: number
   }
 
-  export function computePerAssetCoverage(sessionID: string): AssetCoverage[] {
-    const entries = get(sessionID)
-    const allChecks = getVrtChecks(sessionID)
+  export function computePerAssetCoverage(
+    sessionID: string,
+    includeEntry?: (entry: Entry) => boolean,
+  ): AssetCoverage[] {
+    const entries = get(sessionID).filter((entry) => includeEntry?.(entry) ?? true)
+    const entryIDs = new Set(entries.map((entry) => entry.id))
+    const allChecks = getVrtChecks(sessionID).filter((check) => entryIDs.has(check.entryID))
 
     const assetMap = new Map<string, { entries: Entry[]; checks: ReturnType<typeof getVrtChecks> }>()
     for (const entry of entries) {
