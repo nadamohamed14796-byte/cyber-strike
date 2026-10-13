@@ -6,7 +6,7 @@ import { SessionTable } from "../../src/session/session.sql"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
-import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
+import { ResearchStudyTool } from "../../src/tool/research-study"
 import { tmpdir } from "../fixture/fixture"
 
 test("agent-led research study persists model analysis and completes its queue lease", async () => {
@@ -172,9 +172,27 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
         expect(row).not.toBeNull()
       }
 
-      const result = await queueLegacyKnowledgeForModelStudy("portswigger")
-      expect(result.queued).toBe(legacyCount)
-      expect(result.examined).toBe(legacyCount)
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_legacy_backfill_" + marker.slice(0, 18),
+        messageID: "msg_legacy_backfill_" + marker.slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const result = await tool.execute({
+        action: "backfill",
+        pages: 5,
+        depth: 2,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      const summary = JSON.parse(result.output)
+      expect(summary.legacy_knowledge_queued_for_model_study).toBe(legacyCount)
+      expect(summary.legacy_knowledge_examined).toBe(legacyCount)
+      expect(summary.current.queue.queued).toBe(legacyCount)
       expect(ResearchQueue.stats("portswigger").queued).toBe(legacyCount)
       await Instance.dispose()
     },
