@@ -9,10 +9,17 @@ import { ReportKnowledge } from "./report-knowledge"
  * Build a compact advisory briefing from the existing SQLite knowledge base.
  * External material is not a finding and must be independently reproduced against the target.
  */
-export function requestResearchSignals(input: { method: string; path: string; contentType?: string | null; status?: number | null }): string[] {
+export function requestResearchSignals(input: {
+  method: string
+  path: string
+  contentType?: string | null
+  status?: number | null
+  responseHeaders?: Record<string, string> | null
+}): string[] {
   const requestPath = input.path.toLowerCase()
   const contentType = (input.contentType ?? "").toLowerCase()
   const method = input.method.toLowerCase()
+  const responseHeaderNames = Object.keys(input.responseHeaders ?? {}).map((name) => name.toLowerCase())
   const tags = ["captured-request", method]
 
   // Signals describe where a useful methodology might apply; none establishes a vulnerability.
@@ -30,6 +37,14 @@ export function requestResearchSignals(input: { method: string; path: string; co
   if (/upload|attachment|import-file|media/.test(requestPath) || /multipart\/form-data/.test(contentType)) tags.push("file-upload")
   if (/redirect|return[-_]?url|next[-_]?url|proxy|webhook|fetch[-_]?url|import[-_]?url/.test(requestPath)) tags.push("server-side-request")
   if (input.status === 401 || input.status === 403) tags.push("authorization-boundary")
+  // Use header names only: response headers may contain Set-Cookie or other
+  // secret-bearing values, which must never become research queries or prompts.
+  if (responseHeaderNames.some((name) => /^(?:cache-control|expires|age|etag|vary|pragma|surrogate-control|x-cache|cf-cache-status)$/.test(name))) {
+    tags.push("cache-behavior")
+  }
+  if (responseHeaderNames.some((name) => name.startsWith("access-control-") || name === "timing-allow-origin")) {
+    tags.push("cors-policy")
+  }
   if (/^(post|put|patch|delete)$/i.test(method)) tags.push("business-logic")
   return [...new Set(tags)]
 }
@@ -37,7 +52,7 @@ export function requestResearchSignals(input: { method: string; path: string; co
 /** Map an observed signal tag to a broad research class; this selects advisory material only. */
 export function researchClassForSignalTags(input: string[]): string | undefined {
   const tags = input.map((tag) => tag.trim().replace(/^target:/i, "").toLowerCase())
-  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization)$/.test(tag))
+  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|cache-behavior|cors|cors-policy|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization|information-disclosure|privilege-escalation|security-misconfiguration|account-takeover)$/.test(tag))
   if (!classTag) return undefined
   const aliases: Record<string, string> = {
     bola: "idor",
@@ -46,6 +61,8 @@ export function researchClassForSignalTags(input: string[]): string | undefined 
     "authorization-boundary": "access-control",
     "server-side-request": "ssrf",
     "token-or-jwt": "jwt",
+    "cache-behavior": "web-cache",
+    "cors-policy": "cors",
     authz: "access-control",
     authorization: "access-control",
   }
@@ -54,6 +71,7 @@ export function researchClassForSignalTags(input: string[]): string | undefined 
     "open-redirect", "auth-bypass", "access-control", "business-logic", "prototype-pollution",
     "deserialization", "request-smuggling", "cache-poisoning", "file-upload", "graphql",
     "jwt", "command-injection", "path-traversal", "subdomain-takeover", "oauth", "web-cache",
+    "cors", "information-disclosure", "privilege-escalation", "security-misconfiguration", "account-takeover",
   ])
   const normalized = aliases[classTag] ?? classTag
   return knownClasses.has(normalized) ? normalized : undefined
@@ -84,6 +102,11 @@ export function promptResearchSignals(input: string): string[] {
     ["path-traversal", /path traversal|directory traversal/],
     ["prototype-pollution", /prototype pollution/],
     ["request-smuggling", /request smuggling|http desynchronization/],
+    ["cors-policy", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
+    ["information-disclosure", /information disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
+    ["privilege-escalation", /privilege escalation|vertical privilege escalation|horizontal privilege escalation/],
+    ["security-misconfiguration", /security misconfiguration|misconfiguration|insecure configuration/],
+    ["account-takeover", /account takeover|account compromise|ato\b/],
   ]
   for (const [signal, pattern] of patterns) if (pattern.test(text)) signals.push(signal)
   return [...new Set(signals)].slice(0, 12)
@@ -141,6 +164,7 @@ export namespace ResearchContext {
           normalizedPath: RequestTable.normalized_path,
           contentType: RequestTable.response_content_type,
           status: RequestTable.response_status,
+          responseHeaders: RequestTable.response_headers,
         })
         .from(RequestTable)
         .where(inArray(RequestTable.session_id, [...sessionIDs]))
@@ -163,7 +187,13 @@ export namespace ResearchContext {
     const requestSignals = recentRequests.map((request) => ({
       title: [request.method, request.normalizedPath, request.contentType, request.status ? "status " + request.status : ""].filter(Boolean).join(" "),
       type: "captured_request",
-      tags: requestResearchSignals({ method: request.method, path: request.normalizedPath, contentType: request.contentType, status: request.status }),
+      tags: requestResearchSignals({
+        method: request.method,
+        path: request.normalizedPath,
+        contentType: request.contentType,
+        status: request.status,
+        responseHeaders: request.responseHeaders,
+      }),
     }))
     const functionSignals = webFunctions.map((fn) => {
       const objects = ((fn.objects as string[] | null) ?? []).slice(0, 6)
@@ -206,7 +236,7 @@ export namespace ResearchContext {
     // API/auth/business-logic signal). Query the most recent actionable signals
     // independently, then deduplicate the global public references.
     const actionableType = /^(endpoint|api_schema|authentication_flow|business_rule|parameter|configuration|technology|vulnerability_hint|sensitive_data|infrastructure)$/i
-    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
+    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information disclosure|data leakage|misconfiguration|account takeover|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
     const signalEntries = signalPool.filter((entry) => {
       const tags = ((entry.tags as string[] | null) ?? []).slice(0, 8)
       return actionableType.test(entry.type ?? "") ||
@@ -257,6 +287,7 @@ export namespace ResearchContext {
         : "not recorded"
       return [
         "### " + row.title,
+        "Knowledge record ID: " + row.id,
         "Class: " + (row.vulnerability_class ?? "unclassified") +
           " | Severity mentioned by source: " + row.severity +
           " | Source trust metadata: " + trustLabel +
