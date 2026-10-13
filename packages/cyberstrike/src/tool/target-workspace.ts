@@ -105,6 +105,8 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       let sourceContents: string | undefined
       let sourcePath: string | undefined
       let sourceHash: string | undefined
+      let sourceFilename: string | undefined
+      let sourceArtifactPath: string | undefined
 
       if (params.scope_file_path) {
         // Do not let a file-path typo silently create a second target workspace.
@@ -137,6 +139,11 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         sourceContents = bytes.toString("utf-8")
         fileEntries = parseScopeFileContents(sourceContents!)
         sourceHash = createHash("sha256").update(bytes).digest("hex")
+        sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
+        sourceArtifactPath = path.join(existingWorkspace.workspacePath, "scope", sourceFilename)
+        // Persist the input before changing the authorization manifest. If any later
+        // validation fails, the source list is still safely preserved in the workspace.
+        await TargetMemory.writeWorkspaceFile(existingWorkspace, "scope/" + sourceFilename, sourceContents!)
       }
 
       const includeEntries = [...(params.include ?? []), ...fileEntries]
@@ -147,11 +154,12 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         authorizationReference: required(params.authorization_reference, "authorization_reference"),
       })
 
-      let sourceArtifactPath: string | undefined
-      if (sourceContents !== undefined && sourceHash) {
-        const sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
-        sourceArtifactPath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
-        await TargetMemory.writeWorkspaceFile(result.workspace, "scope/" + sourceFilename, sourceContents)
+      if (sourceContents !== undefined && sourceHash && sourceFilename && sourceArtifactPath) {
+        const canonicalSourcePath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
+        if (canonicalSourcePath !== sourceArtifactPath) {
+          await TargetMemory.writeWorkspaceFile(result.workspace, "scope/" + sourceFilename, sourceContents)
+          sourceArtifactPath = canonicalSourcePath
+        }
         await TargetMemory.addNote(result.workspace.targetURL, {
           kind: "manual",
           title: "Scope file import checkpoint",
