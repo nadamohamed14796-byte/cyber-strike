@@ -347,6 +347,7 @@ export namespace ReportKnowledge {
     reportID: string
     sessionID: string
     outcome: "observed" | "useful"
+    hook?: "research-context" | "research_knowledge" | "finding-validation"
     signal?: string
     metadata?: Record<string, unknown>
   }): boolean {
@@ -368,14 +369,33 @@ export namespace ReportKnowledge {
           !input.sessionID.trim()
         ) return false
 
-        // Count a reference at most once per session and feedback outcome. This
-        // keeps repeated validation retries from artificially inflating ranking.
+        const hook = input.hook ?? "finding-validation"
+        // A usefulness event is valid only if this exact reference was previously
+        // surfaced in this session tree. This prevents guessed IDs from gaming ranking.
+        if (input.outcome === "useful") {
+          const surfaced = db.select({ id: ReportKnowledgeEventTable.id })
+            .from(ReportKnowledgeEventTable)
+            .where(and(
+              eq(ReportKnowledgeEventTable.report_id, input.reportID),
+              eq(ReportKnowledgeEventTable.session_id, input.sessionID),
+              eq(ReportKnowledgeEventTable.outcome, "observed"),
+              or(
+                eq(ReportKnowledgeEventTable.hook, "research-context"),
+                eq(ReportKnowledgeEventTable.hook, "research_knowledge"),
+                eq(ReportKnowledgeEventTable.hook, "finding-validation"),
+              ),
+            ))
+            .get()
+          if (!surfaced) return false
+        }
+
+        // Count each reference at most once per session, hook, and feedback outcome.
         const existingEvent = db.select({ id: ReportKnowledgeEventTable.id })
           .from(ReportKnowledgeEventTable)
           .where(and(
             eq(ReportKnowledgeEventTable.report_id, input.reportID),
             eq(ReportKnowledgeEventTable.session_id, input.sessionID),
-            eq(ReportKnowledgeEventTable.hook, "finding-validation"),
+            eq(ReportKnowledgeEventTable.hook, hook),
             eq(ReportKnowledgeEventTable.outcome, input.outcome),
           ))
           .get()
@@ -386,7 +406,7 @@ export namespace ReportKnowledge {
           id: Identifier.ascending("report_knowledge_event"),
           report_id: input.reportID,
           session_id: input.sessionID,
-          hook: "finding-validation",
+          hook,
           outcome: input.outcome,
           signal: input.signal ?? null,
           evidence: null,
