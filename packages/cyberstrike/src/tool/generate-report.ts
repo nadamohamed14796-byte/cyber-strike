@@ -10,6 +10,7 @@ import { Chain } from "../methodology/chain"
 import { Validation } from "../methodology/validation"
 import { Request } from "../session/request"
 import { AgentPerformance } from "../methodology/performance"
+import { TargetMemory } from "../target"
 
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
@@ -69,6 +70,7 @@ export const GenerateReportTool = Tool.define("generate_report", {
     const chains = Chain.load(rootSession)
     const requests = Request.get(rootSession)
     const gates = Validation.runAllGates(rootSession, [])
+    const targetURLs = new Map(TargetMemory.list().map((target) => [target.id, target.targetURL]))
 
     const breakdown = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
     for (const v of vulns) {
@@ -88,7 +90,7 @@ export const GenerateReportTool = Tool.define("generate_report", {
       parts.push("---\n\n<!-- AI: executive_summary -->\n\n---\n\n<!-- AI: risk_assessment -->")
     }
 
-    if (sections.includes("findings")) parts.push(formatVulnTable(vulns))
+    if (sections.includes("findings")) parts.push(formatVulnTable(vulns, targetURLs))
 
     if (sections.includes("coverage")) parts.push(formatCoverage(coverage, assetCoverage, coverageNotes))
 
@@ -158,15 +160,15 @@ function formatHeader(
   ].join("\n")
 }
 
-function formatVulnTable(vulns: Vulnerability.Info[]): string {
+function formatVulnTable(vulns: Vulnerability.Info[], targetURLs: Map<string, string> = new Map()): string {
   if (vulns.length === 0) return "## Vulnerability Findings\n\nNo vulnerabilities discovered."
 
   const sorted = [...vulns].sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 4) - (SEVERITY_ORDER[b.severity] ?? 4))
 
   const counters: Record<string, number> = {}
   const lines: string[] = ["## Vulnerability Findings", "", "### Summary", ""]
-  lines.push("| # | Severity | Title | Endpoint | CWE | Status |")
-  lines.push("|---|----------|-------|----------|-----|--------|")
+  lines.push("| # | Severity | Title | Target workspace | Endpoint | CWE | Status |")
+  lines.push("|---|----------|-------|------------------|----------|-----|--------|")
 
   const details: string[] = ["", "### Finding Details"]
 
@@ -175,11 +177,13 @@ function formatVulnTable(vulns: Vulnerability.Info[]): string {
     counters[sev] = (counters[sev] ?? 0) + 1
     const ref = `${sev}-${String(counters[sev]).padStart(3, "0")}`
 
-    lines.push(`| ${ref} | ${sev} | ${v.title} | ${v.endpoint ?? "—"} | ${v.cwe_id ?? "—"} | ${v.status} |`)
+    const targetURL = v.target_id ? targetURLs.get(v.target_id) : undefined
+    lines.push(`| ${ref} | ${sev} | ${v.title} | ${targetURL ? targetURL + " (" + v.target_id + ")" : v.target_id ?? "—"} | ${v.endpoint ?? "—"} | ${v.cwe_id ?? "—"} | ${v.status} |`)
 
     details.push("")
     details.push(`#### [${ref}] ${v.title}`)
     details.push(`- **Severity:** ${sev}`)
+    if (v.target_id) details.push(`- **Target workspace:** ${targetURLs.get(v.target_id) ?? v.target_id}`)
     if (v.endpoint) details.push(`- **Endpoint:** ${v.endpoint}`)
     if (v.cwe_id) details.push(`- **CWE:** ${v.cwe_id}`)
     if (v.attack_vector) details.push(`- **Attack Vector:** ${v.attack_vector}`)
