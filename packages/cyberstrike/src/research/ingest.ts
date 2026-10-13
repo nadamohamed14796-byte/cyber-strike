@@ -245,9 +245,13 @@ export function classifyResearchTopic(title: string, text: string) {
     ["web-cache", /web cache|cache deception/],
   ]
   const normalizedTitle = title.toLowerCase()
-  // Prefer an explicit title topic over incidental mentions in the article body.
-  const titleMatch = classes.find(([, pattern]) => pattern.test(normalizedTitle))
-  if (titleMatch) return titleMatch[0]
+  // When a title names more than one security concept, use the first explicitly
+  // named topic instead of whichever regex happens to appear first in this array.
+  const titleMatches = classes
+    .map(([name, pattern]) => ({ name, index: normalizedTitle.search(pattern) }))
+    .filter((match) => match.index >= 0)
+    .sort((left, right) => left.index - right.index)
+  if (titleMatches.length) return titleMatches[0].name
 
   const body = text.toLowerCase()
   const ranked = classes
