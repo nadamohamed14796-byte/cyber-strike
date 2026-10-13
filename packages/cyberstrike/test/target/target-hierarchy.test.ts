@@ -25,6 +25,12 @@ describe("target asset hierarchy", () => {
         expect(child!.relativePath.startsWith(path.join(configured.workspace.relativePath, "assets"))).toBe(true)
         expect(await fs.stat(child!.workspacePath)).toBeTruthy()
 
+        await TargetMemory.addNote("https://api.example.com", {
+          kind: "asset",
+          title: "API evidence",
+          content: "This note must survive a later scope change.",
+          source: "test",
+        })
         const repeated = await TargetMemory.registerObservedAsset("https://api.example.com/other/path", "api")
         expect(repeated?.id).toBe(child!.id)
         expect(TargetMemory.children(configured.workspace.id).map((item) => item.id)).toEqual([child!.id])
@@ -59,6 +65,7 @@ describe("target asset hierarchy", () => {
         expect(detached?.workspacePath).toContain(path.join(".cyberstrike", "targets"))
         const detachedNotes = await fs.readFile(path.join(detached!.workspacePath, "notes.md"), "utf-8")
         expect(detachedNotes).toContain("https://api.example.com")
+        expect(detachedNotes).toContain("This note must survive a later scope change.")
       },
     })
   })
