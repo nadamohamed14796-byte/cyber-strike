@@ -234,8 +234,14 @@ test("finding-validation feedback ranks shared references without poisoning glob
         signal: "finding-validation:confirmed",
         metadata: { validation_verdict: "confirmed", feedback_basis: "agent-marked-materially-influential" },
       }
-      // A guessed record ID cannot raise ranking until that exact public reference
-      // was actually surfaced in the current session tree.
+      // A guessed record ID cannot raise ranking until the exact reference was
+      // surfaced by retrieval. A validation event itself is not proof of exposure.
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(false)
+      expect(ReportKnowledge.recordReferenceUse({
+        ...feedback,
+        outcome: "observed",
+        hook: "finding-validation",
+      })).toBe(true)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(false)
       expect(ReportKnowledge.recordReferenceUse({
         ...feedback,
@@ -246,7 +252,7 @@ test("finding-validation feedback ranks shared references without poisoning glob
       })).toBe(true)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(true)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(false)
-      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "observed" })).toBe(true)
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "observed" })).toBe(false)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, reportID: scoped.id, outcome: "useful" })).toBe(false)
 
       const stored = Database.use((db) =>
