@@ -19,9 +19,11 @@ export namespace PackageRegistry {
       },
     })
 
-    const code = await result.exited
-    const stdout = result.stdout ? await readableStreamToText(result.stdout) : ""
-    const stderr = result.stderr ? await readableStreamToText(result.stderr) : ""
+    // Consume piped output concurrently with process execution. If we await
+    // exit first, a noisy child can fill a pipe buffer and never exit.
+    const stdoutPromise = result.stdout ? readableStreamToText(result.stdout) : Promise.resolve("")
+    const stderrPromise = result.stderr ? readableStreamToText(result.stderr) : Promise.resolve("")
+    const [code, stdout, stderr] = await Promise.all([result.exited, stdoutPromise, stderrPromise])
 
     if (code !== 0) {
       log.warn("bun info failed", { pkg, field, code, stderr })
