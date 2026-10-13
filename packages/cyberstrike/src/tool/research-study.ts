@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import z from "zod"
 import { ReportKnowledge } from "../learning/report-knowledge"
-import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION, RESEARCH_SOURCES } from "../research/sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION, RESEARCH_SOURCES, resolveResearchSourceForURL } from "../research/sources"
 import {
   discoverResearch,
   fetchResearchSourceForStudy,
@@ -358,21 +358,18 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
       }
 
       const metadata = row.metadata ?? {}
-      const matchingSources = RESEARCH_SOURCES.filter((source) =>
-        source.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
-      )
-      const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
-      const preferred = matchingSources.find((source) => source.id === preferredID)
-      const source = preferredID
-        ? preferred
-        : matchingSources.length === 1 ? matchingSources[0] : undefined
+      const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : undefined
+      const source = resolveResearchSourceForURL(sourceURL, preferredID)
       if (!source) {
-        // Do not silently assign another source's trust rating or crawler policy
-        // when legacy metadata is missing/contradictory on a shared host.
+        const hasConfiguredHost = RESEARCH_SOURCES.some((entry) =>
+          entry.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
+        )
+        // Shared hosts are resolved only by trusted source metadata or a unique
+        // configured seed-path match; never borrow the trust score of a peer feed.
         markSkipped(
           row.id,
-          matchingSources.length
-            ? "legacy source provenance is missing or does not match the configured URL host"
+          hasConfiguredHost
+            ? "legacy source provenance is missing or ambiguous for the configured source host/path"
             : "no currently configured source permits safe fetching from this host",
         )
         continue
