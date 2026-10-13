@@ -132,7 +132,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           throw new Error("Could not read scope file " + sourcePath + ": " + (error instanceof Error ? error.message : String(error)))
         }
         sourceContents = bytes.toString("utf-8")
-        fileEntries = parseScopeFileContents(sourceContents)
+        fileEntries = parseScopeFileContents(sourceContents!)
         sourceHash = createHash("sha256").update(bytes).digest("hex")
       }
 
@@ -148,7 +148,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       if (sourceContents !== undefined && sourceHash) {
         const sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
         sourceArtifactPath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
-        await TargetMemory.writeWorkspaceFile(result.workspace, "scope/" + sourceFilename, sourceContents.endsWith("\n") ? sourceContents : sourceContents + "\n")
+        await TargetMemory.writeWorkspaceFile(result.workspace, "scope/" + sourceFilename, sourceContents)
         await TargetMemory.addNote(result.workspace.targetURL, {
           kind: "manual",
           title: "Scope file import checkpoint",
