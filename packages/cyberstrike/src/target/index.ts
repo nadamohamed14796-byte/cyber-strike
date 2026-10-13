@@ -1459,7 +1459,7 @@ export namespace TargetMemory {
         if (!matchingObservation) return undefined
         const targetPath = new URL(normalized.targetURL).pathname.replace(/\/$/, "") || "/"
         return {
-          workspace: mapWorkspace(row, path.join(".cyberstrike", "targets", normalized.slug)),
+          workspace: mapWorkspace(row),
           hostScore: new URL(normalized.targetURL).origin.length,
           pathScore: targetPath === "/" ? 0 : targetPath.length,
         }
