@@ -86,6 +86,15 @@ test("explicit user request produces bounded global retrieval tags without retai
   )
 })
 
+
+test("explicit injection requests map to searchable vulnerability classes", () => {
+  const signals = promptResearchSignals("SQL injection, command injection, server-side template injection")
+  expect(signals).toEqual(expect.arrayContaining(["sqli", "command-injection", "ssti"]))
+  expect(researchClassForSignalTags(["sqli"])).toBe("sqli")
+  expect(researchClassForSignalTags(["command-injection"])).toBe("command-injection")
+  expect(researchClassForSignalTags(["ssti"])).toBe("ssti")
+})
+
 test("maps request patterns to broad research classes without treating them as findings", () => {
   expect(researchClassForSignalTags(["object-identifier"])).toBe("idor")
   expect(researchClassForSignalTags(["authorization-boundary"])).toBe("access-control")
