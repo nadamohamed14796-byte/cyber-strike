@@ -691,6 +691,13 @@ export namespace ResearchQueue {
         typeof row.payload?.model_study_version === "number" &&
         row.payload.model_study_version >= RESEARCH_MODEL_STUDY_VERSION,
       )
+      const preflightSkippedRows = reportRows.filter((row) =>
+        row.status === "rejected" &&
+        row.payload?.model_study_method === "preflight-skip" &&
+        row.payload?.model_study_decision === "skipped" &&
+        typeof row.payload?.model_study_version === "number" &&
+        row.payload.model_study_version >= RESEARCH_MODEL_STUDY_VERSION,
+      )
       const counts: Record<string, number> = {
         total: reportRows.length,
         crawl_pages: crawlPageRows.length,
@@ -708,6 +715,7 @@ export namespace ResearchQueue {
         model_study_learned: modelStudiedRows.filter((row) => row.status === "learned").length,
         model_study_rejected: modelStudiedRows.filter((row) => row.status === "rejected").length,
         model_study_completed: modelStudiedRows.filter((row) => row.status === "learned" || row.status === "rejected").length,
+        model_study_skipped: preflightSkippedRows.length,
         model_study_pending: reportRows.filter((row) => ["queued", "retry", "studying"].includes(row.status)).length,
       }
       for (const row of reportRows) counts[row.status] = (counts[row.status] ?? 0) + 1
