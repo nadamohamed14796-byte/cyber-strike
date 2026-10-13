@@ -4,6 +4,7 @@ import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { classifyResearchTopic, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
+import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -363,4 +364,63 @@ test("research topic classification covers CORS, information disclosure, privile
   expect(classifyResearchTopic("Privilege escalation through role assignment", "A role check is missing.")).toBe("privilege-escalation")
   expect(classifyResearchTopic("Security misconfiguration exposes an admin panel", "The application has an insecure configuration.")).toBe("security-misconfiguration")
   expect(classifyResearchTopic("Account takeover through password recovery", "An account can be compromised.")).toBe("account-takeover")
+})
+
+
+test("learning preserves the full source fingerprint when only a cached excerpt is available", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceID = "portswigger-fingerprint-" + marker
+      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
+      if (!baseSource) throw new Error("PortSwigger test source is not configured")
+      const isolatedSource = { ...baseSource, id: sourceID }
+      RESEARCH_SOURCES.push(isolatedSource)
+      const sourceURL = "https://portswigger.net/web-security/access-control/idor?fingerprint_test=" + marker
+      const fullSourceFingerprint = "f".repeat(40)
+      const excerpt = [
+        "Insecure direct object reference (IDOR) occurs when object-level authorization is missing.",
+        "Prerequisite: use two controlled accounts with different object ownership.",
+        "Reproduction: capture the owner's GET /api/objects/123 request and repeat it with the second account.",
+        "Impact: the second account may read a private record. Compare the response with the owner baseline.",
+        "Unique fixture marker: " + marker,
+      ].join(" ")
+
+      try {
+        ResearchQueue.enqueue({
+          sourceID,
+          sourceURL,
+          title: "IDOR truncated-source fingerprint " + marker,
+          payload: {
+            cached_text: excerpt,
+            cached_text_truncated: true,
+            content_length: 150_000,
+            content_fingerprint: fullSourceFingerprint,
+            source_name: isolatedSource.name,
+            source_kind: isolatedSource.kind,
+            source_trust: isolatedSource.trust,
+          },
+        })
+
+        const result = await learnResearchQueue({ limit: 1, sourceID })
+        expect(result.learned).toBe(1)
+
+        const row = ReportKnowledge.search({
+          query: "IDOR truncated-source fingerprint " + marker,
+          sourceKind: "external_report",
+          limit: 5,
+        }).find((candidate) => candidate.title.includes(marker))
+        expect(row).toBeDefined()
+        expect(row?.metadata?.content_fingerprint).toBe(fullSourceFingerprint)
+        expect(row?.metadata?.content_length).toBe(150_000)
+        expect(row?.metadata?.content_truncated_for_learning).toBe(true)
+      } finally {
+        const sourceIndex = RESEARCH_SOURCES.indexOf(isolatedSource)
+        if (sourceIndex >= 0) RESEARCH_SOURCES.splice(sourceIndex, 1)
+        await Instance.dispose()
+      }
+    },
+  })
 })
