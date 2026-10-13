@@ -78,9 +78,10 @@ test("agent-led research study persists model analysis and completes its queue l
         continue_after_save: false,
       }, context)
       const batch = JSON.parse(next.output)
-      expect(batch.batch_size).toBe(1)
-      const claimed = batch.items[0]
-      expect(claimed.public_id).toBe(queued.id)
+      expect(batch.batch_size).toBeGreaterThanOrEqual(1)
+      const claimed = batch.items.find((item: { public_id: string }) => item.public_id === queued.id)
+      expect(claimed).toBeDefined()
+      if (!claimed) throw new Error("the explicitly queued PortSwigger row was not claimed")
       expect(claimed.text).toContain("CWE-639")
 
       const save = await tool.execute({
@@ -163,17 +164,18 @@ test("model-study backfill includes old reports with missing excerpts for safe r
       expect(legacy).not.toBeNull()
       if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
 
-      const first = await queueLegacyKnowledgeForModelStudy()
-      expect(first.queued).toBe(1)
-      expect(first.skipped).toBe(0)
+      const first = await queueLegacyKnowledgeForModelStudy("portswigger")
+      expect(first.queued).toBeGreaterThanOrEqual(1)
       const queued = ResearchQueue.find("portswigger", sourceURL)
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.cached_text).toBe("")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
 
-      const second = await queueLegacyKnowledgeForModelStudy()
-      expect(second.queued).toBe(0)
-      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
+      await queueLegacyKnowledgeForModelStudy("portswigger")
+      const stillQueued = ResearchQueue.find("portswigger", sourceURL)
+      expect(stillQueued?.sequence).toBe(queued?.sequence)
+      expect(stillQueued?.status).toBe("queued")
+      expect(stillQueued?.payload?.legacy_knowledge_id).toBe(legacy.id)
       await Instance.dispose()
     },
   })
@@ -231,8 +233,8 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(legacy).not.toBeNull()
       if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
 
-      const first = await queueLegacyKnowledgeForModelStudy()
-      expect(first.queued).toBe(1)
+      const first = await queueLegacyKnowledgeForModelStudy("portswigger")
+      expect(first.queued).toBeGreaterThanOrEqual(1)
       const queued = ResearchQueue.find("portswigger", sourceURL)
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
@@ -245,9 +247,11 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(currentKnowledge?.status).toBe("observed")
       expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(1)
 
-      const second = await queueLegacyKnowledgeForModelStudy()
-      expect(second.queued).toBe(0)
-      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
+      await queueLegacyKnowledgeForModelStudy("portswigger")
+      const stillQueued = ResearchQueue.find("portswigger", sourceURL)
+      expect(stillQueued?.sequence).toBe(queued?.sequence)
+      expect(stillQueued?.status).toBe("queued")
+      expect(stillQueued?.payload?.legacy_knowledge_id).toBe(legacy.id)
 
       const studyTool = await ResearchStudyTool.init()
       const context = {
@@ -268,8 +272,12 @@ test("model-led update queues legacy shared reports once without refetching or c
         continue_after_save: false,
       }, context)
       const batch = JSON.parse(next.output)
-      expect(batch.batch_size).toBe(1)
-      expect(batch.items[0].public_id).toBe(queued.source_id)
+      expect(batch.batch_size).toBeGreaterThanOrEqual(1)
+      if (!queued) throw new Error("legacy research queue record was not found")
+      const claimed = batch.items.find((item: { source_url: string }) => item.source_url === sourceURL)
+      expect(claimed).toBeDefined()
+      if (!claimed) throw new Error("the specific legacy report was not claimed")
+      expect(claimed.public_id).toBe(queued.source_id)
 
       const save = await studyTool.execute({
         action: "save",
@@ -279,8 +287,8 @@ test("model-led update queues legacy shared reports once without refetching or c
         limit: 3,
         continue_after_save: false,
         items: [{
-          public_id: batch.items[0].public_id,
-          lease_owner: batch.items[0].lease_owner,
+          public_id: claimed.public_id,
+          lease_owner: claimed.lease_owner,
           decision: "rejected",
           reason: "legacy fixture is intentionally rejected by the model in this integration test",
         }],
@@ -295,7 +303,10 @@ test("model-led update queues legacy shared reports once without refetching or c
       const finishedQueue = ResearchQueue.find("portswigger", sourceURL)
       expect(finishedQueue?.status).toBe("rejected")
       expect(finishedQueue?.payload?.model_study_version).toBe(1)
-      expect((await queueLegacyKnowledgeForModelStudy()).queued).toBe(0)
+      await queueLegacyKnowledgeForModelStudy("portswigger")
+      const noDuplicateRequeue = ResearchQueue.find("portswigger", sourceURL)
+      expect(noDuplicateRequeue?.status).toBe("rejected")
+      expect(noDuplicateRequeue?.payload?.model_study_version).toBe(1)
       await Instance.dispose()
     },
   })

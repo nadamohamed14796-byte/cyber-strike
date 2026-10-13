@@ -220,9 +220,23 @@ export namespace ResearchContext {
     // any target request has been captured. Only generic tags enter the query; raw text
     // is neither persisted nor included in the global knowledge context.
     const explicitSignals = promptResearchSignals(userSignalText)
-    const explicitSignalEntries = explicitSignals.length
-      ? [{ title: explicitSignals.join(" "), type: "user_prompt_signal", tags: explicitSignals }]
-      : []
+    const explicitClasses = [...new Set(
+      explicitSignals
+        .map((signal) => researchClassForSignalTags([signal]))
+        .filter((value): value is string => Boolean(value)),
+    )]
+    const explicitSignalEntries = explicitClasses.length > 1
+      ? explicitClasses.map((vulnerabilityClass) => ({
+          title: vulnerabilityClass,
+          type: "user_prompt_signal",
+          tags: [
+            vulnerabilityClass,
+            ...explicitSignals.filter((signal) => researchClassForSignalTags([signal]) === vulnerabilityClass),
+          ],
+        }))
+      : explicitSignals.length
+        ? [{ title: explicitSignals.join(" "), type: "user_prompt_signal", tags: explicitSignals }]
+        : []
     // Honor the current user's explicit security question before ambient traffic.
     // Otherwise several recent generic API requests can fill the five-result budget
     // before the request-specific vulnerability class is even queried.

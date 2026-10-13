@@ -189,13 +189,15 @@ export namespace ReportKnowledge {
 
   /** Return URLs already represented in the global external-report knowledge store. */
   export function externalSourceURLs(): string[] {
+    // Discovery/deduplication must know about public URLs already represented by a
+    // target-scoped record too. This is an existence index, not a recommendation list:
+    // recommendation APIs independently exclude target-scoped records from global context.
     return Database.use((db) =>
       db.select({ source_url: ReportKnowledgeTable.source_url })
         .from(ReportKnowledgeTable)
         .where(and(
           eq(ReportKnowledgeTable.source_kind, "external_report"),
           isNull(ReportKnowledgeTable.session_id),
-          or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
         ))
         .all()
         .flatMap((row) => row.source_url ? [row.source_url] : []),
