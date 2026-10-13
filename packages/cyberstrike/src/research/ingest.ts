@@ -158,7 +158,7 @@ export function sourceRelevance(url: string, title: string, text: string, source
   // For noisy sources such as Medium, require real security relevance.
   // A title/path hit alone is not enough unless it is a highly specific vuln term.
   const specificVulnerability =
-    /\b(idor|xss|ssrf|csrf|sqli|ssti|xxe|cve|cors|account[- ]takeover|information[- ]disclosure|privilege[- ]escalation|security[- ]misconfiguration|prototype pollution|request smuggling|race condition|subdomain takeover|path traversal)\b/i.test(
+    /\b(idor|xss|ssrf|csrf|sqli|nosqli|ssti|xxe|cve|cors|mass[- ]assignment|host header injection|mfa bypass|rate[- ]limit bypass|websocket|saml|account[- ]takeover|information[- ]disclosure|privilege[- ]escalation|security[- ]misconfiguration|prototype pollution|request smuggling|race condition|subdomain takeover|path traversal)\b/i.test(
       title + " " + path,
     )
   const accepted = specificVulnerability || included >= 2 || (included >= 1 && pathBoost > 0)
@@ -219,11 +219,15 @@ export function classifyResearchTopic(title: string, text: string) {
     ["ssrf", /server[- ]side request forgery|\bssrf\b/],
     ["csrf", /cross[- ]site request forgery|\bcsrf\b/],
     ["sqli", /sql injection|\bsqli\b/],
+    ["nosqli", /no[- ]?sql injection|\bnosqli\b|mongodb injection/],
+    ["mass-assignment", /mass[- ]assignment|over[- ]posting|overposting/],
     ["xxe", /xml external entity|\bxxe\b/],
     ["ssti", /server[- ]side template injection|\bssti\b/],
     ["race-condition", /race condition|time[- ]of[- ]check/],
     ["open-redirect", /open redirect/],
     ["auth-bypass", /authentication bypass|auth bypass/],
+    ["mfa-bypass", /mfa bypass|multi[- ]factor authentication bypass|two[- ]factor authentication bypass|\b2fa bypass\b/],
+    ["host-header-injection", /host header injection|host header poisoning|password reset poisoning/],
     ["access-control", /access control|authorization bypass|broken access control/],
     ["privilege-escalation", /privilege[- ]escalation|vertical privilege[- ]escalation|horizontal privilege[- ]escalation/],
     ["account-takeover", /account[- ]takeover|account compromise|\bato\b/],
@@ -234,6 +238,9 @@ export function classifyResearchTopic(title: string, text: string) {
     ["prototype-pollution", /prototype pollution/],
     ["deserialization", /insecure deserialization|deserialization/],
     ["request-smuggling", /request smuggling/],
+    ["rate-limit-bypass", /rate[- ]limit(?:ing)? bypass|bypass rate limits?/],
+    ["websocket", /\bwebsockets?\b|web socket/],
+    ["saml", /\bsaml\b|security assertion markup language/],
     ["cache-poisoning", /cache poisoning/],
     ["file-upload", /file upload/],
     ["graphql", /graphql/],
@@ -360,6 +367,13 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
     ["information-disclosure", /information[- ]disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
     ["security-misconfiguration", /security[- ]misconfiguration|misconfiguration|insecure configuration/],
     ["cors-policy", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
+    ["mass-assignment", /mass[- ]assignment|over[- ]posting|overposting/],
+    ["nosqli", /no[- ]?sql injection|\bnosqli\b|mongodb injection/],
+    ["host-header-injection", /host header injection|host header poisoning|password reset poisoning/],
+    ["mfa-bypass", /mfa bypass|multi[- ]factor authentication bypass|two[- ]factor authentication bypass|\b2fa bypass\b/],
+    ["rate-limit-bypass", /rate[- ]limit(?:ing)? bypass|bypass rate limits?/],
+    ["websocket", /\bwebsockets?\b|web socket/],
+    ["saml", /\bsaml\b|security assertion markup language/],
     ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/],
     ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/],
     ["javascript-client", /\.m?js\b|javascript|source map|client-side|frontend/],
