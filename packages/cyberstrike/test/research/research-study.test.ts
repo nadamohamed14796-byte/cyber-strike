@@ -198,6 +198,60 @@ test("preflight skips are counted separately from model-studied reports", async 
 })
 
 
+test("source-scoped model-study save refuses a lease from another source", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sessionID = "ses_source_filter_" + marker.replace(/-/g, "").slice(0, 18)
+      const sourceURL = "https://portswigger.net/web-security/source-filter-" + marker
+      const sourceText = ("A reusable access-control security lesson. ").repeat(12)
+      const queued = ResearchQueue.enqueue({
+        sourceID: "portswigger",
+        sourceURL,
+        title: "Access-control source filter test " + marker,
+        payload: { cached_text: sourceText, content_length: sourceText.length, content_fingerprint: "b".repeat(40) },
+      })
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID,
+        messageID: "msg_source_filter_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const next = await tool.execute({
+        action: "next", source: "portswigger", pages: 5, depth: 2, limit: 3, continue_after_save: false,
+      }, context)
+      const batch = JSON.parse(next.output)
+      const claimed = batch.items.find((item: { public_id: string }) => item.public_id === queued.id)
+      expect(claimed).toBeDefined()
+      if (!claimed) throw new Error("the PortSwigger fixture was not claimed")
+
+      const save = await tool.execute({
+        action: "save", source: "hackerone-blog", pages: 5, depth: 2, limit: 3, continue_after_save: false,
+        items: [{
+          public_id: claimed.public_id,
+          lease_owner: claimed.lease_owner,
+          decision: "learned",
+          vulnerability_class: "access-control",
+          lesson: "The source mismatch must not be persisted as a lesson.",
+        }],
+      }, context)
+      const summary = JSON.parse(save.output)
+      expect(summary.saved).toBe(0)
+      expect(summary.results[0].result).toBe("source-filter-mismatch")
+      expect(ResearchQueue.find("portswigger", sourceURL)?.status).toBe("retry")
+      expect(ReportKnowledge.stats().external).toBe(0)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("legacy model-study backfill drains multiple 500-row batches", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
