@@ -986,7 +986,10 @@ export namespace MCP {
   }
 
   export function toolID(serverName: string, toolName: string): string {
-    return stableToolIDPart(serverName) + "_" + stableToolIDPart(toolName)
+    // Length prefixes make the server/tool boundary unambiguous too:
+    // ("a_b", "c") must not collide with ("a", "b_c").
+    return "mcp_s" + serverName.length + "_" + stableToolIDPart(serverName) +
+      "_t" + toolName.length + "_" + stableToolIDPart(toolName)
   }
 
   export async function tools() {
