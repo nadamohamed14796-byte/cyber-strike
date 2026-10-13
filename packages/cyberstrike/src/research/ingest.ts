@@ -170,7 +170,7 @@ export function sourceRelevance(url: string, title: string, text: string, source
   const haystack = (title + " " + text).toLowerCase()
   const path = new URL(url).pathname.toLowerCase()
   const excludedPath = source.excludePaths?.some((value) => path.includes(value.toLowerCase()))
-  if (excludedPath) return { accepted: false, score: -100 }
+  if (excludedPath) return { accepted: false, score: -100, excluded: true }
 
   const excluded = source.excludeTerms?.filter((term) => matchesTerm(haystack, term)).length ?? 0
   const included = source.includeTerms?.filter((term) => matchesTerm(haystack, term)).length ?? 0
@@ -179,7 +179,7 @@ export function sourceRelevance(url: string, title: string, text: string, source
   // Sources without include terms keep generic relevance, but explicit exclusions
   // remain policy: never let this early return bypass an exclusion-only source config.
   if (!source.includeTerms?.length) {
-    return { accepted: excluded === 0, score: pathBoost - excluded * 20 }
+    return { accepted: excluded === 0, score: pathBoost - excluded * 20, excluded: excluded > 0 }
   }
 
   // For noisy sources such as Medium, require real security relevance.
@@ -189,7 +189,7 @@ export function sourceRelevance(url: string, title: string, text: string, source
       title + " " + path,
     )
   const accepted = specificVulnerability || included >= 2 || (included >= 1 && pathBoost > 0)
-  return { accepted: accepted && excluded === 0, score: included * 12 + pathBoost - excluded * 20 }
+  return { accepted: accepted && excluded === 0, score: included * 12 + pathBoost - excluded * 20, excluded: excluded > 0 }
 }
 
 export function isIndexLikeResearchUrl(url: string) {
@@ -751,7 +751,7 @@ export async function syncResearch(input: { sourceID?: string } & ResearchSyncOp
 }
 
 /** Discovery-only worker: persist candidate URLs without doing knowledge extraction. */
-export async function discoverResearch(input: { sourceID?: string; pages?: number; depth?: number } = {}) {
+export async function discoverResearch(input: { sourceID?: string; pages?: number; depth?: number; agentLed?: boolean } = {}) {
   const { ResearchQueue } = await import("./queue")
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   if (!sources.length) throw new Error("unknown research source: " + input.sourceID)
@@ -851,7 +851,8 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         // during discovery instead of occupying a durable queue slot first.
         if (text.length >= 250 && (current.depth === 0 || isResearchCandidate(current.url, source))) {
           const relevance = sourceRelevance(current.url, title, text, source)
-          if (relevance.accepted && !isIndexLikeResearchUrl(current.url)) {
+          const canQueue = relevance.accepted || (input.agentLed === true && !relevance.excluded)
+          if (canQueue && !isIndexLikeResearchUrl(current.url)) {
             const row = ResearchQueue.enqueue({
               sourceID: source.id,
               sourceURL: current.url,
@@ -862,6 +863,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 source_trust: source.trust,
                 crawl_depth: current.depth,
                 candidate_score: candidateScore(current.url, source),
+                source_relevance_precheck: { accepted: relevance.accepted, score: relevance.score, agent_review_requested: !relevance.accepted },
                 // Discovery already fetched and sanitized this report. Cache a bounded excerpt
                 // so the learner never makes a duplicate HTTP request for this URL. Preserve the
                 // original length and full-content fingerprint for transparent truncation metadata.
