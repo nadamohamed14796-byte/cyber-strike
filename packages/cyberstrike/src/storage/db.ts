@@ -115,7 +115,7 @@ export namespace Database {
         const columns = tableColumns(sqlite, "target_workspace")
         if (columns.has("parent_target_id")) {
           sql = sql.replace(
-            /ALTER TABLE target_workspace ADD COLUMN parent_target_id TEXT REFERENCES target_workspace\\(id\\) ON DELETE SET NULL;/i,
+            /ALTER TABLE target_workspace ADD COLUMN parent_target_id TEXT REFERENCES target_workspace\(id\) ON DELETE SET NULL;/i,
             "SELECT 1;",
           )
         }
