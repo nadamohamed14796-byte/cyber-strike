@@ -149,6 +149,55 @@ test("agent-led research study persists model analysis and completes its queue l
 })
 
 
+test("preflight skips are counted separately from model-studied reports", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceID = "unconfigured-source-" + marker
+      const sourceURL = "https://legacy.example.test/" + marker
+      const queued = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy report from an unknown source",
+        payload: { cached_text: "An untrusted source excerpt that must not be studied because its host is no longer configured. ".repeat(5) },
+      })
+      expect(queued.created).toBe(true)
+
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_preflight_skip_" + marker.replace(/-/g, "").slice(0, 18),
+        messageID: "msg_preflight_skip_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const next = await tool.execute({
+        action: "next",
+        pages: 5,
+        depth: 2,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      const result = JSON.parse(next.output)
+      expect(result.batch_size).toBe(0)
+      expect(result.issues).toEqual(expect.arrayContaining([queued.id + ": unknown source id"]))
+
+      const row = ResearchQueue.find(sourceID, sourceURL)
+      expect(row?.status).toBe("rejected")
+      expect(row?.payload?.model_study_method).toBe("preflight-skip")
+      expect(row?.payload?.model_study_decision).toBe("skipped")
+      expect(ResearchQueue.stats(sourceID).model_study_skipped).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_completed).toBe(0)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("legacy model-study backfill drains multiple 500-row batches", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
