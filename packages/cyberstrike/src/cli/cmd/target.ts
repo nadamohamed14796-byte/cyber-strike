@@ -1,7 +1,7 @@
 import type { Argv } from "yargs"
 import { cmd } from "./cmd"
 import { Instance } from "../../project/instance"
-import { TargetMemory, type TargetNoteKind, type TargetNoteStatus } from "../../target"
+import { TargetMemory, type TargetAssetType, type TargetNoteKind, type TargetNoteStatus } from "../../target"
 
 const TargetInitCommand = cmd({
   command: "init <url>",
@@ -14,6 +14,8 @@ const TargetInitCommand = cmd({
         const target = await TargetMemory.ensure(args.url)
         console.log("Target: " + target.targetURL)
         console.log("Workspace: " + target.workspacePath)
+        console.log("Asset type: " + target.assetType)
+        if (target.parentTargetID) console.log("Parent workspace ID: " + target.parentTargetID)
         console.log("Notes: " + target.workspacePath + "/notes.md")
         console.log("Created or verified target directories: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research")
       },
@@ -34,7 +36,7 @@ const TargetListCommand = cmd({
           return
         }
         for (const target of targets) {
-          console.log(target.targetURL + "\n  " + target.workspacePath)
+          console.log((target.parentTargetID ? "  ↳ " : "") + "[" + target.assetType + "] " + target.targetURL + "\n  " + target.workspacePath)
         }
       },
     })
@@ -57,6 +59,8 @@ const TargetShowCommand = cmd({
         const notes = TargetMemory.allNotes(target.id)
         console.log("Target: " + target.targetURL)
         console.log("Workspace: " + target.workspacePath)
+        console.log("Asset type: " + target.assetType)
+        if (target.parentTargetID) console.log("Parent workspace ID: " + target.parentTargetID)
         console.log("Saved notes: " + notes.length)
         for (const note of notes) {
           console.log("\n[" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"))
@@ -95,6 +99,7 @@ const TargetScopeCommand = cmd({
           console.log("Reference: " + result.scope.authorizationReference)
           console.log("Included: " + result.scope.scopeItems.join(", "))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
+          console.log("Existing in-scope child workspaces attached: " + result.associatedAssets.length)
           console.log("Scope file: " + result.workspace.workspacePath + "/scope/scope.json")
           console.log("Review the official program policy before active testing; this manifest records your explicit scope decision.")
           return
@@ -115,6 +120,71 @@ const TargetScopeCommand = cmd({
           console.log("WARNING: Scope is unconfigured. Do not perform active testing.")
           console.log("Configure with --include <domain> --source <program> --reference <official-https-url>.")
         }
+      },
+    })
+  },
+})
+
+
+const TargetTreeCommand = cmd({
+  command: "tree <url>",
+  describe: "show a target and all nested in-scope assets",
+  builder: (yargs: Argv) => yargs.positional("url", { type: "string", demandOption: true }),
+  async handler(args) {
+    await Instance.provide({
+      directory: process.cwd(),
+      async fn() {
+        const root = await TargetMemory.get(args.url)
+        if (!root) {
+          console.log("Target not found. Create it with: cyberstrike target init " + args.url)
+          return
+        }
+        const all = TargetMemory.list()
+        const byParent = new Map<string, typeof all>()
+        for (const item of all) {
+          if (!item.parentTargetID) continue
+          const siblings = byParent.get(item.parentTargetID) ?? []
+          siblings.push(item)
+          byParent.set(item.parentTargetID, siblings)
+        }
+        const seen = new Set<string>()
+        const print = (item: (typeof all)[number], depth: number) => {
+          if (seen.has(item.id)) {
+            console.log("  ".repeat(depth) + "[cycle refused] " + item.targetURL)
+            return
+          }
+          seen.add(item.id)
+          console.log("  ".repeat(depth) + (depth ? "└─ " : "") + "[" + item.assetType + "] " + item.targetURL)
+          console.log("  ".repeat(depth + 1) + item.workspacePath)
+          for (const child of byParent.get(item.id) ?? []) print(child, depth + 1)
+        }
+        print(root, 0)
+      },
+    })
+  },
+})
+
+const TargetAttachCommand = cmd({
+  command: "attach <parent> <asset>",
+  describe: "attach an asset to a parent only when the saved scope explicitly authorizes it",
+  builder: (yargs: Argv) =>
+    yargs
+      .positional("parent", { type: "string", demandOption: true, describe: "existing program/parent target URL" })
+      .positional("asset", { type: "string", demandOption: true, describe: "authorized child host URL" })
+      .option("kind", {
+        type: "string",
+        choices: ["subdomain", "application", "api", "host"] as const,
+        default: "subdomain",
+      }),
+  async handler(args) {
+    await Instance.provide({
+      directory: process.cwd(),
+      async fn() {
+        const result = await TargetMemory.attachAsset(args.parent, args.asset, args.kind as TargetAssetType)
+        console.log("Asset attached under: " + result.parent.targetURL)
+        console.log("Asset: " + result.asset.targetURL)
+        console.log("Type: " + result.asset.assetType)
+        console.log("Workspace: " + result.asset.workspacePath)
       },
     })
   },
@@ -175,6 +245,8 @@ export const TargetCommand = cmd({
       .command(TargetListCommand)
       .command(TargetShowCommand)
       .command(TargetScopeCommand)
+      .command(TargetTreeCommand)
+      .command(TargetAttachCommand)
       .command(TargetNoteCommand)
       .demandCommand(),
   async handler() {},
