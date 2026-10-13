@@ -650,11 +650,15 @@ export namespace ResearchQueue {
       const rows = sourceID
         ? db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.source_id, sourceID)).orderBy(asc(ResearchQueueTable.sequence)).all()
         : db.select().from(ResearchQueueTable).orderBy(asc(ResearchQueueTable.sequence)).all()
-      const crawlPages = rows.filter((row) => row.payload?.crawl_page === true).length
+      const crawlPageRows = rows.filter((row) => row.payload?.crawl_page === true)
       const reportRows = rows.filter((row) => row.payload?.crawl_page !== true)
       const counts: Record<string, number> = {
         total: reportRows.length,
-        crawl_pages: crawlPages,
+        crawl_pages: crawlPageRows.length,
+        crawl_page_errors: crawlPageRows.filter((row) => row.payload?.crawl_error === true).length,
+        crawl_page_auth_blocked: crawlPageRows.filter((row) =>
+          row.status === "blocked_auth" || row.payload?.auth_required === true,
+        ).length,
         discovered: 0,
         queued: 0,
         studying: 0,
