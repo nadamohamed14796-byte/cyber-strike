@@ -1099,11 +1099,28 @@ export namespace TargetMemory {
     const cached = scopeManifestCache.get(scopePath)
     if (cached?.signature === signature) return cached.scope
 
-    let parsed: unknown
+    let source: string
     try {
-      parsed = JSON.parse(await fs.readFile(scopePath, "utf-8"))
+      source = await fs.readFile(scopePath, "utf-8")
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
+      throw new Error("Target scope manifest is unreadable or invalid JSON.")
+    }
+    let afterReadInfo: Awaited<ReturnType<typeof fs.stat>>
+    try {
+      afterReadInfo = await fs.stat(scopePath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
+      throw error
+    }
+    if (scopeFileSignature(afterReadInfo) !== signature) {
+      throw new Error("Target scope manifest changed while being read; retry the scope check.")
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(source)
+    } catch {
       throw new Error("Target scope manifest is unreadable or invalid JSON.")
     }
     if (!parsed || typeof parsed !== "object") throw new Error("Target scope manifest has an invalid shape.")
