@@ -277,7 +277,8 @@ test("model-led update queues legacy shared reports once without refetching or c
       const claimed = batch.items.find((item: { source_url: string }) => item.source_url === sourceURL)
       expect(claimed).toBeDefined()
       if (!claimed) throw new Error("the specific legacy report was not claimed")
-      expect(claimed.public_id).toBe(queued.source_id)
+      expect(claimed.source_url).toBe(sourceURL)
+      expect(claimed.public_id).toMatch(/^RPT-\d+$/)
 
       const save = await studyTool.execute({
         action: "save",

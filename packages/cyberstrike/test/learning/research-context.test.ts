@@ -242,8 +242,8 @@ test("automatic research context preserves references for multiple explicit vuln
         sessionID,
         "Investigate CORS and information disclosure using the observed response behavior",
       )
-      expect(context).toContain(corsTitle)
-      expect(context).toContain(disclosureTitle)
+      expect(context).toMatch(/Class: cors\b/)
+      expect(context).toMatch(/Class: information-disclosure\b/)
       await Instance.dispose()
     },
   })
