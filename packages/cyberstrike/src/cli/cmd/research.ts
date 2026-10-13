@@ -93,7 +93,20 @@ export const ResearchCommand = cmd({
             for (const error of result.errors) prompts.log.warn(error)
           }
           const limit = exhaustive ? 500 : Math.min(500, (deep ? 200 : args.limit) * discoveries.length)
-          const learned = await learnResearchQueue({ limit, sourceID: args.source })
+          const learned = { claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
+          // --all means drain the currently claimable queue, not just its first
+          // 500 items. A failed item is retried on the next batch and eventually
+          // reaches a terminal state; ordinary sync remains bounded to one batch.
+          do {
+            const batch = await learnResearchQueue({ limit, sourceID: args.source })
+            learned.claimed += batch.claimed
+            learned.learned += batch.learned
+            learned.skipped += batch.skipped
+            learned.failed += batch.failed
+            learned.blocked_auth += batch.blocked_auth
+            learned.errors.push(...batch.errors.slice(0, Math.max(0, 20 - learned.errors.length)))
+            if (!exhaustive || batch.claimed === 0) break
+          } while (true)
           prompts.log.info("queue worker: claimed=" + learned.claimed + " learned=" + learned.learned +
             " skipped=" + learned.skipped + " failed=" + learned.failed + " blocked_auth=" + learned.blocked_auth)
           for (const error of learned.errors) prompts.log.warn(error)
