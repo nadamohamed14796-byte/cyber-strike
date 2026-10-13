@@ -203,6 +203,71 @@ export namespace ReportKnowledge {
   }
 
   /**
+   * Find legacy shared public reports that have not yet been studied by the active model.
+   * The study marker is independent of heuristic extraction_version so older records
+   * can be revisited once without repeatedly flooding the durable queue.
+   */
+  export function externalRecordsForModelStudy(limit = 100, modelStudyVersion = 1) {
+    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    const currentVersion = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : 1))
+    return Database.use((db) =>
+      db.select().from(ReportKnowledgeTable)
+        .where(and(
+          eq(ReportKnowledgeTable.source_kind, "external_report"),
+          isNull(ReportKnowledgeTable.session_id),
+          or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
+          notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]),
+        ))
+        .orderBy(asc(ReportKnowledgeTable.time_updated))
+        .all()
+        .filter((row) => {
+          if (!row.source_url) return false
+          const metadata = row.metadata ?? {}
+          const requested = metadata.model_study_requested_version
+          const studied = metadata.model_study_version
+          return typeof metadata.excerpt === "string" &&
+            metadata.excerpt.trim().length >= 250 &&
+            !(typeof studied === "number" && studied >= currentVersion) &&
+            !(typeof requested === "number" && requested >= currentVersion) &&
+            metadata.study_method !== "llm-assisted-agent-command-v1"
+        })
+        .slice(0, bounded),
+    )
+  }
+
+  /** Mark a legacy reference as queued for model study, without changing its truth state. */
+  export function markModelStudyRequested(input: { id: string; version?: number }): boolean {
+    const version = Math.max(1, Math.floor(Number.isFinite(input.version) ? input.version ?? 1 : 1))
+    try {
+      return Database.transaction((db) => {
+        const row = db.select().from(ReportKnowledgeTable)
+          .where(eq(ReportKnowledgeTable.id, input.id)).get()
+        if (
+          !row ||
+          row.source_kind !== "external_report" ||
+          row.session_id ||
+          normalize(row.target_pattern) ||
+          ["rejected", "disproven", "duplicate"].includes(row.status)
+        ) return false
+        const metadata = row.metadata ?? {}
+        if (
+          metadata.study_method === "llm-assisted-agent-command-v1" ||
+          (typeof metadata.model_study_version === "number" && metadata.model_study_version >= version) ||
+          (typeof metadata.model_study_requested_version === "number" && metadata.model_study_requested_version >= version)
+        ) return false
+        db.update(ReportKnowledgeTable).set({
+          metadata: { ...metadata, model_study_requested_version: version },
+          time_updated: Date.now(),
+        }).where(eq(ReportKnowledgeTable.id, row.id)).run()
+        return true
+      })
+    } catch (error) {
+      console.warn("[cyberstrike] model-study request marker persistence failed:", error)
+      return false
+    }
+  }
+
+  /**
    * Return only shared public rows with a stored excerpt that predates the current
    * extraction schema. Reprocessing uses local SQLite text only; it performs no fetch.
    */
