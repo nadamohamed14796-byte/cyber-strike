@@ -48,7 +48,7 @@ const HackBrowserParameters = z.object({
       .array(z.string())
       .optional()
       .describe(
-        'Optional narrowing scope. Every entry must exactly match a persisted authorized scope entry; this option can never expand the target's saved authorization.',
+        "Optional narrowing scope. Every entry must exactly match a persisted authorized scope entry; this option can never expand the target's saved authorization.",
       ),
     exclude: z
       .array(z.string())
