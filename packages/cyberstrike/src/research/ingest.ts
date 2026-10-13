@@ -615,7 +615,7 @@ export type ResearchSyncOptions = {
   limit?: number
   pages?: number
   depth?: number
-  /** Exhaust the discovered queue until the page budget is reached. */
+  /** Drain all currently claimable queued research after bounded page discovery. */
   all?: boolean
 }
 
