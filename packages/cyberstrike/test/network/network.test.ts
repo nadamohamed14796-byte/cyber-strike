@@ -34,3 +34,9 @@ test("proxy URLs reject embedded credentials and unsupported SOCKS protocols", (
   expect(() => Network.toProxyUrl("http://alice:secret@127.0.0.1:8080")).toThrow("Do not embed proxy credentials")
   expect(() => Network.toProxyUrl("socks5://127.0.0.1:1080")).toThrow("HTTP(S)")
 })
+
+test("browser proxy bypass disables Chromium implicit loopback bypass only when requested", () => {
+  expect(Network.chromiumBypass([], false)).toEqual(["localhost", ".localhost", "127.0.0.1", "::1"])
+  expect(Network.chromiumBypass([], true)).toEqual(["<-loopback>"])
+  expect(Network.chromiumBypass(["*.example.com"], true)).toEqual(["<-loopback>", ".example.com"])
+})
