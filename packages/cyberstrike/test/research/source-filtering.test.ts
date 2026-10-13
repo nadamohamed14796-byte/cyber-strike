@@ -81,6 +81,15 @@ test("does not classify root landing pages or all-labs indexes as learnable arti
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/authentication")).toBe(false)
 })
 
+test("hyphenated vulnerability names pass curated source relevance filters", () => {
+  expect(sourceRelevance(
+    "https://trickster0.medium.com/account-takeover-report",
+    "Account-takeover via an OAuth flow",
+    "A technical report describing account-takeover impact and responsible disclosure.",
+    trickster0,
+  ).accepted).toBe(true)
+})
+
 
 test("source pagination seeds respect the configured budget up to the discovery hard limit", () => {
   const hackerOne = RESEARCH_SOURCES.find((source) => source.id === "hackerone-hacktivity")!
