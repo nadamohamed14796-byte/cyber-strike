@@ -2,7 +2,7 @@ import * as prompts from "@clack/prompts"
 import { cmd } from "./cmd"
 import { ReportKnowledge } from "../../learning/report-knowledge"
 import { RESEARCH_SOURCES } from "../../research/sources"
-import { discoverResearch, learnResearchQueue, retryAuthenticatedResearch } from "../../research/ingest"
+import { classifyResearchTopic, discoverResearch, extractResearchDetails, learnResearchQueue, retryAuthenticatedResearch } from "../../research/ingest"
 import { ResearchQueue } from "../../research/queue"
 
 function knowledgeScoreLabel(row: {
@@ -274,6 +274,130 @@ export const ResearchCommand = cmd({
                 (row.source_url ?? "local"),
             )
           }
+        },
+      })
+      .command({
+        command: "enrich",
+        describe: "re-extract legacy public research from locally stored excerpts without network fetches",
+        builder: (yargs) => yargs
+          .option("limit", { type: "number", default: 100, describe: "maximum legacy records to enrich per run" })
+          .option("all", { type: "boolean", default: false, describe: "continue through all eligible legacy records" }),
+        async handler(args) {
+          prompts.intro("CyberStrike Local Research Enrichment")
+          const requestedLimit = Number.isFinite(args.limit) ? Math.max(1, Math.min(500, Math.floor(args.limit))) : 100
+          const totals = { scanned: 0, enriched: 0, skipped: 0, errors: 0 }
+          do {
+            const records = ReportKnowledge.externalRecordsForEnrichment(args.all ? 500 : requestedLimit)
+            if (!records.length) break
+            let enrichedThisBatch = 0
+            for (const row of records) {
+              totals.scanned++
+              const metadata = row.metadata ?? {}
+              const excerpt = typeof metadata.excerpt === "string" ? metadata.excerpt : ""
+              const existingExtracted = metadata.extracted && typeof metadata.extracted === "object"
+                ? metadata.extracted as Record<string, unknown>
+                : {}
+              try {
+                const topic = classifyResearchTopic(row.title, excerpt)
+                const vulnerabilityClass = topic ?? row.vulnerabilityClass ?? undefined
+                const extracted = extractResearchDetails(row.title, excerpt, vulnerabilityClass)
+                const cweID = extracted.cweID ?? row.cweID ?? undefined
+                const oldSignals = Array.isArray(existingExtracted.retrieval_signals)
+                  ? existingExtracted.retrieval_signals.filter((value): value is string => typeof value === "string")
+                  : []
+                const retrievalSignals = Array.from(new Set([
+                  ...oldSignals,
+                  ...extracted.retrievalSignals,
+                  ...(vulnerabilityClass ? [vulnerabilityClass] : []),
+                  ...(cweID ? [cweID] : []),
+                ]))
+                const nextExtracted: Record<string, unknown> = {
+                  ...existingExtracted,
+                  ...(vulnerabilityClass ? { vulnerability_class: vulnerabilityClass } : {}),
+                  classification_method: "title-first-dominant-body-v2",
+                  ...(extracted.severity !== "unknown" ? { severity: extracted.severity } : {}),
+                  ...(cweID ? { cwe_id: cweID } : {}),
+                  ...(extracted.lesson ? { lesson: extracted.lesson } : {}),
+                  ...(extracted.attackVector ? { attack_vector: extracted.attackVector } : {}),
+                  ...(extracted.impact ? { impact: extracted.impact } : {}),
+                  ...(extracted.reproduction ? { reproduction_steps: extracted.reproduction } : {}),
+                  ...(extracted.poc ? { poc_snippet: extracted.poc } : {}),
+                  ...(extracted.prerequisites ? { prerequisites: extracted.prerequisites } : {}),
+                  ...(extracted.verificationSignals ? { verification_signals: extracted.verificationSignals } : {}),
+                  ...(extracted.falsePositiveCautions ? { false_positive_cautions: extracted.falsePositiveCautions } : {}),
+                  ...(extracted.rootCause ? { root_cause: extracted.rootCause } : {}),
+                  ...(extracted.requestResponseEvidence ? { request_response_evidence: extracted.requestResponseEvidence } : {}),
+                  ...(extracted.affectedComponents ? { affected_components: extracted.affectedComponents } : {}),
+                  ...(extracted.affectedVersions ? { affected_versions: extracted.affectedVersions } : {}),
+                  ...(extracted.technologyStack ? { technology_stack: extracted.technologyStack } : {}),
+                  ...(extracted.remediation ? { remediation: extracted.remediation } : {}),
+                  ...(extracted.attackChain ? { attack_chain: extracted.attackChain } : {}),
+                  ...(extracted.negativeEvidence ? { negative_evidence: extracted.negativeEvidence } : {}),
+                  ...(extracted.limitations ? { limitations: extracted.limitations } : {}),
+                  retrieval_signals: retrievalSignals,
+                }
+                const merged = [
+                  nextExtracted.lesson ?? row.lesson,
+                  nextExtracted.cwe_id ?? row.cweID,
+                  nextExtracted.attack_vector ?? row.attackVector,
+                  nextExtracted.impact ?? row.impact,
+                  nextExtracted.reproduction_steps ?? row.reproduction,
+                  nextExtracted.poc_snippet ?? row.poc,
+                  nextExtracted.prerequisites,
+                  nextExtracted.verification_signals,
+                  nextExtracted.false_positive_cautions,
+                  nextExtracted.root_cause,
+                  nextExtracted.request_response_evidence,
+                  nextExtracted.affected_components,
+                  nextExtracted.affected_versions,
+                  nextExtracted.technology_stack,
+                  nextExtracted.remediation,
+                  nextExtracted.attack_chain,
+                  nextExtracted.negative_evidence,
+                  nextExtracted.limitations,
+                ]
+                nextExtracted.extraction_coverage = {
+                  present: merged.filter(Boolean).length,
+                  total: 18,
+                  note: "Field presence only; not a quality score or practical validation.",
+                }
+                const saved = ReportKnowledge.enrichExternalRecord({
+                  id: row.id,
+                  vulnerabilityClass,
+                  cweID,
+                  severity: extracted.severity,
+                  lesson: extracted.lesson,
+                  attackVector: extracted.attackVector,
+                  impact: extracted.impact,
+                  reproduction: extracted.reproduction,
+                  poc: extracted.poc,
+                  tags: retrievalSignals,
+                  metadata: {
+                    extraction_version: 7,
+                    study_method: "bounded-heuristic-extraction",
+                    extracted: nextExtracted,
+                  },
+                })
+                if (saved) {
+                  totals.enriched++
+                  enrichedThisBatch++
+                } else {
+                  totals.skipped++
+                }
+              } catch (error) {
+                totals.errors++
+                if (totals.errors <= 10) prompts.log.warn(row.id + " — " + (error instanceof Error ? error.message : String(error)))
+              }
+            }
+            if (!args.all || enrichedThisBatch === 0) break
+          } while (true)
+          prompts.log.info(
+            "scanned=" + totals.scanned +
+            " enriched=" + totals.enriched +
+            " skipped=" + totals.skipped +
+            " errors=" + totals.errors,
+          )
+          prompts.outro("Legacy public research enrichment complete; no source URLs were fetched.")
         },
       })
       .command({
