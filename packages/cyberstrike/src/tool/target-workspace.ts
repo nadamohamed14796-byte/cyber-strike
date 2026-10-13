@@ -14,6 +14,28 @@ const Parameters = z.object({
   asset_type: z.enum(["subdomain", "application", "api", "host"]).optional(),
 })
 
+type TargetWorkspaceMetadata = {
+  initialized?: boolean
+  found?: boolean
+  attached?: boolean
+  saved?: boolean
+  target_id?: string
+  target_url?: string
+  workspace?: string
+  notes_file?: string
+  scope_file?: string
+  scope_configured?: boolean
+  parent_target_id?: string | null
+  asset_type?: TargetAssetType
+  include_count?: number
+  exclude_count?: number
+  associated_asset_count?: number
+  note_count?: number
+  child_count?: number
+  count?: number
+  targets?: Array<{ id: string; url: string; path: string; parent_id: string | null; asset_type: TargetAssetType }>
+}
+
 function required(value: string | undefined, name: string): string {
   if (!value?.trim()) throw new Error(name + " is required for this action.")
   return value.trim()
@@ -54,7 +76,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           scope_file: workspace.workspacePath + "/scope/scope.json",
           scope_configured: scope?.status === "configured",
           parent_target_id: workspace.parentTargetID,
-        },
+        } as TargetWorkspaceMetadata,
       }
     }
 
@@ -87,7 +109,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           include_count: result.scope.scopeItems.length,
           exclude_count: result.scope.excludedItems.length,
           associated_asset_count: result.associatedAssets.length,
-        },
+        } as TargetWorkspaceMetadata,
       }
     }
 
@@ -116,7 +138,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           target_url: result.asset.targetURL,
           workspace: result.asset.workspacePath,
           asset_type: result.asset.assetType,
-        },
+        } as TargetWorkspaceMetadata,
       }
     }
 
@@ -127,7 +149,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         return {
           title: "Target workspace not found",
           output: "No workspace matches " + targetURL + ". Initialize the parent target first.",
-          metadata: { found: false, target_url: targetURL },
+          metadata: { found: false, target_url: targetURL } as TargetWorkspaceMetadata,
         }
       }
       const scope = await TargetMemory.getScope(workspace.targetURL)
@@ -159,7 +181,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           exclude_count: scope?.excludedItems.length ?? 0,
           note_count: notes.length,
           child_count: children.length,
-        },
+        } as TargetWorkspaceMetadata,
       }
     }
 
@@ -182,7 +204,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           parent_id: target.parentTargetID,
           asset_type: target.assetType,
         })),
-      },
+      } as TargetWorkspaceMetadata,
     }
   },
 })
