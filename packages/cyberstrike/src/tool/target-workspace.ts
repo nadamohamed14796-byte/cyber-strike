@@ -73,6 +73,17 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     if (params.action === "init") {
       const workspace = await TargetMemory.ensure(required(params.target_url, "target_url"))
       const scope = await TargetMemory.getScope(workspace.targetURL)
+      const requiredFiles = [
+        path.join(workspace.workspacePath, "workspace.json"),
+        path.join(workspace.workspacePath, "scope", "scope.json"),
+        path.join(workspace.workspacePath, "notes.md"),
+      ]
+      for (const requiredFile of requiredFiles) {
+        const info = await fs.lstat(requiredFile).catch(() => undefined)
+        if (!info?.isFile() || info.isSymbolicLink()) {
+          throw new Error("Target workspace initialization failed integrity verification: required regular file is missing: " + requiredFile)
+        }
+      }
       return {
         title: "Target workspace initialized",
         output: [
@@ -84,6 +95,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           "Notes file: " + workspace.workspacePath + "/notes.md",
           "Scope file: " + workspace.workspacePath + "/scope/scope.json",
           "Authorization: " + (scope?.status === "configured" ? "configured; still check each candidate" : "UNCONFIGURED — do not perform active testing"),
+          "Workspace integrity: metadata, scope manifest, and notes verified.",
           "Workspace creation does not grant permission to test.",
         ].join("\n"),
         metadata: {
