@@ -344,19 +344,8 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
   const matchesHost = (source: ResearchSource) =>
     source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
   const hostCandidates = RESEARCH_SOURCES.filter(matchesHost)
-  if (preferredID) {
-    const preferred = hostCandidates.find((source) => source.id === preferredID)
-    if (preferred) return preferred
-    // A known configured source that rejects this host is contradictory provenance.
-    // Unknown legacy aliases (for example "hackerone" or "default") have no trust
-    // policy of their own, so allow only an unambiguous host-and-seed-path inference.
-    if (RESEARCH_SOURCES.some((source) => source.id === preferredID)) return undefined
-  }
-
-  if (hostCandidates.length === 1) return hostCandidates[0]
-
   const pathname = url.pathname.toLowerCase()
-  const scored = hostCandidates.map((source) => {
+  const pathScore = (source: ResearchSource) => {
     let score = 0
     for (const seed of source.seedUrls) {
       try {
@@ -374,8 +363,26 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
         // Invalid configured seeds do not participate in provenance inference.
       }
     }
-    return { source, score }
-  })
+    return score
+  }
+
+  if (preferredID) {
+    const preferred = hostCandidates.find((source) => source.id === preferredID)
+    if (preferred) {
+      // A unique host mapping is enough. On shared providers, explicit provenance
+      // must also match that source's configured path family or it is contradictory.
+      if (hostCandidates.length === 1 || pathScore(preferred) > 0) return preferred
+      return undefined
+    }
+    // A known configured source that rejects this host is contradictory provenance.
+    // Unknown legacy aliases (for example "hackerone" or "default") have no trust
+    // policy of their own, so allow only an unambiguous host-and-seed-path inference.
+    if (RESEARCH_SOURCES.some((source) => source.id === preferredID)) return undefined
+  }
+
+  if (hostCandidates.length === 1) return hostCandidates[0]
+
+  const scored = hostCandidates.map((source) => ({ source, score: pathScore(source) }))
   const highest = Math.max(0, ...scored.map((item) => item.score))
   if (!highest) return undefined
   const winners = scored.filter((item) => item.score === highest).map((item) => item.source)
