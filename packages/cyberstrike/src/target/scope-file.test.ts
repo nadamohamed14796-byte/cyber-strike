@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parseScopeFileContents } from "./scope-file"
+import { parseScopeFileContents, resolveScopeFilePath } from "./scope-file"
 
 describe("parseScopeFileContents", () => {
   test("parses exact entries and explicit wildcards without broadening", () => {
@@ -20,5 +20,16 @@ describe("parseScopeFileContents", () => {
 
   test("rejects files with no usable entries", () => {
     expect(() => parseScopeFileContents("# only comments\n\n// and blanks")).toThrow("no usable entries")
+  })
+
+  test("converts Windows Explorer WSL UNC paths to the matching Linux path", () => {
+    expect(resolveScopeFilePath(String.raw`\\wsl.localhost\kali-linux\root\att.com.txt`, "/repo", "linux"))
+      .toBe("/root/att.com.txt")
+    expect(resolveScopeFilePath(String.raw`\\wsl$\kali-linux\root\att.com.txt`, "/repo", "linux"))
+      .toBe("/root/att.com.txt")
+  })
+
+  test("keeps ordinary relative paths under the current working directory", () => {
+    expect(resolveScopeFilePath("scope/att.com.txt", "/repo", "linux")).toBe("/repo/scope/att.com.txt")
   })
 })
