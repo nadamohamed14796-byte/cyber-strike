@@ -99,7 +99,7 @@ const TargetScopeCommand = cmd({
           console.log("Reference: " + result.scope.authorizationReference)
           console.log("Included: " + result.scope.scopeItems.join(", "))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
-          console.log("Existing in-scope child workspaces attached: " + result.associatedAssets.length)
+          console.log("Existing workspaces newly linked/reorganized: " + result.associatedAssets.length)
           console.log("Scope file: " + result.workspace.workspacePath + "/scope/scope.json")
           console.log("Review the official program policy before active testing; this manifest records your explicit scope decision.")
           return
