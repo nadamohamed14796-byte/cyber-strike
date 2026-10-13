@@ -257,6 +257,10 @@ test("finding-validation feedback ranks shared references without poisoning glob
       expect(stored?.status).toBe("observed")
       expect(stored?.outcome).toBe("observed")
 
+      const stats = ReportKnowledge.stats()
+      expect(stats.externalReferencesUsed).toBe(1)
+      expect(stats.externalReferenceUsefulnessEvents).toBe(1)
+
       const events = Database.use((db) =>
         db.select().from(ReportKnowledgeEventTable)
           .where(eq(ReportKnowledgeEventTable.report_id, shared.id))
