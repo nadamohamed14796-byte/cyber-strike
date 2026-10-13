@@ -1,3 +1,6 @@
+/** Bump when classification/extraction semantics change so old rejected queue rows can be safely revisited once. */
+export const RESEARCH_LEARNING_VERSION = 7
+
 export type ResearchSourceKind = "disclosure" | "academy" | "writeup" | "blog" | "reference" | "research"
 
 export type ResearchSource = {
