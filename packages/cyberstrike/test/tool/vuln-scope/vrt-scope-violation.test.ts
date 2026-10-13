@@ -60,6 +60,10 @@ describe("vrtScopeViolation", () => {
     test("business-logic tester recording race condition", () => {
       expect(vrtScopeViolation("proxy-tester-business-logic", "race condition")).toBeNull()
     })
+
+    test("LLM tester recording prompt injection", () => {
+      expect(vrtScopeViolation("proxy-tester-llm", "prompt injection")).toBeNull()
+    })
   })
 
   describe("out-of-scope categories — returns violation", () => {
