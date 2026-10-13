@@ -413,3 +413,39 @@ test("legacy classifier rejections with cached text are requeued once per learni
     },
   })
 })
+
+test("an expired lease cannot complete work before another worker reclaims it", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const item = ResearchQueue.enqueue({ sourceID: "test", sourceURL: "https://research.example.test/expired-without-reclaim" })
+      const claim = ResearchQueue.claimNext("late-worker", "test")
+      expect(claim?.sequence).toBe(item.sequence)
+      const leaseOwner = claim?.lease_owner
+      if (!leaseOwner) throw new Error("claim did not include its lease token")
+
+      Database.use((db) =>
+        db.update(ResearchQueueTable)
+          .set({ lease_until: Date.now() - 1 })
+          .where(eq(ResearchQueueTable.sequence, item.sequence))
+          .run(),
+      )
+
+      expect(ResearchQueue.complete(item.sequence, leaseOwner, "learned")).toBeUndefined()
+      const current = Database.use((db) =>
+        db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.sequence, item.sequence)).get(),
+      )
+      expect(current?.status).toBe("studying")
+      expect(current?.lease_owner).toBe(leaseOwner)
+
+      const recovered = ResearchQueue.claimNext("recovery-worker", "test")
+      expect(recovered?.sequence).toBe(item.sequence)
+      expect(recovered?.lease_owner).not.toBe(leaseOwner)
+      expect(ResearchQueue.complete(item.sequence, leaseOwner, "learned")).toBeUndefined()
+      expect(ResearchQueue.complete(item.sequence, recovered!.lease_owner, "learned")?.status).toBe("learned")
+      await Instance.dispose()
+    },
+  })
+})
+
