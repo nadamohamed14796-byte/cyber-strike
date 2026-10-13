@@ -284,7 +284,8 @@ export const ResearchCommand = cmd({
           .option("all", { type: "boolean", default: false, describe: "continue through all eligible legacy records" }),
         async handler(args) {
           prompts.intro("CyberStrike Local Research Enrichment")
-          const requestedLimit = Number.isFinite(args.limit) ? Math.max(1, Math.min(500, Math.floor(args.limit))) : 100
+          const rawLimit = typeof args.limit === "number" && Number.isFinite(args.limit) ? Math.floor(args.limit) : 100
+          const requestedLimit = Math.max(1, Math.min(500, rawLimit))
           const totals = { scanned: 0, enriched: 0, skipped: 0, errors: 0 }
           do {
             const records = ReportKnowledge.externalRecordsForEnrichment(args.all ? 500 : requestedLimit)
