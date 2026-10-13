@@ -320,11 +320,30 @@ export namespace ResearchQueue {
     })
   }
 
-  export function blockAuthentication(input: { sourceID: string; sourceURL: string; title?: string; reason: string; payload?: Record<string, unknown> }) {
+  export function blockAuthentication(input: {
+    sourceID: string
+    sourceURL: string
+    title?: string
+    reason: string
+    payload?: Record<string, unknown>
+    /** When called by a claimed learner, only that still-active lease may block the row. */
+    claim?: { sequence: number; leaseOwner: string }
+  }) {
     const now = Date.now()
     return Database.transaction((db) => {
       const existing = db.select().from(ResearchQueueTable)
-        .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
+        .where(and(
+          eq(ResearchQueueTable.source_id, input.sourceID),
+          eq(ResearchQueueTable.source_url, input.sourceURL),
+          ...(input.claim ? [
+            eq(ResearchQueueTable.sequence, input.claim.sequence),
+            eq(ResearchQueueTable.status, "studying"),
+            eq(ResearchQueueTable.lease_owner, input.claim.leaseOwner),
+            gt(ResearchQueueTable.lease_until, now),
+          ] : []),
+        )).get()
+      // A stale learner must not overwrite a newer worker's result or lease state.
+      if (input.claim && !existing) return undefined
       // Preserve rows already completed by the model-study workflow. Authentication
       // is a fetch/access state, not a new study verdict; turning a learned/rejected
       // report into blocked_auth would lose its completion marker and cause repeat work.
