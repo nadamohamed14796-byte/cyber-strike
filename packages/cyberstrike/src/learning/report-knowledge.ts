@@ -904,6 +904,10 @@ export namespace ReportKnowledge {
           conditions.push(isNull(ReportKnowledgeTable.session_id))
           conditions.push(or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!)
           conditions.push(notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]))
+          // Filter rejected/skipped legacy study decisions in SQL before the
+          // 500-row candidate cap; post-ranking filtering could let old rejected
+          // rows starve valid references from automatic hunting recommendations.
+          conditions.push(sql`coalesce(json_extract(${ReportKnowledgeTable.metadata}, '$.model_study_decision'), '') NOT IN ('rejected', 'skipped')`)
         }
 
         const tokens = queryTokens(input.query)
