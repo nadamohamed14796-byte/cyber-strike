@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull, lt, or } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
+import { RESEARCH_LEARNING_VERSION } from "./sources"
 
 export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth"
 
@@ -244,6 +245,50 @@ export namespace ResearchQueue {
     })
   }
 
+  /**
+   * Requeue old reports rejected by the classifier/relevance gate only when a
+   * cached text excerpt is available. The version marker makes this a one-time
+   * migration: current-version rejects are never put back into the queue loop.
+   */
+  export function requeueLegacyRejected(limit = 100, sourceID?: string) {
+    const now = Date.now()
+    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    return Database.transaction((db) => {
+      const candidates = db.select().from(ResearchQueueTable)
+        .where(sourceID
+          ? and(eq(ResearchQueueTable.status, "rejected"), eq(ResearchQueueTable.source_id, sourceID))
+          : eq(ResearchQueueTable.status, "rejected"))
+        .orderBy(asc(ResearchQueueTable.sequence))
+        .all()
+        .filter((row) => {
+          if (row.payload?.crawl_page === true) return false
+          const previousVersion = row.payload?.learning_version
+          if (typeof previousVersion === "number" && previousVersion >= RESEARCH_LEARNING_VERSION) return false
+          if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
+          return row.last_error === "no recognizable security topic" ||
+            row.last_error === "page failed research relevance gate"
+        })
+        .slice(0, bounded)
+
+      for (const row of candidates) {
+        db.update(ResearchQueueTable).set({
+          status: "queued",
+          payload: { ...(row.payload ?? {}), learning_version: RESEARCH_LEARNING_VERSION },
+          attempts: 0,
+          last_error: null,
+          lease_owner: null,
+          lease_until: null,
+          completed_at: null,
+          updated_at: now,
+        }).where(and(
+          eq(ResearchQueueTable.sequence, row.sequence),
+          eq(ResearchQueueTable.status, "rejected"),
+        )).run()
+      }
+      return candidates.length
+    })
+  }
+
   export function claimNext(workerID: string, sourceID?: string) {
     const now = Date.now()
     // Lease identity must be unique per claim, not just per configured worker label.
@@ -275,6 +320,7 @@ export namespace ResearchQueue {
         .update(ResearchQueueTable)
         .set({
           status: "studying",
+          payload: { ...(row.payload ?? {}), learning_version: RESEARCH_LEARNING_VERSION },
           attempts: row.attempts + 1,
           lease_owner: leaseOwner,
           lease_until: now + LEASE_MS,
