@@ -15,6 +15,8 @@ import { CorrelateJavaScriptTool } from "./correlate-javascript"
 import { ResearchKnowledgeTool } from "./research-knowledge"
 import { ResearchStudyTool } from "./research-study"
 import { TargetNoteTool } from "./target-note"
+import { TargetWorkspaceTool } from "./target-workspace"
+import { TargetArtifactTool } from "./target-artifact"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
@@ -171,6 +173,8 @@ export namespace ToolRegistry {
       ResearchKnowledgeTool,
       ResearchStudyTool,
       TargetNoteTool,
+      TargetWorkspaceTool,
+      TargetArtifactTool,
       // TodoReadTool,
       WebSearchTool,
       CodeSearchTool,
