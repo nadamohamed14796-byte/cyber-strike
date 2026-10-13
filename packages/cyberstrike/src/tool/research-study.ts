@@ -291,140 +291,148 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
 
 export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
   const requestedSource = sourceFilter ? RESEARCH_SOURCES.find((entry) => entry.id === sourceFilter) : undefined
-  const rows = ReportKnowledge.externalRecordsForModelStudy(
-    500,
-    RESEARCH_MODEL_STUDY_VERSION,
-    requestedSource?.hosts,
-  )
   const result = { examined: 0, queued: 0, skipped: 0, errors: [] as string[] }
-  for (const row of rows) {
-    if (result.queued >= 100) break
-    result.examined++
+  const seen = new Set<string>()
 
-    const rawURL = typeof row.source_url === "string" ? row.source_url : ""
-    const sourceURL = normalizeResearchUrl(rawURL)
-    if (!sourceURL) {
-      result.skipped++
-      ReportKnowledge.markModelStudyCompleted({
-        id: row.id,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "skipped",
-        reason: "source URL could not be safely normalized",
-      })
-      continue
-    }
-
-    let parsed: URL
-    try {
-      parsed = new URL(sourceURL)
-    } catch {
-      result.skipped++
-      ReportKnowledge.markModelStudyCompleted({
-        id: row.id,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "skipped",
-        reason: "source URL is invalid",
-      })
-      continue
-    }
-    if (parsed.protocol !== "https:") {
-      result.skipped++
-      ReportKnowledge.markModelStudyCompleted({
-        id: row.id,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "skipped",
-        reason: "only configured HTTPS research sources may be studied",
-      })
-      continue
-    }
-
-    const metadata = row.metadata ?? {}
-    const matchingSources = RESEARCH_SOURCES.filter((source) =>
-      source.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
+  // Drain batches from the eligible legacy set instead of silently stopping at
+  // the old 100-row limit. Enqueued/completed rows leave the eligible set, so a
+  // subsequent query advances to the next batch without relying on offsets that
+  // shift as rows are marked.
+  while (true) {
+    const rows = ReportKnowledge.externalRecordsForModelStudy(
+      500,
+      RESEARCH_MODEL_STUDY_VERSION,
+      requestedSource?.hosts,
+      sourceFilter,
     )
-    const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
-    const preferred = matchingSources.find((source) => source.id === preferredID)
-    const source = preferredID
-      ? preferred
-      : matchingSources.length === 1 ? matchingSources[0] : undefined
-    if (!source) {
-      // Do not silently assign a different source's trust rating or crawler policy
-      // when legacy metadata is missing/contradictory on a shared host.
-      result.skipped++
-      ReportKnowledge.markModelStudyCompleted({
-        id: row.id,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "skipped",
-        reason: matchingSources.length
-          ? "legacy source provenance is missing or does not match the configured URL host"
-          : "no currently configured source permits safe fetching from this host",
-      })
-      continue
+    if (!rows.length) break
+    if (rows.some((row) => seen.has(row.id))) {
+      result.errors.push("legacy backfill paused because eligible rows did not advance")
+      break
     }
-    if (sourceFilter && source.id !== sourceFilter) continue
-    // The curated Medium source represents one researcher's articles only, not
-    // the entire platform. Preserve that path restriction during legacy backfill.
-    if (source.id === "trickster0" && !isResearchCandidate(sourceURL, source)) {
+    let stalled = false
+    const markSkipped = (id: string, reason: string) => {
       result.skipped++
-      ReportKnowledge.markModelStudyCompleted({
-        id: row.id,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "skipped",
-        reason: "legacy Medium URL is outside the curated researcher's path",
-      })
-      continue
-    }
-
-    const storedExcerpt = typeof metadata.excerpt === "string"
-      ? redactResearchSecrets(metadata.excerpt).slice(0, 100_000)
-      : ""
-    const hasCachedExcerpt = storedExcerpt.trim().length >= 250
-    // Empty/short legacy excerpts trigger the existing source-scoped safe fetch
-    // on action=next; stale partial text must not suppress that refetch.
-    const excerpt = hasCachedExcerpt ? storedExcerpt : ""
-    const contentLength = hasCachedExcerpt && typeof metadata.content_length === "number" && Number.isFinite(metadata.content_length)
-      ? Math.max(excerpt.length, metadata.content_length)
-      : excerpt.length
-    const storedFingerprint = metadata.content_fingerprint
-    const contentFingerprint = hasCachedExcerpt && typeof storedFingerprint === "string" && /^[a-f0-9]{40}$/i.test(storedFingerprint)
-      ? storedFingerprint
-      : ""
-
-    const queued = ResearchQueue.enqueueForModelStudy({
-      sourceID: source.id,
-      sourceURL,
-      title: redactResearchSecrets(row.title).slice(0, 500),
-      modelStudyVersion: RESEARCH_MODEL_STUDY_VERSION,
-      payload: {
-        source_name: source.name,
-        source_kind: source.kind,
-        source_trust: source.trust,
-        cached_text: excerpt,
-        content_length: contentLength,
-        content_fingerprint: contentFingerprint,
-        cached_text_truncated: hasCachedExcerpt && (metadata.content_truncated_for_learning === true || contentLength > excerpt.length),
-        crawl_depth: typeof metadata.crawl_depth === "number" ? metadata.crawl_depth : 0,
-        legacy_knowledge_id: row.id,
-      },
-    })
-    if (!queued.queued) {
-      if (queued.reason === "already-model-studied") {
-        ReportKnowledge.markModelStudyCompleted({
-          id: row.id,
-          version: RESEARCH_MODEL_STUDY_VERSION,
-          decision: "learned",
-          reason: "already completed model-led study for this version",
-        })
-      } else if (result.errors.length < 5 && "reason" in queued && queued.reason) {
-        result.errors.push(row.id + ": " + queued.reason)
+      if (!ReportKnowledge.markModelStudyCompleted({ id, version: RESEARCH_MODEL_STUDY_VERSION, decision: "skipped", reason })) {
+        if (result.errors.length < 5) result.errors.push(id + ": could not persist the legacy skip marker")
+        stalled = true
       }
-      continue
     }
-    const markedRequested = ReportKnowledge.markModelStudyRequested({ id: row.id, version: RESEARCH_MODEL_STUDY_VERSION })
-    result.queued++
-    if (!markedRequested && result.errors.length < 5) {
-      result.errors.push(row.id + ": queued for model study, but the legacy knowledge request marker could not be refreshed")
+
+    for (const row of rows) {
+      seen.add(row.id)
+      result.examined++
+
+      const rawURL = typeof row.source_url === "string" ? row.source_url : ""
+      const sourceURL = normalizeResearchUrl(rawURL)
+      if (!sourceURL) {
+        markSkipped(row.id, "source URL could not be safely normalized")
+        continue
+      }
+
+      let parsed: URL
+      try {
+        parsed = new URL(sourceURL)
+      } catch {
+        markSkipped(row.id, "source URL is invalid")
+        continue
+      }
+      if (parsed.protocol !== "https:") {
+        markSkipped(row.id, "only configured HTTPS research sources may be studied")
+        continue
+      }
+
+      const metadata = row.metadata ?? {}
+      const matchingSources = RESEARCH_SOURCES.filter((source) =>
+        source.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
+      )
+      const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
+      const preferred = matchingSources.find((source) => source.id === preferredID)
+      const source = preferredID
+        ? preferred
+        : matchingSources.length === 1 ? matchingSources[0] : undefined
+      if (!source) {
+        // Do not silently assign another source's trust rating or crawler policy
+        // when legacy metadata is missing/contradictory on a shared host.
+        markSkipped(
+          row.id,
+          matchingSources.length
+            ? "legacy source provenance is missing or does not match the configured URL host"
+            : "no currently configured source permits safe fetching from this host",
+        )
+        continue
+      }
+      if (sourceFilter && source.id !== sourceFilter) {
+        // This should already have been excluded before the page limit; leave it
+        // untouched and stop if the source-specific query ever violates that invariant.
+        if (result.errors.length < 5) result.errors.push(row.id + ": source-specific legacy filter returned a mismatched source")
+        stalled = true
+        continue
+      }
+      // The curated Medium source represents one researcher's articles only, not
+      // the entire platform. Preserve that path restriction during legacy backfill.
+      if (source.id === "trickster0" && !isResearchCandidate(sourceURL, source)) {
+        markSkipped(row.id, "legacy Medium URL is outside the curated researcher's path")
+        continue
+      }
+
+      const storedExcerpt = typeof metadata.excerpt === "string"
+        ? redactResearchSecrets(metadata.excerpt).slice(0, 100_000)
+        : ""
+      const hasCachedExcerpt = storedExcerpt.trim().length >= 250
+      // Empty/short legacy excerpts trigger source-scoped safe fetch on action=next.
+      const excerpt = hasCachedExcerpt ? storedExcerpt : ""
+      const contentLength = hasCachedExcerpt && typeof metadata.content_length === "number" && Number.isFinite(metadata.content_length)
+        ? Math.max(excerpt.length, metadata.content_length)
+        : excerpt.length
+      const storedFingerprint = metadata.content_fingerprint
+      const contentFingerprint = hasCachedExcerpt && typeof storedFingerprint === "string" && /^[a-f0-9]{40}$/i.test(storedFingerprint)
+        ? storedFingerprint
+        : ""
+
+      const queued = ResearchQueue.enqueueForModelStudy({
+        sourceID: source.id,
+        sourceURL,
+        title: redactResearchSecrets(row.title).slice(0, 500),
+        modelStudyVersion: RESEARCH_MODEL_STUDY_VERSION,
+        payload: {
+          source_name: source.name,
+          source_kind: source.kind,
+          source_trust: source.trust,
+          cached_text: excerpt,
+          content_length: contentLength,
+          content_fingerprint: contentFingerprint,
+          cached_text_truncated: hasCachedExcerpt && (metadata.content_truncated_for_learning === true || contentLength > excerpt.length),
+          crawl_depth: typeof metadata.crawl_depth === "number" ? metadata.crawl_depth : 0,
+          legacy_knowledge_id: row.id,
+        },
+      })
+      if (!queued.queued) {
+        if (queued.reason === "already-model-studied") {
+          if (!ReportKnowledge.markModelStudyCompleted({
+            id: row.id,
+            version: RESEARCH_MODEL_STUDY_VERSION,
+            decision: "learned",
+            reason: "already completed model-led study for this version",
+          })) {
+            if (result.errors.length < 5) result.errors.push(row.id + ": could not persist the completed study marker")
+            stalled = true
+          }
+        } else {
+          if (result.errors.length < 5) result.errors.push(row.id + ": " + (("reason" in queued && queued.reason) || "legacy row was not queued"))
+          stalled = true
+        }
+        continue
+      }
+
+      const markedRequested = ReportKnowledge.markModelStudyRequested({ id: row.id, version: RESEARCH_MODEL_STUDY_VERSION })
+      result.queued++
+      if (!markedRequested) {
+        if (result.errors.length < 5) result.errors.push(row.id + ": queued for model study, but the legacy knowledge request marker could not be refreshed")
+        stalled = true
+      }
     }
+    if (stalled || rows.length < 500) break
   }
   return result
 }
