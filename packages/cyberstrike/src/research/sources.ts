@@ -1,5 +1,7 @@
 /** Bump when classification/extraction semantics change so old rejected queue rows can be safely revisited once. */
 export const RESEARCH_LEARNING_VERSION = 7
+/** Increment when the model-led article study format changes, not for heuristic extraction changes. */
+export const RESEARCH_MODEL_STUDY_VERSION = 1
 
 export type ResearchSourceKind = "disclosure" | "academy" | "writeup" | "blog" | "reference" | "research"
 
