@@ -216,6 +216,21 @@ export const WebReconTool = Tool.define("web_recon", {
           "Configure the official scope first with: cyberstrike target scope <url> --include <domain> --source <program> --reference <official-https-url>",
         ].join("\n"))
       }
+      // A host covered by a root wildcard gets its own nested workspace before outputs
+      // are produced; exact-host target workspaces keep their path-scoped identity.
+      try {
+        const requestedURL = new URL(params.target)
+        if (targetWorkspace && requestedURL.hostname !== targetWorkspace.hostname) {
+          const child = await TargetMemory.registerObservedAsset(requestedURL.origin, "subdomain")
+          if (!child) {
+            return fail("[-] Scope matched but the child workspace could not be attached under its authorized parent. No network probes were sent and no artifact was written.")
+          }
+          targetWorkspace = child
+        }
+      } catch (error) {
+        return fail("[-] Could not prepare the canonical target workspace before reconnaissance: " + (error instanceof Error ? error.message : String(error)) + ". No network probes were sent.")
+      }
+
       await ctx.ask({
         permission: "web_recon",
         patterns: [params.target],
