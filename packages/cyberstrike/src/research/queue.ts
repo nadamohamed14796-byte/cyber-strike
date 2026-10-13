@@ -291,7 +291,7 @@ export namespace ResearchQueue {
 
   /** Load one exact active claim by its stable public ID and opaque lease token. */
   export function claimed(id: string, leaseOwner: string) {
-    const match = /^RPT-(\\d{1,12})$/.exec(id.trim())
+    const match = /^RPT-(\d{1,12})$/.exec(id.trim())
     if (!match || !leaseOwner.trim()) return null
     const sequence = Number(match[1])
     if (!Number.isSafeInteger(sequence) || sequence <= 0) return null
@@ -320,7 +320,7 @@ export namespace ResearchQueue {
     contentFingerprint: string
     contentLength: number
   }) {
-    const match = /^RPT-(\\d{1,12})$/.exec(input.id.trim())
+    const match = /^RPT-(\d{1,12})$/.exec(input.id.trim())
     if (!match || !input.leaseOwner.trim()) return false
     const sequence = Number(match[1])
     if (!Number.isSafeInteger(sequence) || sequence <= 0) return false
