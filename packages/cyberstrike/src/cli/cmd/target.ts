@@ -1,4 +1,6 @@
 import type { Argv } from "yargs"
+import fs from "node:fs/promises"
+import path from "node:path"
 import { cmd } from "./cmd"
 import { Instance } from "../../project/instance"
 import { TargetMemory, type TargetAssetType, type TargetNoteKind, type TargetNoteStatus } from "../../target"
@@ -81,15 +83,36 @@ const TargetScopeCommand = cmd({
       .option("include", { type: "string", array: true, describe: "authorized domain, *.domain wildcard, or IPv4 CIDR (repeatable)" })
       .option("exclude", { type: "string", array: true, describe: "explicitly excluded domain, wildcard, or IPv4 CIDR (repeatable)" })
       .option("source", { type: "string", describe: "program or authorization source name" })
-      .option("reference", { type: "string", describe: "HTTPS URL for the official program scope/policy" }),
+      .option("reference", { type: "string", describe: "HTTPS URL for the official program scope/policy" })
+      .option("file", { type: "string", describe: "import exact in-scope entries from a UTF-8 text file (one host/domain/CIDR per line; blank lines and # comments ignored)" }),
   async handler(args) {
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
-        const requestedChange = Boolean(args.include?.length || args.exclude?.length || args.source || args.reference)
+        const requestedChange = Boolean(args.include?.length || args.exclude?.length || args.source || args.reference || args.file)
         if (requestedChange) {
+          let fileEntries: string[] = []
+          if (args.file) {
+            const filePath = path.resolve(process.cwd(), args.file)
+            let contents: string
+            try {
+              contents = await fs.readFile(filePath, "utf-8")
+            } catch (error) {
+              throw new Error("Cannot read scope file " + filePath + ": " + (error instanceof Error ? error.message : String(error)))
+            }
+            fileEntries = contents
+              .split(/\\r?\\n/)
+              .map((line, index) => ({ line: index + 1, value: line.trim() }))
+              .filter(({ value }) => value.length > 0 && !value.startsWith("#") && !value.startsWith("//"))
+              .map(({ line, value }) => {
+                if (/\\s/.test(value)) throw new Error("Invalid scope file entry at line " + line + ": entries must be one domain, wildcard, or IPv4 CIDR per line.")
+                return value
+              })
+            if (!fileEntries.length) throw new Error("Scope file contains no usable entries: " + filePath)
+          }
+          const includeEntries = [...(args.include ?? []), ...fileEntries]
           const result = await TargetMemory.configureScope(args.url, {
-            include: args.include ?? [],
+            include: includeEntries,
             exclude: args.exclude ?? [],
             authorizationSource: args.source ?? "",
             authorizationReference: args.reference ?? "",
@@ -97,7 +120,7 @@ const TargetScopeCommand = cmd({
           console.log("Scope configured for: " + result.workspace.targetURL)
           console.log("Authorization source: " + result.scope.authorizationSource)
           console.log("Reference: " + result.scope.authorizationReference)
-          console.log("Included: " + result.scope.scopeItems.join(", "))
+          console.log("Included entries: " + result.scope.scopeItems.length)\n          if (args.file) console.log("Imported from: " + path.resolve(process.cwd(), args.file))\n          console.log("Included: " + result.scope.scopeItems.slice(0, 20).join(", ") + (result.scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
           console.log("Existing workspaces newly linked/reorganized: " + result.associatedAssets.length)
           console.log("Scope file: " + result.workspace.workspacePath + "/scope/scope.json")
