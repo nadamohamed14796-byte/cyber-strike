@@ -80,7 +80,7 @@ jobs:
         env:
           CYBERSTRIKE_VERSION: ${{ needs.version.outputs.version }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: cyberstrike-web
           path: packages/app/dist
@@ -106,7 +106,7 @@ jobs:
           CYBERSTRIKE_BUILD_OS: ${{ inputs.platform }}
           GH_TOKEN: ${{ github.token }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: cyberstrike-cli
           path: packages/cyberstrike/dist
