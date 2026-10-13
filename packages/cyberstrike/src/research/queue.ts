@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, or } from "drizzle-orm"
+import { and, asc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
 import { RESEARCH_LEARNING_VERSION } from "./sources"
@@ -289,8 +289,77 @@ export namespace ResearchQueue {
     })
   }
 
-  export function claimNext(workerID: string, sourceID?: string) {
+  /** Load one exact active claim by its stable public ID and opaque lease token. */
+  export function claimed(id: string, leaseOwner: string) {
+    const match = /^RPT-(\\d{1,12})$/.exec(id.trim())
+    if (!match || !leaseOwner.trim()) return null
+    const sequence = Number(match[1])
+    if (!Number.isSafeInteger(sequence) || sequence <= 0) return null
     const now = Date.now()
+    return Database.use((db) => {
+      const row = db.select().from(ResearchQueueTable).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
+      )).get()
+      return row ? { ...row, public_id: publicID(row.sequence) } : null
+    })
+  }
+
+  /**
+   * Cache sanitized text fetched by the agent-study path, tied to the still-active
+   * claim. This lets saving knowledge read canonical source text from SQLite rather
+   * than trusting an excerpt echoed back by the model.
+   */
+  export function cacheClaimedText(input: {
+    id: string
+    leaseOwner: string
+    title: string
+    text: string
+    contentFingerprint: string
+    contentLength: number
+  }) {
+    const match = /^RPT-(\\d{1,12})$/.exec(input.id.trim())
+    if (!match || !input.leaseOwner.trim()) return false
+    const sequence = Number(match[1])
+    if (!Number.isSafeInteger(sequence) || sequence <= 0) return false
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const row = db.select().from(ResearchQueueTable).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, input.leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
+      )).get()
+      if (!row) return false
+      const text = input.text.slice(0, 100_000)
+      const payload = {
+        ...(row.payload ?? {}),
+        cached_text: text,
+        cached_text_truncated: input.contentLength > text.length,
+        content_fingerprint: input.contentFingerprint,
+        content_length: input.contentLength,
+      }
+      const updated = db.update(ResearchQueueTable).set({
+        title: input.title.slice(0, 500),
+        payload,
+        updated_at: now,
+      }).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, input.leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
+      )).returning().get()
+      return Boolean(updated)
+    })
+  }
+
+  export function claimNext(workerID: string, sourceID?: string, leaseDurationMs = LEASE_MS) {
+    const now = Date.now()
+    const boundedLease = Number.isFinite(leaseDurationMs)
+      ? Math.max(LEASE_MS, Math.min(20 * 60_000, Math.floor(leaseDurationMs)))
+      : LEASE_MS
     // Lease identity must be unique per claim, not just per configured worker label.
     // Otherwise a stale process could complete work reclaimed by a second process
     // that reused the same --worker value after the original lease expired.
@@ -323,7 +392,7 @@ export namespace ResearchQueue {
           payload: { ...(row.payload ?? {}), learning_version: RESEARCH_LEARNING_VERSION },
           attempts: row.attempts + 1,
           lease_owner: leaseOwner,
-          lease_until: now + LEASE_MS,
+          lease_until: now + boundedLease,
           claimed_at: now,
           updated_at: now,
           last_error: null,
