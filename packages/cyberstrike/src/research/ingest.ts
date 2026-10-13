@@ -102,6 +102,33 @@ function titleOf(html: string, fallback: string) {
   )
 }
 
+/**
+ * Fetch one queued public research URL through the same source-scoped SSRF-safe
+ * fetcher used by discovery, returning only sanitized plain text.
+ */
+export async function fetchResearchSourceForStudy(sourceID: string, sourceURL: string) {
+  const source = RESEARCH_SOURCES.find((entry) => entry.id === sourceID)
+  if (!source) throw new Error("unknown research source id")
+  const normalized = normalizeUrl(sourceURL)
+  if (!normalized) throw new Error("research source URL failed normalization")
+  const parsed = new URL(normalized)
+  if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) {
+    throw new Error("research URL is outside the configured HTTPS source hosts")
+  }
+  const html = await fetchText(normalized, source)
+  const title = redactResearchSecrets(titleOf(html, normalized))
+  const text = redactResearchSecrets(cleanHtml(html))
+  if (looksLikeResearchAuthenticationWall(normalized, title, text, html)) {
+    throw new Error("authentication required: source returned a login wall")
+  }
+  return {
+    title,
+    text,
+    contentFingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
+    contentLength: text.length,
+  }
+}
+
 function linksOf(html: string, base: URL, source: ResearchSource) {
   const links = new Set<string>()
   for (const match of html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
