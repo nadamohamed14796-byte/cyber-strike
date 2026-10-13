@@ -325,7 +325,14 @@ export namespace ResearchQueue {
     return Database.transaction((db) => {
       const existing = db.select().from(ResearchQueueTable)
         .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
-      if (existing?.status === "learned" || existing?.status === "rejected") return existing
+      // Preserve rows already completed by the model-study workflow. Authentication
+      // is a fetch/access state, not a new study verdict; turning a learned/rejected
+      // report into blocked_auth would lose its completion marker and cause repeat work.
+      if (
+        existing &&
+        (existing.status === "learned" || existing.status === "rejected") &&
+        typeof existing.payload?.model_study_version === "number"
+      ) return existing
       if (existing) {
         // A cached login page must never be reused after credentials are configured.
         const {
