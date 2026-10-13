@@ -782,7 +782,9 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           add(link, current.depth + 1)
         }
 
-        if (text.length >= 120 && (current.depth === 0 || isResearchCandidate(current.url, source))) {
+        // Match the learner's minimum text length so short pages are rejected
+        // during discovery instead of occupying a durable queue slot first.
+        if (text.length >= 250 && (current.depth === 0 || isResearchCandidate(current.url, source))) {
           const relevance = sourceRelevance(current.url, title, text, source)
           if (relevance.accepted && !isIndexLikeResearchUrl(current.url)) {
             const row = ResearchQueue.enqueue({
