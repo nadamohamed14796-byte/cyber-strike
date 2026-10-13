@@ -130,8 +130,13 @@ test("agent-led research study persists model analysis and completes its queue l
 
       const events = Database.use((db) => db.select().from(ReportKnowledgeEventTable)
         .where(eq(ReportKnowledgeEventTable.report_id, knowledgeID)).all())
-      expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(true)
+      expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(false)
       expect(ReportKnowledge.stats().external).toBeGreaterThanOrEqual(1)
+
+      const status = JSON.parse((await tool.execute({ action: "stats", pages: 1000 }, context)).output)
+      expect(status.configured_sources).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "portswigger", name: "PortSwigger Web Security Academy" }),
+      ]))
       await Instance.dispose()
     },
   })
