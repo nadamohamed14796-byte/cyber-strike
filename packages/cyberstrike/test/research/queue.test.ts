@@ -441,9 +441,11 @@ test("an expired lease cannot complete work before another worker reclaims it", 
 
       const recovered = ResearchQueue.claimNext("recovery-worker", "test")
       expect(recovered?.sequence).toBe(item.sequence)
-      expect(recovered?.lease_owner).not.toBe(leaseOwner)
+      const recoveredLease = recovered?.lease_owner
+      if (!recoveredLease) throw new Error("recovered claim did not include its lease token")
+      expect(recoveredLease).not.toBe(leaseOwner)
       expect(ResearchQueue.complete(item.sequence, leaseOwner, "learned")).toBeUndefined()
-      expect(ResearchQueue.complete(item.sequence, recovered!.lease_owner, "learned")?.status).toBe("learned")
+      expect(ResearchQueue.complete(item.sequence, recoveredLease, "learned")?.status).toBe("learned")
       await Instance.dispose()
     },
   })
