@@ -7,6 +7,24 @@ export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learne
 
 const LEASE_MS = 5 * 60_000
 const CRAWL_PAGE_TTL_MS = 6 * 60 * 60_000
+const MAX_CACHED_DISCOVERY_LINKS = 160
+const MAX_CACHED_DISCOVERY_LINK_CHARS = 16_384
+
+function boundedDiscoveryLinks(links: string[] | undefined) {
+  if (!links) return undefined
+  const unique = new Set<string>()
+  const result: string[] = []
+  let totalChars = 0
+  for (const link of links) {
+    if (typeof link !== "string" || link.length > 4096 || unique.has(link)) continue
+    if (totalChars + link.length > MAX_CACHED_DISCOVERY_LINK_CHARS) continue
+    unique.add(link)
+    result.push(link)
+    totalChars += link.length
+    if (result.length >= MAX_CACHED_DISCOVERY_LINKS) break
+  }
+  return result
+}
 
 function publicID(sequence: number) {
   return "RPT-" + String(sequence).padStart(6, "0")
@@ -290,7 +308,7 @@ export namespace ResearchQueue {
         return db.update(ResearchQueueTable).set({
           payload: {
             ...(existing.payload ?? {}),
-            discovered_links: [...new Set(input.discoveredLinks.filter((link) => link.length <= 4096))].slice(0, 160),
+            discovered_links: boundedDiscoveryLinks(input.discoveredLinks)!,
           },
           updated_at: now,
         }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
@@ -311,7 +329,7 @@ export namespace ResearchQueue {
             ...existingPayload,
             crawl_page: true,
             ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
-            ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks.filter((link) => link.length <= 4096))].slice(0, 160) } : {}),
+            ...(input.discoveredLinks ? { discovered_links: boundedDiscoveryLinks(input.discoveredLinks)! } : {}),
           },
           status: "discovered",
           updated_at: now,
@@ -328,7 +346,7 @@ export namespace ResearchQueue {
         payload: {
           crawl_page: true,
           ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
-          ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks.filter((link) => link.length <= 4096))].slice(0, 160) } : {}),
+          ...(input.discoveredLinks ? { discovered_links: boundedDiscoveryLinks(input.discoveredLinks)! } : {}),
         },
         status: "discovered",
         attempts: 0,
