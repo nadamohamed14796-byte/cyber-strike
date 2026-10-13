@@ -160,9 +160,9 @@ export async function sessionScan(
     lines.push(`\n[*] ${origin} (${bucket.apis.size} API, ${bucket.pages.size} pages)`)
 
     const results = await Promise.allSettled([
-      techDetect(origin, [], timeout),
-      headerAudit(origin, [], timeout),
-      sensitiveFiles(origin, [], timeout),
+      techDetect(origin, [], timeout, scopeFilter),
+      headerAudit(origin, [], timeout, scopeFilter),
+      sensitiveFiles(origin, [], timeout, scopeFilter),
     ])
 
     const labels = ["tech_detect", "header_audit", "sensitive_files"]
@@ -196,8 +196,8 @@ export async function sessionScan(
       lines.push(`\n=== PHASE 2: API & METHOD CHECKS (${corsTargets.length} CORS, ${methodRoots.length} method) ===`)
 
       const allTasks = [
-        ...corsTargets.map((url) => corsCheck(url, [], timeout)),
-        ...methodRoots.map((url) => methodCheck(url, [], timeout)),
+        ...corsTargets.map((url) => corsCheck(url, [], timeout, scopeFilter)),
+        ...methodRoots.map((url) => methodCheck(url, [], timeout, scopeFilter)),
       ]
       const allResults = await Promise.allSettled(allTasks)
 
@@ -233,7 +233,7 @@ export async function sessionScan(
       for (const url of redirSlice) {
         if (abort?.aborted || Date.now() > deadline) break
         try {
-          const result = await openRedirect(url, [], timeout)
+          const result = await openRedirect(url, [], timeout, scopeFilter)
           if (result.findings.length > 0) {
             allFindings.push(...result.findings)
             lines.push(`    [!] Open redirect: ${url}`)
