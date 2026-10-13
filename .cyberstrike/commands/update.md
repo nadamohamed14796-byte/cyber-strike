@@ -8,7 +8,8 @@ You are running CyberStrike's **model-led research learning cycle**. `/update` o
 
 1. Call `research_study(action="stats")`.
 2. Record initial queue/knowledge counts and read `configured_sources`. Use the exact `id` values returned there; never guess aliases such as `hackerone` or `default`.
-3. Do not claim all sources are configured or accessible merely because their IDs are listed.
+3. Before crawling, call `research_study(action="backfill")` without a source filter. This does no network discovery: it drains older learned/rejected queue states, retries auth-blocked rows only when a source-scoped session is configured, and queues every safely attributable legacy public-knowledge record for active-model study. Inspect all returned counters, `legacy_knowledge_skip_examples`, and `legacy_knowledge_errors`. A skip is a terminal, reasoned decision; an error/stalled backfill is not completion.
+4. Do not claim all sources are configured or accessible merely because their IDs are listed.
 
 ## 2. Discover in source-scoped, resumable passes
 
@@ -40,10 +41,11 @@ A queue being empty is not proof that a site's public archive was exhausted. Be 
 
 ## 5. Final verification and separation of responsibilities
 
-1. Call `research_study(action="stats")` again. Compare initial/final queue and knowledge counts. Report source-by-source pages/candidates/new queue rows, successful model-studied saves, rejection reasons, auth blocks, retries/errors, useful Knowledge IDs and source URLs, remaining queue counts, and any source that reached the crawl cap.
-2. `/update` only builds and persists the global public-methodology knowledge base. Do **not** call `research_knowledge`, `research search`, or `research recommend` as a substitute for studying/saving. Studying a report must not record it as already surfaced during a hunt or as useful.
-3. Hunting-time retrieval is separate: when live, authorized target observations produce relevant signals, the hunting workflow may query this saved knowledge base. Public references stay unverified methodology, never target-specific evidence.
-4. Never copy source-program hosts, endpoints, object IDs, users, accounts, tokens, or scope into current-target facts. Use independently observed target artifacts only. Preserve target memory and notes separately from the global research database. Do not edit `SKILL.md` files as a side effect of study.
+1. After the source passes and current study queue have been drained, call `research_study(action="backfill")` without a source filter again. If it queues/requeues additional work, process that work with the normal `next` → model study → lease-matched `save` cycle, then repeat backfill. Stop repeating only when a full pass adds/requeues no work, or document a durable blocker/remaining state. Do not repeatedly retry auth-blocked rows unless a valid source session is configured.
+2. Call `research_study(action="stats")` again. Compare initial/final queue and knowledge counts. Report source-by-source pages/candidates/new queue rows, successful model-studied saves, rejection reasons, auth blocks, retries/errors, useful Knowledge IDs and source URLs, remaining queue counts, legacy skip examples/reasons, and any source that reached the crawl cap.
+3. `/update` only builds and persists the global public-methodology knowledge base. Do **not** call `research_knowledge`, `research search`, or `research recommend` as a substitute for studying/saving. Studying a report must not record it as already surfaced during a hunt or as useful.
+4. Hunting-time retrieval is separate: when live, authorized target observations produce relevant signals, the hunting workflow may query this saved knowledge base. Public references stay unverified methodology, never target-specific evidence.
+5. Never copy source-program hosts, endpoints, object IDs, users, accounts, tokens, or scope into current-target facts. Use independently observed target artifacts only. Preserve target memory and notes separately from the global research database. Do not edit `SKILL.md` files as a side effect of study.
 
 ## Study model
 
