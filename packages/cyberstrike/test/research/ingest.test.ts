@@ -444,6 +444,13 @@ test("research extraction keeps explicit CWE identifiers and does not infer seve
   expect(labelled.severity).toBe("high")
   expect(labelled.retrievalSignals).toContain("CWE-639")
 
+  const cvssOnly = extractResearchDetails(
+    "CWE-79 reflected input issue",
+    "CVSS v3.1: 9.8. The source does not include a separate severity label.",
+    "xss",
+  )
+  expect(cvssOnly.severity).toBe("critical")
+
   const incidental = extractResearchDetails(
     "High-level overview of low-level API behavior",
     "This writeup describes a medium-sized endpoint and does not state a severity rating.",
