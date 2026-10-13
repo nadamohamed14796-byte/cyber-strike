@@ -119,6 +119,16 @@ Normalize case, trailing dots, scheme/port, redirects, canonical names and resol
 
 Return candidates with scope/provenance, confidence level, evidence path, deduplication key, negative control, priority rationale, safe next step and trigger for any linked attack skill. Promote a candidate to active testing only after scope and attribution are confirmed; promote it to a finding only after the relevant attack skill verifies the security boundary.
 
+### CyberStrike workspace handoff
+
+A candidate list is not yet the target workspace inventory. After attribution, DNS/HTTP checks, and the saved program-scope review, register each corroborated authorized child host so future runs can find its notes and evidence:
+
+- `cyberstrike target attach https://example.com https://api.example.com --kind api`
+- `cyberstrike target attach https://example.com https://app.example.com --kind application`
+
+Replace both example hosts with the actual authorized program and child. Never attach third-party SaaS tenants, excluded hosts, uncertain candidates, or out-of-scope names. The command uses the persisted scope and refuses ambiguous parent matches. Run `cyberstrike target tree https://example.com` to verify placement. Store source URL, observation time, DNS/HTTP evidence, and attribution confidence in the child target's notes; do not treat an asset registration as a vulnerability finding.
+
+
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/subdomain-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/subdomain-enumeration/SKILL.md)
