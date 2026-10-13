@@ -56,6 +56,13 @@ export interface TargetScope {
   warning?: string
 }
 
+type ScopeManifestCacheEntry = { signature: string; scope: TargetScope }
+const scopeManifestCache = new Map<string, ScopeManifestCacheEntry>()
+
+function scopeFileSignature(info: Awaited<ReturnType<typeof fs.stat>>): string {
+  return [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(":")
+}
+
 export interface NormalizedTarget {
   targetURL: string
   targetKey: string
