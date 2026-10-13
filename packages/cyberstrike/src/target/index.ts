@@ -862,7 +862,7 @@ export namespace TargetMemory {
   export async function attachAsset(
     parentURL: string,
     assetURL: string,
-    assetType: TargetAssetType = "subdomain",
+    assetType?: TargetAssetType,
   ): Promise<{ parent: Workspace; asset: Workspace }> {
     const parent = await get(parentURL)
     if (!parent) throw new Error("Parent workspace not found; initialize the program target first.")
@@ -882,7 +882,7 @@ export namespace TargetMemory {
   }
 
   /** Passive observations may be linked to authorized programs, but never trigger probes. */
-  export async function registerObservedAsset(input: string, assetType: TargetAssetType = "subdomain"): Promise<Workspace | null> {
+  export async function registerObservedAsset(input: string, assetType?: TargetAssetType): Promise<Workspace | null> {
     let candidate: URL
     try { candidate = new URL(input) } catch { return null }
     if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) return null
