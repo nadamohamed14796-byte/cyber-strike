@@ -968,6 +968,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           title,
           reason: "authentication wall detected; configure a source-scoped session, then run research retry-auth",
           payload: { source_name: source.name, source_kind: source.kind, crawl_depth: item.payload.crawl_depth },
+          claim: { sequence: item.sequence, leaseOwner: item.lease_owner },
         })
         result.blocked_auth++
         continue
