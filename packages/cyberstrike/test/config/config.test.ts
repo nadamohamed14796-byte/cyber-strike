@@ -55,6 +55,23 @@ test("loads JSON config file", async () => {
   })
 })
 
+test("skips non-regular config paths instead of trying to read them", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      // A directory is not a valid config file; startup should safely ignore it.
+      await fs.mkdir(path.join(dir, "cyberstrike.json"))
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await Config.get()
+      expect(config.username).toBeDefined()
+    },
+  })
+})
+
 test("loads JSONC config file", async () => {
   await using tmp = await tmpdir({
     init: async (dir) => {
