@@ -355,6 +355,9 @@ export namespace FindingValidation {
             "Check history is stored in the SQLite finding_validation table. This note intentionally excludes raw request/response evidence.",
           ].join("\n"),
           source: "finding-validation:" + validationID,
+          ...(assessment.verdict === "confirmed" || assessment.verdict === "false_positive"
+            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; distinct evidence-backed attempts: " + assessment.attemptCount + "; summary: " + assessment.summary }
+            : {}),
           status: assessment.verdict === "confirmed" ? "confirmed" : assessment.verdict === "false_positive" ? "disproven" : "unverified",
           tags: ["finding-validation", assessment.verdict, ...assessment.failedCheckIDs.map((id) => "failed:" + id)],
         })
