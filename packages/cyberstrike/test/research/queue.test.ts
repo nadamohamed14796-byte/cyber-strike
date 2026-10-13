@@ -200,6 +200,29 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
       expect(ResearchQueue.find("test-crawl-cache", url)?.payload?.crawl_page).not.toBe(true)
       expect(ResearchQueue.stats("test-crawl-cache").total).toBe(1)
       expect(ResearchQueue.stats("test-crawl-cache").crawl_pages).toBe(0)
+
+      // Reports retain their queue status and source text, but their outbound
+      // links are preserved for later discovery passes.
+      const reportURL = "https://research.example.test/writeup/report-with-links"
+      const report = ResearchQueue.enqueue({
+        sourceID: "test-crawl-cache",
+        sourceURL: reportURL,
+        title: "Existing queued report",
+        payload: { cached_text: "canonical report body" },
+      })
+      expect(report.created).toBe(true)
+      const annotated = ResearchQueue.markVisitedPage({
+        sourceID: "test-crawl-cache",
+        sourceURL: reportURL,
+        title: "Existing queued report",
+        discoveredLinks: ["https://research.example.test/writeup/linked-report"],
+      })
+      expect(annotated?.status).toBe("queued")
+      expect(annotated?.payload?.crawl_page).not.toBe(true)
+      expect(annotated?.payload?.cached_text).toBe("canonical report body")
+      expect(annotated?.payload?.discovered_links).toEqual([
+        "https://research.example.test/writeup/linked-report",
+      ])
       await Instance.dispose()
     },
   })
