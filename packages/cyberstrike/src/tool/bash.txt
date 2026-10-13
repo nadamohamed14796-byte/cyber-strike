@@ -4,6 +4,13 @@ All commands run in ${directory} by default. Use the `workdir` parameter if you 
 
 IMPORTANT: This tool is for terminal operations like git, npm, docker, etc. DO NOT use it for file operations (reading, writing, editing, searching, finding files) - use the specialized tools for this instead.
 
+MANDATORY TARGET OUTPUT RULES:
+- For an authorized target task, first initialize/show the canonical target with target_workspace and use the exact workspace path returned by that tool.
+- Run recon commands with workdir set to the relevant target workspace (root for inventories, child workspace for one validated asset). For output flags, use an absolute path beneath that workspace, e.g. <workspace>/recon or <workspace>/scans. Never default to /root/targets or a separate agent-made folder.
+- Prefer command stdout piped/captured and persisted with target_artifact, or use the tool's explicit file-output option pointed to the canonical workspace. Do not assume output was saved; verify exit code, output path, file existence, and size, then update the run manifest/notes through target_workspace(action="record_summary").
+- For a local scope file, copy it into <workspace>/scope/ using target_artifact(source_path=...) before processing. Preserve the original input and a run checkpoint; do not print huge scope files into model context.
+- Do not store target output with generic write/edit tools. Those are for project source files, not recon artifacts. Do not test any candidate until persisted scope_check says it is allowed.
+
 Before executing the command, please follow these steps:
 
 1. Directory Verification:
