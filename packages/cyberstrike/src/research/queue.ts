@@ -189,10 +189,11 @@ export namespace ResearchQueue {
       )).orderBy(asc(ResearchQueueTable.sequence)).all().filter((row) => {
         if (row.payload?.crawl_page === true) return false
         if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
-        const requested = row.payload.model_study_requested_version
         const studied = row.payload.model_study_version
+        // A request marker alone is not completion: an older heuristic worker may
+        // have reclaimed the row after scheduling. Only the model's completion
+        // marker prevents another model-study attempt.
         if (typeof studied === "number" && studied >= version) return false
-        if (typeof requested === "number" && requested >= version) return false
         if (row.status === "rejected" && !["no recognizable security topic", "page failed research relevance gate"].includes(row.last_error ?? "")) return false
         return true
       }).slice(0, bounded)
