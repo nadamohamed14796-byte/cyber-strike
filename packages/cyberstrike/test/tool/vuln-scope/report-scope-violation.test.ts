@@ -28,6 +28,10 @@ describe("reportScopeViolation", () => {
     test("ssrf tester, ssrf category, ssrf title", () => {
       expect(reportScopeViolation("proxy-tester-ssrf", "ssrf", "SSRF via webhook")).toBeNull()
     })
+
+    test("LLM tester, prompt injection category and title", () => {
+      expect(reportScopeViolation("proxy-tester-llm", "prompt injection", "Prompt Injection in AI chatbot")).toBeNull()
+    })
   })
 
   describe("out-of-scope category — violation returned", () => {
