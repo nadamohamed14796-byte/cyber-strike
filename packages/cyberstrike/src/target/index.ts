@@ -342,14 +342,18 @@ async function ensureSafeDirectoryPath(rootPath: string, relativePath: string): 
   return current
 }
 
-async function assertRegularFileOrMissing(filePath: string): Promise<void> {
+async function assertRegularFileOrMissing(
+  filePath: string,
+): Promise<Awaited<ReturnType<typeof fs.lstat>> | null> {
   try {
     const info = await fs.lstat(filePath)
     if (info.isSymbolicLink() || !info.isFile()) {
       throw new Error("Unsafe target workspace file: symbolic links and non-regular files are not allowed.")
     }
+    return info
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
+    throw error
   }
 }
 
@@ -1093,37 +1097,18 @@ export namespace TargetMemory {
     const workspace = mapWorkspace(row)
     const scopePath = path.join(workspace.workspacePath, "scope", "scope.json")
     const notesPath = path.join(workspace.workspacePath, "notes.md")
-    await assertRegularFileOrMissing(scopePath)
-    await assertRegularFileOrMissing(notesPath)
+    const workspaceManifestPath = path.join(workspace.workspacePath, "workspace.json")
 
-    let needsRepair = false
-    try {
-      await fs.stat(notesPath)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-      needsRepair = true
-    }
-
-    let info: Awaited<ReturnType<typeof fs.stat>> | undefined
-    try {
-      info = await fs.stat(scopePath)
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-      needsRepair = true
-    }
-
+    let info = await assertRegularFileOrMissing(scopePath)
+    const notesInfo = await assertRegularFileOrMissing(notesPath)
+    const workspaceManifestInfo = await assertRegularFileOrMissing(workspaceManifestPath)
+    const needsRepair = !info || !notesInfo || notesInfo.size === 0 || !workspaceManifestInfo
     if (needsRepair) {
-      // Repair missing generated files once, without preparing and rewriting the
-      // entire workspace on every ordinary scope check.
+      // Heal missing generated workspace files once, not on every normal scope check.
       await prepareWorkspace(workspace)
-      try {
-        info = await fs.stat(scopePath)
-      } catch (repairError) {
-        if ((repairError as NodeJS.ErrnoException).code === "ENOENT") return null
-        throw repairError
-      }
+      info = await assertRegularFileOrMissing(scopePath)
     }
-    if (!info?.isFile()) throw new Error("Unsafe target scope manifest: expected a regular file.")
+    if (!info) return null
     const signature = scopeFileSignature(info)
     const cached = scopeManifestCache.get(scopePath)
     if (cached?.signature === signature) {
