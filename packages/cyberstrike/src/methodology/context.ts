@@ -7,6 +7,55 @@ import { AgentPerformance } from "./performance"
 import { Phase } from "./phase"
 import { Validation } from "./validation"
 import { categoryInLane } from "../tool/vuln-scope"
+import { SkillIndex } from "../skill/index-engine"
+
+// Phase-aware skill discovery is intentionally separate from loading: the agent must
+// use the skill tool to load the selected skill so normal per-agent permissions apply.
+const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
+  scope_analysis: ["attack-bb-methodology", "scope", "attack surface"],
+  passive_recon: ["recon-methodology", "recon-subdomain-enumeration", "osint"],
+  active_recon: ["attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration"],
+  technology_profiling: ["technology profiling", "technology fingerprinting", "framework detection"],
+  authentication_testing: ["authentication", "auth bypass", "login"],
+  session_management: ["session management", "cookie", "JWT"],
+  authorization_testing: ["attack-idor-automation", "authorization", "IDOR"],
+  input_validation: ["injection", "XSS", "SQL injection", "SSRF"],
+  business_logic: ["business logic", "race condition", "attack-bb-methodology"],
+  data_protection: ["data protection", "sensitive data", "TLS"],
+  api_security: ["API security", "GraphQL", "REST API"],
+  infrastructure: ["recon-asn-infrastructure", "cloud security", "network exposure"],
+  reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing"],
+}
+
+export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
+  return [...PHASE_SKILL_QUERIES[phaseId]]
+}
+
+async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
+  await SkillIndex.ensureBuilt()
+  const selected = new Map<string, { description: string; query: string }>()
+  for (const query of skillQueriesForPhase(phaseId)) {
+    for (const entry of SkillIndex.search(query, 8)) {
+      if (entry.verified === "tampered" || selected.has(entry.name)) continue
+      selected.set(entry.name, { description: entry.description, query })
+      if (selected.size >= 4) break
+    }
+    if (selected.size >= 4) break
+  }
+
+  const lines = [
+    "## Required Skill Preflight",
+    "Before testing this phase, use the `skill` tool to load at least one relevant skill listed below. A name in this list is only a recommendation; it is not loaded until the tool returns its skill content.",
+    "If loading is denied or a skill is unavailable, search for an allowed alternative and note the gap. Do not claim a skill was loaded unless the tool call succeeded.",
+  ]
+  if (selected.size === 0) {
+    lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
+  } else {
+    lines.push("", "Phase-specific candidates:")
+    for (const [name, match] of selected) lines.push(`- ${name} — ${match.description} (matched: ${match.query})`)
+  }
+  return lines.join("\n")
+}
 
 // ============================================================
 // METHODOLOGY CONTEXT — System prompt injection for
@@ -26,7 +75,7 @@ export namespace MethodologyContext {
    *   are dropped — a tester is handed only its own work, not the routing view.
    *   Leave undefined for the orchestrator / non-tester agents (full context).
    */
-  export function generate(sessionID: string, agentClass?: string): string | null {
+  export async function generate(sessionID: string, agentClass?: string): Promise<string | null> {
     const isTester = !!agentClass
     // Check if any intel entries exist for this session
     const count = Database.use((db) =>
@@ -76,6 +125,11 @@ export namespace MethodologyContext {
         sections.push(`## Current Phase Directive`)
         sections.push(directive)
       }
+    }
+    // Phase-specific skill guidance is injected into every methodology-aware turn.
+    // The agent must still call SkillTool.load, which enforces its permission policy.
+    if (state.currentPhase) {
+      sections.push("", await formatPhaseSkillGuidance(state.currentPhase))
     }
 
     // 4. Coverage summary (brief)
