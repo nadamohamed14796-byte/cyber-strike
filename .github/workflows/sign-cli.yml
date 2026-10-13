@@ -27,7 +27,7 @@ jobs:
 
       - name: Upload unsigned Windows CLI
         id: upload_unsigned_windows_cli
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: unsigned-cyberstrike-windows-cli
           path: packages/cyberstrike/dist/cyberstrike-windows-x64/bin/cyberstrike.exe
@@ -47,7 +47,7 @@ jobs:
           output-artifact-directory: signed-cyberstrike-cli
 
       - name: Upload signed Windows CLI
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: signed-cyberstrike-windows-cli
           path: signed-cyberstrike-cli/*.exe
