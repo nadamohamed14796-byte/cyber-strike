@@ -174,6 +174,66 @@ function normalizedSourceURL(input?: string): string | undefined {
   }
 }
 
+type ScopeManifestCacheEntry = { signature: string; scope: TargetScope }
+const scopeManifestCache = new Map<string, ScopeManifestCacheEntry>()
+
+type CompiledScopeItems = {
+  exactHosts: Set<string>
+  wildcardDomains: Set<string>
+  cidrs: string[]
+}
+type CompiledTargetScope = { include: CompiledScopeItems; exclude: CompiledScopeItems }
+const compiledTargetScopeCache = new WeakMap<TargetScope, CompiledTargetScope>()
+
+function scopeFileSignature(info: Awaited<ReturnType<typeof fs.stat>>): string {
+  return [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(":")
+}
+
+/** Compile large scope manifests once; common exact-host checks then use O(1) set lookups. */
+function compileScopeItems(items: string[]): CompiledScopeItems {
+  const exactHosts = new Set<string>()
+  const wildcardDomains = new Set<string>()
+  const cidrs: string[] = []
+  for (const item of items) {
+    if (item.includes("/")) cidrs.push(item)
+    else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2))
+    else exactHosts.add(item)
+  }
+  return { exactHosts, wildcardDomains, cidrs }
+}
+
+function compiledTargetScope(scope: TargetScope): CompiledTargetScope {
+  const existing = compiledTargetScopeCache.get(scope)
+  if (existing) return existing
+  const compiled = {
+    include: compileScopeItems(scope.scopeItems),
+    exclude: compileScopeItems(scope.excludedItems),
+  }
+  compiledTargetScopeCache.set(scope, compiled)
+  return compiled
+}
+
+/** Return only the entries that match this URL without scanning every host in a large file. */
+function matchingScopeItems(candidate: URL | string, items: string[]): string[] {
+  const url = typeof candidate === "string" ? new URL(candidate) : candidate
+  const index = compileScopeItems(items)
+  const hostname = url.hostname.toLowerCase().replace(/\\.$/, "")
+  const matches: string[] = []
+  if (index.exactHosts.has(hostname)) matches.push(hostname)
+
+  // A wildcard only matches subdomains, never its apex. Walk URL suffixes instead
+  // of iterating all wildcard patterns.
+  const labels = hostname.split(".")
+  for (let offset = 1; offset < labels.length; offset++) {
+    const suffix = labels.slice(offset).join(".")
+    if (index.wildcardDomains.has(suffix)) matches.push("*." + suffix)
+  }
+  for (const cidr of index.cidrs) {
+    if (checkMatch(url.href, cidr).matches) matches.push(cidr)
+  }
+  return matches
+}
+
 /**
  * Canonicalizes a target identifier without retaining query strings, fragments, or credentials.
  * Bare hosts default to HTTPS. This function only normalizes identifiers; it performs no requests.
@@ -634,8 +694,8 @@ export namespace TargetMemory {
       let scope: TargetScope | null
       try { scope = await getScope(current.targetURL) } catch { return false }
       if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) return false
-      if (scope.excludedItems.some((item) => checkMatch(candidateHref, item).matches)) return false
-      if (!scope.scopeItems.some((item) => checkMatch(candidateHref, item).matches)) return false
+      if (matchingScopeItems(candidateHref, scope.excludedItems).length) return false
+      if (!matchingScopeItems(candidateHref, scope.scopeItems).length) return false
       if (!current.parentTargetID) return true
       const row = Database.use((db) =>
         db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, current!.parentTargetID!)).get(),
@@ -669,8 +729,8 @@ export namespace TargetMemory {
       if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) continue
       const href = candidate.origin + "/"
       // A narrower, configured exclusion must never fall back to a wider wildcard parent.
-      if (scope.excludedItems.some((item) => checkMatch(href, item).matches)) return null
-      if (!scope.scopeItems.some((item) => checkMatch(href, item).matches)) return null
+      if (matchingScopeItems(href, scope.excludedItems).length) return null
+      if (!matchingScopeItems(href, scope.scopeItems).length) return null
       // Every configured ancestor must also authorize this origin.
       if (!await parentChainAuthorizes(candidate, workspace)) return null
       return workspace
@@ -1038,10 +1098,33 @@ export namespace TargetMemory {
 
   /** Read the target's explicit scope manifest. Missing/corrupt manifests never imply authorization. */
   export async function getScope(input: string): Promise<TargetScope | null> {
-    const workspace = await get(input)
-    if (!workspace) return null
+    const normalized = normalizeTarget(input)
+    const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
+    const row = Database.use((db) =>
+      db.select().from(TargetWorkspaceTable).where(and(
+        eq(TargetWorkspaceTable.project_id, projectID),
+        eq(TargetWorkspaceTable.owner_key, ownerKey),
+        eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+      )).get(),
+    )
+    if (!row) return null
+
+    const workspace = mapWorkspace(row)
     const scopePath = path.join(workspace.workspacePath, "scope", "scope.json")
     await assertRegularFileOrMissing(scopePath)
+    let info: Awaited<ReturnType<typeof fs.stat>>
+    try {
+      info = await fs.stat(scopePath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
+      throw error
+    }
+    if (!info.isFile()) throw new Error("Unsafe target scope manifest: expected a regular file.")
+    const signature = scopeFileSignature(info)
+    const cached = scopeManifestCache.get(scopePath)
+    if (cached?.signature === signature) return cached.scope
+
     let parsed: unknown
     try {
       parsed = JSON.parse(await fs.readFile(scopePath, "utf-8"))
@@ -1084,7 +1167,10 @@ export namespace TargetMemory {
         throw new Error("Target scope authorization reference is invalid or contains unsafe URL data.")
       }
     }
-    return scope as TargetScope
+    const validated = scope as TargetScope
+    // Avoid retaining obsolete manifests for renamed/replaced files at the same path.
+    scopeManifestCache.set(scopePath, { signature, scope: validated })
+    return validated
   }
 
   /** Configure a scope only with explicit authorization provenance and at least one allowed item. */
@@ -1167,7 +1253,8 @@ export namespace TargetMemory {
         continue
       }
       const hasScopeMatch = Boolean(scope && scope.status === "configured" &&
-        [...scope.scopeItems, ...scope.excludedItems].some((item) => checkMatch(candidate.href, item).matches))
+        (matchingScopeItems(candidate, scope.scopeItems).length > 0 ||
+          matchingScopeItems(candidate, scope.excludedItems).length > 0))
       // Exact-host workspaces always take precedence, including when unconfigured:
       // a different workspace must not authorize around a missing exact-host scope.
       if (!exactHost && !hasScopeMatch) continue
@@ -1220,11 +1307,11 @@ export namespace TargetMemory {
       if (!parentScope || parentScope.status !== "configured" || parentScope.scopeItems.length === 0) {
         return { allowed: false, reason: "an ancestor target has no configured authorization scope", workspace: selected.workspace, scope: ownScope ?? undefined, includeMatches: [], excludeMatches: [] }
       }
-      const excludedByParent = parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+      const excludedByParent = matchingScopeItems(candidate, parentScope.excludedItems)
       if (excludedByParent.length) {
         return { allowed: false, reason: "URL matches parent/ancestor scope exclusion: " + excludedByParent.join(", "), workspace: selected.workspace, scope: ownScope ?? parentScope, includeMatches: [], excludeMatches: excludedByParent }
       }
-      if (!parentScope.scopeItems.some((item) => checkMatch(candidate.href, item).matches)) {
+      if (!matchingScopeItems(candidate, parentScope.scopeItems).length) {
         return { allowed: false, reason: "URL is not included in every ancestor target scope", workspace: selected.workspace, scope: ownScope ?? parentScope, includeMatches: [], excludeMatches: [] }
       }
       inheritedScopes.push(parentScope)
@@ -1240,8 +1327,8 @@ export namespace TargetMemory {
     if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
       return { allowed: false, reason: "the most specific target workspace has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
     }
-    const includeMatches = scope.scopeItems.filter((item) => checkMatch(candidate.href, item).matches)
-    const ownExclusions = scope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+    const includeMatches = matchingScopeItems(candidate, scope.scopeItems)
+    const ownExclusions = matchingScopeItems(candidate, scope.excludedItems)
     const excludeMatches = [...new Set([...ownExclusions, ...parentExclusions])]
     if (excludeMatches.length) {
       return { allowed: false, reason: "URL matches explicit scope exclusion: " + excludeMatches.join(", "), workspace: selected.workspace, scope, includeMatches, excludeMatches }
