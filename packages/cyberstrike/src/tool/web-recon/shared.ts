@@ -19,6 +19,8 @@ const MAX_BODY = 2_000_000
 
 export type FetchResult = { status: number; headers: Headers; text: string }
 
+export type ScopeCheck = (url: string) => Promise<boolean>
+
 /**
  * Fetch only a caller-selected HTTP(S) URL. Redirects are deliberately not
  * followed automatically: a target-controlled Location header must never turn
@@ -26,7 +28,7 @@ export type FetchResult = { status: number; headers: Headers; text: string }
  */
 export async function safeFetch(
   url: string,
-  opts: { timeout?: number; method?: string; body?: string; headers?: Record<string, string>; redirect?: "manual" } = {},
+  opts: { timeout?: number; method?: string; body?: string; headers?: Record<string, string>; redirect?: "manual"; scopeCheck?: ScopeCheck } = {},
 ): Promise<FetchResult | null> {
   let parsed: URL
   try {
@@ -35,6 +37,15 @@ export async function safeFetch(
     return null
   }
   if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) return null
+  if (opts.scopeCheck) {
+    try {
+      // Scope-check the exact URL that will be requested, including path and port.
+      // The callback fails closed if the active target or any ancestor disallows it.
+      if (!(await opts.scopeCheck(parsed.href))) return null
+    } catch {
+      return null
+    }
+  }
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), (opts.timeout ?? 10) * 1000)
