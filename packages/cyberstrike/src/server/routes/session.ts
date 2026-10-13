@@ -31,6 +31,7 @@ import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
+import { TargetMemory } from "../../target"
 
 const log = Log.create({ service: "server" })
 
@@ -1183,6 +1184,32 @@ export const SessionRoutes = lazy(() =>
 
         const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
         const normalized = await runNormalize(body, sessionID, ingestDryRun)
+
+        // Passive discovery only: attach observed origins when a persisted scope authorizes them.
+        // This branch never probes the host and must not block request ingestion on hierarchy errors.
+        if (normalized?.origin) {
+          const assetType = /^\/(?:api|graphql|v\d+)(?:\/|$)/i.test(normalized.normalizedPath) ||
+            /^(api|graphql|gateway)([.-]|$)/i.test(new URL(normalized.origin).hostname)
+            ? "api"
+            : "subdomain"
+          try {
+            await TargetMemory.registerObservedAsset(normalized.origin, assetType)
+          } catch (error) {
+            log.warn("unable to update target hierarchy from captured request", {
+              origin: normalized.origin,
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }
+        if (body.page_url) {
+          try {
+            await TargetMemory.registerObservedAsset(body.page_url, "application")
+          } catch (error) {
+            log.warn("unable to register captured page asset", {
+              error: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }
 
         if (normalized) {
           const isDuplicate = Request.exists({
