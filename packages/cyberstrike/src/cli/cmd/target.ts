@@ -171,6 +171,7 @@ const TargetScopeCommand = cmd({
             path.join(result.workspace.workspacePath, "workspace.json"),
             path.join(result.workspace.workspacePath, "scope", "scope.json"),
             path.join(result.workspace.workspacePath, "notes.md"),
+            ...(sourceArtifactPath ? [sourceArtifactPath] : []),
           ]
           for (const expectedFile of expectedFiles) {
             const info = await fs.lstat(expectedFile).catch(() => undefined)
