@@ -1675,8 +1675,25 @@ export namespace TargetMemory {
     const selected = matched[0]?.workspace
     if (!selected) return null
 
+    // Build the selected asset's ancestor chain from rows in this project/owner only.
+    // This gives the agent the program context while keeping the selected asset's notes
+    // separate from its siblings' notes.
+    const lineage: Workspace[] = [selected]
+    const lineageIDs = new Set<string>([selected.id])
+    let parentTargetID = selected.parentTargetID
+    while (parentTargetID && lineage.length < 16) {
+      if (lineageIDs.has(parentTargetID)) break
+      const parentRow = workspaces.find((row) => row.id === parentTargetID)
+      if (!parentRow || parentRow.project_id !== projectID || parentRow.owner_key !== ownerKey) break
+      const parentWorkspace = mapWorkspace(parentRow)
+      lineage.unshift(parentWorkspace)
+      lineageIDs.add(parentWorkspace.id)
+      parentTargetID = parentWorkspace.parentTargetID
+    }
+    const programRoot = lineage[0] ?? selected
+
     const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.min(Math.floor(maxNotes), 20)) : 8
-    const notes = Database.use((db) =>
+    const primaryNotes = Database.use((db) =>
       db
         .select()
         .from(TargetNoteTable)
@@ -1686,28 +1703,81 @@ export namespace TargetMemory {
         .all()
         .map(mapNote),
     )
+    const parentNotes = programRoot.id === selected.id
+      ? []
+      : Database.use((db) =>
+          db
+            .select()
+            .from(TargetNoteTable)
+            .where(eq(TargetNoteTable.target_id, programRoot.id))
+            .orderBy(desc(TargetNoteTable.time_created))
+            .limit(Math.min(4, noteLimit))
+            .all()
+            .map(mapNote),
+        )
+
+    // Create a compact, cycle-safe inventory of the program's already-registered assets.
+    // Listing an asset is not authorization; each request still goes through checkURLScope.
+    const hierarchyLines: string[] = []
+    const treeVisited = new Set<string>()
+    let listedAssets = 0
+    const maxListedAssets = 100
+    const appendChildren = (parent: Workspace, depth: number) => {
+      if (depth >= 12 || listedAssets >= maxListedAssets || treeVisited.has(parent.id)) return
+      treeVisited.add(parent.id)
+      let items: Workspace[] = []
+      try {
+        items = children(parent.id)
+      } catch {
+        hierarchyLines.push("  ".repeat(depth + 1) + "[asset inventory unavailable for this node]")
+        return
+      }
+      for (const child of items) {
+        if (listedAssets >= maxListedAssets) break
+        listedAssets++
+        hierarchyLines.push(
+          "  ".repeat(depth + 1) + "- [" + child.assetType + "] " + child.targetURL +
+          " | workspace: " + path.relative(programRoot.workspacePath, child.workspacePath).split(path.sep).join("/"),
+        )
+        appendChildren(child, depth + 1)
+      }
+    }
+    appendChildren(programRoot, 0)
+    if (listedAssets >= maxListedAssets) hierarchyLines.push("- Asset inventory truncated at " + maxListedAssets + " entries.")
 
     const sections = [
       "## Target Workspace Context (project-scoped)",
       "",
-      "Selected target: " + selected.targetURL,
-      "Workspace ID: " + selected.id,
-      "Workspace: " + selected.relativePath,
-      "Authorization manifest: " + path.join(selected.relativePath, "scope", "scope.json"),
-      "Before any active request, verify that scope/scope.json is configured against the official program policy. If it is missing, unconfigured, ambiguous, or excluded, stop and ask the user; never infer authorization from a target URL or discovered asset.",
-      "Use scope_check with target_url set to this workspace URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe require the persisted scope and fail closed when it does not authorize the URL.",
-      "Keep artifacts in this workspace. Preserve run/session IDs and source references. A note or static JavaScript candidate is a lead, not proof; revalidate it against current responses and evidence.",
+      "Program/root target: " + programRoot.targetURL,
+      "Program workspace ID: " + programRoot.id,
+      "Program workspace: " + programRoot.relativePath,
+      "Selected asset: " + selected.targetURL + " [" + selected.assetType + "]",
+      "Selected workspace ID: " + selected.id,
+      "Selected workspace: " + selected.relativePath,
+      "Ancestor chain: " + lineage.map((item) => item.targetURL).join(" -> "),
+      "Selected authorization manifest: " + path.join(selected.relativePath, "scope", "scope.json"),
+      "Before any active request, verify the selected asset's saved scope against the official program policy. Every ancestor scope and exclusion also applies. If any manifest is missing, unconfigured, invalid, ambiguous, or excludes the URL, stop; never infer authorization from a target URL or discovery alone.",
+      "Use scope_check with target_url set to the selected asset URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must pass persisted scope checks for every outbound URL.",
+      "Keep endpoint/request/finding/evidence files inside the selected asset's workspace. Keep program summaries in the program/root workspace. Do not copy one asset's full notes or findings into a sibling's workspace.",
       "",
-      "Expected artifact areas: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
+      "## Registered program asset tree",
+      ...(hierarchyLines.length ? hierarchyLines : ["No authorized child assets are currently registered."]),
       "",
-      ...(notes.length ? ["## Target Memory (persistent notes)", "", ...notes.flatMap((note) => [
+      "Expected artifact areas per workspace: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
+      "",
+      ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
+        note.content.slice(0, 900),
+        "",
+      ])] : []),
+      ...(primaryNotes.length ? ["## Selected asset memory (persistent notes)", "", ...primaryNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
         note.content.slice(0, 1800),
         "",
-      ]),
-    ] : []),
+      ])] : []),
     ]
-    return sections.join("\n").slice(0, 14_000)
+    return sections.join("\n").slice(0, 18_000)
   }
 }
