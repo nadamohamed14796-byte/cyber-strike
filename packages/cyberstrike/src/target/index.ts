@@ -58,9 +58,38 @@ export interface TargetScope {
 
 type ScopeManifestCacheEntry = { signature: string; scope: TargetScope }
 const scopeManifestCache = new Map<string, ScopeManifestCacheEntry>()
+const MAX_CACHED_SCOPE_MANIFESTS = 8
+const MAX_CACHED_SCOPE_ITEMS = 1_000_000
+let cachedScopeItemCount = 0
 
 function scopeFileSignature(info: Awaited<ReturnType<typeof fs.stat>>): string {
   return [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(":")
+}
+
+function cacheScopeManifest(scopePath: string, signature: string, scope: TargetScope): void {
+  const existing = scopeManifestCache.get(scopePath)
+  if (existing) {
+    cachedScopeItemCount -= existing.scope.scopeItems.length + existing.scope.excludedItems.length
+    scopeManifestCache.delete(scopePath)
+  }
+
+  const itemCount = scope.scopeItems.length + scope.excludedItems.length
+  // Do not pin extraordinarily large manifests in process memory. They remain valid;
+  // they simply need to be parsed again on the next request.
+  if (itemCount > MAX_CACHED_SCOPE_ITEMS) return
+
+  scopeManifestCache.set(scopePath, { signature, scope })
+  cachedScopeItemCount += itemCount
+  while (
+    scopeManifestCache.size > MAX_CACHED_SCOPE_MANIFESTS ||
+    cachedScopeItemCount > MAX_CACHED_SCOPE_ITEMS
+  ) {
+    const oldestPath = scopeManifestCache.keys().next().value
+    if (oldestPath === undefined) break
+    const oldest = scopeManifestCache.get(oldestPath)
+    if (oldest) cachedScopeItemCount -= oldest.scope.scopeItems.length + oldest.scope.excludedItems.length
+    scopeManifestCache.delete(oldestPath)
+  }
 }
 
 export interface NormalizedTarget {
@@ -1097,7 +1126,12 @@ export namespace TargetMemory {
     if (!info?.isFile()) throw new Error("Unsafe target scope manifest: expected a regular file.")
     const signature = scopeFileSignature(info)
     const cached = scopeManifestCache.get(scopePath)
-    if (cached?.signature === signature) return cached.scope
+    if (cached?.signature === signature) {
+      // Touch the entry to keep frequently used target scopes resident.
+      scopeManifestCache.delete(scopePath)
+      scopeManifestCache.set(scopePath, cached)
+      return cached.scope
+    }
 
     let source: string
     try {
@@ -1166,7 +1200,7 @@ export namespace TargetMemory {
     Object.freeze(validated.excludedItems)
     Object.freeze(validated)
     // Avoid retaining obsolete manifests for renamed/replaced files at the same path.
-    scopeManifestCache.set(scopePath, { signature, scope: validated })
+    cacheScopeManifest(scopePath, signature, validated)
     return validated
   }
 
