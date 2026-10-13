@@ -206,8 +206,9 @@ export namespace ReportKnowledge {
    * Return only shared public rows with a stored excerpt that predates the current
    * extraction schema. Reprocessing uses local SQLite text only; it performs no fetch.
    */
-  export function externalRecordsForEnrichment(limit = 100) {
+  export function externalRecordsForEnrichment(limit = 100, learningVersion = 7) {
     const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    const currentVersion = Math.max(1, Math.floor(Number.isFinite(learningVersion) ? learningVersion : 7))
     return Database.use((db) =>
       db.select({
         id: ReportKnowledgeTable.id,
@@ -238,7 +239,7 @@ export namespace ReportKnowledge {
           const version = metadata.extraction_version
           return typeof metadata.excerpt === "string" &&
             metadata.excerpt.trim().length >= 250 &&
-            !(typeof version === "number" && version >= 7)
+            !(typeof version === "number" && version >= currentVersion)
         })
         .slice(0, bounded),
     )
