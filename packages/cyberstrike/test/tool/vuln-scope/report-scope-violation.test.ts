@@ -46,6 +46,12 @@ describe("reportScopeViolation", () => {
       expect(result).not.toBeNull()
       expect(result!.cls).toBe("idor")
     })
+
+    test("LLM tester cannot report IDOR under an LLM category", () => {
+      const result = reportScopeViolation("proxy-tester-llm", "prompt injection", "IDOR in user profile")
+      expect(result).not.toBeNull()
+      expect(result!.cls).toBe("llm")
+    })
   })
 
   describe("anti-spoof: in-scope category but title reveals different class", () => {
