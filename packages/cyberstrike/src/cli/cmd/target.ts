@@ -124,7 +124,7 @@ const TargetScopeCommand = cmd({
               throw new Error("Cannot read scope file " + sourceFilePath + ": " + (error instanceof Error ? error.message : String(error)))
             }
             try {
-              fileEntries = parseScopeFileContents(sourceContents)
+              fileEntries = parseScopeFileContents(sourceContents!)
             } catch (error) {
               throw new Error((error instanceof Error ? error.message : String(error)) + " File: " + sourceFilePath)
             }
@@ -143,7 +143,7 @@ const TargetScopeCommand = cmd({
             await TargetMemory.writeWorkspaceFile(
               result.workspace,
               "scope/" + sourceFilename,
-              sourceContents.endsWith("\n") ? sourceContents : sourceContents + "\n",
+              sourceContents,
             )
             await TargetMemory.addNote(result.workspace.targetURL, {
               kind: "manual",
