@@ -301,7 +301,7 @@ export namespace ResearchQueue {
             ...existingPayload,
             crawl_page: true,
             ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
-            ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks)].slice(0, 160) } : {}),
+            ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks.filter((link) => link.length <= 4096))].slice(0, 160) } : {}),
           },
           status: "discovered",
           updated_at: now,
@@ -318,7 +318,7 @@ export namespace ResearchQueue {
         payload: {
           crawl_page: true,
           ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
-          ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks)].slice(0, 160) } : {}),
+          ...(input.discoveredLinks ? { discovered_links: [...new Set(input.discoveredLinks.filter((link) => link.length <= 4096))].slice(0, 160) } : {}),
         },
         status: "discovered",
         attempts: 0,
