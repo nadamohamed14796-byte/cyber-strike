@@ -75,6 +75,7 @@ test("explicit user request produces bounded global retrieval tags without retai
     expect.arrayContaining(["idor", "object-identifier", "api-endpoint"]),
   )
   expect(promptResearchSignals("ordinary copywriting task with no security signal")).toEqual([])
+  expect(promptResearchSignals("XSS, CSRF, XXE, RCE")).toEqual(expect.arrayContaining(["xss", "csrf", "xxe", "rce"]))
   expect(promptResearchSignals("JWT OAuth refresh token login session")).toEqual(
     expect.arrayContaining(["authentication-flow", "token-or-jwt"]),
   )
@@ -109,6 +110,8 @@ test("maps request patterns to broad research classes without treating them as f
   expect(researchClassForSignalTags(["mfa-bypass"])).toBe("mfa-bypass")
   expect(researchClassForSignalTags(["rate-limit-bypass"])).toBe("rate-limit-bypass")
   expect(researchClassForSignalTags(["javascript-client"])).toBeUndefined()
+  expect(researchClassForSignalTags(["authentication-flow"])).toBe("authn")
+  expect(researchClassForSignalTags(["rce"])).toBe("rce")
 })
 
 test("explicit current research intent is not starved by recent generic API traffic", async () => {

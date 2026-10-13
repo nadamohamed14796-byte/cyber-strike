@@ -52,7 +52,7 @@ export function requestResearchSignals(input: {
 /** Map an observed signal tag to a broad research class; this selects advisory material only. */
 export function researchClassForSignalTags(input: string[]): string | undefined {
   const tags = input.map((tag) => tag.trim().replace(/^target:/i, "").toLowerCase())
-  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|cache-behavior|cors|cors-policy|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization|information-disclosure|privilege-escalation|security-misconfiguration|account-takeover|mass-assignment|nosqli|host-header-injection|mfa-bypass|rate-limit-bypass|websocket|saml)$/.test(tag))
+  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication-flow|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|cache-behavior|cors|cors-policy|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization|information-disclosure|privilege-escalation|security-misconfiguration|account-takeover|mass-assignment|nosqli|host-header-injection|mfa-bypass|rate-limit-bypass|websocket|saml)$/.test(tag))
   if (!classTag) return undefined
   const aliases: Record<string, string> = {
     bola: "idor",
@@ -60,6 +60,8 @@ export function researchClassForSignalTags(input: string[]): string | undefined 
     "resource-identifier": "idor",
     "authorization-boundary": "access-control",
     "server-side-request": "ssrf",
+    "authentication-flow": "authn",
+    authentication: "authn",
     "token-or-jwt": "jwt",
     "cache-behavior": "web-cache",
     "cors-policy": "cors",
@@ -67,7 +69,7 @@ export function researchClassForSignalTags(input: string[]): string | undefined 
     authorization: "access-control",
   }
   const knownClasses = new Set([
-    "idor", "xss", "ssrf", "csrf", "sqli", "xxe", "ssti", "race-condition",
+    "idor", "xss", "ssrf", "csrf", "sqli", "xxe", "ssti", "rce", "authn", "race-condition",
     "open-redirect", "auth-bypass", "access-control", "business-logic", "prototype-pollution",
     "deserialization", "request-smuggling", "cache-poisoning", "file-upload", "graphql",
     "jwt", "command-injection", "path-traversal", "subdomain-takeover", "oauth", "web-cache",
@@ -90,6 +92,10 @@ export function promptResearchSignals(input: string): string[] {
     ["object-identifier", /object id|user id|account id|order id|resource identifier|object identifier/],
     ["authorization-boundary", /authorization|authorisation|access control|permission check|role[- ]based|privilege escalation|tenant isolation/],
     ["authentication-flow", /authentication|login|session fixation|password reset|account recovery|sign[- ]?in/],
+    ["xss", /cross[- ]site scripting|\\bxss\\b/],
+    ["csrf", /cross[- ]site request forgery|\\bcsrf\\b/],
+    ["xxe", /\\bxxe\\b|xml external entity/],
+    ["rce", /\\brce\\b|remote code execution/],
     ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|\boauth\b/],
     ["javascript-client", /javascript|\.m?js\b|source map|frontend script|client[- ]side bundle/],
     ["api-endpoint", /\bapi\b|endpoint|graphql|rest api|api route/],
