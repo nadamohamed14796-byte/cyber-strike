@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { stableStringify, toolSig, isProgressTool, READ_ONLY_TOOLS } from "../../../src/session/stuck/signals"
+import { stableStringify, toolSig, isProgressTool, READ_ONLY_TOOLS, CONTEXT_ONLY_TOOLS } from "../../../src/session/stuck/signals"
 
 describe("stableStringify — key-order invariant", () => {
   test("same object, different key order → identical string", () => {
@@ -38,6 +38,12 @@ describe("isProgressTool — read-only vs progress", () => {
     for (const t of ["methodology_status", "get_coverage_notes", "web_get_session_context", "scope_check"]) {
       expect(isProgressTool(t)).toBe(false)
       expect(READ_ONLY_TOOLS.has(t)).toBe(true)
+    }
+  })
+  test("skill/tool discovery and knowledge writes are NOT testing progress", () => {
+    for (const t of ["skill", "tool_search", "load_tools", "unload_tools", "list_loaded_tools", "research_knowledge", "memory_search", "memory_read", "memory_context", "memory_write", "target_note"]) {
+      expect(isProgressTool(t)).toBe(false)
+      expect(CONTEXT_ONLY_TOOLS.has(t)).toBe(true)
     }
   })
   test("exploit/mutating tools ARE progress", () => {
