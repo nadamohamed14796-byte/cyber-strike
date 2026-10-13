@@ -274,3 +274,52 @@ test("finding-validation feedback ranks shared references without poisoning glob
     },
   })
 })
+
+
+test("re-ingesting an existing public source enriches newly extracted CWE and class fields", async () => {
+  await using dir = await tmpdir()
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceURL = "https://research.example.test/reports/cwe-backfill-" + crypto.randomUUID()
+      const first = ReportKnowledge.ingestExternalDetailed({
+        title: "CORS policy report",
+        severity: "unknown",
+        sourceURL,
+        lesson: "A public report about a cross-origin policy.",
+        sourceTrust: 80,
+        metadata: { source_trust: 80, extracted: { extraction_version: 6 } },
+      })
+      expect(first).not.toBeNull()
+      if (!first) throw new Error("initial report was not persisted")
+
+      const second = ReportKnowledge.ingestExternalDetailed({
+        title: "CORS policy report",
+        severity: "high",
+        vulnerabilityClass: "cors",
+        cweID: "CWE-942",
+        sourceURL,
+        lesson: "The cross-origin policy allows an unintended origin.",
+        sourceTrust: 80,
+        tags: ["cors", "cors-policy", "CWE-942"],
+        metadata: {
+          source_trust: 80,
+          extracted: { extraction_version: 7, cwe_id: "CWE-942" },
+        },
+      })
+      expect(second).not.toBeNull()
+      expect(second?.id).toBe(first.id)
+      expect(second?.created).toBe(false)
+
+      const row = Database.use((db) =>
+        db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, first.id)).get(),
+      )
+      expect(row?.vulnerability_class).toBe("cors")
+      expect(row?.cwe_id).toBe("CWE-942")
+      expect(row?.severity).toBe("high")
+      expect(row?.tags).toEqual(expect.arrayContaining(["cors", "cors-policy", "CWE-942"]))
+      expect((row?.metadata?.extracted as Record<string, unknown>)?.extraction_version).toBe(7)
+      await Instance.dispose()
+    },
+  })
+})
