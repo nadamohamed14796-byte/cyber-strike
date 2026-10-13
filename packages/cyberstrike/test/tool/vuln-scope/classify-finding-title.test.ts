@@ -48,6 +48,10 @@ describe("classifyFindingTitle", () => {
     test("system prompt disclosure", () => {
       expect(classifyFindingTitle("System Prompt Leakage in AI Agent")).toBe("llm")
     })
+
+    test("sensitive data disclosure from model output", () => {
+      expect(classifyFindingTitle("Sensitive Data Disclosure by AI chatbot")).toBe("llm")
+    })
   })
 
 
