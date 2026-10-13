@@ -1,6 +1,8 @@
 import z from "zod"
 import { Tool } from "../tool"
-import { TargetMemory } from "../../target"
+import { TargetMemory, type Workspace } from "../../target"
+import { redactTargetNoteSecrets } from "../../target/redact"
+import type { ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
 import {
   fullRecon,
@@ -72,7 +74,7 @@ type Program = keyof typeof PROGRAMS
 
 const dispatch: Record<
   Exclude<Program, "session_scan">,
-  (target: string, args: string[], timeout: number) => Promise<WebReconResult>
+  (target: string, args: string[], timeout: number, scopeCheck?: ScopeCheck) => Promise<WebReconResult>
 > = {
   full_recon: fullRecon,
   sitemap_scan: sitemapScan,
@@ -177,10 +179,18 @@ export const WebReconTool = Tool.define("web_recon", {
     const fail = (msg: string) => ({
       title: `web_recon: ${program}`,
       output: msg,
-      metadata: { program, findings: [] as Finding[] },
+      metadata: {
+        program,
+        findings: [] as Finding[],
+        target_workspace: undefined as string | undefined,
+        artifact_path: undefined as string | undefined,
+        artifact_saved: false,
+        artifact_error: undefined as string | undefined,
+      },
     })
 
     let result: WebReconResult
+    let targetWorkspace: Workspace | undefined
     if (program === "session_scan") {
       try {
         result = await sessionScan(ctx.sessionID, params.timeout_seconds, ctx.abort, async (origins) => {
@@ -197,6 +207,7 @@ export const WebReconTool = Tool.define("web_recon", {
     } else {
       if (!params.target) return fail(`[-] target URL is required for ${program}. Only session_scan runs without a target.`)
       const authorization = await TargetMemory.checkURLScope(params.target)
+      targetWorkspace = authorization.workspace
       if (!authorization.allowed) {
         return fail([
           "[-] Refusing active reconnaissance: " + authorization.reason,
@@ -213,13 +224,54 @@ export const WebReconTool = Tool.define("web_recon", {
       })
       const handler = dispatch[program]
       try {
-        result = await handler(params.target, params.args, params.timeout_seconds)
+        const persistedScopeCheck: ScopeCheck = async (url) => (await TargetMemory.checkURLScope(url)).allowed
+        result = await handler(params.target, params.args, params.timeout_seconds, persistedScopeCheck)
       } catch (e) {
         return fail(`[-] ${program} failed: ${e instanceof Error ? e.message : String(e)}`)
       }
     }
 
     const { output, enriched } = formatOutput(program, result)
-    return { title: `web_recon: ${program}`, output, metadata: { program, findings: enriched } }
+    let artifactPath: string | undefined
+    let artifactError: string | undefined
+    let finalOutput = output
+    if (program !== "session_scan" && targetWorkspace && params.target) {
+      const completedAt = new Date().toISOString()
+      const filename = "recon/" + program + "-" + completedAt.replace(/[:.]/g, "-") + ".json"
+      const record = {
+        schemaVersion: 1,
+        recordType: "web-recon-result",
+        program,
+        requestedTarget: params.target,
+        canonicalTarget: targetWorkspace.targetURL,
+        workspaceID: targetWorkspace.id,
+        workspacePath: targetWorkspace.workspacePath,
+        sessionID: ctx.sessionID,
+        completedAt,
+        result,
+      }
+      try {
+        const content = redactTargetNoteSecrets(JSON.stringify(record, null, 2)) + "\n"
+        artifactPath = await TargetMemory.writeWorkspaceFile(targetWorkspace, filename, content)
+        finalOutput += "\n\n[+] Target artifact saved: " + artifactPath
+      } catch (error) {
+        artifactError = error instanceof Error ? error.message : String(error)
+        finalOutput += "\n\n[!] Target artifact auto-save failed. Results were returned but were NOT confirmed persisted: " + artifactError
+      }
+    } else if (program === "session_scan") {
+      finalOutput += "\n\n[*] session_scan can span multiple target workspaces, so no single-target artifact was chosen automatically. Keep its per-target results separated when saving them."
+    }
+    return {
+      title: `web_recon: ${program}`,
+      output: finalOutput,
+      metadata: {
+        program,
+        findings: enriched,
+        target_workspace: targetWorkspace?.workspacePath,
+        artifact_path: artifactPath,
+        artifact_saved: Boolean(artifactPath),
+        artifact_error: artifactError,
+      },
+    }
   },
 })
