@@ -6,6 +6,7 @@
 export namespace Phase {
   export type Id =
     | "scope_analysis"
+    | "mobile_application_testing"
     | "passive_recon"
     | "active_recon"
     | "technology_profiling"
