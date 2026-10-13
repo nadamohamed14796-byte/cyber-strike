@@ -645,6 +645,16 @@ export namespace TargetMemory {
     return "subdomain"
   }
 
+  /** Keep denormalized workspace_path values synchronized after moving an entire asset subtree. */
+  function syncDescendantWorkspacePaths(parent: Workspace): void {
+    for (const child of children(parent.id)) {
+      Database.use((db) => db.update(TargetWorkspaceTable).set({
+        workspace_path: child.relativePath,
+        time_updated: Date.now(),
+      }).where(eq(TargetWorkspaceTable.id, child.id)).run())
+      syncDescendantWorkspacePaths(child)
+    }
+  }
   /** Detach an asset that is no longer authorized by its former parent, preserving its data. */
   async function detachWorkspace(
     row: typeof TargetWorkspaceTable.$inferSelect,
@@ -692,6 +702,7 @@ export namespace TargetMemory {
     const updated = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.id)).get())
     if (!updated) throw new Error("Detached target workspace disappeared.")
     const workspace = mapWorkspace(updated, standaloneRelative)
+    syncDescendantWorkspacePaths(workspace)
     await prepareWorkspace(workspace, false)
     await TargetMemory.writeWorkspaceFile(workspace, "target.json", JSON.stringify({
       schemaVersion: 2, targetURL: workspace.targetURL, hostname: workspace.hostname,
@@ -768,6 +779,7 @@ export namespace TargetMemory {
     const updated = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.id)).get())
     if (!updated) throw new Error("Nested target workspace disappeared during reparenting.")
     const workspace = mapWorkspace(updated, destinationRelative)
+    syncDescendantWorkspacePaths(workspace)
     await prepareWorkspace(workspace, false)
     await TargetMemory.writeWorkspaceFile(workspace, "target.json", JSON.stringify({
       schemaVersion: 2, targetURL: workspace.targetURL, hostname: workspace.hostname,
