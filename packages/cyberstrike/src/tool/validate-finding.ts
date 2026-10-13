@@ -94,13 +94,14 @@ export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters,
         title: "Finding validation: " + result.verdict,
         output: result.output + (
           result.targetNoteID
-            ? "\nTarget-specific validation note saved: " + result.targetNoteID
+            ? "\nTarget-specific validation note saved: " + result.targetNoteID + (result.targetFilePath ? "\nTarget validation file: " + result.targetFilePath : "")
             : "\nNo target note was written because no uniquely matched, observed target workspace was available."
         ),
         metadata: {
           validation_id: result.id,
           finding_id: result.findingID,
           target_note_id: result.targetNoteID,
+          target_file_path: result.targetFilePath,
           verdict: result.verdict,
           rubric_confidence: result.confidence,
           distinct_attempts: result.attemptCount,
