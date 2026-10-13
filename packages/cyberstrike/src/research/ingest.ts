@@ -629,10 +629,21 @@ export async function syncResearchSource(
   // previously completed reports through an in-memory-only crawl.
   const discovered = await discoverResearch({ sourceID: source.id, pages: maxPages, depth: maxDepth })
   const discovery = discovered[0]
-  const learned = await learnResearchQueue({
-    limit: exhaustive ? MAX_LIMIT : limit,
-    sourceID: source.id,
-  })
+  const learned = { learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
+  do {
+    const batch = await learnResearchQueue({
+      limit: exhaustive ? MAX_LIMIT : limit,
+      sourceID: source.id,
+    })
+    learned.learned += batch.learned
+    learned.skipped += batch.skipped
+    learned.failed += batch.failed
+    learned.blocked_auth += batch.blocked_auth
+    learned.errors.push(...batch.errors.slice(0, Math.max(0, 5 - learned.errors.length)))
+    // Exhaustive sync drains the claimable queue, not only the first MAX_LIMIT
+    // items. A retried item eventually reaches a terminal state before draining continues.
+    if (!exhaustive || batch.claimed === 0) break
+  } while (true)
   return {
     source: source.id,
     fetched: discovery?.pages ?? 0,
@@ -896,7 +907,14 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         continue
       }
 
-      const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
+      // Discovery hashes the full sanitized source text before caching a bounded
+      // excerpt. Preserve that full-document fingerprint rather than replacing it
+      // with the hash of the truncated cached excerpt.
+      const discoveredFingerprint = item.payload.content_fingerprint
+      const contentFingerprint =
+        typeof discoveredFingerprint === "string" && /^[a-f0-9]{40}$/i.test(discoveredFingerprint)
+          ? discoveredFingerprint
+          : createHash("sha256").update(text).digest("hex").slice(0, 40)
       const sourceContentLength = typeof item.payload.content_length === "number" && Number.isFinite(item.payload.content_length)
         ? item.payload.content_length
         : text.length
