@@ -219,7 +219,11 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           continue
         }
         const relevance = sourceRelevance(claim.source_url, title, text, source)
-        if (!relevance.accepted) {
+        // Legacy KB entries already passed an earlier ingestion gate. Keep them
+        // eligible for model review when source policies evolve, while still requiring
+        // the configured source host, HTTPS safe fetch, and sufficient article text.
+        const isLegacyKnowledge = typeof current.payload.legacy_knowledge_id === "string"
+        if (!relevance.accepted && !isLegacyKnowledge) {
           ResearchQueue.complete(claim.sequence, claim.lease_owner, "rejected", "page failed research relevance gate")
           issues.push(claim.public_id + ": source relevance gate rejected page")
           continue
