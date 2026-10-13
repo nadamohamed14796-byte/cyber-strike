@@ -298,7 +298,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
         legacy_requeued: legacyRequeued,
         items: batch,
         issues,
-        current: statistics(),
+        current: statistics(params.source),
       }
       return result
 }
@@ -523,7 +523,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           error_count: item.error_count,
           errors: item.errors.slice(0, 3),
         })),
-        current: statistics(),
+        current: statistics(params.source),
       }
       return output(
         "Public research discovery complete",
@@ -755,7 +755,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       })
     }
 
-    const summary = { saved, rejected, stale_or_expired: stale, results, current: statistics() }
+    const summary = { saved, rejected, stale_or_expired: stale, results, current: statistics(params.source) }
     const nextBatch = params.continue_after_save
       ? await claimResearchBatch({ source: params.source, limit: params.limit })
       : undefined
