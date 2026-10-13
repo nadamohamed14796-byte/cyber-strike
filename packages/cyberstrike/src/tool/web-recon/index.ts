@@ -186,6 +186,8 @@ export const WebReconTool = Tool.define("web_recon", {
         artifact_path: undefined as string | undefined,
         artifact_saved: false,
         artifact_error: undefined as string | undefined,
+        notes_saved: false,
+        notes_error: undefined as string | undefined,
       },
     })
 
@@ -249,6 +251,8 @@ export const WebReconTool = Tool.define("web_recon", {
     const { output, enriched } = formatOutput(program, result)
     let artifactPath: string | undefined
     let artifactError: string | undefined
+    let notesSaved = false
+    let notesError: string | undefined
     let finalOutput = output
     if (program !== "session_scan" && targetWorkspace && params.target) {
       const completedAt = new Date().toISOString()
@@ -268,7 +272,30 @@ export const WebReconTool = Tool.define("web_recon", {
       try {
         const content = redactTargetNoteSecrets(JSON.stringify(record, null, 2)) + "\n"
         artifactPath = await TargetMemory.writeWorkspaceFile(targetWorkspace, filename, content)
-        finalOutput += "\n\n[+] Target artifact saved: " + artifactPath
+        try {
+          const note = await TargetMemory.addNote(targetWorkspace.targetURL, {
+            kind: "asset",
+            title: "Recon run: " + program,
+            content: [
+              "Program: " + program,
+              "Requested URL: " + params.target,
+              "Completed at: " + completedAt,
+              "Run artifact: " + path.relative(targetWorkspace.workspacePath, artifactPath).split(path.sep).join("/"),
+              "Result status: completed; detailed output is in the linked JSON artifact.",
+              "Finding-like signals returned: " + result.findings.length + " (not automatically confirmed as vulnerabilities).",
+            ].join("\n"),
+            source: "web_recon",
+            sourceURL: params.target,
+            status: "observed",
+            tags: ["recon", program],
+          })
+          notesSaved = note.created || note.updated || !note.created
+          finalOutput += "\n\n[+] Target artifact saved: " + artifactPath
+          finalOutput += "\n[+] Target notes synchronized: " + targetWorkspace.workspacePath + "/notes.md"
+        } catch (error) {
+          notesError = error instanceof Error ? error.message : String(error)
+          finalOutput += "\n\n[!] Recon artifact was saved, but notes.md summary failed: " + notesError
+        }
       } catch (error) {
         artifactError = error instanceof Error ? error.message : String(error)
         finalOutput += "\n\n[!] Target artifact auto-save failed. Results were returned but were NOT confirmed persisted: " + artifactError
@@ -286,6 +313,8 @@ export const WebReconTool = Tool.define("web_recon", {
         artifact_path: artifactPath,
         artifact_saved: Boolean(artifactPath),
         artifact_error: artifactError,
+        notes_saved: notesSaved,
+        notes_error: notesError,
       },
     }
   },
