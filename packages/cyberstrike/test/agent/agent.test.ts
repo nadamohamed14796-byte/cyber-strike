@@ -90,6 +90,30 @@ test("proxy vulnerability agents can retrieve shared global research and validat
   })
 })
 
+test("specialized proxy tools stay limited to their intended tester agents", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const injection = await Agent.get("proxy-tester-injection")
+      const fileAttacks = await Agent.get("proxy-tester-file-attacks")
+      const llm = await Agent.get("proxy-tester-llm")
+      const idor = await Agent.get("proxy-tester-idor")
+
+      expect(evalPerm(injection, "inject_probe")).toBe("allow")
+      expect(evalPerm(fileAttacks, "inject_probe")).toBe("allow")
+      expect(evalPerm(idor, "inject_probe")).toBe("deny")
+      expect(evalPerm(llm, "llmhook")).toBe("allow")
+      expect(evalPerm(idor, "llmhook")).toBe("deny")
+
+      for (const agent of [injection, fileAttacks, llm, idor]) {
+        expect(evalPerm(agent, "webfetch")).toBe("deny")
+        expect(evalPerm(agent, "http_replay")).toBe("allow")
+      }
+    },
+  })
+})
+
 test("explore agent denies edits", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
