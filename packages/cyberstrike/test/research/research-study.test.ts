@@ -127,6 +127,9 @@ test("agent-led research study persists model analysis and completes its queue l
       const completedQueueRow = ResearchQueue.find(sourceID, sourceURL)
       expect(completedQueueRow?.status).toBe("learned")
       expect(completedQueueRow?.payload?.model_study_version).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_learned).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_completed).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_pending).toBe(0)
 
       const events = Database.use((db) => db.select().from(ReportKnowledgeEventTable)
         .where(eq(ReportKnowledgeEventTable.report_id, knowledgeID)).all())
