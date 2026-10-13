@@ -72,6 +72,12 @@ function boundedText(value: string | undefined, max: number) {
   return typeof value === "string" ? redactResearchSecrets(value.trim()).slice(0, max) : undefined
 }
 
+function boundedList(values: string[] | undefined, max: number): string[] {
+  return (values ?? [])
+    .map((value) => boundedText(value, max))
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+}
+
 function output(title: string, text: string, metadata: Record<string, unknown> = {}) {
   return { title, output: text, metadata }
 }
@@ -307,7 +313,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       const vulnerabilityClass = canonicalClass(note.vulnerability_class)
       const cweID = note.cwe_id?.toUpperCase()
       const severity = note.severity ?? "unknown"
-      const extracted = {
+      const extractedBase = {
         vulnerability_class: vulnerabilityClass ?? null,
         classification_method: "model-led-source-study-v1",
         severity,
@@ -320,17 +326,17 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         poc_snippet: boundedText(note.poc_snippet, 3000) ?? null,
         root_cause: boundedText(note.root_cause, 2400) ?? null,
         request_response_evidence: boundedText(note.request_response_evidence, 2400) ?? null,
-        verification_signals: (note.verification_signals ?? []).map((value) => boundedText(value, 400)).filter(Boolean),
-        false_positive_cautions: (note.false_positive_cautions ?? []).map((value) => boundedText(value, 400)).filter(Boolean),
-        affected_components: (note.affected_components ?? []).map((value) => boundedText(value, 200)).filter(Boolean),
-        affected_versions: (note.affected_versions ?? []).map((value) => boundedText(value, 200)).filter(Boolean),
-        technology_stack: (note.technology_stack ?? []).map((value) => boundedText(value, 200)).filter(Boolean),
+        verification_signals: boundedList(note.verification_signals, 400),
+        false_positive_cautions: boundedList(note.false_positive_cautions, 400),
+        affected_components: boundedList(note.affected_components, 200),
+        affected_versions: boundedList(note.affected_versions, 200),
+        technology_stack: boundedList(note.technology_stack, 200),
         remediation: boundedText(note.remediation, 2400) ?? null,
         attack_chain: boundedText(note.attack_chain, 2400) ?? null,
         negative_evidence: boundedText(note.negative_evidence, 1800) ?? null,
         limitations: boundedText(note.limitations, 1800) ?? null,
         retrieval_signals: Array.from(new Set([
-          ...(note.retrieval_signals ?? []).map((value) => boundedText(value, 120)).filter(Boolean),
+          ...boundedList(note.retrieval_signals, 120),
           ...(vulnerabilityClass ? [vulnerabilityClass] : []),
           ...(cweID ? [cweID] : []),
           "source:" + source.id,
@@ -356,10 +362,13 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         extracted.negative_evidence,
         extracted.limitations,
       ]
-      extracted["extraction_coverage"] = {
-        present: coverageValues.filter(Boolean).length,
-        total: 18,
-        note: "Field presence only; not a quality score or practical validation.",
+      const extracted = {
+        ...extractedBase,
+        extraction_coverage: {
+          present: coverageValues.filter(Boolean).length,
+          total: 18,
+          note: "Field presence only; not a quality score or practical validation.",
+        },
       }
 
       const contentFingerprint =
