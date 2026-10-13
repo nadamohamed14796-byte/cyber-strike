@@ -101,11 +101,11 @@ const TargetScopeCommand = cmd({
               throw new Error("Cannot read scope file " + filePath + ": " + (error instanceof Error ? error.message : String(error)))
             }
             fileEntries = contents
-              .split(/\\r?\\n/)
+              .split(/\r?\n/)
               .map((line, index) => ({ line: index + 1, value: line.trim() }))
               .filter(({ value }) => value.length > 0 && !value.startsWith("#") && !value.startsWith("//"))
               .map(({ line, value }) => {
-                if (/\\s/.test(value)) throw new Error("Invalid scope file entry at line " + line + ": entries must be one domain, wildcard, or IPv4 CIDR per line.")
+                if (/\s/.test(value)) throw new Error("Invalid scope file entry at line " + line + ": entries must be one domain, wildcard, or IPv4 CIDR per line.")
                 return value
               })
             if (!fileEntries.length) throw new Error("Scope file contains no usable entries: " + filePath)
@@ -120,7 +120,9 @@ const TargetScopeCommand = cmd({
           console.log("Scope configured for: " + result.workspace.targetURL)
           console.log("Authorization source: " + result.scope.authorizationSource)
           console.log("Reference: " + result.scope.authorizationReference)
-          console.log("Included entries: " + result.scope.scopeItems.length)\n          if (args.file) console.log("Imported from: " + path.resolve(process.cwd(), args.file))\n          console.log("Included: " + result.scope.scopeItems.slice(0, 20).join(", ") + (result.scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
+          console.log("Included entries: " + result.scope.scopeItems.length)
+          if (args.file) console.log("Imported from: " + path.resolve(process.cwd(), args.file))
+          console.log("Included: " + result.scope.scopeItems.slice(0, 20).join(", ") + (result.scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
           console.log("Existing workspaces newly linked/reorganized: " + result.associatedAssets.length)
           console.log("Scope file: " + result.workspace.workspacePath + "/scope/scope.json")
