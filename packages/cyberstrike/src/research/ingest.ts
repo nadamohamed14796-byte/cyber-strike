@@ -158,7 +158,7 @@ export function sourceRelevance(url: string, title: string, text: string, source
   // For noisy sources such as Medium, require real security relevance.
   // A title/path hit alone is not enough unless it is a highly specific vuln term.
   const specificVulnerability =
-    /\b(idor|xss|ssrf|csrf|sqli|ssti|xxe|cve|cors|account takeover|information disclosure|privilege escalation|security misconfiguration|prototype pollution|request smuggling|race condition|subdomain takeover|path traversal)\b/i.test(
+    /\b(idor|xss|ssrf|csrf|sqli|ssti|xxe|cve|cors|account[- ]takeover|information[- ]disclosure|privilege[- ]escalation|security[- ]misconfiguration|prototype pollution|request smuggling|race condition|subdomain takeover|path traversal)\b/i.test(
       title + " " + path,
     )
   const accepted = specificVulnerability || included >= 2 || (included >= 1 && pathBoost > 0)
@@ -225,10 +225,10 @@ export function classifyResearchTopic(title: string, text: string) {
     ["open-redirect", /open redirect/],
     ["auth-bypass", /authentication bypass|auth bypass/],
     ["access-control", /access control|authorization bypass|broken access control/],
-    ["privilege-escalation", /privilege escalation|vertical privilege escalation|horizontal privilege escalation/],
-    ["account-takeover", /account takeover|account compromise|\bato\b/],
-    ["information-disclosure", /information disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
-    ["security-misconfiguration", /security misconfiguration|misconfiguration|insecure configuration/],
+    ["privilege-escalation", /privilege[- ]escalation|vertical privilege[- ]escalation|horizontal privilege[- ]escalation/],
+    ["account-takeover", /account[- ]takeover|account compromise|\bato\b/],
+    ["information-disclosure", /information[- ]disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
+    ["security-misconfiguration", /security[- ]misconfiguration|misconfiguration|insecure configuration/],
     ["cors", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
     ["business-logic", /business logic/],
     ["prototype-pollution", /prototype pollution/],
@@ -355,10 +355,10 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
     ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
     ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
     ["authorization-boundary", /authorization|access control|privilege escalation|another user|other account/],
-    ["privilege-escalation", /privilege escalation|vertical privilege escalation|horizontal privilege escalation/],
-    ["account-takeover", /account takeover|account compromise|\bato\b/],
-    ["information-disclosure", /information disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
-    ["security-misconfiguration", /security misconfiguration|misconfiguration|insecure configuration/],
+    ["privilege-escalation", /privilege[- ]escalation|vertical privilege[- ]escalation|horizontal privilege[- ]escalation/],
+    ["account-takeover", /account[- ]takeover|account compromise|\bato\b/],
+    ["information-disclosure", /information[- ]disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
+    ["security-misconfiguration", /security[- ]misconfiguration|misconfiguration|insecure configuration/],
     ["cors-policy", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
     ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/],
     ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/],
@@ -482,7 +482,7 @@ export function extractResearchDetails(title: string, text: string, vulnerabilit
     ),
     attackChain: matchingSentences(
       text,
-      /chain(?:ed|ing)?|pivot|combine(?:d|s)? with|leads? to|result(?:s|ed)? in|escalat(?:e|ion)|account takeover|privilege escalation|lateral movement|from .* to /i,
+      /chain(?:ed|ing)?|pivot|combine(?:d|s)? with|leads? to|result(?:s|ed)? in|escalat(?:e|ion)|account[- ]takeover|privilege[- ]escalation|lateral movement|from .* to /i,
       6,
       1800,
     ),
