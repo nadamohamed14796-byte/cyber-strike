@@ -251,7 +251,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
       return result
 }
 
-async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
+export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
   const rows = ReportKnowledge.externalRecordsForModelStudy(500, RESEARCH_MODEL_STUDY_VERSION)
   const result = { examined: 0, queued: 0, skipped: 0, errors: [] as string[] }
   for (const row of rows) {
