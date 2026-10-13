@@ -139,7 +139,9 @@ export namespace ResearchQueue {
       } = existing.payload ?? {}
       const priorText = typeof previousPayload.cached_text === "string" ? previousPayload.cached_text : ""
       const incomingText = typeof input.payload.cached_text === "string" ? input.payload.cached_text : ""
-      const keepPriorText = priorText.length >= incomingText.length
+      // Preserve a canonical cached excerpt only when it is long enough to study.
+      // A stale short excerpt must not block the safe refetch path for legacy rows.
+      const keepPriorText = priorText.trim().length >= 250 && priorText.length >= incomingText.length
       const payload = {
         ...previousPayload,
         ...input.payload,
