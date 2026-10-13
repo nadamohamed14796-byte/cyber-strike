@@ -114,7 +114,21 @@ const TargetScopeCommand = cmd({
             authorizationSource: args.source ?? "",
             authorizationReference: args.reference ?? "",
           })
+          const expectedFiles = [
+            path.join(result.workspace.workspacePath, "workspace.json"),
+            path.join(result.workspace.workspacePath, "scope", "scope.json"),
+            path.join(result.workspace.workspacePath, "notes.md"),
+          ]
+          for (const expectedFile of expectedFiles) {
+            const info = await fs.stat(expectedFile).catch(() => undefined)
+            if (!info?.isFile()) {
+              throw new Error("Scope was written but workspace integrity verification failed: required file is missing: " + expectedFile)
+            }
+          }
           console.log("Scope configured for: " + result.workspace.targetURL)
+          console.log("Workspace: " + result.workspace.workspacePath)
+          console.log("Notes: " + path.join(result.workspace.workspacePath, "notes.md"))
+          console.log("Workspace integrity: metadata, scope manifest, and notes verified")
           console.log("Authorization source: " + result.scope.authorizationSource)
           console.log("Reference: " + result.scope.authorizationReference)
           console.log("Included entries: " + result.scope.scopeItems.length)
@@ -122,7 +136,7 @@ const TargetScopeCommand = cmd({
           console.log("Included: " + result.scope.scopeItems.slice(0, 20).join(", ") + (result.scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
           console.log("Existing workspaces newly linked/reorganized: " + result.associatedAssets.length)
-          console.log("Scope file: " + result.workspace.workspacePath + "/scope/scope.json")
+          console.log("Scope file: " + path.join(result.workspace.workspacePath, "scope", "scope.json"))
           console.log("Review the official program policy before active testing; this manifest records your explicit scope decision.")
           return
         }
