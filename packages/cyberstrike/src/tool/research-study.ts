@@ -530,20 +530,20 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
 
       const text = typeof claim.payload.cached_text === "string" ? claim.payload.cached_text : ""
       if (text.trim().length < 250) {
-        ResearchQueue.complete(claim.sequence, note.lease_owner, "retry", "agent study: cached source text is missing or too short")
-        results.push({ public_id: note.public_id, result: "retry", reason: "missing-canonical-source-text" })
+        const completed = ResearchQueue.complete(claim.sequence, note.lease_owner, "retry", "agent study: cached source text is missing or too short")
+        results.push({ public_id: note.public_id, result: completed ? "retry" : "lease-lost", reason: "missing-canonical-source-text" })
         continue
       }
       const source = RESEARCH_SOURCES.find((entry) => entry.id === claim.source_id)
       if (!source) {
-        ResearchQueue.complete(claim.sequence, note.lease_owner, "rejected", "unknown source id")
-        results.push({ public_id: note.public_id, result: "rejected", reason: "unknown-source" })
+        const completed = ResearchQueue.complete(claim.sequence, note.lease_owner, "rejected", "unknown source id")
+        results.push({ public_id: note.public_id, result: completed ? "rejected" : "lease-lost", reason: "unknown-source" })
         continue
       }
       const lesson = boundedText(note.lesson, 2400)
       if (!lesson || lesson.length < 30) {
-        ResearchQueue.complete(claim.sequence, note.lease_owner, "retry", "agent study did not provide a reusable lesson")
-        results.push({ public_id: note.public_id, result: "retry", reason: "lesson-too-short" })
+        const completed = ResearchQueue.complete(claim.sequence, note.lease_owner, "retry", "agent study did not provide a reusable lesson")
+        results.push({ public_id: note.public_id, result: completed ? "retry" : "lease-lost", reason: "lesson-too-short" })
         continue
       }
 
@@ -657,8 +657,8 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         },
       })
       if (!ingested) {
-        ResearchQueue.complete(claim.sequence, note.lease_owner, "retry", "agent study could not persist shared knowledge")
-        results.push({ public_id: note.public_id, result: "retry", reason: "knowledge-persistence-failed" })
+        const completed = ResearchQueue.complete(claim.sequence, note.lease_owner, "retry", "agent study could not persist shared knowledge")
+        results.push({ public_id: note.public_id, result: completed ? "retry" : "lease-lost", reason: "knowledge-persistence-failed" })
         continue
       }
       const completed = ResearchQueue.complete(
