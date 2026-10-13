@@ -45,6 +45,20 @@ describe("target asset hierarchy", () => {
         const denied = await TargetMemory.checkURLScope("https://admin.example.com/login")
         expect(denied.allowed).toBe(false)
         expect(denied.reason).toContain("exclusion")
+
+        // Narrowing the saved scope detaches old children instead of leaving them
+        // presented as in-scope under the root; the child data remains on disk.
+        await TargetMemory.configureScope("https://example.com", {
+          include: ["example.com"],
+          authorizationSource: "Example authorized program",
+          authorizationReference: "https://example.com/security",
+        })
+        const detached = await TargetMemory.get("https://api.example.com")
+        expect(detached?.id).toBe(child!.id)
+        expect(detached?.parentTargetID).toBeNull()
+        expect(detached?.workspacePath).toContain(path.join(".cyberstrike", "targets"))
+        const detachedNotes = await fs.readFile(path.join(detached!.workspacePath, "notes.md"), "utf-8")
+        expect(detachedNotes).toContain("https://api.example.com")
       },
     })
   })
