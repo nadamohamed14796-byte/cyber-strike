@@ -174,13 +174,12 @@ const TargetAttachCommand = cmd({
       .option("kind", {
         type: "string",
         choices: ["subdomain", "application", "api", "host"] as const,
-        default: "subdomain",
       }),
   async handler(args) {
     await Instance.provide({
       directory: process.cwd(),
       async fn() {
-        const result = await TargetMemory.attachAsset(args.parent, args.asset, args.kind as TargetAssetType)
+        const result = await TargetMemory.attachAsset(args.parent, args.asset, args.kind as TargetAssetType | undefined)
         console.log("Asset attached under: " + result.parent.targetURL)
         console.log("Asset: " + result.asset.targetURL)
         console.log("Type: " + result.asset.assetType)
