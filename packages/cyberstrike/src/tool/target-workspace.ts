@@ -1,11 +1,16 @@
 import z from "zod"
+import fs from "node:fs/promises"
+import path from "node:path"
+import { createHash } from "node:crypto"
 import { TargetMemory, type TargetAssetType } from "../target"
+import { parseScopeFileContents, resolveScopeFilePath } from "../target/scope-file"
 import { Tool } from "./tool"
 
 const Parameters = z.object({
   action: z.enum(["init", "configure_scope", "attach_asset", "show", "list", "record_summary"]),
   target_url: z.string().optional(),
   include: z.array(z.string().min(1)).optional(),
+  scope_file_path: z.string().min(1).optional().describe("Path to a UTF-8 scope file. Imports exact entries, preserves a copy under the canonical target workspace, and records an import checkpoint in notes.md."),
   exclude: z.array(z.string().min(1)).optional(),
   authorization_source: z.string().optional(),
   authorization_reference: z.string().optional(),
@@ -36,6 +41,9 @@ type TargetWorkspaceMetadata = {
   parent_target_id?: string | null
   asset_type?: TargetAssetType
   include_count?: number
+  source_scope_entry_count?: number
+  source_scope_file?: string
+  source_scope_sha256?: string
   exclude_count?: number
   associated_asset_count?: number
   note_count?: number
@@ -58,7 +66,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     "Always initialize the parent/program root with action=init before processing scope files, running recon, or saving artifacts. This creates a project-scoped .cyberstrike/targets/<slug> tree, notes.md, target.json, workspace.json, scope/scope.json and the standard artifact directories.",
     "Workspace creation is NOT authorization. Init leaves scope unconfigured. Only configure scope after reviewing the official program/customer policy and passing its HTTPS reference, include rules and exclusions.",
     "Attach only a child host permitted by the saved parent scope. Child workspaces are nested beneath the parent assets directory. For huge scopes, store the original candidate list in the root workspace and create child workspaces as assets are validated/processed; do not create hundreds of thousands of empty directories.",
-    "Use show/list to retrieve canonical absolute paths. Use target_artifact for files and target_note for technical observations tied to session evidence. Use action=record_summary for explicit run/scope/checkpoint summaries after verified tool outcomes; it requires an existing workspace and keeps notes.md synchronized without pretending that unobserved technical behavior was tested. Never invent an alternate output directory.",
+    "Use show/list to retrieve canonical absolute paths. For a supplied scope-list file use action=configure_scope with scope_file_path; it imports exact entries, stores a copy under the root workspace scope directory, and records the count/source hash in notes.md. Use target_artifact for other target files and target_note for observations tied to evidence. Never invent an alternate output directory.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params) {
@@ -92,22 +100,100 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     }
 
     if (params.action === "configure_scope") {
-      const result = await TargetMemory.configureScope(required(params.target_url, "target_url"), {
-        include: params.include ?? [],
+      const targetURL = required(params.target_url, "target_url")
+      let fileEntries: string[] = []
+      let sourceContents: string | undefined
+      let sourcePath: string | undefined
+      let sourceHash: string | undefined
+
+      if (params.scope_file_path) {
+        // Do not let a file-path typo silently create a second target workspace.
+        const existingWorkspace = await TargetMemory.get(targetURL)
+        if (!existingWorkspace) {
+          return {
+            title: "Scope import stopped: target workspace missing",
+            output: "Initialize the canonical program/root with target_workspace(action=\"init\") first. No scope, file copy, or alternate workspace was created.",
+            metadata: { saved: false, reason: "workspace_missing", target_url: targetURL } as TargetWorkspaceMetadata,
+          }
+        }
+
+        sourcePath = resolveScopeFilePath(params.scope_file_path)
+        let bytes: Buffer
+        try {
+          const info = await fs.lstat(sourcePath)
+          if (info.isSymbolicLink() || !info.isFile()) {
+            throw new Error("Scope file must be a regular file; symbolic links and non-file inputs are refused.")
+          }
+          if (info.size > 32 * 1024 * 1024) {
+            throw new Error("Scope file exceeds the 32 MB import limit.")
+          }
+          bytes = await fs.readFile(sourcePath)
+        } catch (error) {
+          throw new Error("Could not read scope file " + sourcePath + ": " + (error instanceof Error ? error.message : String(error)))
+        }
+        sourceContents = bytes.toString("utf-8")
+        fileEntries = parseScopeFileContents(sourceContents)
+        sourceHash = createHash("sha256").update(bytes).digest("hex")
+      }
+
+      const includeEntries = [...(params.include ?? []), ...fileEntries]
+      const result = await TargetMemory.configureScope(targetURL, {
+        include: includeEntries,
         exclude: params.exclude ?? [],
         authorizationSource: required(params.authorization_source, "authorization_source"),
         authorizationReference: required(params.authorization_reference, "authorization_reference"),
       })
+
+      let sourceArtifactPath: string | undefined
+      if (sourceContents !== undefined && sourceHash) {
+        const sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
+        sourceArtifactPath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
+        await TargetMemory.writeWorkspaceFile(result.workspace, "scope/" + sourceFilename, sourceContents.endsWith("\n") ? sourceContents : sourceContents + "\n")
+        await TargetMemory.addNote(result.workspace.targetURL, {
+          kind: "manual",
+          title: "Scope file import checkpoint",
+          content: [
+            "Imported an explicit scope list from " + path.basename(sourcePath ?? "scope file") + ".",
+            "Usable file entries: " + fileEntries.length + ".",
+            "Configured unique include entries: " + result.scope.scopeItems.length + ".",
+            "Source copy: scope/" + sourceFilename + ".",
+            "Source SHA-256: " + sourceHash + ".",
+            "Authorization policy: " + result.scope.authorizationReference + ".",
+            "No active testing was performed by the import operation.",
+          ].join("\n"),
+          source: "target_workspace",
+          status: "observed",
+          tags: ["scope-import", "provenance"],
+        })
+      }
+
+      const requiredFiles = [
+        path.join(result.workspace.workspacePath, "workspace.json"),
+        path.join(result.workspace.workspacePath, "scope", "scope.json"),
+        path.join(result.workspace.workspacePath, "notes.md"),
+      ]
+      for (const requiredFile of requiredFiles) {
+        const info = await fs.lstat(requiredFile).catch(() => undefined)
+        if (!info?.isFile() || info.isSymbolicLink()) {
+          throw new Error("Scope was configured but workspace integrity verification failed: required regular file is missing: " + requiredFile)
+        }
+      }
+
       return {
         title: "Target scope saved",
         output: [
           "Target: " + result.workspace.targetURL,
           "Workspace: " + result.workspace.workspacePath,
+          "Notes file: " + result.workspace.workspacePath + "/notes.md",
           "Scope file: " + result.workspace.workspacePath + "/scope/scope.json",
+          ...(sourceArtifactPath ? ["Original scope list copy: " + sourceArtifactPath] : []),
+          ...(sourceHash ? ["Original scope SHA-256: " + sourceHash] : []),
+          ...(sourceContents !== undefined ? ["Usable lines imported: " + fileEntries.length] : []),
           "Authorization source: " + result.scope.authorizationSource,
           "Official policy reference: " + result.scope.authorizationReference,
           "Included entries: " + result.scope.scopeItems.length,
           "Excluded entries: " + result.scope.excludedItems.length,
+          "Workspace integrity: manifests and notes verified",
           "Authorized child workspaces attached/reorganized: " + result.associatedAssets.length,
           "Use scope_check before active testing of each candidate.",
         ].join("\n"),
@@ -120,6 +206,9 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           scope_configured: result.scope.status === "configured",
           include_count: result.scope.scopeItems.length,
           exclude_count: result.scope.excludedItems.length,
+          source_scope_entry_count: sourceContents !== undefined ? fileEntries.length : undefined,
+          source_scope_file: sourceArtifactPath,
+          source_scope_sha256: sourceHash,
           associated_asset_count: result.associatedAssets.length,
         } as TargetWorkspaceMetadata,
       }
