@@ -1096,7 +1096,18 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const authRequired = /\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)
-      ResearchQueue.complete(item.sequence, item.lease_owner, authRequired ? "blocked_auth" : item.attempts >= 3 ? "rejected" : "retry", message)
+      const completed = ResearchQueue.complete(
+        item.sequence,
+        item.lease_owner,
+        authRequired ? "blocked_auth" : item.attempts >= 3 ? "rejected" : "retry",
+        message,
+      )
+      // A slow worker may lose its lease while fetching/studying. Do not report a
+      // stale failure or stop this batch when its completion was correctly fenced out.
+      if (!completed) {
+        result.skipped++
+        continue
+      }
       if (authRequired) result.blocked_auth++
       result.failed++
       if (result.errors.length < 5) result.errors.push(item.public_id + " " + item.source_url + " — " + message)
