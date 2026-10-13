@@ -124,6 +124,19 @@ function configuredSources() {
   return RESEARCH_SOURCES.map(({ id, name, kind }) => ({ id, name, kind }))
 }
 
+async function drainBatchedCount(run: () => number | Promise<number>) {
+  const batchLimit = 500
+  let total = 0
+  while (true) {
+    const reported = await run()
+    const count = Number.isFinite(reported) ? Math.max(0, Math.min(batchLimit, Math.floor(reported))) : 0
+    total += count
+    // Each requeue operation must move its rows out of the selected state. A
+    // short batch proves that no further eligible rows were returned.
+    if (count < batchLimit) return total
+  }
+}
+
 async function claimResearchBatch(params: { source?: string; limit: number }) {
       const batchLimit = Math.max(1, Math.min(3, params.limit))
       const legacyRequeued = ResearchQueue.requeueLegacyRejected(batchLimit, params.source)
@@ -460,9 +473,15 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
     }
 
     if (params.action === "discover") {
-      const authResumed = await retryAuthenticatedResearch({ sourceID: params.source, limit: 100 })
-      const legacyRejectedRequeued = ResearchQueue.requeueLegacyRejected(100, params.source)
-      const legacyQueueRequeued = ResearchQueue.requeueLearnedForModelStudy(100, params.source, RESEARCH_MODEL_STUDY_VERSION)
+      const authResumed = await drainBatchedCount(() =>
+        retryAuthenticatedResearch({ sourceID: params.source, limit: 500 }),
+      )
+      const legacyRejectedRequeued = await drainBatchedCount(() =>
+        ResearchQueue.requeueLegacyRejected(500, params.source),
+      )
+      const legacyQueueRequeued = await drainBatchedCount(() =>
+        ResearchQueue.requeueLearnedForModelStudy(500, params.source, RESEARCH_MODEL_STUDY_VERSION),
+      )
       const legacyKnowledge = await queueLegacyKnowledgeForModelStudy(params.source)
       const results = await discoverResearch({
         sourceID: params.source,
