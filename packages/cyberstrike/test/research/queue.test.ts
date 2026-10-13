@@ -425,6 +425,65 @@ test("research queue survives an application restart and resumes cached report w
 })
 
 
+test("legacy rejected rows without cached text are requeued for safe model fetch", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "portswigger"
+      const sourceURL = "https://portswigger.net/web-security/legacy-empty-rejected-" + crypto.randomUUID()
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy rejected row without cached source text",
+        payload: { crawl_depth: 1 },
+      })
+      Database.use((db) => db.update(ResearchQueueTable).set({
+        status: "rejected",
+        last_error: "page failed research relevance gate",
+        payload: { crawl_depth: 1 },
+      }).where(eq(ResearchQueueTable.sequence, item.sequence)).run())
+
+      expect(ResearchQueue.requeueLegacyRejected(10, sourceID)).toBe(1)
+      const requeued = ResearchQueue.find(sourceID, sourceURL)
+      expect(requeued?.status).toBe("queued")
+      expect(requeued?.payload?.cached_text).toBeUndefined()
+      expect(requeued?.payload?.learning_version).toBe(RESEARCH_LEARNING_VERSION)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy learned rows without cached text can be revisited by the model-study worker", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "portswigger"
+      const sourceURL = "https://portswigger.net/web-security/legacy-empty-learned-" + crypto.randomUUID()
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy learned row without cached source text",
+        payload: { crawl_depth: 1 },
+      })
+      Database.use((db) => db.update(ResearchQueueTable).set({
+        status: "learned",
+        payload: { crawl_depth: 1 },
+      }).where(eq(ResearchQueueTable.sequence, item.sequence)).run())
+
+      expect(ResearchQueue.requeueLearnedForModelStudy(10, sourceID, 1)).toBe(1)
+      const requeued = ResearchQueue.find(sourceID, sourceURL)
+      expect(requeued?.status).toBe("queued")
+      expect(requeued?.payload?.cached_text).toBeUndefined()
+      expect(requeued?.payload?.model_study_requested_version).toBe(1)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("legacy classifier rejections with cached text are requeued once per learning version", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
