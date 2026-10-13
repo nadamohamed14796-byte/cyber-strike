@@ -366,7 +366,14 @@ export namespace ResearchQueue {
           payload: { ...existingPayload, ...incomingPayload, auth_required: true },
           last_error: input.reason.slice(0, 1000), lease_owner: null, lease_until: null,
           updated_at: now, completed_at: now,
-        }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+        }).where(and(
+          eq(ResearchQueueTable.sequence, existing.sequence),
+          ...(input.claim ? [
+            eq(ResearchQueueTable.status, "studying"),
+            eq(ResearchQueueTable.lease_owner, input.claim.leaseOwner),
+            gt(ResearchQueueTable.lease_until, now),
+          ] : []),
+        )).returning().get()
       }
       const { cached_text: _incomingCachedText, ...incomingPayload } = input.payload ?? {}
       return db.insert(ResearchQueueTable).values({
