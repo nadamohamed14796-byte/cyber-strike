@@ -1,3 +1,4 @@
+import fs from "node:fs/promises"
 import { expect, test } from "bun:test"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
@@ -115,6 +116,101 @@ test("target-scoped reports include authorized descendants but not unrelated wor
         expect(apiReport.metadata.findingCount).toBe(1)
         expect(apiReport.metadata.includedWorkspaceIDs).toEqual([api!.id])
         expect(apiReport.metadata.recommendedReportPath).toContain(api!.relativePath + "/reports/report-")
+        expect(apiReport.metadata.automaticallySaved).toBe(true)
+        const savedChildReport = await fs.readFile(apiReport.metadata.recommendedReportPath as string, "utf-8")
+        expect(savedChildReport).toContain("API-only finding")
+        expect(savedChildReport).not.toContain("Root-only finding")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
+
+
+test("generate_report defaults to the only observed root target and saves a workspace report", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const root = await TargetMemory.configureScope("https://single-program.example.test", {
+        include: ["single-program.example.test", "*.single-program.example.test"],
+        authorizationSource: "Single program",
+        authorizationReference: "https://single-program.example.test/security",
+      })
+      const child = await TargetMemory.registerObservedAsset("https://api.single-program.example.test/v1", "api")
+      expect(child).not.toBeNull()
+      const session = await Session.create({})
+      try {
+        Vulnerability.add({
+          sessionID: session.id,
+          data: {
+            severity: "high",
+            title: "Scoped auto-report finding",
+            description: "A finding attributed to one authorized program.",
+            endpoint: "https://api.single-program.example.test/v1/users",
+            target_id: child!.id,
+          },
+        })
+        const tool = await GenerateReportTool.init()
+        const result = await tool.execute({
+          include_sections: ["findings"],
+        }, toolContext(session.id))
+        expect(result.metadata.reportTargetURL).toBe(root.workspace.targetURL)
+        expect(result.metadata.includedWorkspaceIDs).toContain(child!.id)
+        expect(result.metadata.automaticallySaved).toBe(true)
+        const reportPath = result.metadata.recommendedReportPath as string
+        expect(reportPath).toContain(root.workspace.relativePath + "/reports/report-")
+        const saved = await fs.readFile(reportPath, "utf-8")
+        expect(saved).toContain("Scoped auto-report finding")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
+
+test("generate_report refuses to silently mix multiple observed root programs", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const roots = await Promise.all([
+        TargetMemory.configureScope("https://program-a.example.test", {
+          include: ["program-a.example.test"],
+          authorizationSource: "Program A",
+          authorizationReference: "https://program-a.example.test/security",
+        }),
+        TargetMemory.configureScope("https://program-b.example.test", {
+          include: ["program-b.example.test"],
+          authorizationSource: "Program B",
+          authorizationReference: "https://program-b.example.test/security",
+        }),
+      ])
+      const session = await Session.create({})
+      try {
+        for (const [index, root] of roots.entries()) {
+          Vulnerability.add({
+            sessionID: session.id,
+            data: {
+              severity: "medium",
+              title: "Program " + (index ? "B" : "A") + " finding",
+              description: "Finding from a different root target.",
+              endpoint: root.workspace.targetURL + "/account",
+              target_id: root.workspace.id,
+            },
+          })
+        }
+        const tool = await GenerateReportTool.init()
+        await expect(tool.execute({ include_sections: ["findings"] }, toolContext(session.id)))
+          .rejects.toThrow(/more than one target program.*target_url/i)
+        const selected = await tool.execute({
+          target_url: roots[0]!.workspace.targetURL,
+          include_children: true,
+          include_sections: ["findings"],
+        }, toolContext(session.id))
+        expect(selected.output).toContain("Program A finding")
+        expect(selected.output).not.toContain("Program B finding")
       } finally {
         await Session.remove(session.id)
       }
