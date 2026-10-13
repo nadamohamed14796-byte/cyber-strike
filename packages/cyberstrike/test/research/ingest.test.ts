@@ -427,3 +427,26 @@ test("learning preserves the full source fingerprint when only a cached excerpt 
     },
   })
 })
+
+
+test("research extraction keeps explicit CWE identifiers and does not infer severity from incidental adjectives", () => {
+  const labelled = extractResearchDetails(
+    "CWE-639: IDOR in an object endpoint",
+    [
+      "Severity: High",
+      "CVSS v3.1: 8.2",
+      "An authenticated user can access another user's object when object-level authorization is missing.",
+      "Reproduction: compare the owner request with a second controlled account.",
+    ].join("\n"),
+    "idor",
+  )
+  expect(labelled.cweID).toBe("CWE-639")
+  expect(labelled.severity).toBe("high")
+  expect(labelled.retrievalSignals).toContain("CWE-639")
+
+  const incidental = extractResearchDetails(
+    "High-level overview of low-level API behavior",
+    "This writeup describes a medium-sized endpoint and does not state a severity rating.",
+  )
+  expect(incidental.severity).toBe("unknown")
+})
