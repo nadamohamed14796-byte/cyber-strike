@@ -733,7 +733,11 @@ export namespace ReportKnowledge {
         const externalUseRows = db.select({
           timesUseful: ReportKnowledgeTable.times_useful,
         }).from(ReportKnowledgeTable)
-          .where(eq(ReportKnowledgeTable.source_kind, "external_report"))
+          .where(and(
+            eq(ReportKnowledgeTable.source_kind, "external_report"),
+            isNull(ReportKnowledgeTable.session_id),
+            or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
+          ))
           .all()
         const externalReferencesUsed = externalUseRows.filter((row) => row.timesUseful > 0).length
         const externalReferenceUsefulnessEvents = externalUseRows.reduce((sum, row) => sum + row.timesUseful, 0)
