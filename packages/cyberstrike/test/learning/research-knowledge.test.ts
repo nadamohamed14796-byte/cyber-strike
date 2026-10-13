@@ -323,3 +323,76 @@ test("re-ingesting an existing public source enriches newly extracted CWE and cl
     },
   })
 })
+
+
+test("local enrichment selects only legacy shared excerpts and marks records current", async () => {
+  await using dir = await tmpdir()
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const legacy = ReportKnowledge.ingestExternalDetailed({
+        title: "Legacy CWE-less IDOR report " + marker,
+        severity: "unknown",
+        sourceURL: "https://research.example.test/" + marker + "/legacy",
+        lesson: "An object access control check is missing.",
+        sourceTrust: 80,
+        metadata: {
+          source_trust: 80,
+          extraction_version: 6,
+          excerpt: [
+            "CWE-639: Insecure direct object reference in the API.",
+            "Severity: High",
+            "An authenticated user can access another account's object.",
+            "Reproduction: compare an owner request against a second controlled account.",
+          ].join(" "),
+          extracted: { retrieval_signals: ["idor"] },
+        },
+      })
+      const scoped = ReportKnowledge.ingestExternalDetailed({
+        title: "Target-scoped legacy note " + marker,
+        severity: "unknown",
+        sourceURL: "https://research.example.test/" + marker + "/scoped",
+        targetPattern: "private-" + marker + ".example",
+        sourceTrust: 80,
+        metadata: { source_trust: 80, extraction_version: 6, excerpt: "A".repeat(300) },
+      })
+      expect(legacy).not.toBeNull()
+      expect(scoped).not.toBeNull()
+      if (!legacy) throw new Error("legacy record was not persisted")
+
+      const candidates = ReportKnowledge.externalRecordsForEnrichment(100)
+      expect(candidates.some((row) => row.id === legacy.id)).toBe(true)
+      expect(candidates.some((row) => row.id === scoped?.id)).toBe(false)
+      const row = candidates.find((candidate) => candidate.id === legacy.id)
+      expect(row).toBeDefined()
+
+      const saved = ReportKnowledge.enrichExternalRecord({
+        id: legacy.id,
+        vulnerabilityClass: "idor",
+        cweID: "CWE-639",
+        severity: "high",
+        tags: ["idor", "CWE-639"],
+        metadata: {
+          extraction_version: 7,
+          extracted: {
+            vulnerability_class: "idor",
+            cwe_id: "CWE-639",
+            severity: "high",
+            classification_method: "title-first-dominant-body-v2",
+          },
+        },
+      })
+      expect(saved).toBe(true)
+      const enriched = Database.use((db) =>
+        db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, legacy.id)).get(),
+      )
+      expect(enriched?.cwe_id).toBe("CWE-639")
+      expect(enriched?.vulnerability_class).toBe("idor")
+      expect(enriched?.severity).toBe("high")
+      expect(enriched?.status).toBe("observed")
+      expect(ReportKnowledge.externalRecordsForEnrichment(100).some((candidate) => candidate.id === legacy.id)).toBe(false)
+      await Instance.dispose()
+    },
+  })
+})
