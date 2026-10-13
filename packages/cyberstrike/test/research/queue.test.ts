@@ -186,6 +186,8 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url, Date.now() + 7 * 60 * 60_000)).toBe(false)
       expect(ResearchQueue.stats("test-crawl-cache").total).toBe(0)
       expect(ResearchQueue.stats("test-crawl-cache").crawl_pages).toBe(1)
+      expect(ResearchQueue.stats("test-crawl-cache").crawl_page_errors).toBe(0)
+      expect(ResearchQueue.stats("test-crawl-cache").crawl_page_auth_blocked).toBe(0)
 
       const promoted = ResearchQueue.enqueue({
         sourceID: "test-crawl-cache",
@@ -227,6 +229,7 @@ test("failed crawl pages get a cooldown and recover without becoming report work
       expect(ResearchQueue.isFreshCrawlPage(sourceID, failedURL, Date.now() + 7 * 60 * 60_000)).toBe(false)
       expect(ResearchQueue.stats(sourceID).total).toBe(0)
       expect(ResearchQueue.stats(sourceID).crawl_pages).toBe(1)
+      expect(ResearchQueue.stats(sourceID).crawl_page_errors).toBe(1)
 
       const recovered = ResearchQueue.markVisitedPage({
         sourceID,
