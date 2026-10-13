@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from "drizzle-orm/sqlite-core"
 import { ProjectTable } from "../project/project.sql"
+import { TargetWorkspaceTable } from "../target/target.sql"
 import type { MessageV2 } from "./message-v2"
 import type { Snapshot } from "@/snapshot"
 import type { PermissionNext } from "@/permission/next"
@@ -99,6 +100,7 @@ export const VulnerabilityTable = sqliteTable(
     recommendation: text(),
     poc: text(),
     endpoint: text(),
+    target_id: text().references(() => TargetWorkspaceTable.id, { onDelete: "set null" }),
     attack_vector: text(),
     status: text().notNull(),
     // Candidate marker: when non-null, this finding was recorded as an UNCONFIRMED candidate
@@ -113,6 +115,7 @@ export const VulnerabilityTable = sqliteTable(
   (table) => [
     index("vulnerability_session_idx").on(table.session_id),
     index("vulnerability_severity_idx").on(table.severity),
+    index("vulnerability_target_idx").on(table.target_id),
   ],
 )
 
