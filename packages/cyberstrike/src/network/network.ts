@@ -163,8 +163,11 @@ export namespace Network {
     return init
   }
 
-  function chromiumBypass(patterns: readonly string[], includeLoopback: boolean): string[] {
-    const result = includeLoopback ? [] : ["localhost", "127.0.0.1", "::1"]
+  export function chromiumBypass(patterns: readonly string[], includeLoopback: boolean): string[] {
+    // Chromium implicitly bypasses loopback even when the configured bypass list is empty.
+    // The special < -loopback > rule (without spaces) disables that implicit rule, allowing
+    // an explicitly configured local proxy to receive loopback traffic too.
+    const result = includeLoopback ? ["<-loopback>"] : ["localhost", ".localhost", "127.0.0.1", "::1"]
     for (const value of patterns) {
       const pattern = value.trim()
       if (!pattern) continue
