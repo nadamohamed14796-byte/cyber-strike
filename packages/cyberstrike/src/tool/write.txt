@@ -1,5 +1,9 @@
 Writes a file to the local filesystem.
 
+Target-workflow restriction:
+- Use this tool only for ordinary project/source files. Do not use it to save target-specific scope lists, recon output, requests/responses, evidence, scan logs, reports, or run manifests.
+- Target artifacts must be saved through target_artifact into the canonical target workspace, and durable run summaries through target_workspace(action="record_summary"). Initialize/show the target workspace first; never invent /root/targets or another target directory.
+
 Usage:
 - This tool will overwrite the existing file if there is one at the provided path.
 - If this is an existing file, you MUST use the Read tool first to read the file's contents. This tool will fail if you did not read the file first.
