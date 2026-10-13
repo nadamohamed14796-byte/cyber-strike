@@ -361,7 +361,7 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
           decision: "learned",
           reason: "already completed model-led study for this version",
         })
-      } else if (result.errors.length < 5 && queued.reason) {
+      } else if (result.errors.length < 5 && "reason" in queued && queued.reason) {
         result.errors.push(row.id + ": " + queued.reason)
       }
       continue
