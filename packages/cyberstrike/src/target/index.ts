@@ -977,7 +977,7 @@ export namespace TargetMemory {
   export async function configureScope(
     input: string,
     options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference: string },
-  ): Promise<{ workspace: Workspace; scope: TargetScope }> {
+  ): Promise<{ workspace: Workspace; scope: TargetScope; associatedAssets: Workspace[] }> {
     const include = [...new Set((options.include ?? []).map(normalizeScopeItem))]
     const exclude = [...new Set((options.exclude ?? []).map(normalizeScopeItem))]
     const authorizationSource = redactTargetNoteLine(options.authorizationSource ?? "", 200)
