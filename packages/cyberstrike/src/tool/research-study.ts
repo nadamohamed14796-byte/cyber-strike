@@ -459,7 +459,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "llm-assisted-agent-command-v1" },
         )
         const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
-        if (legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
+        if (completed && legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
           id: legacyKnowledgeID,
           version: RESEARCH_MODEL_STUDY_VERSION,
           decision: "rejected",
@@ -614,6 +614,12 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         results.push({ public_id: note.public_id, result: "saved-but-lease-completion-failed", knowledge_id: ingested.id })
         continue
       }
+      const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
+      if (legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
+        id: legacyKnowledgeID,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "learned",
+      })
       ReportKnowledge.recordReferenceUse({
         reportID: ingested.id,
         sessionID,
