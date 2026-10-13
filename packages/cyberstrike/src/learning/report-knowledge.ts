@@ -727,10 +727,27 @@ export namespace ReportKnowledge {
             )
             .get()?.count ?? 0,
         )
-        return { total, external, useful, rejected }
+        // External reports deliberately stay "observed" even when one target
+        // validates or disproves a hypothesis. Report their usefulness feedback
+        // separately so the CLI does not imply that the global source was reclassified.
+        const externalUseRows = db.select({
+          timesUseful: ReportKnowledgeTable.times_useful,
+        }).from(ReportKnowledgeTable)
+          .where(eq(ReportKnowledgeTable.source_kind, "external_report"))
+          .all()
+        const externalReferencesUsed = externalUseRows.filter((row) => row.timesUseful > 0).length
+        const externalReferenceUsefulnessEvents = externalUseRows.reduce((sum, row) => sum + row.timesUseful, 0)
+        return { total, external, useful, rejected, externalReferencesUsed, externalReferenceUsefulnessEvents }
       })
     } catch {
-      return { total: 0, external: 0, useful: 0, rejected: 0 }
+      return {
+        total: 0,
+        external: 0,
+        useful: 0,
+        rejected: 0,
+        externalReferencesUsed: 0,
+        externalReferenceUsefulnessEvents: 0,
+      }
     }
   }
 
