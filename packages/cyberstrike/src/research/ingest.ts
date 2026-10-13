@@ -780,7 +780,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     let blockedAuth = 0
     const add = (value: string, depth: number) => {
       const url = normalizeUrl(value)
-      if (!url || depth > maxDepth || queued.has(url) || visited.has(url)) return
+      if (!url || url.length > 4096 || depth > maxDepth || queued.has(url) || visited.has(url)) return
       try {
         const parsed = new URL(url)
         if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) return
