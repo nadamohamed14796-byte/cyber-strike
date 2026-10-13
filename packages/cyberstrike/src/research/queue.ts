@@ -218,8 +218,9 @@ export namespace ResearchQueue {
         return true
       }).slice(0, bounded)
 
+      let updatedCount = 0
       for (const row of candidates) {
-        db.update(ResearchQueueTable).set({
+        const updated = db.update(ResearchQueueTable).set({
           status: "queued",
           payload: { ...(row.payload ?? {}), model_study_requested_version: version },
           attempts: 0,
@@ -231,9 +232,10 @@ export namespace ResearchQueue {
         }).where(and(
           eq(ResearchQueueTable.sequence, row.sequence),
           inArray(ResearchQueueTable.status, ["learned", "rejected"]),
-        )).run()
+        )).returning({ sequence: ResearchQueueTable.sequence }).get()
+        if (updated) updatedCount++
       }
-      return candidates.length
+      return updatedCount
     })
   }
 
@@ -432,6 +434,7 @@ export namespace ResearchQueue {
           ...(minAgeMs > 0 ? [lt(ResearchQueueTable.updated_at, now - minAgeMs)] : []),
         ))
         .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
+      let updatedCount = 0
       for (const row of rows) {
         const isCrawlPage = row.payload?.crawl_page === true
         const {
@@ -440,7 +443,7 @@ export namespace ResearchQueue {
           crawl_error: _crawlError,
           ...payload
         } = row.payload ?? {}
-        db.update(ResearchQueueTable).set({
+        const updated = db.update(ResearchQueueTable).set({
           // Crawl/index pages must return to discovery, not be learned as if they were reports.
           status: isCrawlPage ? "discovered" : "queued",
           payload,
@@ -451,9 +454,10 @@ export namespace ResearchQueue {
           completed_at: null,
           // Make auth-blocked index pages eligible for immediate rediscovery after credentials change.
           updated_at: isCrawlPage ? now - CRAWL_PAGE_TTL_MS - 1 : now,
-        }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).run()
+        }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).returning({ sequence: ResearchQueueTable.sequence }).get()
+        if (updated) updatedCount++
       }
-      return rows.length
+      return updatedCount
     })
   }
 
@@ -482,8 +486,9 @@ export namespace ResearchQueue {
         })
         .slice(0, bounded)
 
+      let updatedCount = 0
       for (const row of candidates) {
-        db.update(ResearchQueueTable).set({
+        const updated = db.update(ResearchQueueTable).set({
           status: "queued",
           payload: { ...(row.payload ?? {}), learning_version: RESEARCH_LEARNING_VERSION },
           attempts: 0,
@@ -495,9 +500,10 @@ export namespace ResearchQueue {
         }).where(and(
           eq(ResearchQueueTable.sequence, row.sequence),
           eq(ResearchQueueTable.status, "rejected"),
-        )).run()
+        )).returning({ sequence: ResearchQueueTable.sequence }).get()
+        if (updated) updatedCount++
       }
-      return candidates.length
+      return updatedCount
     })
   }
 
