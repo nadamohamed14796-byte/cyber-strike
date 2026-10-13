@@ -309,12 +309,17 @@ export namespace FindingValidation {
       description,
     })
 
-    // Save the outcome in target-specific notes only when an existing workspace is
-    // unambiguously matched to observations from this session tree. Never infer a target
-    // from a finding title or write validation details into global research memory.
+    // Prefer the explicit workspace attribution already stored on the finding. Older findings
+    // without target_id can still use unambiguous session observations as a conservative fallback.
+    // Never infer a target from the title or write target validation details into global research memory.
     let targetNoteID: string | undefined
+    let targetFilePath: string | undefined
     try {
-      const observed = TargetMemory.list()
+      const workspaces = TargetMemory.list()
+      const attributedWorkspace = finding.target_id
+        ? workspaces.find((workspace) => workspace.id === finding.target_id)
+        : undefined
+      const observed = workspaces
         .filter((workspace) => TargetMemory.isObservedInSession(rootSessionID, workspace.targetURL))
         .sort((left, right) => {
           const hostSpecificity = right.hostname.length - left.hostname.length
@@ -333,7 +338,7 @@ export namespace FindingValidation {
             best.hostname.length > second.hostname.length ||
             (best.hostname.length === second.hostname.length && bestPathLength > secondPathLength)),
       )
-      const workspace = unambiguousBest ? best : undefined
+      const workspace = attributedWorkspace ?? (unambiguousBest ? best : undefined)
       if (workspace) {
         const note = await TargetMemory.addNote(workspace.targetURL, {
           kind: "finding",
@@ -354,6 +359,23 @@ export namespace FindingValidation {
           tags: ["finding-validation", assessment.verdict, ...assessment.failedCheckIDs.map((id) => "failed:" + id)],
         })
         targetNoteID = note.note.id
+        targetFilePath = "findings/" + input.vulnerabilityID + ".validation-" + validationID + ".json"
+        await TargetMemory.writeWorkspaceFile(note.workspace, targetFilePath, JSON.stringify({
+          schemaVersion: 1,
+          recordType: "finding-validation-reference",
+          vulnerabilityID: input.vulnerabilityID,
+          validationID,
+          targetID: note.workspace.id,
+          targetURL: note.workspace.targetURL,
+          sessionID: rootSessionID,
+          verdict: assessment.verdict,
+          confidence: assessment.confidence,
+          distinctAttempts: assessment.attemptCount,
+          failedCheckIDs: assessment.failedCheckIDs,
+          unknownCheckIDs: assessment.unknownCheckIDs,
+          targetNoteID: note.note.id,
+          recordedAt: new Date(now).toISOString(),
+        }, null, 2) + "\n")
       }
     } catch (error) {
       // A note-file failure must not roll back the durable validation record or verdict.
@@ -371,6 +393,7 @@ export namespace FindingValidation {
       id: validationID,
       findingID: input.vulnerabilityID,
       targetNoteID,
+      targetFilePath,
     }
   }
 
