@@ -96,7 +96,7 @@ export namespace Command {
           "8) Final report must include every configured source's pages/candidates/new queue rows, learned and rejected model decisions, useful Knowledge IDs and source URLs, preflight skips separately from model decisions, auth blocks, errors/retries, crawl-cap status, initial/final queue and knowledge counts, and all remaining unresolved states. Be explicit about incomplete sources and limits. Never claim success merely because the queue is empty.",
           "Separation rules: /update updates only shared public-research methodology knowledge. Do not call research_knowledge, research search, or research recommend as a substitute for study/save, and do not mark reports as already surfaced during a hunt. Public references are unverified methodology, never current-target evidence. Never copy source-program hosts, endpoints, object IDs, users, accounts, tokens, or scope into current-target facts. Keep target memory/notes separate. Do not modify SKILL.md files.",
           "If the available runtime or tool budget interrupts this cycle, report a resumable partial result with exact source/queue state and blockers; never falsely say everything completed.",
-        ].join("\\n"),
+        ].join("\n"),
         hints: [],
       },
     }
