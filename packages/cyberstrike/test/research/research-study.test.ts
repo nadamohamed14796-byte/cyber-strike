@@ -127,11 +127,243 @@ test("agent-led research study persists model analysis and completes its queue l
       const completedQueueRow = ResearchQueue.find(sourceID, sourceURL)
       expect(completedQueueRow?.status).toBe("learned")
       expect(completedQueueRow?.payload?.model_study_version).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_learned).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_completed).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_pending).toBe(0)
 
       const events = Database.use((db) => db.select().from(ReportKnowledgeEventTable)
         .where(eq(ReportKnowledgeEventTable.report_id, knowledgeID)).all())
-      expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(true)
+      expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(false)
       expect(ReportKnowledge.stats().external).toBeGreaterThanOrEqual(1)
+
+      const status = JSON.parse((await tool.execute({ action: "stats", source: sourceID, pages: 1000, depth: 3, limit: 3, continue_after_save: false }, context)).output)
+      expect(status.queue_source_filter).toBe(sourceID)
+      expect(status.queue).toHaveProperty("crawl_page_errors")
+      expect(status.queue).toHaveProperty("crawl_page_auth_blocked")
+      expect(status.configured_sources).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "portswigger", name: "PortSwigger Web Security Academy" }),
+      ]))
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("preflight skips are counted separately from model-studied reports", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceID = "unconfigured-source-" + marker
+      const sourceURL = "https://legacy.example.test/" + marker
+      const queued = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy report from an unknown source",
+        payload: { cached_text: "An untrusted source excerpt that must not be studied because its host is no longer configured. ".repeat(5) },
+      })
+      expect(queued.created).toBe(true)
+
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_preflight_skip_" + marker.replace(/-/g, "").slice(0, 18),
+        messageID: "msg_preflight_skip_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const next = await tool.execute({
+        action: "next",
+        pages: 5,
+        depth: 2,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      const result = JSON.parse(next.output)
+      expect(result.batch_size).toBe(0)
+      expect(result.issues).toEqual(expect.arrayContaining([queued.id + ": unknown source id"]))
+
+      const row = ResearchQueue.find(sourceID, sourceURL)
+      expect(row?.status).toBe("rejected")
+      expect(row?.payload?.model_study_method).toBe("preflight-skip")
+      expect(row?.payload?.model_study_decision).toBe("skipped")
+      expect(ResearchQueue.stats(sourceID).model_study_skipped).toBe(1)
+      expect(ResearchQueue.stats(sourceID).model_study_completed).toBe(0)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("source-scoped model-study save refuses a lease from another source", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sessionID = "ses_source_filter_" + marker.replace(/-/g, "").slice(0, 18)
+      const sourceURL = "https://portswigger.net/web-security/source-filter-" + marker
+      const sourceText = ("A reusable access-control security lesson. ").repeat(12)
+      const queued = ResearchQueue.enqueue({
+        sourceID: "portswigger",
+        sourceURL,
+        title: "Access-control source filter test " + marker,
+        payload: { cached_text: sourceText, content_length: sourceText.length, content_fingerprint: "b".repeat(40) },
+      })
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID,
+        messageID: "msg_source_filter_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const next = await tool.execute({
+        action: "next", source: "portswigger", pages: 5, depth: 2, limit: 3, continue_after_save: false,
+      }, context)
+      const batch = JSON.parse(next.output)
+      const claimed = batch.items.find((item: { public_id: string }) => item.public_id === queued.id)
+      expect(claimed).toBeDefined()
+      if (!claimed) throw new Error("the PortSwigger fixture was not claimed")
+
+      const save = await tool.execute({
+        action: "save", source: "hackerone-blog", pages: 5, depth: 2, limit: 3, continue_after_save: false,
+        items: [{
+          public_id: claimed.public_id,
+          lease_owner: claimed.lease_owner,
+          decision: "learned",
+          vulnerability_class: "access-control",
+          lesson: "The source mismatch must not be persisted as a lesson.",
+        }],
+      }, context)
+      const summary = JSON.parse(save.output)
+      expect(summary.saved).toBe(0)
+      expect(summary.results[0].result).toBe("source-filter-mismatch")
+      expect(ResearchQueue.find("portswigger", sourceURL)?.status).toBe("retry")
+      expect(ReportKnowledge.stats().external).toBe(0)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy model-study backfill drains multiple 500-row batches", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID().replace(/-/g, "")
+      const legacyCount = 501
+      for (let index = 0; index < legacyCount; index++) {
+        const row = ReportKnowledge.ingestExternalDetailed({
+          title: "Legacy IDOR model-study backfill " + marker + "-" + index,
+          severity: "unknown",
+          vulnerabilityClass: "idor",
+          sourceURL: "https://portswigger.net/web-security/backfill/" + marker + "/" + index,
+          lesson: "Legacy heuristic note without active-model study marker.",
+          sourceTrust: 100,
+          tags: ["idor"],
+          metadata: {
+            research_source: "portswigger",
+            source_trust: 100,
+            study_method: "bounded-heuristic-extraction",
+            extraction_version: 7,
+          },
+        })
+        expect(row).not.toBeNull()
+      }
+
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_legacy_backfill_" + marker.slice(0, 18),
+        messageID: "msg_legacy_backfill_" + marker.slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const result = await tool.execute({
+        action: "backfill",
+        pages: 5,
+        depth: 2,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      const summary = JSON.parse(result.output)
+      expect(summary.legacy_knowledge_queued_for_model_study).toBe(legacyCount)
+      expect(summary.legacy_knowledge_examined).toBe(legacyCount)
+      expect(summary.current.queue.queued).toBe(legacyCount)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(legacyCount)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy source filtering happens before the batch limit for shared hosts", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID().replace(/-/g, "")
+      const hacktivity = ReportKnowledge.ingestExternalDetailed({
+        title: "Older HackerOne Hacktivity record " + marker,
+        severity: "unknown",
+        sourceURL: "https://hackerone.com/hacktivity/legacy-" + marker,
+        lesson: "Legacy report from the disclosures feed.",
+        sourceTrust: 95,
+        metadata: {
+          research_source: "hackerone-hacktivity",
+          source_trust: 95,
+          study_method: "bounded-heuristic-extraction",
+        },
+      })
+      const blog = ReportKnowledge.ingestExternalDetailed({
+        title: "HackerOne Blog record " + marker,
+        severity: "unknown",
+        sourceURL: "https://www.hackerone.com/blog/legacy-" + marker,
+        lesson: "Legacy blog post with separate configured source provenance.",
+        sourceTrust: 90,
+        metadata: {
+          research_source: "hackerone-blog",
+          source_trust: 90,
+          study_method: "bounded-heuristic-extraction",
+        },
+      })
+      const pathOnlyHacktivity = ReportKnowledge.ingestExternalDetailed({
+        title: "HackerOne Hacktivity record missing legacy source tag " + marker,
+        severity: "unknown",
+        sourceURL: "https://hackerone.com/hacktivity/untagged-" + marker,
+        lesson: "Older disclosure row has no explicit source metadata.",
+        sourceTrust: 95,
+      })
+      const pathOnlyBlog = ReportKnowledge.ingestExternalDetailed({
+        title: "HackerOne Blog record missing legacy source tag " + marker,
+        severity: "unknown",
+        sourceURL: "https://www.hackerone.com/blog/untagged-" + marker,
+        lesson: "Older blog row has no explicit source metadata.",
+        sourceTrust: 90,
+      })
+      expect(hacktivity).not.toBeNull()
+      expect(blog).not.toBeNull()
+      expect(pathOnlyHacktivity).not.toBeNull()
+      expect(pathOnlyBlog).not.toBeNull()
+      if (!blog || !pathOnlyBlog || !pathOnlyHacktivity) throw new Error("legacy fixtures were not persisted")
+
+      const candidates = ReportKnowledge.externalRecordsForModelStudy(10, 1, ["hackerone.com"], "hackerone-blog")
+      expect(candidates.some((row) => row.id === blog.id)).toBe(true)
+      expect(candidates.some((row) => row.id === pathOnlyBlog.id)).toBe(true)
+      expect(candidates.some((row) => row.id === pathOnlyHacktivity.id)).toBe(false)
+
+      const boundedBatch = ReportKnowledge.externalRecordsForModelStudy(1, 1, ["hackerone.com"], "hackerone-blog")
+      expect(boundedBatch).toHaveLength(1)
+      expect(boundedBatch[0]?.metadata?.research_source).toBe("hackerone-blog")
       await Instance.dispose()
     },
   })

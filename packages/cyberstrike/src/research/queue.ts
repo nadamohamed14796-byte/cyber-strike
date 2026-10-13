@@ -7,6 +7,24 @@ export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learne
 
 const LEASE_MS = 5 * 60_000
 const CRAWL_PAGE_TTL_MS = 6 * 60 * 60_000
+const MAX_CACHED_DISCOVERY_LINKS = 160
+const MAX_CACHED_DISCOVERY_LINK_CHARS = 16_384
+
+function boundedDiscoveryLinks(links: string[] | undefined) {
+  if (!links) return undefined
+  const unique = new Set<string>()
+  const result: string[] = []
+  let totalChars = 0
+  for (const link of links) {
+    if (typeof link !== "string" || link.length > 4096 || unique.has(link)) continue
+    if (totalChars + link.length > MAX_CACHED_DISCOVERY_LINK_CHARS) continue
+    unique.add(link)
+    result.push(link)
+    totalChars += link.length
+    if (result.length >= MAX_CACHED_DISCOVERY_LINKS) break
+  }
+  return result
+}
 
 function publicID(sequence: number) {
   return "RPT-" + String(sequence).padStart(6, "0")
@@ -176,9 +194,10 @@ export namespace ResearchQueue {
   }
 
   /**
-   * Revisit reports previously marked learned by the heuristic worker if they have
-   * cached text but no completed model-study marker. The per-version request marker
-   * keeps this one-time and prevents every /update cycle from requeueing the same row.
+   * Revisit reports previously marked learned/rejected by the heuristic worker when
+   * there is no completed model-study marker. Existing sanitized excerpts are reused;
+   * missing excerpts use the source-scoped fetcher. A requested marker is not enough
+   * to suppress retries if another worker completed the row without model study.
    */
   export function requeueLearnedForModelStudy(limit = 100, sourceID?: string, modelStudyVersion = RESEARCH_MODEL_STUDY_VERSION) {
     const now = Date.now()
@@ -190,7 +209,8 @@ export namespace ResearchQueue {
         ...(sourceID ? [eq(ResearchQueueTable.source_id, sourceID)] : []),
       )).orderBy(asc(ResearchQueueTable.sequence)).all().filter((row) => {
         if (row.payload?.crawl_page === true) return false
-        if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
+        // Missing excerpts are recoverable: the model-led claim path fetches via
+        // the source-scoped allowlisted fetcher when cached_text is absent.
         const studied = row.payload.model_study_version
         // A request marker alone is not completion: an older heuristic worker may
         // have reclaimed the row after scheduling. Only the model's completion
@@ -200,8 +220,9 @@ export namespace ResearchQueue {
         return true
       }).slice(0, bounded)
 
+      let updatedCount = 0
       for (const row of candidates) {
-        db.update(ResearchQueueTable).set({
+        const updated = db.update(ResearchQueueTable).set({
           status: "queued",
           payload: { ...(row.payload ?? {}), model_study_requested_version: version },
           attempts: 0,
@@ -213,9 +234,10 @@ export namespace ResearchQueue {
         }).where(and(
           eq(ResearchQueueTable.sequence, row.sequence),
           inArray(ResearchQueueTable.status, ["learned", "rejected"]),
-        )).run()
+        )).returning({ sequence: ResearchQueueTable.sequence }).get()
+        if (updated) updatedCount++
       }
-      return candidates.length
+      return updatedCount
     })
   }
 
@@ -272,13 +294,29 @@ export namespace ResearchQueue {
     })
   }
 
-  export function markVisitedPage(input: { sourceID: string; sourceURL: string; title?: string; contentFingerprint?: string }) {
+  export function markVisitedPage(input: {
+    sourceID: string
+    sourceURL: string
+    title?: string
+    contentFingerprint?: string
+    discoveredLinks?: string[]
+  }) {
     const now = Date.now()
     return Database.transaction((db) => {
       const existing = db.select().from(ResearchQueueTable)
         .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
-      // Never downgrade or overwrite a real report/auth record with an index-page marker.
-      if (existing && existing.payload?.crawl_page !== true) return existing
+      // Preserve report status and source text while recording links discovered from its HTML.
+      // A report is never downgraded to an index-page marker; the frontier is separate metadata.
+      if (existing && existing.payload?.crawl_page !== true) {
+        if (!input.discoveredLinks) return existing
+        return db.update(ResearchQueueTable).set({
+          payload: {
+            ...(existing.payload ?? {}),
+            discovered_links: boundedDiscoveryLinks(input.discoveredLinks)!,
+          },
+          updated_at: now,
+        }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      }
       if (existing) {
         // A successful revisit after login must clear the auth-wall marker. Otherwise the
         // row becomes "discovered" but still carries auth_required=true, contradicting its
@@ -295,6 +333,7 @@ export namespace ResearchQueue {
             ...existingPayload,
             crawl_page: true,
             ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
+            ...(input.discoveredLinks ? { discovered_links: boundedDiscoveryLinks(input.discoveredLinks)! } : {}),
           },
           status: "discovered",
           updated_at: now,
@@ -308,7 +347,11 @@ export namespace ResearchQueue {
         source_id: input.sourceID,
         source_url: input.sourceURL,
         title: input.title ?? null,
-        payload: { crawl_page: true, ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}) },
+        payload: {
+          crawl_page: true,
+          ...(input.contentFingerprint ? { content_fingerprint: input.contentFingerprint } : {}),
+          ...(input.discoveredLinks ? { discovered_links: boundedDiscoveryLinks(input.discoveredLinks)! } : {}),
+        },
         status: "discovered",
         attempts: 0,
         discovered_at: now,
@@ -393,6 +436,7 @@ export namespace ResearchQueue {
           ...(minAgeMs > 0 ? [lt(ResearchQueueTable.updated_at, now - minAgeMs)] : []),
         ))
         .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
+      let updatedCount = 0
       for (const row of rows) {
         const isCrawlPage = row.payload?.crawl_page === true
         const {
@@ -401,7 +445,7 @@ export namespace ResearchQueue {
           crawl_error: _crawlError,
           ...payload
         } = row.payload ?? {}
-        db.update(ResearchQueueTable).set({
+        const updated = db.update(ResearchQueueTable).set({
           // Crawl/index pages must return to discovery, not be learned as if they were reports.
           status: isCrawlPage ? "discovered" : "queued",
           payload,
@@ -412,16 +456,18 @@ export namespace ResearchQueue {
           completed_at: null,
           // Make auth-blocked index pages eligible for immediate rediscovery after credentials change.
           updated_at: isCrawlPage ? now - CRAWL_PAGE_TTL_MS - 1 : now,
-        }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).run()
+        }).where(and(eq(ResearchQueueTable.sequence, row.sequence), eq(ResearchQueueTable.status, "blocked_auth"))).returning({ sequence: ResearchQueueTable.sequence }).get()
+        if (updated) updatedCount++
       }
-      return rows.length
+      return updatedCount
     })
   }
 
   /**
-   * Requeue old reports rejected by the classifier/relevance gate only when a
-   * cached text excerpt is available. The version marker makes this a one-time
-   * migration: current-version rejects are never put back into the queue loop.
+   * Requeue old reports rejected by the earlier classifier/relevance gate once.
+   * If sanitized text is absent, the model-study claim path safely refetches the
+   * report through its configured source allowlist. The version marker prevents
+   * current-version rejects from being fed back into the queue indefinitely.
    */
   export function requeueLegacyRejected(limit = 100, sourceID?: string) {
     const now = Date.now()
@@ -437,14 +483,17 @@ export namespace ResearchQueue {
           if (row.payload?.crawl_page === true) return false
           const previousVersion = row.payload?.learning_version
           if (typeof previousVersion === "number" && previousVersion >= RESEARCH_LEARNING_VERSION) return false
-          if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
+          // The model-study claim path can safely refetch an empty excerpt from
+          // the exact configured source. Do not strand older rejected rows merely
+          // because the former heuristic worker did not cache their text.
           return row.last_error === "no recognizable security topic" ||
             row.last_error === "page failed research relevance gate"
         })
         .slice(0, bounded)
 
+      let updatedCount = 0
       for (const row of candidates) {
-        db.update(ResearchQueueTable).set({
+        const updated = db.update(ResearchQueueTable).set({
           status: "queued",
           payload: { ...(row.payload ?? {}), learning_version: RESEARCH_LEARNING_VERSION },
           attempts: 0,
@@ -456,9 +505,10 @@ export namespace ResearchQueue {
         }).where(and(
           eq(ResearchQueueTable.sequence, row.sequence),
           eq(ResearchQueueTable.status, "rejected"),
-        )).run()
+        )).returning({ sequence: ResearchQueueTable.sequence }).get()
+        if (updated) updatedCount++
       }
-      return candidates.length
+      return updatedCount
     })
   }
 
@@ -639,11 +689,27 @@ export namespace ResearchQueue {
       const rows = sourceID
         ? db.select().from(ResearchQueueTable).where(eq(ResearchQueueTable.source_id, sourceID)).orderBy(asc(ResearchQueueTable.sequence)).all()
         : db.select().from(ResearchQueueTable).orderBy(asc(ResearchQueueTable.sequence)).all()
-      const crawlPages = rows.filter((row) => row.payload?.crawl_page === true).length
+      const crawlPageRows = rows.filter((row) => row.payload?.crawl_page === true)
       const reportRows = rows.filter((row) => row.payload?.crawl_page !== true)
+      const modelStudiedRows = reportRows.filter((row) =>
+        row.payload?.model_study_method === "llm-assisted-agent-command-v1" &&
+        typeof row.payload?.model_study_version === "number" &&
+        row.payload.model_study_version >= RESEARCH_MODEL_STUDY_VERSION,
+      )
+      const preflightSkippedRows = reportRows.filter((row) =>
+        row.status === "rejected" &&
+        row.payload?.model_study_method === "preflight-skip" &&
+        row.payload?.model_study_decision === "skipped" &&
+        typeof row.payload?.model_study_version === "number" &&
+        row.payload.model_study_version >= RESEARCH_MODEL_STUDY_VERSION,
+      )
       const counts: Record<string, number> = {
         total: reportRows.length,
-        crawl_pages: crawlPages,
+        crawl_pages: crawlPageRows.length,
+        crawl_page_errors: crawlPageRows.filter((row) => row.payload?.crawl_error === true).length,
+        crawl_page_auth_blocked: crawlPageRows.filter((row) =>
+          row.status === "blocked_auth" || row.payload?.auth_required === true,
+        ).length,
         discovered: 0,
         queued: 0,
         studying: 0,
@@ -651,6 +717,11 @@ export namespace ResearchQueue {
         retry: 0,
         rejected: 0,
         blocked_auth: 0,
+        model_study_learned: modelStudiedRows.filter((row) => row.status === "learned").length,
+        model_study_rejected: modelStudiedRows.filter((row) => row.status === "rejected").length,
+        model_study_completed: modelStudiedRows.filter((row) => row.status === "learned" || row.status === "rejected").length,
+        model_study_skipped: preflightSkippedRows.length,
+        model_study_pending: reportRows.filter((row) => ["queued", "retry", "studying"].includes(row.status)).length,
       }
       for (const row of reportRows) counts[row.status] = (counts[row.status] ?? 0) + 1
       return counts

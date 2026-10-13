@@ -766,7 +766,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       return normalized ? [normalized] : []
     }),
   )
-  const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; errors: string[] }> = []
+  const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; error_count: number; errors: string[] }> = []
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
@@ -778,9 +778,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     let candidates = 0
     let added = 0
     let blockedAuth = 0
+    let errorCount = 0
     const add = (value: string, depth: number) => {
       const url = normalizeUrl(value)
-      if (!url || depth > maxDepth || queued.has(url) || visited.has(url)) return
+      if (!url || url.length > 4096 || depth > maxDepth || queued.has(url) || visited.has(url)) return
       try {
         const parsed = new URL(url)
         if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) return
@@ -810,14 +811,36 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       if (isReportURL && (
         (existing && existing.payload?.crawl_page !== true) ||
         knownKnowledgeURLs.has(current.url)
-      )) continue
+      )) {
+        // Even when a report's text is already cached/learned, reuse its saved
+        // source-allowlisted outgoing links so larger future page passes can keep
+        // walking the graph without refetching that report.
+        const cachedLinks = existing?.payload?.discovered_links
+        if (Array.isArray(cachedLinks)) {
+          for (const link of cachedLinks) {
+            if (typeof link === "string") add(link, current.depth + 1)
+          }
+        }
+        continue
+      }
       if (
         existing?.payload?.crawl_page === true &&
         ResearchQueue.isFreshCrawlPage(source.id, current.url) &&
-        // Successful seed/index pages may be refreshed each cycle, but failures
-        // (including primary seeds) get the same cooldown as pagination pages.
         (existing.payload?.crawl_error === true || !primarySeeds.has(current.url))
-      ) continue
+      ) {
+        // Reuse the bounded, source-allowlisted link set from fresh crawl pages so
+        // repeated discovery passes can continue traversing the graph without
+        // repeatedly downloading the same index pages. Older cache rows without
+        // this field are fetched once to backfill the frontier.
+        if (existing.payload?.crawl_error === true) continue
+        const cachedLinks = existing.payload?.discovered_links
+        if (Array.isArray(cachedLinks)) {
+          for (const link of cachedLinks) {
+            if (typeof link === "string") add(link, current.depth + 1)
+          }
+          continue
+        }
+      }
       pages++
       try {
         const html = await fetchText(current.url, source)
@@ -839,10 +862,12 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
             },
           })
           blockedAuth++
-          errors.push(current.url + " — authentication required")
+          errorCount++
+          if (errors.length < 5) errors.push(current.url + " — authentication required")
           continue
         }
-        for (const link of linksOf(html, new URL(current.url), source)) {
+        const discoveredLinks = linksOf(html, new URL(current.url), source)
+        for (const link of discoveredLinks) {
           candidates++
           add(link, current.depth + 1)
         }
@@ -881,8 +906,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           sourceURL: current.url,
           title,
           contentFingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
+          discoveredLinks,
         })
       } catch (error) {
+        errorCount++
         const message = error instanceof Error ? error.message : String(error)
         if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {
           ResearchQueue.blockAuthentication({
@@ -897,7 +924,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
             },
           })
           blockedAuth++
-          errors.push(current.url + " — authentication required (" + message + ")")
+          if (errors.length < 5) errors.push(current.url + " — authentication required (" + message + ")")
         } else {
           // Persist transient/network failures so watch mode does not refetch the
           // same broken page every cycle. Failed records stay in discovery, not
@@ -912,7 +939,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       }
       if (current.depth >= maxDepth) continue
     }
-    results.push({ source: source.id, pages, candidates, added, blocked_auth: blockedAuth, errors })
+    results.push({ source: source.id, pages, candidates, added, blocked_auth: blockedAuth, error_count: errorCount, errors })
   }
   return results
 }

@@ -327,6 +327,61 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
   },
 ]
 
+/**
+ * Resolve a legacy public-research URL to its configured source without guessing
+ * when multiple source feeds share a host. Explicit metadata wins only when its
+ * source allowlist matches the URL; otherwise path-specific seed prefixes may
+ * disambiguate shared hosts such as HackerOne and GitHub.
+ */
+export function resolveResearchSourceForURL(value: string, preferredID?: string) {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return undefined
+  }
+  if (url.protocol !== "https:" || (url.port && url.port !== "443") || url.username || url.password) return undefined
+  const matchesHost = (source: ResearchSource) =>
+    source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
+  const hostCandidates = RESEARCH_SOURCES.filter(matchesHost)
+  if (preferredID) {
+    const preferred = hostCandidates.find((source) => source.id === preferredID)
+    if (preferred) return preferred
+    // A known configured source that rejects this host is contradictory provenance.
+    // Unknown legacy aliases (for example "hackerone" or "default") have no trust
+    // policy of their own, so allow only an unambiguous host-and-seed-path inference.
+    if (RESEARCH_SOURCES.some((source) => source.id === preferredID)) return undefined
+  }
+
+  if (hostCandidates.length === 1) return hostCandidates[0]
+
+  const pathname = url.pathname.toLowerCase()
+  const scored = hostCandidates.map((source) => {
+    let score = 0
+    for (const seed of source.seedUrls) {
+      try {
+        const seedURL = new URL(seed)
+        const seedHost = seedURL.hostname.toLowerCase()
+        const seedHostAllowed = source.hosts.some((host) =>
+          seedHost === host || seedHost.endsWith("." + host),
+        )
+        if (!seedHostAllowed || seedURL.pathname === "/") continue
+        const prefix = seedURL.pathname.toLowerCase().replace(/\/+$/, "")
+        if (pathname === prefix || pathname.startsWith(prefix + "/")) {
+          score = Math.max(score, prefix.length)
+        }
+      } catch {
+        // Invalid configured seeds do not participate in provenance inference.
+      }
+    }
+    return { source, score }
+  })
+  const highest = Math.max(0, ...scored.map((item) => item.score))
+  if (!highest) return undefined
+  const winners = scored.filter((item) => item.score === highest).map((item) => item.source)
+  return winners.length === 1 ? winners[0] : undefined
+}
+
 export function getResearchSource(id: string) {
   return RESEARCH_SOURCES.find((source) => source.id === id)
 }

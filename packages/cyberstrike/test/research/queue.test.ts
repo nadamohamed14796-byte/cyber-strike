@@ -175,12 +175,19 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
         sourceURL: url,
         title: "Archive page",
         contentFingerprint: "fingerprint-1",
+        discoveredLinks: ["https://research.example.test/archive?page=3", "https://research.example.test/writeup/idor"],
       })
       expect(visited?.status).toBe("discovered")
+      expect(visited?.payload?.discovered_links).toEqual([
+        "https://research.example.test/archive?page=3",
+        "https://research.example.test/writeup/idor",
+      ])
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url)).toBe(true)
       expect(ResearchQueue.isFreshCrawlPage("test-crawl-cache", url, Date.now() + 7 * 60 * 60_000)).toBe(false)
       expect(ResearchQueue.stats("test-crawl-cache").total).toBe(0)
       expect(ResearchQueue.stats("test-crawl-cache").crawl_pages).toBe(1)
+      expect(ResearchQueue.stats("test-crawl-cache").crawl_page_errors).toBe(0)
+      expect(ResearchQueue.stats("test-crawl-cache").crawl_page_auth_blocked).toBe(0)
 
       const promoted = ResearchQueue.enqueue({
         sourceID: "test-crawl-cache",
@@ -193,6 +200,52 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
       expect(ResearchQueue.find("test-crawl-cache", url)?.payload?.crawl_page).not.toBe(true)
       expect(ResearchQueue.stats("test-crawl-cache").total).toBe(1)
       expect(ResearchQueue.stats("test-crawl-cache").crawl_pages).toBe(0)
+
+      // Reports retain their queue status and source text, but their outbound
+      // links are preserved for later discovery passes.
+      const reportURL = "https://research.example.test/writeup/report-with-links"
+      const report = ResearchQueue.enqueue({
+        sourceID: "test-crawl-cache",
+        sourceURL: reportURL,
+        title: "Existing queued report",
+        payload: { cached_text: "canonical report body" },
+      })
+      expect(report.created).toBe(true)
+      const annotated = ResearchQueue.markVisitedPage({
+        sourceID: "test-crawl-cache",
+        sourceURL: reportURL,
+        title: "Existing queued report",
+        discoveredLinks: ["https://research.example.test/writeup/linked-report"],
+      })
+      expect(annotated?.status).toBe("queued")
+      expect(annotated?.payload?.crawl_page).not.toBe(true)
+      expect(annotated?.payload?.cached_text).toBe("canonical report body")
+      expect(annotated?.payload?.discovered_links).toEqual([
+        "https://research.example.test/writeup/linked-report",
+      ])
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("cached research discovery frontiers have a strict size bound", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const links = Array.from({ length: 160 }, (_, index) =>
+        "https://research.example.test/path/" + index + "/" + "x".repeat(1000),
+      )
+      const row = ResearchQueue.markVisitedPage({
+        sourceID: "test-frontier-size",
+        sourceURL: "https://research.example.test/archive",
+        discoveredLinks: links,
+      })
+      const stored = (row?.payload?.discovered_links as string[] | undefined) ?? []
+      expect(stored.length).toBeGreaterThan(0)
+      expect(stored.length).toBeLessThan(160)
+      expect(stored.reduce((sum, link) => sum + link.length, 0)).toBeLessThanOrEqual(16_384)
       await Instance.dispose()
     },
   })
@@ -222,6 +275,7 @@ test("failed crawl pages get a cooldown and recover without becoming report work
       expect(ResearchQueue.isFreshCrawlPage(sourceID, failedURL, Date.now() + 7 * 60 * 60_000)).toBe(false)
       expect(ResearchQueue.stats(sourceID).total).toBe(0)
       expect(ResearchQueue.stats(sourceID).crawl_pages).toBe(1)
+      expect(ResearchQueue.stats(sourceID).crawl_page_errors).toBe(1)
 
       const recovered = ResearchQueue.markVisitedPage({
         sourceID,
@@ -365,6 +419,65 @@ test("research queue survives an application restart and resumes cached report w
       expect(claimed?.sequence).toBe(sequence)
       expect(claimed?.status).toBe("studying")
       expect(claimed?.payload?.cached_text).toBe("sanitized report body")
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy rejected rows without cached text are requeued for safe model fetch", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "portswigger"
+      const sourceURL = "https://portswigger.net/web-security/legacy-empty-rejected-" + crypto.randomUUID()
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy rejected row without cached source text",
+        payload: { crawl_depth: 1 },
+      })
+      Database.use((db) => db.update(ResearchQueueTable).set({
+        status: "rejected",
+        last_error: "page failed research relevance gate",
+        payload: { crawl_depth: 1 },
+      }).where(eq(ResearchQueueTable.sequence, item.sequence)).run())
+
+      expect(ResearchQueue.requeueLegacyRejected(10, sourceID)).toBe(1)
+      const requeued = ResearchQueue.find(sourceID, sourceURL)
+      expect(requeued?.status).toBe("queued")
+      expect(requeued?.payload?.cached_text).toBeUndefined()
+      expect(requeued?.payload?.learning_version).toBe(RESEARCH_LEARNING_VERSION)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy learned rows without cached text can be revisited by the model-study worker", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "portswigger"
+      const sourceURL = "https://portswigger.net/web-security/legacy-empty-learned-" + crypto.randomUUID()
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy learned row without cached source text",
+        payload: { crawl_depth: 1 },
+      })
+      Database.use((db) => db.update(ResearchQueueTable).set({
+        status: "learned",
+        payload: { crawl_depth: 1 },
+      }).where(eq(ResearchQueueTable.sequence, item.sequence)).run())
+
+      expect(ResearchQueue.requeueLearnedForModelStudy(10, sourceID, 1)).toBe(1)
+      const requeued = ResearchQueue.find(sourceID, sourceURL)
+      expect(requeued?.status).toBe("queued")
+      expect(requeued?.payload?.cached_text).toBeUndefined()
+      expect(requeued?.payload?.model_study_requested_version).toBe(1)
       await Instance.dispose()
     },
   })
