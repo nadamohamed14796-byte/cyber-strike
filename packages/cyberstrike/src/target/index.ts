@@ -1085,16 +1085,29 @@ export namespace TargetMemory {
 
     let scope = selected.scope ?? null
     let parentScope: TargetScope | null = null
+    let parentIncludeMatches: string[] = []
     if (selected.workspace.parentTargetID) {
       const parentRow = Database.use((db) =>
         db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, selected.workspace.parentTargetID!)).get(),
       )
-      if (parentRow) {
-        try { parentScope = await getScope(parentRow.target_url) } catch {
-          return { allowed: false, reason: "parent target scope is invalid; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
-        }
+      if (!parentRow) {
+        return { allowed: false, reason: "parent workspace is missing; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
       }
-      if ((!scope || scope.status !== "configured") && parentScope?.status === "configured") scope = parentScope
+      try { parentScope = await getScope(parentRow.target_url) } catch {
+        return { allowed: false, reason: "parent target scope is invalid; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
+      }
+      if (!parentScope || parentScope.status !== "configured" || parentScope.scopeItems.length === 0) {
+        return { allowed: false, reason: "parent target has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
+      }
+      const parentExclusions = parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+      if (parentExclusions.length) {
+        return { allowed: false, reason: "URL matches parent target scope exclusion: " + parentExclusions.join(", "), workspace: selected.workspace, scope: scope ?? parentScope, includeMatches: [], excludeMatches: parentExclusions }
+      }
+      parentIncludeMatches = parentScope.scopeItems.filter((item) => checkMatch(candidate.href, item).matches)
+      if (!parentIncludeMatches.length) {
+        return { allowed: false, reason: "URL is not included in the parent target scope", workspace: selected.workspace, scope: scope ?? parentScope, includeMatches: [], excludeMatches: [] }
+      }
+      if (!scope || scope.status !== "configured") scope = parentScope
     }
     const parentExclusions = parentScope?.status === "configured"
       ? parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
