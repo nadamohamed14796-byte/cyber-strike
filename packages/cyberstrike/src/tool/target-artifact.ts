@@ -10,6 +10,18 @@ const AREAS = [
   "sessions", "research",
 ] as const
 
+type TargetArtifactMetadata = {
+  saved: boolean
+  reason?: string
+  target_url?: string
+  target_id?: string
+  workspace?: string
+  area?: (typeof AREAS)[number]
+  filename?: string
+  path?: string
+  bytes?: number
+}
+
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Exact existing target workspace URL. Use the root target for parent inventory and the child origin for per-asset artifacts."),
   area: z.enum(AREAS).describe("Target-local artifact directory. Do not replace authoritative scope/asset/run index files."),
@@ -33,7 +45,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       return {
         title: "Target artifact not saved",
         output: "No existing workspace matches " + params.target_url + ". Initialize the root target or attach the authorized asset with target_workspace first. No other directory was created.",
-        metadata: { saved: false, reason: "workspace_missing", target_url: params.target_url },
+        metadata: { saved: false, reason: "workspace_missing", target_url: params.target_url } as TargetArtifactMetadata,
       }
     }
 
@@ -47,7 +59,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       return {
         title: "Target artifact not saved",
         output: "Refusing to replace a generated identity, authorization, asset-registry, or run-index file. Use target_workspace or a structured API instead.",
-        metadata: { saved: false, reason: "reserved_file", area: params.area, filename },
+        metadata: { saved: false, reason: "reserved_file", area: params.area, filename } as TargetArtifactMetadata,
       }
     }
 
@@ -57,7 +69,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       return {
         title: "Target artifact already exists",
         output: "Existing artifact preserved: " + filePath + ". Set overwrite=true only if replacement is intentional.",
-        metadata: { saved: false, reason: "already_exists", target_id: workspace.id, path: filePath },
+        metadata: { saved: false, reason: "already_exists", target_id: workspace.id, path: filePath } as TargetArtifactMetadata,
       }
     }
     const safeContent = redactTargetNoteSecrets(params.content)
@@ -81,7 +93,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
         filename,
         path: filePath,
         bytes: Buffer.byteLength(content, "utf-8"),
-      },
+      } as TargetArtifactMetadata,
     }
   },
 })
