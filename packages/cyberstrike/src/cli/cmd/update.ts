@@ -83,7 +83,9 @@ export const UpdateCommand = cmd({
         "knowledge: total=" + knowledgeStats.total +
           " external_research=" + knowledgeStats.external +
           " useful_or_confirmed=" + knowledgeStats.useful +
-          " rejected_disproven_or_duplicate=" + knowledgeStats.rejected,
+          " rejected_disproven_or_duplicate=" + knowledgeStats.rejected +
+          " external_references_used=" + knowledgeStats.externalReferencesUsed +
+          " external_reference_usefulness_events=" + knowledgeStats.externalReferenceUsefulnessEvents,
       )
 
       if (!args.watch) break
