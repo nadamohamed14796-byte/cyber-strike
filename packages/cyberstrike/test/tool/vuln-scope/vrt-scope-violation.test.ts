@@ -64,6 +64,10 @@ describe("vrtScopeViolation", () => {
     test("LLM tester recording prompt injection", () => {
       expect(vrtScopeViolation("proxy-tester-llm", "prompt injection")).toBeNull()
     })
+
+    test("LLM tester recording encoding/evasion bypass", () => {
+      expect(vrtScopeViolation("proxy-tester-llm", "encoding bypass")).toBeNull()
+    })
   })
 
   describe("out-of-scope categories — returns violation", () => {
