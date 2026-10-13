@@ -335,6 +335,74 @@ export namespace ReportKnowledge {
     }
   }
 
+  /**
+   * Record feedback for a shared public reference without turning one target's
+   * verdict into a global claim about whether the source report is true.
+   *
+   * Only an explicitly supplied "useful" outcome increases the cross-target
+   * usefulness counter. Non-confirmed verdicts are telemetry only and never
+   * penalize or disprove a public report.
+   */
+  export function recordReferenceUse(input: {
+    reportID: string
+    sessionID: string
+    outcome: "observed" | "useful"
+    signal?: string
+    metadata?: Record<string, unknown>
+  }): boolean {
+    try {
+      return Database.transaction((db) => {
+        const row = db.select().from(ReportKnowledgeTable)
+          .where(eq(ReportKnowledgeTable.id, input.reportID)).get()
+        if (
+          !row ||
+          row.source_kind !== "external_report" ||
+          row.session_id ||
+          normalize(row.target_pattern) ||
+          !input.sessionID.trim()
+        ) return false
+
+        // Count a reference at most once per session and feedback outcome. This
+        // keeps repeated validation retries from artificially inflating ranking.
+        const existingEvent = db.select({ id: ReportKnowledgeEventTable.id })
+          .from(ReportKnowledgeEventTable)
+          .where(and(
+            eq(ReportKnowledgeEventTable.report_id, input.reportID),
+            eq(ReportKnowledgeEventTable.session_id, input.sessionID),
+            eq(ReportKnowledgeEventTable.hook, "finding-validation"),
+            eq(ReportKnowledgeEventTable.outcome, input.outcome),
+          ))
+          .get()
+        if (existingEvent) return false
+
+        const now = Date.now()
+        db.insert(ReportKnowledgeEventTable).values({
+          id: Identifier.ascending("report_knowledge_event"),
+          report_id: input.reportID,
+          session_id: input.sessionID,
+          hook: "finding-validation",
+          outcome: input.outcome,
+          signal: input.signal ?? null,
+          evidence: null,
+          metadata: input.metadata ?? {},
+          time_created: now,
+          time_updated: now,
+        }).run()
+
+        if (input.outcome === "useful") {
+          db.update(ReportKnowledgeTable)
+            .set({ times_useful: row.times_useful + 1, time_updated: now })
+            .where(eq(ReportKnowledgeTable.id, input.reportID))
+            .run()
+        }
+        return true
+      })
+    } catch (error) {
+      console.warn("[cyberstrike] research reference feedback persistence failed:", error)
+      return false
+    }
+  }
+
   function boundedLimit(value: number | undefined, fallback: number, minimum: number, maximum: number) {
     const candidate = value === undefined || !Number.isFinite(value) ? fallback : value
     return Math.max(minimum, Math.min(Math.floor(candidate), maximum))
