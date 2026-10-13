@@ -983,6 +983,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
             classification_method: "title-first-dominant-body-v2",
             severity: extracted.severity,
             cwe_id: extracted.cweID ?? null,
+            lesson: extracted.lesson ?? null,
             attack_vector: extracted.attackVector ?? null,
             impact: extracted.impact ?? null,
             reproduction_steps: extracted.reproduction ?? null,
@@ -1003,6 +1004,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
             extraction_coverage: {
               present: [
                 extracted.lesson,
+                extracted.cweID,
                 extracted.attackVector,
                 extracted.impact,
                 extracted.reproduction,
@@ -1020,7 +1022,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
                 extracted.negativeEvidence,
                 extracted.limitations,
               ].filter(Boolean).length,
-              total: 17,
+              total: 18,
               note: "Field presence only; not a quality score or practical validation.",
             },
           },
