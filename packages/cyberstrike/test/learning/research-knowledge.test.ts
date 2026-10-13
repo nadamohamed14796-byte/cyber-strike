@@ -234,6 +234,16 @@ test("finding-validation feedback ranks shared references without poisoning glob
         signal: "finding-validation:confirmed",
         metadata: { validation_verdict: "confirmed", feedback_basis: "agent-marked-materially-influential" },
       }
+      // A guessed record ID cannot raise ranking until that exact public reference
+      // was actually surfaced in the current session tree.
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(false)
+      expect(ReportKnowledge.recordReferenceUse({
+        ...feedback,
+        outcome: "observed",
+        hook: "research-context",
+        signal: "automatic-context",
+        metadata: { feedback_basis: "reference-surfaced-in-context" },
+      })).toBe(true)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(true)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(false)
       expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "observed" })).toBe(true)
