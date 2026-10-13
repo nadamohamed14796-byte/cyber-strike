@@ -7,6 +7,7 @@ import {
   discoverResearch,
   fetchResearchSourceForStudy,
   isIndexLikeResearchUrl,
+  isResearchCandidate,
   looksLikeResearchAuthenticationWall,
   normalizeResearchUrl,
   redactResearchSecrets,
@@ -328,6 +329,18 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
       continue
     }
     if (sourceFilter && source.id !== sourceFilter) continue
+    // The curated Medium source represents one researcher's articles only, not
+    // the entire platform. Preserve that path restriction during legacy backfill.
+    if (source.id === "trickster0" && !isResearchCandidate(sourceURL, source)) {
+      result.skipped++
+      ReportKnowledge.markModelStudyCompleted({
+        id: row.id,
+        version: RESEARCH_MODEL_STUDY_VERSION,
+        decision: "skipped",
+        reason: "legacy Medium URL is outside the curated researcher's path",
+      })
+      continue
+    }
 
     const excerpt = typeof metadata.excerpt === "string"
       ? redactResearchSecrets(metadata.excerpt).slice(0, 100_000)
