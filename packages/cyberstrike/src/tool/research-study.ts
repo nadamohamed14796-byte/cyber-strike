@@ -558,6 +558,21 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         results.push({ public_id: note.public_id, result: "stale-or-expired-lease" })
         continue
       }
+      if (params.source && params.source !== claim.source_id) {
+        const released = ResearchQueue.complete(
+          claim.sequence,
+          note.lease_owner,
+          "retry",
+          "agent study: save source filter did not match the claimed report source",
+        )
+        results.push({
+          public_id: note.public_id,
+          result: released ? "source-filter-mismatch" : "lease-lost",
+          expected_source: params.source,
+          actual_source: claim.source_id,
+        })
+        continue
+      }
       if (note.decision === "rejected") {
         const reason = boundedText(note.reason, 800) || "agent study found no reusable security lesson"
         const completed = ResearchQueue.complete(
