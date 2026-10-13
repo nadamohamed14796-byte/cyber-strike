@@ -43,33 +43,48 @@ test("cyberstrike agent has correct default properties", async () => {
   })
 })
 
-test("proxy vulnerability agents can retrieve shared global research", async () => {
+test("proxy vulnerability agents can retrieve shared global research and validation tools", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      const idor = await Agent.get("proxy-tester-idor")
+      const testerNames = [
+        "proxy-tester-idor",
+        "proxy-tester-authz",
+        "proxy-tester-mass-assignment",
+        "proxy-tester-injection",
+        "proxy-tester-authn",
+        "proxy-tester-business-logic",
+        "proxy-tester-ssrf",
+        "proxy-tester-file-attacks",
+        "proxy-tester-llm",
+      ] as const
+      const testers = await Promise.all(testerNames.map((name) => Agent.get(name)))
       const orchestrator = await Agent.get("proxy-agent")
       const analyzer = await Agent.get("proxy-analyzer")
-      expect(idor).toBeDefined()
       expect(orchestrator).toBeDefined()
       expect(analyzer).toBeDefined()
-      expect(evalPerm(idor, "research_knowledge")).toBe("allow")
+
+      for (let i = 0; i < testerNames.length; i++) {
+        const tester = testers[i]
+        expect(tester, testerNames[i]).toBeDefined()
+        expect(evalPerm(tester, "research_knowledge"), testerNames[i]).toBe("allow")
+        expect(evalPerm(tester, "validate_finding"), testerNames[i]).toBe("allow")
+        expect(evalPerm(tester, "correlate_javascript"), testerNames[i]).toBe("allow")
+        expect(evalPerm(tester, "report_vulnerability"), testerNames[i]).toBe("allow")
+        expect(evalPerm(tester, "http_replay"), testerNames[i]).toBe("allow")
+        expect(tester?.prompt, testerNames[i]).toContain("Global Research")
+      }
+
       expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
+      expect(evalPerm(orchestrator, "report_vulnerability")).toBe("deny")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
-      expect(evalPerm(idor, "validate_finding")).toBe("allow")
-      expect(evalPerm(idor, "correlate_javascript")).toBe("allow")
-      expect(evalPerm(await Agent.get("web-application"), "correlate_javascript")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
-      expect(evalPerm(await Agent.get("web-application"), "research_knowledge")).toBe("allow")
-      expect(evalPerm(await Agent.get("mobile-application"), "research_knowledge")).toBe("allow")
-      expect(evalPerm(await Agent.get("cloud-security"), "research_knowledge")).toBe("allow")
-      expect(evalPerm(await Agent.get("internal-network"), "research_knowledge")).toBe("allow")
-      expect(evalPerm(await Agent.get("general"), "research_knowledge")).toBe("allow")
-      expect(idor?.prompt).toContain("Global Research")
-      expect(idor?.prompt).toContain("correlate_javascript")
-      expect(idor?.prompt).toContain("validate_finding")
-      expect(analyzer?.prompt).toContain("research_knowledge")
+      expect(evalPerm(analyzer, "report_vulnerability")).toBe("deny")
+
+      for (const name of ["web-application", "mobile-application", "cloud-security", "internal-network", "general"]) {
+        expect(evalPerm(await Agent.get(name), "research_knowledge"), name).toBe("allow")
+      }
     },
   })
 })
