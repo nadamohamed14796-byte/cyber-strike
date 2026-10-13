@@ -174,6 +174,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         path.join(result.workspace.workspacePath, "workspace.json"),
         path.join(result.workspace.workspacePath, "scope", "scope.json"),
         path.join(result.workspace.workspacePath, "notes.md"),
+        ...(sourceArtifactPath ? [sourceArtifactPath] : []),
       ]
       for (const requiredFile of requiredFiles) {
         const info = await fs.lstat(requiredFile).catch(() => undefined)
