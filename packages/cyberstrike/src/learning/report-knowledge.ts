@@ -497,7 +497,6 @@ export namespace ReportKnowledge {
               or(
                 eq(ReportKnowledgeEventTable.hook, "research-context"),
                 eq(ReportKnowledgeEventTable.hook, "research_knowledge"),
-                eq(ReportKnowledgeEventTable.hook, "finding-validation"),
               ),
             ))
             .get()
