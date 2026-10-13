@@ -133,3 +133,33 @@ test("fresh asset hierarchy migration contains both parent and asset type column
     sqlite.close()
   }
 })
+
+const FINDING_TARGET_MIGRATION = "20261013020000_vulnerability-target-workspace-id"
+
+function findingTargetMigrationSQL() {
+  return readFileSync(new URL("../../migration/20261013020000_vulnerability-target-workspace-id/migration.sql", import.meta.url), "utf-8")
+}
+
+test("finding target migration skips only the duplicate target_id column and keeps its index", () => {
+  const sqlite = new BunDatabase(":memory:")
+  try {
+    sqlite.exec("CREATE TABLE vulnerability (id TEXT PRIMARY KEY NOT NULL, target_id TEXT)")
+    const prepared = Database.prepareMigrations(sqlite, [{ name: FINDING_TARGET_MIGRATION, timestamp: Date.UTC(2026, 9, 13, 2), sql: findingTargetMigrationSQL() }])
+    expect(prepared[0]?.sql).not.toContain("ALTER TABLE vulnerability ADD COLUMN target_id")
+    expect(prepared[0]?.sql).toContain("SELECT 1;")
+    expect(prepared[0]?.sql).toContain("vulnerability_target_idx")
+  } finally {
+    sqlite.close()
+  }
+})
+
+test("fresh finding target migration adds a nullable reference to the target workspace", () => {
+  const sqlite = new BunDatabase(":memory:")
+  try {
+    const prepared = Database.prepareMigrations(sqlite, [{ name: FINDING_TARGET_MIGRATION, timestamp: Date.UTC(2026, 9, 13, 2), sql: findingTargetMigrationSQL() }])
+    expect(prepared[0]?.sql).toContain("ADD COLUMN target_id TEXT REFERENCES target_workspace(id) ON DELETE SET NULL")
+    expect(prepared[0]?.sql).toContain("vulnerability_target_idx")
+  } finally {
+    sqlite.close()
+  }
+})
