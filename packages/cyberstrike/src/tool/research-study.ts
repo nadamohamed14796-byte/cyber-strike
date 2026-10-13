@@ -133,7 +133,20 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
         if (!claim) break
         const source = RESEARCH_SOURCES.find((entry) => entry.id === claim.source_id)
         if (!source) {
-          ResearchQueue.complete(claim.sequence, claim.lease_owner, "rejected", "unknown source id")
+          const completed = ResearchQueue.complete(
+            claim.sequence,
+            claim.lease_owner,
+            "rejected",
+            "unknown source id",
+            { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "preflight-skip", model_study_decision: "skipped" },
+          )
+          const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
+          if (completed && legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
+            id: legacyKnowledgeID,
+            version: RESEARCH_MODEL_STUDY_VERSION,
+            decision: "skipped",
+            reason: "the source is no longer configured for safe fetching",
+          })
           issues.push(claim.public_id + ": unknown source id")
           continue
         }
@@ -215,7 +228,20 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           continue
         }
         if (text.trim().length < 250 || isIndexLikeResearchUrl(claim.source_url)) {
-          ResearchQueue.complete(claim.sequence, claim.lease_owner, "rejected", "agent study: insufficient article content")
+          const completed = ResearchQueue.complete(
+            claim.sequence,
+            claim.lease_owner,
+            "rejected",
+            "agent study: insufficient article content",
+            { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "preflight-skip", model_study_decision: "skipped" },
+          )
+          const legacyKnowledgeID = typeof current.payload.legacy_knowledge_id === "string" ? current.payload.legacy_knowledge_id : undefined
+          if (completed && legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
+            id: legacyKnowledgeID,
+            version: RESEARCH_MODEL_STUDY_VERSION,
+            decision: "skipped",
+            reason: "source page is an index or does not contain enough article text",
+          })
           issues.push(claim.public_id + ": insufficient article content")
           continue
         }
