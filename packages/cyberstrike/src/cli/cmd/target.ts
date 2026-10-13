@@ -109,6 +109,8 @@ const TargetScopeCommand = cmd({
           let sourceContents: string | undefined
           let sourceFilePath: string | undefined
           let sourceHash: string | undefined
+          let sourceFilename: string | undefined
+          let sourceArtifactPath: string | undefined
           if (args.file) {
             const existingWorkspace = await TargetMemory.get(args.url)
             if (!existingWorkspace) {
@@ -133,6 +135,10 @@ const TargetScopeCommand = cmd({
             } catch (error) {
               throw new Error((error instanceof Error ? error.message : String(error)) + " File: " + sourceFilePath)
             }
+            sourceFilename = "source-scope-" + sourceHash!.slice(0, 16) + ".txt"
+            sourceArtifactPath = path.join(existingWorkspace.workspacePath, "scope", sourceFilename)
+            // Preserve the exact source list before attempting to change authorization.
+            await TargetMemory.writeWorkspaceFile(existingWorkspace, "scope/" + sourceFilename, sourceContents!)
           }
           const includeEntries = [...(args.include ?? []), ...fileEntries]
           const result = await TargetMemory.configureScope(args.url, {
@@ -141,15 +147,12 @@ const TargetScopeCommand = cmd({
             authorizationSource: args.source ?? "",
             authorizationReference: args.reference ?? "",
           })
-          let sourceArtifactPath: string | undefined
-          if (sourceContents !== undefined && sourceHash) {
-            const sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
-            sourceArtifactPath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
-            await TargetMemory.writeWorkspaceFile(
-              result.workspace,
-              "scope/" + sourceFilename,
-              sourceContents,
-            )
+          if (sourceContents !== undefined && sourceHash && sourceFilename && sourceArtifactPath) {
+            const canonicalSourcePath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
+            if (canonicalSourcePath !== sourceArtifactPath) {
+              await TargetMemory.writeWorkspaceFile(result.workspace, "scope/" + sourceFilename, sourceContents)
+              sourceArtifactPath = canonicalSourcePath
+            }
             await TargetMemory.addNote(result.workspace.targetURL, {
               kind: "manual",
               title: "Scope file import checkpoint",
