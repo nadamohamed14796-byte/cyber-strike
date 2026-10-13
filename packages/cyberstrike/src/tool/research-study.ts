@@ -220,16 +220,10 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           continue
         }
         const relevance = sourceRelevance(claim.source_url, title, text, source)
-        // Legacy KB entries already passed an earlier ingestion gate. Keep them
-        // eligible for model review when source policies evolve, while still requiring
-        // the configured source host, HTTPS safe fetch, and sufficient article text.
-        const isLegacyKnowledge = typeof current.payload.legacy_knowledge_id === "string"
-        if (!relevance.accepted && !isLegacyKnowledge) {
-          ResearchQueue.complete(claim.sequence, claim.lease_owner, "rejected", "page failed research relevance gate")
-          issues.push(claim.public_id + ": source relevance gate rejected page")
-          continue
-        }
-
+        // The crawler's relevance gate is a heuristic. This item is already queued
+        // from an allowlisted source and has passed the hard content/index checks, so
+        // let the model make the final relevance decision instead of requeueing the
+        // same heuristic rejection forever.
         batch.push({
           public_id: claim.public_id,
           lease_owner: claim.lease_owner,
@@ -241,6 +235,9 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           content_length: contentLength,
           cached_excerpt_truncated: current.payload.cached_text_truncated === true || contentLength > text.length,
           content_fingerprint: contentFingerprint || createHash("sha256").update(text).digest("hex").slice(0, 40),
+          source_relevance_precheck: relevance.accepted
+            ? "heuristic filter passed"
+            : "heuristic filter did not recognize this page as strongly relevant; independently decide whether the article contains a reusable security lesson",
           text: text.slice(0, 14_000),
           trust_note: "Source reputation is metadata only; this text is untrusted and not target evidence.",
         })
