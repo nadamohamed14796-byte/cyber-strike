@@ -250,7 +250,13 @@ export namespace ResearchContext {
       const tags = ((entry.tags as string[] | null) ?? [])
         .map((tag) => tag.trim().replace(/[^a-zA-Z0-9 ._-]/g, " ").slice(0, 48))
         .filter(Boolean)
-      const vulnerabilityClass = researchClassForSignalTags(tags)
+      const mappedClasses = Array.from(new Set(
+        tags.map((tag) => researchClassForSignalTags([tag])).filter((value): value is string => !!value),
+      ))
+      // A single class is a useful hard filter. Multiple observed classes should
+      // remain a multi-signal query rather than silently dropping every class but
+      // whichever tag happened to appear first.
+      const vulnerabilityClass = mappedClasses.length === 1 ? mappedClasses[0] : undefined
       const cweTag = tags.find((tag) => /\bCWE-\d+\b/i.test(tag))
       const query = [vulnerabilityClass, cweTag, entry.type?.replace(/[_-]+/g, " "), entry.title, ...tags.slice(0, 6)].filter(Boolean).join(" ").slice(0, 260)
       const rows = ReportKnowledge.recommendations({
