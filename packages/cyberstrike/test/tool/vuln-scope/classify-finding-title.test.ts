@@ -54,7 +54,7 @@ describe("classifyFindingTitle", () => {
     })
   })
 
-
+  describe("idor class", () => {
     test("IDOR keyword", () => {
       expect(classifyFindingTitle("IDOR in user profile endpoint")).toBe("idor")
     })
