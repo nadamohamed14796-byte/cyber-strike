@@ -41,7 +41,7 @@ test("path-scoped recon passes every requested URL through the persisted scope g
   })
 
   try {
-    const target = \`http://127.0.0.1:\${server.port}/portal\`
+    const target = "http://127.0.0.1:" + server.port + "/portal"
     const result = await sitemapScan(target, [], 2, async (url) => {
       const candidate = new URL(url)
       return candidate.pathname === "/portal" || candidate.pathname.startsWith("/portal/")
