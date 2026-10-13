@@ -56,6 +56,17 @@ test("request-derived research signals cover JavaScript, auth, uploads, and URL-
   expect(requestResearchSignals({ method: "POST", path: "/webhook/import-url", contentType: "application/json", status: 200 })).toEqual(
     expect.arrayContaining(["server-side-request", "business-logic"]),
   )
+  expect(requestResearchSignals({
+    method: "GET",
+    path: "/api/profile",
+    contentType: "application/json",
+    status: 200,
+    responseHeaders: {
+      "Cache-Control": "private, no-store",
+      "Access-Control-Allow-Origin": "https://app.example.test",
+      "Set-Cookie": "session=must-not-be-used-as-a-signal",
+    },
+  })).toEqual(expect.arrayContaining(["cache-behavior", "cors-policy"]))
   expect(requestResearchSignals({ method: "GET", path: "/assets/app.js", contentType: "application/javascript", status: 200 })).not.toContain("idor")
 })
 
@@ -67,12 +78,19 @@ test("explicit user request produces bounded global retrieval tags without retai
   expect(promptResearchSignals("JWT OAuth refresh token login session")).toEqual(
     expect.arrayContaining(["authentication-flow", "token-or-jwt"]),
   )
+  expect(promptResearchSignals("CORS security misconfiguration exposes sensitive information")).toEqual(
+    expect.arrayContaining(["cors-policy", "security-misconfiguration", "information-disclosure"]),
+  )
 })
 
 test("maps request patterns to broad research classes without treating them as findings", () => {
   expect(researchClassForSignalTags(["object-identifier"])).toBe("idor")
   expect(researchClassForSignalTags(["authorization-boundary"])).toBe("access-control")
   expect(researchClassForSignalTags(["server-side-request"])).toBe("ssrf")
+  expect(researchClassForSignalTags(["cache-behavior"])).toBe("web-cache")
+  expect(researchClassForSignalTags(["cors-policy"])).toBe("cors")
+  expect(researchClassForSignalTags(["information-disclosure"])).toBe("information-disclosure")
+  expect(researchClassForSignalTags(["security-misconfiguration"])).toBe("security-misconfiguration")
   expect(researchClassForSignalTags(["javascript-client"])).toBeUndefined()
 })
 
