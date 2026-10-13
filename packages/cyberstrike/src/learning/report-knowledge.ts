@@ -1,4 +1,4 @@
-import { and, desc, eq, or, like, count, sql, isNull, notInArray } from "drizzle-orm"
+import { and, asc, desc, eq, or, like, count, sql, isNull, notInArray } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "./report-knowledge.sql"
@@ -196,6 +196,92 @@ export namespace ReportKnowledge {
         .all()
         .flatMap((row) => row.source_url ? [row.source_url] : []),
     )
+  }
+
+  /**
+   * Return only shared public rows with a stored excerpt that predates the current
+   * extraction schema. Reprocessing uses local SQLite text only; it performs no fetch.
+   */
+  export function externalRecordsForEnrichment(limit = 100) {
+    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    return Database.use((db) =>
+      db.select({
+        id: ReportKnowledgeTable.id,
+        title: ReportKnowledgeTable.title,
+        severity: ReportKnowledgeTable.severity,
+        vulnerabilityClass: ReportKnowledgeTable.vulnerability_class,
+        cweID: ReportKnowledgeTable.cwe_id,
+        tags: ReportKnowledgeTable.tags,
+        sourceURL: ReportKnowledgeTable.source_url,
+        metadata: ReportKnowledgeTable.metadata,
+      })
+        .from(ReportKnowledgeTable)
+        .where(and(
+          eq(ReportKnowledgeTable.source_kind, "external_report"),
+          isNull(ReportKnowledgeTable.session_id),
+          or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
+          notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]),
+        ))
+        .orderBy(asc(ReportKnowledgeTable.time_updated))
+        .all()
+        .filter((row) => {
+          const metadata = row.metadata ?? {}
+          const version = metadata.extraction_version
+          return typeof metadata.excerpt === "string" &&
+            metadata.excerpt.trim().length >= 250 &&
+            !(typeof version === "number" && version >= 7)
+        })
+        .slice(0, bounded),
+    )
+  }
+
+  /** Update extracted fields on a shared public record without changing its truth/outcome state. */
+  export function enrichExternalRecord(input: {
+    id: string
+    vulnerabilityClass?: string
+    cweID?: string
+    severity?: string
+    tags?: string[]
+    metadata?: Record<string, unknown>
+  }): boolean {
+    try {
+      return Database.transaction((db) => {
+        const row = db.select().from(ReportKnowledgeTable)
+          .where(eq(ReportKnowledgeTable.id, input.id)).get()
+        if (
+          !row ||
+          row.source_kind !== "external_report" ||
+          row.session_id ||
+          normalize(row.target_pattern) ||
+          ["rejected", "disproven", "duplicate"].includes(row.status)
+        ) return false
+
+        const existingMetadata = row.metadata ?? {}
+        const incomingMetadata = input.metadata ?? {}
+        const existingExtracted = existingMetadata.extracted && typeof existingMetadata.extracted === "object"
+          ? existingMetadata.extracted as Record<string, unknown>
+          : {}
+        const incomingExtracted = incomingMetadata.extracted && typeof incomingMetadata.extracted === "object"
+          ? incomingMetadata.extracted as Record<string, unknown>
+          : {}
+        db.update(ReportKnowledgeTable).set({
+          vulnerability_class: input.vulnerabilityClass ?? row.vulnerability_class,
+          cwe_id: input.cweID ?? row.cwe_id,
+          severity: input.severity && input.severity !== "unknown" ? input.severity : row.severity,
+          tags: input.tags?.length ? Array.from(new Set([...(row.tags ?? []), ...input.tags])) : row.tags,
+          metadata: {
+            ...existingMetadata,
+            ...incomingMetadata,
+            extracted: { ...existingExtracted, ...incomingExtracted },
+          },
+          time_updated: Date.now(),
+        }).where(eq(ReportKnowledgeTable.id, row.id)).run()
+        return true
+      })
+    } catch (error) {
+      console.warn("[cyberstrike] external research enrichment failed:", error)
+      return false
+    }
   }
 
   export function ingestExternalDetailed(input: {
