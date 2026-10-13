@@ -14,6 +14,10 @@ describe("parseScopeFileContents", () => {
     expect(parseScopeFileContents("\n  # comment\n // comment\napi.att.com  \n")).toEqual(["api.att.com"])
   })
 
+  test("accepts a UTF-8 byte-order mark on the first entry", () => {
+    expect(parseScopeFileContents("\uFEFFatt.com\napi.att.com")).toEqual(["att.com", "api.att.com"])
+  })
+
   test("rejects entries containing internal whitespace with the source line number", () => {
     expect(() => parseScopeFileContents("att.com\nnot a host\n")).toThrow("line 2")
   })
