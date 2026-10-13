@@ -319,7 +319,7 @@ export namespace ResearchContext {
       ].join("\n")
     })
 
-    return [
+    const context = [
       baseline,
       "",
       "## Relevant Public Research Knowledge (unverified advisory references)",
@@ -330,5 +330,20 @@ export namespace ResearchContext {
       "",
       "Use these references only to design controlled tests that match current observed behavior. Record what was tested and whether evidence supports, disproves, or leaves the hypothesis inconclusive.",
     ].join("\n").slice(0, 10_000)
+
+    // Record only IDs that survive the actual prompt-size cap; omitted references
+    // were not genuinely surfaced to the model and must not influence feedback.
+    for (const row of results) {
+      if (!context.includes("Knowledge record ID: " + row.id)) continue
+      ReportKnowledge.recordReferenceUse({
+        reportID: row.id,
+        sessionID,
+        outcome: "observed",
+        hook: "research-context",
+        signal: "automatic-context",
+        metadata: { feedback_basis: "reference-surfaced-in-context" },
+      })
+    }
+    return context
   }
 }
