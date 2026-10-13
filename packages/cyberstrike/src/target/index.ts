@@ -573,24 +573,52 @@ export namespace TargetMemory {
   }
 
 
-  /** Pick one unambiguous, explicitly authorized parent for a discovered host. */
+  /** A parent must authorize this exact host and every ancestor must authorize it too. */
+  async function parentChainAuthorizes(candidate: URL, workspace: Workspace): Promise<boolean> {
+    const candidateHref = candidate.origin + "/"
+    const ownBase = new URL(workspace.targetURL)
+    if (
+      ownBase.hostname === candidate.hostname ||
+      !candidate.hostname.endsWith("." + ownBase.hostname) ||
+      ownBase.protocol !== candidate.protocol ||
+      ownBase.port !== candidate.port ||
+      ownBase.pathname !== "/"
+    ) return false
+
+    let current: Workspace | null = workspace
+    const visited = new Set<string>()
+    while (current) {
+      if (visited.has(current.id)) return false
+      visited.add(current.id)
+      const base = new URL(current.targetURL)
+      let scope: TargetScope | null
+      try { scope = await getScope(current.targetURL) } catch { return false }
+      if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) return false
+      if (scope.excludedItems.some((item) => checkMatch(candidateHref, item).matches)) return false
+      if (!scope.scopeItems.some((item) => checkMatch(candidateHref, item).matches)) return false
+      if (!current.parentTargetID) return true
+      const row = Database.use((db) =>
+        db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, current!.parentTargetID!)).get(),
+      )
+      if (!row || row.project_id !== current.projectID || row.owner_key !== currentOwnerKey()) return false
+      current = mapWorkspace(row)
+    }
+    return false
+  }
+
+  /** Pick one unambiguous, most-specific, explicitly authorized parent for a discovered host. */
   async function findAuthorizedParent(candidateURL: string): Promise<Workspace | null> {
     let candidate: URL
     try { candidate = new URL(candidateURL) } catch { return null }
     if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) return null
     const matches: Array<{ workspace: Workspace; score: number }> = []
-    for (const workspace of list().filter((item) => !item.parentTargetID)) {
+    for (const workspace of list()) {
       const base = new URL(workspace.targetURL)
       if (base.hostname === candidate.hostname || base.protocol !== candidate.protocol || base.port !== candidate.port) continue
-      if (base.pathname !== "/") continue
-      let scope: TargetScope | null
-      try { scope = await getScope(workspace.targetURL) } catch { continue }
-      if (!scope || scope.status !== "configured") continue
-      if (scope.excludedItems.some((item) => checkMatch(candidate.origin, item).matches)) continue
-      const included = scope.scopeItems.filter((item) => checkMatch(candidate.origin, item).matches)
-      if (!included.length) continue
-      const score = Math.max(...included.map((item) => item.startsWith("*.") ? item.slice(2).length : item.length))
-      matches.push({ workspace, score })
+      if (!candidate.hostname.endsWith("." + base.hostname) || base.pathname !== "/") continue
+      if (!await parentChainAuthorizes(candidate, workspace)) continue
+      // Hostname suffix specificity makes nested assets deterministic; equal-depth ties fail closed.
+      matches.push({ workspace, score: base.hostname.length })
     }
     matches.sort((a, b) => b.score - a.score)
     if (!matches.length) return null
@@ -1083,37 +1111,45 @@ export namespace TargetMemory {
       return { allowed: false, reason: "multiple equally specific target workspaces match; refusing ambiguous scope", includeMatches: [], excludeMatches: [] }
     }
 
-    let scope = selected.scope ?? null
-    let parentScope: TargetScope | null = null
-    let parentIncludeMatches: string[] = []
-    if (selected.workspace.parentTargetID) {
-      const parentRow = Database.use((db) =>
-        db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, selected.workspace.parentTargetID!)).get(),
-      )
-      if (!parentRow) {
-        return { allowed: false, reason: "parent workspace is missing; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
+    const ownScope = selected.scope ?? null
+    const inheritedScopes: TargetScope[] = []
+    const inheritedExclusions: string[] = []
+    let parentTargetID = selected.workspace.parentTargetID
+    const visitedParents = new Set<string>()
+    while (parentTargetID) {
+      if (visitedParents.has(parentTargetID)) {
+        return { allowed: false, reason: "target hierarchy contains a parent cycle; authorization refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
       }
+      visitedParents.add(parentTargetID)
+      const parentRow = Database.use((db) =>
+        db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, parentTargetID!)).get(),
+      )
+      if (!parentRow || parentRow.project_id !== selected.workspace.projectID || parentRow.owner_key !== currentOwnerKey()) {
+        return { allowed: false, reason: "parent workspace is missing or belongs to another project; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
+      }
+      let parentScope: TargetScope | null
       try { parentScope = await getScope(parentRow.target_url) } catch {
         return { allowed: false, reason: "parent target scope is invalid; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
       }
       if (!parentScope || parentScope.status !== "configured" || parentScope.scopeItems.length === 0) {
-        return { allowed: false, reason: "parent target has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
+        return { allowed: false, reason: "an ancestor target has no configured authorization scope", workspace: selected.workspace, scope: ownScope ?? undefined, includeMatches: [], excludeMatches: [] }
       }
-      const parentExclusions = parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
-      if (parentExclusions.length) {
-        return { allowed: false, reason: "URL matches parent target scope exclusion: " + parentExclusions.join(", "), workspace: selected.workspace, scope: scope ?? parentScope, includeMatches: [], excludeMatches: parentExclusions }
+      const excludedByParent = parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+      if (excludedByParent.length) {
+        return { allowed: false, reason: "URL matches parent/ancestor scope exclusion: " + excludedByParent.join(", "), workspace: selected.workspace, scope: ownScope ?? parentScope, includeMatches: [], excludeMatches: excludedByParent }
       }
-      parentIncludeMatches = parentScope.scopeItems.filter((item) => checkMatch(candidate.href, item).matches)
-      if (!parentIncludeMatches.length) {
-        return { allowed: false, reason: "URL is not included in the parent target scope", workspace: selected.workspace, scope: scope ?? parentScope, includeMatches: [], excludeMatches: [] }
+      if (!parentScope.scopeItems.some((item) => checkMatch(candidate.href, item).matches)) {
+        return { allowed: false, reason: "URL is not included in every ancestor target scope", workspace: selected.workspace, scope: ownScope ?? parentScope, includeMatches: [], excludeMatches: [] }
       }
-      if (!scope || scope.status !== "configured") scope = parentScope
+      inheritedScopes.push(parentScope)
+      inheritedExclusions.push(...excludedByParent)
+      parentTargetID = parentRow.parent_target_id ?? null
     }
-    const parentExclusions = parentScope?.status === "configured"
-      ? parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
-      : []
+    let scope = ownScope
+    if (!scope || scope.status !== "configured") scope = inheritedScopes[0] ?? null
+    const parentExclusions = [...new Set(inheritedExclusions)]
     if (parentExclusions.length) {
-      return { allowed: false, reason: "URL matches parent target scope exclusion: " + parentExclusions.join(", "), workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: parentExclusions }
+      return { allowed: false, reason: "URL matches parent/ancestor scope exclusion: " + parentExclusions.join(", "), workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: parentExclusions }
     }
     if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
       return { allowed: false, reason: "the most specific target workspace has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
