@@ -229,13 +229,18 @@ export const WebReconTool = Tool.define("web_recon", {
       // are produced; exact-host target workspaces keep their path-scoped identity.
       try {
         const requestedURL = new URL(params.target)
-        if (targetWorkspace && requestedURL.hostname !== targetWorkspace.hostname) {
+        if (targetWorkspace &&
+            requestedURL.hostname !== targetWorkspace.hostname &&
+            requestedURL.hostname.toLowerCase().endsWith("." + targetWorkspace.hostname.toLowerCase())) {
           const child = await TargetMemory.registerObservedAsset(requestedURL.origin, "subdomain")
           if (!child) {
-            return fail("[-] Scope matched but the child workspace could not be attached under its authorized parent. No network probes were sent and no artifact was written.")
+            return fail("[-] Scope matched but this subdomain could not be attached under its authorized parent. No network probes were sent and no artifact was written.")
           }
           targetWorkspace = child
         }
+        // A program may list an additional non-subdomain host as an explicit scope item.
+        // Keep those results under the authorizing program workspace rather than falsely
+        // nesting the unrelated hostname or manufacturing a second authorization manifest.
       } catch (error) {
         return fail("[-] Could not prepare the canonical target workspace before reconnaissance: " + (error instanceof Error ? error.message : String(error)) + ". No network probes were sent.")
       }
