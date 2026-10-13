@@ -164,6 +164,76 @@ test("model-rejected or unstudyable legacy public records stay out of hunting re
 })
 
 
+test("model-rejected references cannot starve valid research beyond the query candidate cap", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID().replace(/-/g, "")
+      const valid = ReportKnowledge.ingestExternalDetailed({
+        title: "Valid IDOR methodology older than rejected noise " + marker,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL: "https://research.example.test/" + marker + "/valid",
+        lesson: "Compare the owner baseline with the same request from a second controlled account.",
+        sourceTrust: 95,
+        tags: ["idor", "object-identifier"],
+        metadata: { source_trust: 95, extracted: { retrieval_signals: ["idor", "object-identifier"] } },
+      })
+      expect(valid).not.toBeNull()
+      if (!valid) throw new Error("valid reference fixture was not persisted")
+
+      // Fill the 500-row search candidate window with newer rows rejected by the
+      // model. They remain searchable for audit, but must not starve recommendations.
+      const base = Date.now() + 10_000
+      const rows = Array.from({ length: 500 }, (_, index) => {
+        const id = marker + "-rejected-" + index
+        return {
+          id: "rk_" + id,
+          session_id: null,
+          source_vulnerability_id: null,
+          fingerprint: "starve-fingerprint-" + id,
+          title: "Model-rejected IDOR noise " + id,
+          vulnerability_class: "idor",
+          cwe_id: null,
+          severity: "unknown",
+          status: "observed",
+          source_kind: "external_report",
+          source_url: "https://research.example.test/" + marker + "/" + index,
+          program: null,
+          target_pattern: null,
+          endpoint: null,
+          attack_vector: null,
+          impact: null,
+          reproduction: null,
+          poc: null,
+          outcome: "observed",
+          lesson: "This legacy lesson was explicitly rejected by the model.",
+          tags: ["idor"],
+          metadata: { source_trust: 90, model_study_decision: "rejected", study_method: "llm-assisted-agent-command-v1" },
+          confidence: 50,
+          times_seen: 1,
+          times_useful: 0,
+          times_rejected: 0,
+          time_created: base + index,
+          time_updated: base + index,
+        }
+      })
+      Database.use((db) => {
+        for (let offset = 0; offset < rows.length; offset += 100) {
+          db.insert(ReportKnowledgeTable).values(rows.slice(offset, offset + 100)).run()
+        }
+      })
+
+      const recommendations = ReportKnowledge.recommendations({ signal: "idor", limit: 5 })
+      expect(recommendations.some((row) => row.id === valid.id)).toBe(true)
+      expect(recommendations.some((row) => row.metadata?.model_study_decision === "rejected")).toBe(false)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("target outcomes do not relabel globally shared external research", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
