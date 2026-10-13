@@ -1,5 +1,6 @@
 import type { Argv } from "yargs"
 import fs from "node:fs/promises"
+import { createHash } from "node:crypto"
 import path from "node:path"
 import { parseScopeFileContents, resolveScopeFilePath } from "../../target/scope-file"
 import { cmd } from "./cmd"
@@ -105,18 +106,27 @@ const TargetScopeCommand = cmd({
         const requestedChange = Boolean(args.include?.length || args.exclude?.length || args.source || args.reference || args.file)
         if (requestedChange) {
           let fileEntries: string[] = []
+          let sourceContents: string | undefined
+          let sourceFilePath: string | undefined
+          let sourceHash: string | undefined
           if (args.file) {
-            const filePath = resolveScopeFilePath(args.file)
-            let contents: string
+            sourceFilePath = resolveScopeFilePath(args.file)
             try {
-              contents = await fs.readFile(filePath, "utf-8")
+              const info = await fs.lstat(sourceFilePath)
+              if (info.isSymbolicLink() || !info.isFile()) {
+                throw new Error("Scope file must be a regular file; symbolic links and non-file inputs are refused.")
+              }
+              if (info.size > 32 * 1024 * 1024) throw new Error("Scope file exceeds the 32 MB import limit.")
+              const bytes = await fs.readFile(sourceFilePath)
+              sourceContents = bytes.toString("utf-8")
+              sourceHash = createHash("sha256").update(bytes).digest("hex")
             } catch (error) {
-              throw new Error("Cannot read scope file " + filePath + ": " + (error instanceof Error ? error.message : String(error)))
+              throw new Error("Cannot read scope file " + sourceFilePath + ": " + (error instanceof Error ? error.message : String(error)))
             }
             try {
-              fileEntries = parseScopeFileContents(contents)
+              fileEntries = parseScopeFileContents(sourceContents)
             } catch (error) {
-              throw new Error((error instanceof Error ? error.message : String(error)) + " File: " + filePath)
+              throw new Error((error instanceof Error ? error.message : String(error)) + " File: " + sourceFilePath)
             }
           }
           const includeEntries = [...(args.include ?? []), ...fileEntries]
@@ -126,6 +136,32 @@ const TargetScopeCommand = cmd({
             authorizationSource: args.source ?? "",
             authorizationReference: args.reference ?? "",
           })
+          let sourceArtifactPath: string | undefined
+          if (sourceContents !== undefined && sourceHash) {
+            const sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
+            sourceArtifactPath = path.join(result.workspace.workspacePath, "scope", sourceFilename)
+            await TargetMemory.writeWorkspaceFile(
+              result.workspace,
+              "scope/" + sourceFilename,
+              sourceContents.endsWith("\n") ? sourceContents : sourceContents + "\n",
+            )
+            await TargetMemory.addNote(result.workspace.targetURL, {
+              kind: "manual",
+              title: "Scope file import checkpoint",
+              content: [
+                "Imported an explicit scope list from " + path.basename(sourceFilePath ?? "scope file") + ".",
+                "Usable file entries: " + fileEntries.length + ".",
+                "Configured unique include entries: " + result.scope.scopeItems.length + ".",
+                "Source copy: scope/" + sourceFilename + ".",
+                "Source SHA-256: " + sourceHash + ".",
+                "Authorization policy: " + result.scope.authorizationReference + ".",
+                "No active testing was performed by the import operation.",
+              ].join("\n"),
+              source: "target_scope_cli",
+              status: "observed",
+              tags: ["scope-import", "provenance"],
+            })
+          }
           const expectedFiles = [
             path.join(result.workspace.workspacePath, "workspace.json"),
             path.join(result.workspace.workspacePath, "scope", "scope.json"),
@@ -145,6 +181,9 @@ const TargetScopeCommand = cmd({
           console.log("Reference: " + result.scope.authorizationReference)
           console.log("Included entries: " + result.scope.scopeItems.length)
           if (args.file) console.log("Imported from: " + resolveScopeFilePath(args.file))
+          if (sourceArtifactPath) console.log("Original scope list copy: " + sourceArtifactPath)
+          if (sourceHash) console.log("Original scope SHA-256: " + sourceHash)
+          if (sourceContents !== undefined) console.log("Usable file entries: " + fileEntries.length)
           console.log("Included: " + result.scope.scopeItems.slice(0, 20).join(", ") + (result.scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
           console.log("Excluded: " + (result.scope.excludedItems.join(", ") || "(none)"))
           console.log("Existing workspaces newly linked/reorganized: " + result.associatedAssets.length)
