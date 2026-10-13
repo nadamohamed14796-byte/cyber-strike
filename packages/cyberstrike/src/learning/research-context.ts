@@ -101,9 +101,9 @@ export function promptResearchSignals(input: string): string[] {
     ["injection-sink", /sql injection|command injection|template injection|\bsqli\b|\bssti\b/],
     ["mass-assignment", /mass[- ]assignment|over[- ]posting|overposting/],
     ["nosqli", /no[- ]?sql injection|\bnosqli\b|mongodb injection/],
-    ["host-header-injection", /host header injection|host header poisoning|password reset poisoning/],
-    ["mfa-bypass", /mfa bypass|multi[- ]factor authentication bypass|two[- ]factor authentication bypass|\b2fa bypass\b/],
-    ["rate-limit-bypass", /rate[- ]limit(?:ing)? bypass|bypass rate limits?/],
+    ["host-header-injection", /host[- ]header[- ]injection|host[- ]header[- ]poisoning|password reset poisoning/],
+    ["mfa-bypass", /mfa[- ]bypass|multi[- ]factor authentication bypass|two[- ]factor authentication bypass|\b2fa[- ]bypass\b/],
+    ["rate-limit-bypass", /rate[- ]limit[- ]bypass|rate[- ]limit(?:ing)? bypass|bypass rate limits?/],
     ["websocket", /\bwebsockets?\b|web socket/],
     ["saml", /\bsaml\b|security assertion markup language/],
     ["open-redirect", /open redirect|unvalidated redirect/],
@@ -245,7 +245,7 @@ export namespace ResearchContext {
     // API/auth/business-logic signal). Query the most recent actionable signals
     // independently, then deduplicate the global public references.
     const actionableType = /^(endpoint|api_schema|authentication_flow|business_rule|parameter|configuration|technology|vulnerability_hint|sensitive_data|infrastructure)$/i
-    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information[- ]disclosure|data leakage|misconfiguration|account[- ]takeover|mass[- ]assignment|no[- ]?sql injection|nosqli|host header injection|mfa bypass|rate[- ]limit bypass|websocket|saml|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
+    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information[- ]disclosure|data leakage|misconfiguration|account[- ]takeover|mass[- ]assignment|no[- ]?sql injection|nosqli|host[- ]header[- ]injection|mfa[- ]bypass|rate[- ]limit[- ]bypass|websocket|saml|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
     const signalEntries = signalPool.filter((entry) => {
       const tags = ((entry.tags as string[] | null) ?? []).slice(0, 8)
       return actionableType.test(entry.type ?? "") ||
