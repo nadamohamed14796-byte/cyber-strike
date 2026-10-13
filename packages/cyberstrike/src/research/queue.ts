@@ -492,7 +492,12 @@ export namespace ResearchQueue {
     })
   }
 
-  export function claimNext(workerID: string, sourceID?: string, leaseDurationMs = LEASE_MS) {
+  export function claimNext(
+    workerID: string,
+    sourceID?: string,
+    leaseDurationMs = LEASE_MS,
+    modelStudyVersion?: number,
+  ) {
     const now = Date.now()
     const boundedLease = Number.isFinite(leaseDurationMs)
       ? Math.max(LEASE_MS, Math.min(20 * 60_000, Math.floor(leaseDurationMs)))
@@ -526,7 +531,13 @@ export namespace ResearchQueue {
         .update(ResearchQueueTable)
         .set({
           status: "studying",
-          payload: { ...(row.payload ?? {}), learning_version: RESEARCH_LEARNING_VERSION },
+          payload: {
+            ...(row.payload ?? {}),
+            learning_version: RESEARCH_LEARNING_VERSION,
+            ...(typeof modelStudyVersion === "number"
+              ? { model_study_requested_version: modelStudyVersion, model_study_started_at: now }
+              : {}),
+          },
           attempts: row.attempts + 1,
           lease_owner: leaseOwner,
           lease_until: now + boundedLease,
