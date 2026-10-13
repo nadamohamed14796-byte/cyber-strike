@@ -66,6 +66,21 @@ test("target artifact tool writes only inside an existing workspace and protects
       const content = await fs.readFile(saved.metadata.path!, "utf-8")
       expect(content).toContain("api.example.com")
       expect(content).not.toContain("super.secret.token")
+      const largeInput = path.join(tmp.path, "large-scope.txt")
+      await fs.writeFile(largeInput, "api.example.com\n" + "x".repeat(2_100_000) + "\nAuthorization: Bearer source.secret.token\n")
+      const copied = await artifact.execute({
+        target_url: "https://example.com",
+        area: "scope",
+        filename: "targets.txt",
+        source_path: largeInput,
+        overwrite: false,
+      }, {} as never)
+      expect(copied.metadata.saved).toBe(true)
+      expect(copied.metadata.source_sha256).toMatch(/^[a-f0-9]{64}$/)
+      const copiedText = await fs.readFile(copied.metadata.path!, "utf-8")
+      expect(copiedText.length).toBeGreaterThan(2_000_000)
+      expect(copiedText).toContain("api.example.com")
+      expect(copiedText).not.toContain("source.secret.token")
 
       const duplicate = await artifact.execute({
         target_url: "https://example.com",
