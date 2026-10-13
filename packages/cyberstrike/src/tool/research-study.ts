@@ -485,6 +485,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           candidates: item.candidates,
           queued_new: item.added,
           blocked_auth: item.blocked_auth,
+          error_count: item.error_count,
           errors: item.errors.slice(0, 3),
         })),
         current: statistics(),
