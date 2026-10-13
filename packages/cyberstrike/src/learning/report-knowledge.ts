@@ -1053,6 +1053,10 @@ export namespace ReportKnowledge {
           // those out of shared hunting context to prevent cross-target leakage.
           if (row.session_id || normalize(row.target_pattern)) return false
           if (["rejected", "disproven", "duplicate"].includes(row.status)) return false
+          // A model-level decision that a legacy public record is irrelevant or
+          // unsafe to reuse does not rewrite the source's truth/status, but it
+          // must remove the record from automatic cross-target recommendations.
+          if (row.metadata?.model_study_decision === "rejected" || row.metadata?.model_study_decision === "skipped") return false
           if (row.source_kind === "external_report" && row.status === "observed") {
             const trust = row.metadata?.source_trust
             // Keep externally imported material advisory regardless of trust;
