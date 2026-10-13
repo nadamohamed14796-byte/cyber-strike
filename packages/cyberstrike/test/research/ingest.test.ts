@@ -367,6 +367,10 @@ test("research topic classification covers CORS, information disclosure, privile
   // Compound titles follow the named topic order, not the source-code regex list order.
   expect(classifyResearchTopic("CORS misconfiguration leads to information disclosure", "A cross-origin policy issue.")).toBe("cors")
   expect(classifyResearchTopic("Security misconfiguration causes privilege escalation", "Privilege changes were possible.")).toBe("security-misconfiguration")
+  expect(classifyResearchTopic("Mass-assignment in the account update endpoint", "A mass assignment flaw allowed role changes.")).toBe("mass-assignment")
+  expect(classifyResearchTopic("NoSQL injection in document filtering", "A NoSQL injection affected a database query.")).toBe("nosqli")
+  expect(classifyResearchTopic("Host-header injection poisons password reset links", "The host header was trusted.")).toBe("host-header-injection")
+  expect(classifyResearchTopic("MFA bypass through recovery flow", "A multi-factor authentication bypass was possible.")).toBe("mfa-bypass")
 })
 
 
