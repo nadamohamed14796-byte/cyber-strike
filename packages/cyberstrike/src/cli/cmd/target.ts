@@ -110,6 +110,10 @@ const TargetScopeCommand = cmd({
           let sourceFilePath: string | undefined
           let sourceHash: string | undefined
           if (args.file) {
+            const existingWorkspace = await TargetMemory.get(args.url)
+            if (!existingWorkspace) {
+              throw new Error("Initialize the canonical target workspace first with cyberstrike target init " + args.url + ". Scope-file import will not create a workspace from an unverified working directory.")
+            }
             sourceFilePath = resolveScopeFilePath(args.file)
             try {
               const info = await fs.lstat(sourceFilePath)
@@ -118,6 +122,7 @@ const TargetScopeCommand = cmd({
               }
               if (info.size > 32 * 1024 * 1024) throw new Error("Scope file exceeds the 32 MB import limit.")
               const bytes = await fs.readFile(sourceFilePath)
+              if (bytes.byteLength > 32 * 1024 * 1024) throw new Error("Scope file grew beyond the 32 MB import limit while being read.")
               sourceContents = bytes.toString("utf-8")
               sourceHash = createHash("sha256").update(bytes).digest("hex")
             } catch (error) {
