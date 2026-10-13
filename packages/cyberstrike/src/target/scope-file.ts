@@ -1,3 +1,5 @@
+import path from "node:path"
+
 /** Parse a plain-text scope list without inferring authorization or broadening entries. */
 export function parseScopeFileContents(contents: string): string[] {
   const entries: string[] = []
@@ -11,4 +13,15 @@ export function parseScopeFileContents(contents: string): string[] {
   }
   if (entries.length === 0) throw new Error("Scope file contains no usable entries.")
   return entries
+}
+
+/** Resolve Windows Explorer paths to their Linux-side WSL path when running inside WSL/Linux. */
+export function resolveScopeFilePath(input: string, cwd = process.cwd(), platform = process.platform): string {
+  const value = input.trim()
+  if (!value) throw new Error("Scope file path is required.")
+  if (platform !== "win32") {
+    const wslPath = value.match(/^\\\\\\\\wsl(?:\\.localhost|\\$)?\\\\[^\\\\]+\\\\(.+)$/i)
+    if (wslPath) return path.resolve("/" + wslPath[1].replace(/\\\\/g, "/"))
+  }
+  return path.resolve(cwd, value)
 }
