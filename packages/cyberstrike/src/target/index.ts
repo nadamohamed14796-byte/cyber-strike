@@ -10,7 +10,7 @@ import { checkMatch } from "./scope-match"
 import { Instance } from "../project/instance"
 import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
-import { TargetNoteTable, TargetWorkspaceTable } from "./target.sql"
+import { TargetNoteTable, TargetWorkspaceTable, type TargetAssetType } from "./target.sql"
 
 const TARGET_DIRECTORIES = [
   "scope",
@@ -42,6 +42,7 @@ export type TargetNoteKind =
   | "lesson"
 
 export type TargetNoteStatus = "unverified" | "observed" | "confirmed" | "disproven"
+export type { TargetAssetType } from "./target.sql"
 
 export interface TargetScope {
   schemaVersion: 1
@@ -69,6 +70,8 @@ export interface Workspace {
   targetKey: string
   hostname: string
   slug: string
+  parentTargetID: string | null
+  assetType: TargetAssetType
   relativePath: string
   workspacePath: string
   timeCreated: number
@@ -218,7 +221,27 @@ export function normalizeTarget(input: string): NormalizedTarget {
   return { targetURL, targetKey, hostname: url.hostname, slug }
 }
 
-function mapWorkspace(row: typeof TargetWorkspaceTable.$inferSelect, relativePath: string): Workspace {
+function workspaceRelativePath(
+  row: typeof TargetWorkspaceTable.$inferSelect,
+  visited = new Set<string>(),
+): string {
+  if (visited.has(row.id)) throw new Error("Target workspace hierarchy contains a parent cycle.")
+  visited.add(row.id)
+  const own = path.join(".cyberstrike", "targets", normalizeTarget(row.target_url).slug)
+  if (!row.parent_target_id) return own
+  const parent = Database.use((db) =>
+    db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.parent_target_id!)).get(),
+  )
+  if (!parent || parent.project_id !== row.project_id || parent.owner_key !== row.owner_key) {
+    throw new Error("Target workspace parent is missing or belongs to another project.")
+  }
+  return path.join(workspaceRelativePath(parent, visited), "assets", normalizeTarget(row.target_url).slug)
+}
+
+function mapWorkspace(
+  row: typeof TargetWorkspaceTable.$inferSelect,
+  relativePath = workspaceRelativePath(row),
+): Workspace {
   const absolutePath = path.resolve(projectRoot(), relativePath)
   return {
     id: row.id,
@@ -227,6 +250,8 @@ function mapWorkspace(row: typeof TargetWorkspaceTable.$inferSelect, relativePat
     targetKey: row.target_key,
     hostname: row.hostname,
     slug: row.slug,
+    parentTargetID: row.parent_target_id ?? null,
+    assetType: (row.asset_type ?? "target") as TargetAssetType,
     relativePath,
     workspacePath: absolutePath,
     timeCreated: row.time_created,
@@ -459,10 +484,12 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
     path.join(workspace.workspacePath, "target.json"),
     JSON.stringify(
       {
-        schemaVersion: 1,
+        schemaVersion: 2,
         targetURL: workspace.targetURL,
         hostname: workspace.hostname,
         slug: workspace.slug,
+        parentTargetID: workspace.parentTargetID,
+        assetType: workspace.assetType,
         createdAt: new Date(workspace.timeCreated).toISOString(),
       },
       null,
@@ -473,13 +500,15 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
     path.join(workspace.workspacePath, "workspace.json"),
     JSON.stringify(
       {
-        schemaVersion: 2,
+        schemaVersion: 3,
         workspaceID: workspace.id,
         projectID: workspace.projectID,
         targetURL: workspace.targetURL,
         targetKey: workspace.targetKey,
         hostname: workspace.hostname,
         slug: workspace.slug,
+        parentTargetID: workspace.parentTargetID,
+        assetType: workspace.assetType,
         relativePath: workspace.relativePath,
         createdAt: new Date(workspace.timeCreated).toISOString(),
       },
@@ -543,59 +572,165 @@ export namespace TargetMemory {
     return normalizeTarget(input)
   }
 
-  /** Create or load a target workspace, persist its identity, and create missing workspace files. */
-  export async function ensure(input: string, options: { reconcileNotes?: boolean } = {}): Promise<Workspace> {
+
+  /** Pick one unambiguous, explicitly authorized parent for a discovered host. */
+  async function findAuthorizedParent(candidateURL: string): Promise<Workspace | null> {
+    let candidate: URL
+    try { candidate = new URL(candidateURL) } catch { return null }
+    if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) return null
+    const matches: Array<{ workspace: Workspace; score: number }> = []
+    for (const workspace of list().filter((item) => !item.parentTargetID)) {
+      const base = new URL(workspace.targetURL)
+      if (base.hostname === candidate.hostname || base.protocol !== candidate.protocol || base.port !== candidate.port) continue
+      if (base.pathname !== "/") continue
+      let scope: TargetScope | null
+      try { scope = await getScope(workspace.targetURL) } catch { continue }
+      if (!scope || scope.status !== "configured") continue
+      if (scope.excludedItems.some((item) => checkMatch(candidate.origin, item).matches)) continue
+      const included = scope.scopeItems.filter((item) => checkMatch(candidate.origin, item).matches)
+      if (!included.length) continue
+      const score = Math.max(...included.map((item) => item.startsWith("*.") ? item.slice(2).length : item.length))
+      matches.push({ workspace, score })
+    }
+    matches.sort((a, b) => b.score - a.score)
+    if (!matches.length) return null
+    if (matches.length > 1 && matches[0]!.score === matches[1]!.score) return null
+    return matches[0]!.workspace
+  }
+
+  function guessAssetType(hostname: string, requested?: TargetAssetType): TargetAssetType {
+    if (requested && requested !== "target") return requested
+    if (/^(api|graphql|gateway)([.-]|$)/i.test(hostname)) return "api"
+    if (/^(app|www|web|portal|admin)([.-]|$)/i.test(hostname)) return "application"
+    return "subdomain"
+  }
+
+  /** Move an existing workspace beneath a parent without overwriting or merging its data. */
+  async function reparentWorkspace(
+    row: typeof TargetWorkspaceTable.$inferSelect,
+    parent: Workspace,
+    assetType: TargetAssetType,
+  ): Promise<Workspace> {
+    if (row.id === parent.id) throw new Error("A target cannot be its own parent.")
+    let ancestor: string | null = parent.id
+    while (ancestor) {
+      if (ancestor === row.id) throw new Error("A target cannot be reparented beneath one of its descendants.")
+      const next = Database.use((db) =>
+        db.select({ parent_target_id: TargetWorkspaceTable.parent_target_id })
+          .from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, ancestor!)).get(),
+      )
+      ancestor = next?.parent_target_id ?? null
+    }
+    const oldParentID = row.parent_target_id ?? null
+    const oldRelative = workspaceRelativePath(row)
+    const childSlug = normalizeTarget(row.target_url).slug
+    const destinationRelative = path.join(parent.relativePath, "assets", childSlug)
+    if (path.normalize(oldRelative) !== path.normalize(destinationRelative)) {
+      const oldAbsolute = path.resolve(projectRoot(), oldRelative)
+      const destinationParent = await ensureSafeDirectoryPath(projectRoot(), path.join(parent.relativePath, "assets"))
+      const destination = path.join(destinationParent, childSlug)
+      let oldExists = true
+      try {
+        const oldInfo = await fs.lstat(oldAbsolute)
+        if (oldInfo.isSymbolicLink() || !oldInfo.isDirectory()) throw new Error("Unsafe existing target workspace during hierarchy move.")
+        await ensureSafeDirectoryPath(projectRoot(), oldRelative)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") oldExists = false
+        else throw error
+      }
+      let destinationExists = true
+      try {
+        const destinationInfo = await fs.lstat(destination)
+        if (destinationInfo.isSymbolicLink() || !destinationInfo.isDirectory()) throw new Error("Unsafe destination path for nested target workspace.")
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") destinationExists = false
+        else throw error
+      }
+      if (oldExists && destinationExists) throw new Error("Cannot attach target because both its old and nested workspaces exist; merge them manually to prevent data loss.")
+      if (destinationExists && !oldExists) {
+        let manifest: { workspaceID?: string } = {}
+        try { manifest = JSON.parse(await fs.readFile(path.join(destination, "workspace.json"), "utf-8")) }
+        catch { throw new Error("Existing nested directory cannot be verified as this workspace; refusing to reuse it.") }
+        if (manifest.workspaceID !== row.id) throw new Error("Existing nested directory belongs to another workspace; refusing to overwrite it.")
+      }
+      if (oldExists && !destinationExists) await fs.rename(oldAbsolute, destination)
+    }
+
+    Database.use((db) => db.update(TargetWorkspaceTable).set({
+      parent_target_id: parent.id,
+      asset_type: assetType,
+      workspace_path: destinationRelative,
+      time_updated: Date.now(),
+    }).where(eq(TargetWorkspaceTable.id, row.id)).run())
+    const updated = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.id)).get())
+    if (!updated) throw new Error("Nested target workspace disappeared during reparenting.")
+    const workspace = mapWorkspace(updated, destinationRelative)
+    await prepareWorkspace(workspace)
+    await TargetMemory.writeWorkspaceFile(workspace, "target.json", JSON.stringify({
+      schemaVersion: 2, targetURL: workspace.targetURL, hostname: workspace.hostname,
+      slug: workspace.slug, parentTargetID: workspace.parentTargetID, assetType: workspace.assetType,
+      createdAt: new Date(workspace.timeCreated).toISOString(),
+    }, null, 2) + "\n")
+    await TargetMemory.writeWorkspaceFile(workspace, "workspace.json", JSON.stringify({
+      schemaVersion: 3, workspaceID: workspace.id, projectID: workspace.projectID,
+      targetURL: workspace.targetURL, targetKey: workspace.targetKey, hostname: workspace.hostname,
+      slug: workspace.slug, parentTargetID: workspace.parentTargetID, assetType: workspace.assetType,
+      relativePath: workspace.relativePath, createdAt: new Date(workspace.timeCreated).toISOString(),
+    }, null, 2) + "\n")
+    if (oldParentID) {
+      const oldParentRow = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, oldParentID)).get())
+      if (oldParentRow) await syncAssetRegistry(mapWorkspace(oldParentRow))
+    }
+    return workspace
+  }
+
+  /** Create or open a workspace; authorized discovered assets are nested beneath their parent. */
+  export async function ensure(
+    input: string,
+    options: { reconcileNotes?: boolean; parentTargetURL?: string; assetType?: TargetAssetType } = {},
+  ): Promise<Workspace> {
     const normalized = normalizeTarget(input)
     const projectID = Instance.project.id
     const ownerKey = currentOwnerKey()
-    const relativePath = path.join(".cyberstrike", "targets", normalized.slug)
+    let parent: Workspace | null = null
+    if (options.parentTargetURL) {
+      parent = await get(options.parentTargetURL)
+      if (!parent) throw new Error("Parent target workspace does not exist.")
+      if (parent.targetKey === normalized.targetKey) throw new Error("A target cannot be its own parent.")
+    } else {
+      parent = await findAuthorizedParent(new URL(normalized.targetURL).origin)
+    }
+    const requestedAssetType = parent ? guessAssetType(normalized.hostname, options.assetType) : "target"
+    const relativePath = parent
+      ? path.join(parent.relativePath, "assets", normalized.slug)
+      : path.join(".cyberstrike", "targets", normalized.slug)
     const now = Date.now()
-
     const row = Database.transaction((db) => {
-      const existing = db
-        .select()
-        .from(TargetWorkspaceTable)
-        .where(and(
-          eq(TargetWorkspaceTable.project_id, projectID),
-          eq(TargetWorkspaceTable.owner_key, ownerKey),
-          eq(TargetWorkspaceTable.target_key, normalized.targetKey),
-        ))
-        .get()
+      const existing = db.select().from(TargetWorkspaceTable).where(and(
+        eq(TargetWorkspaceTable.project_id, projectID),
+        eq(TargetWorkspaceTable.owner_key, ownerKey),
+        eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+      )).get()
       if (existing) return existing
-
-      db.insert(TargetWorkspaceTable)
-        .values({
-          id: Identifier.ascending("target_workspace"),
-          project_id: projectID,
-          owner_key: ownerKey,
-          target_key: normalized.targetKey,
-          target_url: normalized.targetURL,
-          hostname: normalized.hostname,
-          slug: normalized.slug,
-          workspace_path: relativePath,
-          time_created: now,
-          time_updated: now,
-        })
-        .onConflictDoNothing()
-        .run()
-
-      const insertedOrRaced = db
-        .select()
-        .from(TargetWorkspaceTable)
-        .where(and(
-          eq(TargetWorkspaceTable.project_id, projectID),
-          eq(TargetWorkspaceTable.owner_key, ownerKey),
-          eq(TargetWorkspaceTable.target_key, normalized.targetKey),
-        ))
-        .get()
-      if (!insertedOrRaced) throw new Error("Target workspace could not be persisted.")
-      return insertedOrRaced
+      db.insert(TargetWorkspaceTable).values({
+        id: Identifier.ascending("target_workspace"),
+        project_id: projectID, owner_key: ownerKey, target_key: normalized.targetKey,
+        target_url: normalized.targetURL, hostname: normalized.hostname, slug: normalized.slug,
+        parent_target_id: parent?.id ?? null, asset_type: requestedAssetType,
+        workspace_path: relativePath, time_created: now, time_updated: now,
+      }).onConflictDoNothing().run()
+      const row = db.select().from(TargetWorkspaceTable).where(and(
+        eq(TargetWorkspaceTable.project_id, projectID),
+        eq(TargetWorkspaceTable.owner_key, ownerKey),
+        eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+      )).get()
+      if (!row) throw new Error("Target workspace could not be persisted.")
+      return row
     })
-
-    // Never trust a persisted path as an arbitrary filesystem path. Re-derive it from a sanitized slug.
-    const safeRelativePath = path.join(".cyberstrike", "targets", normalized.slug)
-    const workspace = mapWorkspace(row, safeRelativePath)
+    if (parent && row.parent_target_id !== parent.id) return await reparentWorkspace(row, parent, requestedAssetType)
+    const workspace = mapWorkspace(row)
     await prepareWorkspace(workspace, options.reconcileNotes ?? true)
+    if (parent) await syncAssetRegistry(parent)
     return workspace
   }
 
@@ -607,15 +742,108 @@ export namespace TargetMemory {
         .select()
         .from(TargetWorkspaceTable)
         .where(and(eq(TargetWorkspaceTable.project_id, projectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
-        .orderBy(desc(TargetWorkspaceTable.time_updated))
+        .orderBy(asc(TargetWorkspaceTable.time_created))
         .all()
-        .map((row) => {
-          // Re-derive directory names from normalized target identity rather than trusting DB paths.
-          const safeSlug = normalizeTarget(row.target_url).slug
-          const relativePath = path.join(".cyberstrike", "targets", safeSlug)
-          return mapWorkspace(row, relativePath)
-        }),
+        .map((row) => mapWorkspace(row)),
     )
+  }
+
+
+  export function children(parentTargetID: string): Workspace[] {
+    const projectID = Instance.project.id
+    const ownerKey = currentOwnerKey()
+    return Database.use((db) => db.select().from(TargetWorkspaceTable).where(and(
+      eq(TargetWorkspaceTable.parent_target_id, parentTargetID),
+      eq(TargetWorkspaceTable.project_id, projectID),
+      eq(TargetWorkspaceTable.owner_key, ownerKey),
+    )).orderBy(asc(TargetWorkspaceTable.time_created)).all().map((row) => mapWorkspace(row)))
+  }
+
+  async function syncAssetRegistry(parent: Workspace): Promise<void> {
+    const assets = children(parent.id)
+    const registry = {
+      schemaVersion: 2, parentTargetID: parent.id, targetURL: parent.targetURL,
+      updatedAt: new Date().toISOString(),
+      assets: assets.map((asset) => ({
+        workspaceID: asset.id, targetURL: asset.targetURL, hostname: asset.hostname,
+        type: asset.assetType,
+        relativePath: path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/"),
+      })),
+    }
+    await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\n")
+    const notesPath = path.join(parent.workspacePath, "notes.md")
+    const startMarker = "<!-- cyberstrike-assets:start -->"
+    const endMarker = "<!-- cyberstrike-assets:end -->"
+    const table = assets.length
+      ? ["| Asset | Type | Workspace |", "|---|---|---|", ...assets.map((asset) =>
+          "| [" + asset.targetURL.replace(/\|/g, "%7C") + "](" + asset.targetURL + ") | " +
+          asset.assetType + " | " + path.relative(parent.workspacePath, asset.workspacePath).split(path.sep).join("/") + " |",
+        )]
+      : ["No in-scope child assets registered yet."]
+    const managed = [startMarker, "", "## Managed Asset Inventory", "", ...table, "", endMarker].join("\n")
+    await withNotesMarkdownLock(notesPath, async () => {
+      await assertRegularFileOrMissing(notesPath)
+      let current = ""
+      try { current = await fs.readFile(notesPath, "utf-8") } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+      }
+      const base = current || defaultTargetNotes(parent)
+      const from = base.indexOf(startMarker)
+      const to = base.indexOf(endMarker, from + startMarker.length)
+      const next = from >= 0 && to >= from
+        ? base.slice(0, from) + managed + base.slice(to + endMarker.length)
+        : base.replace(/\s*$/, "") + "\n\n" + managed + "\n"
+      if (next !== current) await TargetMemory.writeWorkspaceFile(parent, "notes.md", next)
+    })
+  }
+
+  export async function attachAsset(
+    parentURL: string,
+    assetURL: string,
+    assetType: TargetAssetType = "subdomain",
+  ): Promise<{ parent: Workspace; asset: Workspace }> {
+    const parent = await get(parentURL)
+    if (!parent) throw new Error("Parent workspace not found; initialize the program target first.")
+    let candidate: URL
+    try { candidate = new URL(assetURL) } catch { throw new Error("Asset URL must be an absolute HTTP(S) URL.") }
+    if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) {
+      throw new Error("Asset URL must be credential-free HTTP(S).")
+    }
+    if (candidate.hostname === parent.hostname) throw new Error("A same-host path belongs in the existing target workspace, not a child asset.")
+    const matchingParent = await findAuthorizedParent(candidate.origin)
+    if (!matchingParent || matchingParent.id !== parent.id) {
+      throw new Error("The asset is not unambiguously authorized by this parent's saved scope; check includes, exclusions, protocol, and port.")
+    }
+    const asset = await ensure(candidate.origin, { parentTargetURL: parent.targetURL, assetType })
+    await syncAssetRegistry(parent)
+    return { parent, asset }
+  }
+
+  /** Passive observations may be linked to authorized programs, but never trigger probes. */
+  export async function registerObservedAsset(input: string, assetType: TargetAssetType = "subdomain"): Promise<Workspace | null> {
+    let candidate: URL
+    try { candidate = new URL(input) } catch { return null }
+    if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) return null
+    const parent = await findAuthorizedParent(candidate.origin)
+    if (!parent) return null
+    return await ensure(candidate.origin, { parentTargetURL: parent.targetURL, assetType })
+  }
+
+  export async function refreshScopedAssets(parentURL: string): Promise<Workspace[]> {
+    const parent = await get(parentURL)
+    if (!parent) throw new Error("Parent workspace not found.")
+    const candidates = list().filter((item) => item.id !== parent.id && !item.parentTargetID)
+    const attached: Workspace[] = []
+    for (const candidate of candidates) {
+      const matchingParent = await findAuthorizedParent(new URL(candidate.targetURL).origin)
+      if (matchingParent?.id !== parent.id) continue
+      attached.push(await ensure(candidate.targetURL, {
+        parentTargetURL: parent.targetURL,
+        assetType: guessAssetType(candidate.hostname, candidate.assetType),
+      }))
+    }
+    await syncAssetRegistry(parent)
+    return attached
   }
 
   /** Read the target's explicit scope manifest. Missing/corrupt manifests never imply authorization. */
@@ -698,7 +926,8 @@ export namespace TargetMemory {
       configuredAt: new Date().toISOString(),
     }
     await writeWorkspaceFile(workspace, "scope/scope.json", JSON.stringify(scope, null, 2) + "\n")
-    return { workspace, scope }
+    const associatedAssets = await refreshScopedAssets(workspace.targetURL)
+    return { workspace, scope, associatedAssets }
   }
 
   /**
@@ -778,12 +1007,31 @@ export namespace TargetMemory {
       return { allowed: false, reason: "multiple equally specific target workspaces match; refusing ambiguous scope", includeMatches: [], excludeMatches: [] }
     }
 
-    const scope = selected.scope ?? null
+    let scope = selected.scope ?? null
+    let parentScope: TargetScope | null = null
+    if (selected.workspace.parentTargetID) {
+      const parentRow = Database.use((db) =>
+        db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, selected.workspace.parentTargetID!)).get(),
+      )
+      if (parentRow) {
+        try { parentScope = await getScope(parentRow.target_url) } catch {
+          return { allowed: false, reason: "parent target scope is invalid; inherited authorization is refused", workspace: selected.workspace, includeMatches: [], excludeMatches: [] }
+        }
+      }
+      if ((!scope || scope.status !== "configured") && parentScope?.status === "configured") scope = parentScope
+    }
+    const parentExclusions = parentScope?.status === "configured"
+      ? parentScope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+      : []
+    if (parentExclusions.length) {
+      return { allowed: false, reason: "URL matches parent target scope exclusion: " + parentExclusions.join(", "), workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: parentExclusions }
+    }
     if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
       return { allowed: false, reason: "the most specific target workspace has no configured authorization scope", workspace: selected.workspace, scope: scope ?? undefined, includeMatches: [], excludeMatches: [] }
     }
     const includeMatches = scope.scopeItems.filter((item) => checkMatch(candidate.href, item).matches)
-    const excludeMatches = scope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+    const ownExclusions = scope.excludedItems.filter((item) => checkMatch(candidate.href, item).matches)
+    const excludeMatches = [...new Set([...ownExclusions, ...parentExclusions])]
     if (excludeMatches.length) {
       return { allowed: false, reason: "URL matches explicit scope exclusion: " + excludeMatches.join(", "), workspace: selected.workspace, scope, includeMatches, excludeMatches }
     }
@@ -841,7 +1089,7 @@ export namespace TargetMemory {
         .get(),
     )
     if (!row) return null
-    const workspace = mapWorkspace(row, path.join(".cyberstrike", "targets", normalized.slug))
+    const workspace = mapWorkspace(row)
     await prepareWorkspace(workspace)
     return workspace
   }
@@ -971,20 +1219,22 @@ export namespace TargetMemory {
     const ownerKey = currentOwnerKey()
     const normalizedTarget = normalizeTarget(workspace.targetURL)
     const workspaceRecord = Database.use((db) =>
-      db
-        .select({ targetKey: TargetWorkspaceTable.target_key })
-        .from(TargetWorkspaceTable)
-        .where(and(eq(TargetWorkspaceTable.id, workspace.id), eq(TargetWorkspaceTable.project_id, activeProjectID), eq(TargetWorkspaceTable.owner_key, ownerKey)))
-        .get(),
+      db.select().from(TargetWorkspaceTable).where(and(
+        eq(TargetWorkspaceTable.id, workspace.id),
+        eq(TargetWorkspaceTable.project_id, activeProjectID),
+        eq(TargetWorkspaceTable.owner_key, ownerKey),
+      )).get(),
     )
-    const expectedRelativePath = path.join(".cyberstrike", "targets", normalizedTarget.slug)
+    const expectedRelativePath = workspaceRecord ? workspaceRelativePath(workspaceRecord) : ""
     if (
       workspace.projectID !== activeProjectID ||
       !workspaceRecord ||
-      workspaceRecord.targetKey !== normalizedTarget.targetKey ||
+      workspaceRecord.target_key !== normalizedTarget.targetKey ||
+      workspace.parentTargetID !== (workspaceRecord.parent_target_id ?? null) ||
+      workspace.assetType !== (workspaceRecord.asset_type ?? "target") ||
       path.normalize(workspace.relativePath) !== path.normalize(expectedRelativePath)
     ) {
-      throw new Error("Workspace output target does not belong to the active project or has mismatched identity.")
+      throw new Error("Workspace output target does not belong to the active project or has mismatched hierarchy identity.")
     }
     const normalized = relativeFilePath.trim()
     if (
