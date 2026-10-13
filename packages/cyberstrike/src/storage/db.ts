@@ -127,6 +127,15 @@ export namespace Database {
         }
       }
 
+      if (entry.name === "20261013020000_vulnerability-target-workspace-id" && tableExists(sqlite, "vulnerability")) {
+        if (tableColumns(sqlite, "vulnerability").has("target_id")) {
+          sql = sql.replace(
+            /ALTER TABLE vulnerability ADD COLUMN target_id TEXT REFERENCES target_workspace\(id\) ON DELETE SET NULL;/i,
+            "SELECT 1;",
+          )
+        }
+      }
+
       return { ...entry, sql }
     })
   }
