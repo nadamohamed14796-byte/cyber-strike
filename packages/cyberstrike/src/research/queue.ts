@@ -584,7 +584,12 @@ export namespace ResearchQueue {
         eq(ResearchQueueTable.sequence, sequence),
         eq(ResearchQueueTable.status, "studying"),
         eq(ResearchQueueTable.lease_owner, leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
       )).get()
+      // Expired claims are no longer authorized to write a terminal state, even
+      // when no replacement worker has claimed the row yet. The lease token
+      // prevents stale workers from completing work after a reclaim; the expiry
+      // check also fences late results before that reclaim happens.
       if (!row) return undefined
       return db.update(ResearchQueueTable).set({
         status: outcome,
@@ -598,6 +603,7 @@ export namespace ResearchQueue {
         eq(ResearchQueueTable.sequence, sequence),
         eq(ResearchQueueTable.status, "studying"),
         eq(ResearchQueueTable.lease_owner, leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
       )).returning().get()
     })
   }
