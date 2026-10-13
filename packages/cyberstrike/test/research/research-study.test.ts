@@ -233,15 +233,34 @@ test("legacy source filtering happens before the batch limit for shared hosts", 
           study_method: "bounded-heuristic-extraction",
         },
       })
+      const pathOnlyHacktivity = ReportKnowledge.ingestExternalDetailed({
+        title: "HackerOne Hacktivity record missing legacy source tag " + marker,
+        severity: "unknown",
+        sourceURL: "https://hackerone.com/hacktivity/untagged-" + marker,
+        lesson: "Older disclosure row has no explicit source metadata.",
+        sourceTrust: 95,
+      })
+      const pathOnlyBlog = ReportKnowledge.ingestExternalDetailed({
+        title: "HackerOne Blog record missing legacy source tag " + marker,
+        severity: "unknown",
+        sourceURL: "https://www.hackerone.com/blog/untagged-" + marker,
+        lesson: "Older blog row has no explicit source metadata.",
+        sourceTrust: 90,
+      })
       expect(hacktivity).not.toBeNull()
       expect(blog).not.toBeNull()
-      if (!blog) throw new Error("blog legacy fixture was not persisted")
+      expect(pathOnlyHacktivity).not.toBeNull()
+      expect(pathOnlyBlog).not.toBeNull()
+      if (!blog || !pathOnlyBlog || !pathOnlyHacktivity) throw new Error("legacy fixtures were not persisted")
 
-      const candidates = ReportKnowledge.externalRecordsForModelStudy(1, 1, ["hackerone.com"], "hackerone-blog")
-      expect(candidates).toHaveLength(1)
-      const candidate = candidates[0]
-      if (!candidate) throw new Error("the exact-source backfill candidate was filtered out")
-      expect(candidate.id).toBe(blog.id)
+      const candidates = ReportKnowledge.externalRecordsForModelStudy(10, 1, ["hackerone.com"], "hackerone-blog")
+      expect(candidates.some((row) => row.id === blog.id)).toBe(true)
+      expect(candidates.some((row) => row.id === pathOnlyBlog.id)).toBe(true)
+      expect(candidates.some((row) => row.id === pathOnlyHacktivity.id)).toBe(false)
+
+      const boundedBatch = ReportKnowledge.externalRecordsForModelStudy(1, 1, ["hackerone.com"], "hackerone-blog")
+      expect(boundedBatch).toHaveLength(1)
+      expect(boundedBatch[0]?.metadata?.research_source).toBe("hackerone-blog")
       await Instance.dispose()
     },
   })
