@@ -550,7 +550,8 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
     let current: Record<string, unknown> | undefined
     try { current = JSON.parse(await fs.readFile(manifestPath, "utf-8")) as Record<string, unknown> }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") current = undefined }
-    const matches = Boolean(current && manifest.keys.every((key) => current![key] === manifest.expected[key]))
+    const expected = manifest.expected as unknown as Record<string, unknown>
+    const matches = Boolean(current && manifest.keys.every((key) => current![key] === expected[key]))
     if (!matches) {
       await TargetMemory.writeWorkspaceFile(workspace, manifest.file, JSON.stringify(manifest.expected, null, 2) + "\n")
     }
