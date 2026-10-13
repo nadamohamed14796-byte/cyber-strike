@@ -111,6 +111,22 @@ export namespace Database {
         sql = sql.replace(addOwnerKey, "SELECT 1;")
       }
 
+      if (entry.name === "20261013010000_target-asset-hierarchy" && tableExists(sqlite, "target_workspace")) {
+        const columns = tableColumns(sqlite, "target_workspace")
+        if (columns.has("parent_target_id")) {
+          sql = sql.replace(
+            /ALTER TABLE target_workspace ADD COLUMN parent_target_id TEXT REFERENCES target_workspace\\(id\\) ON DELETE SET NULL;/i,
+            "SELECT 1;",
+          )
+        }
+        if (columns.has("asset_type")) {
+          sql = sql.replace(
+            /ALTER TABLE target_workspace ADD COLUMN asset_type TEXT NOT NULL DEFAULT 'target';/i,
+            "SELECT 1;",
+          )
+        }
+      }
+
       return { ...entry, sql }
     })
   }
