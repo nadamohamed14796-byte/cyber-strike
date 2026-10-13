@@ -162,6 +162,7 @@ test("explicit current research intent is not starved by recent generic API traf
         "Please investigate IDOR and object-level authorization in the API; compare owner-account and non-owner behavior",
       )
       expect(context).toContain(explicitTitle)
+      expect(context).toContain("Knowledge record ID: " + explicit?.id)
       expect(context).toContain("Compare the owner baseline")
 
       await Instance.dispose()
