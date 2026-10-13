@@ -46,6 +46,16 @@ export namespace Phase {
       agents: ["explore", "cyberstrike"],
     },
     {
+      id: "mobile_application_testing",
+      name: "Mobile Application Security Testing",
+      prerequisites: ["scope_analysis"],
+      requiredTags: ["mobile-testing", "android", "ios", "masvs", "mobile-security"],
+      minDeliverables: 1,
+      relatedVrtCategories: ["Info Disclosure", "Auth Bypass", "Privilege Escalation", "Known CVE"],
+      appliesTo: ["mobile"],
+      agents: ["cyberstrike", "web-application"],
+    },
+    {
       id: "passive_recon",
       name: "Passive Reconnaissance",
       prerequisites: ["scope_analysis"],
@@ -169,6 +179,7 @@ export namespace Phase {
       name: "Reporting & Validation",
       prerequisites: [
         "scope_analysis",
+        "mobile_application_testing",
         "passive_recon",
         "active_recon",
         "technology_profiling",
