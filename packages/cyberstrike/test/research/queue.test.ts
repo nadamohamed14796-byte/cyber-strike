@@ -414,6 +414,41 @@ test("legacy classifier rejections with cached text are requeued once per learni
   })
 })
 
+test("an expired learner cannot block authentication over a reclaimed lease", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const url = "https://research.example.test/late-login-wall"
+      const item = ResearchQueue.enqueue({ sourceID: "auth-lease-fence", sourceURL: url })
+      const first = ResearchQueue.claimNext("late-worker", "auth-lease-fence")
+      if (!first) throw new Error("first worker did not claim the queue item")
+
+      Database.use((db) =>
+        db.update(ResearchQueueTable)
+          .set({ lease_until: Date.now() - 1 })
+          .where(eq(ResearchQueueTable.sequence, item.sequence))
+          .run(),
+      )
+      const current = ResearchQueue.claimNext("replacement-worker", "auth-lease-fence")
+      if (!current) throw new Error("replacement worker did not reclaim the queue item")
+
+      expect(ResearchQueue.blockAuthentication({
+        sourceID: "auth-lease-fence",
+        sourceURL: url,
+        reason: "late worker observed a login wall",
+        claim: { sequence: item.sequence, leaseOwner: first.lease_owner },
+      })).toBeUndefined()
+
+      const row = ResearchQueue.find("auth-lease-fence", url)
+      expect(row?.status).toBe("studying")
+      expect(row?.lease_owner).toBe(current.lease_owner)
+      expect(ResearchQueue.complete(item.sequence, current.lease_owner, "learned")?.status).toBe("learned")
+      await Instance.dispose()
+    },
+  })
+})
+
 test("an expired lease cannot complete work before another worker reclaims it", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
