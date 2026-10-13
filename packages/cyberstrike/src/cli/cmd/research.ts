@@ -1,7 +1,7 @@
 import * as prompts from "@clack/prompts"
 import { cmd } from "./cmd"
 import { ReportKnowledge } from "../../learning/report-knowledge"
-import { RESEARCH_SOURCES } from "../../research/sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES } from "../../research/sources"
 import { classifyResearchTopic, discoverResearch, extractResearchDetails, learnResearchQueue, retryAuthenticatedResearch } from "../../research/ingest"
 import { ResearchQueue } from "../../research/queue"
 
@@ -93,7 +93,7 @@ export const ResearchCommand = cmd({
             for (const error of result.errors) prompts.log.warn(error)
           }
           const limit = exhaustive ? 500 : Math.min(500, (deep ? 200 : args.limit) * discoveries.length)
-          const learned = { claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
+          const learned = { claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, requeued_legacy: 0, errors: [] as string[] }
           // --all means drain the currently claimable queue, not just its first
           // 500 items. A failed item is retried on the next batch and eventually
           // reaches a terminal state; ordinary sync remains bounded to one batch.
@@ -104,11 +104,13 @@ export const ResearchCommand = cmd({
             learned.skipped += batch.skipped
             learned.failed += batch.failed
             learned.blocked_auth += batch.blocked_auth
+            learned.requeued_legacy += batch.requeued_legacy
             learned.errors.push(...batch.errors.slice(0, Math.max(0, 20 - learned.errors.length)))
             if (!exhaustive || batch.claimed === 0) break
           } while (true)
           prompts.log.info("queue worker: claimed=" + learned.claimed + " learned=" + learned.learned +
-            " skipped=" + learned.skipped + " failed=" + learned.failed + " blocked_auth=" + learned.blocked_auth)
+            " skipped=" + learned.skipped + " failed=" + learned.failed + " blocked_auth=" + learned.blocked_auth +
+            " legacy_requeued=" + learned.requeued_legacy)
           for (const error of learned.errors) prompts.log.warn(error)
           prompts.outro(exhaustive ? "Exhaustive research sync complete" : "Research sync complete")
         },
@@ -176,7 +178,8 @@ export const ResearchCommand = cmd({
                 " failed=" +
                 result.failed +
                 " blocked_auth=" +
-                result.blocked_auth,
+                result.blocked_auth +
+                " legacy_requeued=" + result.requeued_legacy,
             )
             for (const error of result.errors) prompts.log.warn(error)
             if (!args.watch) break
@@ -288,7 +291,7 @@ export const ResearchCommand = cmd({
           const requestedLimit = Math.max(1, Math.min(500, rawLimit))
           const totals = { scanned: 0, enriched: 0, skipped: 0, errors: 0 }
           do {
-            const records = ReportKnowledge.externalRecordsForEnrichment(args.all ? 500 : requestedLimit)
+            const records = ReportKnowledge.externalRecordsForEnrichment(args.all ? 500 : requestedLimit, RESEARCH_LEARNING_VERSION)
             if (!records.length) break
             let enrichedThisBatch = 0
             for (const row of records) {
@@ -374,7 +377,7 @@ export const ResearchCommand = cmd({
                   poc: extracted.poc,
                   tags: retrievalSignals,
                   metadata: {
-                    extraction_version: 7,
+                    extraction_version: RESEARCH_LEARNING_VERSION,
                     study_method: "bounded-heuristic-extraction",
                     extracted: nextExtracted,
                   },
