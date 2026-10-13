@@ -4,6 +4,8 @@ import path from "node:path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
+import { Session } from "../../src/session"
+import { Intel } from "../../src/methodology/intel"
 
 describe("target asset hierarchy", () => {
   test("nests authorized observed subdomains, updates registry/notes, and applies parent exclusions", async () => {
@@ -127,5 +129,60 @@ describe("target asset hierarchy", () => {
         expect(notes).toContain("Existing asset research must remain")
       },
     })
+  })
+})
+
+
+test("session target context shows the program root, selected asset, registered tree, and separated notes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const root = await TargetMemory.configureScope("https://context-example.test", {
+        include: ["context-example.test", "*.context-example.test"],
+        exclude: ["admin.context-example.test"],
+        authorizationSource: "Context hierarchy test program",
+        authorizationReference: "https://context-example.test/security",
+      })
+      const child = await TargetMemory.registerObservedAsset("https://api.context-example.test/v1/users", "api")
+      expect(child).not.toBeNull()
+
+      await TargetMemory.addNote(root.workspace.targetURL, {
+        kind: "manual",
+        title: "Program-wide note",
+        content: "Program policy and shared architecture overview.",
+        source: "test",
+      })
+      await TargetMemory.addNote(child!.targetURL, {
+        kind: "asset",
+        title: "API-specific note",
+        content: "The API exposes a versioned user endpoint.",
+        source: "test",
+      })
+
+      const session = await Session.create({})
+      try {
+        Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "endpoint",
+            title: "Versioned API users endpoint",
+            asset: "https://api.context-example.test/v1/users",
+            confidenceLevel: "confirmed",
+          },
+        })
+        const context = TargetMemory.contextForSession(session.id)
+        expect(context).not.toBeNull()
+        expect(context).toContain("Program/root target: https://context-example.test")
+        expect(context).toContain("Selected asset: https://api.context-example.test")
+        expect(context).toContain("Ancestor chain: https://context-example.test -> https://api.context-example.test")
+        expect(context).toContain("[api] https://api.context-example.test")
+        expect(context).toContain("Program-wide note")
+        expect(context).toContain("API-specific note")
+        expect(context).toContain("Every ancestor scope and exclusion also applies")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
   })
 })
