@@ -516,6 +516,45 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
       2,
     ) + "\n",
   )
+  // Existing workspaces predate hierarchy fields. Reconcile generated identity manifests
+  // from SQLite so old `workspace.json` files cannot disagree with the parent/child model.
+  const expectedTargetManifest = {
+    schemaVersion: 2,
+    targetURL: workspace.targetURL,
+    hostname: workspace.hostname,
+    slug: workspace.slug,
+    parentTargetID: workspace.parentTargetID,
+    assetType: workspace.assetType,
+    createdAt: new Date(workspace.timeCreated).toISOString(),
+  }
+  const expectedWorkspaceManifest = {
+    schemaVersion: 3,
+    workspaceID: workspace.id,
+    projectID: workspace.projectID,
+    targetURL: workspace.targetURL,
+    targetKey: workspace.targetKey,
+    hostname: workspace.hostname,
+    slug: workspace.slug,
+    parentTargetID: workspace.parentTargetID,
+    assetType: workspace.assetType,
+    relativePath: workspace.relativePath,
+    createdAt: new Date(workspace.timeCreated).toISOString(),
+  }
+  const manifests = [
+    { file: "target.json", expected: expectedTargetManifest, keys: ["schemaVersion", "targetURL", "hostname", "slug", "parentTargetID", "assetType"] as const },
+    { file: "workspace.json", expected: expectedWorkspaceManifest, keys: ["schemaVersion", "workspaceID", "projectID", "targetURL", "targetKey", "hostname", "slug", "parentTargetID", "assetType", "relativePath"] as const },
+  ]
+  for (const manifest of manifests) {
+    const manifestPath = path.join(workspace.workspacePath, manifest.file)
+    await assertRegularFileOrMissing(manifestPath)
+    let current: Record<string, unknown> | undefined
+    try { current = JSON.parse(await fs.readFile(manifestPath, "utf-8")) as Record<string, unknown> }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") current = undefined }
+    const matches = Boolean(current && manifest.keys.every((key) => current![key] === manifest.expected[key]))
+    if (!matches) {
+      await TargetMemory.writeWorkspaceFile(workspace, manifest.file, JSON.stringify(manifest.expected, null, 2) + "\n")
+    }
+  }
   await createIfMissing(path.join(workspace.workspacePath, "README.md"), defaultWorkspaceReadme(workspace))
   await createIfMissing(
     path.join(workspace.workspacePath, "scope", "scope.json"),
