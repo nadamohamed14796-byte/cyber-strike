@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { isIndexLikeResearchUrl, isResearchCandidate, sourceRelevance } from "../../src/research/ingest"
+import { discoverySeeds } from "../../src/research/adapters"
 
 const trickster0 = RESEARCH_SOURCES.find((source) => source.id === "trickster0")!
 
@@ -78,4 +79,20 @@ test("does not classify root landing pages or all-labs indexes as learnable arti
   expect(isIndexLikeResearchUrl("https://trickster0.medium.com/")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/all-labs")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/authentication")).toBe(false)
+})
+
+
+test("source pagination seeds respect the configured budget up to the discovery hard limit", () => {
+  const hackerOne = RESEARCH_SOURCES.find((source) => source.id === "hackerone-hacktivity")!
+  const normal = discoverySeeds(hackerOne, 10)
+  expect(normal.filter((url) => new URL(url).pathname.includes("/overview"))).toHaveLength(10)
+  expect(normal.some((url) => new URL(url).searchParams.get("pageIndex") === "9")).toBe(true)
+
+  const exhaustive = discoverySeeds(hackerOne, 1000)
+  const pageURLs = exhaustive.filter((url) => new URL(url).pathname.includes("/overview"))
+  expect(pageURLs).toHaveLength(1000)
+  expect(pageURLs.some((url) => new URL(url).searchParams.get("pageIndex") === "999")).toBe(true)
+
+  // Requests above the crawler's hard ceiling are still bounded.
+  expect(discoverySeeds(hackerOne, 5000)).toHaveLength(exhaustive.length)
 })
