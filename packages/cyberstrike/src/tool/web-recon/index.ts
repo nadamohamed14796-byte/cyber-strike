@@ -194,8 +194,14 @@ export const WebReconTool = Tool.define("web_recon", {
 
     let result: WebReconResult
     let targetWorkspace: Workspace | undefined
+    const sessionScopeWorkspaceIDs = new Set<string>()
     if (program === "session_scan") {
       try {
+        const sessionScopeCheck: ScopeCheck = async (url) => {
+          const decision = await TargetMemory.checkURLScope(url)
+          if (decision.allowed && decision.workspace) sessionScopeWorkspaceIDs.add(decision.workspace.id)
+          return decision.allowed
+        }
         result = await sessionScan(ctx.sessionID, params.timeout_seconds, ctx.abort, async (origins) => {
           await ctx.ask({
             permission: "web_recon",
@@ -203,7 +209,7 @@ export const WebReconTool = Tool.define("web_recon", {
             always: origins,
             metadata: { program },
           })
-        }, async (url) => (await TargetMemory.checkURLScope(url)).allowed)
+        }, sessionScopeCheck)
       } catch (e) {
         return fail(`[-] session_scan failed: ${e instanceof Error ? e.message : String(e)}`)
       }
@@ -249,20 +255,39 @@ export const WebReconTool = Tool.define("web_recon", {
       }
     }
 
+    if (program === "session_scan" && sessionScopeWorkspaceIDs.size > 0) {
+      const allWorkspaces = TargetMemory.list()
+      const byID = new Map(allWorkspaces.map((workspace) => [workspace.id, workspace]))
+      const roots = new Map<string, Workspace>()
+      for (const id of sessionScopeWorkspaceIDs) {
+        let current = byID.get(id)
+        const visited = new Set<string>()
+        while (current?.parentTargetID && !visited.has(current.id)) {
+          visited.add(current.id)
+          current = byID.get(current.parentTargetID)
+        }
+        if (current) roots.set(current.id, current)
+      }
+      // A combined session result is saved only when all authorized probes belong
+      // to a single root program. It is never copied into multiple unrelated targets.
+      if (roots.size === 1) targetWorkspace = [...roots.values()][0]
+    }
+
     const { output, enriched } = formatOutput(program, result)
     let artifactPath: string | undefined
     let artifactError: string | undefined
     let notesSaved = false
     let notesError: string | undefined
     let finalOutput = output
-    if (program !== "session_scan" && targetWorkspace && params.target) {
+    if (targetWorkspace && (program === "session_scan" || params.target)) {
       const completedAt = new Date().toISOString()
-      const filename = "recon/" + program + "-" + completedAt.replace(/[:.]/g, "-") + ".json"
+      const artifactDirectory = program === "session_scan" ? "scans" : "recon"
+      const filename = artifactDirectory + "/" + program + "-" + completedAt.replace(/[:.]/g, "-") + ".json"
       const record = {
         schemaVersion: 1,
         recordType: "web-recon-result",
         program,
-        requestedTarget: params.target,
+        requestedTarget: params.target ?? "session_scan: authorized origins from the current session",
         canonicalTarget: targetWorkspace.targetURL,
         workspaceID: targetWorkspace.id,
         workspacePath: targetWorkspace.workspacePath,
@@ -279,7 +304,7 @@ export const WebReconTool = Tool.define("web_recon", {
             title: "Recon run: " + program,
             content: [
               "Program: " + program,
-              "Requested URL: " + params.target,
+              "Requested URL: " + (params.target ?? "authorized origins from the current session"),
               "Completed at: " + completedAt,
               "Run artifact: " + path.relative(targetWorkspace.workspacePath, artifactPath).split(path.sep).join("/"),
               "Result status: completed; detailed output is in the linked JSON artifact.",
@@ -302,7 +327,7 @@ export const WebReconTool = Tool.define("web_recon", {
         finalOutput += "\n\n[!] Target artifact auto-save failed. Results were returned but were NOT confirmed persisted: " + artifactError
       }
     } else if (program === "session_scan") {
-      finalOutput += "\n\n[*] session_scan can span multiple target workspaces, so no single-target artifact was chosen automatically. Keep its per-target results separated when saving them."
+      finalOutput += "\n\n[!] session_scan results were not auto-saved because the authorized probes did not resolve to exactly one root target workspace. The combined output was left unsaved to prevent cross-target contamination."
     }
     return {
       title: `web_recon: ${program}`,
