@@ -2,12 +2,13 @@ import { createHash } from "node:crypto"
 import z from "zod"
 import { ReportKnowledge } from "../learning/report-knowledge"
 import { Session } from "../session"
-import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES } from "../research/sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION, RESEARCH_SOURCES } from "../research/sources"
 import {
   discoverResearch,
   fetchResearchSourceForStudy,
   isIndexLikeResearchUrl,
   looksLikeResearchAuthenticationWall,
+  normalizeResearchUrl,
   redactResearchSecrets,
   retryAuthenticatedResearch,
   sourceRelevance,
@@ -127,7 +128,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
       const issues: string[] = []
 
       for (let index = 0; index < batchLimit; index++) {
-        const claim = ResearchQueue.claimNext(workerID, params.source, 15 * 60_000)
+        const claim = ResearchQueue.claimNext(workerID, params.source, 15 * 60_000, RESEARCH_MODEL_STUDY_VERSION)
         if (!claim) break
         const source = RESEARCH_SOURCES.find((entry) => entry.id === claim.source_id)
         if (!source) {
@@ -269,11 +270,19 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
 
     if (params.action === "discover") {
       const authResumed = await retryAuthenticatedResearch({ sourceID: params.source, limit: 100 })
-      const legacyRequeued = ResearchQueue.requeueLegacyRejected(100, params.source)
+      const legacyRejectedRequeued = ResearchQueue.requeueLegacyRejected(100, params.source)
+      const legacyQueueRequeued = ResearchQueue.requeueLearnedForModelStudy(100, params.source, RESEARCH_MODEL_STUDY_VERSION)
+      const legacyKnowledge = await queueLegacyKnowledgeForModelStudy(params.source)
       const results = await discoverResearch({ sourceID: params.source, pages: params.pages, depth: params.depth })
       const summary = {
         auth_resumed: authResumed,
-        legacy_requeued: legacyRequeued,
+        legacy_rejected_requeued: legacyRejectedRequeued,
+        legacy_queue_requeued_for_model_study: legacyQueueRequeued,
+        legacy_knowledge_queued_for_model_study: legacyKnowledge.queued,
+        legacy_knowledge_examined: legacyKnowledge.examined,
+        legacy_knowledge_skipped: legacyKnowledge.skipped,
+        legacy_knowledge_errors: legacyKnowledge.errors,
+
         sources: results.map((item) => ({
           source: item.source,
           pages: item.pages,
@@ -320,7 +329,20 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       }
       if (note.decision === "rejected") {
         const reason = boundedText(note.reason, 800) || "agent study found no reusable security lesson"
-        const completed = ResearchQueue.complete(claim.sequence, note.lease_owner, "rejected", "agent study: " + reason)
+        const completed = ResearchQueue.complete(
+          claim.sequence,
+          note.lease_owner,
+          "rejected",
+          "agent study: " + reason,
+          { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "llm-assisted-agent-command-v1" },
+        )
+        const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
+        if (legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
+          id: legacyKnowledgeID,
+          version: RESEARCH_MODEL_STUDY_VERSION,
+          decision: "rejected",
+          reason,
+        })
         if (completed) rejected++
         results.push({ public_id: note.public_id, result: completed ? "rejected" : "lease-lost", reason })
         continue
@@ -448,6 +470,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           stored_excerpt_length: Math.min(text.length, 12000),
           queue_id: claim.public_id,
           extraction_version: RESEARCH_LEARNING_VERSION,
+          model_study_version: RESEARCH_MODEL_STUDY_VERSION,
           study_method: "llm-assisted-agent-command-v1",
           excerpt: text.slice(0, 12000),
           extracted,
@@ -458,7 +481,13 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         results.push({ public_id: note.public_id, result: "retry", reason: "knowledge-persistence-failed" })
         continue
       }
-      const completed = ResearchQueue.complete(claim.sequence, note.lease_owner, "learned")
+      const completed = ResearchQueue.complete(
+        claim.sequence,
+        note.lease_owner,
+        "learned",
+        undefined,
+        { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "llm-assisted-agent-command-v1" },
+      )
       if (!completed) {
         results.push({ public_id: note.public_id, result: "saved-but-lease-completion-failed", knowledge_id: ingested.id })
         continue
