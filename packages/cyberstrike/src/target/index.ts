@@ -1094,13 +1094,61 @@ export namespace TargetMemory {
     const scopePath = path.join(workspace.workspacePath, "scope", "scope.json")
     const notesPath = path.join(workspace.workspacePath, "notes.md")
     const workspaceManifestPath = path.join(workspace.workspacePath, "workspace.json")
+    const targetManifestPath = path.join(workspace.workspacePath, "target.json")
 
     let info = await assertRegularFileOrMissing(scopePath)
     const notesInfo = await assertRegularFileOrMissing(notesPath)
     const workspaceManifestInfo = await assertRegularFileOrMissing(workspaceManifestPath)
-    const needsRepair = !info || !notesInfo || notesInfo.size === 0 || !workspaceManifestInfo
+    const targetManifestInfo = await assertRegularFileOrMissing(targetManifestPath)
+
+    const identityFieldsMatch = async (
+      manifestPath: string,
+      fields: Record<string, unknown>,
+    ): Promise<boolean> => {
+      if (!await assertRegularFileOrMissing(manifestPath)) return false
+      try {
+        const parsed = JSON.parse(await fs.readFile(manifestPath, "utf-8")) as Record<string, unknown>
+        return Object.entries(fields).every(([key, expected]) => parsed[key] === expected)
+      } catch (error) {
+        if (error instanceof SyntaxError) return false
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
+        throw error
+      }
+    }
+
+    const [workspaceIdentityMatches, targetIdentityMatches] = await Promise.all([
+      identityFieldsMatch(workspaceManifestPath, {
+        schemaVersion: 3,
+        workspaceID: workspace.id,
+        projectID: workspace.projectID,
+        targetURL: workspace.targetURL,
+        targetKey: workspace.targetKey,
+        hostname: workspace.hostname,
+        slug: workspace.slug,
+        parentTargetID: workspace.parentTargetID,
+        assetType: workspace.assetType,
+        relativePath: workspace.relativePath,
+      }),
+      identityFieldsMatch(targetManifestPath, {
+        schemaVersion: 2,
+        targetURL: workspace.targetURL,
+        hostname: workspace.hostname,
+        slug: workspace.slug,
+        parentTargetID: workspace.parentTargetID,
+        assetType: workspace.assetType,
+      }),
+    ])
+
+    const needsRepair =
+      !info ||
+      !notesInfo ||
+      notesInfo.size === 0 ||
+      !workspaceManifestInfo ||
+      !targetManifestInfo ||
+      !workspaceIdentityMatches ||
+      !targetIdentityMatches
     if (needsRepair) {
-      // Heal missing generated workspace files once, not on every normal scope check.
+      // Heal missing or stale generated workspace files once, not on every normal scope check.
       await prepareWorkspace(workspace)
       info = await assertRegularFileOrMissing(scopePath)
     }
