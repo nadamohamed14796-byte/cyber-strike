@@ -810,7 +810,18 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       if (isReportURL && (
         (existing && existing.payload?.crawl_page !== true) ||
         knownKnowledgeURLs.has(current.url)
-      )) continue
+      )) {
+        // Even when a report's text is already cached/learned, reuse its saved
+        // source-allowlisted outgoing links so larger future page passes can keep
+        // walking the graph without refetching that report.
+        const cachedLinks = existing?.payload?.discovered_links
+        if (Array.isArray(cachedLinks)) {
+          for (const link of cachedLinks) {
+            if (typeof link === "string") add(link, current.depth + 1)
+          }
+        }
+        continue
+      }
       if (
         existing?.payload?.crawl_page === true &&
         ResearchQueue.isFreshCrawlPage(source.id, current.url) &&
