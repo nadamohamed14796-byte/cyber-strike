@@ -86,7 +86,20 @@ export namespace MethodologyContext {
         .limit(1)
         .all(),
     )
-    if (count.length === 0) return null
+    if (count.length === 0) {
+      // Skill preflight must also run before the first intel entry is recorded;
+      // otherwise the initial scope-analysis phase would be the one phase that
+      // never receives phase-aware skill guidance.
+      const initialState = Methodology.computeState(sessionID)
+      if (!initialState.currentPhase) return null
+      return [
+        "# Methodology Skill Preflight",
+        "",
+        "No target intelligence has been recorded yet. Establish scope and initialize the target workspace before reconnaissance or active testing.",
+        "",
+        await formatPhaseSkillGuidance(initialState.currentPhase),
+      ].join("\n")
+    }
 
     const sections: string[] = ["# Methodology Engine Active", ""]
 
