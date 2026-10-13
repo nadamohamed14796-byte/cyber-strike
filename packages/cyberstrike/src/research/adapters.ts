@@ -1,6 +1,7 @@
 import type { ResearchSource } from "./sources"
 
-const PAGE_CAP = 100
+// Match the discovery worker's hard ceiling; lower per-run page budgets still apply.
+const PAGE_CAP = 1000
 
 function withQuery(url: string, key: string, value: number) {
   const parsed = new URL(url)
