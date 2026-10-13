@@ -364,6 +364,9 @@ test("research topic classification covers CORS, information disclosure, privile
   expect(classifyResearchTopic("Privilege escalation through role assignment", "A role check is missing.")).toBe("privilege-escalation")
   expect(classifyResearchTopic("Security misconfiguration exposes an admin panel", "The application has an insecure configuration.")).toBe("security-misconfiguration")
   expect(classifyResearchTopic("Account takeover through password recovery", "An account can be compromised.")).toBe("account-takeover")
+  // Compound titles follow the named topic order, not the source-code regex list order.
+  expect(classifyResearchTopic("CORS misconfiguration leads to information disclosure", "A cross-origin policy issue.")).toBe("cors")
+  expect(classifyResearchTopic("Security misconfiguration causes privilege escalation", "Privilege changes were possible.")).toBe("security-misconfiguration")
 })
 
 
