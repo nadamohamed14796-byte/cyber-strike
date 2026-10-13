@@ -229,6 +229,29 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
 })
 
 
+test("cached research discovery frontiers have a strict size bound", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const links = Array.from({ length: 160 }, (_, index) =>
+        "https://research.example.test/path/" + index + "/" + "x".repeat(1000),
+      )
+      const row = ResearchQueue.markVisitedPage({
+        sourceID: "test-frontier-size",
+        sourceURL: "https://research.example.test/archive",
+        discoveredLinks: links,
+      })
+      const stored = (row?.payload?.discovered_links as string[] | undefined) ?? []
+      expect(stored.length).toBeGreaterThan(0)
+      expect(stored.length).toBeLessThan(160)
+      expect(stored.reduce((sum, link) => sum + link.length, 0)).toBeLessThanOrEqual(16_384)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("failed crawl pages get a cooldown and recover without becoming report work", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
