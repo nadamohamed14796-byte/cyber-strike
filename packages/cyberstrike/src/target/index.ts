@@ -92,6 +92,20 @@ function cacheScopeManifest(scopePath: string, signature: string, scope: TargetS
   }
 }
 
+type IdentityManifestCacheEntry = { signature: string; identity: string; matches: boolean }
+const identityManifestCache = new Map<string, IdentityManifestCacheEntry>()
+const MAX_CACHED_IDENTITY_MANIFESTS = 32
+
+function cacheIdentityManifest(filePath: string, entry: IdentityManifestCacheEntry): void {
+  identityManifestCache.delete(filePath)
+  identityManifestCache.set(filePath, entry)
+  while (identityManifestCache.size > MAX_CACHED_IDENTITY_MANIFESTS) {
+    const oldestPath = identityManifestCache.keys().next().value
+    if (oldestPath === undefined) break
+    identityManifestCache.delete(oldestPath)
+  }
+}
+
 export interface NormalizedTarget {
   targetURL: string
   targetKey: string
@@ -1103,22 +1117,34 @@ export namespace TargetMemory {
 
     const identityFieldsMatch = async (
       manifestPath: string,
+      info: Awaited<ReturnType<typeof fs.lstat>> | null,
       fields: Record<string, unknown>,
     ): Promise<boolean> => {
-      if (!await assertRegularFileOrMissing(manifestPath)) return false
+      if (!info) return false
+      const signature = scopeFileSignature(info)
+      const identity = JSON.stringify(fields)
+      const cached = identityManifestCache.get(manifestPath)
+      if (cached?.signature === signature && cached.identity === identity) {
+        identityManifestCache.delete(manifestPath)
+        identityManifestCache.set(manifestPath, cached)
+        return cached.matches
+      }
+
+      let matches = false
       try {
         const parsed: unknown = JSON.parse(await fs.readFile(manifestPath, "utf-8"))
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false
-        return Object.entries(fields).every(([key, expected]) => (parsed as Record<string, unknown>)[key] === expected)
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          matches = Object.entries(fields).every(([key, expected]) => (parsed as Record<string, unknown>)[key] === expected)
+        }
       } catch (error) {
-        if (error instanceof SyntaxError) return false
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
-        throw error
+        if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code !== "ENOENT") throw error
       }
+      cacheIdentityManifest(manifestPath, { signature, identity, matches })
+      return matches
     }
 
     const [workspaceIdentityMatches, targetIdentityMatches] = await Promise.all([
-      identityFieldsMatch(workspaceManifestPath, {
+      identityFieldsMatch(workspaceManifestPath, workspaceManifestInfo, {
         schemaVersion: 3,
         workspaceID: workspace.id,
         projectID: workspace.projectID,
@@ -1130,7 +1156,7 @@ export namespace TargetMemory {
         assetType: workspace.assetType,
         relativePath: workspace.relativePath,
       }),
-      identityFieldsMatch(targetManifestPath, {
+      identityFieldsMatch(targetManifestPath, targetManifestInfo, {
         schemaVersion: 2,
         targetURL: workspace.targetURL,
         hostname: workspace.hostname,
