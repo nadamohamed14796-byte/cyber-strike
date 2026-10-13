@@ -190,6 +190,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
                 title,
                 reason: message,
                 payload: { source_name: source.name, source_kind: source.kind, crawl_depth: claim.payload.crawl_depth },
+                claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
               })
             } else {
               ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message)
@@ -223,6 +224,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             title,
             reason: "authentication wall detected during agent-led research study",
             payload: { source_name: source.name, source_kind: source.kind, crawl_depth: current.payload.crawl_depth },
+            claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
           })
           issues.push(claim.public_id + ": authentication wall")
           continue
