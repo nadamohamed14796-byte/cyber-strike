@@ -20,8 +20,8 @@ export function resolveScopeFilePath(input: string, cwd = process.cwd(), platfor
   const value = input.trim()
   if (!value) throw new Error("Scope file path is required.")
   if (platform !== "win32") {
-    const wslPath = value.match(/^\\\\\\\\wsl(?:\\.localhost|\\$)?\\\\[^\\\\]+\\\\(.+)$/i)
-    if (wslPath) return path.resolve("/" + wslPath[1].replace(/\\\\/g, "/"))
+    const wslPath = value.match(/^\\\\wsl(?:\.localhost|\$)?\\[^\\]+\\(.+)$/i)
+    if (wslPath) return path.resolve("/" + wslPath[1].replace(/\\/g, "/"))
   }
   return path.resolve(cwd, value)
 }
