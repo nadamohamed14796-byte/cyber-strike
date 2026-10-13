@@ -72,6 +72,29 @@ describe("target asset hierarchy", () => {
     })
   })
 
+  test("explicit parent selection cannot bypass a parent exclusion or ancestor scope", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const root = await TargetMemory.configureScope("https://example.test", {
+          include: ["example.test", "*.example.test"],
+          exclude: ["admin.example.test"],
+          authorizationSource: "Test program",
+          authorizationReference: "https://example.test/security",
+        })
+
+        await expect(
+          TargetMemory.ensure("https://admin.example.test", { parentTargetURL: root.workspace.targetURL }),
+        ).rejects.toThrow(/do not authorize this child target/i)
+
+        const denied = await TargetMemory.get("https://admin.example.test")
+        expect(denied).toBeNull()
+        expect(TargetMemory.children(root.workspace.id)).toHaveLength(0)
+      },
+    })
+  })
+
   test("supports nested subdomains only when every parent scope authorizes the origin", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
