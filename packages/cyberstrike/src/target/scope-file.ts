@@ -19,7 +19,7 @@ export function parseScopeFileContents(contents: string): string[] {
 export function resolveScopeFilePath(input: string, cwd = process.cwd(), platform = process.platform): string {
   const value = input.trim()
   if (!value) throw new Error("Scope file path is required.")
-  if (platform !== "win32") {
+  if (platform === "linux") {
     const wslPath = value.match(/^\\\\wsl(?:\.localhost|\$)?\\[^\\]+\\(.+)$/i)
     if (wslPath) return path.resolve("/" + wslPath[1].replace(/\\/g, "/"))
   }
