@@ -27,17 +27,24 @@ export namespace BunProc {
         BUN_BE_BUN: "1",
       },
     })
-    const code = await result.exited
-    const stdout = result.stdout
+    // Drain both pipes while the child is running. Waiting for exit before
+    // consuming piped output can deadlock when either pipe buffer fills.
+    const stdoutPromise = result.stdout
       ? typeof result.stdout === "number"
-        ? result.stdout
-        : await readableStreamToText(result.stdout)
-      : undefined
-    const stderr = result.stderr
+        ? Promise.resolve(result.stdout)
+        : readableStreamToText(result.stdout)
+      : Promise.resolve(undefined)
+    const stderrPromise = result.stderr
       ? typeof result.stderr === "number"
-        ? result.stderr
-        : await readableStreamToText(result.stderr)
-      : undefined
+        ? Promise.resolve(result.stderr)
+        : readableStreamToText(result.stderr)
+      : Promise.resolve(undefined)
+
+    const [code, stdout, stderr] = await Promise.all([
+      result.exited,
+      stdoutPromise,
+      stderrPromise,
+    ])
     log.info("done", {
       code,
       stdout,
