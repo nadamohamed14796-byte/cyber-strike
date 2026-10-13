@@ -68,7 +68,7 @@ jobs:
           echo "Computed hash for ${SYSTEM}: $HASH"
 
       - name: Upload hash
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: hash-${{ matrix.system }}
           path: hash.txt
