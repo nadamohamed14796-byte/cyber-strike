@@ -680,6 +680,11 @@ export namespace ResearchQueue {
         : db.select().from(ResearchQueueTable).orderBy(asc(ResearchQueueTable.sequence)).all()
       const crawlPageRows = rows.filter((row) => row.payload?.crawl_page === true)
       const reportRows = rows.filter((row) => row.payload?.crawl_page !== true)
+      const modelStudiedRows = reportRows.filter((row) =>
+        row.payload?.model_study_method === "llm-assisted-agent-command-v1" &&
+        typeof row.payload?.model_study_version === "number" &&
+        row.payload.model_study_version >= RESEARCH_MODEL_STUDY_VERSION,
+      )
       const counts: Record<string, number> = {
         total: reportRows.length,
         crawl_pages: crawlPageRows.length,
@@ -694,6 +699,10 @@ export namespace ResearchQueue {
         retry: 0,
         rejected: 0,
         blocked_auth: 0,
+        model_study_learned: modelStudiedRows.filter((row) => row.status === "learned").length,
+        model_study_rejected: modelStudiedRows.filter((row) => row.status === "rejected").length,
+        model_study_completed: modelStudiedRows.filter((row) => row.status === "learned" || row.status === "rejected").length,
+        model_study_pending: reportRows.filter((row) => ["queued", "retry", "studying"].includes(row.status)).length,
       }
       for (const row of reportRows) counts[row.status] = (counts[row.status] ?? 0) + 1
       return counts
