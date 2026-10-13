@@ -482,6 +482,9 @@ export namespace ReportKnowledge {
         ) return false
 
         const hook = input.hook ?? "finding-validation"
+        // Only the explicit finding-validation path may raise ranking. Retrieval
+        // hooks record exposure, never usefulness.
+        if (input.outcome === "useful" && hook !== "finding-validation") return false
         // A usefulness event is valid only if this exact reference was previously
         // surfaced in this session tree. This prevents guessed IDs from gaming ranking.
         if (input.outcome === "useful") {
