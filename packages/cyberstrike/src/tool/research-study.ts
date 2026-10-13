@@ -131,9 +131,10 @@ async function drainBatchedCount(run: () => number | Promise<number>) {
     const reported = await run()
     const count = Number.isFinite(reported) ? Math.max(0, Math.min(batchLimit, Math.floor(reported))) : 0
     total += count
-    // Each requeue operation must move its rows out of the selected state. A
-    // short batch proves that no further eligible rows were returned.
-    if (count < batchLimit) return total
+    // The queue helpers report only successful row transitions. Continue even
+    // after a partial batch: a concurrent worker may have won some rows, leaving
+    // others eligible. Zero means no row changed and ends the drain.
+    if (count === 0) return total
   }
 }
 
