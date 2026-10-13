@@ -78,7 +78,7 @@ test("explicit user request produces bounded global retrieval tags without retai
   expect(promptResearchSignals("JWT OAuth refresh token login session")).toEqual(
     expect.arrayContaining(["authentication-flow", "token-or-jwt"]),
   )
-  expect(promptResearchSignals("CORS security misconfiguration exposes sensitive information")).toEqual(
+  expect(promptResearchSignals("CORS security misconfiguration and information disclosure")).toEqual(
     expect.arrayContaining(["cors-policy", "security-misconfiguration", "information-disclosure"]),
   )
 })
