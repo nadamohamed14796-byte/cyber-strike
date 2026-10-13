@@ -40,7 +40,17 @@ describe("classifyFindingTitle", () => {
     })
   })
 
-  describe("idor class", () => {
+  describe("llm class", () => {
+    test("direct prompt injection", () => {
+      expect(classifyFindingTitle("Prompt Injection in support chatbot")).toBe("llm")
+    })
+
+    test("system prompt disclosure", () => {
+      expect(classifyFindingTitle("System Prompt Leakage in AI Agent")).toBe("llm")
+    })
+  })
+
+
     test("IDOR keyword", () => {
       expect(classifyFindingTitle("IDOR in user profile endpoint")).toBe("idor")
     })
