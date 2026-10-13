@@ -83,12 +83,12 @@ function canonicalClass(value?: string) {
 }
 
 function severityFromSource(title: string, text: string): string {
-  const content = title + "\\n" + text
+  const content = title + "\n" + text
   const labelled = content.match(
-    /\\b(?:severity|risk(?:\\s+level)?|priority)\\b\\s*(?:(?:is|of|rating)\\s*)?[:=-]?\\s*(critical|high|medium|low|informational|info)\\b/i,
+    /\b(?:severity|risk(?:\s+level)?|priority)\b\s*(?:(?:is|of|rating)\s*)?[:=-]?\s*(critical|high|medium|low|informational|info)\b/i,
   )
   if (labelled) return labelled[1].toLowerCase() === "info" ? "informational" : labelled[1].toLowerCase()
-  const cvss = content.match(/\\bCVSS(?:\\s+v?[0-9]+(?:\\.[0-9]+)?)?(?:\\s+score)?\\s*[:=]\\s*(10(?:\\.0)?|[0-9](?:\\.[0-9])?)\\b/i)
+  const cvss = content.match(/\bCVSS(?:\s+v?[0-9]+(?:\.[0-9]+)?)?(?:\s+score)?\s*[:=]\s*(10(?:\.0)?|[0-9](?:\.[0-9])?)\b/i)
   if (!cvss) return "unknown"
   const score = Number(cvss[1])
   if (score >= 9) return "critical"
