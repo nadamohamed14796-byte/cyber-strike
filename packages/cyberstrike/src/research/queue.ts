@@ -194,9 +194,10 @@ export namespace ResearchQueue {
   }
 
   /**
-   * Revisit reports previously marked learned by the heuristic worker if they have
-   * cached text but no completed model-study marker. The per-version request marker
-   * keeps this one-time and prevents every /update cycle from requeueing the same row.
+   * Revisit reports previously marked learned/rejected by the heuristic worker when
+   * there is no completed model-study marker. Existing sanitized excerpts are reused;
+   * missing excerpts use the source-scoped fetcher. A requested marker is not enough
+   * to suppress retries if another worker completed the row without model study.
    */
   export function requeueLearnedForModelStudy(limit = 100, sourceID?: string, modelStudyVersion = RESEARCH_MODEL_STUDY_VERSION) {
     const now = Date.now()
@@ -463,9 +464,10 @@ export namespace ResearchQueue {
   }
 
   /**
-   * Requeue old reports rejected by the classifier/relevance gate only when a
-   * cached text excerpt is available. The version marker makes this a one-time
-   * migration: current-version rejects are never put back into the queue loop.
+   * Requeue old reports rejected by the earlier classifier/relevance gate once.
+   * If sanitized text is absent, the model-study claim path safely refetches the
+   * report through its configured source allowlist. The version marker prevents
+   * current-version rejects from being fed back into the queue indefinitely.
    */
   export function requeueLegacyRejected(limit = 100, sourceID?: string) {
     const now = Date.now()
