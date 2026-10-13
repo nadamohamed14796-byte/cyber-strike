@@ -36,7 +36,7 @@ export const ResearchKnowledgeTool = Tool.define<typeof ResearchKnowledgeParamet
         output: [
           "No sufficiently relevant shared public report/writeup was found for this signal.",
           "Continue with the existing methodology and current target evidence; do not infer that the vulnerability is absent.",
-          "If useful, broaden the signal or use the research CLI to discover and study additional public sources.",
+          "If more source material is needed, use research_study(action=discover) and then action=next/save so the active model reads and analyzes the sanitized reports; /update runs this workflow in bounded resumable batches.",
         ].join("\n"),
         metadata: { matches: 0, signal: params.signal },
       }
