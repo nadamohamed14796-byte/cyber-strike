@@ -353,7 +353,7 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
     if (RESEARCH_SOURCES.some((source) => source.id === preferredID)) return undefined
   }
 
-  if (hostCandidates.length === 1 && !preferredID) return hostCandidates[0]
+  if (hostCandidates.length === 1) return hostCandidates[0]
 
   const pathname = url.pathname.toLowerCase()
   const scored = hostCandidates.map((source) => {
