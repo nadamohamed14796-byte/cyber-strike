@@ -127,25 +127,25 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (params.action === "search") {
         const limit = 50
-        let results: SkillIndex.Entry[] = []
-        let totalCount = 0
+        const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
+        let candidates: SkillIndex.Entry[] = []
 
+        // Filter permissions before applying the result limit. Otherwise denied
+        // skills can leak through search and occupy the first page, hiding allowed matches.
         if (params.cwe) {
-          results = SkillIndex.byCWE(params.cwe, limit)
-          totalCount = SkillIndex.byCWE(params.cwe, Infinity).length
+          candidates = SkillIndex.byCWE(params.cwe, Infinity)
         } else if (params.tech?.length) {
-          results = SkillIndex.byTechStack(params.tech, limit)
-          totalCount = SkillIndex.byTechStack(params.tech, Infinity).length
+          candidates = SkillIndex.byTechStack(params.tech, Infinity)
         } else if (params.category) {
-          results = SkillIndex.byCategory(params.category, limit)
-          totalCount = SkillIndex.byCategory(params.category, Infinity).length
+          candidates = SkillIndex.byCategory(params.category, Infinity)
         } else if (params.query) {
-          results = SkillIndex.search(params.query, limit)
-          totalCount = results.length
+          candidates = SkillIndex.search(params.query, Infinity)
         } else {
-          results = SkillIndex.all().slice(0, limit)
-          totalCount = SkillIndex.all().length
+          candidates = SkillIndex.all()
         }
+        const permitted = candidates.filter((entry) => accessibleNames.has(entry.name))
+        const totalCount = permitted.length
+        const results = permitted.slice(0, limit)
 
         if (results.length === 0)
           return {
