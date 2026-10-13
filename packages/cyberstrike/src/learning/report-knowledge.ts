@@ -192,7 +192,11 @@ export namespace ReportKnowledge {
     return Database.use((db) =>
       db.select({ source_url: ReportKnowledgeTable.source_url })
         .from(ReportKnowledgeTable)
-        .where(eq(ReportKnowledgeTable.source_kind, "external_report"))
+        .where(and(
+          eq(ReportKnowledgeTable.source_kind, "external_report"),
+          isNull(ReportKnowledgeTable.session_id),
+          or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!,
+        ))
         .all()
         .flatMap((row) => row.source_url ? [row.source_url] : []),
     )
