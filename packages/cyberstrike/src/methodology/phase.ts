@@ -325,7 +325,8 @@ export namespace Phase {
 
   export function detectScopeType(items: string[]): ScopeType {
     if (items.some((i) => /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(i))) return "cidr"
-    if (items.some((i) => /\.(apk|ipa)$/i.test(i) || /^(com|io|net)\.[a-z]/i.test(i))) return "mobile"
+    // A bare com.example.com string is indistinguishable from a domain. Require an app artifact or an explicit package marker to avoid misclassifying web targets as mobile.
+    if (items.some((i) => /\.(apk|ipa)$/i.test(i) || /^(?:android|ios|package):(?:com|io|net)\.[a-z][\w.]*/i.test(i))) return "mobile"
     if (items.some((i) => /^\*\./.test(i))) return "wildcard"
     return "single"
   }
