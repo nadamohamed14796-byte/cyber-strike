@@ -218,7 +218,9 @@ test("legacy source filtering happens before the batch limit for shared hosts", 
 
       const candidates = ReportKnowledge.externalRecordsForModelStudy(1, 1, ["hackerone.com"], "hackerone-blog")
       expect(candidates).toHaveLength(1)
-      expect(candidates[0].id).toBe(blog.id)
+      const candidate = candidates[0]
+      if (!candidate) throw new Error("the exact-source backfill candidate was filtered out")
+      expect(candidate.id).toBe(blog.id)
       await Instance.dispose()
     },
   })
