@@ -97,7 +97,7 @@ const TargetScopeCommand = cmd({
       .option("exclude", { type: "string", array: true, describe: "explicitly excluded domain, wildcard, or IPv4 CIDR (repeatable)" })
       .option("source", { type: "string", describe: "program or authorization source name" })
       .option("reference", { type: "string", describe: "HTTPS URL for the official program scope/policy" })
-      .option("file", { type: "string", describe: "import exact in-scope entries from a UTF-8 text file (one host/domain/CIDR per line; blank lines and # comments ignored)" }),
+      .option("file", { type: "string", describe: "import exact in-scope entries from a UTF-8 text file (one host/domain/CIDR per line; blank lines and # / // comment lines ignored)" }),
   async handler(args) {
     await Instance.provide({
       directory: process.cwd(),
@@ -160,8 +160,10 @@ const TargetScopeCommand = cmd({
         }
         console.log("Target: " + scope.targetURL)
         console.log("Status: " + scope.status)
-        console.log("Included: " + (scope.scopeItems.join(", ") || "(none)"))
-        console.log("Excluded: " + (scope.excludedItems.join(", ") || "(none)"))
+        console.log("Included entries: " + scope.scopeItems.length)
+        console.log("Included: " + (scope.scopeItems.slice(0, 20).join(", ") || "(none)") + (scope.scopeItems.length > 20 ? ", ... (showing first 20)" : ""))
+        console.log("Excluded entries: " + scope.excludedItems.length)
+        console.log("Excluded: " + (scope.excludedItems.slice(0, 20).join(", ") || "(none)") + (scope.excludedItems.length > 20 ? ", ... (showing first 20)" : ""))
         console.log("Authorization source: " + (scope.authorizationSource ?? "(not configured)"))
         console.log("Reference: " + (scope.authorizationReference ?? "(not configured)"))
         if (scope.status !== "configured") {
