@@ -814,10 +814,21 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       if (
         existing?.payload?.crawl_page === true &&
         ResearchQueue.isFreshCrawlPage(source.id, current.url) &&
-        // Successful seed/index pages may be refreshed each cycle, but failures
-        // (including primary seeds) get the same cooldown as pagination pages.
         (existing.payload?.crawl_error === true || !primarySeeds.has(current.url))
-      ) continue
+      ) {
+        // Reuse the bounded, source-allowlisted link set from fresh crawl pages so
+        // repeated discovery passes can continue traversing the graph without
+        // repeatedly downloading the same index pages. Older cache rows without
+        // this field are fetched once to backfill the frontier.
+        if (existing.payload?.crawl_error === true) continue
+        const cachedLinks = existing.payload?.discovered_links
+        if (Array.isArray(cachedLinks)) {
+          for (const link of cachedLinks) {
+            if (typeof link === "string") add(link, current.depth + 1)
+          }
+          continue
+        }
+      }
       pages++
       try {
         const html = await fetchText(current.url, source)
@@ -842,7 +853,8 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           errors.push(current.url + " — authentication required")
           continue
         }
-        for (const link of linksOf(html, new URL(current.url), source)) {
+        const discoveredLinks = linksOf(html, new URL(current.url), source)
+        for (const link of discoveredLinks) {
           candidates++
           add(link, current.depth + 1)
         }
@@ -881,6 +893,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           sourceURL: current.url,
           title,
           contentFingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
+          discoveredLinks,
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
