@@ -211,7 +211,7 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
   return /[?&](page|p|offset|start|pageindex)=\d+/i.test(parsed.search)
 }
 
-function classify(title: string, text: string) {
+export function classifyResearchTopic(title: string, text: string) {
   const classes: Array<[string, RegExp]> = [
     ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
     ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
@@ -224,7 +224,12 @@ function classify(title: string, text: string) {
     ["race-condition", /race condition|time[- ]of[- ]check/],
     ["open-redirect", /open redirect/],
     ["auth-bypass", /authentication bypass|auth bypass/],
-    ["access-control", /access control|authorization bypass/],
+    ["access-control", /access control|authorization bypass|broken access control/],
+    ["privilege-escalation", /privilege escalation|vertical privilege escalation|horizontal privilege escalation/],
+    ["account-takeover", /account takeover|account compromise|\bato\b/],
+    ["information-disclosure", /information disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
+    ["security-misconfiguration", /security misconfiguration|misconfiguration|insecure configuration/],
+    ["cors", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
     ["business-logic", /business logic/],
     ["prototype-pollution", /prototype pollution/],
     ["deserialization", /insecure deserialization|deserialization/],
@@ -325,6 +330,11 @@ function extractResearchSignals(text: string, vulnerabilityClass?: string) {
     ["idor", /\bidor\b|insecure direct object|object[- ]level authorization|object[- ]identifier|resource identifier|another user(?:'s)? (?:data|object|account)/],
     ["object-identifier", /object identifier|resource identifier|object id|user id|account id|order id/],
     ["authorization-boundary", /authorization|access control|privilege escalation|another user|other account/],
+    ["privilege-escalation", /privilege escalation|vertical privilege escalation|horizontal privilege escalation/],
+    ["account-takeover", /account takeover|account compromise|\bato\b/],
+    ["information-disclosure", /information disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
+    ["security-misconfiguration", /security misconfiguration|misconfiguration|insecure configuration/],
+    ["cors-policy", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
     ["authentication-flow", /authentication|login|session fixation|password reset|account recovery/],
     ["token-or-jwt", /\bjwt\b|bearer token|refresh token|access token|oauth/],
     ["javascript-client", /\.m?js\b|javascript|source map|client-side|frontend/],
@@ -880,7 +890,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         result.skipped++
         continue
       }
-      const vulnerabilityClass = classify(title, text)
+      const vulnerabilityClass = classifyResearchTopic(title, text)
       if (!vulnerabilityClass && source.kind !== "reference" && source.kind !== "academy") {
         ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "no recognizable security topic")
         result.skipped++
