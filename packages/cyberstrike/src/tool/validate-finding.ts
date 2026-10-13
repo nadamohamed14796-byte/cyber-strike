@@ -1,5 +1,6 @@
 import z from "zod"
 import { Tool } from "./tool"
+import { ReportKnowledge } from "../learning/report-knowledge"
 import {
   FINDING_VALIDATION_CHECKS,
   FindingValidation,
@@ -34,11 +35,16 @@ const DESCRIPTION = [
   ...FINDING_VALIDATION_CHECKS.map((check) => "#" + check.number + " [" + check.id + "] " + check.question),
   "The tool stores every assessment in SQLite and appends the latest summary to the finding. It may set finding status to false_positive only after 20 distinct valid attempts and multiple evidence-backed contradictions, including at least one primary contradiction. Otherwise it returns confirmed or inconclusive according to the rubric.",
   "When exactly one existing target workspace is the most specific match for observations in this session tree, it also saves a target-specific summary note and reports its note ID. Ambiguous/unobserved targets receive no note; raw request/response evidence is not copied into the note.",
+  "Optional research_reference_ids must contain only exact Knowledge record IDs for shared public references that materially influenced this validation. A confirmed verdict records reference usefulness for ranking; inconclusive and false-positive results are recorded as observed only and never disprove the source report.",
   "The result is a conservative rubric, not a statistical probability or replacement for human review. Do not run actions outside the existing approved scope; this tool does not change scope enforcement.",
 ].join("\n")
 
 const ValidateFindingParameters = z.object({
     id: z.string().min(1).describe("Finding ID returned by report_vulnerability"),
+    research_reference_ids: z.array(z.string().trim().min(1).max(128))
+      .max(8)
+      .optional()
+      .describe("Exact Knowledge record IDs returned by research_knowledge or the automatic research context; include only references that materially influenced this validation"),
     attempts: z.array(z.object({
       strategy: ATTEMPT_STRATEGY,
       checkID: CHECK_ID.describe("Which of the ten validation checks this attempt tests"),
@@ -69,6 +75,20 @@ export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters,
         checks: params.checks as FindingValidationInputCheck[],
         attempts: params.attempts as FindingValidationAttemptInput[] | undefined,
       })
+      let researchFeedbackRecorded = 0
+      const feedbackOutcome = result.verdict === "confirmed" ? "useful" : "observed"
+      for (const reportID of new Set(params.research_reference_ids ?? [])) {
+        if (ReportKnowledge.recordReferenceUse({
+          reportID,
+          sessionID: ctx.sessionID,
+          outcome: feedbackOutcome,
+          signal: "finding-validation:" + result.verdict,
+          metadata: {
+            validation_verdict: result.verdict,
+            feedback_basis: "agent-marked-materially-influential",
+          },
+        })) researchFeedbackRecorded++
+      }
       return {
         title: "Finding validation: " + result.verdict,
         output: result.output + (
@@ -87,6 +107,7 @@ export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters,
           recommended_strategies: result.strategyPlan,
           failed_checks: result.failedCheckIDs,
           unknown_checks: result.unknownCheckIDs,
+          research_reference_feedback_recorded: researchFeedbackRecorded,
         },
       }
     } catch (error) {
