@@ -19,6 +19,19 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       const rootPath = init.metadata.workspace!
       expect(await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")).toContain("# Target Notes")
       expect((await fs.readFile(path.join(rootPath, "scope", "scope.json"), "utf-8"))).toContain('"status": "unconfigured"')
+      const summary = await tool.execute({
+        action: "record_summary",
+        target_url: "https://example.com",
+        summary_title: "Scope input registered",
+        summary_content: "The operator-provided scope list is staged at scope/targets.txt; recon has not started.",
+        summary_kind: "manual",
+        summary_status: "observed",
+        summary_source: "orchestrator",
+        summary_tags: ["scope", "run-state"],
+      }, {} as never)
+      expect(summary.metadata.saved).toBe(true)
+      expect(summary.metadata.note_id).toBeTruthy()
+      expect(await fs.readFile(summary.metadata.notes_file!, "utf-8")).toContain("Scope input registered")
 
       const scope = await tool.execute({
         action: "configure_scope",
