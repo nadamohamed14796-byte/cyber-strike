@@ -3,6 +3,7 @@ import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "./report-knowledge.sql"
 import { matchesSourceURLFingerprint, sourceFingerprints } from "./source-fingerprint"
+import { RESEARCH_SOURCES } from "../research/sources"
 
 export namespace ReportKnowledge {
   export type Outcome = "observed" | "useful" | "confirmed" | "rejected" | "duplicate" | "disproven"
@@ -209,7 +210,7 @@ export namespace ReportKnowledge {
    * The study marker is independent of heuristic extraction_version so older records
    * can be revisited once without repeatedly flooding the durable queue.
    */
-  export function externalRecordsForModelStudy(limit = 100, modelStudyVersion = 1, sourceHosts?: string[]) {
+  export function externalRecordsForModelStudy(limit = 100, modelStudyVersion = 1, sourceHosts?: string[], sourceID?: string) {
     const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
     const currentVersion = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : 1))
     return Database.use((db) => {
@@ -236,6 +237,26 @@ export namespace ReportKnowledge {
         .filter((row) => {
           if (!row.source_url) return false
           const metadata = row.metadata ?? {}
+          if (sourceID) {
+            let parsed: URL
+            try {
+              parsed = new URL(row.source_url)
+            } catch {
+              return false
+            }
+            if (parsed.protocol !== "https:") return false
+            const matchingSources = RESEARCH_SOURCES.filter((source) =>
+              source.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
+            )
+            const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
+            const resolvedSource = preferredID
+              ? matchingSources.find((source) => source.id === preferredID)
+              : matchingSources.length === 1 ? matchingSources[0] : undefined
+            // Filter to a safely attributable source before the batch limit.
+            // Older reports from another source on a shared host must not crowd
+            // the requested source out of every legacy backfill batch.
+            if (resolvedSource?.id !== sourceID) return false
+          }
           const requested = metadata.model_study_requested_version
           const studied = metadata.model_study_version
           // A stored excerpt is optional: the agent-study worker can safely fetch
