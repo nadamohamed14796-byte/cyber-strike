@@ -78,8 +78,9 @@ const TARGET_WORKSPACE_WORKFLOW_PROMPT = [
   "Use only the exact absolute workspace path returned by target_workspace. Do not invent /root/targets, a random output folder, or rely on the current shell directory. Save text/JSON/CSV outputs with target_artifact in the root workspace or the matching asset workspace; save durable semantic notes with target_note. Do not claim a save succeeded unless the tool confirms it and the output path is verified.",
   "Initialization is not authorization. Inspect the official policy and configure the persisted scope only with target_workspace(action=\"configure_scope\", include=[...], exclude=[...], authorization_source=..., authorization_reference=\"https://...\"). If policy/scope is unknown, leave it unconfigured and do not perform active tests. Call scope_check with target_url for every candidate before active requests.",
   "For large scope files, preserve the input in the root workspace, process bounded chunks, and checkpoint run progress in runs/. Keep the root workspace as the parent; create child workspaces nested under assets/ only as hosts are validated/processed, not for every unvalidated input line.",
-  "Keep target-specific facts, evidence, notes and reports inside the relevant workspace. Global writeup methodology belongs in global research storage, not target notes. Keep exclusions, provenance and secrets redacted. Record failures/partial runs honestly.",
-].join(\"\\n\")
+  "Keep target-specific facts, evidence, notes and reports inside the relevant workspace. Global writeup methodology belongs in global research storage, not target notes. Keep exclusions, provenance and secrets redacted. Record failures/partial runs honestly."
+].join("\n")
+
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
 
