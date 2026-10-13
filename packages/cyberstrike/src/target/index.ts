@@ -853,6 +853,12 @@ export namespace TargetMemory {
       parent = await get(options.parentTargetURL)
       if (!parent) throw new Error("Parent target workspace does not exist.")
       if (parent.targetKey === normalized.targetKey) throw new Error("A target cannot be its own parent.")
+      // Explicit parent selection is an internal convenience, not an authorization
+      // bypass. Re-check the candidate against this parent's saved scope and every
+      // ancestor before creating or reusing a nested workspace.
+      if (!await parentChainAuthorizes(new URL(normalized.targetURL), parent)) {
+        throw new Error("The selected parent scope and its ancestors do not authorize this child target.")
+      }
     } else {
       parent = await findAuthorizedParent(new URL(normalized.targetURL).origin)
     }
