@@ -211,6 +211,11 @@ export namespace ReportKnowledge {
         severity: ReportKnowledgeTable.severity,
         vulnerabilityClass: ReportKnowledgeTable.vulnerability_class,
         cweID: ReportKnowledgeTable.cwe_id,
+        lesson: ReportKnowledgeTable.lesson,
+        attackVector: ReportKnowledgeTable.attack_vector,
+        impact: ReportKnowledgeTable.impact,
+        reproduction: ReportKnowledgeTable.reproduction,
+        poc: ReportKnowledgeTable.poc,
         tags: ReportKnowledgeTable.tags,
         sourceURL: ReportKnowledgeTable.source_url,
         metadata: ReportKnowledgeTable.metadata,
@@ -241,6 +246,11 @@ export namespace ReportKnowledge {
     vulnerabilityClass?: string
     cweID?: string
     severity?: string
+    lesson?: string
+    attackVector?: string
+    impact?: string
+    reproduction?: string
+    poc?: string
     tags?: string[]
     metadata?: Record<string, unknown>
   }): boolean {
@@ -268,6 +278,11 @@ export namespace ReportKnowledge {
           vulnerability_class: input.vulnerabilityClass ?? row.vulnerability_class,
           cwe_id: input.cweID ?? row.cwe_id,
           severity: input.severity && input.severity !== "unknown" ? input.severity : row.severity,
+          lesson: input.lesson ?? row.lesson,
+          attack_vector: input.attackVector ?? row.attack_vector,
+          impact: input.impact ?? row.impact,
+          reproduction: input.reproduction ?? row.reproduction,
+          poc: input.poc ?? row.poc,
           tags: input.tags?.length ? Array.from(new Set([...(row.tags ?? []), ...input.tags])) : row.tags,
           metadata: {
             ...existingMetadata,
