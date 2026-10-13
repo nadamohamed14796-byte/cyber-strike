@@ -396,3 +396,59 @@ test("local enrichment selects only legacy shared excerpts and marks records cur
     },
   })
 })
+
+
+test("source trust breaks otherwise equal relevance ties without overriding stronger signals", async () => {
+  await using dir = await tmpdir()
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const title = "CORS cross-origin response policy reference " + marker
+      const highTrust = ReportKnowledge.ingestExternalDetailed({
+        title,
+        severity: "unknown",
+        vulnerabilityClass: "cors",
+        sourceURL: "https://research.example.test/" + marker + "/high-trust",
+        lesson: "Compare CORS response behavior with the intended cross-origin policy.",
+        sourceTrust: 100,
+        tags: ["cors", "cors-policy"],
+        metadata: {
+          source_trust: 100,
+          extracted: {
+            classification_method: "title-first-dominant-body-v2",
+            retrieval_signals: ["cors", "cors-policy"],
+          },
+        },
+      })
+      const lowerTrust = ReportKnowledge.ingestExternalDetailed({
+        title,
+        severity: "unknown",
+        vulnerabilityClass: "cors",
+        sourceURL: "https://research.example.test/" + marker + "/lower-trust",
+        lesson: "Compare CORS response behavior with the intended cross-origin policy.",
+        sourceTrust: 80,
+        tags: ["cors", "cors-policy"],
+        metadata: {
+          source_trust: 80,
+          extracted: {
+            classification_method: "title-first-dominant-body-v2",
+            retrieval_signals: ["cors", "cors-policy"],
+          },
+        },
+      })
+      expect(highTrust).not.toBeNull()
+      expect(lowerTrust).not.toBeNull()
+      if (!highTrust || !lowerTrust) throw new Error("test references were not persisted")
+
+      const rows = ReportKnowledge.recommendations({
+        signal: "CORS cross-origin response policy",
+        vulnerabilityClass: "cors",
+        limit: 5,
+      })
+      expect(rows[0]?.id).toBe(highTrust.id)
+      expect(rows.some((row) => row.id === lowerTrust.id)).toBe(true)
+      await Instance.dispose()
+    },
+  })
+})
