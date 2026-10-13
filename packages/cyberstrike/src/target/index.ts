@@ -1219,6 +1219,15 @@ export namespace TargetMemory {
       configuredAt: new Date().toISOString(),
     }
     await writeWorkspaceFile(workspace, "scope/scope.json", JSON.stringify(scope, null, 2) + "\n")
+    // configureScope already canonicalized every entry above; seed the validated cache
+    // from the file we just atomically wrote so large imports are not normalized twice.
+    const scopePath = path.join(workspace.workspacePath, "scope", "scope.json")
+    const scopeInfo = await assertRegularFileOrMissing(scopePath)
+    if (!scopeInfo) throw new Error("Configured scope manifest was not persisted: " + scopePath)
+    Object.freeze(scope.scopeItems)
+    Object.freeze(scope.excludedItems)
+    Object.freeze(scope)
+    cacheScopeManifest(scopePath, scopeFileSignature(scopeInfo), scope)
     const associatedAssets = await refreshScopedAssets(workspace.targetURL)
     return { workspace, scope, associatedAssets }
   }
