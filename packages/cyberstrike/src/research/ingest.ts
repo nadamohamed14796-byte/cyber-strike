@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { ReportKnowledge } from "../learning/report-knowledge"
-import { RESEARCH_SOURCES, type ResearchSource } from "./sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, type ResearchSource } from "./sources"
 import { discoverySeeds, sourceDocumentPriority } from "./adapters"
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
@@ -892,7 +892,17 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
   const { ResearchQueue } = await import("./queue")
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
   const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
-  const result = { worker: workerID, claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
+  const legacyRequeued = ResearchQueue.requeueLegacyRejected(limit, input.sourceID)
+  const result = {
+    worker: workerID,
+    claimed: 0,
+    learned: 0,
+    skipped: 0,
+    failed: 0,
+    blocked_auth: 0,
+    requeued_legacy: legacyRequeued,
+    errors: [] as string[],
+  }
 
   // Reuse the same source-scoped retry path as CLI/update instead of retrying
   // 100 rows independently per source. This keeps auth recovery bounded globally
@@ -990,7 +1000,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           content_truncated_for_learning: cachedTextTruncated,
           stored_excerpt_length: Math.min(text.length, 12000),
           queue_id: item.public_id,
-          extraction_version: 7,
+          extraction_version: RESEARCH_LEARNING_VERSION,
           study_method: "bounded-heuristic-extraction",
           extracted: {
             vulnerability_class: vulnerabilityClass ?? null,
