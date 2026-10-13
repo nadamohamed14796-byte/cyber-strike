@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { Instance } from "../../src/project/instance"
 import { Database } from "../../src/storage/db"
 import { SessionTable } from "../../src/session/session.sql"
-import { ReportKnowledgeEventTable } from "../../src/learning/report-knowledge.sql"
+import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { tmpdir } from "../fixture/fixture"
 
@@ -169,6 +169,85 @@ test("target outcomes do not relabel globally shared external research", async (
         event.outcome === "disproven" &&
         event.hook === "verification"
       )).toBe(true)
+
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("finding-validation feedback ranks shared references without poisoning global truth", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sessionID = "ses_reference_feedback_" + marker
+      const now = Date.now()
+      Database.use((db) =>
+        db.insert(SessionTable).values({
+          id: sessionID,
+          project_id: Instance.project.id,
+          slug: "reference-feedback",
+          directory: dir.path,
+          title: "Reference feedback test",
+          version: "1",
+          time_created: now,
+          time_updated: now,
+        }).run(),
+      )
+
+      const shared = ReportKnowledge.ingestExternalDetailed({
+        title: "CORS and authorization research reference " + marker,
+        severity: "unknown",
+        vulnerabilityClass: "cors",
+        sourceURL: "https://research.example.test/" + marker + "/cors-reference",
+        lesson: "Compare the observed CORS response headers against the intended cross-origin policy.",
+        sourceTrust: 80,
+        tags: ["cors-policy", "cors"],
+        metadata: { source_trust: 80, extracted: { retrieval_signals: ["cors-policy"] } },
+      })
+      const scoped = ReportKnowledge.ingestExternalDetailed({
+        title: "Target-scoped CORS note " + marker,
+        severity: "unknown",
+        sourceURL: "https://research.example.test/" + marker + "/scoped-cors-reference",
+        targetPattern: "tenant-" + marker + ".example",
+        lesson: "This note belongs to one target only.",
+        sourceTrust: 80,
+        tags: ["cors-policy"],
+        metadata: { source_trust: 80 },
+      })
+      expect(shared).not.toBeNull()
+      expect(scoped).not.toBeNull()
+      if (!shared || !scoped) throw new Error("test references were not persisted")
+
+      const feedback = {
+        reportID: shared.id,
+        sessionID,
+        signal: "finding-validation:confirmed",
+        metadata: { validation_verdict: "confirmed", feedback_basis: "agent-marked-materially-influential" },
+      }
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(true)
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "useful" })).toBe(false)
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, outcome: "observed" })).toBe(true)
+      expect(ReportKnowledge.recordReferenceUse({ ...feedback, reportID: scoped.id, outcome: "useful" })).toBe(false)
+
+      const stored = Database.use((db) =>
+        db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, shared.id)).get(),
+      )
+      expect(stored?.times_useful).toBe(1)
+      expect(stored?.times_rejected).toBe(0)
+      expect(stored?.status).toBe("observed")
+      expect(stored?.outcome).toBe("observed")
+
+      const events = Database.use((db) =>
+        db.select().from(ReportKnowledgeEventTable)
+          .where(eq(ReportKnowledgeEventTable.report_id, shared.id))
+          .all(),
+      )
+      expect(events.filter((event) => event.session_id === sessionID && event.hook === "finding-validation")).toHaveLength(2)
+      expect(events.some((event) => event.outcome === "useful")).toBe(true)
+      expect(events.some((event) => event.outcome === "observed")).toBe(true)
 
       await Instance.dispose()
     },
