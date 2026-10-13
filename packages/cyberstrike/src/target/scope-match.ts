@@ -10,7 +10,11 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // Treat any IPv4-looking CIDR as a CIDR candidate, including malformed prefixes,
   // so invalid ranges fail closed rather than falling through to hostname matching.
   if (/^\d+(?:\.\d+){3}\/.+$/.test(allowed) || /^\d+(?:\.\d+){3}\/$/.test(allowed)) {
-    const [range, prefixText] = allowed.split("/", 2)
+    const cidrParts = allowed.split("/")
+    if (cidrParts.length !== 2) {
+      return { matches: false, reason: "invalid IPv4 CIDR" }
+    }
+    const [range, prefixText] = cidrParts
     const rangeNumber = ipv4ToNumber(range)
     if (!/^(?:0|[1-9]\d?)$/.test(prefixText)) {
       return { matches: false, reason: "invalid IPv4 CIDR" }

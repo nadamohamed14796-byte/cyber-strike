@@ -26,6 +26,8 @@ describe("scope_check IPv4 CIDR matching", () => {
     expect(checkMatch("10.20.30.40", "10.20.30.0/33").matches).toBe(false)
     expect(checkMatch("10.20.30.40", "10.20.30.0/-1").matches).toBe(false)
     expect(checkMatch("10.20.30.40", "10.20.30.0/").matches).toBe(false)
+    expect(checkMatch("10.20.30.40", "10.20.30.0/24/extra").matches).toBe(false)
+    expect(checkMatch("10.20.30.40", "10.20.30.0/24/").matches).toBe(false)
   })
 
   test("rejects credential-bearing target URLs", () => {
