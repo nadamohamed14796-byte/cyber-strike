@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm"
 import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
-import { RESEARCH_LEARNING_VERSION } from "./sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION } from "./sources"
 
 export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth"
 
@@ -76,6 +76,143 @@ export namespace ResearchQueue {
         .get()
       if (!raced) throw new Error("research queue insert conflicted but the row could not be reloaded")
       return { id: publicID(raced.sequence), sequence: raced.sequence, created: false }
+    })
+  }
+
+  /**
+   * Queue a previously stored public report for the model-led study path using its
+   * already sanitized excerpt. This upgrades older heuristic-only knowledge without
+   * making another network request.
+   */
+  export function enqueueForModelStudy(input: {
+    sourceID: string
+    sourceURL: string
+    title: string
+    payload: Record<string, unknown>
+    modelStudyVersion?: number
+  }) {
+    const now = Date.now()
+    const version = Math.max(1, Math.floor(Number.isFinite(input.modelStudyVersion) ? input.modelStudyVersion ?? RESEARCH_MODEL_STUDY_VERSION : RESEARCH_MODEL_STUDY_VERSION))
+    return Database.transaction((db) => {
+      const existing = db.select().from(ResearchQueueTable).where(and(
+        eq(ResearchQueueTable.source_id, input.sourceID),
+        eq(ResearchQueueTable.source_url, input.sourceURL),
+      )).get()
+      if (!existing) {
+        const payload = { ...input.payload, model_study_requested_version: version }
+        const row = db.insert(ResearchQueueTable).values({
+          source_id: input.sourceID,
+          source_url: input.sourceURL,
+          title: input.title,
+          payload,
+          status: "queued",
+          attempts: 0,
+          discovered_at: now,
+          updated_at: now,
+        }).onConflictDoNothing().returning().get()
+        if (row) return { id: publicID(row.sequence), sequence: row.sequence, queued: true, created: true }
+        const raced = db.select().from(ResearchQueueTable).where(and(
+          eq(ResearchQueueTable.source_id, input.sourceID),
+          eq(ResearchQueueTable.source_url, input.sourceURL),
+        )).get()
+        return raced
+          ? { id: publicID(raced.sequence), sequence: raced.sequence, queued: raced.status === "queued" || raced.status === "retry", created: false }
+          : { id: "", sequence: 0, queued: false, created: false }
+      }
+
+      if (typeof existing.payload?.model_study_version === "number" && existing.payload.model_study_version >= version) {
+        return { id: publicID(existing.sequence), sequence: existing.sequence, queued: false, created: false, reason: "already-model-studied" }
+      }
+      if (
+        existing.status === "studying" &&
+        typeof existing.lease_until === "number" &&
+        existing.lease_until > now
+      ) {
+        return { id: publicID(existing.sequence), sequence: existing.sequence, queued: false, created: false, reason: "currently-claimed" }
+      }
+
+      const {
+        crawl_page: _crawlPage,
+        crawl_error: _crawlError,
+        auth_required: _authRequired,
+        ...previousPayload
+      } = existing.payload ?? {}
+      const priorText = typeof previousPayload.cached_text === "string" ? previousPayload.cached_text : ""
+      const incomingText = typeof input.payload.cached_text === "string" ? input.payload.cached_text : ""
+      const keepPriorText = priorText.length >= incomingText.length
+      const payload = {
+        ...previousPayload,
+        ...input.payload,
+        ...(keepPriorText ? { cached_text: priorText } : {}),
+        ...(keepPriorText && typeof previousPayload.content_length === "number"
+          ? { content_length: previousPayload.content_length }
+          : {}),
+        ...(keepPriorText && typeof previousPayload.content_fingerprint === "string"
+          ? { content_fingerprint: previousPayload.content_fingerprint }
+          : {}),
+        ...(keepPriorText && previousPayload.cached_text_truncated === true
+          ? { cached_text_truncated: true }
+          : {}),
+        model_study_requested_version: version,
+      }
+      const requeued = existing.status !== "queued" && existing.status !== "retry"
+      const updated = db.update(ResearchQueueTable).set({
+        title: input.title || existing.title,
+        payload,
+        status: "queued",
+        attempts: requeued ? 0 : existing.attempts,
+        last_error: null,
+        lease_owner: null,
+        lease_until: null,
+        completed_at: null,
+        updated_at: now,
+      }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      return updated
+        ? { id: publicID(updated.sequence), sequence: updated.sequence, queued: true, created: false, requeued }
+        : { id: publicID(existing.sequence), sequence: existing.sequence, queued: false, created: false, reason: "queue-row-changed" }
+    })
+  }
+
+  /**
+   * Revisit reports previously marked learned by the heuristic worker if they have
+   * cached text but no completed model-study marker. The per-version request marker
+   * keeps this one-time and prevents every /update cycle from requeueing the same row.
+   */
+  export function requeueLearnedForModelStudy(limit = 100, sourceID?: string, modelStudyVersion = RESEARCH_MODEL_STUDY_VERSION) {
+    const now = Date.now()
+    const version = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : RESEARCH_MODEL_STUDY_VERSION))
+    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    return Database.transaction((db) => {
+      const candidates = db.select().from(ResearchQueueTable).where(and(
+        inArray(ResearchQueueTable.status, ["learned", "rejected"]),
+        ...(sourceID ? [eq(ResearchQueueTable.source_id, sourceID)] : []),
+      )).orderBy(asc(ResearchQueueTable.sequence)).all().filter((row) => {
+        if (row.payload?.crawl_page === true) return false
+        if (typeof row.payload?.cached_text !== "string" || row.payload.cached_text.trim().length < 250) return false
+        const requested = row.payload.model_study_requested_version
+        const studied = row.payload.model_study_version
+        if (typeof studied === "number" && studied >= version) return false
+        if (typeof requested === "number" && requested >= version) return false
+        if (row.status === "rejected" && !["no recognizable security topic", "page failed research relevance gate"].includes(row.last_error ?? "")) return false
+        return true
+      }).slice(0, bounded)
+
+      for (const row of candidates) {
+        db.update(ResearchQueueTable).set({
+          status: "queued",
+          payload: { ...(row.payload ?? {}), model_study_requested_version: version },
+          attempts: 0,
+          last_error: null,
+          lease_owner: null,
+          lease_until: null,
+          completed_at: null,
+          updated_at: now,
+        }).where(and(
+          eq(ResearchQueueTable.sequence, row.sequence),
+          inArray(ResearchQueueTable.status, ["learned", "rejected"]),
+        )).run()
+      }
+      return candidates.length
     })
   }
 
@@ -418,29 +555,30 @@ export namespace ResearchQueue {
     leaseOwner: string,
     outcome: "learned" | "retry" | "rejected" | "blocked_auth",
     error?: string,
+    payloadPatch?: Record<string, unknown>,
   ) {
     const now = Date.now()
-    return Database.use((db) =>
-      db
-        .update(ResearchQueueTable)
-        .set({
-          status: outcome,
-          last_error: error ?? null,
-          lease_owner: null,
-          lease_until: null,
-          completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" ? now : null,
-          updated_at: now,
-        })
-        .where(
-          and(
-            eq(ResearchQueueTable.sequence, sequence),
-            eq(ResearchQueueTable.status, "studying"),
-            eq(ResearchQueueTable.lease_owner, leaseOwner),
-          ),
-        )
-        .returning()
-        .get(),
-    )
+    return Database.transaction((db) => {
+      const row = db.select().from(ResearchQueueTable).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, leaseOwner),
+      )).get()
+      if (!row) return undefined
+      return db.update(ResearchQueueTable).set({
+        status: outcome,
+        payload: payloadPatch ? { ...(row.payload ?? {}), ...payloadPatch } : row.payload,
+        last_error: error ?? null,
+        lease_owner: null,
+        lease_until: null,
+        completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" ? now : null,
+        updated_at: now,
+      }).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, leaseOwner),
+      )).returning().get()
+    })
   }
 
   export function stats(sourceID?: string) {
