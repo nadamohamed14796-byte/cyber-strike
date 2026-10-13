@@ -103,10 +103,10 @@ export function promptResearchSignals(input: string): string[] {
     ["prototype-pollution", /prototype pollution/],
     ["request-smuggling", /request smuggling|http desynchronization/],
     ["cors-policy", /\bcors\b|cross-origin resource sharing|access-control-allow-origin|cross-origin policy/],
-    ["information-disclosure", /information disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
-    ["privilege-escalation", /privilege escalation|vertical privilege escalation|horizontal privilege escalation/],
-    ["security-misconfiguration", /security misconfiguration|misconfiguration|insecure configuration/],
-    ["account-takeover", /account takeover|account compromise|ato\b/],
+    ["information-disclosure", /information[- ]disclosure|sensitive information exposure|sensitive data exposure|data leakage|exposed sensitive data/],
+    ["privilege-escalation", /privilege[- ]escalation|vertical privilege[- ]escalation|horizontal privilege[- ]escalation/],
+    ["security-misconfiguration", /security[- ]misconfiguration|misconfiguration|insecure configuration/],
+    ["account-takeover", /account[- ]takeover|account compromise|ato\b/],
   ]
   for (const [signal, pattern] of patterns) if (pattern.test(text)) signals.push(signal)
   return [...new Set(signals)].slice(0, 12)
@@ -237,7 +237,7 @@ export namespace ResearchContext {
     // API/auth/business-logic signal). Query the most recent actionable signals
     // independently, then deduplicate the global public references.
     const actionableType = /^(endpoint|api_schema|authentication_flow|business_rule|parameter|configuration|technology|vulnerability_hint|sensitive_data|infrastructure)$/i
-    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information disclosure|data leakage|misconfiguration|account takeover|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
+    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information[- ]disclosure|data leakage|misconfiguration|account[- ]takeover|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
     const signalEntries = signalPool.filter((entry) => {
       const tags = ((entry.tags as string[] | null) ?? []).slice(0, 8)
       return actionableType.test(entry.type ?? "") ||
