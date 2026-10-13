@@ -143,6 +143,18 @@ test("model-led update queues legacy shared reports once without refetching or c
     directory: dir.path,
     fn: async () => {
       const marker = crypto.randomUUID()
+      const sessionID = "ses_legacy_model_study_" + marker.replace(/-/g, "").slice(0, 16)
+      const now = Date.now()
+      Database.use((db) => db.insert(SessionTable).values({
+        id: sessionID,
+        project_id: Instance.project.id,
+        slug: "legacy-model-study",
+        directory: dir.path,
+        title: "Legacy model study backfill test",
+        version: "1",
+        time_created: now,
+        time_updated: now,
+      }).run())
       const sourceURL = "https://portswigger.net/web-security/access-control/idor?legacy-study=" + marker
       const excerpt = [
         "IDOR occurs when object-level authorization is not enforced by the server.",
@@ -194,6 +206,54 @@ test("model-led update queues legacy shared reports once without refetching or c
       const second = await queueLegacyKnowledgeForModelStudy()
       expect(second.queued).toBe(0)
       expect(ResearchQueue.stats("portswigger").queued).toBe(1)
+
+      const studyTool = await ResearchStudyTool.init()
+      const context = {
+        sessionID,
+        messageID: "msg_legacy_study_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const next = await studyTool.execute({
+        action: "next",
+        source: "portswigger",
+        pages: 1,
+        depth: 1,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      const batch = JSON.parse(next.output)
+      expect(batch.batch_size).toBe(1)
+      expect(batch.items[0].public_id).toBe(queued.id)
+
+      const save = await studyTool.execute({
+        action: "save",
+        source: "portswigger",
+        pages: 1,
+        depth: 1,
+        limit: 3,
+        continue_after_save: false,
+        items: [{
+          public_id: batch.items[0].public_id,
+          lease_owner: batch.items[0].lease_owner,
+          decision: "rejected",
+          reason: "legacy fixture is intentionally rejected by the model in this integration test",
+        }],
+      }, context)
+      expect(JSON.parse(save.output).rejected).toBe(1)
+      const finishedLegacy = Database.use((db) =>
+        db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, legacy.id)).get(),
+      )
+      expect(finishedLegacy?.status).toBe("observed")
+      expect(finishedLegacy?.metadata?.model_study_version).toBe(1)
+      expect(finishedLegacy?.metadata?.model_study_decision).toBe("rejected")
+      const finishedQueue = ResearchQueue.find("portswigger", sourceURL)
+      expect(finishedQueue?.status).toBe("rejected")
+      expect(finishedQueue?.payload?.model_study_version).toBe(1)
+      expect((await queueLegacyKnowledgeForModelStudy()).queued).toBe(0)
       await Instance.dispose()
     },
   })
