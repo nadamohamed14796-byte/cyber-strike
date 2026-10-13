@@ -169,3 +169,74 @@ test("explicit current research intent is not starved by recent generic API traf
     },
   })
 })
+
+
+test("automatic research context preserves references for multiple explicit vulnerability classes", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sessionID = "ses_research_multi_class_" + marker
+      const now = Date.now()
+      Database.use((db) =>
+        db.insert(SessionTable).values({
+          id: sessionID,
+          project_id: Instance.project.id,
+          slug: "research-multi-class",
+          directory: dir.path,
+          title: "Research multi-class test",
+          version: "1",
+          time_created: now,
+          time_updated: now,
+        }).run(),
+      )
+
+      const corsTitle = "CORS cross-origin policy reference " + marker
+      const disclosureTitle = "Information disclosure reference " + marker
+      for (const item of [
+        {
+          title: corsTitle,
+          vulnerabilityClass: "cors",
+          sourceURL: "https://research.example.test/" + marker + "/cors",
+          signals: ["cors", "cors-policy"],
+          lesson: "Compare the observed Access-Control-Allow-Origin behavior with the intended origin policy.",
+        },
+        {
+          title: disclosureTitle,
+          vulnerabilityClass: "information-disclosure",
+          sourceURL: "https://research.example.test/" + marker + "/disclosure",
+          signals: ["information-disclosure"],
+          lesson: "Check whether responses expose sensitive data to a caller without the required permission.",
+        },
+      ]) {
+        expect(ReportKnowledge.ingestExternalDetailed({
+          title: item.title,
+          severity: "unknown",
+          vulnerabilityClass: item.vulnerabilityClass,
+          sourceURL: item.sourceURL,
+          lesson: item.lesson,
+          sourceTrust: 85,
+          tags: item.signals,
+          metadata: {
+            source_trust: 85,
+            extraction_version: 7,
+            extracted: {
+              vulnerability_class: item.vulnerabilityClass,
+              classification_method: "title-first-dominant-body-v2",
+              retrieval_signals: item.signals,
+            },
+          },
+        })).not.toBeNull()
+      }
+
+      const context = ResearchContext.generate(
+        sessionID,
+        "Investigate CORS and information disclosure using the observed response behavior",
+      )
+      expect(context).toContain(corsTitle)
+      expect(context).toContain(disclosureTitle)
+      await Instance.dispose()
+    },
+  })
+})
