@@ -1142,6 +1142,11 @@ export namespace TargetMemory {
       }
     }
     const validated = scope as TargetScope
+    // The cached manifest is shared by permission checks; freeze its arrays and
+    // object so a caller cannot mutate in-memory authorization without changing disk.
+    Object.freeze(validated.scopeItems)
+    Object.freeze(validated.excludedItems)
+    Object.freeze(validated)
     // Avoid retaining obsolete manifests for renamed/replaced files at the same path.
     scopeManifestCache.set(scopePath, { signature, scope: validated })
     return validated
