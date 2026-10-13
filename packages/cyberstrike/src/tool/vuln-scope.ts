@@ -64,6 +64,13 @@ export const TESTER_VRT_SCOPE: Record<string, string[]> = {
     "large language model",
     "prompt injection",
     "indirect prompt injection",
+    "encoding bypass",
+    "evasion bypass",
+    "guardrail bypass",
+    "sensitive data disclosure",
+    "data exfiltration",
+    "pii disclosure",
+    "token exhaustion",
     "system prompt",
     "prompt leakage",
     "model extraction",
@@ -101,7 +108,7 @@ export function vrtScopeViolation(
 // the most specific signatures first. Returns null when uncertain.
 const TITLE_SIGNATURES: [string, RegExp][] = [
   ["injection", /sql injection|sqli|nosql|\bxss\b|cross-site script|ssti|\bxxe\b|command inj|ldap inj/i],
-  ["llm", /prompt injection|indirect prompt|system prompt|prompt leakage|model extraction|training data extraction|insecure output handling|excessive agency|jailbreak|\bllm\b|large language model|ai chatbot|ai agent/i],
+  ["llm", /prompt injection|indirect prompt|encoding bypass|evasion bypass|guardrail bypass|sensitive data disclosure|data exfiltration|pii (?:leak|disclosure)|token exhaustion|system prompt|prompt leakage|model extraction|training data extraction|insecure output handling|excessive agency|jailbreak|\bllm\b|large language model|ai chatbot|ai agent/i],
   ["idor", /\bidor\b|\bbola\b|insecure direct object/i],
   ["ssrf", /\bssrf\b|server-side request forgery/i],
   ["file-attacks", /path traversal|directory traversal|\blfi\b|\brfi\b|arbitrary file (read|upload)|zip slip/i],
