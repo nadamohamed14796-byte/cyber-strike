@@ -1063,14 +1063,29 @@ export namespace TargetMemory {
 
     const workspace = mapWorkspace(row)
     const scopePath = path.join(workspace.workspacePath, "scope", "scope.json")
+    const notesPath = path.join(workspace.workspacePath, "notes.md")
     await assertRegularFileOrMissing(scopePath)
-    let info: Awaited<ReturnType<typeof fs.stat>>
+    await assertRegularFileOrMissing(notesPath)
+
+    let needsRepair = false
+    try {
+      await fs.stat(notesPath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+      needsRepair = true
+    }
+
+    let info: Awaited<ReturnType<typeof fs.stat>> | undefined
     try {
       info = await fs.stat(scopePath)
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-      // Repair a missing generated manifest once, alongside the notes.md and other
-      // canonical workspace files, instead of treating an existing target as absent.
+      needsRepair = true
+    }
+
+    if (needsRepair) {
+      // Repair missing generated files once, without preparing and rewriting the
+      // entire workspace on every ordinary scope check.
       await prepareWorkspace(workspace)
       try {
         info = await fs.stat(scopePath)
@@ -1079,7 +1094,7 @@ export namespace TargetMemory {
         throw repairError
       }
     }
-    if (!info.isFile()) throw new Error("Unsafe target scope manifest: expected a regular file.")
+    if (!info?.isFile()) throw new Error("Unsafe target scope manifest: expected a regular file.")
     const signature = scopeFileSignature(info)
     const cached = scopeManifestCache.get(scopePath)
     if (cached?.signature === signature) return cached.scope
