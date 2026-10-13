@@ -78,7 +78,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
     "Before testing this phase, use the `skill` tool to load at least one relevant skill listed below. A name in this list is only a recommendation; it is not loaded until the tool returns its skill content.",
     "If loading is denied or a skill is unavailable, search for an allowed alternative and note the gap. Do not claim a skill was loaded unless the tool call succeeded.",
   ]
-  if (selected.size === 0) {
+  if (selected.length === 0) {
     lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
   } else {
     lines.push("", "Phase-specific candidates:")
