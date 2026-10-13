@@ -13,6 +13,7 @@ import { SkillIndex } from "../skill/index-engine"
 // use the skill tool to load the selected skill so normal per-agent permissions apply.
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   scope_analysis: ["attack-bb-methodology", "scope", "attack surface"],
+  mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: ["recon-methodology", "recon-subdomain-enumeration", "osint"],
   active_recon: ["attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration"],
   technology_profiling: ["technology profiling", "technology fingerprinting", "framework detection"],
