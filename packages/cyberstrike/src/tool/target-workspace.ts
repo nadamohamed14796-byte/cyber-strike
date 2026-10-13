@@ -45,7 +45,6 @@ type TargetWorkspaceMetadata = {
   note_id?: string
   note_created?: boolean
   note_updated?: boolean
-  notes_file?: string
 }
 
 function required(value: string | undefined, name: string): string {
