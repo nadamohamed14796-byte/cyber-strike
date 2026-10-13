@@ -441,7 +441,12 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       const legacyRejectedRequeued = ResearchQueue.requeueLegacyRejected(100, params.source)
       const legacyQueueRequeued = ResearchQueue.requeueLearnedForModelStudy(100, params.source, RESEARCH_MODEL_STUDY_VERSION)
       const legacyKnowledge = await queueLegacyKnowledgeForModelStudy(params.source)
-      const results = await discoverResearch({ sourceID: params.source, pages: params.pages, depth: params.depth })
+      const results = await discoverResearch({
+        sourceID: params.source,
+        pages: params.pages,
+        depth: params.depth,
+        agentLed: true,
+      })
       const summary = {
         auth_resumed: authResumed,
         legacy_rejected_requeued: legacyRejectedRequeued,
