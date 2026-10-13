@@ -6,7 +6,7 @@ import { SessionTable } from "../../src/session/session.sql"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
-import { ResearchStudyTool } from "../../src/tool/research-study"
+import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
 import { tmpdir } from "../fixture/fixture"
 
 test("agent-led research study persists model analysis and completes its queue lease", async () => {
@@ -128,6 +128,69 @@ test("agent-led research study persists model analysis and completes its queue l
         .where(eq(ReportKnowledgeEventTable.report_id, knowledgeID)).all())
       expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(true)
       expect(ReportKnowledge.stats().external).toBeGreaterThanOrEqual(1)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("model-led update queues legacy shared reports once without refetching or changing source truth", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceURL = "https://portswigger.net/web-security/access-control/idor?legacy-study=" + marker
+      const excerpt = [
+        "IDOR occurs when object-level authorization is not enforced by the server.",
+        "CWE-639: Authorization bypass through a user-controlled object key.",
+        "Severity: High.",
+        "Prerequisites: two controlled accounts with different object ownership.",
+        "Reproduction: capture the owner request and replay it using the second account, then compare object ownership and response content.",
+        "Impact: the second account may access private data belonging to the first account.",
+        "False-positive caution: an intentionally shared object or public record is not evidence of an authorization bypass.",
+      ].join(" ")
+
+      const legacy = ReportKnowledge.ingestExternalDetailed({
+        title: "Legacy heuristic IDOR report " + marker,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL,
+        lesson: "Legacy heuristic lesson that should be reviewed by the current model.",
+        sourceTrust: 100,
+        tags: ["idor"],
+        metadata: {
+          research_source: "portswigger",
+          research_source_name: "PortSwigger Web Security Academy",
+          source_trust: 100,
+          study_method: "bounded-heuristic-extraction",
+          extraction_version: 7,
+          content_length: excerpt.length,
+          content_fingerprint: "b".repeat(40),
+          excerpt,
+          extracted: { retrieval_signals: ["idor", "CWE-639"] },
+        },
+      })
+      expect(legacy).not.toBeNull()
+      if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
+
+      const first = await queueLegacyKnowledgeForModelStudy()
+      expect(first.queued).toBe(1)
+      const queued = ResearchQueue.find("portswigger", sourceURL)
+      expect(queued?.status).toBe("queued")
+      expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
+      expect(queued?.payload?.cached_text).toBe(excerpt)
+      expect(queued?.payload?.model_study_requested_version).toBe(1)
+
+      const currentKnowledge = Database.use((db) =>
+        db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, legacy.id)).get(),
+      )
+      expect(currentKnowledge?.status).toBe("observed")
+      expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(1)
+
+      const second = await queueLegacyKnowledgeForModelStudy()
+      expect(second.queued).toBe(0)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
       await Instance.dispose()
     },
   })
