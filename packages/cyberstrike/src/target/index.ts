@@ -1107,8 +1107,9 @@ export namespace TargetMemory {
     ): Promise<boolean> => {
       if (!await assertRegularFileOrMissing(manifestPath)) return false
       try {
-        const parsed = JSON.parse(await fs.readFile(manifestPath, "utf-8")) as Record<string, unknown>
-        return Object.entries(fields).every(([key, expected]) => parsed[key] === expected)
+        const parsed: unknown = JSON.parse(await fs.readFile(manifestPath, "utf-8"))
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false
+        return Object.entries(fields).every(([key, expected]) => (parsed as Record<string, unknown>)[key] === expected)
       } catch (error) {
         if (error instanceof SyntaxError) return false
         if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
