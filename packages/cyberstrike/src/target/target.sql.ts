@@ -1,11 +1,14 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core"
+import { sqliteTable, text, integer, index, uniqueIndex, type AnySQLiteColumn } from "drizzle-orm/sqlite-core"
 import { ProjectTable } from "../project/project.sql"
 import { Timestamps } from "../storage/schema.sql"
 
+/** Child assets have independent workspaces nested under their authorized parent. */
+export type TargetAssetType = "target" | "subdomain" | "application" | "api" | "host"
+
 /**
  * A target workspace is isolated to one CyberStrike project and one normalized target URL.
- * Target metadata is stored in SQLite; workspace_path is project-relative so workspaces
- * remain portable if the project directory moves.
+ * Parent/child relationships group discovered assets without merging their identities.
+ * workspace_path is project-relative so workspaces remain portable if the project moves.
  */
 export const TargetWorkspaceTable = sqliteTable(
   "target_workspace",
@@ -20,12 +23,15 @@ export const TargetWorkspaceTable = sqliteTable(
     target_url: text().notNull(),
     hostname: text().notNull(),
     slug: text().notNull(),
+    parent_target_id: text().references((): AnySQLiteColumn => TargetWorkspaceTable.id, { onDelete: "set null" }),
+    asset_type: text().notNull().default("target").$type<TargetAssetType>(),
     workspace_path: text().notNull(),
     ...Timestamps,
   },
   (table) => [
     uniqueIndex("target_workspace_owner_target_key_idx").on(table.owner_key, table.target_key),
     index("target_workspace_owner_host_idx").on(table.owner_key, table.hostname),
+    index("target_workspace_parent_idx").on(table.parent_target_id),
   ],
 )
 
