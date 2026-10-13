@@ -606,24 +606,36 @@ export namespace TargetMemory {
     return false
   }
 
-  /** Pick one unambiguous, most-specific, explicitly authorized parent for a discovered host. */
+  /** Pick the most-specific parent; a configured narrower policy cannot be bypassed via an ancestor. */
   async function findAuthorizedParent(candidateURL: string): Promise<Workspace | null> {
     let candidate: URL
     try { candidate = new URL(candidateURL) } catch { return null }
     if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) return null
-    const matches: Array<{ workspace: Workspace; score: number }> = []
-    for (const workspace of list()) {
-      const base = new URL(workspace.targetURL)
-      if (base.hostname === candidate.hostname || base.protocol !== candidate.protocol || base.port !== candidate.port) continue
-      if (!candidate.hostname.endsWith("." + base.hostname) || base.pathname !== "/") continue
-      if (!await parentChainAuthorizes(candidate, workspace)) continue
-      // Hostname suffix specificity makes nested assets deterministic; equal-depth ties fail closed.
-      matches.push({ workspace, score: base.hostname.length })
+    const candidates = list()
+      .filter((workspace) => {
+        const base = new URL(workspace.targetURL)
+        return base.hostname !== candidate.hostname &&
+          candidate.hostname.endsWith("." + base.hostname) &&
+          base.protocol === candidate.protocol &&
+          base.port === candidate.port &&
+          base.pathname === "/"
+      })
+      .sort((a, b) => new URL(b.targetURL).hostname.length - new URL(a.targetURL).hostname.length)
+
+    for (const workspace of candidates) {
+      let scope: TargetScope | null
+      try { scope = await getScope(workspace.targetURL) } catch { return null }
+      // An unconfigured intermediate host is not a delegation boundary; try its ancestor.
+      if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) continue
+      const href = candidate.origin + "/"
+      // A narrower, configured exclusion must never fall back to a wider wildcard parent.
+      if (scope.excludedItems.some((item) => checkMatch(href, item).matches)) return null
+      if (!scope.scopeItems.some((item) => checkMatch(href, item).matches)) return null
+      // Every configured ancestor must also authorize this origin.
+      if (!await parentChainAuthorizes(candidate, workspace)) return null
+      return workspace
     }
-    matches.sort((a, b) => b.score - a.score)
-    if (!matches.length) return null
-    if (matches.length > 1 && matches[0]!.score === matches[1]!.score) return null
-    return matches[0]!.workspace
+    return null
   }
 
   function guessAssetType(hostname: string, requested?: TargetAssetType): TargetAssetType {
@@ -692,6 +704,7 @@ export namespace TargetMemory {
       slug: workspace.slug, parentTargetID: null, assetType: "target",
       relativePath: workspace.relativePath, createdAt: new Date(workspace.timeCreated).toISOString(),
     }, null, 2) + "\n")
+    await syncAssetRegistry(parent)
     return workspace
   }
 
@@ -767,10 +780,11 @@ export namespace TargetMemory {
       slug: workspace.slug, parentTargetID: workspace.parentTargetID, assetType: workspace.assetType,
       relativePath: workspace.relativePath, createdAt: new Date(workspace.timeCreated).toISOString(),
     }, null, 2) + "\n")
-    if (oldParentID) {
+    if (oldParentID && oldParentID !== parent.id) {
       const oldParentRow = Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, oldParentID)).get())
       if (oldParentRow) await syncAssetRegistry(mapWorkspace(oldParentRow))
     }
+    await syncAssetRegistry(parent)
     return workspace
   }
 
@@ -818,6 +832,13 @@ export namespace TargetMemory {
       return row
     })
     if (parent && row.parent_target_id !== parent.id) return await reparentWorkspace(row, parent, requestedAssetType)
+    if (!options.parentTargetURL && !parent && row.parent_target_id) {
+      const oldParentRow = Database.use((db) =>
+        db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.parent_target_id!)).get(),
+      )
+      if (!oldParentRow) throw new Error("Existing parent workspace is missing; refusing to write an orphaned target.")
+      return await detachWorkspace(row, mapWorkspace(oldParentRow))
+    }
     const workspace = mapWorkspace(row)
     await prepareWorkspace(workspace, options.reconcileNotes ?? true)
     if (parent) await syncAssetRegistry(parent)
@@ -923,30 +944,34 @@ export namespace TargetMemory {
     const parent = await get(parentURL)
     if (!parent) throw new Error("Parent workspace not found.")
     const scope = await getScope(parent.targetURL)
-    if (!scope || scope.status !== "configured") throw new Error("Cannot reconcile child assets without a configured parent scope.")
-    const candidates = list().filter((item) => item.id !== parent.id && !item.parentTargetID)
+    if (!scope || scope.status !== "configured") throw new Error("Cannot reconcile assets without a configured parent scope.")
+
+    // Reconcile every known workspace against its most-specific parent. In particular,
+    // a child scope added later must take ownership of its descendants before the root
+    // wildcard can claim them as siblings.
+    const candidates = list().filter((item) => item.id !== parent.id)
     const attached: Workspace[] = []
     for (const candidate of candidates) {
-      const matchingParent = await findAuthorizedParent(new URL(candidate.targetURL).origin)
-      if (matchingParent?.id !== parent.id) continue
-      attached.push(await ensure(candidate.targetURL, {
-        parentTargetURL: parent.targetURL,
-        assetType: guessAssetType(candidate.hostname, candidate.assetType),
-      }))
-    }
-
-    // A previously attached child must not remain under the parent after scope is narrowed.
-    // Detach it to its own target root without deleting its notes or evidence.
-    for (const child of children(parent.id)) {
-      const origin = new URL(child.targetURL).origin
-      const excluded = scope.excludedItems.some((item) => checkMatch(origin, item).matches)
-      const included = scope.scopeItems.some((item) => checkMatch(origin, item).matches)
-      if (!included || excluded) await detachWorkspace(
-        Database.use((db) => db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, child.id)).get())!,
-        parent,
+      const currentRow = Database.use((db) =>
+        db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, candidate.id)).get(),
       )
+      if (!currentRow) continue
+      const matchingParent = await findAuthorizedParent(new URL(candidate.targetURL).origin)
+      if (matchingParent) {
+        if (currentRow.parent_target_id !== matchingParent.id) {
+          attached.push(await ensure(candidate.targetURL, {
+            parentTargetURL: matchingParent.targetURL,
+            assetType: guessAssetType(candidate.hostname, candidate.assetType),
+          }))
+        }
+      } else if (currentRow.parent_target_id) {
+        const oldParentRow = Database.use((db) =>
+          db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, currentRow.parent_target_id!)).get(),
+        )
+        if (oldParentRow) await detachWorkspace(currentRow, mapWorkspace(oldParentRow))
+      }
     }
-    await syncAssetRegistry(parent)
+    await syncAssetRegistry(await get(parent.targetURL) ?? parent)
     return attached
   }
 
