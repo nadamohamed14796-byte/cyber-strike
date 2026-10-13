@@ -26,3 +26,16 @@ jobs:
 
       - name: Build monorepo
         run: bun turbo build
+      - name: Package Linux x64 executable
+        run: |
+          test -x packages/cyberstrike/dist/cyberstrike-linux-x64/bin/cyberstrike
+          test -f packages/cyberstrike/dist/cyberstrike-linux-x64/bin/hackbrowser-worker.js
+          tar -czf cyberstrike-linux-x64.tar.gz -C packages/cyberstrike/dist/cyberstrike-linux-x64/bin cyberstrike hackbrowser-worker.js
+
+      - name: Upload runnable Linux x64 build
+        uses: actions/upload-artifact@v6
+        with:
+          name: cyberstrike-linux-x64
+          path: cyberstrike-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 14
