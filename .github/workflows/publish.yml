@@ -146,12 +146,12 @@ jobs:
           git config --global user.email "cyberstrike[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${{ secrets.PUBLISH_TOKEN }}@github.com/${{ github.repository }}"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: cyberstrike-cli
           path: packages/cyberstrike/dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           name: cyberstrike-web
           path: packages/app/dist
