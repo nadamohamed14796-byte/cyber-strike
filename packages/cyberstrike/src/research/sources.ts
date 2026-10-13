@@ -344,9 +344,16 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
   const matchesHost = (source: ResearchSource) =>
     source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
   const hostCandidates = RESEARCH_SOURCES.filter(matchesHost)
-  if (preferredID) return hostCandidates.find((source) => source.id === preferredID)
+  if (preferredID) {
+    const preferred = hostCandidates.find((source) => source.id === preferredID)
+    if (preferred) return preferred
+    // A known configured source that rejects this host is contradictory provenance.
+    // Unknown legacy aliases (for example "hackerone" or "default") have no trust
+    // policy of their own, so allow only an unambiguous host-and-seed-path inference.
+    if (RESEARCH_SOURCES.some((source) => source.id === preferredID)) return undefined
+  }
 
-  if (hostCandidates.length === 1) return hostCandidates[0]
+  if (hostCandidates.length === 1 && !preferredID) return hostCandidates[0]
 
   const pathname = url.pathname.toLowerCase()
   const scored = hostCandidates.map((source) => {
