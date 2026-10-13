@@ -146,6 +146,85 @@ test("agent-led research study persists model analysis and completes its queue l
 })
 
 
+test("legacy model-study backfill drains more than 100 eligible records in one cycle", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID().replace(/-/g, "")
+      const legacyCount = 101
+      for (let index = 0; index < legacyCount; index++) {
+        const row = ReportKnowledge.ingestExternalDetailed({
+          title: "Legacy IDOR model-study backfill " + marker + "-" + index,
+          severity: "unknown",
+          vulnerabilityClass: "idor",
+          sourceURL: "https://portswigger.net/web-security/backfill/" + marker + "/" + index,
+          lesson: "Legacy heuristic note without active-model study marker.",
+          sourceTrust: 100,
+          tags: ["idor"],
+          metadata: {
+            research_source: "portswigger",
+            source_trust: 100,
+            study_method: "bounded-heuristic-extraction",
+            extraction_version: 7,
+          },
+        })
+        expect(row).not.toBeNull()
+      }
+
+      const result = await queueLegacyKnowledgeForModelStudy("portswigger")
+      expect(result.queued).toBe(legacyCount)
+      expect(result.examined).toBe(legacyCount)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(legacyCount)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy source filtering happens before the batch limit for shared hosts", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID().replace(/-/g, "")
+      const hacktivity = ReportKnowledge.ingestExternalDetailed({
+        title: "Older HackerOne Hacktivity record " + marker,
+        severity: "unknown",
+        sourceURL: "https://hackerone.com/hacktivity/legacy-" + marker,
+        lesson: "Legacy report from the disclosures feed.",
+        sourceTrust: 95,
+        metadata: {
+          research_source: "hackerone-hacktivity",
+          source_trust: 95,
+          study_method: "bounded-heuristic-extraction",
+        },
+      })
+      const blog = ReportKnowledge.ingestExternalDetailed({
+        title: "HackerOne Blog record " + marker,
+        severity: "unknown",
+        sourceURL: "https://www.hackerone.com/blog/legacy-" + marker,
+        lesson: "Legacy blog post with separate configured source provenance.",
+        sourceTrust: 90,
+        metadata: {
+          research_source: "hackerone-blog",
+          source_trust: 90,
+          study_method: "bounded-heuristic-extraction",
+        },
+      })
+      expect(hacktivity).not.toBeNull()
+      expect(blog).not.toBeNull()
+      if (!blog) throw new Error("blog legacy fixture was not persisted")
+
+      const candidates = ReportKnowledge.externalRecordsForModelStudy(1, 1, ["hackerone.com"], "hackerone-blog")
+      expect(candidates).toHaveLength(1)
+      expect(candidates[0].id).toBe(blog.id)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("model-study backfill includes old reports with missing excerpts for safe refetch", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
