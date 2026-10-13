@@ -1,6 +1,7 @@
 import z from "zod"
 import { Tool } from "./tool"
 import { ReportKnowledge } from "../learning/report-knowledge"
+import { Session } from "../session"
 import {
   FINDING_VALIDATION_CHECKS,
   FindingValidation,
@@ -80,7 +81,7 @@ export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters,
       for (const reportID of new Set(params.research_reference_ids ?? [])) {
         if (ReportKnowledge.recordReferenceUse({
           reportID,
-          sessionID: ctx.sessionID,
+          sessionID: Session.root(ctx.sessionID),
           outcome: feedbackOutcome,
           signal: "finding-validation:" + result.verdict,
           metadata: {
