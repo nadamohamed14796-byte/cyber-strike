@@ -3,7 +3,7 @@ import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "./report-knowledge.sql"
 import { matchesSourceURLFingerprint, sourceFingerprints } from "./source-fingerprint"
-import { RESEARCH_SOURCES } from "../research/sources"
+import { resolveResearchSourceForURL } from "../research/sources"
 
 export namespace ReportKnowledge {
   export type Outcome = "observed" | "useful" | "confirmed" | "rejected" | "duplicate" | "disproven"
@@ -238,23 +238,11 @@ export namespace ReportKnowledge {
           if (!row.source_url) return false
           const metadata = row.metadata ?? {}
           if (sourceID) {
-            let parsed: URL
-            try {
-              parsed = new URL(row.source_url)
-            } catch {
-              return false
-            }
-            if (parsed.protocol !== "https:") return false
-            const matchingSources = RESEARCH_SOURCES.filter((source) =>
-              source.hosts.some((host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)),
-            )
-            const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
-            const resolvedSource = preferredID
-              ? matchingSources.find((source) => source.id === preferredID)
-              : matchingSources.length === 1 ? matchingSources[0] : undefined
+            const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : undefined
+            const resolvedSource = resolveResearchSourceForURL(row.source_url, preferredID)
             // Filter to a safely attributable source before the batch limit.
-            // Older reports from another source on a shared host must not crowd
-            // the requested source out of every legacy backfill batch.
+            // Path-specific configured seed prefixes can disambiguate legacy
+            // HackerOne/GitHub rows that predate source provenance metadata.
             if (resolvedSource?.id !== sourceID) return false
           }
           const requested = metadata.model_study_requested_version
