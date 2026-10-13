@@ -127,8 +127,12 @@ export namespace ReportKnowledge {
                   : 0),
               confidence: confidence(existing, input.outcome),
               status: input.outcome ?? existing.status,
+              vulnerability_class: input.vulnerabilityClass ?? existing.vulnerability_class,
+              cwe_id: input.cweID ?? existing.cwe_id,
+              severity: input.severity && input.severity !== "unknown" ? input.severity : existing.severity,
               lesson: input.lesson ?? existing.lesson,
-              metadata: input.metadata ?? existing.metadata,
+              tags: input.tags?.length ? Array.from(new Set([...(existing.tags ?? []), ...input.tags])) : existing.tags,
+              metadata: input.metadata ? { ...(existing.metadata ?? {}), ...input.metadata } : existing.metadata,
               time_updated: now,
             })
             .where(eq(ReportKnowledgeTable.id, existing.id))
@@ -229,6 +233,9 @@ export namespace ReportKnowledge {
           db.update(ReportKnowledgeTable)
             .set({
               times_seen: existing.times_seen + 1,
+              vulnerability_class: input.vulnerabilityClass ?? existing.vulnerability_class,
+              cwe_id: input.cweID ?? existing.cwe_id,
+              severity: input.severity && input.severity !== "unknown" ? input.severity : existing.severity,
               lesson: input.lesson ?? existing.lesson,
               impact: input.impact ?? existing.impact,
               attack_vector: input.attackVector ?? existing.attack_vector,
