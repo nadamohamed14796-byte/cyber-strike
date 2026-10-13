@@ -21,11 +21,20 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     let excludedItems: string[] = []
     let scopeSource = "caller-provided (not persisted authorization)"
     let scopeConfigured = false
+    let authoritativeDecision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>> | undefined
 
     if (params.target_url) {
-      let persisted
+      let workspace
+      let persisted: Awaited<ReturnType<typeof TargetMemory.getScope>>
       try {
+        workspace = await TargetMemory.get(params.target_url)
         persisted = await TargetMemory.getScope(params.target_url)
+        // A child without its own scope inherits the saved parent scope. Its own
+        // scope, when configured, is still intersected with the parent at decision time.
+        if ((!persisted || persisted.status !== "configured" || persisted.scopeItems.length === 0) && workspace?.parentTargetID) {
+          const parent = TargetMemory.list().find((item) => item.id === workspace!.parentTargetID)
+          if (parent) persisted = await TargetMemory.getScope(parent.targetURL)
+        }
       } catch (error) {
         return {
           title: "Target scope could not be loaded",
@@ -33,14 +42,14 @@ export const ScopeCheckTool = Tool.define("scope_check", {
           metadata: { target, inScope: false, scopeConfigured: false, scopeError: true },
         }
       }
-      if (!persisted || persisted.status !== "configured" || persisted.scopeItems.length === 0) {
+      if (!workspace || !persisted || persisted.status !== "configured" || persisted.scopeItems.length === 0) {
         return {
           title: "Target scope is not configured",
           output: [
             "Target under test: " + target,
             "Workspace target: " + params.target_url,
             "In scope: NO",
-            "No explicitly configured scope manifest was found.",
+            "No configured parent/child authorization scope was found.",
             "Configure it with: cyberstrike target scope <url> --include <domain> --source <program> --reference <official-https-url>",
             "Do NOT perform active testing until the official program scope has been reviewed and configured.",
           ].join("\n"),
@@ -51,6 +60,18 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       excludedItems = persisted.excludedItems
       scopeConfigured = true
       scopeSource = persisted.authorizationSource ?? "persisted manifest (source missing)"
+      try {
+        const candidateURL = /^https?:\/\//i.test(target)
+          ? target
+          : new URL(workspace.targetURL).protocol + "//" + target.replace(/^\/+/, "")
+        authoritativeDecision = await TargetMemory.checkURLScope(candidateURL)
+      } catch (error) {
+        return {
+          title: "Target scope decision failed closed",
+          output: error instanceof Error ? error.message : String(error),
+          metadata: { target, inScope: false, scopeConfigured, scopeError: true },
+        }
+      }
     }
 
     const results: Array<{ scope: string; matches: boolean; reason: string; excluded?: boolean }> = []
@@ -69,13 +90,18 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       results.push({ scope: s, ...match, excluded: true })
       if (match.matches) excluded = true
     }
-    const inScope = included && !excluded
+    if (authoritativeDecision) {
+      if (!authoritativeDecision.allowed) included = false
+      if (authoritativeDecision.excludeMatches.length > 0) excluded = true
+    }
+    const inScope = included && !excluded && (authoritativeDecision?.allowed ?? true)
 
     const output = [
       `Target: ${target}`,
       `In scope: ${inScope ? "YES" : "NO"}`,
       `Scope source: ${scopeSource}`,
       `Persisted authorization manifest: ${scopeConfigured ? "configured" : "not used"}`,
+      ...(authoritativeDecision ? ["Authoritative active-scope decision: " + authoritativeDecision.reason] : []),
       "",
       "Scope check details:",
       ...(results.length ? results.map((r) => `  ${r.matches ? (r.excluded ? "[EXCLUDED]" : "[MATCH]") : "[NO]"} ${r.scope} — ${r.reason}`) : ["  (no scope entries supplied)"]),
