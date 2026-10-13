@@ -285,6 +285,8 @@ export const ResearchCommand = cmd({
           console.log("external_research=" + stats.external)
           console.log("useful_or_confirmed=" + stats.useful)
           console.log("rejected_disproven_or_duplicate=" + stats.rejected)
+          console.log("external_references_used=" + stats.externalReferencesUsed)
+          console.log("external_reference_usefulness_events=" + stats.externalReferenceUsefulnessEvents)
         },
       })
       .demandCommand(),
