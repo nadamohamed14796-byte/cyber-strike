@@ -221,6 +221,13 @@ test("finding-validation feedback ranks shared references without poisoning glob
       expect(scoped).not.toBeNull()
       if (!shared || !scoped) throw new Error("test references were not persisted")
 
+      const corsMatches = ReportKnowledge.recommendations({
+        signal: "CORS cross-origin response policy",
+        vulnerabilityClass: "cors",
+        limit: 3,
+      })
+      expect(corsMatches.some((row) => row.id === shared.id)).toBe(true)
+
       const feedback = {
         reportID: shared.id,
         sessionID,
