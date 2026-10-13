@@ -137,6 +137,48 @@ test("agent-led research study persists model analysis and completes its queue l
 })
 
 
+test("model-study backfill includes old reports with missing excerpts for safe refetch", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceURL = "https://portswigger.net/web-security/access-control/idor?legacy-empty=" + marker
+      const legacy = ReportKnowledge.ingestExternalDetailed({
+        title: "Legacy report without cached excerpt " + marker,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL,
+        lesson: "Older record predates source-text caching.",
+        sourceTrust: 100,
+        tags: ["idor"],
+        metadata: {
+          research_source: "portswigger",
+          research_source_name: "PortSwigger Web Security Academy",
+          source_trust: 100,
+          study_method: "bounded-heuristic-extraction",
+          extraction_version: 7,
+        },
+      })
+      expect(legacy).not.toBeNull()
+      if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
+
+      const first = await queueLegacyKnowledgeForModelStudy()
+      expect(first.queued).toBe(1)
+      expect(first.skipped).toBe(0)
+      const queued = ResearchQueue.find("portswigger", sourceURL)
+      expect(queued?.status).toBe("queued")
+      expect(queued?.payload?.cached_text).toBe("")
+      expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
+
+      const second = await queueLegacyKnowledgeForModelStudy()
+      expect(second.queued).toBe(0)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
+      await Instance.dispose()
+    },
+  })
+})
+
 test("model-led update queues legacy shared reports once without refetching or changing source truth", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
