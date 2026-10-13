@@ -31,6 +31,7 @@ import { ResearchQueue } from "../../src/research/queue"
 import { Database, eq } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { Instance } from "../../src/project/instance"
+import { RESEARCH_LEARNING_VERSION } from "../../src/research/sources"
 import { tmpdir } from "../fixture/fixture"
 
 test("research queue only accepts completion from the current lease owner", async () => {
@@ -364,6 +365,50 @@ test("research queue survives an application restart and resumes cached report w
       expect(claimed?.sequence).toBe(sequence)
       expect(claimed?.status).toBe("studying")
       expect(claimed?.payload?.cached_text).toBe("sanitized report body")
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("legacy classifier rejections with cached text are requeued once per learning version", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "legacy-relearn-" + crypto.randomUUID()
+      const sourceURL = "https://research.example.test/legacy-relearn-" + crypto.randomUUID()
+      const cachedText = [
+        "Mass-assignment in a user profile endpoint allowed a client-supplied role to be updated.",
+        "Prerequisite: use a controlled test account and capture the normal profile update request.",
+        "Reproduction: compare the permitted update fields with fields accepted by the server.",
+        "Impact: a user may modify a protected account property when server-side allowlisting is missing.",
+      ].join(" ").repeat(3)
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Legacy mass assignment report",
+        payload: { cached_text: cachedText },
+      })
+      // Simulate a pre-versioned item rejected by the earlier, narrower classifier.
+      Database.use((db) => db.update(ResearchQueueTable).set({
+        status: "rejected",
+        last_error: "no recognizable security topic",
+        payload: { cached_text: cachedText },
+      }).where(eq(ResearchQueueTable.sequence, item.sequence)).run())
+
+      expect(ResearchQueue.requeueLegacyRejected(10, sourceID)).toBe(1)
+      const requeued = ResearchQueue.find(sourceID, sourceURL)
+      expect(requeued?.status).toBe("queued")
+      expect(requeued?.payload?.learning_version).toBe(RESEARCH_LEARNING_VERSION)
+      expect(ResearchQueue.requeueLegacyRejected(10, sourceID)).toBe(0)
+
+      const claim = ResearchQueue.claimNext("legacy-relearn-worker", sourceID)
+      expect(claim?.sequence).toBe(item.sequence)
+      expect(claim?.payload?.learning_version).toBe(RESEARCH_LEARNING_VERSION)
+      expect(ResearchQueue.complete(item.sequence, claim!.lease_owner, "rejected", "no recognizable security topic")).toBeDefined()
+      // A current-version rejection remains terminal until the learner version changes.
+      expect(ResearchQueue.requeueLegacyRejected(10, sourceID)).toBe(0)
       await Instance.dispose()
     },
   })
