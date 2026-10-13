@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { beforeEach, expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Instance } from "../../src/project/instance"
 import { Database } from "../../src/storage/db"
@@ -6,8 +6,19 @@ import { SessionTable } from "../../src/session/session.sql"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
+import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
 import { tmpdir } from "../fixture/fixture"
+
+// These integration tests share the worker-local SQLite database. Clear only the
+// research fixtures before each case so queue claims and legacy backfill counts are deterministic.
+beforeEach(() => {
+  Database.use((db) => {
+    db.delete(ResearchQueueTable).run()
+    db.delete(ReportKnowledgeEventTable).run()
+    db.delete(ReportKnowledgeTable).run()
+  })
+})
 
 test("agent-led research study persists model analysis and completes its queue lease", async () => {
   await using dir = await tmpdir({ git: true })

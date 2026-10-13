@@ -1,13 +1,24 @@
-import { expect, test } from "bun:test"
+import { beforeEach, expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { classifyResearchTopic, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
+import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ResearchQueue } from "../../src/research/queue"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
+
+// These integration tests share the worker-local SQLite database. Clear only the
+// research fixtures before each case so queue claims and legacy backfill counts are deterministic.
+beforeEach(() => {
+  Database.use((db) => {
+    db.delete(ResearchQueueTable).run()
+    db.delete(ReportKnowledgeEventTable).run()
+    db.delete(ReportKnowledgeTable).run()
+  })
+})
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
   const extracted = extractResearchDetails(
