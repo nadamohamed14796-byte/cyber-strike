@@ -52,7 +52,7 @@ export function requestResearchSignals(input: {
 /** Map an observed signal tag to a broad research class; this selects advisory material only. */
 export function researchClassForSignalTags(input: string[]): string | undefined {
   const tags = input.map((tag) => tag.trim().replace(/^target:/i, "").toLowerCase())
-  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|cache-behavior|cors|cors-policy|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization|information-disclosure|privilege-escalation|security-misconfiguration|account-takeover)$/.test(tag))
+  const classTag = tags.find((tag) => /^(idor|bola|object-identifier|resource-identifier|authorization-boundary|ssrf|server-side-request|xss|csrf|sqli|ssti|xxe|rce|authn|authz|authentication|authorization|access-control|auth-bypass|business-logic|race-condition|file-upload|injection|token-or-jwt|jwt|oauth|graphql|cache-poisoning|cache-behavior|cors|cors-policy|web-cache|request-smuggling|prototype-pollution|path-traversal|subdomain-takeover|command-injection|open-redirect|deserialization|information-disclosure|privilege-escalation|security-misconfiguration|account-takeover|mass-assignment|nosqli|host-header-injection|mfa-bypass|rate-limit-bypass|websocket|saml)$/.test(tag))
   if (!classTag) return undefined
   const aliases: Record<string, string> = {
     bola: "idor",
@@ -72,6 +72,7 @@ export function researchClassForSignalTags(input: string[]): string | undefined 
     "deserialization", "request-smuggling", "cache-poisoning", "file-upload", "graphql",
     "jwt", "command-injection", "path-traversal", "subdomain-takeover", "oauth", "web-cache",
     "cors", "information-disclosure", "privilege-escalation", "security-misconfiguration", "account-takeover",
+    "mass-assignment", "nosqli", "host-header-injection", "mfa-bypass", "rate-limit-bypass", "websocket", "saml",
   ])
   const normalized = aliases[classTag] ?? classTag
   return knownClasses.has(normalized) ? normalized : undefined
@@ -98,6 +99,13 @@ export function promptResearchSignals(input: string): string[] {
     ["race-condition", /race condition|time[- ]of[- ]check|concurrent request|toctou/],
     ["business-logic", /business logic|workflow|state transition|coupon|payment flow|checkout/],
     ["injection-sink", /sql injection|command injection|template injection|\bsqli\b|\bssti\b/],
+    ["mass-assignment", /mass[- ]assignment|over[- ]posting|overposting/],
+    ["nosqli", /no[- ]?sql injection|\bnosqli\b|mongodb injection/],
+    ["host-header-injection", /host header injection|host header poisoning|password reset poisoning/],
+    ["mfa-bypass", /mfa bypass|multi[- ]factor authentication bypass|two[- ]factor authentication bypass|\b2fa bypass\b/],
+    ["rate-limit-bypass", /rate[- ]limit(?:ing)? bypass|bypass rate limits?/],
+    ["websocket", /\bwebsockets?\b|web socket/],
+    ["saml", /\bsaml\b|security assertion markup language/],
     ["open-redirect", /open redirect|unvalidated redirect/],
     ["path-traversal", /path traversal|directory traversal/],
     ["prototype-pollution", /prototype pollution/],
@@ -237,7 +245,7 @@ export namespace ResearchContext {
     // API/auth/business-logic signal). Query the most recent actionable signals
     // independently, then deduplicate the global public references.
     const actionableType = /^(endpoint|api_schema|authentication_flow|business_rule|parameter|configuration|technology|vulnerability_hint|sensitive_data|infrastructure)$/i
-    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information[- ]disclosure|data leakage|misconfiguration|account[- ]takeover|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
+    const actionableSignal = /api|graphql|javascript|source.?map|idor|bola|object[- ]identifier|resource identifier|owner(?:ship)?|tenant|authori[sz]|access.?control|privilege|escalation|information[- ]disclosure|data leakage|misconfiguration|account[- ]takeover|mass[- ]assignment|no[- ]?sql injection|nosqli|host header injection|mfa bypass|rate[- ]limit bypass|websocket|saml|jwt|oauth|token|session|upload|multipart|cache|cors|race|ssrf|inject|workflow|business.?logic|cwe-\d+/i
     const signalEntries = signalPool.filter((entry) => {
       const tags = ((entry.tags as string[] | null) ?? []).slice(0, 8)
       return actionableType.test(entry.type ?? "") ||
