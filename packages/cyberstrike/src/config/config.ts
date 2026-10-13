@@ -1432,7 +1432,7 @@ export namespace Config {
     log.info("loading", { path: filepath })
     // Do not attempt to read FIFOs, sockets, devices, or directories as config.
     // Reading a FIFO with Bun.file(...).text() can wait forever and stall startup.
-    let stat
+    let stat: Awaited<ReturnType<typeof fs.stat>>
     try {
       stat = await fs.stat(filepath)
     } catch (err: any) {
@@ -1477,7 +1477,7 @@ export namespace Config {
         }
         const resolvedPath = path.isAbsolute(filePath) ? filePath : path.resolve(configDir, filePath)
         const errMsg = `bad file reference: "${match}"`
-        let referencedStat
+        let referencedStat: Awaited<ReturnType<typeof fs.stat>>
         try {
           referencedStat = await fs.stat(resolvedPath)
         } catch (error: any) {
