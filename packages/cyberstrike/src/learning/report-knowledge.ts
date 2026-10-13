@@ -528,7 +528,8 @@ export namespace ReportKnowledge {
         const pattern = SPECIFIC_QUERY_PATTERNS.find(([name]) => name === signal)?.[1]
         const titleMatches = Boolean(pattern?.test(row.title))
         const currentClassificationMatches =
-          classificationMethod === "title-first-dominant-body-v1" && normalize(row.vulnerability_class) === signal
+          ["title-first-dominant-body-v1", "title-first-dominant-body-v2"].includes(classificationMethod ?? "") &&
+        normalize(row.vulnerability_class) === signal
         return titleMatches || currentClassificationMatches
       })
     }
