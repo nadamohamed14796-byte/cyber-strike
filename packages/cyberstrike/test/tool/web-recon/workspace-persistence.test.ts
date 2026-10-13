@@ -25,6 +25,7 @@ test("web_recon persists results and synchronizes target notes in the canonical 
     await Instance.provide({
       directory: tmp.path,
       async fn() {
+      try {
         const target = "http://127.0.0.1:" + server.port
         const workspace = await TargetMemory.ensure(target)
         await TargetMemory.configureScope(target, {
@@ -62,7 +63,8 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         const notes = await fs.readFile(path.join(workspace.workspacePath, "notes.md"), "utf-8")
         expect(notes).toContain("Recon run: robots_scan")
         expect(notes).toContain("recon/robots_scan-")
-      },
+        } finally { await Instance.dispose() }
+    },
     })
   } finally {
     server.stop(true)
