@@ -15,11 +15,23 @@ const TargetInitCommand = cmd({
       directory: process.cwd(),
       async fn() {
         const target = await TargetMemory.ensure(args.url)
+        const requiredFiles = [
+          path.join(target.workspacePath, "workspace.json"),
+          path.join(target.workspacePath, "scope", "scope.json"),
+          path.join(target.workspacePath, "notes.md"),
+        ]
+        for (const requiredFile of requiredFiles) {
+          const info = await fs.stat(requiredFile).catch(() => undefined)
+          if (!info?.isFile()) {
+            throw new Error("Target workspace initialization failed: required file is missing: " + requiredFile)
+          }
+        }
         console.log("Target: " + target.targetURL)
         console.log("Workspace: " + target.workspacePath)
         console.log("Asset type: " + target.assetType)
         if (target.parentTargetID) console.log("Parent workspace ID: " + target.parentTargetID)
-        console.log("Notes: " + target.workspacePath + "/notes.md")
+        console.log("Notes: " + path.join(target.workspacePath, "notes.md"))
+        console.log("Workspace integrity: metadata, scope manifest, and notes verified")
         console.log("Created or verified target directories: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research")
       },
     })
