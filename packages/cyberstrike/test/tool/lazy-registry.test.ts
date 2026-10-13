@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { LazyToolRegistry } from "../../src/tool/lazy-registry"
+import { MCP } from "../../src/mcp"
 
 describe("lazy tool registry snapshot reconciliation", () => {
   afterEach(() => {
@@ -42,6 +43,19 @@ describe("lazy tool registry snapshot reconciliation", () => {
     expect(dotted?.id).not.toBe(underscored?.id)
     expect(LazyToolRegistry.search("dotted tool")).toContainEqual(expect.objectContaining({ name: "foo.bar" }))
     expect(LazyToolRegistry.search("underscored tool")).toContainEqual(expect.objectContaining({ name: "foo_bar" }))
+  })
+
+  test("canonical IDs distinguish both normalized names and server/tool boundaries", () => {
+    expect(MCP.toolID("test.server", "foo.bar")).not.toBe(MCP.toolID("test.server", "foo_bar"))
+    expect(MCP.toolID("a_b", "c")).not.toBe(MCP.toolID("a", "b_c"))
+
+    LazyToolRegistry.reconcileServerTools("a_b", [{ name: "c", description: "first" }])
+    LazyToolRegistry.reconcileServerTools("a", [{ name: "b_c", description: "second" }])
+    const tools = LazyToolRegistry.getAll().filter((tool) => tool.mcpServer === "a_b" || tool.mcpServer === "a")
+    expect(tools).toHaveLength(2)
+    expect(new Set(tools.map((tool) => tool.id)).size).toBe(2)
+    LazyToolRegistry.reconcileServerTools("a_b", [])
+    LazyToolRegistry.reconcileServerTools("a", [])
   })
 
   test("does not return every tool for empty queries or invalid limits", () => {
