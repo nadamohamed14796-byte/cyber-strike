@@ -133,7 +133,7 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(false)
       expect(ReportKnowledge.stats().external).toBeGreaterThanOrEqual(1)
 
-      const status = JSON.parse((await tool.execute({ action: "stats", pages: 1000 }, context)).output)
+      const status = JSON.parse((await tool.execute({ action: "stats", source: sourceID, pages: 1000, depth: 3, limit: 3, continue_after_save: false }, context)).output)
       expect(status.configured_sources).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: "portswigger", name: "PortSwigger Web Security Academy" }),
       ]))
