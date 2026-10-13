@@ -962,7 +962,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         title = redactResearchSecrets(titleOf(html, item.source_url))
       }
       if (looksLikeResearchAuthenticationWall(item.source_url, title, text, html)) {
-        ResearchQueue.blockAuthentication({
+        const blocked = ResearchQueue.blockAuthentication({
           sourceID: item.source_id,
           sourceURL: item.source_url,
           title,
@@ -970,7 +970,10 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
           payload: { source_name: source.name, source_kind: source.kind, crawl_depth: item.payload.crawl_depth },
           claim: { sequence: item.sequence, leaseOwner: item.lease_owner },
         })
-        result.blocked_auth++
+        // The claim may have expired/reclaimed, or the queue may already hold a
+        // terminal model-study result. Count the transition that actually occurred.
+        if (blocked?.status === "blocked_auth") result.blocked_auth++
+        else result.skipped++
         continue
       }
       if (text.length < 250) {
