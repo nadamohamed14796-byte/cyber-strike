@@ -81,6 +81,9 @@ test("explicit user request produces bounded global retrieval tags without retai
   expect(promptResearchSignals("CORS security misconfiguration and information disclosure")).toEqual(
     expect.arrayContaining(["cors-policy", "security-misconfiguration", "information-disclosure"]),
   )
+  expect(promptResearchSignals("mass-assignment, NoSQL injection, host header injection, MFA bypass, rate-limit bypass, WebSocket, SAML")).toEqual(
+    expect.arrayContaining(["mass-assignment", "nosqli", "host-header-injection", "mfa-bypass", "rate-limit-bypass", "websocket", "saml"]),
+  )
 })
 
 test("maps request patterns to broad research classes without treating them as findings", () => {
@@ -91,6 +94,11 @@ test("maps request patterns to broad research classes without treating them as f
   expect(researchClassForSignalTags(["cors-policy"])).toBe("cors")
   expect(researchClassForSignalTags(["information-disclosure"])).toBe("information-disclosure")
   expect(researchClassForSignalTags(["security-misconfiguration"])).toBe("security-misconfiguration")
+  expect(researchClassForSignalTags(["mass-assignment"])).toBe("mass-assignment")
+  expect(researchClassForSignalTags(["nosqli"])).toBe("nosqli")
+  expect(researchClassForSignalTags(["host-header-injection"])).toBe("host-header-injection")
+  expect(researchClassForSignalTags(["mfa-bypass"])).toBe("mfa-bypass")
+  expect(researchClassForSignalTags(["rate-limit-bypass"])).toBe("rate-limit-bypass")
   expect(researchClassForSignalTags(["javascript-client"])).toBeUndefined()
 })
 
