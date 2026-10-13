@@ -65,6 +65,7 @@ owasp_id: T1078.004
           `---
 name: tool-skill
 description: Skill for tool tests.
+owasp_id: T1078.004
 ---
 
 # Tool Skill
@@ -100,7 +101,7 @@ Use this skill.
 
           expect(requests.length).toBe(1)
           expect(requests[0].permission).toBe("skill")
-          expect(requests[0].patterns).toContain("T1078.004")
+          expect(requests[0].patterns).toContain("tool-skill")
           expect(requests[0].always).toContain("tool-skill")
 
           expect(result.metadata.dir).toBe(dir)
