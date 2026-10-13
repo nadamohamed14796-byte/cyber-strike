@@ -117,6 +117,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           target_url: result.workspace.targetURL,
           workspace: result.workspace.workspacePath,
           scope_file: result.workspace.workspacePath + "/scope/scope.json",
+          scope_configured: result.scope.status === "configured",
           include_count: result.scope.scopeItems.length,
           exclude_count: result.scope.excludedItems.length,
           associated_asset_count: result.associatedAssets.length,
