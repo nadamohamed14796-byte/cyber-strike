@@ -381,8 +381,10 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
       }
       continue
     }
-    if (ReportKnowledge.markModelStudyRequested({ id: row.id, version: RESEARCH_MODEL_STUDY_VERSION })) {
-      result.queued++
+    const markedRequested = ReportKnowledge.markModelStudyRequested({ id: row.id, version: RESEARCH_MODEL_STUDY_VERSION })
+    result.queued++
+    if (!markedRequested && result.errors.length < 5) {
+      result.errors.push(row.id + ": queued for model study, but the legacy knowledge request marker could not be refreshed")
     }
   }
   return result
