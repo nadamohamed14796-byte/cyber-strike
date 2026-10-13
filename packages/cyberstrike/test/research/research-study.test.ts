@@ -269,7 +269,7 @@ test("model-led update queues legacy shared reports once without refetching or c
       }, context)
       const batch = JSON.parse(next.output)
       expect(batch.batch_size).toBe(1)
-      expect(batch.items[0].public_id).toBe(queued.id)
+      expect(batch.items[0].public_id).toBe(queued.source_id)
 
       const save = await studyTool.execute({
         action: "save",

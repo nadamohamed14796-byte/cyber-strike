@@ -15,7 +15,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       .optional()
       .describe("Caller-provided scope entries for standalone checks only; use target_url for the persisted target scope"),
   }),
-  async execute(params) {
+  async execute(params): Promise<{ title: string; output: string; metadata: Tool.Metadata }> {
     const target = params.target.toLowerCase().trim()
     let scopeItems = params.scope_items ?? []
     let excludedItems: string[] = []

@@ -580,7 +580,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
       if ("error" in built) return err(built.error)
       baseMsg = built.baseMsg
       origin = built.origin
-      authorizationURL = params.target!
+      authorizationURL = params.target!.url
     }
 
     // Scope guard applies to BOTH sources — a constructed target must resolve to a

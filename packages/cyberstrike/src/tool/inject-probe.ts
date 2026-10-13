@@ -1677,7 +1677,7 @@ export const InjectProbeTool = Tool.define("inject_probe", {
         "Convenience filter for the auto-enumerate path (probe only this query/form param). Ignored when `points` is given.",
       ),
   }),
-  async execute(params, ctx) {
+  async execute(params, ctx): Promise<{ title: string; output: string; metadata: Tool.Metadata }> {
     let resolved: ResolvedRequest | { error: string }
     if (params.request_id) {
       const sessionID = Session.root(ctx.sessionID)
