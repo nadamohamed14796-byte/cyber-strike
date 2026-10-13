@@ -1068,8 +1068,16 @@ export namespace TargetMemory {
     try {
       info = await fs.stat(scopePath)
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null
-      throw error
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+      // Repair a missing generated manifest once, alongside the notes.md and other
+      // canonical workspace files, instead of treating an existing target as absent.
+      await prepareWorkspace(workspace)
+      try {
+        info = await fs.stat(scopePath)
+      } catch (repairError) {
+        if ((repairError as NodeJS.ErrnoException).code === "ENOENT") return null
+        throw repairError
+      }
     }
     if (!info.isFile()) throw new Error("Unsafe target scope manifest: expected a regular file.")
     const signature = scopeFileSignature(info)
