@@ -670,7 +670,7 @@ export async function syncResearchSource(
   // previously completed reports through an in-memory-only crawl.
   const discovered = await discoverResearch({ sourceID: source.id, pages: maxPages, depth: maxDepth })
   const discovery = discovered[0]
-  const learned = { learned: 0, skipped: 0, failed: 0, blocked_auth: 0, errors: [] as string[] }
+  const learned = { learned: 0, skipped: 0, failed: 0, blocked_auth: 0, requeued_legacy: 0, errors: [] as string[] }
   do {
     const batch = await learnResearchQueue({
       limit: exhaustive ? MAX_LIMIT : limit,
@@ -680,6 +680,7 @@ export async function syncResearchSource(
     learned.skipped += batch.skipped
     learned.failed += batch.failed
     learned.blocked_auth += batch.blocked_auth
+    learned.requeued_legacy += batch.requeued_legacy
     learned.errors.push(...batch.errors.slice(0, Math.max(0, 5 - learned.errors.length)))
     // Exhaustive sync drains the claimable queue, not only the first MAX_LIMIT
     // items. A retried item eventually reaches a terminal state before draining continues.
