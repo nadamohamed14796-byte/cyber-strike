@@ -77,6 +77,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       }
 
       expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
+      expect(evalPerm(orchestrator, "triage_vulnerability")).toBe("allow")
       expect(evalPerm(orchestrator, "report_vulnerability")).toBe("deny")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
