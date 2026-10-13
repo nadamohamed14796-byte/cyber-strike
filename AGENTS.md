@@ -111,3 +111,15 @@ const table = sqliteTable("session", {
 - Avoid mocks as much as possible
 - Test actual implementation, do not duplicate logic into tests
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/cyberstrike`.
+
+
+## Mandatory target workspace and artifact handling
+
+When a request contains a target, program scope, scope file, domain/subdomain list, reconnaissance/hunting task, or target-specific output request, use the `target-workspace-workflow` skill and the structured target tools. This is required behavior, not optional advice.
+
+1. Before recon/testing, call `target_workspace(action="init", target_url="<stable root/program target>")`, then use only the absolute workspace path it returns for target-specific outputs. Workspace initialization is not authorization.
+2. Review the official program/customer policy before `target_workspace(action="configure_scope", ...)`. Preserve exclusions, record the official HTTPS reference, and use `scope_check` before active requests. Missing or invalid authorization means no active testing.
+3. Store target-specific notes via `target_note` and inventories/logs/JSON/CSV/evidence references via `target_artifact`. Do not send target-specific data into generic project memory or the global research knowledge base.
+4. For large scope files, persist the original input beneath the root workspace, process bounded chunks, write checkpoints/run manifests, and make child workspaces nested below the root assets folder only as assets are validated/processed. Never create one workspace per unvalidated candidate.
+5. Never write target outputs to an invented folder such as /root/targets or the current shell directory by default. A failed/missing workspace or failed save is not success; report the exact failure and do not claim the artifact exists.
+6. Keep the root notes.md as a concise parent summary and each child asset's notes.md/evidence inside its own workspace. Validate final artifact paths, sizes, counts, and run status before saying work is complete.
