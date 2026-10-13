@@ -283,8 +283,18 @@ export namespace ResearchQueue {
     return Database.transaction((db) => {
       const existing = db.select().from(ResearchQueueTable)
         .where(and(eq(ResearchQueueTable.source_id, input.sourceID), eq(ResearchQueueTable.source_url, input.sourceURL))).get()
-      // Never downgrade or overwrite a real report/auth record with an index-page marker.
-      if (existing && existing.payload?.crawl_page !== true) return existing
+      // Preserve report status and source text while recording links discovered from its HTML.
+      // A report is never downgraded to an index-page marker; the frontier is separate metadata.
+      if (existing && existing.payload?.crawl_page !== true) {
+        if (!input.discoveredLinks) return existing
+        return db.update(ResearchQueueTable).set({
+          payload: {
+            ...(existing.payload ?? {}),
+            discovered_links: [...new Set(input.discoveredLinks.filter((link) => link.length <= 4096))].slice(0, 160),
+          },
+          updated_at: now,
+        }).where(eq(ResearchQueueTable.sequence, existing.sequence)).returning().get()
+      }
       if (existing) {
         // A successful revisit after login must clear the auth-wall marker. Otherwise the
         // row becomes "discovered" but still carries auth_required=true, contradicting its
