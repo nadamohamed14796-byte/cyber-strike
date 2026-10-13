@@ -67,6 +67,7 @@ export const UpdateCommand = cmd({
           " skipped=" + learned.skipped +
           " failed=" + learned.failed +
           " blocked_auth=" + (blockedAuth + learned.blocked_auth) +
+          " legacy_requeued=" + learned.requeued_legacy +
           " discovery_errors=" + errors,
       )
       prompts.log.info(
