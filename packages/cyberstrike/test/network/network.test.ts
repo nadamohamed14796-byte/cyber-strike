@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test"
 import { Network } from "../../src/network/network"
 
-test("proxy host matching includes the base and true subdomains only", () => {
+test("proxy host matching requires an explicit wildcard for subdomains", () => {
+  expect(Network.matchHost("example.com", "example.com")).toBe(true)
+  expect(Network.matchHost("example.com", "api.example.com")).toBe(false)
   expect(Network.matchHost("*.example.com", "example.com")).toBe(true)
   expect(Network.matchHost("*.example.com", "api.example.com")).toBe(true)
   expect(Network.matchHost("*.example.com", "notexample.com")).toBe(false)
