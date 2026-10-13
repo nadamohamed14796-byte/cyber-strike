@@ -354,11 +354,17 @@ export namespace ReportKnowledge {
       return Database.transaction((db) => {
         const row = db.select().from(ReportKnowledgeTable)
           .where(eq(ReportKnowledgeTable.id, input.reportID)).get()
+        const trust = row?.metadata?.source_trust
         if (
           !row ||
           row.source_kind !== "external_report" ||
           row.session_id ||
           normalize(row.target_pattern) ||
+          ["rejected", "disproven", "duplicate"].includes(row.status) ||
+          typeof trust !== "number" ||
+          !Number.isFinite(trust) ||
+          trust < 0 ||
+          trust > 100 ||
           !input.sessionID.trim()
         ) return false
 
