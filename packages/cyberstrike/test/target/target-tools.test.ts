@@ -11,6 +11,7 @@ test("target workspace tool initializes, configures scope, and nests authorized 
   await Instance.provide({
     directory: tmp.path,
     async fn() {
+      try {
       const tool = await TargetWorkspaceTool.init()
       const init = await tool.execute({ action: "init", target_url: "https://example.com" }, {} as never)
       expect(init.metadata.initialized).toBe(true)
@@ -54,6 +55,7 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       expect(child.metadata.workspace).toContain(path.join("assets", ""))
       expect(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8")).toContain("api.example.com")
       expect(await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")).toContain("Managed Asset Inventory")
+      } finally { await Instance.dispose() }
     },
   })
 })
@@ -63,6 +65,7 @@ test("target artifact tool writes only inside an existing workspace and protects
   await Instance.provide({
     directory: tmp.path,
     async fn() {
+      try {
       const workspaces = await TargetWorkspaceTool.init()
       const artifact = await TargetArtifactTool.init()
       const init = await workspaces.execute({ action: "init", target_url: "https://example.com" }, {} as never)
@@ -126,6 +129,7 @@ test("target artifact tool writes only inside an existing workspace and protects
       }, {} as never)
       expect(missing.metadata.saved).toBe(false)
       expect(missing.metadata.reason).toBe("workspace_missing")
+      } finally { await Instance.dispose() }
     },
   })
 })
