@@ -66,7 +66,36 @@ const KNOWN_CLASSES = new Set([
 function canonicalClass(value?: string) {
   if (!value) return undefined
   const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
-  return KNOWN_CLASSES.has(normalized) ? normalized : undefined
+  const aliases: Record<string, string> = {
+    "insecure-direct-object-reference": "idor",
+    "broken-object-level-authorization": "idor",
+    "cross-site-scripting": "xss",
+    "server-side-request-forgery": "ssrf",
+    "cross-site-request-forgery": "csrf",
+    "sql-injection": "sqli",
+    "no-sql-injection": "nosqli",
+    "nosql-injection": "nosqli",
+    "cross-origin-resource-sharing": "cors",
+    "authentication-bypass": "auth-bypass",
+  }
+  const canonical = aliases[normalized] ?? normalized
+  return KNOWN_CLASSES.has(canonical) ? canonical : undefined
+}
+
+function severityFromSource(title: string, text: string): string {
+  const content = title + "\\n" + text
+  const labelled = content.match(
+    /\\b(?:severity|risk(?:\\s+level)?|priority)\\b\\s*(?:(?:is|of|rating)\\s*)?[:=-]?\\s*(critical|high|medium|low|informational|info)\\b/i,
+  )
+  if (labelled) return labelled[1].toLowerCase() === "info" ? "informational" : labelled[1].toLowerCase()
+  const cvss = content.match(/\\bCVSS(?:\\s+v?[0-9]+(?:\\.[0-9]+)?)?(?:\\s+score)?\\s*[:=]\\s*(10(?:\\.0)?|[0-9](?:\\.[0-9])?)\\b/i)
+  if (!cvss) return "unknown"
+  const score = Number(cvss[1])
+  if (score >= 9) return "critical"
+  if (score >= 7) return "high"
+  if (score >= 4) return "medium"
+  if (score > 0) return "low"
+  return "unknown"
 }
 
 function boundedText(value: string | undefined, max: number) {
@@ -317,8 +346,11 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       }
 
       const vulnerabilityClass = canonicalClass(note.vulnerability_class)
-      const cweID = note.cwe_id?.toUpperCase()
-      const severity = note.severity ?? "unknown"
+      const candidateCwe = note.cwe_id?.toUpperCase()
+      const cweID = candidateCwe && new RegExp("\\b" + candidateCwe.replace("-", "[-:#]?\\s*") + "\\b", "i").test((claim.title ?? "") + " " + text)
+        ? candidateCwe
+        : undefined
+      const severity = severityFromSource(claim.title ?? "", text)
       const extractedBase = {
         vulnerability_class: vulnerabilityClass ?? null,
         classification_method: "model-led-source-study-v1",
@@ -349,24 +381,24 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         ])),
       }
       const coverageValues = [
-        extracted.lesson,
-        extracted.cwe_id,
-        extracted.attack_vector,
-        extracted.impact,
-        extracted.prerequisites,
-        extracted.reproduction_steps,
-        extracted.poc_snippet,
-        extracted.root_cause,
-        extracted.request_response_evidence,
-        extracted.verification_signals.length ? extracted.verification_signals : null,
-        extracted.false_positive_cautions.length ? extracted.false_positive_cautions : null,
-        extracted.affected_components.length ? extracted.affected_components : null,
-        extracted.affected_versions.length ? extracted.affected_versions : null,
-        extracted.technology_stack.length ? extracted.technology_stack : null,
-        extracted.remediation,
-        extracted.attack_chain,
-        extracted.negative_evidence,
-        extracted.limitations,
+        extractedBase.lesson,
+        extractedBase.cwe_id,
+        extractedBase.attack_vector,
+        extractedBase.impact,
+        extractedBase.prerequisites,
+        extractedBase.reproduction_steps,
+        extractedBase.poc_snippet,
+        extractedBase.root_cause,
+        extractedBase.request_response_evidence,
+        extractedBase.verification_signals.length ? extractedBase.verification_signals : null,
+        extractedBase.false_positive_cautions.length ? extractedBase.false_positive_cautions : null,
+        extractedBase.affected_components.length ? extractedBase.affected_components : null,
+        extractedBase.affected_versions.length ? extractedBase.affected_versions : null,
+        extractedBase.technology_stack.length ? extractedBase.technology_stack : null,
+        extractedBase.remediation,
+        extractedBase.attack_chain,
+        extractedBase.negative_evidence,
+        extractedBase.limitations,
       ]
       const extracted = {
         ...extractedBase,
