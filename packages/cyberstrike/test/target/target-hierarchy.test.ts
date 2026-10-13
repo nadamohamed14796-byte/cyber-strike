@@ -70,6 +70,37 @@ describe("target asset hierarchy", () => {
     })
   })
 
+  test("supports nested subdomains only when every parent scope authorizes the origin", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const root = await TargetMemory.configureScope("https://example.org", {
+          include: ["example.org", "*.example.org"],
+          authorizationSource: "Root program",
+          authorizationReference: "https://example.org/security",
+        })
+        const appScope = await TargetMemory.configureScope("https://app.example.org", {
+          include: ["app.example.org", "*.app.example.org"],
+          exclude: ["admin.app.example.org"],
+          authorizationSource: "Nested app scope",
+          authorizationReference: "https://app.example.org/security",
+        })
+        expect(appScope.workspace.parentTargetID).toBe(root.workspace.id)
+
+        const nested = await TargetMemory.registerObservedAsset("https://api.app.example.org/v1", "api")
+        expect(nested?.parentTargetID).toBe(appScope.workspace.id)
+        const decision = await TargetMemory.checkURLScope("https://api.app.example.org/v1")
+        expect(decision.allowed).toBe(true)
+        expect(decision.workspace?.id).toBe(nested?.id)
+
+        expect(await TargetMemory.registerObservedAsset("https://admin.app.example.org", "application")).toBeNull()
+        const denied = await TargetMemory.checkURLScope("https://admin.app.example.org/")
+        expect(denied.allowed).toBe(false)
+        expect(denied.reason).toContain("exclusion")
+      },
+    })
+  })
   test("configuring scope nests earlier standalone workspaces without discarding their notes", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
