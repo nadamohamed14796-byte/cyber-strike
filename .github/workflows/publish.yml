@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: github.repository == 'CyberStrikeus/CyberStrike'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: github.repository == 'CyberStrikeus/CyberStrike'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-bun
 
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: github.repository == 'CyberStrikeus/CyberStrike'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           fetch-tags: true
 
@@ -122,7 +122,7 @@ jobs:
     if: ${{ !cancelled() && needs.build-cli.result == 'success' && needs.build-app.result == 'success' }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-bun
 
