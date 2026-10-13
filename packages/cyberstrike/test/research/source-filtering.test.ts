@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { RESEARCH_SOURCES } from "../../src/research/sources"
+import { RESEARCH_SOURCES, resolveResearchSourceForURL } from "../../src/research/sources"
 import { isIndexLikeResearchUrl, isResearchCandidate, sourceRelevance } from "../../src/research/ingest"
 import { discoverySeeds } from "../../src/research/adapters"
 
@@ -88,6 +88,18 @@ test("hyphenated vulnerability names pass curated source relevance filters", () 
     "A technical report describing account-takeover impact and responsible disclosure.",
     trickster0,
   ).accepted).toBe(true)
+})
+
+
+test("legacy source inference uses allowlisted path prefixes and refuses ambiguous shared hosts", () => {
+  expect(resolveResearchSourceForURL("https://hackerone.com/hacktivity/reports/123")?.id).toBe("hackerone-hacktivity")
+  expect(resolveResearchSourceForURL("https://www.hackerone.com/blog/security-research")?.id).toBe("hackerone-blog")
+  expect(resolveResearchSourceForURL("https://hackerone.com/unclassified/path")).toBeUndefined()
+
+  // Contradictory explicit provenance is not silently replaced with an inferred source.
+  expect(resolveResearchSourceForURL("https://hackerone.com/hacktivity/reports/123", "hackerone-blog")).toBeUndefined()
+  expect(resolveResearchSourceForURL("http://hackerone.com/hacktivity/reports/123")).toBeUndefined()
+  expect(resolveResearchSourceForURL("https://user:pass@hackerone.com/hacktivity/reports/123")).toBeUndefined()
 })
 
 
