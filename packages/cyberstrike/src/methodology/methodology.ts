@@ -356,6 +356,8 @@ export namespace Methodology {
     const directives: Record<Phase.Id, string> = {
       scope_analysis:
         "Analyze the target scope. Identify all in-scope domains, subdomains, IP ranges. Use add_intel to log each discovered asset with tag 'scope-analysis'.",
+      mobile_application_testing:
+        "Perform authorized mobile application security testing for the in-scope Android/iOS app. Review platform storage, local data exposure, transport security, deep links, authentication/session handling, authorization, WebViews, exported components, cryptographic use, and client-side trust assumptions. Use only approved test builds/accounts and in-scope endpoints. Record evidence and findings via add_intel with tags such as mobile-testing, android, ios, and the relevant issue category. Do not treat a skill candidate as loaded unless the skill tool returns its content; if the catalog lacks a relevant mobile testing skill, record that limitation and proceed with documented methodology.",
       passive_recon:
         "Perform passive reconnaissance: DNS records, WHOIS, certificate transparency, Wayback Machine, Google dorking. Log all subdomains and services via add_intel with tag 'passive-recon'.",
       active_recon:

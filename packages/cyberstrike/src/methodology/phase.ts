@@ -6,6 +6,7 @@
 export namespace Phase {
   export type Id =
     | "scope_analysis"
+    | "mobile_application_testing"
     | "passive_recon"
     | "active_recon"
     | "technology_profiling"
@@ -44,6 +45,16 @@ export namespace Phase {
       relatedVrtCategories: [],
       appliesTo: ["wildcard", "single", "cidr", "mobile"],
       agents: ["explore", "cyberstrike"],
+    },
+    {
+      id: "mobile_application_testing",
+      name: "Mobile Application Security Testing",
+      prerequisites: ["scope_analysis"],
+      requiredTags: ["mobile-testing", "android", "ios", "masvs", "mobile-security"],
+      minDeliverables: 1,
+      relatedVrtCategories: ["Info Disclosure", "Auth Bypass", "Privilege Escalation", "Known CVE"],
+      appliesTo: ["mobile"],
+      agents: ["cyberstrike", "web-application"],
     },
     {
       id: "passive_recon",
@@ -169,6 +180,7 @@ export namespace Phase {
       name: "Reporting & Validation",
       prerequisites: [
         "scope_analysis",
+        "mobile_application_testing",
         "passive_recon",
         "active_recon",
         "technology_profiling",
@@ -313,7 +325,8 @@ export namespace Phase {
 
   export function detectScopeType(items: string[]): ScopeType {
     if (items.some((i) => /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(i))) return "cidr"
-    if (items.some((i) => /\.(apk|ipa)$/i.test(i) || /^(com|io|net)\.[a-z]/i.test(i))) return "mobile"
+    // A bare com.example.com string is indistinguishable from a domain. Require an app artifact or an explicit package marker to avoid misclassifying web targets as mobile.
+    if (items.some((i) => /\.(apk|ipa)$/i.test(i) || /^(?:android|ios|package):(?:com|io|net)\.[a-z][\w.]*/i.test(i))) return "mobile"
     if (items.some((i) => /^\*\./.test(i))) return "wildcard"
     return "single"
   }
