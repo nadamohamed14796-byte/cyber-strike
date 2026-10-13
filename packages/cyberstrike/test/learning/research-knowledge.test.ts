@@ -109,6 +109,61 @@ test("shared research retrieval uses signal tags and excludes target-specific re
   })
 })
 
+test("model-rejected or unstudyable legacy public records stay out of hunting recommendations", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const rejected = ReportKnowledge.ingestExternalDetailed({
+        title: "Legacy IDOR article to reject " + marker,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL: "https://research.example.test/" + marker + "/irrelevant-idor",
+        lesson: "An old heuristic extraction not relevant to access-control hunting.",
+        sourceTrust: 90,
+        tags: ["idor"],
+        metadata: { source_trust: 90, study_method: "bounded-heuristic-extraction" },
+      })
+      const skipped = ReportKnowledge.ingestExternalDetailed({
+        title: "Legacy IDOR source with unsafe provenance " + marker,
+        severity: "unknown",
+        vulnerabilityClass: "idor",
+        sourceURL: "https://research.example.test/" + marker + "/unsafe-provenance",
+        lesson: "An old public record could not be attributed to a configured source safely.",
+        sourceTrust: 90,
+        tags: ["idor"],
+        metadata: { source_trust: 90, study_method: "bounded-heuristic-extraction" },
+      })
+      expect(rejected).not.toBeNull()
+      expect(skipped).not.toBeNull()
+      if (!rejected || !skipped) throw new Error("legacy reference fixtures were not persisted")
+
+      expect(ReportKnowledge.recommendations({ signal: "idor", limit: 50 }).some((row) => row.id === rejected.id)).toBe(true)
+      expect(ReportKnowledge.markModelStudyCompleted({
+        id: rejected.id, version: 1, decision: "rejected", reason: "source is unrelated to the claimed security technique",
+      })).toBe(true)
+      expect(ReportKnowledge.markModelStudyCompleted({
+        id: skipped.id, version: 1, decision: "skipped", reason: "source provenance cannot be resolved safely",
+      })).toBe(true)
+
+      const storedRejected = Database.use((db) => db.select().from(ReportKnowledgeTable)
+        .where(eq(ReportKnowledgeTable.id, rejected.id)).get())
+      expect(storedRejected?.status).toBe("observed")
+      expect(storedRejected?.metadata?.model_study_decision).toBe("rejected")
+
+      const recommendations = ReportKnowledge.recommendations({ signal: "idor", limit: 50 })
+      expect(recommendations.some((row) => row.id === rejected.id)).toBe(false)
+      expect(recommendations.some((row) => row.id === skipped.id)).toBe(false)
+      // Explicit research search remains available for audit/review of the source record.
+      const audit = ReportKnowledge.search({ query: "Legacy IDOR article to reject " + marker, sourceKind: "external_report", limit: 10 })
+      expect(audit.some((row) => row.id === rejected.id)).toBe(true)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("target outcomes do not relabel globally shared external research", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
