@@ -22,21 +22,19 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://192.0.3.17/", entries)).toEqual([])
   })
 
-  test("reuses compiled indexes for the same list and recompiles a replacement list", () => {
+  test("recompiles a replacement list rather than reusing an old index", () => {
     const first = ["old.example"]
     expect(matchingScopeItems("https://old.example/", first)).toEqual(["old.example"])
     expect(matchingScopeItems("https://new.example/", first)).toEqual([])
-
     const replacement = ["new.example"]
     expect(matchingScopeItems("https://new.example/", replacement)).toEqual(["new.example"])
     expect(matchingScopeItems("https://old.example/", replacement)).toEqual([])
   })
 
-  test("keeps exact-host lookups practical for very large scope lists", () => {
+  test("supports large lists and reuses the compiled index for repeated checks", () => {
     const entries = Array.from({ length: 100_000 }, (_, index) => "host-" + index + ".att.com")
     entries.push("wanted.att.com")
     expect(matchingScopeItems("https://wanted.att.com/", entries)).toEqual(["wanted.att.com"])
-    // The second lookup uses the same compiled Set rather than rebuilding it.
     expect(matchingScopeItems("https://missing.att.com/", entries)).toEqual([])
   })
 })
