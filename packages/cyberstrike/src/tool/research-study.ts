@@ -252,7 +252,12 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
 }
 
 export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
-  const rows = ReportKnowledge.externalRecordsForModelStudy(500, RESEARCH_MODEL_STUDY_VERSION)
+  const requestedSource = sourceFilter ? RESEARCH_SOURCES.find((entry) => entry.id === sourceFilter) : undefined
+  const rows = ReportKnowledge.externalRecordsForModelStudy(
+    500,
+    RESEARCH_MODEL_STUDY_VERSION,
+    requestedSource?.hosts,
+  )
   const result = { examined: 0, queued: 0, skipped: 0, errors: [] as string[] }
   for (const row of rows) {
     if (result.queued >= 100) break
@@ -301,14 +306,20 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
     )
     const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : ""
     const preferred = matchingSources.find((source) => source.id === preferredID)
-    const source = preferred ?? matchingSources[0]
+    const source = preferredID
+      ? preferred
+      : matchingSources.length === 1 ? matchingSources[0] : undefined
     if (!source) {
+      // Do not silently assign a different source's trust rating or crawler policy
+      // when legacy metadata is missing/contradictory on a shared host.
       result.skipped++
       ReportKnowledge.markModelStudyCompleted({
         id: row.id,
         version: RESEARCH_MODEL_STUDY_VERSION,
         decision: "skipped",
-        reason: "no currently configured source permits safe fetching from this host",
+        reason: matchingSources.length
+          ? "legacy source provenance is missing or does not match the configured URL host"
+          : "no currently configured source permits safe fetching from this host",
       })
       continue
     }
