@@ -93,7 +93,9 @@ test("hyphenated vulnerability names pass curated source relevance filters", () 
 
 test("legacy source inference uses allowlisted path prefixes and refuses ambiguous shared hosts", () => {
   expect(resolveResearchSourceForURL("https://hackerone.com/hacktivity/reports/123")?.id).toBe("hackerone-hacktivity")
+  expect(resolveResearchSourceForURL("https://hackerone.com/hacktivity/reports/123", "hackerone")?.id).toBe("hackerone-hacktivity")
   expect(resolveResearchSourceForURL("https://www.hackerone.com/blog/security-research")?.id).toBe("hackerone-blog")
+  expect(resolveResearchSourceForURL("https://www.hackerone.com/blog/security-research", "default")?.id).toBe("hackerone-blog")
   expect(resolveResearchSourceForURL("https://hackerone.com/unclassified/path")).toBeUndefined()
 
   // Contradictory explicit provenance is not silently replaced with an inferred source.
