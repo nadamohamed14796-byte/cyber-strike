@@ -95,15 +95,15 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
 }
 
 // ============================================================
-// METHODOLOGY CONTEXT — System prompt injection for
-// methodology-aware sessions. Only activates when the session
-// has intel entries (meaning methodology is in use).
+// METHODOLOGY CONTEXT — System prompt injection for methodology-aware sessions.
+// Phase-specific skill preflight also runs before the first intel entry;
+// progress, coverage, and routing context require recorded intelligence.
 // ============================================================
 
 export namespace MethodologyContext {
   /**
    * Generate methodology context for system prompt injection.
-   * Returns null if methodology is not active (no intel entries).
+   * Returns null only when no applicable phase is available.
    */
   /**
    * @param agentClass when set to a proxy-tester class (e.g. "idor"), the context
