@@ -643,6 +643,10 @@ export namespace ResearchQueue {
         cached_text_truncated: input.contentLength > text.length,
         content_fingerprint: input.contentFingerprint,
         content_length: input.contentLength,
+        // Any previous cursor belongs to older text or an interrupted read.
+        // A refetch starts a fresh study at character zero.
+        study_read_offset: 0,
+        study_read_length: text.length,
       }
       const updated = db.update(ResearchQueueTable).set({
         title: input.title.slice(0, 500),
