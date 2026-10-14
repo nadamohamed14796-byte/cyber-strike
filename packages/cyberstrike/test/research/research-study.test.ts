@@ -181,7 +181,6 @@ test("preflight skips are counted separately from model-studied reports", async 
       } as any
       const next = await tool.execute({
         action: "next",
-        source: sourceID,
         pages: 5,
         depth: 2,
         limit: 3,
