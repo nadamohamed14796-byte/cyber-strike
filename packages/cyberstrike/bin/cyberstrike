@@ -16,7 +16,7 @@ function run(target) {
     console.error(result.error.message)
     process.exit(1)
   }
-  const code = typeof result.status === "number" ? result.status : 0
+  const code = typeof result.status === "number" ? result.status : 1
   process.exit(code)
 }
 
