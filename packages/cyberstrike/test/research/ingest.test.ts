@@ -166,11 +166,6 @@ test("learning queue floors non-integer item limits instead of exceeding the req
     directory: dir.path,
     fn: async () => {
       const marker = crypto.randomUUID()
-      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
-      if (!baseSource) throw new Error("PortSwigger test source is not configured")
-      const sourceID = "portswigger-limit-test-" + marker
-      const isolatedSource = { ...baseSource, id: sourceID }
-      RESEARCH_SOURCES.push(isolatedSource)
       const cachedText = [
         "A bug bounty report describes an insecure direct object reference (IDOR) caused by missing object-level authorization.",
         "Prerequisite: use two test-owned accounts and one object owned by the first account.",
@@ -182,16 +177,16 @@ test("learning queue floors non-integer item limits instead of exceeding the req
 
       for (const suffix of ["first", "second"]) {
         ResearchQueue.enqueue({
-          sourceID,
+          sourceID: "portswigger",
           sourceURL: "https://portswigger.net/web-security/access-control/idor?limit_test=" + marker + "-" + suffix,
           title: "IDOR limit test " + marker + "-" + suffix,
           payload: { cached_text: cachedText + " " + suffix },
         })
       }
 
-      const result = await learnResearchQueue({ limit: 1.5, sourceID })
+      const result = await learnResearchQueue({ limit: 1.5, sourceID: "portswigger" })
       expect(result.claimed).toBe(1)
-      expect(ResearchQueue.stats(sourceID).queued).toBe(1)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
       await Instance.dispose()
     },
   })
