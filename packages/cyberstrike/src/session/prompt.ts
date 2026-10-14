@@ -787,7 +787,7 @@ export namespace SessionPrompt {
       // Inject methodology context if the session has intel data. Scope it to the
       // running agent's lane when it's a proxy-tester (Phase 2.3) — orchestrator
       // (non-tester) gets the full routing view.
-      const methodologyCtx = MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
+      const methodologyCtx = await MethodologyContext.generate(Session.root(sessionID), testerClass(lastUser.agent))
       if (methodologyCtx) system.push(methodologyCtx)
 
       // Inject only project-local target memory matching observed hosts/endpoints in this session.
