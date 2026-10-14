@@ -6,7 +6,9 @@ import type { SkillIndex } from "../../src/skill/index-engine"
 describe("Methodology phase skill routing", () => {
   test("every defined phase has a phase-specific skill discovery plan", () => {
     for (const phase of Phase.ALL) {
-      expect(skillQueriesForPhase(phase.id).length).toBeGreaterThan(0)
+      const queries = skillQueriesForPhase(phase.id)
+      expect(queries.length).toBeGreaterThan(0)
+      for (const requiredTag of phase.requiredTags) expect(queries).toContain(requiredTag)
     }
   })
 
