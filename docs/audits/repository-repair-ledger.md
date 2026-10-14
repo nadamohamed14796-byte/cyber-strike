@@ -459,7 +459,7 @@ The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill
 - **Target evidence policy:** aligned the generated workspace README with the implemented private target-local evidence behavior. Exact observed values can be retained only in the private target workspace when needed for reproduction; candidates remain unverified until independently validated and raw evidence must not be copied into Git commits or shared research. Added `**/.cyberstrike/targets/` to the root `.gitignore` so nested-project target workspaces are ignored too, and added a safe migration that updates the old generated README policy without overwriting human-authored content.
 - **Commits:** research test isolation `866ffab26450ac11538e5deca97c24b31c5c44e2`, `334fd145fe8f4bb8931e611f2c2e4b17943a233e`; `/update` `6de2df19a5f134b50a6521adfcf8a26a270ec5c1`; methodology/skill routing `ed1bd516a03f8d7fd39bff3e823d96f2eb39bcb2`, `536f3600f08c4afd36b4b8d49cca4ed27c30982d`, `1dc61f274800e0eea0ea5c87b003384159317450`, `9dddf3bd65fedf7c2208e5b0a9e6b87cbd93410c`, `3b8d643a5c163d5f428601031a8e20949fe3aa73`, `258d3aec6dde0cd92f48149cdb5fdf2a8b4db8c0`, `af80432dedcc7a5f4acfda6111a8141a6290b4fb`, `0abe3f9d9fb65691dcd8c6095befc161ba88c20d`, `c415798e1b75a7a593411adb936076ff784a5e40`; target documentation `2e3525d09b88e0372c72f8175bb09c6275ac4699`.
 - **Additional privacy hardening:** nested target workspace ignore rule `402847fad226482ac25e49bda43bef354eaf4020`; README migration `387f6006f810ee14b8828d554da6d00ed06a5028`; regression test `dd6d4bd92e437d22a9a01120ede088dea6d6413f`; clarified policy wording `b53c3bd72fde7e66319ebd20bd4ca5b16199bc54` and test expectation `21ec8d3ef0937483e18117d8ab9ab85377e4b691`.
-- **Validation boundary:** this environment still has no local repository checkout or Bun runtime; network DNS prevented cloning. The equivalent PR #82 typecheck and build passed (runs [38485444524](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38485444524) and [38485444545](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38485444545)), while its test run failed on shared research fixtures before the cleanup described above. The exact combined main head still requires test, typecheck, build, and CodeQL confirmation; no local or latest-main CI pass is claimed.
+- **Validation boundary (historical statement superseded by the 2026-10-14 checkpoint below):** this environment still has no local repository checkout or Bun runtime; network DNS prevented cloning. At the time this entry was written, the equivalent PR #82 typecheck/build passed while its test run failed on shared research fixtures. The latest-main CI result is recorded separately below; no local test execution is claimed.
 - **Unmerged integration refs:** PR #54 (`feat/proxy-config`) and PR #55 (`dev`) remain conflicted and diverged from current main by roughly 1,801 commits behind. Their large overlapping network/config/Hackbrowser changes were not merged wholesale; preserve them for selective review. Do not force-push or delete their branches as part of this checkpoint.
 
 
@@ -469,3 +469,40 @@ The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill
 - **Fix:** derive the path with `fileURLToPath(import.meta.url)` and add a regression test that runs the copied launcher with Node, a temporary fake platform binary, and a sentinel argument.
 - **Commits:** launcher fix `42d1e553a34f06e676086d4a1cf5814b09428b89`; regression test `32c6680e63904a3e8efc29f4a3cf7723503b744b`, explicit Node invocation `55c3f15588d3b26ba15f3bad96f77e25ddbff773`, package ESM fixture `109058522b0139c0b59f4a61e4b9b05ba3dbba17`, signal-exit fix `0d0fa84dd5b9d0cfec4ddcc537549857b3b5215f`, and signal regression `81ebad38b1dec27d92d4fa968b4d3f5c8665baaf`; corrected PID fixture `ee45d8fd0f0660e71ed1ea9fcd1524503d7cca44` and platform-aware binary fixtures `5ad71638b6e8aa2cc215a8122cec952e74378fce`.
 - **Validation:** regression test has been authored but not executed locally. Include it in the pending exact-main CI run; do not mark this finding CI-verified until that run completes.
+
+
+## Current repository checkpoint — 2026-10-14 13:00 UTC
+
+### Exact latest-main verification
+
+- **Current main SHA:** [985c14ce56ba3f42792aa91a893de123bfc1eb4f](https://github.com/nadamohamed14796-byte/cyber-strike/commit/985c14ce56ba3f42792aa91a893de123bfc1eb4f), `fix(methodology): include explore agent in scope analysis routing`.
+- **GitHub Actions on that exact SHA:** tests [38556166419](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38556166419), typecheck [38556166503](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38556166503), build [38556166429](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38556166429), and CodeQL [38556166475](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38556166475) all completed with conclusion `success`.
+- **Scope of verification:** these results establish the four listed workflow outcomes on this exact commit. They do not establish a live provider-backed `/update` run, live target-side validation, or manual browser/MFA scenarios. No local tests are claimed because this environment does not have a repository checkout or Bun runtime.
+- **Methodology follow-up:** the CI failure on `1f60ac55651315e792e26b88303ef6fdf73a8a6e` was corrected by including `explore` as a worker for `scope_analysis` while retaining `cyberstrike`; all four workflows then passed on `985c14ce`.
+
+### Current pull-request disposition
+
+The current open-PR listing contains four entries:
+
+- **#54 `feat/proxy-config`: do not merge wholesale.** Its changes overlap #55 and include a race tester change that sets `ssl=False`; related branch code reviewed earlier also defaults some outbound TLS paths to accepting invalid certificates. Current `main` has explicit secure-by-default TLS behavior and network regression tests. Extract only individually reviewed proxy functionality with tests; never regress the TLS default.
+- **#55 `dev`: do not merge wholesale.** It substantially overlaps #54 and is similarly divergent. No evidence supports merging both branches.
+- **#82 `fix/phase-aware-skill-routing`: no wholesale merge needed based on the reviewed changes.** Phase-specific skill discovery, mobile phase routing, recon/security agent routing, and related tests are already present in current `main`. The final scope-analysis worker-routing correction is separately committed on main and CI-green.
+- **#83 `fix/research-test-isolation`: the per-test cleanup currently present on main matches the key proposed cleanup.** Its `beforeEach` deletes shared worker-local research tables; this is evidence of cleanup, not proof of complete parallel isolation across test files. Keep the limitation explicit rather than claiming all concurrency races are eliminated.
+
+### Branch inventory observed on 2026-10-14
+
+The branch list returned by GitHub contained `main`, `dev`, `feat/proxy-config`, `fix/phase-aware-skill-routing`, `fix/research-test-isolation`, `docs/idor-skill-expansion`, `feat/target-memory-foundation`, `fix/research-update-exhaustive-cycle`, `fix/scope-check-ipv4-cidr-host-validation-20261012`, `hackbrowser-improvement`, and `audit/fix-verification-ledger-hypothesis-identity`.
+
+- `main` is the verified current base at the SHA above.
+- The first four non-main refs correspond to the four open PRs above; do not infer that an open PR is mergeable just because its feature is partly present in main.
+- Comparisons of `docs/idor-skill-expansion`, `fix/research-update-exhaustive-cycle`, and `audit/fix-verification-ledger-hypothesis-identity` against current main showed no branch-only commits in the comparison result; treat these as stale refs unless a fresh tree-level comparison identifies unique content.
+- `feat/target-memory-foundation` and `fix/scope-check-ipv4-cidr-host-validation-20261012` each showed only two branch-only commits in the current comparison, both package/workspace dependency changes; current main already contains the target workspace and scope-validation implementation. Do not merge these stale branches wholesale.
+- `hackbrowser-improvement` showed two branch-only workspace dependency commits. This is not a reason to merge the old branch: the historical ledger already records unsafe TLS behavior and a branch-only `cookies.txt` concern. Do not open or copy the sensitive file; if it may contain live credentials, the owner must review and revoke them.
+- No branch was deleted, force-pushed, or rewritten during this checkpoint.
+
+### Remaining verification blockers
+
+- The actual `/update` research collection → model study → durable save → recovery → final report cycle has not been run end-to-end in a live session here. CI success is not a substitute for that run.
+- The current-main research test cleanup clears shared worker-local tables before each test, but a separate concurrency/isolation proof is still needed before claiming tests cannot contaminate each other when files execute in parallel.
+- No live authorized target hunt, provider-backed research fetch, or external target validation is claimed.
+- No 20-pass audit is claimed by this checkpoint. Each audit row must remain at the level supported by inspected source, tests, and exact CI evidence.
