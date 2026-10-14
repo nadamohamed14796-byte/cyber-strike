@@ -205,6 +205,7 @@ export function isIndexLikeResearchUrl(url: string) {
     // Root landing pages are discovery seeds, not automatically learnable articles.
     if (path === "/") return true
     if (/[?&](page|p|offset|start|pageindex)=\d+/i.test(parsed.search)) return true
+    if (/\/page\/\d+\/?$/i.test(path)) return true
     if (/\/(all-labs|all-topics|all-courses|all-resources|latest|popular)(\/)?$/.test(path)) return true
     if (/\/(category|categories|topic|topics|tag|tags|archives?|search|help|docs|documentation)(\/|$)/i.test(path))
       return true
