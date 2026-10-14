@@ -1,9 +1,33 @@
 import { expect, test } from "bun:test"
-import { RESEARCH_SOURCES, resolveResearchSourceForURL } from "../../src/research/sources"
+import { RESEARCH_SOURCES, researchSourcePathAllowed, resolveResearchSourceForURL } from "../../src/research/sources"
 import { isIndexLikeResearchUrl, isResearchCandidate, sourceRelevance } from "../../src/research/ingest"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage } from "../../src/research/adapters"
 
 const trickster0 = RESEARCH_SOURCES.find((source) => source.id === "trickster0")!
+
+test("repository-backed GitHub sources cannot crawl sibling repositories", () => {
+  const srcHunter = RESEARCH_SOURCES.find((source) => source.id === "src-hunter-skill")!
+  const payloads = RESEARCH_SOURCES.find((source) => source.id === "payloadsallthethings")!
+  const genericGitHub = RESEARCH_SOURCES.find((source) => source.id === "github")!
+
+  expect(researchSourcePathAllowed(
+    "https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports",
+    srcHunter,
+  )).toBe(true)
+  expect(researchSourcePathAllowed(
+    "https://github.com/MyuriKanao/src-hunter-skill/blob/main/references/h1-reports/raw/reports/report.md",
+    srcHunter,
+  )).toBe(true)
+  expect(researchSourcePathAllowed("https://github.com/MyuriKanao/src-hunter-skill-evil/blob/main/report.md", srcHunter)).toBe(false)
+  expect(researchSourcePathAllowed("https://github.com/attacker/other-repo/blob/main/report.md", srcHunter)).toBe(false)
+
+  expect(researchSourcePathAllowed("https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/SQL%20Injection", payloads)).toBe(true)
+  expect(researchSourcePathAllowed("https://github.com/swisskyrepo/PayloadsAllTheThings-evil/blob/main/README.md", payloads)).toBe(false)
+  expect(researchSourcePathAllowed("https://github.com/another/repo/blob/main/README.md", payloads)).toBe(false)
+
+  // The intentionally generic search source remains able to discover writeups across GitHub.
+  expect(researchSourcePathAllowed("https://github.com/another/repo/blob/main/security-report.md", genericGitHub)).toBe(true)
+})
 
 test("Medium source follows the curated author, not unrelated Medium articles", () => {
   expect(isResearchCandidate("https://trickster0.medium.com/an-idor-report", trickster0)).toBe(true)

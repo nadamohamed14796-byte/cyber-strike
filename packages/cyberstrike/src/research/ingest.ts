@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { ReportKnowledge } from "../learning/report-knowledge"
-import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, type ResearchSource, type ResearchSourceKind } from "./sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, researchSourcePathAllowed, type ResearchSource, type ResearchSourceKind } from "./sources"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage, sourceDocumentPriority } from "./adapters"
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
@@ -27,7 +27,8 @@ function paginationSeriesKey(source: ResearchSource, value: string) {
 }
 
 function hostAllowed(url: URL, source: ResearchSource) {
-  return source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
+  return source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host)) &&
+    researchSourcePathAllowed(url, source)
 }
 
 function normalizeUrl(value: string, base?: URL) {

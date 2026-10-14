@@ -1,4 +1,4 @@
-import type { ResearchSource } from "./sources"
+import { researchSourcePathAllowed, type ResearchSource } from "./sources"
 import { lookup } from "node:dns/promises"
 import { isIP } from "node:net"
 
@@ -121,7 +121,8 @@ function hostAllowed(url: URL, source: ResearchSource) {
     (!url.port || url.port === "443") &&
     !url.username &&
     !url.password &&
-    source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
+    source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host)) &&
+    researchSourcePathAllowed(url, source)
   )
 }
 

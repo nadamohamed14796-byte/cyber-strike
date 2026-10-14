@@ -17,6 +17,28 @@ export type ResearchSource = {
   excludeTerms?: string[]
   includePaths?: string[]
   excludePaths?: string[]
+  /**
+   * Optional same-host path boundary for repository-backed sources. This is a fetch
+   * allowlist, not a relevance hint: sibling repositories on github.com are excluded.
+   */
+  allowedPathPrefixes?: string[]
+}
+
+/** Enforce configured source path boundaries consistently in discovery and fetch/redirect validation. */
+export function researchSourcePathAllowed(url: URL | string, source: Pick<ResearchSource, "allowedPathPrefixes">): boolean {
+  if (!source.allowedPathPrefixes?.length) return true
+  let parsed: URL
+  try {
+    parsed = url instanceof URL ? url : new URL(url)
+  } catch {
+    return false
+  }
+  const pathname = parsed.pathname.toLowerCase().replace(/\\/g, "/")
+  return source.allowedPathPrefixes.some((prefix) => {
+    const normalized = "/" + prefix.split("/").filter(Boolean).join("/")
+    const allowed = normalized.toLowerCase().replace(/\\/g, "/").replace(/\/$/, "")
+    return pathname === allowed || pathname.startsWith(allowed + "/")
+  })
 }
 
 export const RESEARCH_SOURCES: ResearchSource[] = [
@@ -303,6 +325,7 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
     kind: "reference",
     seedUrls: ["https://github.com/swisskyrepo/PayloadsAllTheThings"],
     hosts: ["github.com"],
+    allowedPathPrefixes: ["/swisskyrepo/PayloadsAllTheThings"],
     trust: 90,
   },
   {
@@ -327,6 +350,7 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
       "https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md",
     ],
     hosts: ["github.com"],
+    allowedPathPrefixes: ["/MyuriKanao/src-hunter-skill"],
     trust: 90,
   },
   {
