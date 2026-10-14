@@ -598,15 +598,54 @@ export function candidateScore(url: string, source: ResearchSource) {
 }
 
 async function discoverSitemap(source: ResearchSource) {
-  const origin = "https://" + source.hosts[0]
-  try {
-    const html = await fetchText(origin + "/sitemap.xml", source)
-    return [...html.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
-      .map((match) => normalizeUrl(match[1]))
+  const sitemapQueue = source.hosts.flatMap((host) =>
+    ["/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml", "/wp-sitemap.xml"]
+      .map((path) => "https://" + host + path),
+  )
+  const visitedSitemaps = new Set<string>()
+  const discoveredPages = new Set<string>()
+
+  while (sitemapQueue.length) {
+    const candidate = normalizeUrl(sitemapQueue.shift()!)
+    if (!candidate || visitedSitemaps.has(candidate)) continue
+    visitedSitemaps.add(candidate)
+
+    let parsed: URL
+    try {
+      parsed = new URL(candidate)
+      if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) continue
+    } catch {
+      continue
+    }
+
+    let xml: string
+    try {
+      xml = await fetchText(candidate, source)
+    } catch {
+      // Sitemap variants are optional. Continue trying every other configured
+      // sitemap and rely on ordinary source links if a variant is unavailable.
+      continue
+    }
+
+    const isSitemapIndex = /<sitemapindex\b/i.test(xml)
+    const locations = [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
+      .map((match) => normalizeUrl(match[1].replace(/&amp;/gi, "&"), parsed))
       .filter((value): value is string => !!value)
-  } catch {
-    return []
+
+    for (const location of locations) {
+      try {
+        const url = new URL(location)
+        if (url.protocol !== "https:" || !hostAllowed(url, source)) continue
+        if (isSitemapIndex || /\.xml(?:\.gz)?$/i.test(url.pathname)) {
+          if (!visitedSitemaps.has(url.toString())) sitemapQueue.push(url.toString())
+        } else if (!/\.(png|jpe?g|gif|svg|webp|css|js|zip|woff2?|mp4|mp3)$/i.test(url.pathname)) {
+          discoveredPages.add(url.toString())
+        }
+      } catch {}
+    }
   }
+
+  return [...discoveredPages]
 }
 
 export type ResearchIngestResult = {
