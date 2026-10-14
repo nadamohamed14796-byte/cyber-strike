@@ -1,7 +1,9 @@
 /**
- * Redact common secret-bearing fields before target notes reach SQLite or
- * notes.md. Keep this at the target-data boundary so CLI and agent tools use
- * identical redaction even if a caller forgets to sanitize its input.
+ * Explicit sanitizer for target-note text that must not retain credentials.
+ * This helper is not an automatic persistence boundary: private target evidence
+ * may intentionally preserve exact observed values for authorized reproduction.
+ * Callers must choose deliberately between sanitized metadata and raw target-local
+ * evidence; raw evidence must never be copied into global research or public reports.
  */
 export function redactTargetNoteSecrets(value: string): string {
   return value
