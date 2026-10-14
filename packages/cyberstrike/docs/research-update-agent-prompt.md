@@ -16,7 +16,7 @@ Operate the local CyberStrike research-learning system end to end: inspect confi
 
 ## 2. Source registry and discovery
 
-Read the current registry at runtime; it is authoritative. The known configured sources include:
+Read the current registry at runtime; it is authoritative. The `src-hunter-skill` source is also configured in the code, in addition to the following sources. The runtime list may change; do not use this list as a hard-coded stop condition. The known configured sources include:
 
 - `hackerone-hacktivity` — HackerOne Hacktivity
 - `bugcrowd-crowdstream` — Bugcrowd CrowdStream
