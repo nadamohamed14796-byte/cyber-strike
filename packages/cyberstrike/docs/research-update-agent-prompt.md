@@ -49,7 +49,7 @@ Read the current registry at runtime; it is authoritative. The `src-hunter-skill
 
 ### Exact starting URLs — visit these first, in this order
 
-These are the concrete seed URLs currently configured in `src/research/sources.ts`. Start with every URL below; do not replace them with vague searches or assume that visiting the home page exhausts the source. The code registry is authoritative if it changes. For each seed, follow the source's accessible article pagination, RSS/Atom feed, sitemap, archive/category pages, and relevant in-scope article links until the frontier is exhausted or a blocker is recorded. Preserve each source's host/path allowlist and its own relevance rules.
+These are the concrete seed URLs currently configured in `src/research/sources.ts`. Start with every URL below; do not replace them with vague searches or assume that visiting the home page exhausts the source. The code registry is authoritative if it changes. For each seed, follow the source's accessible article pagination, RSS/Atom feed, sitemap, archive/category pages, and relevant in-scope article links until the frontier is exhausted or a blocker is recorded. Prioritize direct report indexes over generic home pages. When a GitHub tree or search page lists report files, open individual accessible report files and read their actual contents; a directory listing or search snippet alone does not count as studying a report. Deduplicate by canonical URL/content fingerprint and record inaccessible files as blockers rather than silently skipping them. Preserve each source's host/path allowlist and its own relevance rules.
 
 1. **HackerOne Hacktivity** — disclosure reports:
    - https://hackerone.com/hacktivity
@@ -58,8 +58,10 @@ These are the concrete seed URLs currently configured in `src/research/sources.t
 3. **Intigriti research blog** — https://www.intigriti.com/researchers/blog
 4. **YesWeHack blog** — https://blog.yeswehack.com/
 5. **PortSwigger Web Security Academy labs** — https://portswigger.net/web-security/all-labs
-6. **PentesterLand** — https://pentester.land/
-7. **InfoSec Write-ups** — https://infosecwriteups.com/
+6. **PentesterLand write-up directory (direct report index)** — https://pentester.land/writeups/
+   - Site root / additional discovery: https://pentester.land/
+7. **InfoSec Write-ups — Bug Bounty tag (direct article index)** — https://infosecwriteups.com/tagged/bug-bounty
+   - Site root / additional discovery: https://infosecwriteups.com/
 8. **Weekly InfoSec Write-ups** — https://weekly.infosecwriteups.com/
 9. **SecurityCipher bounty write-ups** — https://securitycipher.com/bounty-writeups/
 10. **HackerOne Blog** — https://www.hackerone.com/blog
@@ -74,7 +76,10 @@ These are the concrete seed URLs currently configured in `src/research/sources.t
 19. **HackTricks reference** — https://book.hacktricks.xyz/
 20. **PayloadsAllTheThings repository** — https://github.com/swisskyrepo/PayloadsAllTheThings
 21. **GitHub security write-up repository search** — https://github.com/search?q=bug+bounty+writeup&type=repositories
-22. **src-hunter-skill repository** — https://github.com/MyuriKanao/src-hunter-skill
+   - **GitHub code search for report/write-up files** — https://github.com/search?q=bug+bounty+writeup&type=code
+   - Treat search results as leads; open relevant repositories and read the individual report files, not just snippets.
+22. **src-hunter-skill — direct raw HackerOne report directory (start here)** — https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports
+   - Repository root / supporting playbooks: https://github.com/MyuriKanao/src-hunter-skill
    - Skill instructions: https://github.com/MyuriKanao/src-hunter-skill/blob/main/SKILL.md
    - English README: https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md
 23. **OWASP Cheat Sheet Series** — https://cheatsheetseries.owasp.org/
