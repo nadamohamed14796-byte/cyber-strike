@@ -554,6 +554,60 @@ export namespace ResearchQueue {
   }
 
   /**
+   * Persist source-chunk read progress only against the current lease. expectedOffset
+   * is null when action=next initializes a new claim; otherwise it must match the
+   * existing cursor so chunks cannot be silently skipped or read out of order.
+   */
+  export function recordClaimReadProgress(input: {
+    id: string
+    leaseOwner: string
+    expectedOffset: number | null
+    nextOffset: number
+    totalLength: number
+  }) {
+    const match = /^RPT-(\d{1,12})$/.exec(input.id.trim())
+    if (!match || !input.leaseOwner.trim()) return false
+    if (
+      !Number.isSafeInteger(input.nextOffset) ||
+      !Number.isSafeInteger(input.totalLength) ||
+      input.nextOffset < 0 ||
+      input.totalLength < 0 ||
+      input.nextOffset > input.totalLength ||
+      (input.expectedOffset !== null && (!Number.isSafeInteger(input.expectedOffset) || input.expectedOffset < 0))
+    ) return false
+    const sequence = Number(match[1])
+    if (!Number.isSafeInteger(sequence) || sequence <= 0) return false
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const row = db.select().from(ResearchQueueTable).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, input.leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
+      )).get()
+      if (!row) return false
+      const payload = row.payload ?? {}
+      const currentOffset = typeof payload.study_read_offset === "number" ? payload.study_read_offset : 0
+      if (input.expectedOffset !== null && currentOffset !== input.expectedOffset) return false
+      const updated = db.update(ResearchQueueTable).set({
+        payload: {
+          ...payload,
+          study_read_offset: input.nextOffset,
+          study_read_length: input.totalLength,
+        },
+        lease_until: now + 20 * 60_000,
+        updated_at: now,
+      }).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, input.leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
+      )).returning({ sequence: ResearchQueueTable.sequence }).get()
+      return Boolean(updated)
+    })
+  }
+
+  /**
    * Cache sanitized text fetched by the agent-study path, tied to the still-active
    * claim. This lets saving knowledge read canonical source text from SQLite rather
    * than trusting an excerpt echoed back by the model.
