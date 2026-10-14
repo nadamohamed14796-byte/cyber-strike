@@ -284,6 +284,45 @@ test("agent-led study can read every chunk of a long source under the tool outpu
       expect(claimed.has_more_text).toBe(true)
       expect(claimed.text).toContain(firstMarker)
       expect(claimed.text).not.toContain(lastMarker)
+      expect(next.metadata.truncated).toBe(false)
+
+      // The queue must not accept a learned/rejected decision until every source
+      // chunk has been returned and the durable cursor reaches the document end.
+      const prematureSave = await tool.execute({
+        action: "save",
+        source: sourceID,
+        pages: 1,
+        depth: 1,
+        limit: 3,
+        continue_after_save: false,
+        items: [{
+          public_id: claimed.public_id,
+          lease_owner: claimed.lease_owner,
+          decision: "learned",
+          lesson: "This premature save must be blocked while source chunks remain unread.",
+        }],
+      }, context)
+      const prematureResult = JSON.parse(prematureSave.output)
+      expect(prematureResult.results[0].result).toBe("unread-source-chunks")
+      expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("studying")
+      expect(ReportKnowledge.search({
+        query: "Long IDOR research article " + marker,
+        sourceKind: "external_report",
+        limit: 5,
+      }).some((row) => row.title.includes(marker))).toBe(false)
+
+      const skippedChunk = await tool.execute({
+        action: "read",
+        source: sourceID,
+        public_id: claimed.public_id,
+        lease_owner: claimed.lease_owner,
+        offset: (claimed.next_text_offset as number) + 1,
+        pages: 1,
+        depth: 1,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      expect(skippedChunk.metadata.error).toBe("unexpected_offset")
 
       const chunks = [claimed.text as string]
       let offset = claimed.next_text_offset as number
@@ -302,6 +341,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
           continue_after_save: false,
         }, context)
         const part = JSON.parse(read.output)
+        expect(read.metadata.truncated).toBe(false)
         expect(part.start_offset).toBe(offset)
         expect(part.text.length).toBeGreaterThan(0)
         chunks.push(part.text)
