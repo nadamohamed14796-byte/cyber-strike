@@ -3,7 +3,6 @@ import fs from "node:fs/promises"
 import { createHash } from "node:crypto"
 import z from "zod"
 import { TargetMemory } from "../target"
-import { redactTargetNoteSecrets } from "../target/redact"
 import { Tool } from "./tool"
 
 const AREAS = [
@@ -30,7 +29,7 @@ const Parameters = z.object({
   target_url: z.string().min(1).describe("Exact existing target workspace URL. Use the root target for parent inventory and the child origin for per-asset artifacts."),
   area: z.enum(AREAS).describe("Target-local artifact directory. Do not replace authoritative scope/asset/run index files."),
   filename: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/).describe("Simple filename only, not a path. Use stable inventory names and unique run IDs for evidence."),
-  content: z.string().max(2_000_000).optional().describe("Complete UTF-8 text/JSON/CSV content, maximum 2 MB. Secret-like values are redacted before saving. Provide this OR source_path."),
+  content: z.string().max(2_000_000).optional().describe("Complete UTF-8 text/JSON/CSV content, maximum 2 MB. Exact evidence is preserved in this target-local workspace. Provide this OR source_path."),
   source_path: z.string().min(1).optional().describe("Absolute path to an existing user-provided text file on disk. Copies it into the target workspace without returning its contents to the model; files up to 32 MB. Provide this OR content."),
   overwrite: z.boolean().default(false).describe("Existing artifacts are immutable by default. Set true only when replacement is intentional."),
 }).refine(
@@ -44,7 +43,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     "Use for recon inventories, live-host results, URL/endpoint lists, JavaScript analysis, request/response references, test logs, evidence indexes, scan manifests, run state, report drafts and target-specific research notes.",
     "The workspace must already exist in the current project. This tool never silently creates another directory or guesses a target path. Call target_workspace first.",
     "Provide exactly one input: content (up to 2 MB) or source_path (an absolute, existing regular text file up to 32 MB). source_path copies the file into the workspace without returning its contents to the model and reports its SHA-256 hash.",
-    "Only known artifact folders and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Content is redacted for common secrets at the persistence boundary.",
+    "Only known artifact folders and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Exact evidence is preserved in this private target workspace; do not copy raw secrets into Git commits or global research.",
     "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, then verify the output file. Do not use the shell current directory or /root/targets implicitly.",
   ].join("\n"),
   parameters: Parameters,
@@ -121,8 +120,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       rawContent = params.content!
     }
 
-    const safeContent = redactTargetNoteSecrets(rawContent)
-    const content = safeContent.endsWith("\n") ? safeContent : safeContent + "\n"
+    const content = rawContent.endsWith("\n") ? rawContent : rawContent + "\n"
     await TargetMemory.writeWorkspaceFile(workspace, params.area + "/" + filename, content)
     return {
       title: "Target artifact saved",
@@ -132,7 +130,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
         "Artifact: " + filePath,
         "Bytes written: " + Buffer.byteLength(content, "utf-8"),
         ...(params.source_path ? ["Source file: " + params.source_path, "Source SHA-256: " + sourceHash] : []),
-        "Redaction: applied",
+        "Evidence preservation: exact content stored in target-local workspace",
       ].join("\n"),
       metadata: {
         saved: true,
