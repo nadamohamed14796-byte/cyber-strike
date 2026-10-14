@@ -203,14 +203,13 @@ export namespace Methodology {
     // 1. methodology_ordering: Check if advanced phases are attempted before basics
     const completedIds = new Set(phases.filter((p) => p.status === "completed").map((p) => p.id))
     for (const phase of phases) {
-      // computeState marks unmet prerequisites as "blocked", never "in_progress".
-      // Only emit an ordering violation when the blocked phase has deliverables,
-      // which is evidence that work was attempted before its prerequisites.
-      if (phase.status === "blocked" && phase.blockReason && phase.deliverableCount > 0) {
+      // blockReason records unmet prerequisites even when deliverables make the
+      // phase appear completed. Flag any phase with actual work and unmet prerequisites.
+      if (phase.blockReason && phase.deliverableCount > 0) {
         violations.push({
           gate: "methodology_ordering",
           severity: "blocking",
-          message: `Phase "${phase.name}" has deliverables but is blocked: ${phase.blockReason}`,
+          message: `Phase "${phase.name}" has deliverables despite unmet prerequisites: ${phase.blockReason}`,
         })
       }
     }
