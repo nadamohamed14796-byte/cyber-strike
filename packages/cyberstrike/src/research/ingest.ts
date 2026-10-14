@@ -1036,9 +1036,9 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 crawl_depth: current.depth,
                 candidate_score: candidateScore(current.url, source),
                 source_relevance_precheck: { accepted: relevance.accepted, score: relevance.score, agent_review_requested: !relevance.accepted },
-                // Discovery already fetched and sanitized this report. Cache a bounded excerpt
-                // so the learner never makes a duplicate HTTP request for this URL. Preserve the
-                // original length and full-content fingerprint for transparent truncation metadata.
+                // Discovery already fetched and sanitized this full resource. Preserve the
+                // complete text in the durable queue so model study does not need to refetch it.
+                // The active-model tool returns bounded sequential chunks to fit tool output limits.
                 cached_text: text,
                 cached_text_truncated: false,
                 content_length: text.length,
