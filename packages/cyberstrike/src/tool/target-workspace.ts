@@ -74,6 +74,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       const workspace = await TargetMemory.ensure(required(params.target_url, "target_url"))
       const scope = await TargetMemory.getScope(workspace.targetURL)
       const requiredFiles = [
+        path.join(workspace.workspacePath, "target.json"),
         path.join(workspace.workspacePath, "workspace.json"),
         path.join(workspace.workspacePath, "scope", "scope.json"),
         path.join(workspace.workspacePath, "notes.md"),
