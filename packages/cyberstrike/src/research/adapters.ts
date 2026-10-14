@@ -81,7 +81,7 @@ export function isDiscoveryPaginationURL(source: ResearchSource, value: string) 
     const parsed = new URL(value)
     if (source.id === "hackerone-hacktivity") {
       if (parsed.pathname.includes("/overview")) return parsed.searchParams.has("pageIndex")
-      return parsed.searchParams.has("page") && /^\\d+$/.test(parsed.searchParams.get("page") ?? "")
+      return parsed.searchParams.has("page") && /^\d+$/.test(parsed.searchParams.get("page") ?? "")
     }
     if (["bugcrowd-crowdstream", "github"].includes(source.id)) {
       return parsed.searchParams.has("page") && /^\d+$/.test(parsed.searchParams.get("page") ?? "")
