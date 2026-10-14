@@ -100,7 +100,7 @@ const ResearchStudyParameters = z.object({
   limit: z.number().int().min(1).max(5).default(3),
   continue_after_save: z.boolean().default(false),
   /** Exact active lease and character offset for reading subsequent text chunks. */
-  public_id: z.string().regex(/^RPT-\\d{1,12}$/).optional(),
+  public_id: z.string().regex(/^RPT-\d{1,12}$/).optional(),
   lease_owner: z.string().min(8).max(200).optional(),
   offset: z.number().int().min(0).default(0),
   items: z.array(StudyItem).max(5).optional(),
