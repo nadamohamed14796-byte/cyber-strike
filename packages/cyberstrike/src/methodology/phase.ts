@@ -44,7 +44,7 @@ export namespace Phase {
       minDeliverables: 1,
       relatedVrtCategories: [],
       appliesTo: ["wildcard", "single", "cidr", "mobile"],
-      agents: ["explore", "cyberstrike"],
+      agents: ["cyberstrike"],
     },
     {
       id: "mobile_application_testing",
@@ -64,7 +64,7 @@ export namespace Phase {
       minDeliverables: 1,
       relatedVrtCategories: [],
       appliesTo: ["wildcard", "single"],
-      agents: ["explore"],
+      agents: ["cyberstrike", "web-application"],
     },
     {
       id: "active_recon",
@@ -74,7 +74,7 @@ export namespace Phase {
       minDeliverables: 1,
       relatedVrtCategories: [],
       appliesTo: ["wildcard", "single"],
-      agents: ["explore", "web-application"],
+      agents: ["cyberstrike", "web-application"],
     },
     {
       id: "technology_profiling",
@@ -84,7 +84,7 @@ export namespace Phase {
       minDeliverables: 1,
       relatedVrtCategories: ["Known CVE", "Framework Vuln"],
       appliesTo: ["wildcard", "single"],
-      agents: ["explore", "web-application"],
+      agents: ["cyberstrike", "web-application"],
     },
     {
       id: "authentication_testing",
@@ -144,7 +144,7 @@ export namespace Phase {
       minDeliverables: 0,
       relatedVrtCategories: ["Info Disclosure"],
       appliesTo: ["wildcard", "single"],
-      agents: ["web-application", "explore"],
+      agents: ["web-application", "cyberstrike"],
     },
     {
       id: "api_security",
