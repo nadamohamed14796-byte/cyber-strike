@@ -66,6 +66,7 @@ export namespace Workspace {
   )
 
   export const remove = fn(z.void(), async () => {
+    Actor.assertAdmin()
     await Database.use((tx) =>
       tx
         .update(WorkspaceTable)
