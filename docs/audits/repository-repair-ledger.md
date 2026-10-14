@@ -506,3 +506,11 @@ The branch list returned by GitHub contained `main`, `dev`, `feat/proxy-config`,
 - The current-main research test cleanup clears shared worker-local tables before each test, but a separate concurrency/isolation proof is still needed before claiming tests cannot contaminate each other when files execute in parallel.
 - No live authorized target hunt, provider-backed research fetch, or external target validation is claimed.
 - No 20-pass audit is claimed by this checkpoint. Each audit row must remain at the level supported by inspected source, tests, and exact CI evidence.
+
+
+## Follow-up checkpoint — 2026-10-14, after 12:19 UTC
+
+- **Latest verified main commit:** [0e02b48abebcfeab2be797b0c750724a4f1a8a69](https://github.com/nadamohamed14796-byte/cyber-strike/commit/0e02b48abebcfeab2be797b0c750724a4f1a8a69), updating this ledger.
+- **GitHub Actions on that exact SHA:** [tests](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902765), [typecheck](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902735), [build](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902785), and [CodeQL](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902816) all completed with `success`. The separate issue-comment-triggered `review` and `cyberstrike` runs were `skipped`; they are not part of the four successful push workflows.
+- **PR #83 isolation finding:** inspection of its changed-file list confirms it modifies only `packages/cyberstrike/test/research/ingest.test.ts` and `packages/cyberstrike/test/research/research-study.test.ts`. It does not change `packages/cyberstrike/package.json` or `.github/workflows/test.yml`, so the PR description's claim that it serializes package tests is not implemented by the current diff. The `beforeEach` table cleanup is present on main but does not prove cross-file isolation. This was documented in [PR #83 discussion](https://github.com/nadamohamed14796-byte/cyber-strike/pull/83).
+- **Status boundary:** CI-green does not prove cross-file database isolation or a live `/update` run. Keep issue #39 open until the live research cycle and isolation strategy are demonstrated, and do not claim local test execution.
