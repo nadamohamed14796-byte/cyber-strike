@@ -773,6 +773,29 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         results.push({ public_id: note.public_id, result: completed ? "retry" : "lease-lost", reason: "knowledge-persistence-failed" })
         continue
       }
+      const persisted = ReportKnowledge.getByID(ingested.id)
+      const persistedURL = normalizeResearchUrl(persisted?.source_url ?? "")
+      const expectedURL = normalizeResearchUrl(claim.source_url)
+      if (
+        !persisted ||
+        persistedURL !== expectedURL ||
+        persisted.metadata?.document_type !== documentType ||
+        persisted.metadata?.content_fingerprint !== contentFingerprint
+      ) {
+        const completed = ResearchQueue.complete(
+          claim.sequence,
+          note.lease_owner,
+          "retry",
+          "agent study: saved knowledge failed read-back verification",
+        )
+        results.push({
+          public_id: note.public_id,
+          result: completed ? "retry" : "lease-lost",
+          reason: "knowledge-readback-verification-failed",
+          knowledge_id: ingested.id,
+        })
+        continue
+      }
       const completed = ResearchQueue.complete(
         claim.sequence,
         note.lease_owner,
