@@ -556,6 +556,7 @@ export namespace Agent {
             web_get_request_detail: "allow",
             // Read-only shared knowledge may help interpret a concrete API/auth signal.
             research_knowledge: "allow",
+            skill: "allow",
             target_note: "allow",
             correlate_javascript: "allow",
             web_write_role: "allow",
