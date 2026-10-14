@@ -6,7 +6,6 @@ import { SessionTable } from "../../src/session/session.sql"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
-import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
 import { tmpdir } from "../fixture/fixture"
 
@@ -17,10 +16,7 @@ test("agent-led research study persists model analysis and completes its queue l
     fn: async () => {
       const marker = crypto.randomUUID()
       const sessionID = "ses_agent_research_study_" + marker.replace(/-/g, "").slice(0, 18)
-      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
-      if (!baseSource) throw new Error("PortSwigger test source is not configured")
-      const sourceID = "portswigger-study-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
+      const sourceID = "portswigger"
       const sourceURL = "https://portswigger.net/web-security/access-control/idor?study-test=" + marker
       const sourceText = [
         "IDOR (insecure direct object reference) occurs when the server does not verify object-level authorization.",
@@ -181,7 +177,6 @@ test("preflight skips are counted separately from model-studied reports", async 
       } as any
       const next = await tool.execute({
         action: "next",
-        source: sourceID,
         pages: 5,
         depth: 2,
         limit: 3,
@@ -210,14 +205,10 @@ test("source-scoped model-study save refuses a lease from another source", async
     fn: async () => {
       const marker = crypto.randomUUID()
       const sessionID = "ses_source_filter_" + marker.replace(/-/g, "").slice(0, 18)
-      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
-      if (!baseSource) throw new Error("PortSwigger test source is not configured")
-      const sourceID = "portswigger-filter-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
       const sourceURL = "https://portswigger.net/web-security/source-filter-" + marker
       const sourceText = ("A reusable access-control security lesson. ").repeat(12)
       const queued = ResearchQueue.enqueue({
-        sourceID,
+        sourceID: "portswigger",
         sourceURL,
         title: "Access-control source filter test " + marker,
         payload: { cached_text: sourceText, content_length: sourceText.length, content_fingerprint: "b".repeat(40) },
@@ -233,7 +224,7 @@ test("source-scoped model-study save refuses a lease from another source", async
         ask: async () => {},
       } as any
       const next = await tool.execute({
-        action: "next", source: sourceID, pages: 5, depth: 2, limit: 3, continue_after_save: false,
+        action: "next", source: "portswigger", pages: 5, depth: 2, limit: 3, continue_after_save: false,
       }, context)
       const batch = JSON.parse(next.output)
       const claimed = batch.items.find((item: { public_id: string }) => item.public_id === queued.id)
@@ -253,7 +244,8 @@ test("source-scoped model-study save refuses a lease from another source", async
       const summary = JSON.parse(save.output)
       expect(summary.saved).toBe(0)
       expect(summary.results[0].result).toBe("source-filter-mismatch")
-      expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("retry")
+      expect(ResearchQueue.find("portswigger", sourceURL)?.status).toBe("retry")
+      expect(ReportKnowledge.stats().external).toBe(0)
       await Instance.dispose()
     },
   })
@@ -266,10 +258,6 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
     directory: dir.path,
     fn: async () => {
       const marker = crypto.randomUUID().replace(/-/g, "")
-      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
-      if (!baseSource) throw new Error("PortSwigger test source is not configured")
-      const sourceID = "portswigger-backfill-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
       const legacyCount = 501
       for (let index = 0; index < legacyCount; index++) {
         const row = ReportKnowledge.ingestExternalDetailed({
@@ -281,7 +269,7 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
           sourceTrust: 100,
           tags: ["idor"],
           metadata: {
-            research_source: sourceID,
+            research_source: "portswigger",
             source_trust: 100,
             study_method: "bounded-heuristic-extraction",
             extraction_version: 7,
@@ -302,7 +290,6 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
       } as any
       const result = await tool.execute({
         action: "backfill",
-        source: sourceID,
         pages: 5,
         depth: 2,
         limit: 3,
@@ -312,7 +299,7 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
       expect(summary.legacy_knowledge_queued_for_model_study).toBe(legacyCount)
       expect(summary.legacy_knowledge_examined).toBe(legacyCount)
       expect(summary.current.queue.queued).toBe(legacyCount)
-      expect(ResearchQueue.stats(sourceID).queued).toBe(legacyCount)
+      expect(ResearchQueue.stats("portswigger").queued).toBe(legacyCount)
       await Instance.dispose()
     },
   })
@@ -433,10 +420,6 @@ test("model-led update queues legacy shared reports once without refetching or c
     fn: async () => {
       const marker = crypto.randomUUID()
       const sessionID = "ses_legacy_model_study_" + marker.replace(/-/g, "").slice(0, 16)
-      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
-      if (!baseSource) throw new Error("PortSwigger test source is not configured")
-      const sourceID = "portswigger-legacy-study-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
       const now = Date.now()
       Database.use((db) => db.insert(SessionTable).values({
         id: sessionID,
@@ -468,7 +451,7 @@ test("model-led update queues legacy shared reports once without refetching or c
         sourceTrust: 100,
         tags: ["idor"],
         metadata: {
-          research_source: sourceID,
+          research_source: "portswigger",
           research_source_name: "PortSwigger Web Security Academy",
           source_trust: 100,
           study_method: "bounded-heuristic-extraction",
@@ -482,9 +465,9 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(legacy).not.toBeNull()
       if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
 
-      const first = await queueLegacyKnowledgeForModelStudy(sourceID)
+      const first = await queueLegacyKnowledgeForModelStudy("portswigger")
       expect(first.queued).toBeGreaterThanOrEqual(1)
-      const queued = ResearchQueue.find(sourceID, sourceURL)
+      const queued = ResearchQueue.find("portswigger", sourceURL)
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
       expect(queued?.payload?.cached_text).toBe(excerpt)
@@ -496,8 +479,8 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(currentKnowledge?.status).toBe("observed")
       expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(1)
 
-      await queueLegacyKnowledgeForModelStudy(sourceID)
-      const stillQueued = ResearchQueue.find(sourceID, sourceURL)
+      await queueLegacyKnowledgeForModelStudy("portswigger")
+      const stillQueued = ResearchQueue.find("portswigger", sourceURL)
       expect(stillQueued?.sequence).toBe(queued?.sequence)
       expect(stillQueued?.status).toBe("queued")
       expect(stillQueued?.payload?.legacy_knowledge_id).toBe(legacy.id)
@@ -514,7 +497,7 @@ test("model-led update queues legacy shared reports once without refetching or c
       } as any
       const next = await studyTool.execute({
         action: "next",
-        source: sourceID,
+        source: "portswigger",
         pages: 1,
         depth: 1,
         limit: 3,
@@ -531,7 +514,7 @@ test("model-led update queues legacy shared reports once without refetching or c
 
       const save = await studyTool.execute({
         action: "save",
-        source: sourceID,
+        source: "portswigger",
         pages: 1,
         depth: 1,
         limit: 3,
@@ -550,11 +533,11 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(finishedLegacy?.status).toBe("observed")
       expect(finishedLegacy?.metadata?.model_study_version).toBe(1)
       expect(finishedLegacy?.metadata?.model_study_decision).toBe("rejected")
-      const finishedQueue = ResearchQueue.find(sourceID, sourceURL)
+      const finishedQueue = ResearchQueue.find("portswigger", sourceURL)
       expect(finishedQueue?.status).toBe("rejected")
       expect(finishedQueue?.payload?.model_study_version).toBe(1)
-      await queueLegacyKnowledgeForModelStudy(sourceID)
-      const noDuplicateRequeue = ResearchQueue.find(sourceID, sourceURL)
+      await queueLegacyKnowledgeForModelStudy("portswigger")
+      const noDuplicateRequeue = ResearchQueue.find("portswigger", sourceURL)
       expect(noDuplicateRequeue?.status).toBe("rejected")
       expect(noDuplicateRequeue?.payload?.model_study_version).toBe(1)
       await Instance.dispose()
