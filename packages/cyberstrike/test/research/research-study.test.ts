@@ -40,7 +40,7 @@ test("agent-led research study persists model analysis and completes its queue l
       const sessionID = "ses_agent_research_study_" + marker.replace(/-/g, "").slice(0, 18)
       const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
       if (!baseSource) throw new Error("PortSwigger test source is not configured")
-      const sourceID = "portswigger-study-test-" + marker
+      const sourceID = "portswigger-test-" + marker
       RESEARCH_SOURCES.push({
         ...baseSource,
         id: sourceID,
