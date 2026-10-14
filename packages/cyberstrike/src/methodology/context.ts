@@ -36,8 +36,10 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
   const queries = skillQueriesForPhase(phaseId)
   const lines = [
     "## Required Skill Preflight",
-    "Before testing this phase, use the `skill` tool to load at least one relevant skill listed below. A name in this list is only a recommendation; it is not loaded until the tool returns its skill content.",
-    "If loading is denied or a skill is unavailable, search for an allowed alternative and note the gap. Do not claim a skill was loaded unless the tool call succeeded.",
+    "Before doing phase work, use the `skill` tool with action=load for the best-matching phase-specific candidate below; a listed name is only a recommendation and is not loaded until the tool returns its skill content.",
+    "Choose skills that directly match the phase tasks and observed target technology. Load additional distinct skills when the phase spans separate work areas; do not treat one generic skill as coverage for every task.",
+    "For passive_recon and active_recon, load at least one recon-specific skill (prefer recon-methodology, recon-subdomain-enumeration, attack-web-recon, recon-port-service-discovery, or recon-vhost-enumeration as applicable). A generic web-testing skill alone does not satisfy recon preflight. If none is available, search the skill catalog for a recon-specific alternative before proceeding.",
+    "If loading is denied or a skill is unavailable, search for an allowed alternative and note the exact gap. Do not claim a skill was loaded unless the tool call succeeded. Continue only with clearly documented limitations if the catalog or tool fails."
   ]
 
   try {
