@@ -44,7 +44,7 @@ export const ResearchKnowledgeTool = Tool.define<typeof ResearchKnowledgeParamet
         output: [
           "No sufficiently relevant shared public report/writeup was found for this signal.",
           "Continue with the existing methodology and current target evidence; do not infer that the vulnerability is absent.",
-          "If more source material is needed, use research_study(action=discover), then action=next; when has_more_text=true, call action=read with the exact public_id and lease_owner, setting offset to the prior response's next_text_offset, until the full text is read before action=save. Continue discovery/next/read/save batches until the accessible frontier is exhausted or a blocker is reported. /update orchestrates this resumable workflow; per-call batches are not total-work caps.",
+          "This tool is retrieval-only. Do not crawl, fetch, or study new sources during target hunting. If a useful knowledge gap remains, continue the current authorized methodology without treating the missing match as absence; run the separate /update research-learning workflow when the hunting task is complete to ingest and study more public sources.",
         ].join("\n"),
         metadata: { matches: 0, signal: params.signal },
       }
