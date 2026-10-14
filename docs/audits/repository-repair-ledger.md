@@ -466,5 +466,5 @@ The two remaining open pull requests, #2 (Hackbrowser improvement) and #6 (skill
 
 - **Root cause:** `packages/cyberstrike/package.json` declares `type: module`, but `packages/cyberstrike/bin/cyberstrike` called `fs.realpathSync(__filename)`. Node ESM does not define `__filename`; after the earlier `require` fix, the launcher would still fail before binary discovery.
 - **Fix:** derive the path with `fileURLToPath(import.meta.url)` and add a regression test that runs the copied launcher with Node, a temporary fake platform binary, and a sentinel argument.
-- **Commits:** launcher fix `42d1e553a34f06e676086d4a1cf5814b09428b89`; regression test `32c6680e63904a3e8efc29f4a3cf7723503b744b` plus explicit Node invocation `55c3f15588d3b26ba15f3bad96f77e25ddbff773`.
+- **Commits:** launcher fix `42d1e553a34f06e676086d4a1cf5814b09428b89`; regression test `32c6680e63904a3e8efc29f4a3cf7723503b744b`, explicit Node invocation `55c3f15588d3b26ba15f3bad96f77e25ddbff773`, and package ESM fixture `109058522b0139c0b59f4a61e4b9b05ba3dbba17`.
 - **Validation:** regression test has been authored but not executed locally. Include it in the pending exact-main CI run; do not mark this finding CI-verified until that run completes.
