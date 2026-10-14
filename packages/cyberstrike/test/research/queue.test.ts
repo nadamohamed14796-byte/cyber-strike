@@ -599,3 +599,37 @@ test("an expired lease cannot complete work before another worker reclaims it", 
   })
 })
 
+test("agent-study text cache preserves the complete document beyond the legacy 100k cutoff", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "full-document-cache"
+      const sourceURL = "https://portswigger.net/web-security/full-document-cache-" + crypto.randomUUID()
+      const marker = "END_OF_COMPLETE_SOURCE_DOCUMENT_" + crypto.randomUUID()
+      const completeText = "Research detail. ".repeat(9000) + marker
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Long article should stay whole",
+      })
+      const claim = ResearchQueue.claimNext("full-document-cache-worker", sourceID)
+      if (!claim) throw new Error("queue row was not claimed")
+      expect(claim.sequence).toBe(item.sequence)
+      const cached = ResearchQueue.cacheClaimedText({
+        id: item.id,
+        leaseOwner: claim.lease_owner,
+        title: "Long article should stay whole",
+        text: completeText,
+        contentFingerprint: "a".repeat(40),
+        contentLength: completeText.length,
+      })
+      expect(cached).toBe(true)
+      const persisted = ResearchQueue.find(sourceID, sourceURL)
+      expect(persisted?.payload?.cached_text).toHaveLength(completeText.length)
+      expect(persisted?.payload?.cached_text?.endsWith(marker)).toBe(true)
+      expect(persisted?.payload?.cached_text_truncated).toBe(false)
+      await Instance.dispose()
+    },
+  })
+})
