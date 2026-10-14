@@ -58,7 +58,7 @@ export function rankSkillsForPhase(
   for (const entry of entries) {
     if (entry.verified === "tampered") continue
     const name = normalizeSkillText(entry.name)
-    const tags = entry.tags.map(normalizeSkillText)
+    const tags = entry.tags.map(normalizeSkillText).filter(Boolean)
     const category = normalizeSkillText(entry.category ?? "")
     const description = normalizeSkillText(entry.description)
     const tech = entry.tech_stack.map(normalizeSkillText)
@@ -86,7 +86,8 @@ export function rankSkillsForPhase(
 
     // Token overlap handles differences such as "active-recon" vs "reconnaissance"
     // and uses metadata beyond the skill's display name.
-    const matchedTokens = [...queryTokens].filter((token) => searchable.includes(token))
+    const searchableTokens = new Set(searchable.split(" ").filter(Boolean))
+    const matchedTokens = [...queryTokens].filter((token) => searchableTokens.has(token))
     score += Math.min(matchedTokens.length, 8) * 3
     for (const tag of tags) if (requiredTags.has(tag)) score += 45
     if (phaseId === "passive_recon" || phaseId === "active_recon") {
