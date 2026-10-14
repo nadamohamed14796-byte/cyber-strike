@@ -39,8 +39,9 @@ Read the current registry at runtime; it is authoritative. The known configured 
 - `hacktricks` — HackTricks
 - `payloadsallthethings` — PayloadsAllTheThings
 - `github` — GitHub security write-ups
+- `src-hunter-skill` — the configured `MyuriKanao/src-hunter-skill` reference repository
 
-Do not silently skip a registered source. Additional relevant public sources may be discovered and registered through the supported mechanism. Preserve the actual origin and document type: hosting on Medium or GitHub does not itself determine the type.
+Do not silently skip any source ID returned by the runtime registry. The current implementation can safely crawl only sources in `RESEARCH_SOURCES` (including their configured allowed hosts); there is no runtime tool that permanently registers an arbitrary new host. If external research surfaces another useful source outside that registry, record it as an external-source gap with its URL, resource type, relevance, and exact reason it was not ingested; do not claim all of the public internet was searched. Adding it to the persistent workflow requires a reviewed source-registry/adapter/SSRF-allowlist change. Preserve the actual origin and document type: hosting on Medium or GitHub does not itself determine the type.
 
 For each source, use its configured seed URLs, allowed hosts, source-specific adapter, pagination rules, feeds, sitemaps, and eligible links. Use only the existing safe fetcher and source-scoped authentication. Respect access controls, rate limits, source policies, and SSRF protections. Do not bypass authentication or broaden host allowlists to force a crawl.
 
@@ -64,7 +65,7 @@ For each discovered candidate:
 6. Compute a stable content fingerprint.
 7. Detect unchanged content, duplicates, and changed versions.
 8. Classify the document by its actual contents.
-9. Study all accessible meaningful content, not only the title or search snippet.
+9. Study all accessible meaningful content, not only the title or search snippet. `research_study(action=next)` emits a bounded first text chunk. When `has_more_text=true`, call `research_study(action=read)` with the exact `public_id`, `lease_owner`, and `next_text_offset` until the returned `has_more_text` is false. Read chunks in order; the durable read cursor blocks save/rejection while source text remains unread.
 10. Extract structured facts, reusable techniques, evidence, prerequisites, limitations, and uncertainty.
 11. Persist through the canonical knowledge API.
 12. Read the record back from persistent storage and verify key fields and source relationships.
@@ -144,7 +145,7 @@ Deduplicate URL identity, content fingerprints, knowledge records, and patterns 
 
 ## 7. Exact local persistence
 
-Use the existing database configuration and canonical persistence functions. The current known default candidate is `/root/.local/share/cyberstrike/cyberstrike.db`, but verify the active path before use.
+Use the existing database configuration and canonical persistence functions. The current known default candidate is `/root/.local/share/cyberstrike/cyberstrike.db`, but verify the active path before use. The safe fetcher also has a per-resource response-size ceiling; if a document exceeds that ceiling or cannot be safely extracted, report that resource as partial/blocked rather than claiming its complete contents were studied. This per-resource safety guard is distinct from the absence of total page/item caps.
 
 The existing architecture includes a durable research queue and shared research knowledge represented by `report_knowledge` and related event records. Inspect actual migrations and schema before changing them. Do not assume that the table name alone proves the data is correctly persisted.
 
