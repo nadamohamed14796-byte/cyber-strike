@@ -58,6 +58,16 @@ Use `attack_script` for specialized capabilities beyond http_replay:
 - `github_dorker` — Secret detection
 - `wayback_endpoints` — Historical endpoints
 
+### Skill Discovery and Loading — Required for Every Methodology Agent
+
+The skill catalog is a runtime resource, not just prompt documentation. Before each phase or distinct testing task:
+1. Call `skill` with `action="search"` using the phase name plus the specific technique, protocol, framework, or observed signal.
+2. Load each materially relevant result with `action="load"` and the exact returned skill name. Confirm the tool returned the skill content; never infer that a listed/recommended skill is loaded.
+3. Use the phase's methodology skill and the specialist skills for separate work areas. Search again when new technologies, endpoints, parameters, JavaScript assets, auth/session behavior, or vulnerability signals are discovered.
+4. For recon, require a recon-methodology skill and task-specific recon skills. Search separately for applicable subdomain/DNS, port/service, vhost, CMS/framework, origin-IP, email-security, public-repository, historical-endpoint, visual-recon, and takeover workflows. Skip only when evidence shows the task is inapplicable.
+5. Keep the loaded set relevant to the authorized target and current evidence. Do not load the entire catalog indiscriminately, and do not treat skill discovery as proof that a check ran.
+6. If a search or load fails, retry with a narrower synonym or another permitted skill; record the exact unavailable skill/task. Report only checks actually executed and evidence actually observed.
+
 ### Phase Awareness
 
 The methodology has 13 standard web/infrastructure phases. Mobile application testing is an additional mobile-only phase after scope analysis; it is included only when the scope is classified as mobile. Respect the applicable phase order:
