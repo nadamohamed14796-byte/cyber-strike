@@ -334,6 +334,12 @@ test("research queue resumes authenticated work and learns cached report text wi
         expect(result.learned).toBe(1)
         expect(fetchCalls).toBe(0)
         expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("learned")
+        const persisted = Database.use((db) => db.select().from(ReportKnowledgeTable).all()
+          .find((row) => row.source_url === sourceURL))
+        expect(persisted).toBeDefined()
+        expect(persisted?.metadata?.document_type).toBe("academy")
+        expect(persisted?.metadata?.content_fingerprint).toMatch(/^[a-f0-9]{40}$/)
+        expect(ReportKnowledge.getByID(persisted!.id)?.id).toBe(persisted!.id)
 
         // Keep this coverage in the same Instance scope: Instance/Database are process-wide.
         const authSourceID = "hackerone-hacktivity"
