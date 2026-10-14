@@ -180,6 +180,25 @@ Do not fill unknown fields with guesses or generic filler. A pattern is a reusab
 
 ## 6. Quality and status semantics
 
+### Explicit accept / reject / unresolved decision rubric
+
+Make three separate decisions for every candidate; never collapse them into one opaque score:
+
+1. **Access and processing status:** Was the source fetched safely, and was all accessible meaningful text read? Authentication walls, unsafe URLs/redirects, unsupported content, terminal HTTP errors, size ceilings, timeouts, parsing failures, unread chunks, and tool/model failures are access/processing states—not evidence that the article is irrelevant.
+2. **Document relevance and type:** Classify the actual content as report, write-up, blog, academy, reference, research, mixed, or uncertain. Domain reputation and configured source kind are hints, not proof of type or relevance.
+3. **Extracted-knowledge decision:** Decide learned, rejected, or unresolved/retry using the criteria below.
+
+**LEARNED / accept** only when the full accessible content has been read; it contains at least one specific, reusable security lesson or pattern; the lesson is grounded in source text/evidence; source URL, content fingerprint, and actual document type are retained; uncertainty, applicability, and verification state are explicit; and persistence read-back plus a relevant retrieval query both succeed. A useful general blog, reference, academy lesson, or research article can be learned without a named vulnerability class, CVE, CWE, or real-world PoC.
+
+**REJECTED** only after all accessible chunks have been read and the content is genuinely out of security scope, empty/boilerplate without security value, unusable after extraction, or a true duplicate with no incremental information. Every rejection needs a specific reason tied to the content; duplicate rejection should identify the duplicate record/fingerprint when available. Do not reject solely because there is no recognized vulnerability class, CVE/CWE, PoC, confirmed exploit, or real-target finding.
+
+**UNRESOLVED / RETRY** when evidence is ambiguous or conflicting, content is incomplete/unread, extraction is uncertain, or a transient model/tool/network/database failure prevented a reliable decision. Do not turn uncertainty or infrastructure failure into a relevance rejection.
+
+**BLOCKED** when a terminal access/transport condition applies: use the matching supported state such as authentication-blocked, `blocked_size`, or `blocked_fetch`. Keep blockers separate from irrelevant-content rejections and retryable errors; do not endlessly retry permanent blockers.
+
+Track evidence quality, completeness, reusability, source trust, confidence, and runtime applicability independently. A reputable source does not automatically make every claim true. A report's stated outcome is not independent confirmation. A successful result on one target is not universal proof, and a failed test on one target does not disprove a technique globally. Never mark a record learned before durable persistence, read-back, and retrieval verification pass.
+
+
 Track document classification, security relevance, completeness, evidence quality, reusability, source trust, confidence, and runtime applicability separately. Do not collapse them into one unexplained score.
 
 A high-trust source does not make every claim true. A failed test on one target does not disprove a technique globally. A successful target-specific test does not confirm every source claim globally.
