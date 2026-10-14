@@ -15,6 +15,8 @@ You are running CyberStrike's **target reconnaissance workflow**. Treat the comm
 ## 2. Establish a durable run checkpoint
 
 Before discovery, create a run identifier and save a short checkpoint using `target_workspace(action="record_summary", ...)` or `target_note` for target-specific observations. Record:
+After verifying the canonical workspace path, create a minimal layout inside its existing `recon/` folder: `scripts/`, `results/`, `logs/`, and `checkpoints/`. Use the exact returned path and quote it in shell commands. Save `recon/README.md` and `recon/manifest.json` with `target_artifact`; record each script's purpose, required inputs, exact command, scope preconditions, output paths, and hash. Do not create scripts that perform active requests until the persisted scope is configured and every candidate is checked. Never create a second top-level target folder or write recon outputs to the shell's current directory.
+
 - root target and workspace path;
 - authorization source/reference and scope status;
 - start time, tools available, and intended recon stages;
