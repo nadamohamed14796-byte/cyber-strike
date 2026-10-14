@@ -184,8 +184,29 @@ export interface JavaScriptSourceFile {
   endpointLiterals: string[]
   /** Request identifier for the already-captured source response; raw JS is never copied to the graph. */
   sourceRequestID?: string
-  /** Sanitized static-analysis metadata; never stores raw source or literal secret values. */
+  /** Static-analysis metadata; secret-like literal values must be redacted before persistence. */
   analysis?: JavaScriptSourceAnalysis
+}
+
+const RAW_SECRET_PERSISTENCE_NOTE =
+  "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated."
+
+/** Remove literal secret-like values before analysis metadata is written to graph JSON or target notes. */
+export function sanitizeJavaScriptSourceFileForPersistence(file: JavaScriptSourceFile): JavaScriptSourceFile {
+  if (!file.analysis) return file
+  return {
+    ...file,
+    analysis: {
+      ...file.analysis,
+      secretCandidates: file.analysis.secretCandidates.map((candidate) => ({
+        ...candidate,
+        value: "[REDACTED]",
+      })),
+      notes: file.analysis.notes.map((note) => note === RAW_SECRET_PERSISTENCE_NOTE
+        ? "Secret-like candidate values are redacted from persisted correlation artifacts; fingerprints are leads only and do not prove validity."
+        : note),
+    },
+  }
 }
 
 /**
@@ -436,6 +457,7 @@ export interface JavaScriptCorrelationGraph {
     severity: string
     status: string
     endpoint: string | null
+    targetID: string | null
   }>
   edges: Array<{ from: string; to: string; relation: string; confidence: "direct" | "candidate"; evidence: string }>
   notes: string[]
@@ -456,8 +478,45 @@ export namespace JavaScriptCorrelation {
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     if (input.javascriptURL && !explicitJS) throw new Error("javascriptURL must be a valid HTTP(S) URL without embedded credentials.")
-    const workspace = await TargetMemory.ensure(input.targetURL)
-    // An explicit asset URL must narrow source analysis, not merely the asset list.
+    const workspace = await TargetMemory.get(input.targetURL)
+    if (!workspace) {
+      throw new Error("No existing target workspace matches this target. Initialize it with target_workspace first.")
+    }
+    if (!TargetMemory.isObservedInSession(rootSessionID, workspace.targetURL)) {
+      throw new Error("The target was not observed in this session tree. Refusing to correlate unrelated target data.")
+    }
+
+    // Scope decisions are cached by origin/path because authorization can depend on
+    // path prefixes as well as host, scheme, port, exclusions, and ancestor scopes.
+    const scopeDecisionCache = new Map<string, Awaited<ReturnType<typeof TargetMemory.checkURLScope>>>()
+    const scopeDecisionFor = async (value: string) => {
+      const parsed = safeURL(value)
+      const key = parsed ? parsed.origin + parsed.pathname : value
+      const cached = scopeDecisionCache.get(key)
+      if (cached) return cached
+      const decision = await TargetMemory.checkURLScope(key)
+      scopeDecisionCache.set(key, decision)
+      return decision
+    }
+    const targetScopeDecision = await scopeDecisionFor(workspace.targetURL)
+    if (!targetScopeDecision.allowed || targetScopeDecision.workspace?.id !== workspace.id) {
+      throw new Error("Target workspace does not pass its persisted active-scope gate: " + targetScopeDecision.reason)
+    }
+
+    // Correlation may include the selected workspace and its descendants only.
+    const relatedTargetIDs = new Set<string>([workspace.id])
+    const targetFrontier = [workspace.id]
+    while (targetFrontier.length > 0) {
+      const parentID = targetFrontier.pop()!
+      for (const child of TargetMemory.children(parentID)) {
+        if (relatedTargetIDs.has(child.id)) continue
+        relatedTargetIDs.add(child.id)
+        targetFrontier.push(child.id)
+      }
+    }
+
+    // An explicit asset URL must narrow source analysis, and must have been observed
+    // and pass the same persisted scope/hierarchy gate as captured traffic.
     const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
 
     const projectID = Instance.project.id
@@ -504,15 +563,23 @@ export namespace JavaScriptCorrelation {
     const targetPath = targetURL.pathname.replace(/\/$/, "") || "/"
     if (explicitJS) {
       const explicitKey = explicitJS.origin + explicitJS.pathname
-      const alreadyObserved = jsCandidates.some((item) => item.url.origin + item.url.pathname === explicitKey)
-      if (!isJavaScriptAssetAllowed({
-        targetURL: normalizedTarget.targetURL,
-        javascriptURL: explicitJS.href,
-        alreadyObserved,
-      })) {
-        throw new Error("JavaScript asset is outside the target path/host boundary and is not already observed in this session. This correlation tool does not replace the existing scope engine.")
+      const alreadyInIntel = jsCandidates.some((item) => item.url.origin + item.url.pathname === explicitKey)
+      const observedInSession = alreadyInIntel || TargetMemory.isObservedInSession(rootSessionID, explicitJS.href)
+      const explicitScope = await scopeDecisionFor(explicitJS.href)
+      if (
+        !observedInSession ||
+        !explicitScope.allowed ||
+        !explicitScope.workspace ||
+        !relatedTargetIDs.has(explicitScope.workspace.id) ||
+        !isJavaScriptAssetAllowed({
+          targetURL: normalizedTarget.targetURL,
+          javascriptURL: explicitJS.href,
+          alreadyObserved: observedInSession,
+        })
+      ) {
+        throw new Error("JavaScript asset must be observed in this session and pass the target's persisted scope/hierarchy gate.")
       }
-      if (!alreadyObserved) {
+      if (!alreadyInIntel) {
         jsCandidates.unshift({
           row: {
             id: null as unknown as string,
@@ -538,12 +605,16 @@ export namespace JavaScriptCorrelation {
           return true
         })
     const seenAssets = new Set<string>()
-    const assets = filteredAssets.filter((item) => {
+    const assets: typeof filteredAssets = []
+    for (const item of filteredAssets) {
       const key = item.url.origin + item.url.pathname
-      if (seenAssets.has(key)) return false
+      if (seenAssets.has(key)) continue
       seenAssets.add(key)
-      return true
-    }).slice(0, 150)
+      const decision = await scopeDecisionFor(item.url.href)
+      if (!decision.allowed || !decision.workspace || !relatedTargetIDs.has(decision.workspace.id)) continue
+      assets.push(item)
+      if (assets.length >= 150) break
+    }
 
     const requests = Database.use((db) =>
       db
@@ -554,14 +625,14 @@ export namespace JavaScriptCorrelation {
         .limit(2000)
         .all(),
     )
-    const relevantRequests = requests.filter((request) => {
+    const candidateRequests = requests.filter((request) => {
       const hostURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
       if (!hostURL) return false
       const host = hostURL.hostname.toLowerCase()
       const isTargetHost = host === targetURL.hostname || host.endsWith("." + targetURL.hostname)
       if (isTargetHost) {
-        // When the target is a path-scoped app, don't pull sibling applications' records
-        // from the same host unless the observed page itself belongs to the scoped path.
+        // Keep the quick path boundary check, then apply the authoritative scope
+        // engine below so a sibling application cannot pass this hostname check alone.
         if (host === targetURL.hostname && targetPath !== "/") {
           const pageURL = safeURL(request.page_url)
           const requestPathMatches = pathWithinScope(request.normalized_path, targetPath)
@@ -572,6 +643,18 @@ export namespace JavaScriptCorrelation {
       }
       return assets.some((asset) => asset.url.hostname.toLowerCase() === host)
     })
+    const relevantRequests: typeof candidateRequests = []
+    const requestTargetWorkspaceIDs = new Map<string, string>()
+    for (const request of candidateRequests) {
+      const base = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+      if (!base) continue
+      let observedURL: string
+      try { observedURL = new URL(request.normalized_path, base).href } catch { continue }
+      const decision = await scopeDecisionFor(observedURL)
+      if (!decision.allowed || !decision.workspace || !relatedTargetIDs.has(decision.workspace.id)) continue
+      relevantRequests.push(request)
+      requestTargetWorkspaceIDs.set(request.id, decision.workspace.id)
+    }
     // Analyze bodies that were already captured as JavaScript, but never save the
     // source body to disk or the graph. The graph retains only hashes and route literals.
     const sourceRequests = explicitJS
@@ -599,6 +682,9 @@ export namespace JavaScriptCorrelation {
       ...sourceFiles,
       ...capturedSources.filter((file) => !localSourceKeys.has(file.sha256)),
     ].slice(0, 250)
+    // Keep exact secret-like values transient in memory only. Every copy that may be
+    // serialized to JSON or target notes goes through this redaction boundary.
+    const persistedSourceFiles = mergedSourceFiles.map(sanitizeJavaScriptSourceFileForPersistence)
     const requestIDs = relevantRequests.map((request) => request.id)
     const requestIDSet = new Set(requestIDs)
     const webFunctions = requestIDs.length
@@ -623,7 +709,7 @@ export namespace JavaScriptCorrelation {
             .all(),
         )
       : []
-    const findings = Database.use((db) =>
+    const findingRows = Database.use((db) =>
       db
         .select()
         .from(VulnerabilityTable)
@@ -631,20 +717,34 @@ export namespace JavaScriptCorrelation {
         .orderBy(desc(VulnerabilityTable.time_updated))
         .limit(500)
         .all(),
-    ).filter((finding) => {
-      if (!finding.endpoint) return false
+    )
+    const findings: typeof findingRows = []
+    for (const finding of findingRows) {
+      if (!finding.endpoint) continue
+      if (finding.target_id && !relatedTargetIDs.has(finding.target_id)) continue
       const endpoint = finding.endpoint.trim()
+      const endpointURL = safeURL(endpoint)
       if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
-        const endpointURL = safeURL(endpoint)
-        if (!endpointURL) return false
-        const isTargetHost = endpointURL.hostname === targetURL.hostname || endpointURL.hostname.endsWith("." + targetURL.hostname)
-        if (isTargetHost) {
-          return targetPath === "/" || pathWithinScope(endpointURL.pathname, targetPath)
-        }
-        return assets.some((asset) => sameHost(endpoint, asset.url.href))
+        if (!endpointURL) continue
+        const decision = await scopeDecisionFor(endpointURL.href)
+        if (!decision.allowed || !decision.workspace || !relatedTargetIDs.has(decision.workspace.id)) continue
+        if (finding.target_id && finding.target_id !== decision.workspace.id) continue
+        findings.push(finding)
+        continue
       }
-      return relevantRequests.some((request) => request.normalized_path === endpoint || request.normalized_path.includes(endpoint) || endpoint.includes(request.normalized_path))
-    })
+
+      // Legacy path-only findings without a target foreign key are ambiguous across
+      // multi-host sessions. Do not attach them to whichever target happens to share a path.
+      if (!finding.target_id) continue
+      const endpointPath = endpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "").split(/[?#]/, 1)[0]!
+      const matchesAttributedRequest = relevantRequests.some((request) =>
+        requestTargetWorkspaceIDs.get(request.id) === finding.target_id &&
+        (request.normalized_path === endpointPath ||
+          request.normalized_path.includes(endpointPath) ||
+          endpointPath.includes(request.normalized_path)),
+      )
+      if (matchesAttributedRequest) findings.push(finding)
+    }
 
     const graph: JavaScriptCorrelationGraph = {
       schemaVersion: 1,
@@ -659,7 +759,7 @@ export namespace JavaScriptCorrelation {
         confidence: item.row.confidence_level ?? null,
         tags: (item.row.tags as string[] | null) ?? [],
       })),
-      sourceFiles: mergedSourceFiles,
+      sourceFiles: persistedSourceFiles,
       javascriptAnalysis: {
         functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
         requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).map((item) => {
@@ -690,7 +790,7 @@ export namespace JavaScriptCorrelation {
           ]
           return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs)].slice(0, 100), recommendedChecks }
         })).slice(0, 1500),
-        secretCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
+        secretCandidates: persistedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
       },
@@ -766,6 +866,7 @@ export namespace JavaScriptCorrelation {
         severity: finding.severity,
         status: finding.status,
         endpoint: finding.endpoint ?? null,
+        targetID: finding.target_id ?? null,
       })),
       edges: [],
       notes: [],
@@ -853,12 +954,17 @@ export namespace JavaScriptCorrelation {
       }
     }
     for (const finding of graph.findings) {
+      const rawEndpoint = (finding.endpoint ?? "").trim()
+      const endpointURL = safeURL(rawEndpoint)
+      const endpointPath = (endpointURL?.pathname ?? rawEndpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "")).split(/[?#]/, 1)[0]!
       const matching = graph.requests.filter((request) => {
-        const endpoint = (finding.endpoint ?? "").trim()
-        return endpoint === request.normalizedPath ||
-          request.normalizedPath === endpoint ||
-          (endpoint.startsWith("/") && request.normalizedPath.startsWith(endpoint)) ||
-          (endpoint.length > 2 && request.normalizedPath.includes(endpoint))
+        if (finding.targetID && requestTargetWorkspaceIDs.get(request.id) !== finding.targetID) return false
+        const requestURL = safeURL(request.url)
+        if (endpointURL && requestURL?.origin !== endpointURL.origin) return false
+        return endpointPath === request.normalizedPath ||
+          request.normalizedPath === endpointPath ||
+          (endpointPath.startsWith("/") && request.normalizedPath.startsWith(endpointPath)) ||
+          (endpointPath.length > 2 && request.normalizedPath.includes(endpointPath))
       })
       for (const request of matching) {
         graph.edges.push({
@@ -874,7 +980,7 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Static endpoint candidates are saved separately under endpoints/; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
-    graph.notes.push("Response previews are length-limited and redacted heuristically; the original captured request/response remains the source of evidence in the session database.")
+    graph.notes.push("Response previews are length-limited and redacted heuristically; JavaScript secret-like values are redacted from persisted graph/notes and only their fingerprints are retained.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
 
     const urlList = graph.javascriptAssets.map((asset) => asset.url).join("\n")

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, safeCorrelationResponsePreview } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -50,6 +50,27 @@ test("never persists JavaScript source in correlation response previews", () => 
     processedResponse: '{"api_key":"this-is-a-secret-value-that-must-not-be-saved"}',
   })
   expect(jsonPreview).not.toContain("this-is-a-secret-value")
+})
+
+test("redacts detected literal secrets from source-analysis metadata before persistence", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const secret = "private-api-key-value-must-not-be-persisted"
+  const [source] = extractCapturedJavaScriptSources([{
+    id: "req-secret-js",
+    url: "https://app.example.com/assets/secret.js",
+    responseContentType: "application/javascript",
+    responseBody: 'const api_key = "' + secret + '";',
+  }])
+  expect(source?.analysis?.secretCandidates[0]?.value).toBe(secret)
+  expect(source?.analysis?.secretCandidates[0]?.fingerprint).toBeTruthy()
+
+  const persisted = sanitizeJavaScriptSourceFileForPersistence(source!)
+  const serialized = JSON.stringify(persisted)
+  expect(serialized).not.toContain(secret)
+  expect(persisted.analysis?.secretCandidates[0]?.value).toBe("[REDACTED]")
+  expect(persisted.analysis?.secretCandidates[0]?.fingerprint).toBe(source?.analysis?.secretCandidates[0]?.fingerprint)
+  expect(serialized).not.toContain("Exact candidate values are available")
+  expect(serialized).toContain("redacted from persisted correlation artifacts")
 })
 
 test("correlates security sink candidates from captured JavaScript without retaining source", async () => {
