@@ -16,9 +16,19 @@ export const UpdateCommand = cmd({
   describe: "exhaustively discover and study public reports/writeups into globally shared research knowledge",
   builder: (yargs: Argv) =>
     yargs
+      .option("print-prompt", { type: "boolean", default: false, describe: "print the canonical copyable research update agent prompt without running a crawl" })
       .option("watch", { type: "boolean", default: false, describe: "repeat exhaustive update cycles until interrupted" })
       .option("interval", { type: "number", default: 60, describe: "seconds between watch cycles" }),
   async handler(args) {
+    if (args.printPrompt) {
+      const promptFile = Bun.file(new URL("../../../docs/research-update-agent-prompt.md", import.meta.url))
+      if (!(await promptFile.exists())) {
+        throw new Error("Canonical research prompt file is missing from this installation: " + promptFile.name)
+      }
+      console.log(await promptFile.text())
+      return
+    }
+
     const interval = Number.isFinite(args.interval)
       ? Math.max(5, Math.floor(args.interval))
       : 60
