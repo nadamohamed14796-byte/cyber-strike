@@ -22,7 +22,7 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       expect((await fs.readFile(path.join(rootPath, "scope", "scope.json"), "utf-8"))).toContain('"status": "unconfigured"')
 
       const readmePath = path.join(rootPath, "README.md")
-      const evidencePolicy = "- Preserve exact discovered values only in this private, target-local evidence store when required for reproduction; mark them as candidates until independently validated."
+      const evidencePolicy = "- Preserve exact discovered values in this private, target-local evidence store when they are relevant evidence or needed for reproduction; mark them as candidates until independently validated."
       const generatedReadme = await fs.readFile(readmePath, "utf-8")
       expect(generatedReadme).toContain(evidencePolicy)
       await fs.writeFile(readmePath, generatedReadme.replace(
