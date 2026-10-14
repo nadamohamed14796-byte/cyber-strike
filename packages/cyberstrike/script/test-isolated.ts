@@ -7,6 +7,10 @@ import path from "node:path"
 // in the environment before the Bun test runner starts.
 const testHome = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-test-home-"))
 
+await Promise.all(["data", "cache", "config", "state"].map((name) =>
+  fs.mkdir(path.join(testHome, name), { recursive: true }),
+))
+
 const env = {
   ...process.env,
   XDG_DATA_HOME: path.join(testHome, "data"),
