@@ -552,7 +552,10 @@ export namespace ResearchQueue {
         gt(ResearchQueueTable.lease_until, now),
       )).get()
       if (!row) return false
-      const text = input.text.slice(0, 100_000)
+      // Preserve the complete sanitized document. Safe-fetch already enforces a
+      // byte ceiling and source-host allowlist; truncating here would make it
+      // impossible for the active model to study the full article or its later steps.
+      const text = input.text
       const payload = {
         ...(row.payload ?? {}),
         cached_text: text,
