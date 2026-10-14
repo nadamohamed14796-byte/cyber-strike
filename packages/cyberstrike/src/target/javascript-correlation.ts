@@ -88,9 +88,9 @@ function javascriptAssetURL(input: { type?: string | null; title?: string | null
 function redact(value?: string | null, max = 320): string | null {
   if (!value) return null
   return value
-    // Handle JSON-quoted keys/values before the looser assignment matcher.
-    .replace(/(["']?(?:authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token)["']?\s*:\s*["'])[^"']*(["'])/gi, "$1[REDACTED]$2")
-    .replace(/(authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
+    // Redact complete quoted JSON values (including spaces and escaped quotes).
+    .replace(/(["']?(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)["']?\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,\s;}]+)/gi, "$1[REDACTED]")
+    .replace(/\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
@@ -116,6 +116,21 @@ function sameHost(left: string | null | undefined, right: string | null | undefi
   const a = safeURL(left)
   const b = safeURL(right)
   return Boolean(a && b && a.hostname.toLowerCase() === b.hostname.toLowerCase())
+}
+
+/** Match a finding route to an observed request without unsafe substring/prefix attribution. */
+export function matchesFindingEndpointPath(endpointPath: string, requestPath: string): boolean {
+  const normalizeRoute = (value: string) => {
+    const pathname = value.trim().split(/[?#]/, 1)[0]!
+      .replace(/:([A-Za-z_$][\w$]*)/g, "{$1}")
+    return normalizeJavaScriptEndpointPath(pathname).path.replace(/\/+$/, "") || "/"
+  }
+  const expected = normalizeRoute(endpointPath).split("/").filter(Boolean)
+  const actual = normalizeRoute(requestPath).split("/").filter(Boolean)
+  if (expected.length !== actual.length) return false
+  return expected.every((segment, index) =>
+    segment.startsWith("{") && segment.endsWith("}") ? Boolean(actual[index]) : segment === actual[index],
+  )
 }
 
 function pathWithinScope(candidate: string | null | undefined, scopedPath: string): boolean {
@@ -739,9 +754,7 @@ export namespace JavaScriptCorrelation {
       const endpointPath = endpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "").split(/[?#]/, 1)[0]!
       const matchesAttributedRequest = relevantRequests.some((request) =>
         requestTargetWorkspaceIDs.get(request.id) === finding.target_id &&
-        (request.normalized_path === endpointPath ||
-          request.normalized_path.includes(endpointPath) ||
-          endpointPath.includes(request.normalized_path)),
+        matchesFindingEndpointPath(endpointPath, request.normalized_path),
       )
       if (matchesAttributedRequest) findings.push(finding)
     }
@@ -961,10 +974,7 @@ export namespace JavaScriptCorrelation {
         if (finding.targetID && requestTargetWorkspaceIDs.get(request.id) !== finding.targetID) return false
         const requestURL = safeURL(request.url)
         if (endpointURL && requestURL?.origin !== endpointURL.origin) return false
-        return endpointPath === request.normalizedPath ||
-          request.normalizedPath === endpointPath ||
-          (endpointPath.startsWith("/") && request.normalizedPath.startsWith(endpointPath)) ||
-          (endpointPath.length > 2 && request.normalizedPath.includes(endpointPath))
+        return matchesFindingEndpointPath(endpointPath, request.normalizedPath)
       })
       for (const request of matching) {
         graph.edges.push({

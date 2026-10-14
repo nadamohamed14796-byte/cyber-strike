@@ -52,10 +52,12 @@ export namespace Methodology {
       const result = validateDeliverables(def, entries)
       const prereqCheck = checkPrerequisites(def, applicablePhases, entries)
 
-      const status: Phase.Status = result.completed
-        ? "completed"
-        : !prereqCheck.canStart
-          ? "blocked"
+      // Prerequisites outrank deliverable presence: premature work is still
+      // recorded and reported as a blocking violation, but must not inflate completion.
+      const status: Phase.Status = !prereqCheck.canStart
+        ? "blocked"
+        : result.completed
+          ? "completed"
           : result.deliverableCount > 0
             ? "in_progress"
             : "not_started"
@@ -129,18 +131,39 @@ export namespace Methodology {
     def: Phase.Definition,
     applicablePhases: Phase.Definition[],
     entries: Array<typeof IntelEntryTable.$inferSelect>,
+    visiting = new Set<Phase.Id>(),
   ): { canStart: boolean; reason?: string } {
+    if (visiting.has(def.id)) {
+      return { canStart: false, reason: `prerequisite cycle detected at ${def.id}` }
+    }
     if (def.prerequisites.length === 0) return { canStart: true }
 
     const applicableIds = new Set(applicablePhases.map((p) => p.id))
     const missing: string[] = []
+    const nextVisiting = new Set(visiting)
+    nextVisiting.add(def.id)
 
     for (const prereq of def.prerequisites) {
-      if (!applicableIds.has(prereq)) continue // skip prereqs not in scope
       const prereqDef = Phase.get(prereq)
-      if (!prereqDef) continue
+      if (!prereqDef) {
+        missing.push(`${prereq} (unknown prerequisite)`)
+        continue
+      }
+      if (!applicableIds.has(prereq)) continue // skip valid prereqs not in this scope
+
       const result = validateDeliverables(prereqDef, entries)
-      if (!result.completed) missing.push(prereq)
+      if (!result.completed) {
+        missing.push(prereq)
+        continue
+      }
+
+      // Deliverables alone must not unlock a downstream phase when the prerequisite
+      // itself has unmet ancestors. This prevents premature tags from bypassing the
+      // methodology order while preserving the separate violation for premature work.
+      const ancestorCheck = checkPrerequisites(prereqDef, applicablePhases, entries, nextVisiting)
+      if (!ancestorCheck.canStart) {
+        missing.push(`${prereq} (blocked: ${ancestorCheck.reason ?? "ancestor prerequisite incomplete"})`)
+      }
     }
 
     if (missing.length > 0) return { canStart: false, reason: `Prerequisites incomplete: ${missing.join(", ")}` }
@@ -166,6 +189,7 @@ export namespace Methodology {
               block_reason: phase.blockReason ?? null,
               started_at: phase.status !== "not_started" && !existing.started_at ? now : existing.started_at,
               completed_at: phase.status === "completed" && !existing.completed_at ? now : existing.completed_at,
+              time_updated: now,
             })
             .where(eq(MethodologyPhaseTable.id, existing.id))
             .run()

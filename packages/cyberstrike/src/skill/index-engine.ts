@@ -185,7 +185,7 @@ export namespace SkillIndex {
       if (score > 0) scored.push({ entry, score })
     }
     return scored
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
       .slice(0, limit)
       .map((s) => s.entry)
   }
@@ -200,7 +200,7 @@ export namespace SkillIndex {
     const results = Array.from(names)
       .map((n) => state.entries.get(n)!)
       .filter(Boolean)
-    return results.slice(0, limit)
+    return results.sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit)
   }
 
   export function byCWE(cweId: string, limit = 50): Entry[] {
@@ -208,9 +208,10 @@ export namespace SkillIndex {
     const set = state.cweIndex.get(cweId.toUpperCase())
     if (!set) return []
     return Array.from(set)
-      .slice(0, limit)
       .map((n) => state.entries.get(n)!)
       .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit)
   }
 
   export function byCategory(cat: string, limit = 50): Entry[] {
@@ -218,9 +219,10 @@ export namespace SkillIndex {
     const set = state.categoryIndex.get(cat.toLowerCase())
     if (!set) return []
     return Array.from(set)
-      .slice(0, limit)
       .map((n) => state.entries.get(n)!)
       .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit)
   }
 
   export function byTag(tag: string, limit = 50): Entry[] {
@@ -228,9 +230,10 @@ export namespace SkillIndex {
     const set = state.tagIndex.get(tag.toLowerCase())
     if (!set) return []
     return Array.from(set)
-      .slice(0, limit)
       .map((n) => state.entries.get(n)!)
       .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit)
   }
 
   /** Resolve an exact skill name or exact metadata alias (for example T1078.004). */

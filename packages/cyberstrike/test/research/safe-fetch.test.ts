@@ -271,6 +271,9 @@ test("rejects private, local, link-local, reserved and documentation IP literals
     "172.16.2.3",
     "192.168.1.2",
     "192.0.2.5",
+    "192.31.196.1",
+    "192.52.193.1",
+    "192.175.48.1",
     "198.18.1.2",
     "203.0.113.9",
     "224.0.0.1",
@@ -280,6 +283,12 @@ test("rejects private, local, link-local, reserved and documentation IP literals
     "fc00::1",
     "fe80::1",
     "2001:db8::1",
+    "2001:1::1",
+    "2001:20::1",
+    "2002::1",
+    "3fff::1",
+    "2001:0001:0000:0000:0000:0000:0000:0001",
+    "3fff:0000:0000:0000:0000:0000:0000:0001",
   ]) {
     expect(isPublicResearchAddress(address)).toBe(false)
   }

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesFindingEndpointPath, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -50,6 +50,25 @@ test("never persists JavaScript source in correlation response previews", () => 
     processedResponse: '{"api_key":"this-is-a-secret-value-that-must-not-be-saved"}',
   })
   expect(jsonPreview).not.toContain("this-is-a-secret-value")
+
+  const sensitivePreview = safeCorrelationResponsePreview({
+    id: "request-sensitive-json",
+    normalizedPath: "/api/config",
+    responseContentType: "application/json",
+    processedResponse: JSON.stringify({
+      password: "two word password must be hidden",
+      client_secret: "client secret must be hidden",
+      private_key: "private key must be hidden",
+      csrf_token: "csrf token must be hidden",
+      secret: "generic secret must be hidden",
+    }),
+  })
+  expect(sensitivePreview).toContain("[REDACTED]")
+  expect(sensitivePreview).not.toContain("two word password must be hidden")
+  expect(sensitivePreview).not.toContain("client secret must be hidden")
+  expect(sensitivePreview).not.toContain("private key must be hidden")
+  expect(sensitivePreview).not.toContain("csrf token must be hidden")
+  expect(sensitivePreview).not.toContain("generic secret must be hidden")
 })
 
 test("redacts detected literal secrets from source-analysis metadata before persistence", async () => {
@@ -104,6 +123,15 @@ test("does not treat ordinary labels or non-path relative strings as endpoints",
   expect(endpoints).not.toContain("administrator")
 })
 
+
+test("finding correlation requires an exact route shape instead of substring overlap", () => {
+  expect(matchesFindingEndpointPath("/api/users/123", "/api/users/{id}")).toBe(true)
+  expect(matchesFindingEndpointPath("/api/users/123?expand=roles", "/api/users/{id}")).toBe(true)
+  expect(matchesFindingEndpointPath("/api/users", "/api/users/admin")).toBe(false)
+  expect(matchesFindingEndpointPath("/api/user", "/api/users")).toBe(false)
+  expect(matchesFindingEndpointPath("/api/users/{id}", "/api/users/123/admin")).toBe(false)
+  expect(matchesFindingEndpointPath("/api/users/{id}", "/api/users")).toBe(false)
+})
 
 test("explicit JavaScript target matching rejects unrelated hosts and sibling paths unless observed", () => {
   expect(isJavaScriptAssetAllowed({
