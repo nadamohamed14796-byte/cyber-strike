@@ -10,6 +10,10 @@ const MAX_RETRIES = 2
 
 class NonRetryableResearchError extends Error {}
 
+export function isNonRetryableResearchError(error: unknown): boolean {
+  return error instanceof NonRetryableResearchError
+}
+
 export function researchSourceHasCredentials(source: Pick<ResearchSource, "id">): boolean {
   const suffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
   return Boolean(
