@@ -50,6 +50,25 @@ test("never persists JavaScript source in correlation response previews", () => 
     processedResponse: '{"api_key":"this-is-a-secret-value-that-must-not-be-saved"}',
   })
   expect(jsonPreview).not.toContain("this-is-a-secret-value")
+
+  const sensitivePreview = safeCorrelationResponsePreview({
+    id: "request-sensitive-json",
+    normalizedPath: "/api/config",
+    responseContentType: "application/json",
+    processedResponse: JSON.stringify({
+      password: "two word password must be hidden",
+      client_secret: "client secret must be hidden",
+      private_key: "private key must be hidden",
+      csrf_token: "csrf token must be hidden",
+      secret: "generic secret must be hidden",
+    }),
+  })
+  expect(sensitivePreview).toContain("[REDACTED]")
+  expect(sensitivePreview).not.toContain("two word password must be hidden")
+  expect(sensitivePreview).not.toContain("client secret must be hidden")
+  expect(sensitivePreview).not.toContain("private key must be hidden")
+  expect(sensitivePreview).not.toContain("csrf token must be hidden")
+  expect(sensitivePreview).not.toContain("generic secret must be hidden")
 })
 
 test("redacts detected literal secrets from source-analysis metadata before persistence", async () => {
