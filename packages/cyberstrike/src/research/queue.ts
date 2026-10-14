@@ -7,22 +7,18 @@ export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learne
 
 const LEASE_MS = 5 * 60_000
 const CRAWL_PAGE_TTL_MS = 6 * 60 * 60_000
-const MAX_CACHED_DISCOVERY_LINKS = 160
-const MAX_CACHED_DISCOVERY_LINK_CHARS = 16_384
-
 function boundedDiscoveryLinks(links: string[] | undefined) {
   if (!links) return undefined
   const unique = new Set<string>()
   const result: string[] = []
-  let totalChars = 0
   for (const link of links) {
     if (typeof link !== "string" || link.length > 4096 || unique.has(link)) continue
-    if (totalChars + link.length > MAX_CACHED_DISCOVERY_LINK_CHARS) continue
     unique.add(link)
     result.push(link)
-    totalChars += link.length
-    if (result.length >= MAX_CACHED_DISCOVERY_LINKS) break
   }
+  // Preserve every unique safe discovered link. There is no per-page link-count
+  // or aggregate-character cutoff; the source allowlist and URL validation gate
+  // which links are eligible for traversal.
   return result
 }
 
