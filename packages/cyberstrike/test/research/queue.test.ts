@@ -686,6 +686,24 @@ test("research queue records oversized source blockers as terminal and visible",
       expect(ResearchQueue.stats(sourceID).blocked_size).toBe(1)
       expect(ResearchQueue.stats(sourceID).retry).toBe(0)
       expect(ResearchQueue.pending(50).some((row) => row.sequence === item.sequence)).toBe(false)
+
+      const unsupported = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL: "https://research.example.test/unsupported-content",
+        title: "Unsupported content type",
+      })
+      const unsupportedClaim = ResearchQueue.claimNext("fetch-limit-test", sourceID)
+      expect(unsupportedClaim?.sequence).toBe(unsupported.sequence)
+      if (!unsupportedClaim) throw new Error("expected to claim unsupported-content fixture")
+      expect(ResearchQueue.complete(
+        unsupportedClaim.sequence,
+        unsupportedClaim.lease_owner,
+        "blocked_fetch",
+        "unsupported content type: application/octet-stream",
+        { study_blocked_reason: "non-retryable-safe-fetch-error" },
+      )?.status).toBe("blocked_fetch")
+      expect(ResearchQueue.stats(sourceID).blocked_fetch).toBe(1)
+      expect(ResearchQueue.stats(sourceID).retry).toBe(0)
       await Instance.dispose()
     },
   })
