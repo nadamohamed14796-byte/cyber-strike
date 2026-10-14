@@ -35,6 +35,12 @@
         "^build"
       ],
       "outputs": []
+    },
+    "@cyberstrike-io/console-core#test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
     }
   }
 }
