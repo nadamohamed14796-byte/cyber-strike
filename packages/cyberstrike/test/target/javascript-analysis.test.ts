@@ -202,3 +202,16 @@ test("records roles and hidden-feature hints as candidates", () => {
   expect(result.roleHints.some((hint) => hint.kind === "debug-path-hint")).toBe(true)
   expect(result.requests.some((request) => request.path === "/api/admin/reports")).toBe(true)
 })
+
+test("retains exact secret candidate values and keeps them unverified", () => {
+  const source = 'const api_key = "personal-test-token-value-12345";';
+  const result = analyzeJavaScriptSource(source);
+  expect(result.secretCandidates).toHaveLength(1);
+  expect(result.secretCandidates[0]).toMatchObject({
+    kind: "api-key",
+    line: 1,
+    value: "personal-test-token-value-12345",
+    confidence: "candidate",
+  });
+  expect(result.secretCandidates[0]?.fingerprint).toMatch(/^[a-f0-9]{20}$/);
+});
