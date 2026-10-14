@@ -294,7 +294,6 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
                       {
                         study_blocked_reason: "non-retryable-safe-fetch-error",
                         study_blocked_detail: message,
-                        model_study_version: RESEARCH_MODEL_STUDY_VERSION,
                       },
                     ))
                   : Boolean(ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message))
