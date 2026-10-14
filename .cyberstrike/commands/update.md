@@ -1,8 +1,14 @@
 ---
-description: collect, model-study, and persist public research methodology across configured sources
+description: exhaustively discover, model-study, and persist public research methodology across configured sources
 ---
 
-You are running CyberStrike's **model-led research learning cycle**. `/update` owns collection, study, durable persistence, and verification. Hunting-time retrieval/context injection is a separate workflow; never call retrieval merely to claim the update completed.
+You are running CyberStrike's **exhaustive model-led research and learning cycle**. `/update` owns collection, study, durable persistence, and verification. Hunting-time retrieval/context injection is a separate workflow; never call retrieval merely to claim the update completed.
+
+## Non-negotiable rule: no arbitrary total-work limits
+
+Do not impose a fixed ceiling on search queries, discovery pages, crawl depth, discovered resources, queued resources, sources, or total study batches. Small request and study batches are acceptable only as execution mechanics. Continue making subsequent calls until the work is exhausted or a real external/runtime blocker is recorded. A batch ending is never a reason to stop the whole update.
+
+The `pages` argument is a per-pass work window, not a global cap. Expand it repeatedly until the source is exhausted or a documented blocker remains. Never claim completion merely because a request, batch, session, or timeout ended.
 
 ## 1. Establish exact source IDs and initial state
 
@@ -16,12 +22,12 @@ You are running CyberStrike's **model-led research learning cycle**. `/update` o
 
 Discovery is network-bound and synchronous. Avoid one large unfiltered discovery call that can time out across every site.
 
-1. For each ID in `configured_sources`, call `research_study(action="discover", source="<exact-id>", pages=20, depth=3)`. Handle one source per call so one slow/auth-blocked source does not hide results from the others.
+1. For each ID in `configured_sources`, call `research_study(action="discover", source="<exact-id>", pages=20, depth=9007199254740991)`. Handle one source per call so one slow/auth-blocked source does not hide results from the others. The `pages` value is a per-pass work window, not a global ceiling.
 2. Process only that source's queue before expanding it: call `research_study(action="next", source="<exact-id>", limit=3)`; read every sanitized report and save the decisions with the same `source` filter plus `continue_after_save=true`. Study each returned `next_batch` immediately. Keep the exact `public_id` and `lease_owner` from each claimed item.
 3. Record `pages`, `candidates`, `queued_new`, `blocked_auth`, exact `error_count`, and up to three example `errors` for every source. Retry the entire tool call at most twice only when it aborts or returns no usable source result. A row-level fetch error is different: the crawler records a cooldown marker, so do not hammer that URL with immediate retries. Keep the source marked incomplete until a later eligible retry succeeds. Authentication blocks require a valid operator-provided source session; do not silently treat a skipped blocked row as resolved.
-4. Keep a per-source page budget. After processing the queue discovered so far, expand only sources that exhausted their previous page budget without unresolved errors/authentication blocks, using this progression: **20 → 40 → 80 → 160 → 320 → 640 → 1000**. Call discovery again for that exact source with the larger `pages` value and `depth=3`; then study/save any newly queued reports before expanding further. The tool and crawler support at most 1000 pages per source per pass.
-5. After each pass, call `research_study(action="stats", source="<exact-id>")` and inspect the source-filtered queue fields as well as the current discovery result. Stop expanding a source early only when a successful pass uses fewer pages than its requested budget and there are no unresolved crawl-page errors/auth blocks or report rows in queued/retry/studying/blocked_auth states. If it reaches 1000 pages, label it **crawl-budget-capped**, not fully exhaustive. If a source remains errored or auth-blocked, record it as blocked/incomplete rather than silently excluding it.
-6. The crawl cache contains a bounded, allowlisted set of discovered links so a later pass can continue from cached pages. Never fetch arbitrary URLs from source text; only the source-scoped safe fetcher and configured host allowlist are allowed.
+4. Keep expanding the per-source page window whenever the previous pass processes its full requested window. Use a progression such as **20 → 40 → 80 → 160 → 320 → 640 → 1280 → 2560**, and continue doubling without a fixed endpoint. Call discovery again for that exact source with the larger `pages` value and `depth=9007199254740991`; then study/save any newly queued reports before expanding further. There is no hard-coded total page ceiling.
+5. After each pass, call `research_study(action="stats", source="<exact-id>")` and inspect the source-filtered queue fields as well as the current discovery result. Stop expanding a source only when a successful pass processes fewer pages than its requested window, the durable frontier has no further eligible continuation, and there are no unresolved crawl-page errors/auth blocks or report rows in queued/retry/studying/blocked_auth states. If a source remains errored or auth-blocked, record it as blocked/incomplete rather than silently excluding it.
+6. The crawl cache preserves the discovered source-allowlisted links so a later pass can continue from cached pages without losing frontier items. Never fetch arbitrary URLs from source text; only the source-scoped safe fetcher and configured host allowlist are allowed.
 
 ## 3. Model-led study and durable save
 
@@ -35,16 +41,16 @@ Discovery is network-bound and synchronous. Avoid one large unfiltered discovery
 ## 4. Repeat discovery until the source passes are accounted for
 
 After draining the queue, resume the per-source page-budget progression from Section 2 for each source that still requires expansion. Repeat discover → study → save until:
-- every unblocked source had a complete pass that did not exhaust its requested page budget, or reached the explicit 1000-page ceiling;
+- every unblocked source has a successful pass that did not exhaust its requested page window, with no eligible continuation left;
 - all claimable study work is drained; and
 - any unresolved queued/retry/studying/auth-blocked rows and source errors are recorded as incomplete.
 
-A queue being empty is not proof that a site's public archive was exhausted. Be explicit about page/depth ceilings, crawl errors, authentication blocks, and tool/runtime interruption. If the current tool/session budget prevents completion, report a resumable partial result rather than claiming success.
+A queue being empty is not proof that a site's public archive was exhausted. Be explicit about remaining continuations, crawl errors, authentication blocks, and tool/runtime interruption. Do not stop at a fixed page count or depth. If the current tool/session budget prevents completion, report a resumable partial result rather than claiming success.
 
 ## 5. Final verification and separation of responsibilities
 
 1. After the source passes and current study queue have been drained, call `research_study(action="backfill")` without a source filter again. If it queues/requeues additional work, process that work with the normal `next` → model study → lease-matched `save` cycle, then repeat backfill. Stop repeating only when a full pass adds/requeues no work, or document a durable blocker/remaining state. Do not repeatedly retry auth-blocked rows unless a valid source session is configured.
-2. Call `research_study(action="stats")` again. Compare initial/final global queue and knowledge counts, including `model_study_learned`, `model_study_rejected`, `model_study_completed`, `model_study_skipped`, and `model_study_pending`; then use `stats(source="<exact-id>")` for source-filtered queue counts. Important: `stats(source=...)` filters queue counts, but its knowledge statistics are global, not source-filtered. Do not present global knowledge totals as per-source knowledge counts. Report source-by-source pages/candidates/new queue rows, successful model-studied saves, preflight skips kept separate from model decisions, rejection reasons, auth blocks, retries/errors, useful Knowledge IDs and source URLs, remaining queue counts, legacy skip examples/reasons, and any source that reached the crawl cap.
+2. Call `research_study(action="stats")` again. Compare initial/final global queue and knowledge counts, including `model_study_learned`, `model_study_rejected`, `model_study_completed`, `model_study_skipped`, and `model_study_pending`; then use `stats(source="<exact-id>")` for source-filtered queue counts. Important: `stats(source=...)` filters queue counts, but its knowledge statistics are global, not source-filtered. Do not present global knowledge totals as per-source knowledge counts. Report source-by-source pages/candidates/new queue rows, successful model-studied saves, preflight skips kept separate from model decisions, rejection reasons, auth blocks, retries/errors, useful Knowledge IDs and source URLs, remaining queue counts, legacy skip examples/reasons, and any source that remains incomplete or blocked.
 3. `/update` only builds and persists the global public-methodology knowledge base. Do **not** call `research_knowledge`, `research search`, or `research recommend` as a substitute for studying/saving. Studying a report must not record it as already surfaced during a hunt or as useful.
 4. Hunting-time retrieval is separate: when live, authorized target observations produce relevant signals, the hunting workflow may query this saved knowledge base. Public references stay unverified methodology, never target-specific evidence.
 5. Never copy source-program hosts, endpoints, object IDs, users, accounts, tokens, or scope into current-target facts. Use independently observed target artifacts only. Preserve target memory and notes separately from the global research database. Do not edit `SKILL.md` files as a side effect of study.
@@ -58,7 +64,7 @@ Use these headings in this order so the result is auditable:
 3. **Per-source ledger** — one row per exact configured source ID, with each pass's requested page budget and actual pages, candidates, queued_new, learned saves, rejected decisions, preflight skips, blocked_auth, error_count/examples, retry attempts, remaining queue states, and final status. Mark not-run sources explicitly. Do not mistake source-filtered queue statistics for source-filtered knowledge statistics.
 4. **Persisted lessons** — useful Knowledge IDs and source URLs returned by successful saves; distinguish saved-and-terminal-state-confirmed from saved-but-queue-transition-failed.
 5. **Skipped/rejected work** — preflight skips and model rejections in separate lists with IDs and reasons.
-6. **Outstanding blockers and resume point** — unresolved source errors/auth, queued/retry/studying/blocked_auth rows, stale leases, persistence failures, any 1000-page ceiling, and the exact next safe action. If interrupted, say partial and identify what has and has not completed.
+6. **Outstanding blockers and resume point** — unresolved source errors/auth, queued/retry/studying/blocked_auth rows, stale leases, persistence failures, incomplete pagination, and the exact next safe action. If interrupted, say partial and identify what has and has not completed.
 
 Never invent counts or infer missing results. Use “unknown/not returned” when the tool did not provide a value.
 
