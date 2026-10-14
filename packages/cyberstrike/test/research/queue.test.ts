@@ -659,3 +659,34 @@ test("agent-study text cache preserves the complete document beyond the legacy 1
     },
   })
 })
+
+
+test("research queue records oversized source blockers as terminal and visible", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceID = "test-blocked-size"
+      const item = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL: "https://research.example.test/large-document",
+        title: "Document exceeds safe fetch ceiling",
+      })
+      const claim = ResearchQueue.claimNext("size-limit-test", sourceID)
+      expect(claim?.sequence).toBe(item.sequence)
+      if (!claim) throw new Error("expected to claim oversized research fixture")
+      const completed = ResearchQueue.complete(
+        claim.sequence,
+        claim.lease_owner,
+        "blocked_size",
+        "research document too large",
+        { study_blocked_reason: "safe-fetch-document-size-limit" },
+      )
+      expect(completed?.status).toBe("blocked_size")
+      expect(ResearchQueue.stats(sourceID).blocked_size).toBe(1)
+      expect(ResearchQueue.stats(sourceID).retry).toBe(0)
+      expect(ResearchQueue.pending(50).some((row) => row.sequence === item.sequence)).toBe(false)
+      await Instance.dispose()
+    },
+  })
+})
