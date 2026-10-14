@@ -65,7 +65,7 @@ For each discovered candidate:
 6. Compute a stable content fingerprint.
 7. Detect unchanged content, duplicates, and changed versions.
 8. Classify the document by its actual contents.
-9. Study all accessible meaningful content, not only the title or search snippet. `research_study(action=next)` emits a bounded first text chunk. When `has_more_text=true`, call `research_study(action=read)` with the exact `public_id` and `lease_owner`, setting its `offset` parameter to the previous response's `next_text_offset`, until the returned `has_more_text` is false. Read chunks in order; the durable read cursor blocks save/rejection while source text remains unread.
+9. Study all accessible meaningful content, not only the title or search snippet. `research_study(action=next)` claims one resource per response and emits a bounded first text chunk; per-call size is not a total page/resource cap. When `has_more_text=true`, call `research_study(action=read)` with the exact `public_id` and `lease_owner`, setting its `offset` parameter to the previous response's `next_text_offset`, until the returned `has_more_text` is false. Read chunks in order; the durable read cursor blocks save/rejection while source text remains unread.
 10. Extract structured facts, reusable techniques, evidence, prerequisites, limitations, and uncertainty.
 11. Persist through the canonical knowledge API.
 12. Read the record back from persistent storage and verify key fields and source relationships.
