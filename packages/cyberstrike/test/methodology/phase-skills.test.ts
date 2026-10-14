@@ -56,26 +56,31 @@ describe("Methodology phase skill routing", () => {
       input_validation: [
         "attack-dom-xss", "attack-nosqli", "attack-deserialization", "attack-file-upload",
         "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
+        "attack-host-header", "attack-cache-poison",
       ],
-      business_logic: ["attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass"],
+      business_logic: [
+        "attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass",
+        "attack-clickjacking", "attack-host-header", "attack-cache-poison",
+      ],
       data_protection: [
         "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
       ],
       api_security: [
         "attack-graphql", "attack-schema-enumeration", "attack-grpc",
         "attack-mass-assignment", "attack-nosqli", "attack-websocket",
+        "attack-host-header", "attack-cache-poison", "attack-clickjacking",
       ],
       infrastructure: [
         "attack-cloud-misconfig", "cloud-assessment", "ci-assessment",
-        "cicd-attacks", "k8s-assessment", "ad-security",
+        "cicd-attacks", "k8s-assessment", "ad-security", "attack-ldap",
       ],
       reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing"],
     }
 
-    for (const [phase, skills] of Object.entries(expected) as [Phase.Id, string[]][]) {
-      const queries = skillQueriesForPhase(phase)
-      for (const skill of skills) {
-        expect(queries, `${phase} should route ${skill}`).toContain(skill)
+    for (const phase of Phase.ALL) {
+      const queries = skillQueriesForPhase(phase.id)
+      for (const skill of expected[phase.id] ?? []) {
+        expect(queries, `${phase.id} should route ${skill}`).toContain(skill)
       }
     }
   })
