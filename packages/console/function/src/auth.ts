@@ -102,7 +102,8 @@ export default {
       }),
       subjects,
       async success(ctx, response) {
-        console.log(response)
+        // Never log the OAuth response: it contains access/refresh tokens and identity claims.
+        console.log("OAuth sign-in succeeded", { provider: response.provider })
 
         let subject: string | undefined
         let email: string | undefined
@@ -164,7 +165,7 @@ export default {
           // create account if not found
           let accountID = idByProvider ?? idByEmail
           if (!accountID) {
-            console.log("creating account for", email)
+            console.log("Creating account for new OAuth identity", { provider: response.provider })
             accountID = await Account.create({})
           }
 
