@@ -39,8 +39,8 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
       const saved = await TargetMemory.addNote(workspace.targetURL, {
         kind: params.kind as TargetNoteKind,
         title: redactTargetNoteSecrets(params.title.trim()).slice(0, 180),
-        content: params.content.trim(),
-        evidence: params.evidence,
+        content: redactTargetNoteSecrets(params.content.trim()),
+        evidence: params.evidence ? redactTargetNoteSecrets(params.evidence.trim()) : undefined,
         source: "agent:" + redactTargetNoteSecrets(ctx.agent || "cyberstrike").slice(0, 100),
         sourceURL: params.source_url ? redactTargetNoteSecrets(params.source_url) : undefined,
         status: params.status as TargetNoteStatus,
