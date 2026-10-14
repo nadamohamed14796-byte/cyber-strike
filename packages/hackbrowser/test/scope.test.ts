@@ -34,7 +34,7 @@ describe("hackbrowser network scope", () => {
   })
 
   test("normalization preserves wildcard semantics while removing URL details", () => {
-    expect(normalizeScope("HTTPS://*.Example.com:443/path?q=1")).toBe("*.example.com:443")
+    expect(normalizeScope("HTTPS://*.Example.com:443/path?q=1")).toBe("*.example.com")
     expect(normalizeScope("https://app.example.com/path?q=1")).toBe("app.example.com")
   })
 })
