@@ -399,7 +399,7 @@ test("model-study backfill includes old reports with missing excerpts for safe r
         sourceTrust: 100,
         tags: ["idor"],
         metadata: {
-          research_source: sourceID,
+          research_source: "portswigger",
           research_source_name: "PortSwigger Web Security Academy",
           source_trust: 100,
           study_method: "bounded-heuristic-extraction",
@@ -409,14 +409,14 @@ test("model-study backfill includes old reports with missing excerpts for safe r
       expect(legacy).not.toBeNull()
       if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
 
-      const first = await queueLegacyKnowledgeForModelStudy(sourceID)
+      const first = await queueLegacyKnowledgeForModelStudy("portswigger")
       expect(first.queued).toBeGreaterThanOrEqual(1)
-      const queued = ResearchQueue.find(sourceID, sourceURL)
+      const queued = ResearchQueue.find("portswigger", sourceURL)
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.cached_text).toBe("")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
 
-      await queueLegacyKnowledgeForModelStudy(sourceID)
+      await queueLegacyKnowledgeForModelStudy("portswigger")
       const stillQueued = ResearchQueue.find("portswigger", sourceURL)
       expect(stillQueued?.sequence).toBe(queued?.sequence)
       expect(stillQueued?.status).toBe("queued")
