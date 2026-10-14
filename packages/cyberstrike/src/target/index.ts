@@ -434,7 +434,7 @@ function defaultWorkspaceReadme(workspace: Workspace): string {
     "- Active testing requires an explicitly configured, current, program-authorized scope in `scope/scope.json`.",
     "- Preserve source URL, timestamp, run/session ID, and evidence references for generated artifacts.",
     "- Keep observations, hypotheses, validated findings, and reports separate. A note is not proof.",
-    "- Do not store passwords, cookies, bearer tokens, API keys, or other secrets.",
+    "- Preserve exact discovered values only in this private, target-local evidence store when required for reproduction; mark them as candidates until independently validated.",
     "",
     "## Layout",
     "",
