@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Phase } from "../../src/methodology/phase"
-import { skillQueriesForPhase } from "../../src/methodology/context"
+import { rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
+import type { SkillIndex } from "../../src/skill/index-engine"
 
 describe("Methodology phase skill routing", () => {
   test("every defined phase has a phase-specific skill discovery plan", () => {
@@ -18,6 +19,61 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("reporting")).toContain("attack-report-writing")
     expect(Phase.get("mobile_application_testing")?.appliesTo).toContain("mobile")
     expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
+  })
+
+  test("phase ranking uses required tags and metadata rather than only display-name phrases", () => {
+    const makeSkill = (overrides: Partial<SkillIndex.Entry>): SkillIndex.Entry => ({
+      name: "generic-web-testing",
+      description: "General web application testing",
+      tags: [],
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+      ...overrides,
+    })
+
+    const ranked = rankSkillsForPhase("authorization_testing", [
+      makeSkill({ name: "generic-web-testing", description: "General web application testing" }),
+      makeSkill({
+        name: "access-control-review",
+        description: "Authorization and object-level access checks",
+        tags: ["authz-testing", "authorization", "idor"],
+      }),
+      makeSkill({
+        name: "tampered-idor-skill",
+        description: "Authorization IDOR testing",
+        tags: ["authz-testing", "idor"],
+        verified: "tampered",
+      }),
+    ])
+
+    expect(ranked[0]?.name).toBe("access-control-review")
+    expect(ranked.some((skill) => skill.name === "tampered-idor-skill")).toBe(false)
+  })
+
+  test("recon phases reserve a recon-specific candidate even when a generic skill is present", () => {
+    const makeSkill = (name: string, description: string, tags: string[] = []): SkillIndex.Entry => ({
+      name,
+      description,
+      tags,
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+
+    const ranked = rankSkillsForPhase("active_recon", [
+      makeSkill("generic-web-testing", "General web application testing", ["web"]),
+      makeSkill("recon-port-service-discovery", "Active reconnaissance and service enumeration", ["active-recon", "port-scan"]),
+      makeSkill("http-fingerprint", "HTTP technology fingerprinting", ["technology", "framework"]),
+    ], 2)
+
+    expect(ranked).toHaveLength(2)
+    expect(ranked[0]?.name).toBe("recon-port-service-discovery")
+    expect(ranked.some((skill) => /recon|enumeration|port scan/i.test(skill.name + " " + skill.description))).toBe(true)
   })
 
   test("scope detection distinguishes mobile artifacts from domain names", () => {
