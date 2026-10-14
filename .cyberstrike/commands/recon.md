@@ -2,7 +2,9 @@
 description: initialize a durable target workspace and run resumable, scope-checked reconnaissance
 ---
 
-You are running CyberStrike's **target reconnaissance workflow**. Treat the command arguments and the current conversation as the target request. Recon must be resumable, evidence-based, and scoped; it must not silently create a second target root or lose artifacts when a session stops.
+**Command arguments:** `$ARGUMENTS`
+
+You are running CyberStrike's **target reconnaissance workflow**. Treat the substituted command arguments and the current conversation as the target request. Recon must be resumable, evidence-based, and scoped; it must not silently create a second target root or lose artifacts when a session stops.
 
 ## 1. Resolve the target and workspace first
 
