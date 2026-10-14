@@ -958,6 +958,31 @@ export namespace TargetMemory {
       return row
     })
     if (parent && row.parent_target_id !== parent.id) return await reparentWorkspace(row, parent, requestedAssetType)
+
+    // Repeated passive observations may refine a child's classification. Apply an
+    // explicit type, or promote a generic subdomain to a hostname-inferred type,
+    // but never downgrade a previously specific type just because a later observer
+    // did not know the classification.
+    let currentRow = row
+    if (parent && row.parent_target_id === parent.id) {
+      const desiredAssetType = options.assetType && options.assetType !== "target"
+        ? options.assetType
+        : row.asset_type === "subdomain" && requestedAssetType !== "subdomain"
+          ? requestedAssetType
+          : row.asset_type
+      if (desiredAssetType !== row.asset_type) {
+        Database.use((db) => db.update(TargetWorkspaceTable).set({
+          asset_type: desiredAssetType,
+          time_updated: Date.now(),
+        }).where(eq(TargetWorkspaceTable.id, row.id)).run())
+        const updated = Database.use((db) =>
+          db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.id)).get(),
+        )
+        if (!updated) throw new Error("Target asset classification update failed.")
+        currentRow = updated
+      }
+    }
+
     if (!options.parentTargetURL && !parent && row.parent_target_id) {
       const oldParentRow = Database.use((db) =>
         db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.parent_target_id!)).get(),
@@ -965,7 +990,7 @@ export namespace TargetMemory {
       if (!oldParentRow) throw new Error("Existing parent workspace is missing; refusing to write an orphaned target.")
       return await detachWorkspace(row, mapWorkspace(oldParentRow))
     }
-    const workspace = mapWorkspace(row)
+    const workspace = mapWorkspace(currentRow)
     await prepareWorkspace(workspace, options.reconcileNotes ?? true)
     if (parent) await syncAssetRegistry(parent)
     return workspace
