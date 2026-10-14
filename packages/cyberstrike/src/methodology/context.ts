@@ -14,18 +14,66 @@ import { SkillIndex } from "../skill/index-engine"
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   scope_analysis: ["attack-bb-methodology", "scope", "attack surface"],
   mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
-  passive_recon: ["recon-methodology", "recon-subdomain-enumeration", "recon-email-security", "recon-gitlab-public-recon", "osint"],
-  active_recon: ["attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration", "recon-cms-detection"],
-  technology_profiling: ["technology profiling", "technology fingerprinting", "framework detection"],
-  authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-oauth", "authentication", "auth bypass", "login"],
-  session_management: ["attack-session", "attack-jwt", "session management", "cookie", "JWT"],
-  authorization_testing: ["attack-idor-automation", "authorization", "IDOR"],
-  input_validation: ["attack-xss", "attack-sqli", "attack-ssrf", "attack-ssti", "injection", "XSS", "SQL injection", "SSRF"],
-  business_logic: ["attack-business-logic", "attack-race-condition", "business logic", "race condition", "attack-bb-methodology"],
-  data_protection: ["attack-information-disclosure", "attack-source-leak", "data protection", "sensitive data", "TLS"],
-  api_security: ["attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "API security", "GraphQL", "REST API"],
-  infrastructure: ["recon-asn-infrastructure", "attack-cloud-misconfig", "cloud-assessment", "cloud security", "network exposure"],
-  reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing", "triage-validation", "evidence-hygiene", "report-writing"],
+  passive_recon: [
+    "recon-methodology", "recon-subdomain-enumeration", "recon-email-security",
+    "recon-gitlab-public-recon", "recon-origin-ip-discovery", "recon-error-log-mining",
+    "recon-visual-recon", "osint",
+  ],
+  active_recon: [
+    "attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration",
+    "recon-cms-detection", "recon-subdomain-enumeration", "recon-origin-ip-discovery",
+    "attack-subdomain-takeover",
+  ],
+  technology_profiling: [
+    "technology profiling", "technology fingerprinting", "framework detection",
+    "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
+    "attack-nestjs", "attack-nextjs", "attack-nodejs", "attack-springboot",
+    "attack-wordpress", "attack-exchange-owa", "attack-zimbra", "attack-hikvision-isapi",
+    "attack-vmware-vcenter", "attack-minio-s3",
+  ],
+  authentication_testing: [
+    "attack-auth-bypass", "attack-401-403-bypass", "attack-ato", "attack-mfa-bypass",
+    "attack-captcha-bypass", "attack-forgot-password", "attack-oauth", "attack-saml-sso",
+    "authentication", "auth bypass", "login",
+  ],
+  session_management: [
+    "attack-session", "attack-jwt", "attack-csrf", "attack-oauth", "attack-saml-sso",
+    "session management", "cookie", "JWT",
+  ],
+  authorization_testing: [
+    "attack-idor-automation", "attack-mass-assignment", "attack-bfla",
+    "attack-api-noauth-hunt", "attack-401-403-bypass", "attack-cors",
+    "authorization", "IDOR", "access control",
+  ],
+  input_validation: [
+    "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf",
+    "attack-ssti", "attack-xxe", "attack-deserialization", "attack-file-upload",
+    "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
+    "attack-open-redirect", "injection", "XSS", "SQL injection", "SSRF",
+  ],
+  business_logic: [
+    "attack-business-logic", "attack-race-condition", "attack-mass-assignment",
+    "attack-rate-limit-bypass", "attack-csrf", "business logic", "race condition",
+    "attack-bb-methodology",
+  ],
+  data_protection: [
+    "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
+    "attack-ntlm-info", "data protection", "sensitive data", "TLS",
+  ],
+  api_security: [
+    "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
+    "attack-grpc", "attack-mass-assignment", "attack-nosqli", "attack-rate-limit-bypass",
+    "attack-websocket", "attack-cors", "attack-jwt", "API security", "GraphQL", "REST API",
+  ],
+  infrastructure: [
+    "recon-asn-infrastructure", "recon-origin-ip-discovery", "attack-cloud-misconfig",
+    "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-docker-privesc",
+    "k8s-assessment", "ad-security", "attack-ntlm-info", "cloud security", "network exposure",
+  ],
+  reporting: [
+    "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
+    "triage-validation", "evidence-hygiene", "report-writing",
+  ],
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
