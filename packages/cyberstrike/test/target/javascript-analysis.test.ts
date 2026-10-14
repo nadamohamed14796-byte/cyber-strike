@@ -186,12 +186,16 @@ test("flags browser token storage, cookie writes, and wildcard postMessage as ca
   expect(JSON.stringify(result)).not.toContain("access_token")
 })
 
-test("records hard-coded secret-like assignments as fingerprints only", () => {
+test("retains target-local hard-coded secret evidence with a fingerprint and candidate status", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
   expect(result.secretCandidates).toHaveLength(1)
-  expect(result.secretCandidates[0]?.kind).toBe("api-key")
-  expect(JSON.stringify(result)).not.toContain(secret)
+  expect(result.secretCandidates[0]).toMatchObject({
+    kind: "api-key",
+    value: secret,
+    confidence: "candidate",
+  })
+  expect(result.secretCandidates[0]?.fingerprint).toMatch(/^[a-f0-9]{20}$/)
 })
 
 test("records roles and hidden-feature hints as candidates", () => {
