@@ -33,57 +33,64 @@ export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
 }
 
 async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
-  await SkillIndex.ensureBuilt()
   const queries = skillQueriesForPhase(phaseId)
-  const candidates = new Map<string, SkillIndex.Entry>()
-  // Gather results across every phase query before limiting candidates. Otherwise,
-  // a generic first query can crowd out exact matches from later, more specific queries.
-  for (const query of queries) {
-    for (const entry of SkillIndex.search(query, 20)) {
-      if (entry.verified === "tampered") continue
-      candidates.set(entry.name, entry)
-    }
-  }
-
-  const ranked = [...candidates.values()].map((entry) => {
-    let bestScore = 0
-    let matchedQuery = queries[0] ?? phaseId
-    for (const query of queries) {
-      const q = query.toLowerCase().trim()
-      let score = 0
-      if (entry.name.toLowerCase() === q) score += 100
-      else if (entry.name.toLowerCase().startsWith(q)) score += 50
-      else if (entry.name.toLowerCase().includes(q)) score += 20
-      if (entry.tags.some((tag) => tag.toLowerCase() === q)) score += 40
-      else if (entry.tags.some((tag) => tag.toLowerCase().includes(q))) score += 15
-      if (entry.owasp_id?.toLowerCase().includes(q)) score += 30
-      if (entry.category?.toLowerCase().includes(q)) score += 10
-      if (entry.description.toLowerCase().includes(q)) score += 5
-      if (score > bestScore) {
-        bestScore = score
-        matchedQuery = query
-      }
-    }
-    return { entry, score: bestScore, query: matchedQuery }
-  }).sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
-
-  const selected = ranked.slice(0, 4).map(({ entry, query }) => ({
-    name: entry.name,
-    description: entry.description,
-    query,
-  }))
-
   const lines = [
     "## Required Skill Preflight",
     "Before testing this phase, use the `skill` tool to load at least one relevant skill listed below. A name in this list is only a recommendation; it is not loaded until the tool returns its skill content.",
     "If loading is denied or a skill is unavailable, search for an allowed alternative and note the gap. Do not claim a skill was loaded unless the tool call succeeded.",
   ]
-  if (selected.length === 0) {
-    lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
-  } else {
-    lines.push("", "Phase-specific candidates:")
-    for (const match of selected) lines.push(`- ${match.name} — ${match.description} (matched: ${match.query})`)
+
+  try {
+    await SkillIndex.ensureBuilt()
+    const candidates = new Map<string, SkillIndex.Entry>()
+    // Gather results across every phase query before limiting candidates. Otherwise,
+    // a generic first query can crowd out exact matches from later, more specific queries.
+    for (const query of queries) {
+      for (const entry of SkillIndex.search(query, 20)) {
+        if (entry.verified === "tampered") continue
+        candidates.set(entry.name, entry)
+      }
+    }
+
+    const ranked = [...candidates.values()].map((entry) => {
+      let bestScore = 0
+      let matchedQuery = queries[0] ?? phaseId
+      for (const query of queries) {
+        const q = query.toLowerCase().trim()
+        let score = 0
+        if (entry.name.toLowerCase() === q) score += 100
+        else if (entry.name.toLowerCase().startsWith(q)) score += 50
+        else if (entry.name.toLowerCase().includes(q)) score += 20
+        if (entry.tags.some((tag) => tag.toLowerCase() === q)) score += 40
+        else if (entry.tags.some((tag) => tag.toLowerCase().includes(q))) score += 15
+        if (entry.owasp_id?.toLowerCase().includes(q)) score += 30
+        if (entry.category?.toLowerCase().includes(q)) score += 10
+        if (entry.description.toLowerCase().includes(q)) score += 5
+        if (score > bestScore) {
+          bestScore = score
+          matchedQuery = query
+        }
+      }
+      return { entry, score: bestScore, query: matchedQuery }
+    }).sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
+
+    const selected = ranked.slice(0, 4).map(({ entry, query }) => ({
+      name: entry.name,
+      description: entry.description,
+      query,
+    }))
+
+    if (selected.length === 0) {
+      lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
+    } else {
+      lines.push("", "Phase-specific candidates:")
+      for (const match of selected) lines.push(`- ${match.name} — ${match.description} (matched: ${match.query})`)
+    }
+  } catch {
+    // Skill catalog failures must not prevent session prompt generation.
+    lines.push("Skill catalog lookup failed. Do not claim a skill was loaded; search the available skill catalog manually and record the limitation before testing.")
   }
+
   return lines.join("\n")
 }
 
