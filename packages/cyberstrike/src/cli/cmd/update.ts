@@ -78,7 +78,7 @@ export const UpdateCommand = cmd({
 
           prompts.log.info(
             result.source + ": requested_page_window=" + pageWindow +
-              " fetched_pages=" + result.pages +
+              " processed_pages=" + result.pages +
               " candidates=" + result.candidates +
               " queued_new=" + result.added +
               " blocked_auth=" + result.blocked_auth +
@@ -157,7 +157,7 @@ export const UpdateCommand = cmd({
       const knowledgeStats = ReportKnowledge.stats()
       prompts.log.info(
         "cycle=" + cycle +
-          " fetched_pages=" + totalPages +
+          " processed_pages=" + totalPages +
           " discovered_candidates=" + totalCandidates +
           " queued_new=" + totalQueued +
           " learned=" + totalLearned +
