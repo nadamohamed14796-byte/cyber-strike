@@ -13,6 +13,7 @@ await Promise.all(["data", "cache", "config", "state"].map((name) =>
 
 const env = {
   ...process.env,
+  CYBERSTRIKE_TEST_HOME: testHome,
   XDG_DATA_HOME: path.join(testHome, "data"),
   XDG_CACHE_HOME: path.join(testHome, "cache"),
   XDG_CONFIG_HOME: path.join(testHome, "config"),
