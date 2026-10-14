@@ -710,6 +710,12 @@ test("research queue records oversized source blockers as terminal and visible",
       )?.status).toBe("blocked_fetch")
       expect(ResearchQueue.stats(sourceID).blocked_fetch).toBe(1)
       expect(ResearchQueue.stats(sourceID).retry).toBe(0)
+      expect(ResearchQueue.enqueueForModelStudy({
+        sourceID,
+        sourceURL: "https://research.example.test/unsupported-content",
+        title: "Unsupported content type",
+        payload: {},
+      }).reason).toBe("previously-blocked-fetch")
       await Instance.dispose()
     },
   })
