@@ -2,6 +2,8 @@
 
 **Purpose:** Canonical, version-controlled specification for the agent instructions used by the local `update` research workflow. This document is a contract, not proof that every requirement is already implemented. The CLI, queue, persistence, and retrieval code must be verified against it.
 
+**How to invoke it:** `cyberstrike update --print-prompt` prints this document for copying; it does not run the model-led study. In the interactive CyberStrike agent, invoke `/update` to run the active-model workflow. The standalone `cyberstrike update` CLI is a separate heuristic sync and must not be reported as having performed active-model study.
+
 ## Mission
 
 Operate the local CyberStrike research-learning system end to end: inspect configuration and storage; discover eligible resources; fetch safely; classify actual document type; extract evidence-backed reusable knowledge and patterns; persist through the canonical database APIs; verify read-back and retrieval; and report source-by-source completeness and blockers. Never claim an operation succeeded without checking its result.
