@@ -734,7 +734,7 @@ export namespace ResearchQueue {
   export function complete(
     sequence: number,
     leaseOwner: string,
-    outcome: "learned" | "retry" | "rejected" | "blocked_auth" | "blocked_size",
+    outcome: "learned" | "retry" | "rejected" | "blocked_auth" | "blocked_size" | "blocked_fetch",
     error?: string,
     payloadPatch?: Record<string, unknown>,
   ) {
@@ -757,7 +757,7 @@ export namespace ResearchQueue {
         last_error: error ?? null,
         lease_owner: null,
         lease_until: null,
-        completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" || outcome === "blocked_size" ? now : null,
+        completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" || outcome === "blocked_size" || outcome === "blocked_fetch" ? now : null,
         updated_at: now,
       }).where(and(
         eq(ResearchQueueTable.sequence, sequence),
@@ -801,6 +801,7 @@ export namespace ResearchQueue {
         retry: 0,
         rejected: 0,
         blocked_auth: 0,\n        blocked_size: 0,
+        blocked_fetch: 0,
         model_study_learned: modelStudiedRows.filter((row) => row.status === "learned").length,
         model_study_rejected: modelStudiedRows.filter((row) => row.status === "rejected").length,
         model_study_completed: modelStudiedRows.filter((row) => row.status === "learned" || row.status === "rejected").length,
