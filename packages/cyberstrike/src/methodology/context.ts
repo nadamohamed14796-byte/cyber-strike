@@ -12,24 +12,24 @@ import { SkillIndex } from "../skill/index-engine"
 // Phase-aware skill discovery is intentionally separate from loading: the agent must
 // use the skill tool to load the selected skill so normal per-agent permissions apply.
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
-  scope_analysis: ["attack-bb-methodology", "scope", "attack surface"],
+  scope_analysis: ["attack-bb-methodology", "target-workspace-workflow", "scope", "attack surface"],
   mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: [
     "recon-methodology", "recon-subdomain-enumeration", "recon-email-security",
     "recon-gitlab-public-recon", "recon-origin-ip-discovery", "recon-error-log-mining",
-    "recon-visual-recon", "osint",
+    "recon-visual-recon", "target-workspace-workflow", "osint",
   ],
   active_recon: [
     "attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration",
     "recon-cms-detection", "recon-subdomain-enumeration", "recon-origin-ip-discovery",
-    "attack-subdomain-takeover",
+    "attack-subdomain-takeover", "recon-asn-infrastructure", "target-workspace-workflow",
   ],
   technology_profiling: [
     "technology profiling", "technology fingerprinting", "framework detection",
     "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
     "attack-nestjs", "attack-nextjs", "attack-nodejs", "attack-springboot",
     "attack-wordpress", "attack-exchange-owa", "attack-zimbra", "attack-hikvision-isapi",
-    "attack-vmware-vcenter", "attack-minio-s3",
+    "attack-vmware-vcenter", "attack-minio-s3", "llm-security",
   ],
   authentication_testing: [
     "attack-auth-bypass", "attack-401-403-bypass", "attack-ato", "attack-mfa-bypass",
@@ -49,7 +49,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf",
     "attack-ssti", "attack-xxe", "attack-deserialization", "attack-file-upload",
     "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
-    "attack-open-redirect", "attack-host-header", "attack-cache-poison", "injection",
+    "attack-open-redirect", "attack-host-header", "attack-cache-poison", "llm-security", "injection",
     "XSS", "SQL injection", "SSRF",
   ],
   business_logic: [
@@ -66,17 +66,21 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
     "attack-grpc", "attack-mass-assignment", "attack-nosqli", "attack-rate-limit-bypass",
     "attack-websocket", "attack-cors", "attack-host-header", "attack-cache-poison",
-    "attack-clickjacking", "attack-open-redirect", "attack-jwt", "API security", "GraphQL", "REST API",
+    "attack-clickjacking", "attack-open-redirect", "attack-jwt", "llm-security",
+    "API security", "GraphQL", "REST API",
   ],
   infrastructure: [
     "recon-asn-infrastructure", "recon-origin-ip-discovery", "attack-cloud-misconfig",
     "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-docker-privesc",
     "k8s-assessment", "ad-security", "attack-ldap", "attack-ntlm-info",
+    "aws-postexploit", "azure-postexploit", "gcp-postexploit", "k8s-postexploit",
+    "windows-postexploit", "linux-postexploit", "macos-postexploit", "ebpf-attacks",
+    "kerberos-attacks", "mitre_attack", "mitre_attack_ics", "CIS benchmarks", "NIST controls",
     "cloud security", "network exposure",
   ],
   reporting: [
     "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
-    "triage-validation", "evidence-hygiene", "report-writing",
+    "bugcrowd-reporting", "triage-validation", "evidence-hygiene", "report-writing",
   ],
 }
 
