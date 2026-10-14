@@ -531,7 +531,7 @@ export namespace ResearchQueue {
    * through multiple bounded chunks must not let another worker reclaim it midway.
    */
   export function renewClaim(id: string, leaseOwner: string, leaseDurationMs = LEASE_MS) {
-    const match = /^RPT-(\\d{1,12})$/.exec(id.trim())
+    const match = /^RPT-(\d{1,12})$/.exec(id.trim())
     if (!match || !leaseOwner.trim()) return false
     const sequence = Number(match[1])
     if (!Number.isSafeInteger(sequence) || sequence <= 0) return false
