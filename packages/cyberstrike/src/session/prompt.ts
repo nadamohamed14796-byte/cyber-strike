@@ -815,8 +815,16 @@ export namespace SessionPrompt {
       // Pass the most recent bounded text so a long conversation cannot hide the current ask.
       const researchSignalText = targetTaskText.slice(-4000)
       if (targetWorkflowRequested || targetMemoryCtx || promptResearchSignals(researchSignalText).length > 0) {
-        const researchContext = ResearchContext.generate(Session.root(sessionID), researchSignalText)
-        if (researchContext) system.push(researchContext)
+        try {
+          const researchContext = ResearchContext.generate(Session.root(sessionID), researchSignalText)
+          if (researchContext) system.push(researchContext)
+        } catch (error) {
+          // Global knowledge retrieval is advisory and must never take down session prompting.
+          log.warn("failed to build global research context; continuing without it", {
+            sessionID,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
 
       // Inject MCP tool availability info so the LLM knows to use tool_search
