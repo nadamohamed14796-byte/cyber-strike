@@ -329,7 +329,7 @@ export function classifyResearchDocumentType(
     /\b(?:i noticed|i discovered|i tested|my approach|the initial hypothesis|what i tried)\b/,
   ].filter((pattern) => pattern.test(sample)).length
   // Reproduction steps and PoCs occur in reports and labs too; they are not write-up proof alone.
-  const proceduralSignals = /\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause analysis)\b/.test(sample)
+  const proceduralSignals = /\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause(?: analysis)?)\b/.test(sample)
   const writeupSignals = narrativeWriteupSignals + (narrativeWriteupSignals > 0 && proceduralSignals ? 2 : 0)
   const blogSignals = [
     /\b(?:blog post|in this article|this article explains|guide to|introduction to|best practices)\b/,
