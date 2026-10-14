@@ -610,7 +610,21 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
       await TargetMemory.writeWorkspaceFile(workspace, manifest.file, JSON.stringify(manifest.expected, null, 2) + "\n")
     }
   }
-  await createIfMissing(path.join(workspace.workspacePath, "README.md"), defaultWorkspaceReadme(workspace))
+  const readmePath = path.join(workspace.workspacePath, "README.md")
+  await createIfMissing(readmePath, defaultWorkspaceReadme(workspace))
+  // Migrate the previous generated secret policy without overwriting human-authored README content.
+  const legacyEvidencePolicy = "- Do not store passwords, cookies, bearer tokens, API keys, or other secrets."
+  const currentReadme = await fs.readFile(readmePath, "utf-8")
+  if (currentReadme.includes(legacyEvidencePolicy)) {
+    await TargetMemory.writeWorkspaceFile(
+      workspace,
+      "README.md",
+      currentReadme.replace(
+        legacyEvidencePolicy,
+        "- Preserve exact discovered values only in this private, target-local evidence store when required for reproduction; mark them as candidates until independently validated.",
+      ),
+    )
+  }
   await createIfMissing(
     path.join(workspace.workspacePath, "scope", "scope.json"),
     JSON.stringify(
