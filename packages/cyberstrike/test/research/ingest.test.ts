@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
-import { classifyResearchTopic, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
+import { classifyResearchTopic, classifyResearchDocumentType, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
@@ -27,6 +27,32 @@ afterEach(() => {
       RESEARCH_SOURCES.splice(index, 1)
     }
   }
+})
+
+test("research document classification distinguishes reports, write-ups, blogs, and references", () => {
+  expect(classifyResearchDocumentType(
+    "Disclosed vulnerability report: IDOR in API",
+    "A disclosed bug bounty report describes the affected endpoint and confirms cross-account access with reproduction steps.",
+    "disclosure",
+  )).toBe("report")
+
+  expect(classifyResearchDocumentType(
+    "How I found an authorization bypass",
+    "I noticed a response difference, formed a hypothesis, tested two accounts, rejected the first idea, and found the root cause.",
+    "writeup",
+  )).toBe("writeup")
+
+  expect(classifyResearchDocumentType(
+    "A guide to browser caching",
+    "This article explains how browser caching works, the relevant security assumptions, and common implementation mistakes.",
+    "blog",
+  )).toBe("blog")
+
+  expect(classifyResearchDocumentType(
+    "Web Security Academy lab",
+    "This lab walkthrough explains the learning objective and expected result for a controlled practice lab.",
+    "academy",
+  )).toBe("academy")
 })
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
