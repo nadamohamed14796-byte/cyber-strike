@@ -683,8 +683,8 @@ export async function syncResearchSource(
 ): Promise<ResearchIngestResult> {
   const exhaustive = options.all === true
   const limit = boundedInteger(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
-  const maxPages = boundedInteger(options.pages, DEFAULT_PAGES, 1, MAX_PAGES)
-  const maxDepth = boundedInteger(options.depth, DEFAULT_DEPTH, 0, MAX_DEPTH)
+  const maxPages = Math.max(1, Math.floor(options.pages ?? DEFAULT_PAGES))
+  const maxDepth = Math.max(0, Math.floor(options.depth ?? Number.MAX_SAFE_INTEGER))
 
   // Route every sync through the durable queue. This keeps direct API callers and
   // the CLI on the same idempotent discovery/learning path instead of re-learning
