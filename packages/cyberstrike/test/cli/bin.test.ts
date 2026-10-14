@@ -29,7 +29,7 @@ test("the npm launcher resolves its own file path under Node ESM", async () => {
       await fs.chmod(fakeBinary, 0o755)
     }
 
-    const result = spawnSync(process.execPath, [launcher, "--sentinel", "ok"], { encoding: "utf8" })
+    const result = spawnSync("node", [launcher, "--sentinel", "ok"], { encoding: "utf8" })
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("launcher-ok:--sentinel ok")
