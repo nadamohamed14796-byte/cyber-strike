@@ -233,6 +233,7 @@ export namespace Agent {
             webfetch: "allow",
             websearch: "allow",
             codesearch: "allow",
+            skill: "allow",
             read: "allow",
             external_directory: {
               [Truncate.GLOB]: "allow",
