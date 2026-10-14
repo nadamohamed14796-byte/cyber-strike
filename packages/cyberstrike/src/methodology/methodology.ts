@@ -189,6 +189,7 @@ export namespace Methodology {
               block_reason: phase.blockReason ?? null,
               started_at: phase.status !== "not_started" && !existing.started_at ? now : existing.started_at,
               completed_at: phase.status === "completed" && !existing.completed_at ? now : existing.completed_at,
+              time_updated: now,
             })
             .where(eq(MethodologyPhaseTable.id, existing.id))
             .run()
