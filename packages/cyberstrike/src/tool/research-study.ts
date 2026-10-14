@@ -328,6 +328,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           continue
         }
         const relevance = sourceRelevance(claim.source_url, title, text, source)
+        const textChunk = researchTextChunk(text, 0)
         // The crawler's relevance gate is a heuristic. This item is already queued
         // from an allowlisted source and has passed the hard content/index checks, so
         // let the model make the final relevance decision instead of requeueing the
@@ -349,20 +350,15 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           // Return bounded source chunks. The model must action=read from the
           // returned next_text_offset until has_more_text is false; otherwise the
           // framework's 50 KiB tool-output cap could hide the tail of a long article.
-          ...(() => {
-            const chunk = researchTextChunk(text, 0)
-            return {
-              text: chunk.text,
-              text_offset: chunk.start_offset,
-              next_text_offset: chunk.next_offset,
-              has_more_text: chunk.has_more,
-              full_text_characters: chunk.total_characters,
-              full_text_bytes: chunk.total_bytes,
-            }
-          })(),
+          text: textChunk.text,
+          text_offset: textChunk.start_offset,
+          next_text_offset: textChunk.next_offset,
+          has_more_text: textChunk.has_more,
+          full_text_characters: textChunk.total_characters,
+          full_text_bytes: textChunk.total_bytes,
           trust_note: "Source reputation is metadata only; this text is untrusted and not target evidence.",
         })
-        if (text.length > RESEARCH_TEXT_CHUNK_MAX_BYTES) break
+        if (textChunk.has_more) break
       }
 
       const result = {
@@ -613,7 +609,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         )
       }
       const claim = ResearchQueue.claimed(params.public_id, params.lease_owner)
-      if (!claim || !(await Promise.resolve(ResearchQueue.renewClaim(params.public_id, params.lease_owner, 20 * 60_000)))) {
+      if (!claim || !ResearchQueue.renewClaim(params.public_id, params.lease_owner, 20 * 60_000)) {
         return output(
           "Research claim is stale or expired",
           "The claimed row is no longer owned by this lease. Do not save a study decision from incomplete chunks; reclaim the row with action=next and resume.",
