@@ -169,7 +169,7 @@ export const ResearchCommand = cmd({
           }
           prompts.outro("Research sync finished; inspect the source ledger for any blockers")
         },
-      }),
+      })
       .command({
         command: "discover [source]",
         describe: "exhaustively discover public research URLs and persist them to the durable queue",
@@ -258,7 +258,7 @@ export const ResearchCommand = cmd({
             await Bun.sleep(Math.max(5, args.interval) * 1000)
           } while (true)
         },
-      }),
+      })
       .command({
         command: "learn",
         describe: "study queued public reports and add research notes to knowledge",
