@@ -98,7 +98,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             metadata: {} as { name?: string; dir?: string },
           }
         }
-        const all = accessibleSkills
+        const all = [...accessibleSkills].sort((left, right) => left.name.localeCompare(right.name))
         const limit = Math.min(100, Math.max(1, params.limit ?? 50))
         const offset = Math.max(0, params.offset ?? 0)
         const page = all.slice(offset, offset + limit)
