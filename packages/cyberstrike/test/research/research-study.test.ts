@@ -303,6 +303,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
       }, context)
       const prematureResult = JSON.parse(prematureSave.output)
       expect(prematureResult.results[0].result).toBe("unread-source-chunks")
+      expect(prematureResult.next_batch).toBeUndefined()
       expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("studying")
       expect(ReportKnowledge.search({
         query: "Long IDOR research article " + marker,
@@ -353,7 +354,25 @@ test("agent-led study can read every chunk of a long source under the tool outpu
       expect(chunks[chunks.length - 1]).toContain(lastMarker)
       expect(reads).toBeGreaterThan(1)
       expect(ResearchQueue.renewClaim(claimed.public_id, claimed.lease_owner, 20 * 60_000)).toBe(true)
-      expect(ResearchQueue.complete(queued.sequence, claimed.lease_owner, "rejected", "chunk retrieval test cleanup")).toBeDefined()
+      const finalSave = await tool.execute({
+        action: "save",
+        source: sourceID,
+        pages: 1,
+        depth: 1,
+        limit: 1,
+        continue_after_save: true,
+        items: [{
+          public_id: claimed.public_id,
+          lease_owner: claimed.lease_owner,
+          decision: "rejected",
+          reason: "Chunk streaming integration test cleanup after the complete document was read.",
+        }],
+      }, context)
+      const finalResult = JSON.parse(finalSave.output)
+      expect(finalResult.rejected).toBe(1)
+      expect(finalResult.results[0].result).toBe("rejected")
+      expect(finalResult.next_batch.batch_size).toBe(0)
+      expect(ResearchQueue.find(sourceID, sourceURL)?.status).toBe("rejected")
       await Instance.dispose()
     },
   })
