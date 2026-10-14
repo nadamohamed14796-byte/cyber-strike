@@ -20,6 +20,20 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       const rootPath = init.metadata.workspace!
       expect(await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")).toContain("# Target Notes")
       expect((await fs.readFile(path.join(rootPath, "scope", "scope.json"), "utf-8"))).toContain('"status": "unconfigured"')
+
+      const readmePath = path.join(rootPath, "README.md")
+      const evidencePolicy = "- Preserve exact discovered values only in this private, target-local evidence store when required for reproduction; mark them as candidates until independently validated."
+      const generatedReadme = await fs.readFile(readmePath, "utf-8")
+      expect(generatedReadme).toContain(evidencePolicy)
+      await fs.writeFile(readmePath, generatedReadme.replace(
+        evidencePolicy,
+        "- Do not store passwords, cookies, bearer tokens, API keys, or other secrets.",
+      ))
+      const reopened = await tool.execute({ action: "init", target_url: "https://example.com" }, {} as never)
+      expect(reopened.metadata.initialized).toBe(true)
+      const migratedReadme = await fs.readFile(readmePath, "utf-8")
+      expect(migratedReadme).toContain(evidencePolicy)
+      expect(migratedReadme).not.toContain("- Do not store passwords, cookies, bearer tokens, API keys, or other secrets.")
       const summary = await tool.execute({
         action: "record_summary",
         target_url: "https://example.com",
