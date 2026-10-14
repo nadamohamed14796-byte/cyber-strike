@@ -80,7 +80,7 @@ export const VrtCheckTable = sqliteTable(
 )
 
 /**
- * 13-phase methodology progression tracking.
+ * Methodology phase progression tracking, including the mobile-only phase when applicable.
  * Phase status is primarily computed from intel entry tags, but this table
  * caches the computed state and stores explicit completion evidence.
  */
