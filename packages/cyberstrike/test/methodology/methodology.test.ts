@@ -186,6 +186,7 @@ describe("Methodology — Prerequisites", () => {
             expect.objectContaining({
               gate: "methodology_ordering",
               severity: "blocking",
+              message: expect.stringContaining('Input Validation Testing'),
             }),
           ]),
         )
