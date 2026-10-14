@@ -1533,9 +1533,9 @@ export namespace TargetMemory {
     }
     const combinedContent = rawContent + (rawEvidence ? "\n\nEvidence: " + rawEvidence : "")
     if (combinedContent.length > 100_000) throw new Error("Note content and evidence are too large (maximum 100,000 characters).")
-    // Redact at the persistence boundary, not only in the agent-facing tool:
-    // the CLI and future callers must not be able to write secrets to disk.
-    const content = redactTargetNoteSecrets(combinedContent)
+    const content = combinedContent
+    // This is a private, target-local evidence store. Preserve exact observed values so the
+    // operator can reproduce and validate the finding; never mirror raw evidence into global research.
 
     const workspace = await ensure(targetURL, { reconcileNotes: false })
     const kind = input.kind ?? "manual"
