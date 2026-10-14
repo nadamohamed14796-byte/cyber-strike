@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { redactTargetNoteLine, redactTargetNoteSecrets } from "../../src/target/redact"
 
-test("redacts common secrets before target notes are persisted", () => {
+test("redacts common secrets when target-note text is explicitly sanitized", () => {
   const source = [
     "Authorization: Bearer abc.def.ghi",
     "Cookie: session=secret-session; refresh=secret-refresh",
