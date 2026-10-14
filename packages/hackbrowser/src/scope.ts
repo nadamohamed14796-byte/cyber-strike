@@ -1,26 +1,14 @@
-// psl ships types/index.d.ts but does not expose it via package.json
-// "exports", so TypeScript treats the import as untyped. We narrow it
-// here with the only call signature we use.
-// @ts-expect-error - see comment above
-import pslDefault from "psl"
-const psl = pslDefault as {
-  parse(host: string): { domain: string | null; error?: { code: string; message: string } }
-}
-
 // ============================================================
 // Network scope (ARCHITECTURE.md §1.2 — Network Scope)
 //
-// Scope = which hostnames the agent forwards to CyberStrike.
+// Scope = which hostnames the agent navigates and forwards to CyberStrike.
 // Distinct from --exclude (semantic task filter, planner-side).
 //
-// Resolution order at startup:
-//   1. If user passes --scope flag(s), use that list verbatim.
-//   2. Otherwise derive scope from target URL via PSL eTLD+1
-//      and wrap as "*.{base}" wildcard.
-//
-// All matching uses the same predicate: exact match OR endsWith
-// "." + base. Wildcard "*.foo.com" and bare "foo.com" produce
-// equivalent matchers (matching foo.com itself + any subdomain).
+// Explicit scope patterns follow least-privilege matching:
+//   - bare host: exact host only
+//   - *.example.com: subdomains only, not example.com itself
+// When no scope is supplied, default to the exact starting hostname. A target URL
+// does not imply authorization for sibling subdomains or the whole registrable domain.
 // ============================================================
 
 export type ScopeMatcher = (host: string) => boolean
@@ -33,52 +21,36 @@ export type ScopeMatcher = (host: string) => boolean
 export function normalizeScope(input: string): string {
   let s = input.trim().toLowerCase()
   if (!s) return ""
-  s = s.replace(/^https?:\/\//, "")
+  s = s.replace(/^https?:\\/\\//, "")
   s = s.split(/[/?#]/)[0] ?? ""
-  s = s.replace(/:\d+$/, "")
+  s = s.replace(/:\\d+$/, "")
   while (s.endsWith(".")) s = s.slice(0, -1)
   return s
 }
 
 /**
- * Derive default scope from target URL: "*.{eTLD+1}".
- * Examples:
- *   https://test.com         → "*.test.com"
- *   https://app.test.com     → "*.test.com"
- *   https://x.example.com.tr → "*.example.com.tr"  (PSL handles ccTLDs)
- *
- * Falls back to "*.{hostname}" when PSL cannot resolve (e.g. raw IP,
- * localhost, unknown TLD). This keeps the agent functional in test
- * setups while logging a warning is the caller's responsibility.
+ * Derive the least-privileged default scope from the starting URL.
+ * Never infer sibling-subdomain authorization from a single target URL.
  */
 export function deriveScope(targetUrl: string): string {
-  const host = new URL(targetUrl).hostname.toLowerCase()
-  const parsed = psl.parse(host)
-  if ("error" in parsed || !parsed.domain) return `*.${host}`
-  return `*.${parsed.domain}`
+  return new URL(targetUrl).hostname.toLowerCase().replace(/\\.+$/, "")
 }
 
 /**
- * Build a matcher from one or more scope patterns. The matcher
- * returns true when the host matches ANY pattern (OR semantics).
- *
- *   makeMatcher(["*.test.com"])               → matches test.com + *.test.com
- *   makeMatcher(["app.test.com"])             → same as "*.app.test.com"
- *   makeMatcher(["app.test.com","api.test.com"]) → exact OR
- *
- * Empty input → matcher that rejects everything (safe default).
+ * Build a matcher from one or more scope patterns (OR semantics).
+ * A bare host matches exactly; a wildcard matches subdomains only.
+ * Empty input rejects every host.
  */
 export function makeMatcher(scopes: readonly string[]): ScopeMatcher {
-  const bases = scopes
+  const patterns = scopes
     .map(normalizeScope)
-    .filter((s) => s.length > 0)
-    .map((s) => (s.startsWith("*.") ? s.slice(2) : s))
-  if (bases.length === 0) return () => false
+    .filter((scope) => scope.length > 0)
+    .map((scope) => ({ host: scope.startsWith("*.") ? scope.slice(2) : scope, wildcard: scope.startsWith("*.") }))
+  if (patterns.length === 0) return () => false
   return (host: string) => {
-    const h = host.toLowerCase().replace(/\.+$/, "")
-    for (const base of bases) {
-      if (h === base || h.endsWith("." + base)) return true
-    }
-    return false
+    const normalizedHost = host.toLowerCase().replace(/\\.+$/, "")
+    return patterns.some(({ host: base, wildcard }) =>
+      wildcard ? normalizedHost.endsWith("." + base) : normalizedHost === base,
+    )
   }
 }
