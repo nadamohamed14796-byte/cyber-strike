@@ -960,6 +960,33 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         })
         continue
       }
+
+      // Prove the same stored row is reachable through the real hunt-time search
+      // surface before declaring the queue item learned. This catches cases where
+      // the insert succeeds but tags/signals/search filters make the knowledge
+      // effectively invisible to specialists.
+      const retrievable = ReportKnowledge.search({
+        query: [claim.title ?? claim.source_url, documentType, source.id].join(" "),
+        sourceKind: "external_report",
+        publicReferencesOnly: true,
+        limit: 100,
+      }).some((row) => row.id === ingested.id)
+      if (!retrievable) {
+        const completed = ResearchQueue.complete(
+          claim.sequence,
+          note.lease_owner,
+          "retry",
+          "agent study: saved knowledge could not be retrieved through the hunt-time search surface",
+        )
+        results.push({
+          public_id: note.public_id,
+          result: completed ? "retry" : "lease-lost",
+          reason: "knowledge-retrieval-verification-failed",
+          knowledge_id: ingested.id,
+        })
+        continue
+      }
+
       const completed = ResearchQueue.complete(
         claim.sequence,
         note.lease_owner,
