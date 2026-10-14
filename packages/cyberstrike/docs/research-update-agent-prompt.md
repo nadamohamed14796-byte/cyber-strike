@@ -40,6 +40,10 @@ Read the current registry at runtime; it is authoritative. The `src-hunter-skill
 - `payloadsallthethings` — PayloadsAllTheThings
 - `github` — GitHub security write-ups
 - `src-hunter-skill` — the configured `MyuriKanao/src-hunter-skill` reference repository
+- `owasp-cheat-sheets` — OWASP Cheat Sheet Series
+- `trailofbits` — Trail of Bits Security Research
+- `zdi` — Zero Day Initiative Research Blog
+- `elastic-security-labs` — Elastic Security Labs
 
 Do not silently skip any source ID returned by the runtime registry. The current implementation can safely crawl only sources in `RESEARCH_SOURCES` (including their configured allowed hosts); there is no runtime tool that permanently registers an arbitrary new host. If external research surfaces another useful source outside that registry, record it as an external-source gap with its URL, resource type, relevance, and exact reason it was not ingested; do not claim all of the public internet was searched. Adding it to the persistent workflow requires a reviewed source-registry/adapter/SSRF-allowlist change. Preserve the actual origin and document type: hosting on Medium or GitHub does not itself determine the type.
 
@@ -54,6 +58,8 @@ Do not impose a fixed total limit on pages, links, reports, or resources. Per-ca
 A source is exhausted only when its accessible discovery frontier has been checked. If pagination cannot be proven complete, report uncertain/partial status. Do not claim the whole internet has been searched.
 
 ## 3. Fetch and study lifecycle
+
+The current safe-fetcher also has a per-document byte ceiling (currently 1,500,000 bytes), redirect ceiling, and total fetch-time budget. These are transport/resource-safety guards, not global page or item limits. If a resource exceeds a transport guard, record it as blocked/partial with the exact reason; never silently treat a partial body as a complete study. If the user explicitly wants larger documents supported, implement safe streaming/chunking and tests rather than removing SSRF, timeout, redirect, or memory protections.
 
 For each discovered candidate:
 
