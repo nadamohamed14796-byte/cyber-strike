@@ -5,7 +5,6 @@ import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage, sourceDocu
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
 const MAX_CANDIDATE_SCORE = 100
-const MAX_CACHED_RESEARCH_TEXT = 100_000
 const AUTH_RETRY_COOLDOWN_MS = 10 * 60_000
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 500
@@ -1040,8 +1039,8 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 // Discovery already fetched and sanitized this report. Cache a bounded excerpt
                 // so the learner never makes a duplicate HTTP request for this URL. Preserve the
                 // original length and full-content fingerprint for transparent truncation metadata.
-                cached_text: text.slice(0, MAX_CACHED_RESEARCH_TEXT),
-                cached_text_truncated: text.length > MAX_CACHED_RESEARCH_TEXT,
+                cached_text: text,
+                cached_text_truncated: false,
                 content_length: text.length,
                 content_fingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
               },
