@@ -629,6 +629,32 @@ test("agent-study text cache preserves the complete document beyond the legacy 1
       expect(persisted?.payload?.cached_text).toHaveLength(completeText.length)
       expect(persisted?.payload?.cached_text?.endsWith(marker)).toBe(true)
       expect(persisted?.payload?.cached_text_truncated).toBe(false)
+      expect(persisted?.payload?.study_read_offset).toBe(0)
+      expect(persisted?.payload?.study_read_length).toBe(completeText.length)
+
+      // A refreshed source invalidates any previous read cursor even when the
+      // URL and queue ID are unchanged; otherwise a retry could skip new content.
+      expect(ResearchQueue.recordClaimReadProgress({
+        id: item.id,
+        leaseOwner: claim.lease_owner,
+        expectedOffset: 0,
+        nextOffset: 1234,
+        totalLength: completeText.length,
+      })).toBe(true)
+      const refreshedText = completeText + "\nREFRESHED_SOURCE_TAIL_" + crypto.randomUUID()
+      expect(ResearchQueue.cacheClaimedText({
+        id: item.id,
+        leaseOwner: claim.lease_owner,
+        title: "Long article should stay whole",
+        text: refreshedText,
+        contentFingerprint: "b".repeat(40),
+        contentLength: refreshedText.length,
+      })).toBe(true)
+      const refreshed = ResearchQueue.find(sourceID, sourceURL)
+      expect(refreshed?.payload?.cached_text).toBe(refreshedText)
+      expect(refreshed?.payload?.content_fingerprint).toBe("b".repeat(40))
+      expect(refreshed?.payload?.study_read_offset).toBe(0)
+      expect(refreshed?.payload?.study_read_length).toBe(refreshedText.length)
       await Instance.dispose()
     },
   })
