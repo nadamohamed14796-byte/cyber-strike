@@ -517,6 +517,7 @@ export namespace Agent {
             "*": "deny",
             task: "allow",
             question: "allow",
+            skill: "allow",
             web_get_session_context: "allow",
             web_get_detail: "allow",
             web_get_vulnerabilities: "allow",
