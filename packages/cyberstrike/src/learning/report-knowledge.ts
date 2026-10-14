@@ -249,9 +249,11 @@ export namespace ReportKnowledge {
           const studied = metadata.model_study_version
           // A stored excerpt is optional: the agent-study worker can safely fetch
           // missing/short excerpts from a currently configured source host.
+          // The version markers, not the historical method name, decide whether
+          // a record needs re-study. Otherwise bumping the study schema can never
+          // revisit rows studied by an older model prompt.
           return !(typeof studied === "number" && studied >= currentVersion) &&
-            !(typeof requested === "number" && requested >= currentVersion) &&
-            metadata.study_method !== "llm-assisted-agent-command-v1"
+            !(typeof requested === "number" && requested >= currentVersion)
         })
         .slice(0, bounded)
     })
@@ -314,7 +316,6 @@ export namespace ReportKnowledge {
         ) return false
         const metadata = row.metadata ?? {}
         if (
-          metadata.study_method === "llm-assisted-agent-command-v1" ||
           (typeof metadata.model_study_version === "number" && metadata.model_study_version >= version) ||
           (typeof metadata.model_study_requested_version === "number" && metadata.model_study_requested_version >= version)
         ) return false
