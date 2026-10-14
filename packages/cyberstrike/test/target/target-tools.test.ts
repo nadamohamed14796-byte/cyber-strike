@@ -60,6 +60,50 @@ test("target workspace tool initializes, configures scope, and nests authorized 
   })
 })
 
+test("scope-file import persists the source list, configured manifest, and notes in the canonical workspace", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const init = await tool.execute({ action: "init", target_url: "https://att.com" }, {} as never)
+        const workspace = init.metadata.workspace!
+        const inputPath = path.join(tmp.path, "att.com.txt")
+        const sourceContents = "# authorized program scope\natt.com\n*.att.com\napi.att.com\n"
+        await fs.writeFile(inputPath, sourceContents, "utf-8")
+
+        const imported = await tool.execute({
+          action: "configure_scope",
+          target_url: "https://att.com",
+          scope_file_path: inputPath,
+          authorization_source: "Authorized disclosure program",
+          authorization_reference: "https://hackerone.com/example",
+        }, {} as never)
+
+        expect(imported.metadata.saved).toBe(true)
+        expect(imported.metadata.scope_configured).toBe(true)
+        expect(imported.metadata.workspace).toBe(workspace)
+        expect(imported.metadata.source_scope_entry_count).toBe(3)
+        expect(imported.metadata.source_scope_sha256).toMatch(/^[a-f0-9]{64}$/)
+        expect(imported.metadata.source_scope_file).toBeTruthy()
+
+        const scope = JSON.parse(await fs.readFile(path.join(workspace, "scope", "scope.json"), "utf-8"))
+        expect(scope.status).toBe("configured")
+        expect(scope.scopeItems).toEqual(["att.com", "*.att.com", "api.att.com"])
+        expect(await fs.readFile(imported.metadata.source_scope_file!, "utf-8")).toBe(sourceContents)
+        const notes = await fs.readFile(path.join(workspace, "notes.md"), "utf-8")
+        expect(notes).toContain("# Target Notes")
+        expect(notes).toContain("Scope file import checkpoint")
+        expect(notes).toContain(imported.metadata.source_scope_sha256)
+        expect((await fs.stat(path.join(workspace, "notes.md"))).size).toBeGreaterThan(0)
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
+
 test("target artifact tool writes only inside an existing workspace and protects reserved files", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
