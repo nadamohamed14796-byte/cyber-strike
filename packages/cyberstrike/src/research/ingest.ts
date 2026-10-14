@@ -793,7 +793,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       try {
         const parsed = new URL(url)
         if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) return
-        if (depth > 0 && !isResearchCandidate(url, source)) return
+        if (depth > 0 && !isResearchCandidate(url, source) && !isDiscoveryPaginationURL(source, url)) return
       } catch {
         return
       }
