@@ -159,7 +159,7 @@ export function rankSkillsForPhase(
         score += 55
       }
     }
-    if (score > 0) ranked.push({ entry, score, query: matchedQuery })
+    // A single generic token (for example "tech" from "tech-profile") is not enough\n    // to select an otherwise unrelated skill. Require either multiple token matches\n    // or a substantive exact/tag/description/technology signal.\n    if (score >= 6) ranked.push({ entry, score, query: matchedQuery })
   }
 
   ranked.sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
