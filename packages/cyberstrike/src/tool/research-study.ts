@@ -202,7 +202,13 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             ? claim.payload.content_length
             : text.length
 
-        if (!text) {
+        // Legacy queue rows may only have the old 100k-character cached excerpt.
+        // Refetch those rows through the allowlisted safe-fetcher instead of quietly
+        // treating a truncated leading excerpt as a complete study.
+        const cachedTextIsIncomplete =
+          claim.payload.cached_text_truncated === true ||
+          (typeof claim.payload.content_length === "number" && claim.payload.content_length > text.length)
+        if (!text || cachedTextIsIncomplete) {
           try {
             const fetched = await fetchResearchSourceForStudy(claim.source_id, claim.source_url)
             title = fetched.title
