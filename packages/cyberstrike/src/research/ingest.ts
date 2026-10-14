@@ -1137,12 +1137,18 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
     }
     try {
       const cachedText = typeof item.payload.cached_text === "string" ? item.payload.cached_text : undefined
+      const cachedTextIncomplete =
+        item.payload.cached_text_truncated === true ||
+        (typeof item.payload.content_length === "number" && !!cachedText && item.payload.content_length > cachedText.length)
       let html = ""
       let title = redactResearchSecrets(item.title ?? item.source_url)
       let text: string
-      if (cachedText) {
+      if (cachedText && !cachedTextIncomplete) {
         text = cachedText
       } else {
+        // Older queue rows may contain an excerpt only. Refetch them through the
+        // allowlisted SSRF-safe fetcher; never feed the truncated prefix into even
+        // the legacy heuristic learner as though it represented the full resource.
         html = await fetchText(item.source_url, source)
         text = redactResearchSecrets(cleanHtml(html))
         title = redactResearchSecrets(titleOf(html, item.source_url))
