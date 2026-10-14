@@ -118,6 +118,21 @@ function sameHost(left: string | null | undefined, right: string | null | undefi
   return Boolean(a && b && a.hostname.toLowerCase() === b.hostname.toLowerCase())
 }
 
+/** Match a finding route to an observed request without unsafe substring/prefix attribution. */
+export function matchesFindingEndpointPath(endpointPath: string, requestPath: string): boolean {
+  const normalizeRoute = (value: string) => {
+    const pathname = value.trim().split(/[?#]/, 1)[0]!
+      .replace(/:([A-Za-z_$][\w$]*)/g, "{$1}")
+    return normalizeJavaScriptEndpointPath(pathname).path.replace(/\/+$/, "") || "/"
+  }
+  const expected = normalizeRoute(endpointPath).split("/").filter(Boolean)
+  const actual = normalizeRoute(requestPath).split("/").filter(Boolean)
+  if (expected.length !== actual.length) return false
+  return expected.every((segment, index) =>
+    segment.startsWith("{") && segment.endsWith("}") ? Boolean(actual[index]) : segment === actual[index],
+  )
+}
+
 function pathWithinScope(candidate: string | null | undefined, scopedPath: string): boolean {
   const value = candidate?.split(/[?#]/, 1)[0]
   if (!value) return false
@@ -739,9 +754,7 @@ export namespace JavaScriptCorrelation {
       const endpointPath = endpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "").split(/[?#]/, 1)[0]!
       const matchesAttributedRequest = relevantRequests.some((request) =>
         requestTargetWorkspaceIDs.get(request.id) === finding.target_id &&
-        (request.normalized_path === endpointPath ||
-          request.normalized_path.includes(endpointPath) ||
-          endpointPath.includes(request.normalized_path)),
+        matchesFindingEndpointPath(endpointPath, request.normalized_path),
       )
       if (matchesAttributedRequest) findings.push(finding)
     }
@@ -961,10 +974,7 @@ export namespace JavaScriptCorrelation {
         if (finding.targetID && requestTargetWorkspaceIDs.get(request.id) !== finding.targetID) return false
         const requestURL = safeURL(request.url)
         if (endpointURL && requestURL?.origin !== endpointURL.origin) return false
-        return endpointPath === request.normalizedPath ||
-          request.normalizedPath === endpointPath ||
-          (endpointPath.startsWith("/") && request.normalizedPath.startsWith(endpointPath)) ||
-          (endpointPath.length > 2 && request.normalizedPath.includes(endpointPath))
+        return matchesFindingEndpointPath(endpointPath, request.normalizedPath)
       })
       for (const request of matching) {
         graph.edges.push({
