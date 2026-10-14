@@ -12,6 +12,7 @@ test("the npm launcher resolves its own file path under Node ESM", async () => {
     const packageRoot = path.join(temp, "packages", "cyberstrike")
     const binDir = path.join(packageRoot, "bin")
     await fs.mkdir(binDir, { recursive: true })
+    await fs.writeFile(path.join(packageRoot, "package.json"), JSON.stringify({ type: "module" }))
     const sourceLauncher = path.resolve(import.meta.dir, "../../bin/cyberstrike")
     const launcher = path.join(binDir, "cyberstrike")
     await fs.copyFile(sourceLauncher, launcher)
