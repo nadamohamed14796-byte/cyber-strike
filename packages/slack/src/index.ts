@@ -51,19 +51,19 @@ async function handleToolUpdate(part: ToolPart, channel: string, thread: string)
 }
 
 app.use(async ({ next, context }) => {
-  console.log("📡 Raw Slack event:", JSON.stringify(context, null, 2))
+  // Do not log raw Slack context: it may contain message content or credentials.
   await next()
 })
 
 app.message(async ({ message, say }) => {
-  console.log("📨 Received message event:", JSON.stringify(message, null, 2))
+  console.log("Received Slack message event", { subtype: message.subtype, hasText: "text" in message && Boolean(message.text) })
 
   if (message.subtype || !("text" in message) || !message.text) {
     console.log("⏭️ Skipping message - no text or has subtype")
     return
   }
 
-  console.log("✅ Processing message:", message.text)
+  console.log("Processing Slack message")
 
   const channel = message.channel
   const thread = (message as any).thread_ts || message.ts
@@ -80,7 +80,7 @@ app.message(async ({ message, say }) => {
     })
 
     if (createResult.error) {
-      console.error("❌ Failed to create session:", createResult.error)
+      console.error("Failed to create CyberStrike session")
       await say({
         text: "Sorry, I had trouble creating a session. Please try again.",
         thread_ts: thread,
@@ -88,7 +88,7 @@ app.message(async ({ message, say }) => {
       return
     }
 
-    console.log("✅ Created cyberstrike session:", createResult.data.id)
+    console.log("Created CyberStrike session")
 
     session = { client, server, sessionId: createResult.data.id, channel, thread }
     sessions.set(sessionKey, session)
@@ -96,21 +96,21 @@ app.message(async ({ message, say }) => {
     const shareResult = await client.session.share({ path: { id: createResult.data.id } })
     if (!shareResult.error && shareResult.data) {
       const sessionUrl = shareResult.data.share?.url!
-      console.log("🔗 Session shared:", sessionUrl)
+      console.log("Shared CyberStrike session")
       await app.client.chat.postMessage({ channel, thread_ts: thread, text: sessionUrl })
     }
   }
 
-  console.log("📝 Sending to cyberstrike:", message.text)
+  console.log("Sending Slack message to CyberStrike")
   const result = await session.client.session.prompt({
     path: { id: session.sessionId },
     body: { parts: [{ type: "text", text: message.text }] },
   })
 
-  console.log("📤 Cyberstrike response:", JSON.stringify(result, null, 2))
+  console.log("Received response from CyberStrike", { failed: Boolean(result.error) })
 
   if (result.error) {
-    console.error("❌ Failed to send message:", result.error)
+    console.error("Failed to send Slack message to CyberStrike")
     await say({
       text: "Sorry, I had trouble processing your message. Please try again.",
       thread_ts: thread,
@@ -129,7 +129,7 @@ app.message(async ({ message, say }) => {
       .join("\n") ||
     "I received your message but didn't have a response."
 
-  console.log("💬 Sending response:", responseText)
+  console.log("Sending CyberStrike response to Slack")
 
   // Send main response (tool updates will come via live events)
   await say({ text: responseText, thread_ts: thread })
@@ -137,7 +137,7 @@ app.message(async ({ message, say }) => {
 
 app.command("/test", async ({ command, ack, say }) => {
   await ack()
-  console.log("🧪 Test command received:", JSON.stringify(command, null, 2))
+  console.log("Received Slack test command")
   await say("🤖 Bot is working! I can hear you loud and clear.")
 })
 
