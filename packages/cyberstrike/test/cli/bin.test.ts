@@ -38,7 +38,7 @@ test("the npm launcher resolves its own file path under Node ESM", async () => {
     // A binary killed by a signal has status=null; the launcher must not report success.
     for (const name of packageNames) {
       const fakeBinary = path.join(packageRoot, "node_modules", name, "bin", "cyberstrike")
-      await fs.writeFile(fakeBinary, "#!/bin/sh\nkill -TERM $\n")
+      await fs.writeFile(fakeBinary, "#!/bin/sh\nkill -TERM " + "$" + "$" + "\n")
       await fs.chmod(fakeBinary, 0o755)
     }
     const signaled = spawnSync("node", [launcher, "--sentinel"], { encoding: "utf8" })
