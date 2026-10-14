@@ -12,7 +12,7 @@ Playwright browser
     └── → POST /session/ingest to CyberStrike (with ui_context field)
 ```
 
-The key addition over the Firefox extension: every captured request is enriched with `ui_context` — a snapshot of the page's form fields at the time the request was made. This tells CyberStrike:
+When no `--scope` is supplied, the crawler stays on the exact starting hostname; use explicit `--scope` entries only for additional authorized hosts. A target URL does not imply authorization for sibling subdomains.\n\nThe key addition over the Firefox extension: every captured request is enriched with `ui_context` — a snapshot of the page's form fields at the time the request was made. This tells CyberStrike:
 
 - Which fields were `readonly` or `disabled` in the UI (but still sent in the request)
 - Which values were display-only (`span`/`div`, not `input`) but appear in the request body
