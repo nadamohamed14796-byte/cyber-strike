@@ -33,43 +33,43 @@ describe("Methodology phase skill routing", () => {
     const expected: Partial<Record<Phase.Id, string[]>> = {
       scope_analysis: ["attack-bb-methodology", "target-workspace-workflow"],
       passive_recon: [
-        "recon-email-security", "recon-gitlab-public-recon",
+        "wstg-recon-config", "wstg-info", "recon-email-security", "recon-gitlab-public-recon",
         "recon-origin-ip-discovery", "recon-error-log-mining", "recon-visual-recon",
         "target-workspace-workflow",
       ],
       active_recon: [
-        "attack-web-recon", "recon-port-service-discovery", "recon-cms-detection",
+        "wstg-info", "wstg-conf-05", "wstg-conf-10", "wstg-apit-01", "attack-web-recon", "recon-port-service-discovery", "recon-cms-detection",
         "attack-subdomain-takeover", "recon-asn-infrastructure", "target-workspace-workflow",
       ],
       technology_profiling: [
-        "attack-django", "attack-fastapi", "attack-flask-werkzeug",
+        "wstg-info-08", "wstg-info-09", "wstg-recon-config", "attack-django", "attack-fastapi", "attack-flask-werkzeug",
         "attack-laravel", "attack-nextjs", "attack-nodejs", "attack-springboot",
         "attack-wordpress", "attack-hikvision-isapi", "attack-vmware-vcenter",
         "attack-minio-s3", "attack-exchange-owa", "attack-zimbra",
       ],
       authentication_testing: [
-        "attack-401-403-bypass", "attack-captcha-bypass", "attack-forgot-password",
+        "wstg-athn", "wstg-idnt", "wstg-auth-session", "attack-401-403-bypass", "attack-captcha-bypass", "attack-forgot-password",
         "attack-mfa-bypass", "attack-oauth", "attack-saml-sso",
       ],
-      session_management: ["attack-session", "attack-jwt", "attack-csrf", "attack-saml-sso"],
+      session_management: ["wstg-sess", "wstg-auth-session", "attack-session", "attack-jwt", "attack-csrf", "attack-saml-sso"],
       authorization_testing: [
-        "attack-idor-automation", "attack-mass-assignment", "attack-bfla",
+        "wstg-authz", "wstg-apit-02", "wstg-auth-session", "attack-idor-automation", "attack-mass-assignment", "attack-bfla",
         "attack-api-noauth-hunt", "attack-cors",
       ],
       input_validation: [
-        "attack-dom-xss", "attack-nosqli", "attack-deserialization", "attack-file-upload",
+        "wstg-inpv", "wstg-clnt", "wstg-injection", "attack-dom-xss", "attack-nosqli", "attack-deserialization", "attack-file-upload",
         "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
         "attack-host-header", "attack-cache-poison",
       ],
       business_logic: [
-        "attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass",
+        "wstg-busl", "wstg-logic-client-api", "attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass",
         "attack-clickjacking", "attack-host-header", "attack-cache-poison",
       ],
       data_protection: [
-        "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
+        "wstg-cryp", "wstg-errh", "wstg-conf", "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
       ],
       api_security: [
-        "attack-graphql", "attack-schema-enumeration", "attack-grpc",
+        "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-schema-enumeration", "attack-grpc",
         "attack-mass-assignment", "attack-nosqli", "attack-websocket",
         "attack-host-header", "attack-cache-poison", "attack-clickjacking", "llm-security",
       ],
