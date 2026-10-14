@@ -17,7 +17,7 @@ import {
 import { ResearchQueue } from "../research/queue"
 import { Tool } from "./tool"
 
-const RESEARCH_TEXT_CHUNK_MAX_BYTES = 6 * 1024
+const RESEARCH_TEXT_CHUNK_MAX_BYTES = 4 * 1024
 
 /** Return a UTF-8-safe source chunk sized below the global tool-output cap. */
 function researchTextChunk(text: string, requestedOffset = 0) {
