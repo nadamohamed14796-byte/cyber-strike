@@ -97,7 +97,7 @@ const ResearchStudyParameters = z.object({
   // Per-call discovery window only; /update must expand pages until exhaustion.
   pages: z.number().int().min(1).default(20),
   depth: z.number().int().min(0).default(Number.MAX_SAFE_INTEGER),
-  limit: z.number().int().min(1).max(5).default(3),
+  limit: z.number().int().min(1).max(5).default(1).describe("Compatibility/batch hint; the tool emits one claimed resource per response to stay below the output-size ceiling, so repeat until the queue is drained."),
   continue_after_save: z.boolean().default(false),
   /** Exact active lease and character offset for reading subsequent text chunks. */
   public_id: z.string().regex(/^RPT-\d{1,12}$/).optional(),
