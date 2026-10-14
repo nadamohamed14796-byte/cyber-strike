@@ -43,111 +43,222 @@ export const ResearchCommand = cmd({
       })
       .command({
         command: "sync [source]",
-        describe: "crawl configured research sources and learn from public security material",
-        builder: (yargs) =>
-          yargs
-            .positional("source", { type: "string" })
-            .option("limit", {
-              type: "number",
-              default: 50,
-              describe: "maximum new knowledge records per source",
-            })
-            .option("pages", {
-              type: "number",
-              default: 250,
-              describe: "maximum pages crawled per source",
-            })
-            .option("depth", {
-              type: "number",
-              default: 2,
-              describe: "maximum crawl depth from each seed URL",
-            })
-            .option("deep", {
-              type: "boolean",
-              default: false,
-              describe: "deep preset: 200 new records, 750 pages, depth 3",
-            })
-            .option("all", {
-              type: "boolean",
-              default: false,
-              describe: "exhaust the discovered public queue up to the page/depth budgets",
-            }),
+        describe: "exhaustively discover and learn from all accessible public security research",
+        builder: (yargs) => yargs.positional("source", { type: "string" }),
         async handler(args) {
-          prompts.intro("CyberStrike Research Learning")
-          const deep = Boolean(args.deep)
-          const exhaustive = Boolean(args.all)
-          // Resume blocked reports and crawl pages only when this source has an operator-provided session.
-          const authRequeued = await retryAuthenticatedResearch({
-            sourceID: args.source,
-            limit: exhaustive ? 500 : args.limit,
-          })
-          if (authRequeued > 0) prompts.log.info("auth-blocked reports resumed=" + authRequeued)
-          const discoveries = await discoverResearch({
-            sourceID: args.source,
-            pages: exhaustive ? 1000 : deep ? 750 : args.pages,
-            depth: exhaustive ? 4 : deep ? 3 : args.depth,
-          })
-          for (const result of discoveries) {
-            prompts.log.info(result.source + ": pages=" + result.pages + " candidates=" + result.candidates +
-              " queued_new=" + result.added + " blocked_auth=" + result.blocked_auth)
-            for (const error of result.errors) prompts.log.warn(error)
+          prompts.intro("CyberStrike Exhaustive Research Learning")
+          const sources = args.source
+            ? RESEARCH_SOURCES.filter((source) => source.id === args.source)
+            : RESEARCH_SOURCES
+          if (!sources.length) throw new Error("unknown research source: " + args.source)
+
+          const totals = { pages: 0, candidates: 0, queued: 0, learned: 0, skipped: 0, failed: 0, blockedAuth: 0, errors: 0 }
+          const incomplete: Array<{ source: string; reason: string }> = []
+
+          for (const source of sources) {
+            prompts.log.step("Discovering source: " + source.id)
+            while (true) {
+              const resumed = await retryAuthenticatedResearch({ sourceID: source.id, limit: 500 })
+              if (resumed === 0) break
+              prompts.log.info(source.id + ": auth-blocked rows resumed=" + resumed)
+            }
+
+            let pageWindow = 20
+            let finished = false
+            while (!finished) {
+              let result: Awaited<ReturnType<typeof discoverResearch>>[number] | undefined
+              try {
+                result = (await discoverResearch({
+                  sourceID: source.id,
+                  pages: pageWindow,
+                  depth: Number.MAX_SAFE_INTEGER,
+                }))[0]
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error)
+                incomplete.push({ source: source.id, reason: "discovery call failed: " + message })
+                prompts.log.warn(source.id + ": discovery call failed: " + message)
+                break
+              }
+              if (!result) {
+                incomplete.push({ source: source.id, reason: "discovery returned no result" })
+                break
+              }
+
+              totals.pages += result.pages
+              totals.candidates += result.candidates
+              totals.queued += result.added
+              totals.blockedAuth += result.blocked_auth
+              totals.errors += result.error_count
+              prompts.log.info(source.id + ": processed_pages=" + result.pages +
+                " page_window=" + pageWindow + " candidates=" + result.candidates +
+                " queued_new=" + result.added + " blocked_auth=" + result.blocked_auth +
+                " errors=" + result.error_count)
+              for (const error of result.errors) prompts.log.warn(error)
+
+              while (true) {
+                const batch = await learnResearchQueue({ limit: 500, sourceID: source.id })
+                totals.learned += batch.learned
+                totals.skipped += batch.skipped
+                totals.failed += batch.failed
+                totals.blockedAuth += batch.blocked_auth
+                for (const error of batch.errors) prompts.log.warn(error)
+                if (batch.claimed === 0) break
+              }
+
+              const stats = ResearchQueue.stats(source.id)
+              const blocked =
+                result.error_count > 0 ||
+                result.blocked_auth > 0 ||
+                stats.crawl_page_errors > 0 ||
+                stats.crawl_page_auth_blocked > 0 ||
+                stats.blocked_auth > 0 ||
+                stats.retry > 0 ||
+                stats.studying > 0
+              if (blocked) {
+                const reason = [
+                  result.error_count ? "discovery errors=" + result.error_count : "",
+                  result.blocked_auth || stats.blocked_auth || stats.crawl_page_auth_blocked ? "authentication required" : "",
+                  stats.crawl_page_errors ? "crawl-page errors=" + stats.crawl_page_errors : "",
+                  stats.retry ? "retry queue=" + stats.retry : "",
+                  stats.studying ? "active/stale study leases=" + stats.studying : "",
+                ].filter(Boolean).join(", ") || "unresolved queue state"
+                incomplete.push({ source: source.id, reason })
+                prompts.log.warn(source.id + ": partial: " + reason)
+                finished = true
+                continue
+              }
+
+              if (result.pages >= pageWindow) {
+                const nextWindow = pageWindow * 2
+                if (!Number.isSafeInteger(nextWindow) || nextWindow <= pageWindow) {
+                  incomplete.push({ source: source.id, reason: "runtime integer range exhausted before pagination was proven complete" })
+                  finished = true
+                } else {
+                  pageWindow = nextWindow
+                }
+                continue
+              }
+              finished = true
+            }
           }
-          const limit = exhaustive ? 500 : Math.min(500, (deep ? 200 : args.limit) * discoveries.length)
-          const learned = { claimed: 0, learned: 0, skipped: 0, failed: 0, blocked_auth: 0, requeued_legacy: 0, errors: [] as string[] }
-          // --all means drain the currently claimable queue, not just its first
-          // 500 items. A failed item is retried on the next batch and eventually
-          // reaches a terminal state; ordinary sync remains bounded to one batch.
-          do {
-            const batch = await learnResearchQueue({ limit, sourceID: args.source })
-            learned.claimed += batch.claimed
-            learned.learned += batch.learned
-            learned.skipped += batch.skipped
-            learned.failed += batch.failed
-            learned.blocked_auth += batch.blocked_auth
-            learned.requeued_legacy += batch.requeued_legacy
-            learned.errors.push(...batch.errors.slice(0, Math.max(0, 20 - learned.errors.length)))
-            if (!exhaustive || batch.claimed === 0) break
-          } while (true)
-          prompts.log.info("queue worker: claimed=" + learned.claimed + " learned=" + learned.learned +
-            " skipped=" + learned.skipped + " failed=" + learned.failed + " blocked_auth=" + learned.blocked_auth +
-            " legacy_requeued=" + learned.requeued_legacy)
-          for (const error of learned.errors) prompts.log.warn(error)
-          prompts.outro(exhaustive ? "Exhaustive research sync complete" : "Research sync complete")
+
+          // Final global drain covers legacy rows and any queue work not tied to the
+          // selected source's discovery pass. The batch is bounded; total work is not.
+          while (true) {
+            const batch = await learnResearchQueue({ limit: 500, sourceID: args.source })
+            totals.learned += batch.learned
+            totals.skipped += batch.skipped
+            totals.failed += batch.failed
+            totals.blockedAuth += batch.blocked_auth
+            for (const error of batch.errors) prompts.log.warn(error)
+            if (batch.claimed === 0) break
+          }
+
+          const queue = ResearchQueue.stats(args.source)
+          const knowledge = ReportKnowledge.stats()
+          prompts.log.info("Totals: processed_pages=" + totals.pages + " candidates=" + totals.candidates +
+            " queued_new=" + totals.queued + " learned=" + totals.learned + " skipped=" + totals.skipped +
+            " failed=" + totals.failed + " blocked_auth=" + totals.blockedAuth + " discovery_errors=" + totals.errors)
+          prompts.log.info("Queue: " + JSON.stringify(queue))
+          prompts.log.info("Knowledge: " + JSON.stringify(knowledge))
+          if (incomplete.length) {
+            prompts.log.warn("Research sync is PARTIAL; unresolved sources:")
+            for (const item of incomplete) prompts.log.warn(item.source + ": " + item.reason)
+          } else {
+            prompts.log.success("All selected sources exhausted their accessible discovery frontier.")
+          }
+          prompts.outro("Research sync finished; inspect the source ledger for any blockers")
         },
-      })
+      }),
       .command({
         command: "discover [source]",
-        describe: "discover public research URLs and persist them to the durable queue",
+        describe: "exhaustively discover public research URLs and persist them to the durable queue",
         builder: (yargs) =>
           yargs
             .positional("source", { type: "string" })
-            .option("pages", { type: "number", default: 100, describe: "maximum pages visited per source" })
-            .option("depth", { type: "number", default: 2, describe: "maximum discovery depth" })
-            .option("watch", { type: "boolean", default: false, describe: "repeat discovery until interrupted" })
+            .option("watch", { type: "boolean", default: false, describe: "repeat exhaustive discovery until interrupted" })
             .option("interval", { type: "number", default: 300, describe: "seconds between watch cycles" }),
         async handler(args) {
-          prompts.intro("CyberStrike Research Discovery Worker")
+          prompts.intro("CyberStrike Exhaustive Research Discovery")
           do {
-            const authRequeued = await retryAuthenticatedResearch({ sourceID: args.source, limit: args.pages })
-            if (authRequeued > 0) prompts.log.info("auth-blocked research resumed=" + authRequeued)
-            const results = await discoverResearch({ sourceID: args.source, pages: args.pages, depth: args.depth })
-            for (const result of results) {
-              prompts.log.info(
-                result.source +
-                  ": pages=" +
-                  result.pages +
-                  " candidates=" +
-                  result.candidates +
-                  " added=" +
-                  result.added,
-              )
-              for (const error of result.errors) prompts.log.warn(error)
+            const sources = args.source
+              ? RESEARCH_SOURCES.filter((source) => source.id === args.source)
+              : RESEARCH_SOURCES
+            if (!sources.length) throw new Error("unknown research source: " + args.source)
+            const incomplete: Array<{ source: string; reason: string }> = []
+
+            for (const source of sources) {
+              while (true) {
+                const resumed = await retryAuthenticatedResearch({ sourceID: source.id, limit: 500 })
+                if (resumed === 0) break
+              }
+              let pageWindow = 20
+              let finished = false
+              while (!finished) {
+                let result: Awaited<ReturnType<typeof discoverResearch>>[number] | undefined
+                try {
+                  result = (await discoverResearch({
+                    sourceID: source.id,
+                    pages: pageWindow,
+                    depth: Number.MAX_SAFE_INTEGER,
+                  }))[0]
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : String(error)
+                  incomplete.push({ source: source.id, reason: "discovery call failed: " + message })
+                  break
+                }
+                if (!result) {
+                  incomplete.push({ source: source.id, reason: "discovery returned no result" })
+                  break
+                }
+                prompts.log.info(source.id + ": processed_pages=" + result.pages +
+                  " page_window=" + pageWindow + " candidates=" + result.candidates +
+                  " queued_new=" + result.added + " blocked_auth=" + result.blocked_auth +
+                  " errors=" + result.error_count)
+                for (const error of result.errors) prompts.log.warn(error)
+
+                const stats = ResearchQueue.stats(source.id)
+                const blocked =
+                  result.error_count > 0 ||
+                  result.blocked_auth > 0 ||
+                  stats.crawl_page_errors > 0 ||
+                  stats.crawl_page_auth_blocked > 0 ||
+                  stats.blocked_auth > 0
+                if (blocked) {
+                  const reason = [
+                    result.error_count ? "discovery errors=" + result.error_count : "",
+                    result.blocked_auth || stats.blocked_auth || stats.crawl_page_auth_blocked ? "authentication required" : "",
+                    stats.crawl_page_errors ? "crawl-page errors=" + stats.crawl_page_errors : "",
+                  ].filter(Boolean).join(", ") || "unresolved crawl state"
+                  incomplete.push({ source: source.id, reason })
+                  finished = true
+                  continue
+                }
+                if (result.pages >= pageWindow) {
+                  const nextWindow = pageWindow * 2
+                  if (!Number.isSafeInteger(nextWindow) || nextWindow <= pageWindow) {
+                    incomplete.push({ source: source.id, reason: "runtime integer range exhausted before pagination was proven complete" })
+                    finished = true
+                  } else {
+                    pageWindow = nextWindow
+                  }
+                  continue
+                }
+                finished = true
+              }
+            }
+
+            if (incomplete.length) {
+              prompts.log.warn("Discovery is PARTIAL; unresolved sources:")
+              for (const item of incomplete) prompts.log.warn(item.source + ": " + item.reason)
+            } else {
+              prompts.log.success("All selected sources exhausted their accessible discovery frontier.")
             }
             if (!args.watch) break
             await Bun.sleep(Math.max(5, args.interval) * 1000)
           } while (true)
         },
-      })
+      }),
       .command({
         command: "learn",
         describe: "study queued public reports and add research notes to knowledge",
