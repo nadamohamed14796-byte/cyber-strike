@@ -2,73 +2,169 @@ import type { Argv } from "yargs"
 import * as prompts from "@clack/prompts"
 import { cmd } from "./cmd"
 import { discoverResearch, learnResearchQueue, retryAuthenticatedResearch } from "../../research/ingest"
+import { RESEARCH_SOURCES } from "../../research/sources"
 import { ResearchQueue } from "../../research/queue"
 import { ReportKnowledge } from "../../learning/report-knowledge"
 
-function bounded(value: number | undefined, fallback: number, min: number, max: number) {
-  const candidate = value === undefined || !Number.isFinite(value) ? fallback : Math.floor(value)
-  return Math.max(min, Math.min(candidate, max))
-}
-
 /**
- * One resumable update cycle: discover public candidates, queue them durably,
- * learn a bounded batch, and report progress. Watch mode is explicit and opt-in.
+ * One resumable research update. Page windows grow until each source is exhausted
+ * or has a recorded blocker; queue processing continues in batches until no work
+ * remains claimable. Batch sizes are implementation details, never total-work caps.
  */
 export const UpdateCommand = cmd({
   command: "update",
-  describe: "discover and study public reports/writeups into globally shared research knowledge for every agent",
+  describe: "exhaustively discover and study public reports/writeups into globally shared research knowledge",
   builder: (yargs: Argv) =>
     yargs
-      .option("pages", { type: "number", default: 10, describe: "maximum discovery pages per source for each cycle" })
-      .option("depth", { type: "number", default: 2, describe: "maximum discovery depth" })
-      .option("limit", { type: "number", default: 30, describe: "maximum queued items to study per cycle" })
-      .option("watch", { type: "boolean", default: false, describe: "repeat bounded update cycles until interrupted" })
+      .option("watch", { type: "boolean", default: false, describe: "repeat exhaustive update cycles until interrupted" })
       .option("interval", { type: "number", default: 60, describe: "seconds between watch cycles" }),
   async handler(args) {
-    const pages = bounded(args.pages, 10, 1, 1000)
-    const depth = bounded(args.depth, 2, 0, 4)
-    const limit = bounded(args.limit, 30, 1, 500)
-    const interval = bounded(args.interval, 60, 5, 3600)
+    const interval = Number.isFinite(args.interval)
+      ? Math.max(5, Math.floor(args.interval))
+      : 60
 
-    prompts.intro("CyberStrike Research Update")
+    prompts.intro("CyberStrike Exhaustive Research Update")
     let cycle = 0
     do {
       cycle++
-      prompts.log.step("Cycle " + cycle + ": discovering public research")
-      const authRequeued = await retryAuthenticatedResearch({ limit: 500 })
-      if (authRequeued > 0) prompts.log.info("auth-blocked research resumed=" + authRequeued)
-      const discovery = await discoverResearch({ pages, depth })
-      let candidates = 0
-      let added = 0
-      let blockedAuth = 0
-      let errors = 0
-      for (const result of discovery) {
-        candidates += result.candidates
-        added += result.added
-        blockedAuth += result.blocked_auth
-        errors += result.errors.length
-        prompts.log.info(result.source + ": pages=" + result.pages + " candidates=" + result.candidates +
-          " queued=" + result.added + " blocked_auth=" + result.blocked_auth)
-        for (const error of result.errors) prompts.log.warn(error)
+      let totalCandidates = 0
+      let totalQueued = 0
+      let totalPages = 0
+      let totalLearned = 0
+      let totalSkipped = 0
+      let totalFailed = 0
+      let totalBlockedAuth = 0
+      let totalDiscoveryErrors = 0
+      const incompleteSources: Array<{ source: string; reason: string }> = []
+
+      prompts.log.step("Cycle " + cycle + ": resuming authentication-blocked research")
+      while (true) {
+        const resumed = await retryAuthenticatedResearch({ limit: 500 })
+        if (resumed === 0) break
+        prompts.log.info("auth-blocked research resumed=" + resumed)
       }
 
-      prompts.log.step("Studying queued research")
-      const learned = await learnResearchQueue({ limit })
-      for (const error of learned.errors) prompts.log.warn(error)
+      for (const configuredSource of RESEARCH_SOURCES) {
+        prompts.log.step("Discovering source: " + configuredSource.id)
+        let pageWindow = 20
+        let sourceFinished = false
+
+        while (!sourceFinished) {
+          let result: Awaited<ReturnType<typeof discoverResearch>>[number] | undefined
+          try {
+            const pass = await discoverResearch({
+              sourceID: configuredSource.id,
+              pages: pageWindow,
+              depth: Number.MAX_SAFE_INTEGER,
+            })
+            result = pass[0]
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            incompleteSources.push({ source: configuredSource.id, reason: "discovery call failed: " + message })
+            prompts.log.warn(configuredSource.id + ": discovery call failed: " + message)
+            break
+          }
+
+          if (!result) {
+            incompleteSources.push({ source: configuredSource.id, reason: "discovery returned no source result" })
+            break
+          }
+
+          totalPages += result.pages
+          totalCandidates += result.candidates
+          totalQueued += result.added
+          totalBlockedAuth += result.blocked_auth
+          totalDiscoveryErrors += result.error_count
+
+          prompts.log.info(
+            result.source + ": requested_page_window=" + pageWindow +
+              " fetched_pages=" + result.pages +
+              " candidates=" + result.candidates +
+              " queued_new=" + result.added +
+              " blocked_auth=" + result.blocked_auth +
+              " errors=" + result.error_count,
+          )
+          for (const error of result.errors) prompts.log.warn(error)
+
+          // Study all claimable work after every discovery pass so the durable
+          // queue does not grow indefinitely before processing starts.
+          while (true) {
+            const batch = await learnResearchQueue({ limit: 500, sourceID: configuredSource.id })
+            totalLearned += batch.learned
+            totalSkipped += batch.skipped
+            totalFailed += batch.failed
+            totalBlockedAuth += batch.blocked_auth
+            for (const error of batch.errors) prompts.log.warn(error)
+            if (batch.claimed === 0) break
+          }
+
+          const sourceQueue = ResearchQueue.stats(configuredSource.id)
+          const hasRecordedBlockers =
+            result.error_count > 0 ||
+            result.blocked_auth > 0 ||
+            sourceQueue.crawl_page_errors > 0 ||
+            sourceQueue.crawl_page_auth_blocked > 0 ||
+            sourceQueue.retry > 0 ||
+            sourceQueue.studying > 0
+
+          if (hasRecordedBlockers) {
+            const reasons = [
+              result.error_count > 0 ? "discovery errors=" + result.error_count : "",
+              result.blocked_auth > 0 || sourceQueue.crawl_page_auth_blocked > 0 ? "authentication required" : "",
+              sourceQueue.crawl_page_errors > 0 ? "stored crawl-page errors=" + sourceQueue.crawl_page_errors : "",
+              sourceQueue.retry > 0 ? "retry queue=" + sourceQueue.retry : "",
+              sourceQueue.studying > 0 ? "active/stale study leases=" + sourceQueue.studying : "",
+            ].filter(Boolean).join(", ")
+            incompleteSources.push({ source: configuredSource.id, reason: reasons || "unresolved queue state" })
+            prompts.log.warn(configuredSource.id + ": incomplete; " + (reasons || "unresolved queue state"))
+            sourceFinished = true
+            continue
+          }
+
+          // If the requested window was exhausted, expand it and continue. There is
+          // deliberately no fixed maximum page count or crawl depth.
+          if (result.pages >= pageWindow) {
+            const nextWindow = pageWindow * 2
+            if (!Number.isSafeInteger(nextWindow) || nextWindow <= pageWindow) {
+              incompleteSources.push({
+                source: configuredSource.id,
+                reason: "runtime integer range exhausted before source pagination could be proven complete",
+              })
+              sourceFinished = true
+              continue
+            }
+            pageWindow = nextWindow
+            continue
+          }
+
+          sourceFinished = true
+        }
+      }
+
+      // Final global drain catches legacy or concurrent work that was not tied to
+      // the source-specific pass above. Each call is a bounded batch; total work is not.
+      while (true) {
+        const batch = await learnResearchQueue({ limit: 500 })
+        totalLearned += batch.learned
+        totalSkipped += batch.skipped
+        totalFailed += batch.failed
+        totalBlockedAuth += batch.blocked_auth
+        for (const error of batch.errors) prompts.log.warn(error)
+        if (batch.claimed === 0) break
+      }
 
       const queueStats = ResearchQueue.stats()
       const knowledgeStats = ReportKnowledge.stats()
       prompts.log.info(
         "cycle=" + cycle +
-          " discovered=" + candidates +
-          " queued=" + added +
-          " claimed=" + learned.claimed +
-          " learned=" + learned.learned +
-          " skipped=" + learned.skipped +
-          " failed=" + learned.failed +
-          " blocked_auth=" + (blockedAuth + learned.blocked_auth) +
-          " legacy_requeued=" + learned.requeued_legacy +
-          " discovery_errors=" + errors,
+          " fetched_pages=" + totalPages +
+          " discovered_candidates=" + totalCandidates +
+          " queued_new=" + totalQueued +
+          " learned=" + totalLearned +
+          " skipped=" + totalSkipped +
+          " failed=" + totalFailed +
+          " blocked_auth=" + totalBlockedAuth +
+          " discovery_errors=" + totalDiscoveryErrors,
       )
       prompts.log.info(
         "queue: total=" + queueStats.total +
@@ -89,10 +185,17 @@ export const UpdateCommand = cmd({
           " external_reference_usefulness_events=" + knowledgeStats.externalReferenceUsefulnessEvents,
       )
 
+      if (incompleteSources.length) {
+        prompts.log.warn("Update is PARTIAL; unresolved sources:")
+        for (const item of incompleteSources) prompts.log.warn(item.source + ": " + item.reason)
+      } else {
+        prompts.log.success("All configured source discovery windows exhausted and claimable research drained.")
+      }
+
       if (!args.watch) break
       await Bun.sleep(interval * 1000)
     } while (true)
 
-    prompts.outro(args.watch ? "Research update worker stopped" : "Resumable research update cycle complete")
+    prompts.outro(args.watch ? "Exhaustive research worker stopped" : "Research update cycle finished; inspect any reported blockers")
   },
 })
