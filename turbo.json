@@ -1,19 +1,39 @@
 {
   "$schema": "https://turborepo.com/schema.json",
-  "globalEnv": ["CI", "CYBERSTRIKE_DISABLE_SHARE"],
-  "globalPassThroughEnv": ["CI", "CYBERSTRIKE_DISABLE_SHARE"],
+  "globalEnv": [
+    "CI",
+    "CYBERSTRIKE_DISABLE_SHARE"
+  ],
+  "globalPassThroughEnv": [
+    "CI",
+    "CYBERSTRIKE_DISABLE_SHARE"
+  ],
   "tasks": {
     "typecheck": {},
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "cyberstrike#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": []
     },
     "@cyberstrike-io/app#test": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "@cyberstrike-io/hackbrowser#test": {
+      "dependsOn": [
+        "^build"
+      ],
       "outputs": []
     }
   }
