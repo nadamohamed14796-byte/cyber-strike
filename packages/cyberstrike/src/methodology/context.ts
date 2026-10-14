@@ -13,19 +13,19 @@ import { SkillIndex } from "../skill/index-engine"
 // use the skill tool to load the selected skill so normal per-agent permissions apply.
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   scope_analysis: ["attack-bb-methodology", "scope", "attack surface"],
-  mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
-  passive_recon: ["recon-methodology", "recon-subdomain-enumeration", "osint"],
-  active_recon: ["attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration"],
+  mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
+  passive_recon: ["recon-methodology", "recon-subdomain-enumeration", "recon-email-security", "recon-gitlab-public-recon", "osint"],
+  active_recon: ["attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration", "recon-cms-detection"],
   technology_profiling: ["technology profiling", "technology fingerprinting", "framework detection"],
-  authentication_testing: ["authentication", "auth bypass", "login"],
-  session_management: ["session management", "cookie", "JWT"],
+  authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-oauth", "authentication", "auth bypass", "login"],
+  session_management: ["attack-session", "attack-jwt", "session management", "cookie", "JWT"],
   authorization_testing: ["attack-idor-automation", "authorization", "IDOR"],
-  input_validation: ["injection", "XSS", "SQL injection", "SSRF"],
-  business_logic: ["business logic", "race condition", "attack-bb-methodology"],
-  data_protection: ["data protection", "sensitive data", "TLS"],
-  api_security: ["API security", "GraphQL", "REST API"],
-  infrastructure: ["recon-asn-infrastructure", "cloud security", "network exposure"],
-  reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing"],
+  input_validation: ["attack-xss", "attack-sqli", "attack-ssrf", "attack-ssti", "injection", "XSS", "SQL injection", "SSRF"],
+  business_logic: ["attack-business-logic", "attack-race-condition", "business logic", "race condition", "attack-bb-methodology"],
+  data_protection: ["attack-information-disclosure", "attack-source-leak", "data protection", "sensitive data", "TLS"],
+  api_security: ["attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "API security", "GraphQL", "REST API"],
+  infrastructure: ["recon-asn-infrastructure", "attack-cloud-misconfig", "cloud-assessment", "cloud security", "network exposure"],
+  reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing", "triage-validation", "evidence-hygiene", "report-writing"],
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
