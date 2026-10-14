@@ -7,6 +7,85 @@ import { AgentPerformance } from "./performance"
 import { Phase } from "./phase"
 import { Validation } from "./validation"
 import { categoryInLane } from "../tool/vuln-scope"
+import { SkillIndex } from "../skill/index-engine"
+
+// Phase-aware skill discovery is intentionally separate from loading: the agent must
+// use the skill tool to load the selected skill so normal per-agent permissions apply.
+const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
+  scope_analysis: ["attack-bb-methodology", "scope", "attack surface"],
+  mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
+  passive_recon: ["recon-methodology", "recon-subdomain-enumeration", "osint"],
+  active_recon: ["attack-web-recon", "recon-port-service-discovery", "recon-vhost-enumeration"],
+  technology_profiling: ["technology profiling", "technology fingerprinting", "framework detection"],
+  authentication_testing: ["authentication", "auth bypass", "login"],
+  session_management: ["session management", "cookie", "JWT"],
+  authorization_testing: ["attack-idor-automation", "authorization", "IDOR"],
+  input_validation: ["injection", "XSS", "SQL injection", "SSRF"],
+  business_logic: ["business logic", "race condition", "attack-bb-methodology"],
+  data_protection: ["data protection", "sensitive data", "TLS"],
+  api_security: ["API security", "GraphQL", "REST API"],
+  infrastructure: ["recon-asn-infrastructure", "cloud security", "network exposure"],
+  reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing"],
+}
+
+export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
+  return [...PHASE_SKILL_QUERIES[phaseId]]
+}
+
+async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
+  await SkillIndex.ensureBuilt()
+  const queries = skillQueriesForPhase(phaseId)
+  const candidates = new Map<string, SkillIndex.Entry>()
+  // Gather results across every phase query before limiting candidates. Otherwise,
+  // a generic first query can crowd out exact matches from later, more specific queries.
+  for (const query of queries) {
+    for (const entry of SkillIndex.search(query, 20)) {
+      if (entry.verified === "tampered") continue
+      candidates.set(entry.name, entry)
+    }
+  }
+
+  const ranked = [...candidates.values()].map((entry) => {
+    let bestScore = 0
+    let matchedQuery = queries[0] ?? phaseId
+    for (const query of queries) {
+      const q = query.toLowerCase().trim()
+      let score = 0
+      if (entry.name.toLowerCase() === q) score += 100
+      else if (entry.name.toLowerCase().startsWith(q)) score += 50
+      else if (entry.name.toLowerCase().includes(q)) score += 20
+      if (entry.tags.some((tag) => tag.toLowerCase() === q)) score += 40
+      else if (entry.tags.some((tag) => tag.toLowerCase().includes(q))) score += 15
+      if (entry.owasp_id?.toLowerCase().includes(q)) score += 30
+      if (entry.category?.toLowerCase().includes(q)) score += 10
+      if (entry.description.toLowerCase().includes(q)) score += 5
+      if (score > bestScore) {
+        bestScore = score
+        matchedQuery = query
+      }
+    }
+    return { entry, score: bestScore, query: matchedQuery }
+  }).sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
+
+  const selected = ranked.slice(0, 4).map(({ entry, query }) => ({
+    name: entry.name,
+    description: entry.description,
+    query,
+  }))
+
+  const lines = [
+    "## Required Skill Preflight",
+    "Before testing this phase, use the `skill` tool to load at least one relevant skill listed below. A name in this list is only a recommendation; it is not loaded until the tool returns its skill content.",
+    "If loading is denied or a skill is unavailable, search for an allowed alternative and note the gap. Do not claim a skill was loaded unless the tool call succeeded.",
+  ]
+  if (selected.length === 0) {
+    lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
+  } else {
+    lines.push("", "Phase-specific candidates:")
+    for (const match of selected) lines.push(`- ${match.name} — ${match.description} (matched: ${match.query})`)
+  }
+  return lines.join("\n")
+}
 
 // ============================================================
 // METHODOLOGY CONTEXT — System prompt injection for
@@ -26,7 +105,7 @@ export namespace MethodologyContext {
    *   are dropped — a tester is handed only its own work, not the routing view.
    *   Leave undefined for the orchestrator / non-tester agents (full context).
    */
-  export function generate(sessionID: string, agentClass?: string): string | null {
+  export async function generate(sessionID: string, agentClass?: string): Promise<string | null> {
     const isTester = !!agentClass
     // Check if any intel entries exist for this session
     const count = Database.use((db) =>
@@ -37,7 +116,20 @@ export namespace MethodologyContext {
         .limit(1)
         .all(),
     )
-    if (count.length === 0) return null
+    if (count.length === 0) {
+      // Skill preflight must also run before the first intel entry is recorded;
+      // otherwise the initial scope-analysis phase would be the one phase that
+      // never receives phase-aware skill guidance.
+      const initialState = Methodology.computeState(sessionID)
+      if (!initialState.currentPhase) return null
+      return [
+        "# Methodology Skill Preflight",
+        "",
+        "No target intelligence has been recorded yet. Establish scope and initialize the target workspace before reconnaissance or active testing.",
+        "",
+        await formatPhaseSkillGuidance(initialState.currentPhase),
+      ].join("\n")
+    }
 
     const sections: string[] = ["# Methodology Engine Active", ""]
 
@@ -76,6 +168,11 @@ export namespace MethodologyContext {
         sections.push(`## Current Phase Directive`)
         sections.push(directive)
       }
+    }
+    // Phase-specific skill guidance is injected into every methodology-aware turn.
+    // The agent must still call SkillTool.load, which enforces its permission policy.
+    if (state.currentPhase) {
+      sections.push("", await formatPhaseSkillGuidance(state.currentPhase))
     }
 
     // 4. Coverage summary (brief)
