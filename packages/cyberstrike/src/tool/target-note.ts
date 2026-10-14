@@ -1,7 +1,6 @@
 import z from "zod"
 import { Session } from "../session"
 import { TargetMemory, type TargetNoteKind, type TargetNoteStatus } from "../target"
-import { redactTargetNoteSecrets } from "../target/redact"
 import { Tool } from "./tool"
 
 const TargetNoteParameters = z.object({
@@ -19,7 +18,7 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
   description: [
     "Save a durable target-specific observation in the existing target workspace, SQLite, and notes.md so later agents can reuse it.",
     "This tool only writes notes; it does not test the target. The target workspace must already exist and the target host/path must be present in the current session tree's observed requests or Intel. It will not create a workspace for an unobserved target.",
-    "Use concise, factual notes with provenance. Use observed/unverified unless evidence supports a stronger state. Confirmed or disproven notes require concrete evidence. Never store passwords, session cookies, bearer tokens, or other secrets.",
+    "Use concise, factual notes with provenance. Preserve exact discovered values in this private target workspace when they are evidence. Use observed/unverified unless evidence supports a stronger state. A candidate secret is not confirmed until validated." ,
     "Keep public report/writeup methodology in the global research database, not target notes. Use this for current-target assets, endpoints, test conditions, results, limitations, and finding-validation summaries.",
   ].join("\n"),
   parameters: TargetNoteParameters,
@@ -38,13 +37,13 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
       }
       const saved = await TargetMemory.addNote(workspace.targetURL, {
         kind: params.kind as TargetNoteKind,
-        title: redactTargetNoteSecrets(params.title.trim()).slice(0, 180),
-        content: redactTargetNoteSecrets(params.content.trim()),
-        evidence: params.evidence ? redactTargetNoteSecrets(params.evidence.trim()) : undefined,
-        source: "agent:" + redactTargetNoteSecrets(ctx.agent || "cyberstrike").slice(0, 100),
-        sourceURL: params.source_url ? redactTargetNoteSecrets(params.source_url) : undefined,
+        title: params.title.trim().replace(/[\\r\\n\\t]+/g, " ").slice(0, 180),
+        content: params.content.trim(),
+        evidence: params.evidence?.trim(),
+        source: "agent:" + (ctx.agent || "cyberstrike").replace(/[\\r\\n\\t]+/g, " ").slice(0, 100),
+        sourceURL: params.source_url,
         status: params.status as TargetNoteStatus,
-        tags: params.tags?.map((tag) => redactTargetNoteSecrets(tag).slice(0, 48)),
+        tags: params.tags?.map((tag) => tag.replace(/[\\r\\n\\t]+/g, " ").slice(0, 48)),
       })
       return {
         title: saved.created ? "Target note saved" : saved.updated ? "Target note updated" : "Target note already exists",
