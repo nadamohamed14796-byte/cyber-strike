@@ -48,8 +48,10 @@ export function rankSkillsForPhase(
   phaseId: Phase.Id,
   entries: SkillIndex.Entry[],
   limit = 4,
+  observedTechStack: string[] = [],
 ): Array<{ name: string; description: string; query: string; score: number }> {
   const queries = skillQueriesForPhase(phaseId)
+  const observedTechnologies = observedTechStack.map(normalizeSkillText).filter(Boolean)
   const phase = Phase.get(phaseId)
   const requiredTags = new Set((phase?.requiredTags ?? []).map(normalizeSkillText))
   const queryTokens = new Set(queries.flatMap(skillTokens))
@@ -90,6 +92,11 @@ export function rankSkillsForPhase(
     const matchedTokens = [...queryTokens].filter((token) => searchableTokens.has(token))
     score += Math.min(matchedTokens.length, 8) * 3
     for (const tag of tags) if (requiredTags.has(tag)) score += 45
+    for (const skillTech of tech) {
+      if (observedTechnologies.some((observed) => observed === skillTech || observed.includes(skillTech) || skillTech.includes(observed))) {
+        score += 35
+      }
+    }
     if (phaseId === "passive_recon" || phaseId === "active_recon") {
       if (/\brecon\b|reconnaissance|subdomain|osint|enumeration|port scan|vhost|virtual host/.test(searchable)) {
         score += 55
@@ -132,7 +139,7 @@ export function rankSkillsForPhase(
   }))
 }
 
-async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
+async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): Promise<string> {
   const lines = [
     "## Required Skill Preflight",
     "Before doing phase work, call the `skill` tool with action=`load` and the exact name of a phase-specific candidate below. Wait for the tool result and verify that skill content was returned before claiming it is loaded.",
@@ -143,7 +150,10 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
 
   try {
     await SkillIndex.ensureBuilt()
-    const selected = rankSkillsForPhase(phaseId, SkillIndex.all(), 4)
+    const observedTechStack = Intel.get(sessionID)
+      .filter((entry) => entry.type === "technology")
+      .flatMap((entry) => [entry.title, ...entry.tags])
+    const selected = rankSkillsForPhase(phaseId, SkillIndex.all(), 4, observedTechStack)
     if (selected.length === 0) {
       lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
     } else {
@@ -200,7 +210,7 @@ export namespace MethodologyContext {
         "",
         "No target intelligence has been recorded yet. Establish scope and initialize the target workspace before reconnaissance or active testing.",
         "",
-        await formatPhaseSkillGuidance(initialState.currentPhase),
+        await formatPhaseSkillGuidance(initialState.currentPhase, sessionID),
       ].join("\n")
     }
 
@@ -245,7 +255,7 @@ export namespace MethodologyContext {
     // Phase-specific skill guidance is injected into every methodology-aware turn.
     // The agent must still call SkillTool.load, which enforces its permission policy.
     if (state.currentPhase) {
-      sections.push("", await formatPhaseSkillGuidance(state.currentPhase))
+      sections.push("", await formatPhaseSkillGuidance(state.currentPhase, sessionID))
     }
 
     // 4. Coverage summary (brief)
