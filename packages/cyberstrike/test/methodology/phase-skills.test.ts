@@ -28,6 +28,58 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
   })
 
+
+  test("expanded installed skill families are routed to every relevant methodology phase", () => {
+    const expected: Partial<Record<Phase.Id, string[]>> = {
+      passive_recon: [
+        "recon-email-security", "recon-gitlab-public-recon",
+        "recon-origin-ip-discovery", "recon-error-log-mining", "recon-visual-recon",
+      ],
+      active_recon: [
+        "attack-web-recon", "recon-port-service-discovery", "recon-cms-detection",
+        "attack-subdomain-takeover",
+      ],
+      technology_profiling: [
+        "attack-django", "attack-fastapi", "attack-flask-werkzeug",
+        "attack-laravel", "attack-nextjs", "attack-nodejs", "attack-springboot",
+        "attack-wordpress",
+      ],
+      authentication_testing: [
+        "attack-401-403-bypass", "attack-captcha-bypass", "attack-forgot-password",
+        "attack-mfa-bypass", "attack-oauth", "attack-saml-sso",
+      ],
+      session_management: ["attack-session", "attack-jwt", "attack-csrf", "attack-saml-sso"],
+      authorization_testing: [
+        "attack-idor-automation", "attack-mass-assignment", "attack-bfla",
+        "attack-api-noauth-hunt", "attack-cors",
+      ],
+      input_validation: [
+        "attack-dom-xss", "attack-nosqli", "attack-deserialization", "attack-file-upload",
+        "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
+      ],
+      business_logic: ["attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass"],
+      data_protection: [
+        "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
+      ],
+      api_security: [
+        "attack-graphql", "attack-schema-enumeration", "attack-grpc",
+        "attack-mass-assignment", "attack-nosqli", "attack-websocket",
+      ],
+      infrastructure: [
+        "attack-cloud-misconfig", "cloud-assessment", "ci-assessment",
+        "cicd-attacks", "k8s-assessment", "ad-security",
+      ],
+      reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing"],
+    }
+
+    for (const [phase, skills] of Object.entries(expected) as [Phase.Id, string[]][]) {
+      const queries = skillQueriesForPhase(phase)
+      for (const skill of skills) {
+        expect(queries, `${phase} should route ${skill}`).toContain(skill)
+      }
+    }
+  })
+
   test("phase ranking uses required tags and metadata rather than only display-name phrases", () => {
     const makeSkill = (overrides: Partial<SkillIndex.Entry>): SkillIndex.Entry => ({
       name: "generic-web-testing",
