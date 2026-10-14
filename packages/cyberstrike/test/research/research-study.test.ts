@@ -379,6 +379,69 @@ test("agent-led study can read every chunk of a long source under the tool outpu
 })
 
 
+test("agent-led next limits each response to one item even with escape-heavy source text", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceID = "portswigger-study-test-" + marker
+      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
+      if (!baseSource) throw new Error("PortSwigger test source is not configured")
+      RESEARCH_SOURCES.push({
+        ...baseSource,
+        id: sourceID,
+        seedUrls: ["https://portswigger.net/web-security/"],
+      })
+      const context = {
+        sessionID: "ses_escape_batch_" + marker.replace(/-/g, "").slice(0, 18),
+        messageID: "msg_escape_batch_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const sourceText = "\0".repeat(4000) + " XSS security vulnerability test procedure and evidence."
+      const urls = [1, 2, 3].map((n) => "https://portswigger.net/web-security/control-heavy-" + n + "-" + marker)
+      for (const [index, sourceURL] of urls.entries()) {
+        ResearchQueue.enqueue({
+          sourceID,
+          sourceURL,
+          title: "Control-heavy security research article " + index,
+          payload: {
+            cached_text: sourceText,
+            cached_text_truncated: false,
+            content_length: sourceText.length,
+            content_fingerprint: String(index + 1).repeat(40),
+            source_kind: "academy",
+            source_trust: 100,
+          },
+        })
+      }
+      const tool = await ResearchStudyTool.init()
+      const next = await tool.execute({
+        action: "next",
+        source: sourceID,
+        pages: 1,
+        depth: 1,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      expect(next.metadata.truncated).toBe(false)
+      const result = JSON.parse(next.output)
+      expect(result.batch_size).toBe(1)
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0].text).toBe(sourceText)
+      expect(result.items[0].has_more_text).toBe(false)
+      expect(ResearchQueue.stats(sourceID).studying).toBe(1)
+      expect(ResearchQueue.stats(sourceID).queued).toBe(2)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("preflight skips are counted separately from model-studied reports", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
