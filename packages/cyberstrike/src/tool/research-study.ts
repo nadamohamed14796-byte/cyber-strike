@@ -262,6 +262,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             const authRequired = /authentication required|login wall|HTTP\s+(?:401|403)/i.test(message)
+            const documentTooLarge = /research document too large/i.test(message)
             const handled = authRequired
               ? ResearchQueue.blockAuthentication({
                   sourceID: claim.source_id,
@@ -271,12 +272,26 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
                   payload: { source_name: source.name, source_kind: source.kind, crawl_depth: claim.payload.crawl_depth },
                   claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
                 })?.status === "blocked_auth"
-              : Boolean(ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message))
+              : documentTooLarge
+                ? Boolean(ResearchQueue.complete(
+                    claim.sequence,
+                    claim.lease_owner,
+                    "blocked_size",
+                    message,
+                    {
+                      study_blocked_reason: "safe-fetch-document-size-limit",
+                      study_blocked_detail: message,
+                      model_study_version: RESEARCH_MODEL_STUDY_VERSION,
+                    },
+                  ))
+                : Boolean(ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message))
             if (!handled) {
               issues.push(claim.public_id + ": lease lost before fetch failure could be recorded")
               continue
             }
-            issues.push(claim.public_id + ": " + message)
+            issues.push(claim.public_id + ": " + (documentTooLarge
+              ? "blocked_size (safe-fetch document-size ceiling): " + message
+              : message))
             // Do not immediately reclaim the same failed row repeatedly in this batch.
             break
           }
