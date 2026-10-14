@@ -169,7 +169,7 @@ describe("Methodology — Prerequisites", () => {
             detail: "A candidate input-validation observation before technology profiling is complete.",
             asset: "example.com",
             source: "test",
-            confidenceLevel: "tentative",
+            confidenceLevel: "low",
             tags: ["sqli"],
           },
         })
