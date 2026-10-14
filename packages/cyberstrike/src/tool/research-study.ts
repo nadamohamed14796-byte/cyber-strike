@@ -14,7 +14,8 @@ import {
   retryAuthenticatedResearch,
   sourceRelevance,
 } from "../research/ingest"
-import { isNonRetryableResearchError } from "../research/safe-fetch"\nimport { ResearchQueue } from "../research/queue"
+import { isNonRetryableResearchError } from "../research/safe-fetch"
+import { ResearchQueue } from "../research/queue"
 import { Tool } from "./tool"
 
 const RESEARCH_TEXT_CHUNK_MAX_BYTES = 4 * 1024
