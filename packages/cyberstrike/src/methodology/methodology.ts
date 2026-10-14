@@ -129,18 +129,39 @@ export namespace Methodology {
     def: Phase.Definition,
     applicablePhases: Phase.Definition[],
     entries: Array<typeof IntelEntryTable.$inferSelect>,
+    visiting = new Set<Phase.Id>(),
   ): { canStart: boolean; reason?: string } {
+    if (visiting.has(def.id)) {
+      return { canStart: false, reason: `prerequisite cycle detected at ${def.id}` }
+    }
     if (def.prerequisites.length === 0) return { canStart: true }
 
     const applicableIds = new Set(applicablePhases.map((p) => p.id))
     const missing: string[] = []
+    const nextVisiting = new Set(visiting)
+    nextVisiting.add(def.id)
 
     for (const prereq of def.prerequisites) {
-      if (!applicableIds.has(prereq)) continue // skip prereqs not in scope
       const prereqDef = Phase.get(prereq)
-      if (!prereqDef) continue
+      if (!prereqDef) {
+        missing.push(`${prereq} (unknown prerequisite)`)
+        continue
+      }
+      if (!applicableIds.has(prereq)) continue // skip valid prereqs not in this scope
+
       const result = validateDeliverables(prereqDef, entries)
-      if (!result.completed) missing.push(prereq)
+      if (!result.completed) {
+        missing.push(prereq)
+        continue
+      }
+
+      // Deliverables alone must not unlock a downstream phase when the prerequisite
+      // itself has unmet ancestors. This prevents premature tags from bypassing the
+      // methodology order while preserving the separate violation for premature work.
+      const ancestorCheck = checkPrerequisites(prereqDef, applicablePhases, entries, nextVisiting)
+      if (!ancestorCheck.canStart) {
+        missing.push(`${prereq} (blocked: ${ancestorCheck.reason ?? "ancestor prerequisite incomplete"})`)
+      }
     }
 
     if (missing.length > 0) return { canStart: false, reason: `Prerequisites incomplete: ${missing.join(", ")}` }
