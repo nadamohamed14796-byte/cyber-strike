@@ -134,6 +134,15 @@ export namespace ResearchQueue {
           : { id: "", sequence: 0, queued: false, created: false }
       }
 
+      if (existing.status === "blocked_size" || existing.status === "blocked_fetch") {
+        return {
+          id: publicID(existing.sequence),
+          sequence: existing.sequence,
+          queued: false,
+          created: false,
+          reason: existing.status === "blocked_size" ? "previously-blocked-size-limit" : "previously-blocked-fetch",
+        }
+      }
       if (typeof existing.payload?.model_study_version === "number" && existing.payload.model_study_version >= version) {
         return { id: publicID(existing.sequence), sequence: existing.sequence, queued: false, created: false, reason: "already-model-studied" }
       }
