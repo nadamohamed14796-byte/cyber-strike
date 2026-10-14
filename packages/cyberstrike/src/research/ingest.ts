@@ -1278,6 +1278,21 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         },
       })
       if (!ingested) throw new Error("knowledge ingestion returned no record")
+
+      // Do not transition the durable queue to learned until the canonical
+      // database can read back the exact record and its source/type metadata.
+      const persisted = ReportKnowledge.getByID(ingested.id)
+      if (!persisted) throw new Error("knowledge persistence verification failed: record cannot be read back")
+      if (normalizeUrl(persisted.source_url ?? "") !== normalizeUrl(item.source_url)) {
+        throw new Error("knowledge persistence verification failed: stored source URL does not match queued resource")
+      }
+      if (persisted.metadata?.document_type !== documentType) {
+        throw new Error("knowledge persistence verification failed: document type metadata is missing or mismatched")
+      }
+      if (persisted.metadata?.content_fingerprint !== contentFingerprint) {
+        throw new Error("knowledge persistence verification failed: content fingerprint is missing or mismatched")
+      }
+
       if (ingested.created) {
         result.learned++
       } else {
