@@ -38,7 +38,7 @@ export function nextDiscoveryPage(source: ResearchSource, value: string) {
   switch (source.id) {
     case "hackerone-hacktivity":
       if (parsed.pathname.includes("/overview")) {
-        const current = Number(parsed.searchParams.get("pageIndex") ?? "-1")
+        const current = Number(parsed.searchParams.get("pageIndex") ?? "0")
         if (!Number.isSafeInteger(current) || current < -1) return undefined
         return withQuery(value, "pageIndex", current + 1)
       }
