@@ -31,18 +31,21 @@ describe("Methodology phase skill routing", () => {
 
   test("expanded installed skill families are routed to every relevant methodology phase", () => {
     const expected: Partial<Record<Phase.Id, string[]>> = {
+      scope_analysis: ["attack-bb-methodology", "target-workspace-workflow"],
       passive_recon: [
         "recon-email-security", "recon-gitlab-public-recon",
         "recon-origin-ip-discovery", "recon-error-log-mining", "recon-visual-recon",
+        "target-workspace-workflow",
       ],
       active_recon: [
         "attack-web-recon", "recon-port-service-discovery", "recon-cms-detection",
-        "attack-subdomain-takeover",
+        "attack-subdomain-takeover", "recon-asn-infrastructure", "target-workspace-workflow",
       ],
       technology_profiling: [
         "attack-django", "attack-fastapi", "attack-flask-werkzeug",
         "attack-laravel", "attack-nextjs", "attack-nodejs", "attack-springboot",
-        "attack-wordpress",
+        "attack-wordpress", "attack-hikvision-isapi", "attack-vmware-vcenter",
+        "attack-minio-s3", "attack-exchange-owa", "attack-zimbra",
       ],
       authentication_testing: [
         "attack-401-403-bypass", "attack-captcha-bypass", "attack-forgot-password",
@@ -68,13 +71,19 @@ describe("Methodology phase skill routing", () => {
       api_security: [
         "attack-graphql", "attack-schema-enumeration", "attack-grpc",
         "attack-mass-assignment", "attack-nosqli", "attack-websocket",
-        "attack-host-header", "attack-cache-poison", "attack-clickjacking",
+        "attack-host-header", "attack-cache-poison", "attack-clickjacking", "llm-security",
       ],
       infrastructure: [
         "attack-cloud-misconfig", "cloud-assessment", "ci-assessment",
         "cicd-attacks", "k8s-assessment", "ad-security", "attack-ldap",
+        "aws-postexploit", "azure-postexploit", "gcp-postexploit", "k8s-postexploit",
+        "windows-postexploit", "linux-postexploit", "macos-postexploit", "ebpf-attacks",
+        "kerberos-attacks", "mitre_attack", "mitre_attack_ics", "CIS benchmarks", "NIST controls",
       ],
-      reporting: ["attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing"],
+      reporting: [
+        "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
+        "bugcrowd-reporting", "triage-validation", "evidence-hygiene", "report-writing",
+      ],
     }
 
     for (const phase of Phase.ALL) {
@@ -83,6 +92,37 @@ describe("Methodology phase skill routing", () => {
         expect(queries, `${phase.id} should route ${skill}`).toContain(skill)
       }
     }
+  })
+
+
+  test("recon phases route to security agents, not the codebase-only explore agent", () => {
+    for (const phaseId of ["passive_recon", "active_recon"] as const) {
+      const agents = Phase.get(phaseId)?.agents ?? []
+      expect(agents).toContain("cyberstrike")
+      expect(agents).toContain("web-application")
+      expect(agents).not.toContain("explore")
+    }
+  })
+
+  test("default phase ranking exposes a broad shortlist for evidence-driven skill loading", () => {
+    const makeSkill = (name: string): SkillIndex.Entry => ({
+      name,
+      description: "Reconnaissance enumeration and discovery",
+      tags: ["recon", "active-recon", "enumeration"],
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+    const ranked = rankSkillsForPhase("active_recon", [
+      "recon-methodology", "recon-subdomain-enumeration", "recon-port-service-discovery",
+      "recon-vhost-enumeration", "recon-cms-detection", "recon-origin-ip-discovery",
+      "recon-email-security", "recon-gitlab-public-recon", "recon-error-log-mining",
+      "recon-visual-recon", "recon-asn-infrastructure", "attack-web-recon",
+    ].map(makeSkill))
+    expect(ranked.length).toBe(10)
+    expect(ranked.some((item) => /recon/i.test(item.name))).toBe(true)
   })
 
   test("phase ranking uses required tags and metadata rather than only display-name phrases", () => {
