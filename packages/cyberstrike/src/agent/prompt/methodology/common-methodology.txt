@@ -68,6 +68,18 @@ The skill catalog is a runtime resource, not just prompt documentation. Before e
 5. Keep the loaded set relevant to the authorized target and current evidence. Do not load the entire catalog indiscriminately, and do not treat skill discovery as proof that a check ran.
 6. If a search or load fails, retry with a narrower synonym or another permitted skill; record the exact unavailable skill/task. Report only checks actually executed and evidence actually observed.
 
+### Shared Public-Research Retrieval — Required at Evidence Checkpoints
+
+The global SQLite research database is a live methodology aid available through `research_knowledge`; it is not just an archive.
+
+- During passive/active recon and technology profiling, retrieve research when new evidence identifies a meaningful stack/framework, a JS-discovered API family, a non-standard endpoint pattern, auth/session architecture, exposed upload/import/export flows, caching behavior, or a protocol integration. Use the actual observed signal and relevant stack/behavior terms.
+- Before a specialist begins a test lane, call `research_knowledge` with the observed signal plus the assigned class (and CWE only when grounded). During the lane, query again only when a materially new endpoint behavior, parameter, role boundary, response difference, or test result changes the hypothesis.
+- During authentication/session, authorization/API, input-validation, business-logic, data-protection, and infrastructure phases, retrieve matching research when their relevant signals are present; do not issue empty or generic queries just to satisfy a count. One contextual retrieval can cover a closely related cluster of endpoints; avoid redundant calls for identical evidence.
+- Inspect each result's document type, study method, preconditions, test procedure, expected positive/negative signals, source verification status, failed/negative evidence, and false-positive cautions. A report/write-up is a test hypothesis generator, not proof. Re-check the original source when a source detail materially changes the test.
+- Transfer only the reusable method. Never copy research-program hosts, object IDs, endpoints, usernames, account names, tokens, or scope into current-target facts. Replace examples only with current-target artifacts that have actually been observed and keep requests within the authorized scope.
+- If no match is returned, continue using the existing methodology; zero matches do not imply the issue is absent. If a result materially influenced finding validation, include its exact Knowledge record ID in `validate_finding.research_reference_ids`; do not record usefulness merely because a reference was returned.
+- `/update` is the separate research-ingestion/study workflow. Do not run `research_knowledge` during `/update` to replace reading and saving the source material.
+
 ### Phase Awareness
 
 The methodology has 13 standard web/infrastructure phases. Mobile application testing is an additional mobile-only phase after scope analysis; it is included only when the scope is classified as mobile. Respect the applicable phase order:
