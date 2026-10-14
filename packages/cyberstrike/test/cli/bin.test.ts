@@ -17,12 +17,8 @@ test("the npm launcher resolves its own file path under Node ESM", async () => {
     const launcher = path.join(binDir, "cyberstrike")
     await fs.copyFile(sourceLauncher, launcher)
 
-    const packageNames = [
-      "@cyberstrike-io/cyberstrike-linux-x64",
-      "@cyberstrike-io/cyberstrike-linux-x64-baseline",
-      "@cyberstrike-io/cyberstrike-linux-x64-musl",
-      "@cyberstrike-io/cyberstrike-linux-x64-baseline-musl",
-    ]
+    const base = "@cyberstrike-io/cyberstrike-" + os.platform() + "-" + os.arch()
+    const packageNames = [base, base + "-baseline", base + "-musl", base + "-baseline-musl"]
     for (const name of packageNames) {
       const fakeBinary = path.join(packageRoot, "node_modules", name, "bin", "cyberstrike")
       await fs.mkdir(path.dirname(fakeBinary), { recursive: true })
