@@ -52,10 +52,12 @@ export namespace Methodology {
       const result = validateDeliverables(def, entries)
       const prereqCheck = checkPrerequisites(def, applicablePhases, entries)
 
-      const status: Phase.Status = result.completed
-        ? "completed"
-        : !prereqCheck.canStart
-          ? "blocked"
+      // Prerequisites outrank deliverable presence: premature work is still
+      // recorded and reported as a blocking violation, but must not inflate completion.
+      const status: Phase.Status = !prereqCheck.canStart
+        ? "blocked"
+        : result.completed
+          ? "completed"
           : result.deliverableCount > 0
             ? "in_progress"
             : "not_started"
