@@ -9,6 +9,8 @@ node_modules
 .claude/
 .cyberstrike/*
 !.cyberstrike/skill/
+# Target-local evidence may contain exact observed values; ignore it at every project depth.
+**/.cyberstrike/targets/
 __MACOSX/
 *~
 playground
