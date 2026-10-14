@@ -966,7 +966,9 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       // the insert succeeds but tags/signals/search filters make the knowledge
       // effectively invisible to specialists.
       const retrievable = ReportKnowledge.search({
-        query: [claim.title ?? claim.source_url, documentType, source.id].join(" "),
+        // Use the canonical title/URL as the search query; appending random source IDs
+        // would add noise to relevance scoring without improving the lookup.
+        query: claim.title ?? claim.source_url,
         sourceKind: "external_report",
         publicReferencesOnly: true,
         limit: 100,
