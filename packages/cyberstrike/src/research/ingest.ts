@@ -720,8 +720,9 @@ export async function retryAuthenticatedResearch(input: {
   )
 }
 export type ResearchSyncOptions = {
-  /** Initial per-pass page window; discovery expands it until exhaustion. */
+  /** Number of reports per learning batch; total queue processing is unbounded. */
   limit?: number
+  /** Initial page window; discovery expands it until exhaustion. */
   pages?: number
   /** Retained for compatibility; exhaustive discovery does not use a depth ceiling. */
   depth?: number
