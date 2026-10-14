@@ -3,7 +3,7 @@ import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
 import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION } from "./sources"
 
-export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth" | "blocked_size"
+export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth" | "blocked_size" | "blocked_fetch"
 
 const LEASE_MS = 5 * 60_000
 const CRAWL_PAGE_TTL_MS = 6 * 60 * 60_000
@@ -800,7 +800,8 @@ export namespace ResearchQueue {
         learned: 0,
         retry: 0,
         rejected: 0,
-        blocked_auth: 0,\n        blocked_size: 0,
+        blocked_auth: 0,
+        blocked_size: 0,
         blocked_fetch: 0,
         model_study_learned: modelStudiedRows.filter((row) => row.status === "learned").length,
         model_study_rejected: modelStudiedRows.filter((row) => row.status === "rejected").length,
