@@ -47,6 +47,43 @@ Read the current registry at runtime; it is authoritative. The `src-hunter-skill
 - `zdi` — Zero Day Initiative Research Blog
 - `elastic-security-labs` — Elastic Security Labs
 
+### Exact starting URLs — visit these first, in this order
+
+These are the concrete seed URLs currently configured in `src/research/sources.ts`. Start with every URL below; do not replace them with vague searches or assume that visiting the home page exhausts the source. The code registry is authoritative if it changes. For each seed, follow the source's accessible article pagination, RSS/Atom feed, sitemap, archive/category pages, and relevant in-scope article links until the frontier is exhausted or a blocker is recorded. Preserve each source's host/path allowlist and its own relevance rules.
+
+1. **HackerOne Hacktivity** — disclosure reports:
+   - https://hackerone.com/hacktivity
+   - https://hackerone.com/hacktivity/overview?pageIndex=0&queryString=disclosed%3Atrue&sortDirection=DESC&sortField=latest_disclosable_activity_at
+2. **Bugcrowd CrowdStream** — https://bugcrowd.com/crowdstream
+3. **Intigriti research blog** — https://www.intigriti.com/researchers/blog
+4. **YesWeHack blog** — https://blog.yeswehack.com/
+5. **PortSwigger Web Security Academy labs** — https://portswigger.net/web-security/all-labs
+6. **PentesterLand** — https://pentester.land/
+7. **InfoSec Write-ups** — https://infosecwriteups.com/
+8. **Weekly InfoSec Write-ups** — https://weekly.infosecwriteups.com/
+9. **SecurityCipher bounty write-ups** — https://securitycipher.com/bounty-writeups/
+10. **HackerOne Blog** — https://www.hackerone.com/blog
+11. **Bugcrowd Blog** — https://www.bugcrowd.com/blog/
+12. **NahamSec** — https://nahamsec.com/
+13. **Assetnote research** — https://blog.assetnote.io/
+14. **ProjectDiscovery research** — https://projectdiscovery.io/blog
+15. **Trickster0's curated Medium content** — https://trickster0.medium.com/
+16. **EdOverflow** — https://edoverflow.com/
+17. **DEVCORE / Orange Tsai** — https://devco.re/en/
+18. **LiveOverflow** — https://liveoverflow.com/
+19. **HackTricks reference** — https://book.hacktricks.xyz/
+20. **PayloadsAllTheThings repository** — https://github.com/swisskyrepo/PayloadsAllTheThings
+21. **GitHub security write-up repository search** — https://github.com/search?q=bug+bounty+writeup&type=repositories
+22. **src-hunter-skill repository** — https://github.com/MyuriKanao/src-hunter-skill
+   - Skill instructions: https://github.com/MyuriKanao/src-hunter-skill/blob/main/SKILL.md
+   - English README: https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md
+23. **OWASP Cheat Sheet Series** — https://cheatsheetseries.owasp.org/
+24. **Trail of Bits Security Research** — https://blog.trailofbits.com/
+25. **Zero Day Initiative research blog** — https://www.zerodayinitiative.com/blog/
+26. **Elastic Security Labs** — https://www.elastic.co/security-labs/blog
+
+**Required traversal for every seed:** (a) fetch and inspect the seed itself; (b) identify pagination, feeds, sitemaps, and archive/category links; (c) enumerate article/report URLs from those mechanisms; (d) continue through every accessible page/cursor/batch; (e) fetch and study every eligible unique document; (f) record exact counts and evidence that the frontier is exhausted. Where a source requires JavaScript or an unsupported API, record the exact URL and limitation, then use another permitted route on that same source if available. Never label a source COMPLETE merely because its seed page loaded. Do not use generic Medium-wide crawling; only crawl the configured Trickster0 profile and eligible content linked from it under the existing source policy. GitHub search results are discovery leads, not proof that every matching repository or file was studied.
+
 Do not silently skip any source ID returned by the runtime registry. The current implementation can safely crawl only sources in `RESEARCH_SOURCES` (including their configured allowed hosts); there is no runtime tool that permanently registers an arbitrary new host. If external research surfaces another useful source outside that registry, record it as an external-source gap with its URL, resource type, relevance, and exact reason it was not ingested; do not claim all of the public internet was searched. Adding it to the persistent workflow requires a reviewed source-registry/adapter/SSRF-allowlist change. Preserve the actual origin and document type: hosting on Medium or GitHub does not itself determine the type.
 
 For each source, use its configured seed URLs, allowed hosts, source-specific adapter, pagination rules, feeds, sitemaps, and eligible links. Use only the existing safe fetcher and source-scoped authentication. Respect access controls, rate limits, source policies, and SSRF protections. Do not bypass authentication or broaden host allowlists to force a crawl.
