@@ -157,6 +157,33 @@ describe("Methodology phase skill routing", () => {
     expect(ranked.some((skill) => skill.name === "tampered-idor-skill")).toBe(false)
   })
 
+  test("empty tech_stack metadata does not gain a false match for every observed technology", () => {
+    const makeSkill = (overrides: Partial<SkillIndex.Entry>): SkillIndex.Entry => ({
+      name: "unrelated-skill",
+      description: "General testing notes",
+      tags: [],
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+      ...overrides,
+    })
+
+    const ranked = rankSkillsForPhase("technology_profiling", [
+      makeSkill({ name: "empty-tech-metadata", tech_stack: [""] }),
+      makeSkill({
+        name: "react-framework-check",
+        description: "Technology profiling and framework detection",
+        tags: ["technology", "framework"],
+        tech_stack: ["react"],
+      }),
+    ], 10, ["React 18"])
+
+    expect(ranked.map((skill) => skill.name)).toContain("react-framework-check")
+    expect(ranked.map((skill) => skill.name)).not.toContain("empty-tech-metadata")
+  })
+
   test("observed target technologies influence phase skill ranking", () => {
     const makeSkill = (name: string, tech_stack: string[]): SkillIndex.Entry => ({
       name,

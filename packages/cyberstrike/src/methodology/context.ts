@@ -119,7 +119,8 @@ export function rankSkillsForPhase(
     const tags = entry.tags.map(normalizeSkillText).filter(Boolean)
     const category = normalizeSkillText(entry.category ?? "")
     const description = normalizeSkillText(entry.description)
-    const tech = entry.tech_stack.map(normalizeSkillText)
+    // Empty metadata values must not match every observed technology via includes("").
+    const tech = entry.tech_stack.map(normalizeSkillText).filter(Boolean)
     const searchable = [name, category, description, ...tags, ...tech, normalizeSkillText(entry.owasp_id ?? "")].join(" ")
     let score = 0
     let matchedQuery = queries[0] ?? phaseId
