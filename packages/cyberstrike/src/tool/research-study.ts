@@ -264,7 +264,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             const message = error instanceof Error ? error.message : String(error)
             const authRequired = /authentication required|login wall|HTTP\s+(?:401|403)/i.test(message)
             const documentTooLarge = /research document too large/i.test(message)
-            const terminalFetchFailure = isNonRetryableResearchError(error)
+            const terminalFetchFailure = isNonRetryableResearchError(error) || /unknown research source id|research source URL failed normalization|outside the configured HTTPS source hosts/i.test(message)
             const handled = authRequired
               ? ResearchQueue.blockAuthentication({
                   sourceID: claim.source_id,
