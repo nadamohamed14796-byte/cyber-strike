@@ -965,6 +965,19 @@ export namespace ReportKnowledge {
       return []
     }
   }
+  /** Read a persisted knowledge record by stable ID for write-after-read verification. */
+  export function getByID(id: string) {
+    if (!id?.trim()) return undefined
+    try {
+      return Database.use((db) =>
+        db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, id)).get(),
+      )
+    } catch (error) {
+      console.warn("[cyberstrike] research knowledge read-back failed:", error)
+      return undefined
+    }
+  }
+
   export function stats() {
     try {
       return Database.use((db) => {
