@@ -153,4 +153,42 @@ describe("Methodology — Prerequisites", () => {
       },
     })
   })
+
+  test("blocked phase with deliverables emits a blocking ordering violation", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+
+        Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "technology",
+            severity: "info",
+            title: "SQL injection candidate",
+            detail: "A candidate input-validation observation before technology profiling is complete.",
+            asset: "example.com",
+            source: "test",
+            confidenceLevel: "tentative",
+            tags: ["sqli"],
+          },
+        })
+
+        const state = Methodology.computeState(session.id)
+        const inputPhase = state.phases.find((p) => p.id === "input_validation")
+        expect(inputPhase?.status).toBe("blocked")
+        expect(inputPhase?.deliverableCount).toBe(1)
+        expect(state.violations).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              gate: "methodology_ordering",
+              severity: "blocking",
+            }),
+          ]),
+        )
+
+        await Session.remove(session.id)
+      },
+    })
+  })
 })
