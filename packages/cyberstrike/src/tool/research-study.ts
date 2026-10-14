@@ -283,7 +283,6 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
                     {
                       study_blocked_reason: "safe-fetch-document-size-limit",
                       study_blocked_detail: message,
-                      model_study_version: RESEARCH_MODEL_STUDY_VERSION,
                     },
                   ))
                 : terminalFetchFailure
