@@ -96,11 +96,17 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     }
     const inScope = included && !excluded && (authoritativeDecision?.allowed ?? true)
 
+    const informationalOnly = !params.target_url
     const output = [
       `Target: ${target}`,
-      `In scope: ${inScope ? "YES" : "NO"}`,
+      informationalOnly
+        ? `Matches supplied scope entries: ${inScope ? "YES" : "NO"}`
+        : `In scope: ${inScope ? "YES" : "NO"}`,
       `Scope source: ${scopeSource}`,
       `Persisted authorization manifest: ${scopeConfigured ? "configured" : "not used"}`,
+      ...(informationalOnly
+        ? ["Authorization: NOT VERIFIED — caller-provided scope entries are informational only. Do not treat a match as permission to test."]
+        : []),
       ...(authoritativeDecision ? ["Authoritative active-scope decision: " + authoritativeDecision.reason] : []),
       "",
       "Scope check details:",
@@ -115,9 +121,21 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     }
 
     return {
-      title: inScope ? `In scope: ${target}` : `OUT OF SCOPE: ${target}`,
+      title: informationalOnly
+        ? (inScope ? `Informational scope match: ${target} (authorization unverified)` : `No informational scope match: ${target}`)
+        : inScope ? `In scope: ${target}` : `OUT OF SCOPE: ${target}`,
       output: output.join("\n"),
-      metadata: { target, inScope, scopeConfigured, scopeSource, excluded, results },
+      metadata: {
+        target,
+        inScope: scopeConfigured && inScope,
+        matchesSuppliedScope: inScope,
+        authorizationVerified: scopeConfigured && Boolean(authoritativeDecision?.allowed),
+        scopeMatchOnly: informationalOnly,
+        scopeConfigured,
+        scopeSource,
+        excluded,
+        results,
+      },
     }
   },
 })
