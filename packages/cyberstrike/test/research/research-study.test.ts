@@ -177,7 +177,6 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(knowledge?.metadata?.document_type).toBe("academy")
       const extracted = knowledge?.metadata?.extracted as Record<string, unknown> | undefined
       expect(extracted?.document_type).toBe("academy")
-      expect(extracted?.document_type).toBe("academy")
       expect(extracted?.failed_tests).toEqual(["A modified identifier returns the same authorized public object."])
       expect(extracted?.pattern_name).toBe("Cross-account object ownership check")
       expect(extracted?.test_procedure).toHaveLength(3)
@@ -198,7 +197,7 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(retrieved.output).toContain("Tests attempted:")
       expect(retrieved.output).toContain("Failed tests described by source: A modified identifier returns the same authorized public object.")
       expect(retrieved.output).toContain("Reusable pattern: Cross-account object ownership check")
-      expect(retrieved.output).toContain("Ordered test procedure: Capture the owner's baseline request.");
+      expect(retrieved.output).toContain("Ordered test procedure: Capture the owner's baseline request.")
       
       const completedQueueRow = ResearchQueue.find(sourceID, sourceURL)
       expect(completedQueueRow?.status).toBe("learned")
