@@ -317,24 +317,24 @@ export function classifyResearchDocumentType(
   text: string,
   configuredKind: ResearchSourceKind,
 ): "report" | "writeup" | "blog" | "academy" | "reference" | "research" | "mixed" | "uncertain" {
-  const sample = (title + "\\n" + text.slice(0, 12000)).toLowerCase()
+  const sample = (title + "\n" + text.slice(0, 12000)).toLowerCase()
   const reportSignals = [
-    /\\b(?:disclosed|disclosure|vulnerability report|bug bounty report|security report)\\b/,
-    /\\b(?:hackerone|bugcrowd|intigriti|yeswehack)\\b.{0,100}\\b(?:report|submission|disclosed)\\b/,
-    /\\b(?:cve-\\d{4}-\\d+)\\b/,
+    /\b(?:disclosed|disclosure|vulnerability report|bug bounty report|security report)\b/,
+    /\b(?:hackerone|bugcrowd|intigriti|yeswehack)\b.{0,100}\b(?:report|submission|disclosed)\b/,
+    /\b(?:cve-\d{4}-\d+)\b/,
   ].filter((pattern) => pattern.test(sample)).length
   const writeupSignals = [
-    /\\b(?:write[- ]?up|writeup|bug bounty journey|my first bug bounty|how i found|how we found)\\b/,
-    /\\b(?:i noticed|i discovered|i tested|my approach|the initial hypothesis|what i tried)\\b/,
-    /\\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause analysis)\\b/,
+    /\b(?:write[- ]?up|writeup|bug bounty journey|my first bug bounty|how i found|how we found)\b/,
+    /\b(?:i noticed|i discovered|i tested|my approach|the initial hypothesis|what i tried)\b/,
+    /\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause analysis)\b/,
   ].filter((pattern) => pattern.test(sample)).length
   const blogSignals = [
-    /\\b(?:blog post|in this article|this article explains|guide to|introduction to|best practices)\\b/,
-    /\\b(?:why it matters|how it works|overview|explained|lessons learned)\\b/,
+    /\b(?:blog post|in this article|this article explains|guide to|introduction to|best practices)\b/,
+    /\b(?:why it matters|how it works|overview|explained|lessons learned)\b/,
   ].filter((pattern) => pattern.test(sample)).length
-  const academySignals = /\\b(?:web security academy|lab solution|lab walkthrough|learning objective|practice lab)\\b/.test(sample)
-  const referenceSignals = /\\b(?:documentation|reference guide|cheat sheet|payloads all the things|hacktricks)\\b/.test(sample)
-  const researchSignals = /\\b(?:technical research|root cause|novel technique|security research|research paper|technical analysis)\\b/.test(sample)
+  const academySignals = /\b(?:web security academy|lab solution|lab walkthrough|learning objective|practice lab)\b/.test(sample)
+  const referenceSignals = /\b(?:documentation|reference guide|cheat sheet|payloads all the things|hacktricks)\b/.test(sample)
+  const researchSignals = /\b(?:technical research|root cause|novel technique|security research|research paper|technical analysis)\b/.test(sample)
 
   const scores = [
     ["report", reportSignals] as const,
