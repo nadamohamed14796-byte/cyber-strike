@@ -4,7 +4,15 @@ import { Session } from "../session"
 import { Tool } from "./tool"
 
 function clip(value: unknown, max = 1800) {
-  return typeof value === "string" ? value.slice(0, max) : ""
+  if (typeof value === "string") return value.slice(0, max)
+  // Many structured study fields are arrays. Previously these silently appeared
+  // as "not extracted" because clip() accepted strings only, hiding investigation
+  // sequences and false-positive signals from hunting-time retrieval.
+  if (Array.isArray(value)) {
+    const items = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    return items.join("; ").slice(0, max)
+  }
+  return ""
 }
 
 const ResearchKnowledgeParameters = z.object({
@@ -69,9 +77,30 @@ export const ResearchKnowledgeTool = Tool.define<typeof ResearchKnowledgeParamet
         "- Source: " + (row.source_url ?? "unknown") + " (public-source material; not independently verified here)",
         "- Source trust: " + (typeof metadata.source_trust === "number" ? metadata.source_trust + "/100" : "unknown"),
         "- Study method: " + (typeof metadata.study_method === "string" ? metadata.study_method : "legacy extraction"),
+        "- Document type: " + (typeof metadata.document_type === "string" ? metadata.document_type : "uncertain") +
+          (typeof metadata.document_type_classification_method === "string" ? " (" + metadata.document_type_classification_method + ")" : ""),
         "- Extraction coverage: " + coverageLabel,
         "- Record state: " + row.status + "; confidence field: " + row.confidence + "/100 (not proof of exploitability)",
         "- Lesson: " + (row.lesson ?? "not extracted"),
+        "- Initial observation: " + (clip(extracted.initial_observation, 1200) || "not extracted"),
+        "- Hypotheses considered: " + (clip(extracted.hypotheses, 1600) || "not recorded"),
+        "- Tests attempted: " + (clip(extracted.attempted_tests, 2200) || "not recorded"),
+        "- Successful tests described by source: " + (clip(extracted.successful_tests, 1800) || "not recorded"),
+        "- Failed tests described by source: " + (clip(extracted.failed_tests, 1800) || "not recorded"),
+        "- Rejected hypotheses: " + (clip(extracted.rejected_hypotheses, 1600) || "not recorded"),
+        "- Decisive evidence described by source: " + (clip(extracted.decisive_evidence, 1800) || "not recorded"),
+        "- Source-reported outcome / verification: " + (clip(extracted.reported_outcome, 1000) || "not recorded") +
+          " / " + (clip(extracted.verification_status, 200) || "unknown"),
+        "- Reusable pattern: " + (clip(extracted.pattern_name, 240) || "not named") +
+          " — " + (clip(extracted.pattern_summary, 1300) || "not extracted"),
+        "- Trigger signal: " + (clip(extracted.trigger_signal, 1000) || "not extracted"),
+        "- Ordered test procedure: " + (clip(extracted.test_procedure, 2200) || "not extracted"),
+        "- Expected positive signals: " + (clip(extracted.expected_positive_signals, 1400) || "not extracted"),
+        "- Expected negative signals: " + (clip(extracted.expected_negative_signals, 1400) || "not extracted"),
+        "- Evidence requirements: " + (clip(extracted.evidence_requirements, 1400) || "not extracted"),
+        "- Applicability conditions: " + (clip(extracted.applicability_conditions, 1400) || "not extracted"),
+        "- Non-applicability conditions: " + (clip(extracted.non_applicability_conditions, 1400) || "not extracted"),
+        "- Unresolved questions: " + (clip(extracted.unresolved_questions, 1200) || "none recorded"),
         "- Attack vector: " + (row.attack_vector ?? "not extracted"),
         "- Impact: " + (row.impact ?? "not extracted"),
         "- Prerequisites: " + (clip(extracted.prerequisites, 1000) || "not extracted"),
