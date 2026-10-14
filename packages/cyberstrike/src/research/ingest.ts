@@ -681,10 +681,12 @@ export async function retryAuthenticatedResearch(input: {
   )
 }
 export type ResearchSyncOptions = {
+  /** Initial per-pass page window; discovery expands it until exhaustion. */
   limit?: number
   pages?: number
+  /** Retained for compatibility; exhaustive discovery does not use a depth ceiling. */
   depth?: number
-  /** Drain all currently claimable queued research after bounded page discovery. */
+  /** Retained for compatibility; sync always drains all claimable work. */
   all?: boolean
 }
 
@@ -692,42 +694,70 @@ export async function syncResearchSource(
   source: ResearchSource,
   options: ResearchSyncOptions = {},
 ): Promise<ResearchIngestResult> {
-  const exhaustive = options.all === true
-  const limit = boundedInteger(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
-  const maxPages = Math.max(1, Math.floor(options.pages ?? DEFAULT_PAGES))
-  const maxDepth = Math.max(0, Math.floor(options.depth ?? Number.MAX_SAFE_INTEGER))
-
-  // Route every sync through the durable queue. This keeps direct API callers and
-  // the CLI on the same idempotent discovery/learning path instead of re-learning
-  // previously completed reports through an in-memory-only crawl.
-  const discovered = await discoverResearch({ sourceID: source.id, pages: maxPages, depth: maxDepth })
-  const discovery = discovered[0]
+  const { ResearchQueue } = await import("./queue")
+  const batchLimit = boundedInteger(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  let pageWindow = Math.max(1, Math.floor(options.pages ?? 20))
+  const discovery = { pages: 0, candidates: 0, added: 0, blocked_auth: 0, errors: [] as string[] }
   const learned = { learned: 0, skipped: 0, failed: 0, blocked_auth: 0, requeued_legacy: 0, errors: [] as string[] }
-  do {
-    const batch = await learnResearchQueue({
-      limit: exhaustive ? MAX_LIMIT : limit,
+
+  // Page windows expand without a global ceiling. The source is complete only
+  // when a pass leaves unused window capacity and the durable state has no blockers.
+  while (true) {
+    const pass = await discoverResearch({
       sourceID: source.id,
+      pages: pageWindow,
+      depth: Number.MAX_SAFE_INTEGER,
     })
-    learned.learned += batch.learned
-    learned.skipped += batch.skipped
-    learned.failed += batch.failed
-    learned.blocked_auth += batch.blocked_auth
-    learned.requeued_legacy += batch.requeued_legacy
-    learned.errors.push(...batch.errors.slice(0, Math.max(0, 5 - learned.errors.length)))
-    // Exhaustive sync drains the claimable queue, not only the first MAX_LIMIT
-    // items. A retried item eventually reaches a terminal state before draining continues.
-    if (!exhaustive || batch.claimed === 0) break
-  } while (true)
+    const current = pass[0]
+    if (!current) break
+    discovery.pages += current.pages
+    discovery.candidates += current.candidates
+    discovery.added += current.added
+    discovery.blocked_auth += current.blocked_auth
+    discovery.errors.push(...current.errors.slice(0, Math.max(0, 5 - discovery.errors.length)))
+
+    // Drain all claimable rows after each pass. batchLimit limits one claim only,
+    // never the total number of reports processed by this sync.
+    while (true) {
+      const batch = await learnResearchQueue({ limit: batchLimit, sourceID: source.id })
+      learned.learned += batch.learned
+      learned.skipped += batch.skipped
+      learned.failed += batch.failed
+      learned.blocked_auth += batch.blocked_auth
+      learned.requeued_legacy += batch.requeued_legacy
+      learned.errors.push(...batch.errors.slice(0, Math.max(0, 5 - learned.errors.length)))
+      if (batch.claimed === 0) break
+    }
+
+    const queueStats = ResearchQueue.stats(source.id)
+    const blocked =
+      current.error_count > 0 ||
+      current.blocked_auth > 0 ||
+      queueStats.crawl_page_errors > 0 ||
+      queueStats.crawl_page_auth_blocked > 0 ||
+      queueStats.blocked_auth > 0 ||
+      queueStats.retry > 0 ||
+      queueStats.studying > 0
+    if (blocked || current.pages < pageWindow) break
+
+    const nextWindow = pageWindow * 2
+    if (!Number.isSafeInteger(nextWindow) || nextWindow <= pageWindow) {
+      discovery.errors.push("runtime integer range exhausted before pagination was proven complete")
+      break
+    }
+    pageWindow = nextWindow
+  }
+
   return {
     source: source.id,
-    fetched: discovery?.pages ?? 0,
+    fetched: discovery.pages,
     learned: learned.learned,
     skipped: learned.skipped,
     failed: learned.failed,
-    blocked_auth: (discovery?.blocked_auth ?? 0) + learned.blocked_auth,
-    pages_crawled: discovery?.pages ?? 0,
-    candidates_discovered: discovery?.candidates ?? 0,
-    error_samples: [...(discovery?.errors ?? []), ...learned.errors].slice(0, 5),
+    blocked_auth: discovery.blocked_auth + learned.blocked_auth,
+    pages_crawled: discovery.pages,
+    candidates_discovered: discovery.candidates,
+    error_samples: [...discovery.errors, ...learned.errors].slice(0, 5),
   }
 }
 
