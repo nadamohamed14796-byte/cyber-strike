@@ -808,6 +808,9 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         (existing && existing.payload?.crawl_page !== true) ||
         knownKnowledgeURLs.has(current.url)
       )) {
+        // Count cached frontier nodes against this pass's work window too; otherwise
+        // a second pass could mistake a mostly cached archive for a short archive.
+        pages++
         // Even when a report's text is already cached/learned, reuse its saved
         // source-allowlisted outgoing links so larger future page passes can keep
         // walking the graph without refetching that report.
@@ -824,7 +827,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         ResearchQueue.isFreshCrawlPage(source.id, current.url) &&
         (existing.payload?.crawl_error === true || !primarySeeds.has(current.url))
       ) {
-        // Reuse the bounded, source-allowlisted link set from fresh crawl pages so
+        // Count cached frontier nodes against this pass's work window too; the
+        // window measures traversal progress, not only fresh network requests.
+        pages++
+        // Reuse the source-allowlisted link set from fresh crawl pages so
         // repeated discovery passes can continue traversing the graph without
         // repeatedly downloading the same index pages. Older cache rows without
         // this field are fetched once to backfill the frontier.
