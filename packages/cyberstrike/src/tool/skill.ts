@@ -25,9 +25,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     "  search  - Search skills by keyword, tech stack, CWE, or category",
     "  chain   - Analyze current findings for kill chain opportunities",
     "  suggest - Get next-step skill suggestions based on findings",
-    "  list    - Show all available skills or currently loaded skills",
+    "  list    - Show a page of available skills or currently loaded skills",
     "",
-    'Thousands of skills available. Use "search" or "list" action to discover them.',
+    'Thousands of skills available. Use "search" to narrow the catalog; list/search support limit and offset pagination.',
   ].join("\n")
 
   const parameters = z.object({
