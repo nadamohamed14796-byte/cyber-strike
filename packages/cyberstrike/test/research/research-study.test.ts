@@ -225,6 +225,102 @@ test("agent-led research study persists model analysis and completes its queue l
 })
 
 
+test("agent-led study can read every chunk of a long source under the tool output cap", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const sourceID = "portswigger-study-test-" + marker
+      const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
+      if (!baseSource) throw new Error("PortSwigger test source is not configured")
+      RESEARCH_SOURCES.push({
+        ...baseSource,
+        id: sourceID,
+        seedUrls: ["https://portswigger.net/web-security/"],
+      })
+      const sourceURL = "https://portswigger.net/web-security/long-study-chunks-" + marker
+      const firstMarker = "BEGIN_COMPLETE_RESEARCH_DOCUMENT_" + marker
+      const lastMarker = "END_COMPLETE_RESEARCH_DOCUMENT_" + marker
+      const sourceText = firstMarker + "\n" +
+        ("IDOR object-level authorization procedure, owner baseline, access control verification, and false-positive checks.\n").repeat(700) +
+        lastMarker
+      const queued = ResearchQueue.enqueue({
+        sourceID,
+        sourceURL,
+        title: "Long IDOR research article " + marker,
+        payload: {
+          cached_text: sourceText,
+          cached_text_truncated: false,
+          content_length: sourceText.length,
+          content_fingerprint: "c".repeat(40),
+          source_kind: "academy",
+          source_trust: 95,
+        },
+      })
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_long_chunks_" + marker.replace(/-/g, "").slice(0, 18),
+        messageID: "msg_long_chunks_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const next = await tool.execute({
+        action: "next",
+        source: sourceID,
+        pages: 1,
+        depth: 1,
+        limit: 3,
+        continue_after_save: false,
+      }, context)
+      const batch = JSON.parse(next.output)
+      const claimed = batch.items.find((item: { public_id: string }) => item.public_id === queued.id)
+      expect(claimed).toBeDefined()
+      if (!claimed) throw new Error("the long research item was not claimed")
+      expect(claimed.text_offset).toBe(0)
+      expect(claimed.has_more_text).toBe(true)
+      expect(claimed.text).toContain(firstMarker)
+      expect(claimed.text).not.toContain(lastMarker)
+
+      const chunks = [claimed.text as string]
+      let offset = claimed.next_text_offset as number
+      let hasMore = claimed.has_more_text as boolean
+      let reads = 0
+      while (hasMore) {
+        const read = await tool.execute({
+          action: "read",
+          source: sourceID,
+          public_id: claimed.public_id,
+          lease_owner: claimed.lease_owner,
+          offset,
+          pages: 1,
+          depth: 1,
+          limit: 3,
+          continue_after_save: false,
+        }, context)
+        const part = JSON.parse(read.output)
+        expect(part.start_offset).toBe(offset)
+        expect(part.text.length).toBeGreaterThan(0)
+        chunks.push(part.text)
+        offset = part.next_offset
+        hasMore = part.has_more_text
+        reads++
+        expect(reads).toBeLessThan(100)
+      }
+      expect(chunks.join("")).toBe(sourceText)
+      expect(chunks[chunks.length - 1]).toContain(lastMarker)
+      expect(reads).toBeGreaterThan(1)
+      expect(ResearchQueue.renewClaim(claimed.public_id, claimed.lease_owner, 20 * 60_000)).toBe(true)
+      expect(ResearchQueue.complete(queued.sequence, claimed.lease_owner, "rejected", "chunk retrieval test cleanup")).toBeDefined()
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("preflight skips are counted separately from model-studied reports", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
