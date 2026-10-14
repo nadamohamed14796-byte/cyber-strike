@@ -103,7 +103,7 @@ const ResearchStudyParameters = z.object({
   /** Exact active lease and character offset for reading subsequent text chunks. */
   public_id: z.string().regex(/^RPT-\d{1,12}$/).optional(),
   lease_owner: z.string().min(8).max(200).optional(),
-  offset: z.number().int().min(0).optional().describe("UTF-8 text offset from the previous read response; defaults to zero."),
+  offset: z.number().int().min(0).optional().describe("JavaScript string offset (UTF-16 code units) from the previous next_offset, not a UTF-8 byte offset; defaults to zero."),
   items: z.array(StudyItem).max(5).optional(),
 })
 

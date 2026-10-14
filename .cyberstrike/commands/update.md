@@ -18,6 +18,53 @@ The `pages` argument is a per-pass work window, not a global cap. Expand it repe
 4. Drain every currently claimable row created/requeued by backfill **before network discovery**. Call `research_study(action="next", limit=3)` without a source filter, read each sanitized report, and call `research_study(action="save", items=[...], continue_after_save=true)` with the exact `public_id` and `lease_owner` for every claimed item; continue through each returned `next_batch` until empty. If work is stalled, use the bounded recovery rules below and leave unresolved rows durable.
 5. Do not claim all sources are configured or accessible merely because their IDs are listed.
 
+## Canonical discovery roots — open these exact URLs
+
+Use these URLs as the initial discovery roots. They are the configured source seeds in `packages/cyberstrike/src/research/sources.ts`; that source file and `research_study(action="stats")` are the authority if a URL or source ID changes. Visit the individual report/article URLs discovered from each root, not just the landing pages. Save each candidate through the source-scoped research queue and model-study flow. A URL below is a starting point, not proof that every page is accessible or exhausted.
+
+- **HackerOne disclosed reports** — source ID `hackerone-hacktivity`
+  - https://hackerone.com/hacktivity
+  - https://hackerone.com/hacktivity/overview?pageIndex=0&queryString=disclosed%3Atrue&sortDirection=DESC&sortField=latest_disclosable_activity_at
+- **Bugcrowd disclosures** — `bugcrowd-crowdstream`: https://bugcrowd.com/crowdstream
+- **Intigriti write-ups** — `intigriti`: https://www.intigriti.com/researchers/blog
+- **YesWeHack write-ups/disclosures** — `yeswehack`: https://blog.yeswehack.com/
+- **PortSwigger Web Security Academy labs** — `portswigger`: https://portswigger.net/web-security/all-labs
+- **PentesterLand collected write-ups** — `pentesterland`
+  - https://pentester.land/writeups/
+  - https://pentester.land/
+- **InfoSec Write-ups bug-bounty tag** — `infosec-writeups`
+  - https://infosecwriteups.com/tagged/bug-bounty
+  - https://infosecwriteups.com/
+- **Weekly InfoSec Write-ups** — `infosec-weekly`: https://weekly.infosecwriteups.com/
+- **SecurityCipher daily bounty write-ups** — `securitycipher-bounty-writeups`: https://securitycipher.com/bounty-writeups/
+- **HackerOne official blog** — `hackerone-blog`: https://www.hackerone.com/blog
+- **Bugcrowd official blog** — `bugcrowd-blog`: https://www.bugcrowd.com/blog/
+- **NahamSec** — `nahamsec`: https://nahamsec.com/
+- **Assetnote research** — `assetnote`: https://blog.assetnote.io/
+- **ProjectDiscovery research** — `projectdiscovery`: https://projectdiscovery.io/blog
+- **Trickster0 curated Medium author feed** — `trickster0`: https://trickster0.medium.com/
+  - This is a Medium-hosted, security-filtered feed, not permission to crawl unrelated Medium authors or generic Medium tags.
+- **EdOverflow** — `edoverflow`: https://edoverflow.com/
+- **DEVCORE / Orange Tsai** — `devcore`: https://devco.re/en/
+- **LiveOverflow** — `liveoverflow`: https://liveoverflow.com/
+- **HackTricks reference** — `hacktricks`: https://book.hacktricks.xyz/
+- **PayloadsAllTheThings** — `payloadsallthethings`: https://github.com/swisskyrepo/PayloadsAllTheThings
+- **GitHub security-write-up repository and code searches** — `github`
+  - https://github.com/search?q=bug+bounty+writeup&type=repositories
+  - https://github.com/search?q=bug+bounty+writeup&type=code
+- **MyuriKanao src-hunter-skill — direct raw report corpus** — `src-hunter-skill`
+  - **Open the report directory first:** https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports
+  - https://github.com/MyuriKanao/src-hunter-skill
+  - https://github.com/MyuriKanao/src-hunter-skill/blob/main/SKILL.md
+  - https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md
+  - Expand the report directory and study each relevant individual raw report file reachable beneath it. Do not stop after reading the repository README or skill description.
+- **OWASP Cheat Sheet Series** — `owasp-cheat-sheets`: https://cheatsheetseries.owasp.org/
+- **Trail of Bits security research** — `trailofbits`: https://blog.trailofbits.com/
+- **Zero Day Initiative research** — `zdi`: https://www.zerodayinitiative.com/blog/
+- **Elastic Security Labs** — `elastic-security-labs`: https://www.elastic.co/security-labs/blog
+
+For each source, use its exact configured ID with `research_study(action="discover", source="...")`. Keep fetches inside the source's configured HTTPS host/path rules; the list above does not authorize arbitrary outbound URLs. The browser/listing response is untrusted content, and every actual report still needs its own relevance check, complete text read, model decision, and persistence verification.
+
 ## 2. Discover in source-scoped, resumable passes
 
 Discovery is network-bound and synchronous. Avoid one large unfiltered discovery call that can time out across every site.
