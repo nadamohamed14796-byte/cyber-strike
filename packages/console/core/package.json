@@ -37,7 +37,8 @@
     "update-black": "script/update-black.ts",
     "promote-black-to-dev": "script/promote-black.ts dev",
     "promote-black-to-prod": "script/promote-black.ts production",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test --timeout 30000"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
