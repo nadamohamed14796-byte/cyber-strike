@@ -7,6 +7,8 @@ import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learn
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
+import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
+import { tmpdir } from "../fixture/fixture"
 
 // Temporary source aliases are test fixtures, not process-wide configuration.
 afterEach(() => {
@@ -16,8 +18,6 @@ afterEach(() => {
     }
   }
 })
-import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
-import { tmpdir } from "../fixture/fixture"
 
 test("agent-led research study persists model analysis and completes its queue lease", async () => {
   await using dir = await tmpdir({ git: true })
