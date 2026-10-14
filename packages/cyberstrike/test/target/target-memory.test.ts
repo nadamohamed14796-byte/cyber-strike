@@ -176,25 +176,26 @@ test("requires concrete evidence before a target note can be confirmed or dispro
 })
 
 
-test("redacts secret-bearing fields at the target-note persistence boundary", async () => {
+test("preserves exact secret evidence in private target-local notes for operator validation", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
     async fn() {
       const workspace = await TargetMemory.ensure("https://example.com")
       const secret = "multi word password phrase that must not persist"
+      const secondSecret = "another private phrase"
       const result = await TargetMemory.addNote("https://example.com", {
         kind: "manual",
         title: "Login observation",
-        content: '{"password":"' + secret + '","client_secret":"another private phrase"}',
+        content: '{"password":"' + secret + '","client_secret":"' + secondSecret + '"}',
         source: "test",
       })
 
-      expect(result.note.content).not.toContain(secret)
-      expect(result.note.content).not.toContain("another private phrase")
+      expect(result.note.content).toContain(secret)
+      expect(result.note.content).toContain(secondSecret)
       const disk = await fs.readFile(path.join(workspace.workspacePath, "notes.md"), "utf-8")
-      expect(disk).not.toContain(secret)
-      expect(disk).not.toContain("another private phrase")
+      expect(disk).toContain(secret)
+      expect(disk).toContain(secondSecret)
       await Instance.dispose()
     },
   })
