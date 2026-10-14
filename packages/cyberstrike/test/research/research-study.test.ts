@@ -533,13 +533,13 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
       expect(queued?.payload?.cached_text).toBe(excerpt)
-      expect(queued?.payload?.model_study_requested_version).toBe(1)
+      expect(queued?.payload?.model_study_requested_version).toBe(2)
 
       const currentKnowledge = Database.use((db) =>
         db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, legacy.id)).get(),
       )
       expect(currentKnowledge?.status).toBe("observed")
-      expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(1)
+      expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(2)
 
       await queueLegacyKnowledgeForModelStudy(sourceID)
       const stillQueued = ResearchQueue.find(sourceID, sourceURL)
