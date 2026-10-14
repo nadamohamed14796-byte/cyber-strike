@@ -95,7 +95,7 @@ test("scope-file import persists the source list, configured manifest, and notes
         const notes = await fs.readFile(path.join(workspace, "notes.md"), "utf-8")
         expect(notes).toContain("# Target Notes")
         expect(notes).toContain("Scope file import checkpoint")
-        expect(notes).toContain(imported.metadata.source_scope_sha256)
+        expect(notes).toContain(String(imported.metadata.source_scope_sha256))
         expect((await fs.stat(path.join(workspace, "notes.md"))).size).toBeGreaterThan(0)
       } finally {
         await Instance.dispose()
