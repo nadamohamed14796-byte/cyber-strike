@@ -29,64 +29,127 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
-  return [...PHASE_SKILL_QUERIES[phaseId]]
+  // Include methodology-defined required tags as first-class search terms. These are
+  // the canonical phase taxonomy; hand-maintained queries are additional aliases.
+  const configured = PHASE_SKILL_QUERIES[phaseId] ?? []
+  const requiredTags = Phase.get(phaseId)?.requiredTags ?? []
+  return [...new Set([...requiredTags, ...configured])]
+}
+
+type RankedPhaseSkill = { entry: SkillIndex.Entry; score: number; query: string }
+
+const normalizeSkillText = (value: string) =>
+  value.toLowerCase().replace(/[_/.-]+/g, " ").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim()
+
+const skillTokens = (value: string) =>
+  normalizeSkillText(value).split(" ").filter((token) => token.length > 2)
+
+export function rankSkillsForPhase(
+  phaseId: Phase.Id,
+  entries: SkillIndex.Entry[],
+  limit = 4,
+): Array<{ name: string; description: string; query: string; score: number }> {
+  const queries = skillQueriesForPhase(phaseId)
+  const phase = Phase.get(phaseId)
+  const requiredTags = new Set((phase?.requiredTags ?? []).map(normalizeSkillText))
+  const queryTokens = new Set(queries.flatMap(skillTokens))
+  const ranked: RankedPhaseSkill[] = []
+
+  for (const entry of entries) {
+    if (entry.verified === "tampered") continue
+    const name = normalizeSkillText(entry.name)
+    const tags = entry.tags.map(normalizeSkillText)
+    const category = normalizeSkillText(entry.category ?? "")
+    const description = normalizeSkillText(entry.description)
+    const tech = entry.tech_stack.map(normalizeSkillText)
+    const searchable = [name, category, description, ...tags, ...tech, normalizeSkillText(entry.owasp_id ?? "")].join(" ")
+    let score = 0
+    let matchedQuery = queries[0] ?? phaseId
+
+    // Prefer exact skill aliases and exact phase tags over broad prose matches.
+    for (const query of queries) {
+      const normalizedQuery = normalizeSkillText(query)
+      let queryScore = 0
+      if (name === normalizedQuery) queryScore += 120
+      else if (name.startsWith(normalizedQuery)) queryScore += 70
+      else if (name.includes(normalizedQuery)) queryScore += 35
+      if (tags.includes(normalizedQuery)) queryScore += 90
+      else if (tags.some((tag) => tag.includes(normalizedQuery) || normalizedQuery.includes(tag))) queryScore += 30
+      if (category === normalizedQuery) queryScore += 25
+      if (description.includes(normalizedQuery)) queryScore += 8
+      if (tech.includes(normalizedQuery)) queryScore += 35
+      if (queryScore > score) {
+        score = queryScore
+        matchedQuery = query
+      }
+    }
+
+    // Token overlap handles differences such as "active-recon" vs "reconnaissance"
+    // and uses metadata beyond the skill's display name.
+    const matchedTokens = [...queryTokens].filter((token) => searchable.includes(token))
+    score += Math.min(matchedTokens.length, 8) * 3
+    for (const tag of tags) if (requiredTags.has(tag)) score += 45
+    if (phaseId === "passive_recon" || phaseId === "active_recon") {
+      if (/\brecon\b|reconnaissance|subdomain|osint|enumeration|port scan|vhost|virtual host/.test(searchable)) {
+        score += 55
+      }
+    }
+    if (score > 0) ranked.push({ entry, score, query: matchedQuery })
+  }
+
+  ranked.sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
+  const selected: RankedPhaseSkill[] = []
+  const seen = new Set<string>()
+
+  // Recon preflight has a hard coverage requirement: reserve one slot for a
+  // recon-specific skill even when a generic high-scoring skill ranks first.
+  if (phaseId === "passive_recon" || phaseId === "active_recon") {
+    const recon = ranked.find(({ entry }) => {
+      const text = normalizeSkillText([
+        entry.name, entry.category ?? "", entry.description, ...entry.tags,
+      ].join(" "))
+      return /\brecon\b|reconnaissance|subdomain|osint|enumeration|port scan|vhost|virtual host/.test(text)
+    })
+    if (recon) {
+      selected.push(recon)
+      seen.add(recon.entry.name)
+    }
+  }
+
+  for (const item of ranked) {
+    if (selected.length >= Math.max(0, limit)) break
+    if (seen.has(item.entry.name)) continue
+    selected.push(item)
+    seen.add(item.entry.name)
+  }
+
+  return selected.slice(0, Math.max(0, limit)).map(({ entry, score, query }) => ({
+    name: entry.name,
+    description: entry.description,
+    query,
+    score,
+  }))
 }
 
 async function formatPhaseSkillGuidance(phaseId: Phase.Id): Promise<string> {
-  const queries = skillQueriesForPhase(phaseId)
   const lines = [
     "## Required Skill Preflight",
-    "Before doing phase work, use the `skill` tool with action=load for the best-matching phase-specific candidate below; a listed name is only a recommendation and is not loaded until the tool returns its skill content.",
-    "Choose skills that directly match the phase tasks and observed target technology. Load additional distinct skills when the phase spans separate work areas; do not treat one generic skill as coverage for every task.",
-    "For passive_recon and active_recon, load at least one recon-specific skill (prefer recon-methodology, recon-subdomain-enumeration, attack-web-recon, recon-port-service-discovery, or recon-vhost-enumeration as applicable). A generic web-testing skill alone does not satisfy recon preflight. If none is available, search the skill catalog for a recon-specific alternative before proceeding.",
-    "If loading is denied or a skill is unavailable, search for an allowed alternative and note the exact gap. Do not claim a skill was loaded unless the tool call succeeded. Continue only with clearly documented limitations if the catalog or tool fails."
+    "Before doing phase work, call the `skill` tool with action=`load` and the exact name of a phase-specific candidate below. Wait for the tool result and verify that skill content was returned before claiming it is loaded.",
+    "Load more than one distinct skill when the phase covers separate work areas or observed target technologies. A recommendation is not a loaded skill, and a generic skill does not count as coverage for a specialized task.",
+    "For passive_recon and active_recon, a recon-specific skill is mandatory before reconnaissance. A generic web-testing skill alone does not satisfy this requirement; search the catalog for a recon-specific alternative if no candidate is listed.",
+    "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
   ]
 
   try {
     await SkillIndex.ensureBuilt()
-    const candidates = new Map<string, SkillIndex.Entry>()
-    // Gather results across every phase query before limiting candidates. Otherwise,
-    // a generic first query can crowd out exact matches from later, more specific queries.
-    for (const query of queries) {
-      for (const entry of SkillIndex.search(query, 20)) {
-        if (entry.verified === "tampered") continue
-        candidates.set(entry.name, entry)
-      }
-    }
-
-    const ranked = [...candidates.values()].map((entry) => {
-      let bestScore = 0
-      let matchedQuery = queries[0] ?? phaseId
-      for (const query of queries) {
-        const q = query.toLowerCase().trim()
-        let score = 0
-        if (entry.name.toLowerCase() === q) score += 100
-        else if (entry.name.toLowerCase().startsWith(q)) score += 50
-        else if (entry.name.toLowerCase().includes(q)) score += 20
-        if (entry.tags.some((tag) => tag.toLowerCase() === q)) score += 40
-        else if (entry.tags.some((tag) => tag.toLowerCase().includes(q))) score += 15
-        if (entry.owasp_id?.toLowerCase().includes(q)) score += 30
-        if (entry.category?.toLowerCase().includes(q)) score += 10
-        if (entry.description.toLowerCase().includes(q)) score += 5
-        if (score > bestScore) {
-          bestScore = score
-          matchedQuery = query
-        }
-      }
-      return { entry, score: bestScore, query: matchedQuery }
-    }).sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
-
-    const selected = ranked.slice(0, 4).map(({ entry, query }) => ({
-      name: entry.name,
-      description: entry.description,
-      query,
-    }))
-
+    const selected = rankSkillsForPhase(phaseId, SkillIndex.all(), 4)
     if (selected.length === 0) {
       lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
     } else {
-      lines.push("", "Phase-specific candidates:")
-      for (const match of selected) lines.push(`- ${match.name} — ${match.description} (matched: ${match.query})`)
+      lines.push("", "Phase-specific candidates (ranked by phase tags and skill metadata):")
+      for (const match of selected) {
+        lines.push(`- ${match.name} — ${match.description} (matched: ${match.query}; relevance: ${match.score})`)
+      }
     }
   } catch {
     // Skill catalog failures must not prevent session prompt generation.
