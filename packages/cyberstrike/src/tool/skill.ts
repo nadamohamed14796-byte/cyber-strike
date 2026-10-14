@@ -41,6 +41,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     cwe: z.string().optional().describe("CWE ID filter (for search action)"),
     category: z.string().optional().describe("Category filter (for search action)"),
     loaded: z.boolean().optional().describe("For list action: only show currently loaded skills"),
+    limit: z.number().int().min(1).max(100).default(50).describe("Maximum number of skills to return per page (1-100)"),
+    offset: z.number().int().min(0).default(0).describe("Zero-based result offset for list/search pagination"),
     findings: z
       .array(
         z.object({
@@ -97,19 +99,32 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           }
         }
         const all = accessibleSkills
+        const limit = Math.min(100, Math.max(1, params.limit ?? 50))
+        const offset = Math.max(0, params.offset ?? 0)
+        const page = all.slice(offset, offset + limit)
+        if (page.length === 0) {
+          return {
+            title: "No skills on this page",
+            output: `Offset ${offset} is beyond the ${all.length} available skills. Restart at offset=0 or use action="search" with a focused query.`,
+            metadata: {} as { name?: string; dir?: string },
+          }
+        }
+        const nextOffset = offset + page.length
+        const hasMore = nextOffset < all.length
         return {
-          title: `${all.length} skills available`,
+          title: `${page.length} of ${all.length} skills available`,
           output: [
-            `## Available Skills (${all.length})`,
+            `## Available Skills (showing ${offset + 1}-${nextOffset} of ${all.length})`,
             "",
-            ...all.map(
+            ...page.map(
               (s) =>
                 `- **${s.name}** [${s.verified ?? "unverified"}] — ${s.description}` +
                 (s.category ? ` (${s.category})` : "") +
                 (s.tech_stack?.length ? ` [${s.tech_stack.join(", ")}]` : ""),
             ),
+            ...(hasMore ? ["", `More skills remain. Repeat action="list" with offset=${nextOffset} and limit=${limit}, or use action="search" to narrow the catalog.`] : []),
           ].join("\n"),
-          metadata: {} as { name?: string; dir?: string },
+          metadata: { offset, next_offset: hasMore ? nextOffset : null, total: all.length } as { name?: string; dir?: string },
         }
       }
 
@@ -126,7 +141,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       }
 
       if (params.action === "search") {
-        const limit = 50
+        const limit = Math.min(100, Math.max(1, params.limit ?? 50))
+        const offset = Math.max(0, params.offset ?? 0)
         const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
         let candidates: SkillIndex.Entry[] = []
 
@@ -145,22 +161,23 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         }
         const permitted = candidates.filter((entry) => accessibleNames.has(entry.name))
         const totalCount = permitted.length
-        const results = permitted.slice(0, limit)
+        const results = permitted.slice(offset, offset + limit)
 
         if (results.length === 0)
           return {
-            title: "No results",
-            output: "No skills matched the search criteria.",
-            metadata: {} as { name?: string; dir?: string },
+            title: "No results on this page",
+            output: totalCount === 0
+              ? "No skills matched the search criteria."
+              : `Offset ${offset} is beyond the ${totalCount} matching skills. Reset offset to 0 or refine the query.`,
+            metadata: { offset, total: totalCount } as { name?: string; dir?: string },
           }
 
-        const truncated = totalCount > results.length
-        const header = truncated
-          ? `## Search Results (top ${results.length} of ${totalCount} — refine your query for more specific results)`
-          : `## Search Results (${results.length})`
+        const nextOffset = offset + results.length
+        const hasMore = nextOffset < totalCount
+        const header = `## Search Results (showing ${offset + 1}-${nextOffset} of ${totalCount})`
 
         return {
-          title: truncated ? `${results.length}/${totalCount} skills found` : `${results.length} skills found`,
+          title: `${results.length} of ${totalCount} skills found`,
           output: [
             header,
             "",
@@ -168,8 +185,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
               (r) =>
                 `- **${r.name}** [${r.verified ?? "unverified"}] — ${r.description}${r.tech_stack.length ? ` (${r.tech_stack.join(", ")})` : ""}`,
             ),
+            ...(hasMore ? ["", `More results remain. Repeat the same search filters with offset=${nextOffset} and limit=${limit}, or refine the query.`] : []),
           ].join("\n"),
-          metadata: {} as { name?: string; dir?: string },
+          metadata: { offset, next_offset: hasMore ? nextOffset : null, total: totalCount } as { name?: string; dir?: string },
         }
       }
 
