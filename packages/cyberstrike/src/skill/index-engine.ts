@@ -185,7 +185,7 @@ export namespace SkillIndex {
       if (score > 0) scored.push({ entry, score })
     }
     return scored
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
       .slice(0, limit)
       .map((s) => s.entry)
   }
