@@ -157,7 +157,7 @@ export const UpdateCommand = cmd({
       const knowledgeStats = ReportKnowledge.stats()
       prompts.log.info(
         "cycle=" + cycle +
-          " processed_pages=" + totalPages +
+          " page_visits_across_passes=" + totalPages +
           " discovered_candidates=" + totalCandidates +
           " queued_new=" + totalQueued +
           " learned=" + totalLearned +
