@@ -50,7 +50,7 @@ import { Truncate } from "@/tool/truncation"
 import { Token } from "@/util/token"
 import { MethodologyContext } from "@/methodology/context"
 import { TargetMemory } from "@/target"
-import { ResearchContext } from "@/learning/research-context"
+import { ResearchContext, promptResearchSignals } from "@/learning/research-context"
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
@@ -808,6 +808,16 @@ export namespace SessionPrompt {
         /(?:التارجت|تارجت|اسكوب|السكوب|نطاق|نطاقات|سب.?دومين|استطلاع|صيد\s+الثغرات|تقرير\s+ثغرات)/iu.test(targetTaskText) ||
         (/\.(?:txt|list|csv)\b/i.test(targetTaskText) && /\b(domain|host|scope|subdomain)\b/i.test(targetTaskText))
       if (targetWorkflowRequested || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
+
+      // The global research module was imported here but never wired into the actual
+      // model prompt. Only inject it for a target/security workflow, existing target
+      // memory, or an explicit vulnerability signal; regular unrelated chats stay clean.
+      // Pass the most recent bounded text so a long conversation cannot hide the current ask.
+      const researchSignalText = targetTaskText.slice(-4000)
+      if (targetWorkflowRequested || targetMemoryCtx || promptResearchSignals(researchSignalText).length > 0) {
+        const researchContext = ResearchContext.generate(Session.root(sessionID), researchSignalText)
+        if (researchContext) system.push(researchContext)
+      }
 
       // Inject MCP tool availability info so the LLM knows to use tool_search
       const mcpLazyStats = LazyToolRegistry.stats()
