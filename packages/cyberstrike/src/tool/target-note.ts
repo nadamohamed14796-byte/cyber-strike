@@ -37,13 +37,13 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
       }
       const saved = await TargetMemory.addNote(workspace.targetURL, {
         kind: params.kind as TargetNoteKind,
-        title: params.title.trim().replaceAll("\\r", " ").replaceAll("\\n", " ").replaceAll("\\t", " ").slice(0, 180),
+        title: params.title.trim().replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 180),
         content: params.content.trim(),
         evidence: params.evidence?.trim(),
-        source: "agent:" + (ctx.agent || "cyberstrike").replaceAll("\\r", " ").replaceAll("\\n", " ").replaceAll("\\t", " ").slice(0, 100),
+        source: "agent:" + (ctx.agent || "cyberstrike").replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 100),
         sourceURL: params.source_url,
         status: params.status as TargetNoteStatus,
-        tags: params.tags?.map((tag) => tag.replaceAll("\\r", " ").replaceAll("\\n", " ").replaceAll("\\t", " ").slice(0, 48)),
+        tags: params.tags?.map((tag) => tag.replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 48)),
       })
       return {
         title: saved.created ? "Target note saved" : saved.updated ? "Target note updated" : "Target note already exists",
