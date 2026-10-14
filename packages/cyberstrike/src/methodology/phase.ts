@@ -1,5 +1,5 @@
 // ============================================================
-// PHASE DEFINITIONS — 13-phase testing methodology
+// PHASE DEFINITIONS — 14-phase testing methodology
 // CyberStrike methodology engine — phase lifecycle management
 // ============================================================
 
