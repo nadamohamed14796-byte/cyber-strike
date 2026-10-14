@@ -34,6 +34,15 @@ test("the npm launcher resolves its own file path under Node ESM", async () => {
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("launcher-ok:--sentinel ok")
+
+    // A binary killed by a signal has status=null; the launcher must not report success.
+    for (const name of packageNames) {
+      const fakeBinary = path.join(packageRoot, "node_modules", name, "bin", "cyberstrike")
+      await fs.writeFile(fakeBinary, "#!/bin/sh\nkill -TERM $\n")
+      await fs.chmod(fakeBinary, 0o755)
+    }
+    const signaled = spawnSync("node", [launcher, "--sentinel"], { encoding: "utf8" })
+    expect(signaled.status).toBe(1)
   } finally {
     await fs.rm(temp, { recursive: true, force: true })
   }
