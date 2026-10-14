@@ -61,7 +61,7 @@ A source is exhausted only when its accessible discovery frontier has been check
 
 ## 3. Fetch and study lifecycle
 
-The current safe-fetcher also has a per-document byte ceiling (currently 1,500,000 bytes), redirect ceiling, and total fetch-time budget. These are transport/resource-safety guards, not global page or item limits. If a resource exceeds a transport guard, record it as blocked/partial with the exact reason; never silently treat a partial body as a complete study. The active-model queue uses terminal `blocked_size` for the safe-fetch document-size ceiling; count and report it separately from irrelevant-content rejections and retryable network failures. If the user explicitly wants larger documents supported, implement safe streaming/chunking and tests rather than removing SSRF, timeout, redirect, or memory protections.
+The current safe-fetcher also has a per-document byte ceiling (currently 1,500,000 bytes), redirect ceiling, and total fetch-time budget. These are transport/resource-safety guards, not global page or item limits. If a resource exceeds a transport guard, record it as blocked/partial with the exact reason; never silently treat a partial body as a complete study. The active-model queue uses terminal `blocked_size` for the safe-fetch document-size ceiling and `blocked_fetch` for other non-retryable safe-fetch errors (for example, unsupported content type or terminal HTTP errors); count and report both separately from irrelevant-content rejections and retryable network failures. If the user explicitly wants larger documents supported, implement safe streaming/chunking and tests rather than removing SSRF, timeout, redirect, or memory protections.
 
 For each discovered candidate:
 
