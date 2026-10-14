@@ -156,7 +156,7 @@ export const ResearchCommand = cmd({
 
           const queue = ResearchQueue.stats(args.source)
           const knowledge = ReportKnowledge.stats()
-          prompts.log.info("Totals: processed_pages=" + totals.pages + " candidates=" + totals.candidates +
+          prompts.log.info("Totals: page_visits_across_passes=" + totals.pages + " candidates=" + totals.candidates +
             " queued_new=" + totals.queued + " learned=" + totals.learned + " skipped=" + totals.skipped +
             " failed=" + totals.failed + " blocked_auth=" + totals.blockedAuth + " discovery_errors=" + totals.errors)
           prompts.log.info("Queue: " + JSON.stringify(queue))
