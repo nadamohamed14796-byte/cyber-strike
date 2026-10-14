@@ -4,6 +4,10 @@ import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { classifyResearchTopic, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
+import { ReportKnowledge } from "../../src/learning/report-knowledge"
+import { ResearchQueue } from "../../src/research/queue"
+import { Instance } from "../../src/project/instance"
+import { tmpdir } from "../fixture/fixture"
 
 // Temporary source aliases are test fixtures, not process-wide configuration.
 afterEach(() => {
@@ -13,10 +17,6 @@ afterEach(() => {
     }
   }
 })
-import { ReportKnowledge } from "../../src/learning/report-knowledge"
-import { ResearchQueue } from "../../src/research/queue"
-import { Instance } from "../../src/project/instance"
-import { tmpdir } from "../fixture/fixture"
 
 test("research extraction keeps reproduction, prerequisites, verification, caveats, PoC, and retrieval signals", () => {
   const extracted = extractResearchDetails(
