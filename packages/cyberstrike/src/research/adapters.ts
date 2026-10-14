@@ -42,7 +42,11 @@ export function nextDiscoveryPage(source: ResearchSource, value: string) {
         if (!Number.isSafeInteger(current) || current < -1) return undefined
         return withQuery(value, "pageIndex", current + 1)
       }
-      return withQuery(value, "page", Number(parsed.searchParams.get("page") ?? "1") + 1)
+      {
+        const current = Number(parsed.searchParams.get("page") ?? "1")
+        if (!Number.isSafeInteger(current) || current < 1) return undefined
+        return withQuery(value, "page", current + 1)
+      }
     case "bugcrowd-crowdstream":
     case "github": {
       const current = Number(parsed.searchParams.get("page") ?? "1")
