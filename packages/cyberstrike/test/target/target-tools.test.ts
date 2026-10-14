@@ -18,6 +18,8 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       expect(init.metadata.scope_configured).toBe(false)
       expect(init.metadata.workspace).toBeTruthy()
       const rootPath = init.metadata.workspace!
+      expect(JSON.parse(await fs.readFile(path.join(rootPath, "target.json"), "utf-8")).targetURL).toBe("https://example.com")
+      expect(JSON.parse(await fs.readFile(path.join(rootPath, "workspace.json"), "utf-8")).targetURL).toBe("https://example.com")
       expect(await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")).toContain("# Target Notes")
       expect((await fs.readFile(path.join(rootPath, "scope", "scope.json"), "utf-8"))).toContain('"status": "unconfigured"')
 
