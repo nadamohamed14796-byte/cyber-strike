@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { ReportKnowledge } from "../learning/report-knowledge"
 import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, type ResearchSource } from "./sources"
-import { discoverySeeds, sourceDocumentPriority } from "./adapters"
+import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage, sourceDocumentPriority } from "./adapters"
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
 const MAX_CANDIDATE_SCORE = 100
@@ -14,6 +14,18 @@ const DEFAULT_PAGES = 250
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number) {
   const candidate = value === undefined || !Number.isFinite(value) ? fallback : value
   return Math.max(minimum, Math.min(Math.floor(candidate), maximum))
+}
+
+function paginationSeriesKey(source: ResearchSource, value: string) {
+  const url = new URL(value)
+  if (source.id === "hackerone-hacktivity" && url.pathname.includes("/overview")) {
+    url.searchParams.delete("pageIndex")
+  } else if (["bugcrowd-crowdstream", "github"].includes(source.id)) {
+    url.searchParams.delete("page")
+  } else {
+    url.pathname = url.pathname.replace(/\/page\/\d+\/?$/i, "")
+  }
+  return url.toString()
 }
 
 function hostAllowed(url: URL, source: ResearchSource) {
@@ -769,6 +781,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     const queued = new Set<string>()
     const visited = new Set<string>()
     const errors: string[] = []
+    const paginationFingerprints = new Map<string, string>()
     let pages = 0
     let candidates = 0
     let added = 0
@@ -788,7 +801,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       queue.push({ url, depth })
     }
 
-    for (const seed of discoverySeeds(source, maxPages)) add(seed, 0)
+    for (const seed of discoverySeeds(source)) add(seed, 0)
     for (const url of await discoverSitemap(source)) add(url, 1)
 
     while (queue.length && pages < maxPages) {
@@ -868,6 +881,17 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           continue
         }
         const discoveredLinks = linksOf(html, new URL(current.url), source)
+        const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
+        const canContinuePagination = primarySeeds.has(current.url) || isDiscoveryPaginationURL(source, current.url) || isIndexLikeResearchUrl(current.url)
+        const nextPage = canContinuePagination ? nextDiscoveryPage(source, current.url) : undefined
+        const seriesKey = paginationSeriesKey(source, current.url)
+        const previousFingerprint = paginationFingerprints.get(seriesKey)
+        const repeatsPreviousPage = previousFingerprint === contentFingerprint
+        paginationFingerprints.set(seriesKey, contentFingerprint)
+        const hasRelevantChildren = discoveredLinks.some((link) => isResearchCandidate(link, source) && !isIndexLikeResearchUrl(link))
+        if (nextPage && !repeatsPreviousPage && hasRelevantChildren) {
+          discoveredLinks.push(nextPage)
+        }
         for (const link of discoveredLinks) {
           candidates++
           add(link, current.depth + 1)
@@ -906,12 +930,24 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           sourceID: source.id,
           sourceURL: current.url,
           title,
-          contentFingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
+          contentFingerprint,
           discoveredLinks,
         })
       } catch (error) {
-        errorCount++
         const message = error instanceof Error ? error.message : String(error)
+        // A generated pagination URL returning a normal not-found response is the
+        // archive's end marker, not a crawl failure. Persist that terminal page so
+        // later passes do not repeatedly request it.
+        if (isDiscoveryPaginationURL(source, current.url) && /\bHTTP\s+(?:400|404)\b/i.test(message)) {
+          ResearchQueue.markVisitedPage({
+            sourceID: source.id,
+            sourceURL: current.url,
+            title: "Pagination exhausted",
+            discoveredLinks: [],
+          })
+          continue
+        }
+        errorCount++
         if (/\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)) {
           ResearchQueue.blockAuthentication({
             sourceID: source.id,
