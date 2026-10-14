@@ -154,6 +154,40 @@ describe("Methodology — Prerequisites", () => {
     })
   })
 
+  test("downstream phases remain blocked when a prerequisite has deliverables but its ancestors are incomplete", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+
+        Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "subdomain",
+            severity: "info",
+            title: "Passive recon observation",
+            detail: "A passive reconnaissance candidate was recorded before scope analysis was completed.",
+            asset: "example.com",
+            source: "test",
+            confidenceLevel: "low",
+            tags: ["passive-recon"],
+          },
+        })
+
+        const state = Methodology.computeState(session.id)
+        const passiveRecon = state.phases.find((phase) => phase.id === "passive_recon")
+        const activeRecon = state.phases.find((phase) => phase.id === "active_recon")
+        expect(passiveRecon?.deliverableCount).toBe(1)
+        expect(passiveRecon?.status).toBe("blocked")
+        expect(activeRecon?.status).toBe("blocked")
+        expect(activeRecon?.blockReason).toContain("passive_recon")
+        expect(state.completedCount).toBe(0)
+
+        await Session.remove(session.id)
+      },
+    })
+  })
+
   test("blocked phase with deliverables emits a blocking ordering violation", async () => {
     await Instance.provide({
       directory: projectRoot,
@@ -176,9 +210,9 @@ describe("Methodology — Prerequisites", () => {
 
         const state = Methodology.computeState(session.id)
         const inputPhase = state.phases.find((p) => p.id === "input_validation")
-        // computeState prioritizes deliverables when assigning status, so this
-        // phase can appear completed while blockReason still records missing prerequisites.
-        expect(inputPhase?.status).toBe("completed")
+        // Premature deliverables remain recorded, but a phase with unmet prerequisites
+        // stays blocked and does not inflate the methodology completion percentage.
+        expect(inputPhase?.status).toBe("blocked")
         expect(inputPhase?.blockReason).toContain("technology_profiling")
         expect(inputPhase?.deliverableCount).toBe(1)
         expect(state.violations).toEqual(
