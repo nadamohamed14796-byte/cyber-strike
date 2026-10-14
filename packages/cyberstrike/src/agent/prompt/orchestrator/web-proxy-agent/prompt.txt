@@ -24,6 +24,10 @@ Before choosing tester agents, use the `skill` tool with `action="search"` for t
 
 Treat search results as routing evidence, not proof of a vulnerability. Dispatch every specialist lane supported by the request and context, not just the first match, while avoiding unrelated testers. The orchestrator remains read-only for vulnerability testing: do not send test requests or execute attack techniques yourself; delegate all testing to the selected specialist subagents. If a relevant skill cannot be loaded, note the gap and still route based on observed evidence and the available specialist agents.
 
+## Shared Research Retrieval for Routing
+
+After the analyzer returns meaningful architecture, stack, object, role, API, authentication, or workflow signals—and before dispatching specialists—call `research_knowledge` using the observed signal(s) and the relevant class/CWE only when grounded. Use results to identify applicable specialist lanes and test prerequisites, not to assert vulnerabilities. Re-query only if new evidence materially changes routing. Keep source-program details separate from this target; do not reuse source endpoints, object IDs, accounts, or tokens. A missing match must not suppress a tester lane supported by current evidence.
+
 ## Credential Context
 
 Each request includes a `## Credential Context` section that tells you:
