@@ -209,3 +209,35 @@ test("session target context shows the program root, selected asset, registered 
     },
   })
 })
+
+test("refines existing child asset types without downgrading them on later generic observations", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const root = await TargetMemory.configureScope("https://type-example.test", {
+        include: ["type-example.test", "*.type-example.test"],
+        authorizationSource: "Asset classification test",
+        authorizationReference: "https://type-example.test/security",
+      })
+
+      const initial = await TargetMemory.registerObservedAsset("https://service.type-example.test", "subdomain")
+      expect(initial?.assetType).toBe("subdomain")
+
+      const refined = await TargetMemory.registerObservedAsset("https://service.type-example.test/health", "application")
+      expect(refined?.id).toBe(initial?.id)
+      expect(refined?.assetType).toBe("application")
+
+      // A later observer may only know the hostname; it must not erase the
+      // more specific classification already persisted for this same asset.
+      const rediscovered = await TargetMemory.registerObservedAsset("https://service.type-example.test/api")
+      expect(rediscovered?.id).toBe(initial?.id)
+      expect(rediscovered?.assetType).toBe("application")
+
+      const registry = JSON.parse(await fs.readFile(path.join(root.workspace.workspacePath, "assets", "registry.json"), "utf-8"))
+      expect(registry.assets).toHaveLength(1)
+      expect(registry.assets[0].type).toBe("application")
+    },
+  })
+})
+
