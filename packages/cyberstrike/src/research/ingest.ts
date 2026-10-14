@@ -10,7 +10,6 @@ const AUTH_RETRY_COOLDOWN_MS = 10 * 60_000
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 500
 const DEFAULT_PAGES = 250
-const DEFAULT_DEPTH = 2
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number) {
   const candidate = value === undefined || !Number.isFinite(value) ? fallback : value
