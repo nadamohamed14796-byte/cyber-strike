@@ -25,6 +25,8 @@ export interface JavaScriptRequestCandidate {
 export interface JavaScriptSecretCandidate {
   kind: string
   line: number
+  /** Exact source value for target-local evidence; never promote a pattern match to verified. */
+  value: string
   fingerprint: string
   confidence: "candidate"
 }
@@ -200,8 +202,8 @@ function splitTopLevelArguments(value: string): string[] {
 }
 
 /**
- * Bounded static heuristics only: never evaluates source or returns hard-coded secret values.
- * Results are candidates. Runtime requests and server-side authorization require separate verification.
+ * Bounded static heuristics only: never evaluates source. Exact candidate values are retained so the
+ * private target workspace can record reproducible evidence. Results remain candidates until verified.
  */
 export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis {
   const source = input.slice(0, 1_000_000)
@@ -322,7 +324,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (!rawValue || /^(?:\$\{|\{\{|\$[A-Z_][A-Z0-9_]*|<[^>]+>)/i.test(rawValue.trim())) continue
     const item: JavaScriptSecretCandidate = {
       kind: (match[1] ?? "secret").toLowerCase().replace(/[_-]+/g, "-"), line: lineNumber(lineStarts, match.index ?? 0),
-      fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
+      value: rawValue, fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
     }
     secrets.set(item.kind + ":" + item.fingerprint, item)
     if (secrets.size >= 100) break
@@ -370,7 +372,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     notes: [
       "Bounded static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
-      "Secret values are never returned or persisted; only type, line number, and one-way fingerprint are retained.",
+      "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated.",
       "Static sink signals are triage candidates, can be false positives in comments/vendor code, and do not prove taint or exploitability.",
       "Function attribution is a nearest-preceding-function hint, not a proven runtime call relationship.",
     ],
