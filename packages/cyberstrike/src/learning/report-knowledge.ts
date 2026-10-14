@@ -239,7 +239,7 @@ export namespace ReportKnowledge {
           const metadata = row.metadata ?? {}
           if (sourceID) {
             const preferredID = typeof metadata.research_source === "string" ? metadata.research_source : undefined
-            const resolvedSource = resolveResearchSourceForURL(row.source_url, preferredID)
+            const resolvedSource = resolveResearchSourceForURL(row.source_url, preferredID ?? sourceID)
             // Filter to a safely attributable source before the batch limit.
             // Path-specific configured seed prefixes can disambiguate legacy
             // HackerOne/GitHub rows that predate source provenance metadata.
