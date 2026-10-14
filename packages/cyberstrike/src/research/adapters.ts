@@ -8,7 +8,7 @@ function withQuery(url: string, key: string, value: number) {
 
 function withPathPage(url: string, page: number) {
   const parsed = new URL(url)
-  const path = parsed.pathname.replace(/\/$/, "")
+  const path = parsed.pathname.replace(/\/page\/\d+\/?$/i, "").replace(/\/$/, "")
   parsed.pathname = path + "/page/" + page
   return parsed.toString()
 }
