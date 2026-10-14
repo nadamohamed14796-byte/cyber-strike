@@ -13,7 +13,7 @@ import { ReportKnowledge } from "../../learning/report-knowledge"
  */
 export const UpdateCommand = cmd({
   command: "update",
-  describe: "exhaustively discover and study public reports/writeups into globally shared research knowledge",
+  describe: "heuristic public-research sync (does not invoke active-model study; use /update for model-led research)",
   builder: (yargs: Argv) =>
     yargs
       .option("print-prompt", { type: "boolean", default: false, describe: "print the canonical copyable research update agent prompt without running a crawl" })
@@ -33,7 +33,7 @@ export const UpdateCommand = cmd({
       ? Math.max(5, Math.floor(args.interval))
       : 60
 
-    prompts.intro("CyberStrike Exhaustive Research Update")
+    prompts.intro("CyberStrike Heuristic Research Sync (not active-model /update)")
     let cycle = 0
     do {
       cycle++
@@ -206,6 +206,6 @@ export const UpdateCommand = cmd({
       await Bun.sleep(interval * 1000)
     } while (true)
 
-    prompts.outro(args.watch ? "Exhaustive research worker stopped" : "Research update cycle finished; inspect any reported blockers")
+    prompts.outro(args.watch ? "Heuristic research worker stopped; use /update for active-model study" : "Heuristic sync finished; this CLI path does not invoke active-model research_study. Use /update in the interactive agent for model-led study.")
   },
 })
