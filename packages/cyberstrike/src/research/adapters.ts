@@ -1,8 +1,5 @@
 import type { ResearchSource } from "./sources"
 
-// Match the discovery worker's hard ceiling; lower per-run page budgets still apply.
-const PAGE_CAP = 1000
-
 function withQuery(url: string, key: string, value: number) {
   const parsed = new URL(url)
   parsed.searchParams.set(key, String(value))
@@ -22,7 +19,9 @@ function withPathPage(url: string, page: number) {
  * bypasses authentication or access controls.
  */
 export function discoverySeeds(source: ResearchSource, maxPages: number) {
-  const pages = Math.max(1, Math.min(maxPages, PAGE_CAP))
+  // This is a per-pass seed window, not a global ceiling. The update worker
+  // expands the window until a source's pagination is actually exhausted.
+  const pages = Math.max(1, Math.floor(Number.isFinite(maxPages) ? maxPages : 1))
   const seeds = new Set(source.seedUrls)
 
   const addQueryPages = (urls: string[], key = "page") => {
