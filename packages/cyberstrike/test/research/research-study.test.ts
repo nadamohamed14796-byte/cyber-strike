@@ -40,7 +40,13 @@ test("agent-led research study persists model analysis and completes its queue l
       const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
       if (!baseSource) throw new Error("PortSwigger test source is not configured")
       const sourceID = "portswigger-study-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
+      RESEARCH_SOURCES.push({
+        ...baseSource,
+        id: sourceID,
+        // Make test URLs belong to this temporary alias even while the real
+        // PortSwigger source is registered; production source resolution stays strict.
+        seedUrls: ["https://portswigger.net/web-security/"],
+      })
       const sourceURL = "https://portswigger.net/web-security/access-control/idor?study-test=" + marker
       const sourceText = [
         "IDOR (insecure direct object reference) occurs when the server does not verify object-level authorization.",
@@ -232,7 +238,13 @@ test("source-scoped model-study save refuses a lease from another source", async
       const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
       if (!baseSource) throw new Error("PortSwigger test source is not configured")
       const sourceID = "portswigger-filter-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
+      RESEARCH_SOURCES.push({
+        ...baseSource,
+        id: sourceID,
+        // Make test URLs belong to this temporary alias even while the real
+        // PortSwigger source is registered; production source resolution stays strict.
+        seedUrls: ["https://portswigger.net/web-security/"],
+      })
       const sourceURL = "https://portswigger.net/web-security/source-filter-" + marker
       const sourceText = ("A reusable access-control security lesson. ").repeat(12)
       const queued = ResearchQueue.enqueue({
@@ -288,7 +300,13 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
       const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
       if (!baseSource) throw new Error("PortSwigger test source is not configured")
       const sourceID = "portswigger-backfill-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
+      RESEARCH_SOURCES.push({
+        ...baseSource,
+        id: sourceID,
+        // Make test URLs belong to this temporary alias even while the real
+        // PortSwigger source is registered; production source resolution stays strict.
+        seedUrls: ["https://portswigger.net/web-security/"],
+      })
       const legacyCount = 501
       for (let index = 0; index < legacyCount; index++) {
         const row = ReportKnowledge.ingestExternalDetailed({
@@ -455,7 +473,13 @@ test("model-led update queues legacy shared reports once without refetching or c
       const baseSource = RESEARCH_SOURCES.find((source) => source.id === "portswigger")
       if (!baseSource) throw new Error("PortSwigger test source is not configured")
       const sourceID = "portswigger-legacy-study-test-" + marker
-      RESEARCH_SOURCES.push({ ...baseSource, id: sourceID })
+      RESEARCH_SOURCES.push({
+        ...baseSource,
+        id: sourceID,
+        // Make test URLs belong to this temporary alias even while the real
+        // PortSwigger source is registered; production source resolution stays strict.
+        seedUrls: ["https://portswigger.net/web-security/"],
+      })
       const now = Date.now()
       Database.use((db) => db.insert(SessionTable).values({
         id: sessionID,
