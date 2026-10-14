@@ -3,7 +3,7 @@ import { Database } from "../storage/db"
 import { ResearchQueueTable } from "./queue.sql"
 import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION } from "./sources"
 
-export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth"
+export type ResearchQueueStatus = "discovered" | "queued" | "studying" | "learned" | "retry" | "rejected" | "blocked_auth" | "blocked_size"
 
 const LEASE_MS = 5 * 60_000
 const CRAWL_PAGE_TTL_MS = 6 * 60 * 60_000
@@ -734,7 +734,7 @@ export namespace ResearchQueue {
   export function complete(
     sequence: number,
     leaseOwner: string,
-    outcome: "learned" | "retry" | "rejected" | "blocked_auth",
+    outcome: "learned" | "retry" | "rejected" | "blocked_auth" | "blocked_size",
     error?: string,
     payloadPatch?: Record<string, unknown>,
   ) {
@@ -757,7 +757,7 @@ export namespace ResearchQueue {
         last_error: error ?? null,
         lease_owner: null,
         lease_until: null,
-        completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" ? now : null,
+        completed_at: outcome === "learned" || outcome === "rejected" || outcome === "blocked_auth" || outcome === "blocked_size" ? now : null,
         updated_at: now,
       }).where(and(
         eq(ResearchQueueTable.sequence, sequence),
@@ -800,7 +800,7 @@ export namespace ResearchQueue {
         learned: 0,
         retry: 0,
         rejected: 0,
-        blocked_auth: 0,
+        blocked_auth: 0,\n        blocked_size: 0,
         model_study_learned: modelStudiedRows.filter((row) => row.status === "learned").length,
         model_study_rejected: modelStudiedRows.filter((row) => row.status === "rejected").length,
         model_study_completed: modelStudiedRows.filter((row) => row.status === "learned" || row.status === "rejected").length,
