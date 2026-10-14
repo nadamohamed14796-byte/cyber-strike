@@ -452,6 +452,14 @@ test("learning preserves the full source fingerprint when only a cached excerpt 
         "Unique fixture marker: " + marker,
       ].join(" ")
 
+      const originalFetch = globalThis.fetch
+      let fetchCalls = 0
+      globalThis.fetch = (async () => {
+        fetchCalls++
+        const html = "<!doctype html><html><head><title>IDOR truncated-source fingerprint " + marker + "</title></head><body>" + excerpt + " " + excerpt + " " + excerpt + "</body></html>"
+        return new Response(html, { status: 200, headers: { "content-type": "text/html; charset=utf-8" } })
+      }) as unknown as typeof fetch
+
       try {
         ResearchQueue.enqueue({
           sourceID,
@@ -470,6 +478,7 @@ test("learning preserves the full source fingerprint when only a cached excerpt 
 
         const result = await learnResearchQueue({ limit: 1, sourceID })
         expect(result.learned).toBe(1)
+        expect(fetchCalls).toBe(1)
 
         const row = ReportKnowledge.search({
           query: "IDOR truncated-source fingerprint " + marker,
@@ -481,6 +490,7 @@ test("learning preserves the full source fingerprint when only a cached excerpt 
         expect(row?.metadata?.content_length).toBe(150_000)
         expect(row?.metadata?.content_truncated_for_learning).toBe(true)
       } finally {
+        globalThis.fetch = originalFetch
         const sourceIndex = RESEARCH_SOURCES.indexOf(isolatedSource)
         if (sourceIndex >= 0) RESEARCH_SOURCES.splice(sourceIndex, 1)
         await Instance.dispose()

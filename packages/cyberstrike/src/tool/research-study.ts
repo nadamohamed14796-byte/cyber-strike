@@ -103,7 +103,7 @@ const ResearchStudyParameters = z.object({
   /** Exact active lease and character offset for reading subsequent text chunks. */
   public_id: z.string().regex(/^RPT-\d{1,12}$/).optional(),
   lease_owner: z.string().min(8).max(200).optional(),
-  offset: z.number().int().min(0).default(0),
+  offset: z.number().int().min(0).optional().describe("UTF-8 text offset from the previous read response; defaults to zero."),
   items: z.array(StudyItem).max(5).optional(),
 })
 
@@ -674,6 +674,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         )
       }
       const text = typeof claim.payload.cached_text === "string" ? claim.payload.cached_text : ""
+      const offset = params.offset ?? 0
       if (!text) {
         return output(
           "Canonical research text is unavailable",
@@ -681,7 +682,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           { error: "canonical_text_missing", public_id: params.public_id },
         )
       }
-      if (params.offset > text.length) {
+      if (offset > text.length) {
         return output(
           "Invalid research text offset",
           "The offset exceeds the canonical source-text length; resume from the last returned next_offset.",
@@ -689,14 +690,14 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         )
       }
       const expectedOffset = typeof claim.payload.study_read_offset === "number" ? claim.payload.study_read_offset : 0
-      if (params.offset !== expectedOffset) {
+      if (offset !== expectedOffset) {
         return output(
           "Out-of-order research text chunk",
           "No source text was returned because this offset skips or repeats content. Resume exactly at expected_offset.",
           { error: "unexpected_offset", public_id: params.public_id, expected_offset: expectedOffset, total_characters: text.length },
         )
       }
-      const chunk = researchTextChunk(text, params.offset)
+      const chunk = researchTextChunk(text, offset)
       const cursorSaved = ResearchQueue.recordClaimReadProgress({
         id: params.public_id,
         leaseOwner: params.lease_owner,

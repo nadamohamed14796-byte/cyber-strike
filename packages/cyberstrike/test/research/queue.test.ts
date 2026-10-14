@@ -229,7 +229,7 @@ test("research crawl-page cache skips recent index pages and promotes newly rele
 })
 
 
-test("cached research discovery frontiers have a strict size bound", async () => {
+test("cached research discovery frontiers preserve unique links without a page-wide cutoff", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
     directory: dir.path,
@@ -243,9 +243,10 @@ test("cached research discovery frontiers have a strict size bound", async () =>
         discoveredLinks: links,
       })
       const stored = (row?.payload?.discovered_links as string[] | undefined) ?? []
-      expect(stored.length).toBeGreaterThan(0)
-      expect(stored.length).toBeLessThan(160)
-      expect(stored.reduce((sum, link) => sum + link.length, 0)).toBeLessThanOrEqual(16_384)
+      expect(stored).toHaveLength(links.length)
+      expect(new Set(stored).size).toBe(links.length)
+      // A page-wide character budget silently discards links from large archives.
+      expect(stored.reduce((sum, link) => sum + link.length, 0)).toBeGreaterThan(16_384)
       await Instance.dispose()
     },
   })
@@ -627,7 +628,8 @@ test("agent-study text cache preserves the complete document beyond the legacy 1
       expect(cached).toBe(true)
       const persisted = ResearchQueue.find(sourceID, sourceURL)
       expect(persisted?.payload?.cached_text).toHaveLength(completeText.length)
-      expect(persisted?.payload?.cached_text?.endsWith(marker)).toBe(true)
+      const persistedText = persisted?.payload?.cached_text
+      expect(typeof persistedText === "string" && persistedText.endsWith(marker)).toBe(true)
       expect(persisted?.payload?.cached_text_truncated).toBe(false)
       expect(persisted?.payload?.study_read_offset).toBe(0)
       expect(persisted?.payload?.study_read_length).toBe(completeText.length)

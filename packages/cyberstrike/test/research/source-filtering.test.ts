@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { RESEARCH_SOURCES, resolveResearchSourceForURL } from "../../src/research/sources"
 import { isIndexLikeResearchUrl, isResearchCandidate, sourceRelevance } from "../../src/research/ingest"
-import { discoverySeeds } from "../../src/research/adapters"
+import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage } from "../../src/research/adapters"
 
 const trickster0 = RESEARCH_SOURCES.find((source) => source.id === "trickster0")!
 
@@ -106,17 +106,23 @@ test("legacy source inference uses allowlisted path prefixes and refuses ambiguo
 })
 
 
-test("source pagination seeds respect the configured budget up to the discovery hard limit", () => {
+test("source pagination stays lazy and continues beyond the former hard ceiling", () => {
   const hackerOne = RESEARCH_SOURCES.find((source) => source.id === "hackerone-hacktivity")!
-  const normal = discoverySeeds(hackerOne, 10)
-  expect(normal.filter((url) => new URL(url).pathname.includes("/overview"))).toHaveLength(10)
-  expect(normal.some((url) => new URL(url).searchParams.get("pageIndex") === "9")).toBe(true)
+  const seeds = discoverySeeds(hackerOne)
+  expect(seeds).toEqual([...new Set(hackerOne.seedUrls)])
 
-  const exhaustive = discoverySeeds(hackerOne, 1000)
-  const pageURLs = exhaustive.filter((url) => new URL(url).pathname.includes("/overview"))
-  expect(pageURLs).toHaveLength(1000)
-  expect(pageURLs.some((url) => new URL(url).searchParams.get("pageIndex") === "999")).toBe(true)
+  const overview = seeds.find((url) => new URL(url).pathname.includes("/overview"))
+  expect(overview).toBeDefined()
+  const firstPage = nextDiscoveryPage(hackerOne, overview!)
+  expect(firstPage).toBeDefined()
+  expect(new URL(firstPage!).searchParams.get("pageIndex")).toBe("1")
+  expect(isDiscoveryPaginationURL(hackerOne, firstPage!)).toBe(true)
 
-  // Requests above the crawler's hard ceiling are still bounded.
-  expect(discoverySeeds(hackerOne, 5000)).toHaveLength(exhaustive.length)
+  const page1000 = nextDiscoveryPage(hackerOne, "https://hackerone.com/hacktivity/overview?pageIndex=999&queryString=disclosed%3Atrue")
+  expect(page1000).toBeDefined()
+  expect(new URL(page1000!).searchParams.get("pageIndex")).toBe("1000")
+  const page1001 = nextDiscoveryPage(hackerOne, page1000!)
+  expect(page1001).toBeDefined()
+  expect(new URL(page1001!).searchParams.get("pageIndex")).toBe("1001")
+  expect(isDiscoveryPaginationURL(hackerOne, page1001!)).toBe(true)
 })

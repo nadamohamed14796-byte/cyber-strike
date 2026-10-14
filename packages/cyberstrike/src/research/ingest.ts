@@ -316,17 +316,21 @@ export function classifyResearchDocumentType(
   text: string,
   configuredKind: ResearchSourceKind,
 ): "report" | "writeup" | "blog" | "academy" | "reference" | "research" | "mixed" | "uncertain" {
+  const normalizedTitle = title.toLowerCase()
   const sample = (title + "\n" + text.slice(0, 12000)).toLowerCase()
+  const explicitReportTitle = /\b(?:vulnerability report|bug bounty report|security report|disclosure report)\b/.test(normalizedTitle)
   const reportSignals = [
     /\b(?:disclosed|disclosure|vulnerability report|bug bounty report|security report)\b/,
     /\b(?:hackerone|bugcrowd|intigriti|yeswehack)\b.{0,100}\b(?:report|submission|disclosed)\b/,
     /\b(?:cve-\d{4}-\d+)\b/,
-  ].filter((pattern) => pattern.test(sample)).length
-  const writeupSignals = [
+  ].filter((pattern) => pattern.test(sample)).length + (explicitReportTitle ? 2 : 0)
+  const narrativeWriteupSignals = [
     /\b(?:write[- ]?up|writeup|bug bounty journey|my first bug bounty|how i found|how we found)\b/,
     /\b(?:i noticed|i discovered|i tested|my approach|the initial hypothesis|what i tried)\b/,
-    /\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause analysis)\b/,
   ].filter((pattern) => pattern.test(sample)).length
+  // Reproduction steps and PoCs occur in reports and labs too; they are not write-up proof alone.
+  const proceduralSignals = /\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause analysis)\b/.test(sample)
+  const writeupSignals = narrativeWriteupSignals + (narrativeWriteupSignals > 0 && proceduralSignals ? 1 : 0)
   const blogSignals = [
     /\b(?:blog post|in this article|this article explains|guide to|introduction to|best practices)\b/,
     /\b(?:why it matters|how it works|overview|explained|lessons learned)\b/,
@@ -1116,6 +1120,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
     skipped: 0,
     failed: 0,
     blocked_auth: 0,
+    updated_existing: 0,
     requeued_legacy: legacyRequeued,
     errors: [] as string[],
   }
@@ -1219,6 +1224,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         metadata: {
           research_source: source.id,
           research_source_name: source.name,
+          document_type: documentType,
           source_trust: source.trust,
           content_fingerprint: contentFingerprint,
           candidate_score: item.payload.candidate_score ?? 0,
@@ -1298,12 +1304,15 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         throw new Error("knowledge persistence verification failed: content fingerprint is missing or mismatched")
       }
 
-      if (ingested.created) {
-        result.learned++
-      } else {
+      // Count success only after the matching active lease reaches its terminal state.
+      // Existing records can be safely enriched by this idempotent re-study.
+      const completed = ResearchQueue.complete(item.sequence, item.lease_owner, "learned")
+      if (!completed) {
         result.skipped++
+        continue
       }
-      ResearchQueue.complete(item.sequence, item.lease_owner, "learned")
+      result.learned++
+      if (!ingested.created) result.updated_existing++
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const authRequired = /\bHTTP\s+(?:401|403)\b|authentication required|login required|sign in required/i.test(message)
