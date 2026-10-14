@@ -12,11 +12,13 @@
     "@ai-sdk/anthropic": "2.0.0",
     "@ai-sdk/openai": "2.0.2",
     "ai": "catalog:",
-    "playwright": "1.58.2",
-    "psl": "1.15.0"
+    "playwright": "1.58.2"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:"
+  },
+  "scripts": {
+    "test": "bun test --timeout 30000"
   }
 }
