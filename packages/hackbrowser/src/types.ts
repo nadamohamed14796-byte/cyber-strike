@@ -290,7 +290,7 @@ export interface AgentConfig {
   outOfScope?: string[]
   // Network scope: hostnames whose requests get forwarded to CyberStrike.
   // Each entry is a bare host ("api.test.com") or wildcard ("*.test.com").
-  // When omitted, scope is derived from targetUrl's eTLD+1 wildcard.
+  // When omitted, scope is restricted to the exact hostname in targetUrl.
   // Distinct from outOfScope (which is a planner-side semantic filter).
   scope?: string[]
   // Max navigation steps before stopping
