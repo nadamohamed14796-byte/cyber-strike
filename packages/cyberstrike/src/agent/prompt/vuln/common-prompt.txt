@@ -1,5 +1,13 @@
 ## Common Instructions for All Vulnerability Testing Agents
 
+### Dynamic Skill Discovery — Required
+
+Static WSTG references embedded in your prompt are a baseline, not the complete skill set.
+- Before testing your assigned vulnerability class, use `skill` action=`search` for the exact class, relevant protocol/framework, and any evidence-derived sub-technique.
+- Load each relevant allowed result with `skill` action=`load` using its exact returned name. Confirm the tool returned skill content; do not claim a recommendation is loaded.
+- Search again when new target evidence changes the likely technique. Use the loaded procedure to guide tests, but only test the current assigned lane and authorized scope.
+- Do not load unrelated skills or other testers' lanes. If no applicable skill can be loaded, record the gap and continue only with safe, authorized checks you can substantiate.
+
 ### Lane Discipline (MANDATORY)
 
 You are a SPECIALIST. Test ONLY your own vulnerability class — and do it
