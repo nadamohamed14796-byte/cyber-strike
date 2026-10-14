@@ -468,7 +468,7 @@ test("model-led update queues legacy shared reports once without refetching or c
         sourceTrust: 100,
         tags: ["idor"],
         metadata: {
-          research_source: "portswigger",
+          research_source: sourceID,
           research_source_name: "PortSwigger Web Security Academy",
           source_trust: 100,
           study_method: "bounded-heuristic-extraction",
@@ -482,9 +482,9 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(legacy).not.toBeNull()
       if (!legacy) throw new Error("legacy knowledge fixture was not persisted")
 
-      const first = await queueLegacyKnowledgeForModelStudy("portswigger")
+      const first = await queueLegacyKnowledgeForModelStudy(sourceID)
       expect(first.queued).toBeGreaterThanOrEqual(1)
-      const queued = ResearchQueue.find("portswigger", sourceURL)
+      const queued = ResearchQueue.find(sourceID, sourceURL)
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
       expect(queued?.payload?.cached_text).toBe(excerpt)
@@ -496,8 +496,8 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(currentKnowledge?.status).toBe("observed")
       expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(1)
 
-      await queueLegacyKnowledgeForModelStudy("portswigger")
-      const stillQueued = ResearchQueue.find("portswigger", sourceURL)
+      await queueLegacyKnowledgeForModelStudy(sourceID)
+      const stillQueued = ResearchQueue.find(sourceID, sourceURL)
       expect(stillQueued?.sequence).toBe(queued?.sequence)
       expect(stillQueued?.status).toBe("queued")
       expect(stillQueued?.payload?.legacy_knowledge_id).toBe(legacy.id)
@@ -550,11 +550,11 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(finishedLegacy?.status).toBe("observed")
       expect(finishedLegacy?.metadata?.model_study_version).toBe(1)
       expect(finishedLegacy?.metadata?.model_study_decision).toBe("rejected")
-      const finishedQueue = ResearchQueue.find("portswigger", sourceURL)
+      const finishedQueue = ResearchQueue.find(sourceID, sourceURL)
       expect(finishedQueue?.status).toBe("rejected")
       expect(finishedQueue?.payload?.model_study_version).toBe(1)
-      await queueLegacyKnowledgeForModelStudy("portswigger")
-      const noDuplicateRequeue = ResearchQueue.find("portswigger", sourceURL)
+      await queueLegacyKnowledgeForModelStudy(sourceID)
+      const noDuplicateRequeue = ResearchQueue.find(sourceID, sourceURL)
       expect(noDuplicateRequeue?.status).toBe("rejected")
       expect(noDuplicateRequeue?.payload?.model_study_version).toBe(1)
       await Instance.dispose()
