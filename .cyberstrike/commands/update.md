@@ -49,6 +49,19 @@ A queue being empty is not proof that a site's public archive was exhausted. Be 
 4. Hunting-time retrieval is separate: when live, authorized target observations produce relevant signals, the hunting workflow may query this saved knowledge base. Public references stay unverified methodology, never target-specific evidence.
 5. Never copy source-program hosts, endpoints, object IDs, users, accounts, tokens, or scope into current-target facts. Use independently observed target artifacts only. Preserve target memory and notes separately from the global research database. Do not edit `SKILL.md` files as a side effect of study.
 
+## Required final report format
+
+Use these headings in this order so the result is auditable:
+
+1. **Overall status** — complete, partial, blocked, or crawl-budget-capped; never use “complete” if any configured source or required queue work is unresolved.
+2. **Before → after counters** — global queue and knowledge counters, including learned/rejected/completed/skipped/pending model-study counts.
+3. **Per-source ledger** — one row per exact configured source ID, with each pass's requested page budget and actual pages, candidates, queued_new, learned saves, rejected decisions, preflight skips, blocked_auth, error_count/examples, retry attempts, remaining queue states, and final status. Mark not-run sources explicitly. Do not mistake source-filtered queue statistics for source-filtered knowledge statistics.
+4. **Persisted lessons** — useful Knowledge IDs and source URLs returned by successful saves; distinguish saved-and-terminal-state-confirmed from saved-but-queue-transition-failed.
+5. **Skipped/rejected work** — preflight skips and model rejections in separate lists with IDs and reasons.
+6. **Outstanding blockers and resume point** — unresolved source errors/auth, queued/retry/studying/blocked_auth rows, stale leases, persistence failures, any 1000-page ceiling, and the exact next safe action. If interrupted, say partial and identify what has and has not completed.
+
+Never invent counts or infer missing results. Use “unknown/not returned” when the tool did not provide a value.
+
 ## Study model
 
 For each report, build a causal chain: **prerequisites → vulnerable assumption/check → controlled reproduction → observable evidence → impact → negative controls/limitations → remediation**. Distinguish source claims from your interpretation, use an explicit severity/CVSS only when the source states it, and do not infer exploitability from source reputation. Never report successful discovery/study/persistence when the relevant operation failed.
