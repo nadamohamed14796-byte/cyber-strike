@@ -99,7 +99,7 @@ const skillTokens = (value: string) =>
 export function rankSkillsForPhase(
   phaseId: Phase.Id,
   entries: SkillIndex.Entry[],
-  limit = 4,
+  limit = 10,
   observedTechStack: string[] = [],
 ): Array<{ name: string; description: string; query: string; score: number }> {
   const queries = skillQueriesForPhase(phaseId)
@@ -194,9 +194,10 @@ export function rankSkillsForPhase(
 async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): Promise<string> {
   const lines = [
     "## Required Skill Preflight",
-    "Before doing phase work, call the `skill` tool with action=`load` and the exact name of a phase-specific candidate below. Wait for the tool result and verify that skill content was returned before claiming it is loaded.",
-    "Load more than one distinct skill when the phase covers separate work areas or observed target technologies. A recommendation is not a loaded skill, and a generic skill does not count as coverage for a specialized task.",
-    "For passive_recon and active_recon, a recon-specific skill is mandatory before reconnaissance. A generic web-testing skill alone does not satisfy this requirement; search the catalog for a recon-specific alternative if no candidate is listed.",
+    "Before doing phase work, use the `skill` tool action=`search` to discover relevant skills for each distinct task, then action=`load` with the exact skill name. Wait for each tool result and verify the skill content was returned before claiming it is loaded.",
+    "The candidate list below is a ranked shortlist, not the complete catalog. Search again for every applicable subtask, observed technology/framework, protocol, and vulnerability class; load all skills that materially apply to the current evidence, not unrelated skills from the whole catalog.",
+    "Load the general phase methodology plus specialized skills for each distinct work area. A recommendation is not a loaded skill, and a generic skill does not satisfy coverage for a specialized task. Re-check the catalog when new endpoints, assets, authentication flows, technologies, or vulnerability signals appear.",
+    "For passive_recon and active_recon, load recon-methodology (or the closest available methodology skill) and at least one task-specific recon skill before reconnaissance. Search and load additional relevant skills for subdomain/DNS, service/port discovery, virtual hosts, CMS/framework detection, origin-IP, email/DNS security, exposed repositories, historical URLs, visual recon, and takeover checks when applicable. Do not claim a task was covered merely because a skill was recommended.",
     "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
   ]
 
@@ -205,7 +206,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     const observedTechStack = Intel.get(sessionID)
       .filter((entry) => entry.type === "technology")
       .flatMap((entry) => [entry.title, ...entry.tags])
-    const selected = rankSkillsForPhase(phaseId, SkillIndex.all(), 4, observedTechStack)
+    const selected = rankSkillsForPhase(phaseId, SkillIndex.all(), 10, observedTechStack)
     if (selected.length === 0) {
       lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
     } else {
