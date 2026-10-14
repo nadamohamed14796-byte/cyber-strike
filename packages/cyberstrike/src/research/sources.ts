@@ -325,6 +325,43 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
     hosts: ["github.com"],
     trust: 90,
   },
+  {
+    id: "owasp-cheat-sheets",
+    name: "OWASP Cheat Sheet Series",
+    kind: "reference",
+    seedUrls: ["https://cheatsheetseries.owasp.org/"],
+    hosts: ["cheatsheetseries.owasp.org"],
+    includePaths: ["/cheatsheets/"],
+    trust: 100,
+  },
+  {
+    id: "trailofbits",
+    name: "Trail of Bits Security Research",
+    kind: "research",
+    seedUrls: ["https://blog.trailofbits.com/"],
+    hosts: ["blog.trailofbits.com"],
+    // The blog uses year-first article URLs, e.g. /2026/06/22/article-slug/.
+    includePaths: ["/20"],
+    trust: 100,
+  },
+  {
+    id: "zdi",
+    name: "Zero Day Initiative Research Blog",
+    kind: "research",
+    seedUrls: ["https://www.zerodayinitiative.com/blog/"],
+    hosts: ["zerodayinitiative.com"],
+    includePaths: ["/blog/"],
+    trust: 95,
+  },
+  {
+    id: "elastic-security-labs",
+    name: "Elastic Security Labs",
+    kind: "research",
+    seedUrls: ["https://www.elastic.co/security-labs/blog"],
+    hosts: ["elastic.co"],
+    includePaths: ["/security-labs/"],
+    trust: 95,
+  },
 ]
 
 /**
