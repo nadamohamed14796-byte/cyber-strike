@@ -14,7 +14,7 @@ import {
   retryAuthenticatedResearch,
   sourceRelevance,
 } from "../research/ingest"
-import { ResearchQueue } from "../research/queue"
+import { isNonRetryableResearchError } from "../research/safe-fetch"\nimport { ResearchQueue } from "../research/queue"
 import { Tool } from "./tool"
 
 const RESEARCH_TEXT_CHUNK_MAX_BYTES = 4 * 1024
@@ -263,6 +263,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
             const message = error instanceof Error ? error.message : String(error)
             const authRequired = /authentication required|login wall|HTTP\s+(?:401|403)/i.test(message)
             const documentTooLarge = /research document too large/i.test(message)
+            const terminalFetchFailure = isNonRetryableResearchError(error)
             const handled = authRequired
               ? ResearchQueue.blockAuthentication({
                   sourceID: claim.source_id,
@@ -284,14 +285,30 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
                       model_study_version: RESEARCH_MODEL_STUDY_VERSION,
                     },
                   ))
-                : Boolean(ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message))
+                : terminalFetchFailure
+                  ? Boolean(ResearchQueue.complete(
+                      claim.sequence,
+                      claim.lease_owner,
+                      "blocked_fetch",
+                      message,
+                      {
+                        study_blocked_reason: "non-retryable-safe-fetch-error",
+                        study_blocked_detail: message,
+                        model_study_version: RESEARCH_MODEL_STUDY_VERSION,
+                      },
+                    ))
+                  : Boolean(ResearchQueue.complete(claim.sequence, claim.lease_owner, "retry", message))
             if (!handled) {
               issues.push(claim.public_id + ": lease lost before fetch failure could be recorded")
               continue
             }
-            issues.push(claim.public_id + ": " + (documentTooLarge
-              ? "blocked_size (safe-fetch document-size ceiling): " + message
-              : message))
+            issues.push(claim.public_id + ": " + (
+              documentTooLarge
+                ? "blocked_size (safe-fetch document-size ceiling): " + message
+                : terminalFetchFailure && !authRequired
+                  ? "blocked_fetch (non-retryable safe-fetch error): " + message
+                  : message
+            ))
             // Do not immediately reclaim the same failed row repeatedly in this batch.
             break
           }
