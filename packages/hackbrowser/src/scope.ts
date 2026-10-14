@@ -21,9 +21,9 @@ export type ScopeMatcher = (host: string) => boolean
 export function normalizeScope(input: string): string {
   let s = input.trim().toLowerCase()
   if (!s) return ""
-  s = s.replace(/^https?:\\/\\//, "")
+  s = s.replace(/^https?:\/\//, "")
   s = s.split(/[/?#]/)[0] ?? ""
-  s = s.replace(/:\\d+$/, "")
+  s = s.replace(/:\d+$/, "")
   while (s.endsWith(".")) s = s.slice(0, -1)
   return s
 }
@@ -33,7 +33,7 @@ export function normalizeScope(input: string): string {
  * Never infer sibling-subdomain authorization from a single target URL.
  */
 export function deriveScope(targetUrl: string): string {
-  return new URL(targetUrl).hostname.toLowerCase().replace(/\\.+$/, "")
+  return new URL(targetUrl).hostname.toLowerCase().replace(/\.+$/, "")
 }
 
 /**
@@ -48,7 +48,7 @@ export function makeMatcher(scopes: readonly string[]): ScopeMatcher {
     .map((scope) => ({ host: scope.startsWith("*.") ? scope.slice(2) : scope, wildcard: scope.startsWith("*.") }))
   if (patterns.length === 0) return () => false
   return (host: string) => {
-    const normalizedHost = host.toLowerCase().replace(/\\.+$/, "")
+    const normalizedHost = host.toLowerCase().replace(/\.+$/, "")
     return patterns.some(({ host: base, wildcard }) =>
       wildcard ? normalizedHost.endsWith("." + base) : normalizedHost === base,
     )
