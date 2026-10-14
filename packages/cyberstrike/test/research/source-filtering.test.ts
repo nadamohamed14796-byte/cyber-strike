@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { RESEARCH_SOURCES, researchSourcePathAllowed, resolveResearchSourceForURL } from "../../src/research/sources"
+import { RESEARCH_SOURCES, researchSourceHostAllowed, researchSourcePathAllowed, resolveResearchSourceForURL } from "../../src/research/sources"
 import { isIndexLikeResearchUrl, isResearchCandidate, sourceRelevance } from "../../src/research/ingest"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage } from "../../src/research/adapters"
 
@@ -29,6 +29,13 @@ test("repository-backed GitHub sources cannot crawl sibling repositories", () =>
   expect(researchSourcePathAllowed("https://github.com/another/repo/blob/main/security-report.md", genericGitHub)).toBe(true)
 })
 
+test("curated Medium feed restricts subdomains and sitemap roots to the configured author", () => {
+  const source = RESEARCH_SOURCES.find((item) => item.id === "trickster0")!
+  expect(researchSourceHostAllowed("https://trickster0.medium.com/an-idor-report", source)).toBe(true)
+  expect(researchSourceHostAllowed("https://medium.com/@trickster0/idor-writeup-123", source)).toBe(true)
+  expect(researchSourceHostAllowed("https://anotherwriter.medium.com/general-security-post", source)).toBe(false)
+  expect(source.sitemapHosts).toEqual(["trickster0.medium.com"])
+})
 test("Medium source follows the curated author, not unrelated Medium articles", () => {
   expect(isResearchCandidate("https://trickster0.medium.com/an-idor-report", trickster0)).toBe(true)
   expect(isResearchCandidate("https://medium.com/@trickster0/idor-writeup-123", trickster0)).toBe(true)

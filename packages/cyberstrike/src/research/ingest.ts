@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { ReportKnowledge } from "../learning/report-knowledge"
-import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, researchSourcePathAllowed, type ResearchSource, type ResearchSourceKind } from "./sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, researchSourceHostAllowed, researchSourcePathAllowed, type ResearchSource, type ResearchSourceKind } from "./sources"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage, sourceDocumentPriority } from "./adapters"
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
@@ -27,8 +27,7 @@ function paginationSeriesKey(source: ResearchSource, value: string) {
 }
 
 function hostAllowed(url: URL, source: ResearchSource) {
-  return source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host)) &&
-    researchSourcePathAllowed(url, source)
+  return researchSourceHostAllowed(url, source) && researchSourcePathAllowed(url, source)
 }
 
 function normalizeUrl(value: string, base?: URL) {
@@ -655,7 +654,8 @@ export function candidateScore(url: string, source: ResearchSource) {
 }
 
 async function discoverSitemap(source: ResearchSource) {
-  const sitemapQueue = source.hosts.flatMap((host) =>
+  const sitemapHosts = source.sitemapHosts ?? source.hosts
+  const sitemapQueue = sitemapHosts.flatMap((host) =>
     ["/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml", "/wp-sitemap.xml"]
       .map((path) => "https://" + host + path),
   )

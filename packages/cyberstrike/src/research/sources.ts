@@ -22,6 +22,25 @@ export type ResearchSource = {
    * allowlist, not a relevance hint: sibling repositories on github.com are excluded.
    */
   allowedPathPrefixes?: string[]
+  /** Optional exact hostname allowlist for feeds that intentionally cover only one subdomain/author. */
+  exactHosts?: string[]
+  /** Hosts to query for sitemap indexes; narrower than hosts for curated feeds when necessary. */
+  sitemapHosts?: string[]
+}
+
+/** Enforce configured host boundaries consistently in discovery and redirect validation. */
+export function researchSourceHostAllowed(url: URL | string, source: Pick<ResearchSource, "hosts" | "exactHosts">): boolean {
+  let parsed: URL
+  try {
+    parsed = url instanceof URL ? url : new URL(url)
+  } catch {
+    return false
+  }
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "")
+  if (source.exactHosts?.length) {
+    return source.exactHosts.some((host) => hostname === host.toLowerCase().replace(/\.$/, ""))
+  }
+  return source.hosts.some((host) => hostname === host.toLowerCase() || hostname.endsWith("." + host.toLowerCase()))
 }
 
 /** Enforce configured source path boundaries consistently in discovery and fetch/redirect validation. */
@@ -238,6 +257,9 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
     kind: "writeup",
     seedUrls: ["https://trickster0.medium.com/"],
     hosts: ["medium.com"],
+    exactHosts: ["trickster0.medium.com", "medium.com"],
+    // Do not crawl Medium's platform-wide sitemap for a curated author's feed.
+    sitemapHosts: ["trickster0.medium.com"],
     // Medium is noisy and the host contains unrelated authors' content. Require
     // real security/writeup language instead of accepting generic articles.
     includeTerms: [
@@ -406,8 +428,7 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
     return undefined
   }
   if (url.protocol !== "https:" || (url.port && url.port !== "443") || url.username || url.password) return undefined
-  const matchesHost = (source: ResearchSource) =>
-    source.hosts.some((host) => url.hostname === host || url.hostname.endsWith("." + host))
+  const matchesHost = (source: ResearchSource) => researchSourceHostAllowed(url, source)
   const hostCandidates = RESEARCH_SOURCES.filter(matchesHost)
   const pathname = url.pathname.toLowerCase()
   const pathScore = (source: ResearchSource) => {
@@ -415,10 +436,7 @@ export function resolveResearchSourceForURL(value: string, preferredID?: string)
     for (const seed of source.seedUrls) {
       try {
         const seedURL = new URL(seed)
-        const seedHost = seedURL.hostname.toLowerCase()
-        const seedHostAllowed = source.hosts.some((host) =>
-          seedHost === host || seedHost.endsWith("." + host),
-        )
+        const seedHostAllowed = researchSourceHostAllowed(seedURL, source)
         if (!seedHostAllowed || seedURL.pathname === "/") continue
         const prefix = seedURL.pathname.toLowerCase().replace(/\/+$/, "")
         if (pathname === prefix || pathname.startsWith(prefix + "/")) {
