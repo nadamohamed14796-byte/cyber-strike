@@ -44,7 +44,7 @@ export namespace Phase {
       minDeliverables: 1,
       relatedVrtCategories: [],
       appliesTo: ["wildcard", "single", "cidr", "mobile"],
-      agents: ["cyberstrike"],
+      agents: ["cyberstrike", "explore"],
     },
     {
       id: "mobile_application_testing",
