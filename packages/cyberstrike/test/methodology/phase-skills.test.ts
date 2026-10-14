@@ -11,6 +11,9 @@ describe("Methodology phase skill routing", () => {
 
   test("recon, authorization, reporting, and mobile phases prioritize relevant skill families", () => {
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-subdomain-enumeration")
+    expect(skillQueriesForPhase("active_recon")).toContain("attack-web-recon")
+    expect(skillQueriesForPhase("active_recon")).toContain("recon-port-service-discovery")
+    expect(skillQueriesForPhase("active_recon")).toContain("recon-vhost-enumeration")
     expect(skillQueriesForPhase("authorization_testing")).toContain("attack-idor-automation")
     expect(skillQueriesForPhase("reporting")).toContain("attack-report-writing")
     expect(Phase.get("mobile_application_testing")?.appliesTo).toContain("mobile")
