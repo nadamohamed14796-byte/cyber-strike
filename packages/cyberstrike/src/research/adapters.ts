@@ -14,45 +14,38 @@ function withPathPage(url: string, page: number) {
 }
 
 /**
- * Source-specific discovery seeds. These are public archive/search pagination
- * hints only; the crawler still follows canonical links and sitemaps and never
- * bypasses authentication or access controls.
+ * Return only the source's canonical starting URLs. Pagination is generated lazily
+ * by nextDiscoveryPage as each page is visited, so the crawler does not allocate
+ * thousands of future URLs or silently truncate a large archive at a fixed ceiling.
  */
-export function discoverySeeds(source: ResearchSource, maxPages: number) {
-  // This is a per-pass seed window, not a global ceiling. The update worker
-  // expands the window until a source's pagination is actually exhausted.
-  const pages = Math.max(1, Math.floor(Number.isFinite(maxPages) ? maxPages : 1))
-  const seeds = new Set(source.seedUrls)
+export function discoverySeeds(source: ResearchSource) {
+  return [...new Set(source.seedUrls)]
+}
 
-  const addQueryPages = (urls: string[], key = "page") => {
-    for (const url of urls) {
-      for (let page = 2; page <= pages; page++) seeds.add(withQuery(url, key, page))
-    }
-  }
-
-  const addPathPages = (urls: string[]) => {
-    for (const url of urls) {
-      for (let page = 2; page <= pages; page++) seeds.add(withPathPage(url, page))
-    }
+/**
+ * Produce the next URL in a known public pagination scheme. Only one successor is
+ * generated at a time; the crawler stops the chain when a page is empty, repeats
+ * the prior page content, or returns a normal end-of-pagination response.
+ */
+export function nextDiscoveryPage(source: ResearchSource, value: string) {
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    return undefined
   }
 
   switch (source.id) {
     case "hackerone-hacktivity":
-      for (const url of source.seedUrls) {
-        const parsed = new URL(url)
-        if (parsed.pathname.includes("/overview")) {
-          for (let page = 1; page < pages; page++) {
-            parsed.searchParams.set("pageIndex", String(page))
-            seeds.add(parsed.toString())
-          }
-        } else {
-          addQueryPages([url])
-        }
+      if (parsed.pathname.includes("/overview")) {
+        const current = Number(parsed.searchParams.get("pageIndex") ?? "-1")
+        if (!Number.isSafeInteger(current) || current < -1) return undefined
+        return withQuery(value, "pageIndex", current + 1)
       }
-      break
+      return withQuery(value, "page", Number(parsed.searchParams.get("page") ?? "1") + 1)
     case "bugcrowd-crowdstream":
-      addQueryPages(source.seedUrls)
-      break
+    case "github":
+      return withQuery(value, "page", Number(parsed.searchParams.get("page") ?? "1") + 1)
     case "intigriti":
     case "infosec-writeups":
     case "hackerone-blog":
@@ -64,18 +57,37 @@ export function discoverySeeds(source: ResearchSource, maxPages: number) {
     case "projectdiscovery":
     case "edoverflow":
     case "devcore":
-    case "liveoverflow":
-      addPathPages(source.seedUrls)
-      addQueryPages(source.seedUrls)
-      break
-    case "github":
-      addQueryPages(source.seedUrls)
-      break
+    case "liveoverflow": {
+      const match = parsed.pathname.match(/\/page\/(\d+)\/?$/)
+      const current = match ? Number(match[1]) : 1
+      if (!Number.isSafeInteger(current) || current < 1) return undefined
+      return withPathPage(value, current + 1)
+    }
     default:
-      break
+      return undefined
   }
+}
 
-  return [...seeds]
+/** True for URLs shaped like a page in a supported pagination scheme. */
+export function isDiscoveryPaginationURL(source: ResearchSource, value: string) {
+  try {
+    const parsed = new URL(value)
+    if (source.id === "hackerone-hacktivity" && parsed.pathname.includes("/overview")) {
+      return parsed.searchParams.has("pageIndex")
+    }
+    if (["bugcrowd-crowdstream", "github"].includes(source.id)) {
+      return parsed.searchParams.has("page") && /^\d+$/.test(parsed.searchParams.get("page") ?? "")
+    }
+    if ([
+      "intigriti", "infosec-writeups", "hackerone-blog", "bugcrowd-blog", "yeswehack",
+      "nahamsec", "pentesterland", "assetnote", "projectdiscovery", "edoverflow", "devcore", "liveoverflow",
+    ].includes(source.id)) {
+      return /\/page\/\d+\/?$/i.test(parsed.pathname)
+    }
+    return false
+  } catch {
+    return false
+  }
 }
 
 export function sourceDocumentPriority(source: ResearchSource, url: string) {
