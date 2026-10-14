@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesFindingEndpointPath, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -104,6 +104,15 @@ test("does not treat ordinary labels or non-path relative strings as endpoints",
   expect(endpoints).not.toContain("administrator")
 })
 
+
+test("finding correlation requires an exact route shape instead of substring overlap", () => {
+  expect(matchesFindingEndpointPath("/api/users/123", "/api/users/{id}")).toBe(true)
+  expect(matchesFindingEndpointPath("/api/users/123?expand=roles", "/api/users/{id}")).toBe(true)
+  expect(matchesFindingEndpointPath("/api/users", "/api/users/admin")).toBe(false)
+  expect(matchesFindingEndpointPath("/api/user", "/api/users")).toBe(false)
+  expect(matchesFindingEndpointPath("/api/users/{id}", "/api/users/123/admin")).toBe(false)
+  expect(matchesFindingEndpointPath("/api/users/{id}", "/api/users")).toBe(false)
+})
 
 test("explicit JavaScript target matching rejects unrelated hosts and sibling paths unless observed", () => {
   expect(isJavaScriptAssetAllowed({
