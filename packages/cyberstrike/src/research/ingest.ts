@@ -4,16 +4,13 @@ import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, type ResearchSource } from
 import { discoverySeeds, sourceDocumentPriority } from "./adapters"
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
-const MAX_LINKS_PER_PAGE = 160
 const MAX_CANDIDATE_SCORE = 100
 const MAX_CACHED_RESEARCH_TEXT = 100_000
 const AUTH_RETRY_COOLDOWN_MS = 10 * 60_000
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 500
 const DEFAULT_PAGES = 250
-const MAX_PAGES = 1000
 const DEFAULT_DEPTH = 2
-const MAX_DEPTH = 4
 
 function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number) {
   const candidate = value === undefined || !Number.isFinite(value) ? fallback : value
@@ -139,7 +136,6 @@ function linksOf(html: string, base: URL, source: ResearchSource) {
       if (url.protocol !== "https:" || !hostAllowed(url, source)) continue
       if (/\.(png|jpe?g|gif|svg|webp|css|js|zip|pdf|woff2?|mp4|mp3)$/i.test(url.pathname)) continue
       links.add(value)
-      if (links.size >= MAX_LINKS_PER_PAGE) break
     } catch {}
   }
 
@@ -154,7 +150,6 @@ function linksOf(html: string, base: URL, source: ResearchSource) {
       if (url.href === base.href) continue
       if (/\.(png|jpe?g|gif|svg|webp|css|js|zip|pdf|woff2?|mp4|mp3)$/i.test(url.pathname)) continue
       links.add(value)
-      if (links.size >= MAX_LINKS_PER_PAGE) break
     } catch {}
   }
   return [...links]
@@ -598,7 +593,6 @@ async function discoverSitemap(source: ResearchSource) {
     return [...html.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)]
       .map((match) => normalizeUrl(match[1]))
       .filter((value): value is string => !!value)
-      .slice(0, MAX_LINKS_PER_PAGE)
   } catch {
     return []
   }
@@ -755,8 +749,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
   const { ResearchQueue } = await import("./queue")
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   if (!sources.length) throw new Error("unknown research source: " + input.sourceID)
-  const maxPages = Math.max(1, Math.min(input.pages ?? 100, MAX_PAGES))
-  const maxDepth = Math.max(0, Math.min(input.depth ?? 2, MAX_DEPTH))
+  // Page and depth values are per-pass continuation windows only. The caller
+  // expands page windows until exhaustion; no global page/depth ceiling applies.
+  const maxPages = Math.max(1, Math.floor(Number.isFinite(input.pages) ? input.pages! : 100))
+  const maxDepth = Math.max(0, Math.floor(Number.isFinite(input.depth) ? input.depth! : Number.MAX_SAFE_INTEGER))
   // Backfill-aware dedupe: older versions learned reports directly into ReportKnowledge
   // before the durable queue existed. Do not download those URLs again just because
   // they have no corresponding queue row.
