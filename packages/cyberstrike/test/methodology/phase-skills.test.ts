@@ -23,4 +23,10 @@ describe("Methodology phase skill routing", () => {
     expect(Phase.detectScopeType(["com.example.com"])).toBe("single")
     expect(Phase.detectScopeType(["*.example.com"])).toBe("wildcard")
   })
+
+  test("mobile-only phases do not block web reporting, while mobile reporting requires mobile testing", () => {
+    expect(Phase.forScope("single").some((phase) => phase.id === "mobile_application_testing")).toBe(false)
+    expect(Phase.forScope("mobile").some((phase) => phase.id === "mobile_application_testing")).toBe(true)
+    expect(Phase.get("reporting")?.prerequisites).toContain("mobile_application_testing")
+  })
 })
