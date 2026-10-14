@@ -49,11 +49,13 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf",
     "attack-ssti", "attack-xxe", "attack-deserialization", "attack-file-upload",
     "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
-    "attack-open-redirect", "injection", "XSS", "SQL injection", "SSRF",
+    "attack-open-redirect", "attack-host-header", "attack-cache-poison", "injection",
+    "XSS", "SQL injection", "SSRF",
   ],
   business_logic: [
     "attack-business-logic", "attack-race-condition", "attack-mass-assignment",
-    "attack-rate-limit-bypass", "attack-csrf", "business logic", "race condition",
+    "attack-rate-limit-bypass", "attack-csrf", "attack-clickjacking",
+    "attack-host-header", "attack-cache-poison", "business logic", "race condition",
     "attack-bb-methodology",
   ],
   data_protection: [
@@ -63,12 +65,14 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   api_security: [
     "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
     "attack-grpc", "attack-mass-assignment", "attack-nosqli", "attack-rate-limit-bypass",
-    "attack-websocket", "attack-cors", "attack-jwt", "API security", "GraphQL", "REST API",
+    "attack-websocket", "attack-cors", "attack-host-header", "attack-cache-poison",
+    "attack-clickjacking", "attack-open-redirect", "attack-jwt", "API security", "GraphQL", "REST API",
   ],
   infrastructure: [
     "recon-asn-infrastructure", "recon-origin-ip-discovery", "attack-cloud-misconfig",
     "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-docker-privesc",
-    "k8s-assessment", "ad-security", "attack-ntlm-info", "cloud security", "network exposure",
+    "k8s-assessment", "ad-security", "attack-ldap", "attack-ntlm-info",
+    "cloud security", "network exposure",
   ],
   reporting: [
     "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
