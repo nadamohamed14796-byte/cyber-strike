@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { ReportKnowledge } from "../learning/report-knowledge"
-import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, type ResearchSource } from "./sources"
+import { RESEARCH_LEARNING_VERSION, RESEARCH_SOURCES, type ResearchSource, type ResearchSourceKind } from "./sources"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage, sourceDocumentPriority } from "./adapters"
 import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./safe-fetch"
 
@@ -307,6 +307,59 @@ export function classifyResearchTopic(title: string, text: string) {
   if (ranked.length > 1 && ranked[0].count >= 2 && ranked[0].count > ranked[1].count) return ranked[0].name
   return undefined
 }
+/**
+ * Classify the document's actual purpose separately from the configured host/feed.
+ * This is deliberately conservative: source kind is a fallback, not proof that a
+ * page is a report or a confirmed vulnerability.
+ */
+export function classifyResearchDocumentType(
+  title: string,
+  text: string,
+  configuredKind: ResearchSourceKind,
+): "report" | "writeup" | "blog" | "academy" | "reference" | "research" | "mixed" | "uncertain" {
+  const sample = (title + "\\n" + text.slice(0, 12000)).toLowerCase()
+  const reportSignals = [
+    /\\b(?:disclosed|disclosure|vulnerability report|bug bounty report|security report)\\b/,
+    /\\b(?:hackerone|bugcrowd|intigriti|yeswehack)\\b.{0,100}\\b(?:report|submission|disclosed)\\b/,
+    /\\b(?:cve-\\d{4}-\\d+)\\b/,
+  ].filter((pattern) => pattern.test(sample)).length
+  const writeupSignals = [
+    /\\b(?:write[- ]?up|writeup|bug bounty journey|my first bug bounty|how i found|how we found)\\b/,
+    /\\b(?:i noticed|i discovered|i tested|my approach|the initial hypothesis|what i tried)\\b/,
+    /\\b(?:step[- ]by[- ]step|reproduction steps|proof of concept|root cause analysis)\\b/,
+  ].filter((pattern) => pattern.test(sample)).length
+  const blogSignals = [
+    /\\b(?:blog post|in this article|this article explains|guide to|introduction to|best practices)\\b/,
+    /\\b(?:why it matters|how it works|overview|explained|lessons learned)\\b/,
+  ].filter((pattern) => pattern.test(sample)).length
+  const academySignals = /\\b(?:web security academy|lab solution|lab walkthrough|learning objective|practice lab)\\b/.test(sample)
+  const referenceSignals = /\\b(?:documentation|reference guide|cheat sheet|payloads all the things|hacktricks)\\b/.test(sample)
+  const researchSignals = /\\b(?:technical research|root cause|novel technique|security research|research paper|technical analysis)\\b/.test(sample)
+
+  const scores = [
+    ["report", reportSignals] as const,
+    ["writeup", writeupSignals] as const,
+    ["blog", blogSignals] as const,
+    ["research", researchSignals ? 2 : 0] as const,
+    ["reference", referenceSignals ? 2 : 0] as const,
+    ["academy", academySignals ? 3 : 0] as const,
+  ].sort((a, b) => b[1] - a[1])
+  const positive = scores.filter((item) => item[1] > 0)
+  if (positive.length >= 2 && positive[0][1] > 0 && positive[1][1] > 0 && positive[0][1] === positive[1][1]) {
+    return "mixed"
+  }
+  if (positive.length && positive[0][1] > 0) {
+    // A strong explicit lab/documentation signal should not be overwritten by
+    // generic report/write-up wording in navigation or related links.
+    return positive[0][0]
+  }
+  if (configuredKind === "academy" || configuredKind === "reference" || configuredKind === "research" || configuredKind === "blog" || configuredKind === "writeup") {
+    return configuredKind
+  }
+  if (configuredKind === "disclosure") return reportSignals ? "report" : "uncertain"
+  return "uncertain"
+}
+
 function severityOf(text: string) {
   // Avoid turning incidental words ("high-level", "low-level", "medium-sized")
   // into severity labels. Prefer explicit source labels, then a stated CVSS score.
@@ -1121,9 +1174,13 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         result.skipped++
         continue
       }
+      const documentType = classifyResearchDocumentType(title, text, source.kind)
       const vulnerabilityClass = classifyResearchTopic(title, text)
-      if (!vulnerabilityClass && source.kind !== "reference" && source.kind !== "academy") {
-        ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "no recognizable security topic")
+      // A recognizable vulnerability class is useful but is not mandatory for
+      // a relevant blog, write-up, reference, academy lesson, or technical study.
+      // Relevance is already checked above; preserve the actual document type.
+      if (documentType === "uncertain" && !vulnerabilityClass) {
+        ResearchQueue.complete(item.sequence, item.lease_owner, "rejected", "document type and security topic could not be established")
         result.skipped++
         continue
       }
@@ -1153,7 +1210,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         poc: extracted.poc,
         lesson: extracted.lesson,
         sourceTrust: source.trust,
-        tags: Array.from(new Set([source.id, source.kind, ...extracted.retrievalSignals])),
+        tags: Array.from(new Set([source.id, source.kind, documentType, ...extracted.retrievalSignals])),
         metadata: {
           research_source: source.id,
           research_source_name: source.name,
