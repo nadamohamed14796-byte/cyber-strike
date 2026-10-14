@@ -442,6 +442,46 @@ test("agent-led next limits each response to one item even with escape-heavy sou
 })
 
 
+test("agent-led study terminally blocks queued URLs outside their configured source host", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const sourceURL = "https://example.invalid/outside-configured-source"
+      const queued = ResearchQueue.enqueue({
+        sourceID: "portswigger",
+        sourceURL,
+        title: "Queued URL with contradictory source provenance",
+      })
+      const context = {
+        sessionID: "ses_bad_source_url_" + crypto.randomUUID().replace(/-/g, "").slice(0, 18),
+        messageID: "msg_bad_source_url_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const tool = await ResearchStudyTool.init()
+      const response = await tool.execute({
+        action: "next",
+        source: "portswigger",
+        pages: 1,
+        depth: 1,
+        limit: 1,
+        continue_after_save: false,
+      }, context)
+      const result = JSON.parse(response.output)
+      expect(result.issues.some((issue: string) => issue.includes("blocked_fetch"))).toBe(true)
+      expect(ResearchQueue.find("portswigger", sourceURL)?.status).toBe("blocked_fetch")
+      expect(ResearchQueue.stats("portswigger").retry).toBe(0)
+      expect(ResearchQueue.stats("portswigger").blocked_fetch).toBe(1)
+      await Instance.dispose()
+    },
+  })
+})
+
+
 test("preflight skips are counted separately from model-studied reports", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
