@@ -9,6 +9,7 @@ import { ResearchQueue } from "../../src/research/queue"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
+import { ResearchKnowledgeTool } from "../../src/tool/research-knowledge"
 import { tmpdir } from "../fixture/fixture"
 
 // These integration tests share the worker-local SQLite database. Clear only the
@@ -125,15 +126,36 @@ test("agent-led research study persists model analysis and completes its queue l
           public_id: claimed.public_id,
           lease_owner: claimed.lease_owner,
           decision: "learned",
+          document_type: "academy",
           vulnerability_class: "idor",
           cwe_id: "CWE-639",
           severity: "high",
           lesson: "Compare the same object request between two controlled identities and verify ownership before treating cross-account access as an authorization flaw.",
+          initial_observation: "An authenticated request contains an object identifier and returns a private record.",
+          hypotheses: ["Object-level authorization is missing.", "The object is intentionally public or shared."],
+          attempted_tests: ["Replay the captured owner request using a second controlled account."],
+          successful_tests: ["The second account receives a record proven to belong to the first account."],
+          failed_tests: ["A modified identifier returns the same authorized public object."],
+          rejected_hypotheses: ["The response alone proves IDOR without confirming object ownership."],
+          decisive_evidence: "The returned record's owner identity differs from the authenticated second account, and sharing is not intended.",
+          reported_outcome: "Educational lab scenario; this fixture is not a real confirmed production disclosure.",
+          verification_status: "educational_example",
+          unresolved_questions: ["Would a third role have different access?"],
+          pattern_name: "Cross-account object ownership check",
+          pattern_summary: "Compare the same object request between controlled identities and verify ownership, privacy, and intentional sharing.",
+          trigger_signal: "An authenticated endpoint accepts a caller-controlled user, account, order, or object identifier.",
+          test_procedure: ["Capture the owner's baseline request.", "Replay with a second controlled account.", "Compare returned object identity and ownership."],
+          expected_positive_signals: ["The second account receives private data owned by the first account."],
+          expected_negative_signals: ["The object is intentionally public or shared with both identities."],
+          evidence_requirements: ["Owner-account baseline", "Second-account replay", "Evidence identifying the object owner"],
+          applicability_conditions: ["The endpoint returns user-owned or otherwise access-controlled objects."],
+          non_applicability_conditions: ["The resource is intentionally public or the caller is authorized to access it."],
           attack_vector: "A caller changes an object identifier in an authenticated request.",
           impact: "Private data may be disclosed across account boundaries.",
           prerequisites: "Two controlled accounts with different object ownership and a valid baseline request.",
           reproduction_steps: "Capture the owner request, replay it with the second account, and compare the object identity and response body.",
           root_cause: "The server relies on a caller-controlled object key without enforcing ownership authorization.",
+          request_response_evidence: "Compare the owner baseline and cross-account response, including the object owner field and response body.",
           verification_signals: ["The second account receives the exact private object owned by the first account."],
           false_positive_cautions: ["The object may intentionally be public or shared with both accounts."],
           retrieval_signals: ["idor", "object-identifier", "authorization-boundary", "CWE-639"],
@@ -153,9 +175,31 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(knowledge?.cwe_id).toBe("CWE-639")
       expect(knowledge?.metadata?.study_method).toBe("llm-assisted-agent-command-v1")
       expect(knowledge?.metadata?.document_type).toBe("academy")
-      expect((knowledge?.metadata?.extracted as Record<string, unknown> | undefined)?.document_type).toBe("academy")
+      const extracted = knowledge?.metadata?.extracted as Record<string, unknown> | undefined
+      expect(extracted?.document_type).toBe("academy")
+      expect(extracted?.document_type).toBe("academy")
+      expect(extracted?.failed_tests).toEqual(["A modified identifier returns the same authorized public object."])
+      expect(extracted?.pattern_name).toBe("Cross-account object ownership check")
+      expect(extracted?.test_procedure).toHaveLength(3)
       expect(knowledge?.metadata?.model_study_version).toBe(2)
       expect(knowledge?.metadata?.excerpt).toContain("two controlled accounts")
+
+      // Verify the hunt-time retrieval tool exposes the actual structured lesson,
+      // rather than merely proving that the row exists in SQLite.
+      const researchKnowledge = await ResearchKnowledgeTool.init()
+      const retrieved = await researchKnowledge.execute({
+        signal: "IDOR object identifier authorization",
+        vulnerability_class: "idor",
+        cwe: "CWE-639",
+        limit: 5,
+      }, context)
+      expect(retrieved.metadata.matches).toBeGreaterThan(0)
+      expect(retrieved.output).toContain("Document type: academy")
+      expect(retrieved.output).toContain("Tests attempted:")
+      expect(retrieved.output).toContain("Failed tests described by source: A modified identifier returns the same authorized public object.")
+      expect(retrieved.output).toContain("Reusable pattern: Cross-account object ownership check")
+      expect(retrieved.output).toContain("Ordered test procedure: Capture the owner's baseline request.");
+      
       const completedQueueRow = ResearchQueue.find(sourceID, sourceURL)
       expect(completedQueueRow?.status).toBe("learned")
       expect(completedQueueRow?.payload?.model_study_version).toBe(2)
