@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { afterEach, expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Instance } from "../../src/project/instance"
 import { Database } from "../../src/storage/db"
@@ -7,6 +7,15 @@ import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learn
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
+
+// Temporary source aliases are test fixtures, not process-wide configuration.
+afterEach(() => {
+  for (let index = RESEARCH_SOURCES.length - 1; index >= 0; index--) {
+    if (/^portswigger-(?:study-test|filter-test|backfill-test|legacy-study-test)-/.test(RESEARCH_SOURCES[index]!.id)) {
+      RESEARCH_SOURCES.splice(index, 1)
+    }
+  }
+})
 import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
 import { tmpdir } from "../fixture/fixture"
 
