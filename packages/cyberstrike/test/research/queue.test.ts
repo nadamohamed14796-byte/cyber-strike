@@ -686,6 +686,12 @@ test("research queue records oversized source blockers as terminal and visible",
       expect(ResearchQueue.stats(sourceID).blocked_size).toBe(1)
       expect(ResearchQueue.stats(sourceID).retry).toBe(0)
       expect(ResearchQueue.pending(50).some((row) => row.sequence === item.sequence)).toBe(false)
+      expect(ResearchQueue.enqueueForModelStudy({
+        sourceID,
+        sourceURL: "https://research.example.test/large-document",
+        title: "Document exceeds safe fetch ceiling",
+        payload: {},
+      }).reason).toBe("previously-blocked-size-limit")
 
       const unsupported = ResearchQueue.enqueue({
         sourceID,
