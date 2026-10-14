@@ -53,6 +53,26 @@ describe("Methodology phase skill routing", () => {
     expect(ranked.some((skill) => skill.name === "tampered-idor-skill")).toBe(false)
   })
 
+  test("observed target technologies influence phase skill ranking", () => {
+    const makeSkill = (name: string, tech_stack: string[]): SkillIndex.Entry => ({
+      name,
+      description: "Technology profiling and framework detection",
+      tags: ["technology", "framework", "tech-profile"],
+      tech_stack,
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+
+    const ranked = rankSkillsForPhase("technology_profiling", [
+      makeSkill("a-generic-framework-check", ["generic"]),
+      makeSkill("z-react-framework-check", ["react"]),
+    ], 4, ["React 18"])
+
+    expect(ranked[0]?.name).toBe("z-react-framework-check")
+  })
+
   test("recon phases reserve a recon-specific candidate even when a generic skill is present", () => {
     const makeSkill = (name: string, description: string, tags: string[] = []): SkillIndex.Entry => ({
       name,
