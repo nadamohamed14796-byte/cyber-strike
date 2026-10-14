@@ -329,6 +329,16 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
         }
         const relevance = sourceRelevance(claim.source_url, title, text, source)
         const textChunk = researchTextChunk(text, 0)
+        if (!ResearchQueue.recordClaimReadProgress({
+          id: claim.public_id,
+          leaseOwner: claim.lease_owner,
+          expectedOffset: null,
+          nextOffset: textChunk.next_offset,
+          totalLength: text.length,
+        })) {
+          issues.push(claim.public_id + ": claim lost before initial source-read cursor could be stored")
+          continue
+        }
         // The crawler's relevance gate is a heuristic. This item is already queued
         // from an allowlisted source and has passed the hard content/index checks, so
         // let the model make the final relevance decision instead of requeueing the
@@ -609,7 +619,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         )
       }
       const claim = ResearchQueue.claimed(params.public_id, params.lease_owner)
-      if (!claim || !ResearchQueue.renewClaim(params.public_id, params.lease_owner, 20 * 60_000)) {
+      if (!claim) {
         return output(
           "Research claim is stale or expired",
           "The claimed row is no longer owned by this lease. Do not save a study decision from incomplete chunks; reclaim the row with action=next and resume.",
@@ -638,7 +648,29 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           { error: "offset_out_of_range", public_id: params.public_id, total_characters: text.length },
         )
       }
+      const expectedOffset = typeof claim.payload.study_read_offset === "number" ? claim.payload.study_read_offset : 0
+      if (params.offset !== expectedOffset) {
+        return output(
+          "Out-of-order research text chunk",
+          "No source text was returned because this offset skips or repeats content. Resume exactly at expected_offset.",
+          { error: "unexpected_offset", public_id: params.public_id, expected_offset: expectedOffset, total_characters: text.length },
+        )
+      }
       const chunk = researchTextChunk(text, params.offset)
+      const cursorSaved = ResearchQueue.recordClaimReadProgress({
+        id: params.public_id,
+        leaseOwner: params.lease_owner,
+        expectedOffset,
+        nextOffset: chunk.next_offset,
+        totalLength: text.length,
+      })
+      if (!cursorSaved) {
+        return output(
+          "Research text cursor changed",
+          "The claim or its cursor changed while reading. Refresh action=next and do not submit a study decision until every chunk is retrieved.",
+          { error: "cursor_update_failed", public_id: params.public_id, expected_offset: expectedOffset },
+        )
+      }
       return output(
         "Canonical research source text chunk",
         JSON.stringify({
@@ -702,6 +734,19 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           result: released ? "source-filter-mismatch" : "lease-lost",
           expected_source: params.source,
           actual_source: claim.source_id,
+        })
+        continue
+      }
+      const canonicalText = typeof claim.payload.cached_text === "string" ? claim.payload.cached_text : ""
+      const readOffset = typeof claim.payload.study_read_offset === "number" ? claim.payload.study_read_offset : 0
+      const readLength = typeof claim.payload.study_read_length === "number" ? claim.payload.study_read_length : -1
+      if (readLength !== canonicalText.length || readOffset < canonicalText.length) {
+        results.push({
+          public_id: note.public_id,
+          result: "unread-source-chunks",
+          next_offset: readOffset,
+          total_characters: canonicalText.length,
+          message: "Read every remaining source chunk with action=read before saving learned or rejected.",
         })
         continue
       }
