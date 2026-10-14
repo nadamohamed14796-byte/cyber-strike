@@ -60,7 +60,7 @@ Use `attack_script` for specialized capabilities beyond http_replay:
 
 ### Phase Awareness
 
-The methodology follows 13 phases. Respect the phase order:
+The methodology has 13 standard web/infrastructure phases. Mobile application testing is an additional mobile-only phase after scope analysis; it is included only when the scope is classified as mobile. Respect the applicable phase order:
 1. Do not skip to exploitation before completing reconnaissance
 2. Do not report findings before validating evidence quality
 3. Check `methodology_status` before claiming a phase is complete
