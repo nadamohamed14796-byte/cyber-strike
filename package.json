@@ -10,7 +10,7 @@
     "dev:web": "bun --cwd packages/app dev",
     "typecheck": "bun turbo typecheck",
     "prepare": "husky",
-    "test": "echo 'do not run tests from root' && exit 1",
+    "test": "bun turbo test",
     "build": "bun turbo build"
   },
   "workspaces": {
