@@ -87,21 +87,13 @@ function javascriptAssetURL(input: { type?: string | null; title?: string | null
 
 function redact(value?: string | null, max = 320): string | null {
   if (!value) return null
-  const sensitiveKey =
-    "authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?"
   return value
     // Redact complete quoted JSON values (including spaces and escaped quotes).
-    .replace(
-      new RegExp(
-        String.raw\`(["']?(?:\${sensitiveKey})["']?\\s*:\\s*)(?:"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*'|[^,\\s;}]+)\`,
-        "gi",
-      ),
-      "$1[REDACTED]",
-    )
-    .replace(new RegExp(String.raw\`\\b(\${sensitiveKey})\\s*[:=]\\s*[^\\r\\n,;]+\`, "gi"), "$1: [REDACTED]")
-    .replace(/\\bBearer\\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
-    .replace(/\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b/g, "[JWT REDACTED]")
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
+    .replace(/(["']?(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)? )["']?\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,\s;}]+)/gi, "$1[REDACTED]")
+    .replace(/\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
     .slice(0, max)
 }
 
