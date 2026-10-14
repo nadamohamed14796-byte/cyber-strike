@@ -362,7 +362,7 @@ function processAuthPhase(globalState: ReturnType<typeof createGlobalState>): vo
 // Scope resolution (ARCHITECTURE.md §1.2 — Network Scope)
 //
 // Explicit --scope replaces auto-derivation entirely; otherwise
-// derive a single "*.{eTLD+1}" wildcard from the target URL.
+// use only the exact starting hostname. A URL does not authorize sibling subdomains.
 // ============================================================
 
 function resolveScopePatterns(config: AgentConfig): string[] {
