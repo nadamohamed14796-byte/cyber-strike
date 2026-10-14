@@ -24,7 +24,7 @@ test("target workspace tool initializes, configures scope, and nests authorized 
         action: "record_summary",
         target_url: "https://example.com",
         summary_title: "Scope input registered",
-        summary_content: "The operator-provided scope list is staged at scope/targets.txt; recon has not started.",
+        summary_content: "The operator-provided scope list is staged at scope/targets.txt; recon has not started. Local evidence: api_key = \"test-secret-value-12345\".",
         summary_kind: "manual",
         summary_status: "observed",
         summary_source: "orchestrator",
@@ -33,6 +33,7 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       expect(summary.metadata.saved).toBe(true)
       expect(summary.metadata.note_id).toBeTruthy()
       expect(await fs.readFile(summary.metadata.notes_file!, "utf-8")).toContain("Scope input registered")
+      expect(await fs.readFile(summary.metadata.notes_file!, "utf-8")).toContain("test-secret-value-12345")
 
       const scope = await tool.execute({
         action: "configure_scope",
