@@ -527,6 +527,33 @@ export namespace ResearchQueue {
   }
 
   /**
+   * Extend only a still-active lease owned by the caller. Reading a long source
+   * through multiple bounded chunks must not let another worker reclaim it midway.
+   */
+  export function renewClaim(id: string, leaseOwner: string, leaseDurationMs = LEASE_MS) {
+    const match = /^RPT-(\\d{1,12})$/.exec(id.trim())
+    if (!match || !leaseOwner.trim()) return false
+    const sequence = Number(match[1])
+    if (!Number.isSafeInteger(sequence) || sequence <= 0) return false
+    const duration = Number.isFinite(leaseDurationMs)
+      ? Math.max(LEASE_MS, Math.min(20 * 60_000, Math.floor(leaseDurationMs)))
+      : LEASE_MS
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const renewed = db.update(ResearchQueueTable).set({
+        lease_until: now + duration,
+        updated_at: now,
+      }).where(and(
+        eq(ResearchQueueTable.sequence, sequence),
+        eq(ResearchQueueTable.status, "studying"),
+        eq(ResearchQueueTable.lease_owner, leaseOwner),
+        gt(ResearchQueueTable.lease_until, now),
+      )).returning({ sequence: ResearchQueueTable.sequence }).get()
+      return Boolean(renewed)
+    })
+  }
+
+  /**
    * Cache sanitized text fetched by the agent-study path, tied to the still-active
    * claim. This lets saving knowledge read canonical source text from SQLite rather
    * than trusting an excerpt echoed back by the model.
