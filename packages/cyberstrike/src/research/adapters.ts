@@ -44,8 +44,11 @@ export function nextDiscoveryPage(source: ResearchSource, value: string) {
       }
       return withQuery(value, "page", Number(parsed.searchParams.get("page") ?? "1") + 1)
     case "bugcrowd-crowdstream":
-    case "github":
-      return withQuery(value, "page", Number(parsed.searchParams.get("page") ?? "1") + 1)
+    case "github": {
+      const current = Number(parsed.searchParams.get("page") ?? "1")
+      if (!Number.isSafeInteger(current) || current < 1) return undefined
+      return withQuery(value, "page", current + 1)
+    }
     case "intigriti":
     case "infosec-writeups":
     case "hackerone-blog":
@@ -72,8 +75,9 @@ export function nextDiscoveryPage(source: ResearchSource, value: string) {
 export function isDiscoveryPaginationURL(source: ResearchSource, value: string) {
   try {
     const parsed = new URL(value)
-    if (source.id === "hackerone-hacktivity" && parsed.pathname.includes("/overview")) {
-      return parsed.searchParams.has("pageIndex")
+    if (source.id === "hackerone-hacktivity") {
+      if (parsed.pathname.includes("/overview")) return parsed.searchParams.has("pageIndex")
+      return parsed.searchParams.has("page") && /^\\d+$/.test(parsed.searchParams.get("page") ?? "")
     }
     if (["bugcrowd-crowdstream", "github"].includes(source.id)) {
       return parsed.searchParams.has("page") && /^\d+$/.test(parsed.searchParams.get("page") ?? "")
