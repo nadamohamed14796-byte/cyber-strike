@@ -10,7 +10,7 @@ beforeAll(async () => {
 }, 30000)
 
 afterAll(async () => {
-  await browser.close()
+  await browser?.close()
 }, 15000)
 
 async function loadFixture(name: string): Promise<Page> {
