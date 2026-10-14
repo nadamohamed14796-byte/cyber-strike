@@ -44,6 +44,31 @@ describe("scope_check IPv4 CIDR matching", () => {
 })
 
 
+describe("scope_check caller-provided patterns are not authorization", () => {
+  test("reports a pattern match without claiming the target is authorized", async () => {
+    const info = await ScopeCheckTool.init()
+    const result = await info.execute(
+      { target: "api.example.com", scope_items: ["*.example.com"] },
+      {
+        sessionID: "ses_scope_informational",
+        messageID: "msg_scope_informational",
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => undefined,
+        ask: async () => undefined,
+      },
+    )
+
+    expect(result.title).toContain("authorization unverified")
+    expect(result.output).toContain("Authorization: NOT VERIFIED")
+    expect(result.metadata.inScope).toBe(false)
+    expect(result.metadata.matchesSuppliedScope).toBe(true)
+    expect(result.metadata.authorizationVerified).toBe(false)
+    expect(result.metadata.scopeMatchOnly).toBe(true)
+  })
+})
+
 describe("scope_check uses persisted target scope when a workspace is supplied", () => {
   async function execute(target: string, targetURL: string) {
     const info = await ScopeCheckTool.init()
