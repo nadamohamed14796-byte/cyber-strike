@@ -18,7 +18,7 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
 import { TargetMemory } from "../target"
-import { reconPhaseGate, type ReconPhase } from "./recon-checkpoint"
+import { reconPhaseGate, type ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
 
