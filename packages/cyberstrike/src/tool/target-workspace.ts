@@ -330,7 +330,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         source: params.summary_source ?? "target_workspace",
         sourceURL: params.summary_source_url,
         tags: params.summary_tags,
-        upsertByIdentity: true,
+        upsertByIdentity: Boolean(params.summary_title?.trim()),
       })
       return {
         title: result.created ? "Target summary saved" : result.updated ? "Target summary updated" : "Target summary already exists",
