@@ -57,7 +57,7 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   paramspider: "url_collection",
   curl: "url_collection",
   wget: "url_collection",
-  arjun: "endpoint_inventory",
+  arjun: "parameter_discovery",
   nuclei: "vulnerability_testing",
   ffuf: "vulnerability_testing",
   feroxbuster: "vulnerability_testing",
