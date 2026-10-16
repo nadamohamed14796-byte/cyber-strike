@@ -96,6 +96,7 @@ const StudyItem = z.object({
   negative_evidence: z.string().max(1800).optional(),
   limitations: z.string().max(1800).optional(),
   retrieval_signals: z.array(z.string().max(120)).max(16).optional(),
+  document_note: z.record(z.string(), z.unknown()).optional(),
 })
 
 const ResearchStudyParameters = z.object({
