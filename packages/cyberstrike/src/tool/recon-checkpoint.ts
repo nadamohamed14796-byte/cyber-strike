@@ -17,6 +17,10 @@ import { Tool } from "./tool"
 export { reconRunID, unresolvedReconPrerequisites } from "../target/recon-gate"
 export type { ReconPhase, ReconPhaseRecord, ReconPhaseStatus } from "../target/recon-gate"
 
+function terminal(status: ReconPhaseStatus): boolean {
+  return status === "complete" || status === "unavailable"
+}
+
 const Parameters = z.object({
   action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
