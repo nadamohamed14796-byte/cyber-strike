@@ -76,7 +76,7 @@ For each source, use its exact configured ID with `research_study(action="discov
 
 ## Source-scoped authentication
 
-The safe-fetch layer checks only explicit source-scoped process variables: `CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_SUFFIX>` or `CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_SUFFIX>`, where `<SOURCE_SUFFIX>` is the exact source ID uppercased with non-alphanumeric runs converted to underscores. `stats` reports only the boolean `session_configured`; never request, emit, persist, or infer secret values. This layer does not automatically reuse target-session credentials or the logged-in browser's cookie jar. If `session_configured` is false and a site requires authentication, mark it blocked and do not claim browser cookies were used.
+The safe-fetch layer first accepts explicit source-scoped process variables: `CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_SUFFIX>` or `CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_SUFFIX>`, where `<SOURCE_SUFFIX>` is the exact source ID uppercased with non-alphanumeric runs converted to underscores. It can also reuse a `Cookie` header already captured in the active CyberStrike session, but only when the captured request hostname exactly matches the hostname being fetched. It never borrows a cookie from another host, never forwards credentials across a redirect to a different hostname, and never emits or persists cookie values in research records, prompts, logs, or summaries. `stats` reports only the boolean `session_configured`; it does not return secrets. A captured cookie may be stale; if login walls remain, mark that source blocked/incomplete rather than claiming it was exhausted.
 
 ## 2. Phase A — collect every accessible document before studying any of them
 
