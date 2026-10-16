@@ -34,6 +34,7 @@ Read the current registry at runtime; it is authoritative. The `src-hunter-skill
 - `nahamsec` — NahamSec
 - `assetnote` — Assetnote
 - `projectdiscovery` — ProjectDiscovery
+- `medium-security` — security-topic article feeds on Medium, with per-article relevance checks and source-scoped authentication
 - `trickster0` — curated Trickster0 Medium content
 - `edoverflow` — EdOverflow
 - `devcore` — DEVCORE / Orange Tsai
@@ -69,16 +70,23 @@ These are the concrete seed URLs currently configured in `src/research/sources.t
 12. **NahamSec** — https://nahamsec.com/
 13. **Assetnote research** — https://blog.assetnote.io/
 14. **ProjectDiscovery research** — https://projectdiscovery.io/blog
-15. **Trickster0's curated Medium content** — https://trickster0.medium.com/
-16. **EdOverflow** — https://edoverflow.com/
-17. **DEVCORE / Orange Tsai** — https://devco.re/en/
-18. **LiveOverflow** — https://liveoverflow.com/
-19. **HackTricks reference** — https://book.hacktricks.xyz/
-20. **PayloadsAllTheThings repository** — https://github.com/swisskyrepo/PayloadsAllTheThings
-21. **GitHub security write-up repository search** — https://github.com/search?q=bug+bounty+writeup&type=repositories
+15. **Medium security-topic feeds** — `medium-security`:
+   - https://medium.com/tag/bug-bounty
+   - https://medium.com/tag/web-security
+   - https://medium.com/tag/penetration-testing
+   - https://medium.com/tag/vulnerability
+   - Follow individual article links, including author subdomains. Do not crawl Medium sitemaps, unrelated profile roots, or recommendations; use the source-scoped configured session when required.
+16. **Trickster0's curated Medium content** — https://trickster0.medium.com/
+ — https://trickster0.medium.com/
+17. **EdOverflow** — https://edoverflow.com/
+18. **DEVCORE / Orange Tsai** — https://devco.re/en/
+19. **LiveOverflow** — https://liveoverflow.com/
+20. **HackTricks reference** — https://book.hacktricks.xyz/
+21. **PayloadsAllTheThings repository** — https://github.com/swisskyrepo/PayloadsAllTheThings
+22. **GitHub security write-up repository search** — https://github.com/search?q=bug+bounty+writeup&type=repositories
    - **GitHub code search for report/write-up files** — https://github.com/search?q=bug+bounty+writeup&type=code
    - Treat search results as leads; open relevant repositories and read the individual report files, not just snippets.
-22. **src-hunter-skill — direct raw HackerOne report directory (start here)** — https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports
+23. **src-hunter-skill — direct raw HackerOne report directory (start here)** — https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports
    - Repository root / supporting playbooks: https://github.com/MyuriKanao/src-hunter-skill
    - Skill instructions: https://github.com/MyuriKanao/src-hunter-skill/blob/main/SKILL.md
    - English README: https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md
@@ -102,6 +110,8 @@ Do not impose a fixed total limit on pages, links, reports, or resources. Per-ca
 A source is exhausted only when its accessible discovery frontier has been checked. If pagination cannot be proven complete, report uncertain/partial status. Do not claim the whole internet has been searched.
 
 ## 3. Fetch and study lifecycle
+
+**Required ordering: two distinct phases.** First collect and cache all eligible individual documents across every selected source. Do not claim, read, save, or study queue items during discovery. Only after all selected sources have completed their accessible discovery passes (or have been explicitly marked partial due to a real blocker) begin model-led study of the complete collected queue. A source's listing page is never a substitute for opening its individual report/article links. Print the collection ledger before starting study.
 
 The current safe-fetcher also has a per-document byte ceiling (currently 1,500,000 bytes), redirect ceiling, and total fetch-time budget. These are transport/resource-safety guards, not global page or item limits. If a resource exceeds a transport guard, record it as blocked/partial with the exact reason; never silently treat a partial body as a complete study. The active-model queue uses terminal `blocked_size` for the safe-fetch document-size ceiling and `blocked_fetch` for other non-retryable safe-fetch errors (for example, unsupported content type, terminal HTTP errors, invalid queued URLs, or unsafe redirects); count and report both separately from irrelevant-content rejections and retryable network failures. If the user explicitly wants larger documents supported, implement safe streaming/chunking and tests rather than removing SSRF, timeout, redirect, or memory protections.
 
