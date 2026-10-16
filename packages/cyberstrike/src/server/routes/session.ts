@@ -1400,7 +1400,7 @@ export const SessionRoutes = lazy(() =>
                         "- Response size: " + (req.response_size ?? "unknown"),
                         "",
                         "The full captured request/response remains in the request store under the Request ID. This note is an index into target evidence, not a vulnerability finding. The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
-                      ].join("\\n")
+                      ].join("\n")
                       await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
                         kind: "evidence",
                         title: ("Captured request " + normalized.method + " " + normalized.normalizedPath.split("?")[0]).slice(0, 180),
