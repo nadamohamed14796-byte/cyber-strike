@@ -32,6 +32,7 @@ import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { TargetMemory } from "../../target"
+import { JavaScriptCorrelation } from "../../target/javascript-correlation"
 
 const log = Log.create({ service: "server" })
 
@@ -1375,6 +1376,49 @@ export const SessionRoutes = lazy(() =>
                   before,
                   after: IngestSummary.snapshot(sessionID),
                 })
+
+                // JavaScript response captures automatically refresh the target's static
+                // analysis/correlation graph after the request agent finishes. The builder
+                // reads only already-captured, in-scope traffic and persists redacted metadata.
+                const isJavaScriptResponse =
+                  Boolean(req.processed_response?.trim()) &&
+                  (/(?:java|ecma)script|x-javascript/i.test(req.response_content_type ?? "") ||
+                    /\.(?:m?js|cjs)(?:[?#]|$)/i.test(normalized.normalizedPath))
+                if (isJavaScriptResponse && normalized.origin) {
+                  try {
+                    const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
+                    const scopeDecision = await TargetMemory.checkURLScope(observedURL)
+                    if (scopeDecision.allowed && scopeDecision.workspace) {
+                      const correlation = await JavaScriptCorrelation.build({
+                        sessionID: childSessionID,
+                        targetURL: scopeDecision.workspace.targetURL,
+                      })
+                      log.info("automatic JavaScript correlation completed", {
+                        sessionID,
+                        childSessionID,
+                        requestID: req.id,
+                        targetID: scopeDecision.workspace.id,
+                        sourceFiles: correlation.graph.sourceFiles.length,
+                        endpointCandidates: correlation.graph.endpointCandidates.length,
+                        graphPath: correlation.graphPath,
+                      })
+                    } else {
+                      log.info("automatic JavaScript correlation skipped by persisted scope", {
+                        sessionID,
+                        requestID: req.id,
+                        reason: scopeDecision.reason,
+                      })
+                    }
+                  } catch (error) {
+                    // Correlation is a follow-up analysis, not the request-agent result.
+                    // Preserve the request's successful status and leave a diagnostic log.
+                    log.warn("automatic JavaScript correlation failed", {
+                      sessionID,
+                      requestID: req.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                  }
+                }
                 finalStatus = "processed"
               } finally {
                 Request.updateStatus({ id: req.id, status: finalStatus })
