@@ -5,6 +5,20 @@ import { TargetMemory } from "../../src/target"
 import { tmpdir } from "../fixture/fixture"
 
 describe("scope_check IPv4 CIDR matching", () => {
+  test("supports explicit URL scope with exact scheme, port, and path boundaries", () => {
+    expect(checkMatch("https://example.com/api/users", "https://example.com/api/*").matches).toBe(true)
+    expect(checkMatch("https://example.com/api/users/1", "https://example.com/api/*").matches).toBe(true)
+    expect(checkMatch("https://example.com/apix/users", "https://example.com/api/*").matches).toBe(false)
+    expect(checkMatch("http://example.com/api/users", "https://example.com/api/*").matches).toBe(false)
+    expect(checkMatch("https://example.com:8443/api/users", "https://example.com/api/*").matches).toBe(false)
+    expect(checkMatch("https://example.com/api/users", "https://example.com:8443/api/*").matches).toBe(false)
+  })
+
+  test("supports explicit hostname and port without treating other ports as in scope", () => {
+    expect(checkMatch("http://api.example.com:8080/", "api.example.com:8080").matches).toBe(true)
+    expect(checkMatch("https://api.example.com:8443/", "api.example.com:8080").matches).toBe(false)
+    expect(checkMatch("https://api.example.com/", "api.example.com:443").matches).toBe(true)
+  })
   test("matches valid in-range IPv4 addresses and URLs", () => {
     expect(checkMatch("10.20.30.40", "10.20.30.0/24").matches).toBe(true)
     expect(checkMatch("https://10.20.30.40:8443/api/users", "10.20.30.0/24").matches).toBe(true)
