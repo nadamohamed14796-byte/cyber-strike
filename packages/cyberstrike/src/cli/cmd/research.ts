@@ -43,10 +43,10 @@ export const ResearchCommand = cmd({
       })
       .command({
         command: "sync [source]",
-        describe: "exhaustively discover and learn from all accessible public security research",
+        describe: "exhaustively collect accessible security reports and write-ups, then study the collected documents",
         builder: (yargs) => yargs.positional("source", { type: "string" }),
         async handler(args) {
-          prompts.intro("CyberStrike Exhaustive Research Learning")
+          prompts.intro("CyberStrike Research Collection and Study")
           const sources = args.source
             ? RESEARCH_SOURCES.filter((source) => source.id === args.source)
             : RESEARCH_SOURCES
@@ -54,9 +54,13 @@ export const ResearchCommand = cmd({
 
           const totals = { pages: 0, candidates: 0, queued: 0, learned: 0, skipped: 0, failed: 0, blockedAuth: 0, errors: 0 }
           const incomplete: Array<{ source: string; reason: string }> = []
+          const studySources: string[] = []
 
+          // PHASE 1 — COLLECT. Finish the crawl for every selected source before
+          // starting model-led study. The page window is only a continuation batch;
+          // it doubles until the frontier is exhausted and is never a total-page cap.
           for (const source of sources) {
-            prompts.log.step("Discovering source: " + source.id)
+            prompts.log.step("Collecting source: " + source.id)
             while (true) {
               const resumed = await retryAuthenticatedResearch({ sourceID: source.id, limit: 500 })
               if (resumed === 0) break
@@ -89,41 +93,24 @@ export const ResearchCommand = cmd({
               totals.queued += result.added
               totals.blockedAuth += result.blocked_auth
               totals.errors += result.error_count
-              prompts.log.info(source.id + ": processed_pages=" + result.pages +
-                " page_window=" + pageWindow + " candidates=" + result.candidates +
-                " queued_new=" + result.added + " blocked_auth=" + result.blocked_auth +
+              prompts.log.info(source.id + ": visited_pages=" + result.pages +
+                " continuation_window=" + pageWindow + " report_links_seen=" + result.candidates +
+                " documents_collected_new=" + result.added + " blocked_auth=" + result.blocked_auth +
                 " errors=" + result.error_count)
               for (const error of result.errors) prompts.log.warn(error)
 
-              while (true) {
-                const batch = await learnResearchQueue({ limit: 500, sourceID: source.id })
-                totals.learned += batch.learned
-                totals.skipped += batch.skipped
-                totals.failed += batch.failed
-                totals.blockedAuth += batch.blocked_auth
-                for (const error of batch.errors) prompts.log.warn(error)
-                if (batch.claimed === 0) break
-              }
-
               const stats = ResearchQueue.stats(source.id)
-              const blocked =
-                result.error_count > 0 ||
-                result.blocked_auth > 0 ||
-                stats.crawl_page_errors > 0 ||
-                stats.crawl_page_auth_blocked > 0 ||
-                stats.blocked_auth > 0 ||
-                stats.retry > 0 ||
-                stats.studying > 0
+              const blocked = result.error_count > 0 || result.blocked_auth > 0 ||
+                stats.crawl_page_errors > 0 || stats.crawl_page_auth_blocked > 0 ||
+                stats.blocked_auth > 0
               if (blocked) {
                 const reason = [
                   result.error_count ? "discovery errors=" + result.error_count : "",
                   result.blocked_auth || stats.blocked_auth || stats.crawl_page_auth_blocked ? "authentication required" : "",
                   stats.crawl_page_errors ? "crawl-page errors=" + stats.crawl_page_errors : "",
-                  stats.retry ? "retry queue=" + stats.retry : "",
-                  stats.studying ? "active/stale study leases=" + stats.studying : "",
-                ].filter(Boolean).join(", ") || "unresolved queue state"
+                ].filter(Boolean).join(", ") || "unresolved discovery state"
                 incomplete.push({ source: source.id, reason })
-                prompts.log.warn(source.id + ": partial: " + reason)
+                prompts.log.warn(source.id + ": collection is partial: " + reason)
                 finished = true
                 continue
               }
@@ -140,10 +127,36 @@ export const ResearchCommand = cmd({
               }
               finished = true
             }
+            studySources.push(source.id)
           }
 
-          // Final global drain covers legacy rows and any queue work not tied to the
-          // selected source's discovery pass. The batch is bounded; total work is not.
+          prompts.log.success("COLLECTION PHASE FINISHED: visited_pages=" + totals.pages +
+            ", report/write-up links seen=" + totals.candidates +
+            ", new documents cached for study=" + totals.queued +
+            ", authentication blocks=" + totals.blockedAuth +
+            ", discovery errors=" + totals.errors)
+          prompts.log.step("Beginning study phase only after collection stopped for every selected source")
+
+          // PHASE 2 — STUDY. No page fetching/discovery happens in this loop.
+          // A limit of 500 applies to each queue claim only; the total number of
+          // documents processed is unbounded and the queue is drained to exhaustion.
+          for (const sourceID of studySources) {
+            prompts.log.step("Studying collected documents: " + sourceID)
+            while (true) {
+              const batch = await learnResearchQueue({ limit: 500, sourceID })
+              totals.learned += batch.learned
+              totals.skipped += batch.skipped
+              totals.failed += batch.failed
+              totals.blockedAuth += batch.blocked_auth
+              for (const error of batch.errors) prompts.log.warn(error)
+              if (batch.claimed === 0) break
+              prompts.log.info(sourceID + ": studied_batch=" + batch.claimed +
+                " learned=" + batch.learned + " rejected_or_skipped=" + batch.skipped +
+                " failed=" + batch.failed + " blocked_auth=" + batch.blocked_auth)
+            }
+          }
+
+          // Also drain previously queued legacy work if the caller selected all sources.
           while (true) {
             const batch = await learnResearchQueue({ limit: 500, sourceID: args.source })
             totals.learned += batch.learned
@@ -156,9 +169,10 @@ export const ResearchCommand = cmd({
 
           const queue = ResearchQueue.stats(args.source)
           const knowledge = ReportKnowledge.stats()
-          prompts.log.info("Totals: page_visits_across_passes=" + totals.pages + " candidates=" + totals.candidates +
-            " queued_new=" + totals.queued + " learned=" + totals.learned + " skipped=" + totals.skipped +
-            " failed=" + totals.failed + " blocked_auth=" + totals.blockedAuth + " discovery_errors=" + totals.errors)
+          prompts.log.info("Totals: visited_pages=" + totals.pages + " report/write-up links seen=" + totals.candidates +
+            " new_documents_collected=" + totals.queued + " studied=" + totals.learned +
+            " rejected_or_skipped=" + totals.skipped + " failed=" + totals.failed +
+            " blocked_auth=" + totals.blockedAuth + " discovery_errors=" + totals.errors)
           prompts.log.info("Queue: " + JSON.stringify(queue))
           prompts.log.info("Knowledge: " + JSON.stringify(knowledge))
           if (incomplete.length) {
