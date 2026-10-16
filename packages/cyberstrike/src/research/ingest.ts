@@ -135,7 +135,7 @@ export async function fetchResearchSourceForStudy(sourceID: string, sourceURL: s
   }
 }
 
-function linksOf(html: string, base: URL, source: ResearchSource) {
+export function linksOf(html: string, base: URL, source: ResearchSource) {
   const links = new Set<string>()
   for (const match of html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
     const value = normalizeUrl(match[1], base)
@@ -160,6 +160,21 @@ function linksOf(html: string, base: URL, source: ResearchSource) {
       if (/\.(png|jpe?g|gif|svg|webp|css|js|zip|pdf|woff2?|mp4|mp3)$/i.test(url.pathname)) continue
       links.add(value)
     } catch {}
+  }
+  // HackerOne's client-rendered Hacktivity view can store report routes in
+  // inline state rather than href attributes. Recover only concrete numeric report
+  // IDs from that embedded state; all URLs still pass the normal host/path boundary.
+  if (source.id === "hackerone-hacktivity") {
+    const embedded = html.replace(/\\u002f/gi, "/").replace(/\\\//g, "/")
+    for (const match of embedded.matchAll(/(?:https?:\/\/(?:www\.)?hackerone\.com)?\/reports?\/(\d+)(?=[/?#"'\\\s]|$)/gi)) {
+      const value = normalizeUrl("/reports/" + match[1], base)
+      if (!value) continue
+      try {
+        const url = new URL(value)
+        if (url.protocol !== "https:" || !hostAllowed(url, source)) continue
+        links.add(value)
+      } catch {}
+    }
   }
   return [...links]
 }

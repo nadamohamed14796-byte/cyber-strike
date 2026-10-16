@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { RESEARCH_SOURCES, researchSourceHostAllowed, researchSourcePathAllowed, resolveResearchSourceForURL } from "../../src/research/sources"
-import { isIndexLikeResearchUrl, isResearchCandidate, sourceRelevance } from "../../src/research/ingest"
+import { isIndexLikeResearchUrl, isResearchCandidate, linksOf, sourceRelevance } from "../../src/research/ingest"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage } from "../../src/research/adapters"
 
 const trickster0 = RESEARCH_SOURCES.find((source) => source.id === "trickster0")!
@@ -205,4 +205,21 @@ test("source pagination stays lazy and continues beyond the former hard ceiling"
   expect(page1001).toBeDefined()
   expect(new URL(page1001!).searchParams.get("pageIndex")).toBe("1001")
   expect(isDiscoveryPaginationURL(hackerOne, page1001!)).toBe(true)
+})
+
+
+test("HackerOne recovers report URLs embedded in client-rendered listing state", () => {
+  const source = RESEARCH_SOURCES.find((item) => item.id === "hackerone-hacktivity")!
+  const base = new URL("https://hackerone.com/hacktivity/overview?pageIndex=0")
+  const html = String.raw\`<script id="__APP_STATE__" type="application/json">{
+    "reports":[
+      {"url":"\\/reports\\/12345"},
+      {"url":"https:\\/\\/hackerone.com\\/reports\\/67890"},
+      {"url":"/reports/new"}
+    ]
+  }</script>\`
+  const links = linksOf(html, base, source)
+  expect(links).toContain("https://hackerone.com/reports/12345")
+  expect(links).toContain("https://hackerone.com/reports/67890")
+  expect(links.some((url) => url.endsWith("/reports/new"))).toBe(false)
 })
