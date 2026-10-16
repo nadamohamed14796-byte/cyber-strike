@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { initialReconRun, parseReconRun } from "../../src/target/recon-gate"
 import {
   reconRunID,
   unresolvedReconPrerequisites,
@@ -74,4 +75,19 @@ test("endpoint inventory cannot be bypassed with unavailable status", () => {
 test("a fully resolved inventory allows the vulnerability phase", () => {
   const state = records("complete")
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
+})
+
+test("legacy manifests migrate to require parameter discovery and revalidate downstream phases", () => {
+  const legacy = initialReconRun("https://example.com", "target-root-1", "session-1")
+  delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).parameter_discovery
+  legacy.phases.endpoint_inventory = { status: "complete", summary: "old endpoint inventory", artifacts: ["endpoints/old.json"] }
+  legacy.phases.vulnerability_testing = { status: "complete", summary: "old tests", artifacts: ["testing/old.json"] }
+  legacy.phases.reporting = { status: "complete", summary: "old report", artifacts: ["reports/old.md"] }
+
+  const migrated = parseReconRun(JSON.stringify(legacy), "target-root-1", "https://example.com")
+  expect(migrated.phases.parameter_discovery.status).toBe("pending")
+  expect(migrated.phases.endpoint_inventory.status).toBe("pending")
+  expect(migrated.phases.vulnerability_testing.status).toBe("pending")
+  expect(migrated.phases.reporting.status).toBe("pending")
+  expect(migrated.phases.endpoint_inventory.artifacts).toEqual(["endpoints/old.json"])
 })
