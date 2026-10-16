@@ -217,11 +217,23 @@ export function isIndexLikeResearchUrl(url: string) {
 export function isResearchCandidate(url: string, source: ResearchSource) {
   const parsed = new URL(url)
   const path = parsed.pathname.toLowerCase()
-  // This curated Medium source is one researcher, not permission to ingest the whole platform.
+  // The legacy Trickster0 source is intentionally author-scoped.
   if (source.id === "trickster0") {
     const host = parsed.hostname.toLowerCase()
     if (host === "trickster0.medium.com") return path !== "/"
     return host === "medium.com" && /^\/@trickster0(?:\/|$)/i.test(path)
+  }
+  // The general Medium source starts from security-topic feeds and follows individual
+  // article links. Exclude tag/search/profile/index pages and rely on the relevance
+  // gate to reject unrelated stories; article pages themselves are terminal crawl nodes.
+  if (source.id === "medium-security") {
+    const host = parsed.hostname.toLowerCase()
+    if (host !== "medium.com" && !host.endsWith(".medium.com")) return false
+    if (path === "/" || /^\/(?:tag|topic|topics|search|about|membership|plans|me|following|latest|popular)(?:\/|$)/i.test(path)) return false
+    const segments = path.split("/").filter(Boolean)
+    if (segments.length < 2) return false
+    if (/^@[^/]+$/i.test(segments[0] ?? "")) return false
+    return true
   }
   // These editorial sites publish individual posts at varied URL shapes (slugs or dates),
   // so their article links cannot be identified reliably by generic path keywords alone.
@@ -1021,9 +1033,16 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         if (nextPage && !repeatsPreviousPage && hasRelevantChildren) {
           discoveredLinks.push(nextPage)
         }
-        for (const link of discoveredLinks) {
-          candidates++
-          add(link, current.depth + 1)
+        // Medium article pages often link to unrelated recommendations and publication
+        // navigation. Treat topic feeds as the frontier and article pages as terminal
+        // nodes so collection stays focused on the configured security feeds.
+        const mediumArticleTerminal = source.id === "medium-security" &&
+          isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)
+        if (!mediumArticleTerminal) {
+          for (const link of discoveredLinks) {
+            candidates++
+            add(link, current.depth + 1)
+          }
         }
 
         // Match the learner's minimum text length so short pages are rejected
