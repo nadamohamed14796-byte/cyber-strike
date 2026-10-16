@@ -57,18 +57,20 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
     !!record && ["pending", "running", "complete", "blocked", "failed", "unavailable"].includes(record.status)
   const legacyPhases = RECON_PHASES.filter((phase) => phase !== "parameter_discovery")
   const hasLegacyPhaseSet = !!phases && legacyPhases.every((phase) => validStatus(phases[phase]))
+  const hasParameterPhase = !!phases && Object.prototype.hasOwnProperty.call(phases, "parameter_discovery")
   if (
     parsed?.schemaVersion !== 1 ||
     parsed.targetID !== workspaceID ||
     parsed.targetURL !== targetURL ||
     typeof parsed.sessionID !== "string" ||
-    !hasLegacyPhaseSet
+    !hasLegacyPhaseSet ||
+    (hasParameterPhase && !validStatus(phases.parameter_discovery))
   ) throw new Error("Recon run manifest has invalid identity or schema; refusing to overwrite it.")
 
   // Older persisted runs predate the dedicated parameter-discovery phase. Migrate
   // them in memory and invalidate downstream completion so endpoint inventory and
   // later testing cannot silently bypass the newly required handoff.
-  if (!validStatus(phases.parameter_discovery)) {
+  if (!hasParameterPhase) {
     phases.parameter_discovery = {
       status: "pending",
       reason: "New required phase: discover and persist parameters before rebuilding endpoint inventory.",
