@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto"
 import z from "zod"
 import { ReportKnowledge } from "../learning/report-knowledge"
+import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../learning/report-knowledge.sql"
+import { Database, eq, inArray } from "../storage/db"
 import { RESEARCH_LEARNING_VERSION, RESEARCH_MODEL_STUDY_VERSION, RESEARCH_SOURCES, resolveResearchSourceForURL } from "../research/sources"
 import {
   classifyResearchDocumentType,
@@ -16,6 +18,7 @@ import {
 } from "../research/ingest"
 import { isNonRetryableResearchError } from "../research/safe-fetch"
 import { ResearchQueue } from "../research/queue"
+import { ResearchQueueTable } from "../research/queue.sql"
 import { Tool } from "./tool"
 
 const RESEARCH_TEXT_CHUNK_MAX_BYTES = 4 * 1024
@@ -93,7 +96,7 @@ const StudyItem = z.object({
 })
 
 const ResearchStudyParameters = z.object({
-  action: z.enum(["backfill", "discover", "next", "read", "save", "stats"]),
+  action: z.enum(["backfill", "discover", "next", "read", "reset", "save", "stats"]),
   source: z.string().trim().min(1).max(100).optional(),
   // Per-call discovery window only; /update must expand pages until exhaustion.
   pages: z.number().int().min(1).default(20),
@@ -602,6 +605,37 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
   async execute(params, ctx) {
     if (params.source && !RESEARCH_SOURCES.some((entry) => entry.id === params.source)) {
       return output("Unknown research source", "No configured research source has ID: " + params.source, { error: "unknown_source" })
+    }
+
+    if (params.action === "reset") {
+      if (params.source) {
+        return output(
+          "Research reset requires global scope",
+          "Omit source to reset the research queue and imported external research knowledge globally. Target findings and session-local knowledge are preserved.",
+          { error: "source_not_allowed_for_reset" },
+        )
+      }
+      const reset = Database.transaction((db) => {
+        const queueRows = db.select({ sequence: ResearchQueueTable.sequence }).from(ResearchQueueTable).all()
+        const externalRows = db.select({ id: ReportKnowledgeTable.id }).from(ReportKnowledgeTable)
+          .where(eq(ReportKnowledgeTable.source_kind, "external_report")).all()
+        const externalIDs = externalRows.map((row) => row.id)
+        if (externalIDs.length) {
+          db.delete(ReportKnowledgeEventTable).where(inArray(ReportKnowledgeEventTable.report_id, externalIDs)).run()
+          db.delete(ReportKnowledgeTable).where(inArray(ReportKnowledgeTable.id, externalIDs)).run()
+        }
+        db.delete(ResearchQueueTable).run()
+        return { queue_rows_removed: queueRows.length, external_research_records_removed: externalIDs.length }
+      })
+      return output(
+        "Research workspace reset",
+        JSON.stringify({
+          ...reset,
+          preserved: "Target findings, session-local knowledge, target workspaces, and unrelated data were not modified.",
+          next_step: "Run the normal /update workflow to collect all accessible sources first, then study the complete durable queue.",
+        }, null, 2),
+        reset,
+      )
     }
 
     if (params.action === "stats") {
