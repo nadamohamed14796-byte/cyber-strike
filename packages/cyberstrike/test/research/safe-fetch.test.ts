@@ -1,5 +1,10 @@
 import { expect, spyOn, test } from "bun:test"
 import { fetchResearchText, isPublicResearchAddress, researchSourceHasCredentials } from "../../src/research/safe-fetch"
+import { researchSessionCookieForHost } from "../../src/research/safe-fetch"
+import { Database } from "../../src/storage/db"
+import { Instance } from "../../src/project/instance"
+import { RequestTable, SessionTable, WebCredentialTable } from "../../src/session/session.sql"
+import { tmpdir } from "../fixture/fixture"
 
 const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }]
 function fetchTest(url: string, selectedSource: typeof source = source, resolveHost = publicLookup) {
@@ -355,4 +360,92 @@ test("detects configured source-scoped auth without exposing the credential valu
     if (prior === undefined) delete process.env[envKey]
     else process.env[envKey] = prior
   }
+})
+
+
+test("captured session cookies are reused only for the exact host and never forwarded across redirects", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID().replace(/-/g, "")
+      const sessionID = "ses_research_cookie_" + marker.slice(0, 18)
+      const credentialID = "cred_research_cookie_" + marker.slice(0, 18)
+      const now = Date.now()
+      Database.use((db) => {
+        db.insert(SessionTable).values({
+          id: sessionID,
+          project_id: Instance.project.id,
+          slug: "research-cookie-test",
+          directory: dir.path,
+          title: "Research cookie isolation test",
+          version: "1",
+          time_created: now,
+          time_updated: now,
+        }).run()
+        db.insert(WebCredentialTable).values({
+          id: credentialID,
+          session_id: sessionID,
+          label: "captured proxy request",
+          headers: { Cookie: "session=from-capture" },
+          time_created: now,
+          time_updated: now,
+        }).run()
+        db.insert(RequestTable).values({
+          id: "req_research_cookie_" + marker.slice(0, 18),
+          session_id: sessionID,
+          credential_id: credentialID,
+          method: "GET",
+          normalized_path: "/private",
+          status: "captured",
+          host: "research.example",
+          scheme: "https",
+          origin: "https://research.example:443",
+          raw_request: "GET /private HTTP/1.1\\r\\nHost: research.example\\r\\n\\r\\n",
+          time_created: now,
+          time_updated: now,
+        }).run()
+        db.insert(RequestTable).values({
+          id: "req_other_cookie_" + marker.slice(0, 18),
+          session_id: sessionID,
+          method: "GET",
+          normalized_path: "/private",
+          status: "captured",
+          host: "other.example",
+          scheme: "https",
+          origin: "https://other.example:443",
+          raw_request: "GET /private HTTP/1.1\\r\\nHost: other.example\\r\\nCookie: other=session-secret\\r\\n\\r\\n",
+          time_created: now + 1,
+          time_updated: now + 1,
+        }).run()
+      })
+
+      expect(researchSessionCookieForHost([sessionID], "research.example")).toBe("session=from-capture")
+      expect(researchSessionCookieForHost([sessionID], "sub.research.example")).toBeUndefined()
+      expect(researchSourceHasCredentials({ ...source, hosts: ["research.example"] }, [sessionID])).toBe(true)
+      expect(researchSourceHasCredentials({ ...source, hosts: ["unrelated.example"] }, [sessionID])).toBe(false)
+
+      const seen: Array<{ hostname: string; cookie: string | null }> = []
+      const redirectSource = { ...source, hosts: ["research.example", "sub.research.example"] }
+      await withFetch(
+        (async (input, init) => {
+          const url = new URL(input instanceof Request ? input.url : String(input))
+          seen.push({ hostname: url.hostname, cookie: new Headers(init?.headers).get("cookie") })
+          if (url.hostname === "research.example") {
+            return new Response(null, { status: 302, headers: { location: "https://sub.research.example/article" } })
+          }
+          return new Response("public security report", { status: 200, headers: { "content-type": "text/plain" } })
+        }) as typeof fetch,
+        async () => {
+          await expect(fetchResearchText("https://research.example/private", redirectSource, publicLookup, [sessionID]))
+            .resolves.toBe("public security report")
+        },
+      )
+      expect(seen).toEqual([
+        { hostname: "research.example", cookie: "session=from-capture" },
+        { hostname: "sub.research.example", cookie: null },
+      ])
+      await Instance.dispose()
+    },
+  })
 })
