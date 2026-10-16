@@ -96,7 +96,7 @@ function scannerTargets(command: string[], commandText: string): string[] {
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = command.findIndex((value) => SCANNER_PHASES[path.basename(value).toLowerCase()] !== undefined)
   if (scannerIndex < 0) {
-    const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) => new RegExp("(^|[\\s;&|])" + name + "([\\s;&|]|$)", "i").test(commandText))
+    const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) => new RegExp("\\b" + name + "\\b", "i").test(commandText))
     if (wrappedScanner) {
       throw new Error("Recon execution gate blocked an indirect/wrapped " + wrappedScanner + " invocation. Run the scanner as a direct command so target scope and phase prerequisites can be checked.")
     }
