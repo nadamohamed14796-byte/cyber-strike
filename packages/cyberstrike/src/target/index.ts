@@ -180,7 +180,8 @@ function normalizeScopeItem(input: string): string {
     const host = url.hostname.toLowerCase().replace(/\.$/, "")
     const wildcardHost = host.startsWith("*.")
     const bareHost = wildcardHost ? host.slice(2) : host
-    if (!bareHost || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(bareHost)) {
+    const ipv6Host = !wildcardHost && bareHost.startsWith("[") && bareHost.endsWith("]") && bareHost.slice(1, -1).includes(":")
+    if (!bareHost || (!ipv6Host && !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(bareHost))) {
       throw new Error("Invalid hostname in scope URL: " + value)
     }
     url.hostname = (wildcardHost ? "*." : "") + bareHost
