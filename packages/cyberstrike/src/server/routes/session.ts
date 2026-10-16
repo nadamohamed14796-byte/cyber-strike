@@ -32,7 +32,8 @@ import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { TargetMemory } from "../../target"
-import { JavaScriptCorrelation } from "../../target/javascript-correlation"
+import { JavaScriptCorrelation, safeCorrelationResponsePreview } from "../../target/javascript-correlation"
+import { redactTargetNoteSecrets } from "../../target/redact"
 
 const log = Log.create({ service: "server" })
 
@@ -1386,6 +1387,43 @@ export const SessionRoutes = lazy(() =>
                     const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
                     if (scopeDecision.allowed && scopeDecision.workspace) {
                       const queryNames = [...new Set([...observedURL.searchParams.keys()])].sort()
+                      const requestArtifact = "requests/" + req.id.replace(/[^a-zA-Z0-9_-]/g, "_") + ".json"
+                      try {
+                        await TargetMemory.writeWorkspaceFile(scopeDecision.workspace, requestArtifact, JSON.stringify({
+                          schemaVersion: 1,
+                          requestID: req.id,
+                          childSessionID,
+                          capturedAt: new Date().toISOString(),
+                          targetURL: scopeDecision.workspace.targetURL,
+                          request: {
+                            method: normalized.method,
+                            origin: observedURL.origin,
+                            path: observedURL.pathname,
+                            queryParameterNames: queryNames,
+                            redactedRawRequest: redactTargetNoteSecrets(truncatedRawRequest),
+                          },
+                          response: {
+                            status: req.response_status ?? null,
+                            contentType: req.response_content_type ?? null,
+                            size: req.response_size ?? null,
+                            redactedPreview: safeCorrelationResponsePreview({
+                              id: req.id,
+                              normalizedPath: normalized.normalizedPath,
+                              responseContentType: req.response_content_type,
+                              processedResponse: req.processed_response,
+                            }),
+                          },
+                          evidencePolicy: "Redacted workspace copy for navigation; the canonical captured request remains in SQLite for request-detail/replay tooling.",
+                        }, null, 2) + "\\n")
+                      } catch (error) {
+                        log.warn("request artifact persistence failed", {
+                          sessionID,
+                          childSessionID,
+                          requestID: req.id,
+                          targetID: scopeDecision.workspace.id,
+                          error: error instanceof Error ? error.message : String(error),
+                        })
+                      }
                       const requestNoteContent = [
                         "# Captured Request Observation",
                         "",
@@ -1399,7 +1437,7 @@ export const SessionRoutes = lazy(() =>
                         "- Response content type: " + (req.response_content_type ?? "unknown"),
                         "- Response size: " + (req.response_size ?? "unknown"),
                         "",
-                        "The full captured request/response remains in the request store under the Request ID. This note is an index into target evidence, not a vulnerability finding. The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
+                        "The full captured request/response remains in the request store under the Request ID. Redacted workspace artifact: " + requestArtifact + ". This note is an index into target evidence, not a vulnerability finding. The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
                       ].join("\n")
                       await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
                         kind: "evidence",
