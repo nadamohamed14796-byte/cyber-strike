@@ -107,6 +107,18 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   if (args.some((value) => ["-l", "-list", "--list", "-dl", "-il", "-targets", "--targets-file"].includes(value.toLowerCase()))) {
     throw new Error("Recon execution gate blocked " + scanner + ": target-list input is not accepted until every entry can be individually scope-checked and tied to the current phase manifest.")
   }
+  let portScanPorts: number[] | undefined
+  if (["nmap", "masscan", "naabu"].includes(scanner)) {
+    const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
+    const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
+    if (!portSpec || !/^\\d+(?:,\\d+)*$/.test(portSpec)) {
+      throw new Error("Recon execution gate blocked " + scanner + ": an explicit comma-separated port list is required; ranges, all-port defaults, and unbounded scans are not allowed by this gate.")
+    }
+    portScanPorts = [...new Set(portSpec.split(",").map(Number))]
+    if (!portScanPorts.length || portScanPorts.some((port) => !Number.isInteger(port) || port < 1 || port > 65535)) {
+      throw new Error("Recon execution gate blocked " + scanner + ": port list must contain valid ports from 1 to 65535.")
+    }
+  }
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
       !args.some((value) => /^https?:\/\//i.test(value))) return
   const phase = SCANNER_PHASES[scanner]!
@@ -123,13 +135,27 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     } catch {
       throw new Error("Recon execution gate blocked " + scanner + ": could not normalize target " + target)
     }
-    const decision = await TargetMemory.checkURLScope(url)
-    if (!decision.allowed || !decision.workspace) {
-      throw new Error("Recon execution gate blocked " + scanner + " for " + url + ": persisted scope rejected the target (" + decision.reason + "). No scanner command was started.")
-    }
-    const gate = await reconPhaseGate(decision.workspace, phase)
-    if (!gate.allowed) {
-      throw new Error("Recon execution gate blocked " + scanner + " for " + url + ": " + gate.reason + " Checkpoint: " + gate.manifestPath + ". No scanner command was started.")
+    const targetURLs = portScanPorts
+      ? portScanPorts.map((port) => {
+          const portProtocol = port === 80 ? "http:" : port === 443 ? "https:" : new URL(url).protocol
+          const target = new URL(url)
+          target.protocol = portProtocol
+          target.port = String(port)
+          target.pathname = "/"
+          target.search = ""
+          target.hash = ""
+          return target.toString()
+        })
+      : [url]
+    for (const scopedURL of targetURLs) {
+      const decision = await TargetMemory.checkURLScope(scopedURL)
+      if (!decision.allowed || !decision.workspace) {
+        throw new Error("Recon execution gate blocked " + scanner + " for " + scopedURL + ": persisted scope rejected the target/port (" + decision.reason + "). No scanner command was started.")
+      }
+      const gate = await reconPhaseGate(decision.workspace, phase)
+      if (!gate.allowed) {
+        throw new Error("Recon execution gate blocked " + scanner + " for " + scopedURL + ": " + gate.reason + " Checkpoint: " + gate.manifestPath + ". No scanner command was started.")
+      }
     }
   }
 }
