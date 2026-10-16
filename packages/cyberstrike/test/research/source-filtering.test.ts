@@ -211,13 +211,13 @@ test("source pagination stays lazy and continues beyond the former hard ceiling"
 test("HackerOne recovers report URLs embedded in client-rendered listing state", () => {
   const source = RESEARCH_SOURCES.find((item) => item.id === "hackerone-hacktivity")!
   const base = new URL("https://hackerone.com/hacktivity/overview?pageIndex=0")
-  const html = String.raw\`<script id="__APP_STATE__" type="application/json">{
+  const html = String.raw`<script id="__APP_STATE__" type="application/json">{
     "reports":[
       {"url":"\\/reports\\/12345"},
       {"url":"https:\\/\\/hackerone.com\\/reports\\/67890"},
       {"url":"/reports/new"}
     ]
-  }</script>\`
+  }</script>`
   const links = linksOf(html, base, source)
   expect(links).toContain("https://hackerone.com/reports/12345")
   expect(links).toContain("https://hackerone.com/reports/67890")
