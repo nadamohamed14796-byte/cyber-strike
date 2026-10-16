@@ -1117,6 +1117,7 @@ export namespace JavaScriptCorrelation {
       sourceURL: explicitJS?.href,
       status: "observed",
       tags: ["javascript", "correlation", "request-response", "finding"],
+      upsertByIdentity: true,
     })
 
     // Refresh stable per-target/session outputs atomically, refusing symlink
