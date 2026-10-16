@@ -18,7 +18,8 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
   description: [
     "Save a durable target-specific observation in the existing target workspace, SQLite, and notes.md so later agents can reuse it.",
     "This tool only writes notes; it does not test the target. The target workspace must already exist and the target host/path must be present in the current session tree's observed requests or Intel. It will not create a workspace for an unobserved target.",
-    "Use concise, factual notes with provenance. Preserve exact discovered values in this private target workspace when they are evidence. Use observed/unverified unless evidence supports a stronger state. A candidate secret is not confirmed until validated." ,
+    "Write notes as durable working memory, not a diary or raw dump. Every note should say: (1) observation/claim, (2) evidence and source request/artifact IDs, (3) confidence and what is still unknown, (4) security meaning/impact if any, (5) next discriminating test, and (6) result/decision so future agents do not repeat work. Keep stable facts separate from hypotheses; include negative results and preconditions. Deduplicate by endpoint/finding identity and update prior notes when evidence changes." ,
+    "Never label a bug confirmed because a scanner flagged it, a header is missing, an endpoint exists, or a response looks unusual. A missing header is usually informational/low until a concrete exploit path and meaningful impact are demonstrated. Use confirmed only with reproducible evidence of unexpected behavior and security impact; use observed/unverified for candidates." ,
     "Keep public report/writeup methodology in the global research database, not target notes. Use this for current-target assets, endpoints, test conditions, results, limitations, and finding-validation summaries.",
   ].join("\n"),
   parameters: TargetNoteParameters,
