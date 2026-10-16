@@ -1,47 +1,23 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import { createHash } from "node:crypto"
 import z from "zod"
 import { Session } from "../session"
 import { TargetMemory } from "../target"
+import {
+  RECON_PHASES as PHASES,
+  initialReconRun as initialRun,
+  parseReconRun as parseRun,
+  reconRunID,
+  unresolvedReconPrerequisites,
+  type ReconPhase as Phase,
+  type ReconPhaseRecord,
+  type ReconPhaseStatus,
+  type ReconRunManifest as ReconRun,
+} from "../target/recon-gate"
 import { Tool } from "./tool"
 
-const PHASES = [
-  "scope_validation",
-  "workspace_setup",
-  "asset_discovery",
-  "live_hosts_ports",
-  "url_collection",
-  "javascript_analysis",
-  "endpoint_inventory",
-  "vulnerability_testing",
-  "reporting",
-] as const
-
-export type ReconPhase = typeof PHASES[number]
-type Phase = ReconPhase
-export type ReconPhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable"
-
-export type ReconPhaseRecord = {
-  status: ReconPhaseStatus
-  startedAt?: string
-  finishedAt?: string
-  summary?: string
-  reason?: string
-  counts?: Record<string, number>
-  artifacts?: string[]
-}
-
-type ReconRun = {
-  schemaVersion: 1
-  targetURL: string
-  targetID: string
-  sessionID: string
-  createdAt: string
-  updatedAt: string
-  currentPhase: Phase | null
-  phases: Record<Phase, ReconPhaseRecord>
-}
+export { reconRunID, unresolvedReconPrerequisites } from "../target/recon-gate"
+export type { ReconPhase, ReconPhaseRecord, ReconPhaseStatus } from "../target/recon-gate"
 
 const Parameters = z.object({
   action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable"]),
@@ -92,42 +68,6 @@ export function unresolvedReconPrerequisites(phase: ReconPhase, phases: Record<R
     unresolved.unshift("scope_validation")
   }
   return unresolved
-}
-
-/**
- * Fail-closed runtime gate used by active web-recon programs. It resolves child
- * asset workspaces to the canonical root and checks the durable run manifest.
- */
-export async function reconPhaseGate(
-  workspace: import("../target").Workspace,
-  requiredPhase: ReconPhase,
-): Promise<{ allowed: boolean; reason: string; manifestPath: string }> {
-  const all = TargetMemory.list()
-  const byID = new Map(all.map((item) => [item.id, item]))
-  let root = workspace
-  const seen = new Set<string>()
-  while (root.parentTargetID && !seen.has(root.id)) {
-    seen.add(root.id)
-    const parent = byID.get(root.parentTargetID)
-    if (!parent) break
-    root = parent
-  }
-  const runID = reconRunID(root.id)
-  const manifestPath = path.join(root.workspacePath, "runs", "recon-" + runID + ".json")
-  let run: ReconRun
-  try {
-    run = parseRun(await fs.readFile(manifestPath, "utf-8"), root.id, root.targetURL)
-  } catch (error) {
-    return { allowed: false, reason: "No valid recon checkpoint manifest exists for the root target (" + (error instanceof Error ? error.message : String(error)) + ").", manifestPath }
-  }
-  if (run.phases[requiredPhase].status !== "running") {
-    return { allowed: false, reason: "Required phase " + requiredPhase + " must be explicitly started; current status is " + run.phases[requiredPhase].status + ".", manifestPath }
-  }
-  const unresolved = unresolvedReconPrerequisites(requiredPhase, run.phases)
-  if (unresolved.length) {
-    return { allowed: false, reason: "Required earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + run.phases[phase].status).join(", "), manifestPath }
-  }
-  return { allowed: true, reason: "phase gate passed", manifestPath }
 }
 
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
