@@ -947,7 +947,7 @@ test("explicit research reset removes queued imports and external research but p
         metadata: () => {},
         ask: async () => {},
       } as any
-      const result = await tool.execute({ action: "reset" }, context)
+      const result = await tool.execute({ action: "reset", pages: 1, depth: 0, limit: 1, continue_after_save: false }, context)
       const summary = JSON.parse(result.output)
       expect(summary.queue_rows_removed).toBe(1)
       expect(summary.external_research_records_removed).toBe(1)
