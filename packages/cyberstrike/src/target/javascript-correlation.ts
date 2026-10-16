@@ -329,7 +329,20 @@ export function mergeStructuredJavaScriptEndpoints(
 ): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
   const keyOf = (origin: string | null, route: string) => (origin?.toLowerCase() ?? "*") + normalizedTemplateShape(route)
-  for (const endpoint of staticEndpoints) byKey.set(keyOf(endpoint.origin, endpoint.path), endpoint)
+  for (const endpoint of staticEndpoints) {
+    const key = keyOf(endpoint.origin, endpoint.path)
+    const existing = byKey.get(key)
+    if (!existing) {
+      byKey.set(key, { ...endpoint, sourceFiles: [...endpoint.sourceFiles], observedRequestIDs: [...endpoint.observedRequestIDs] })
+      continue
+    }
+    existing.sourceFiles = [...new Set([...existing.sourceFiles, ...endpoint.sourceFiles])]
+    existing.observedRequestIDs = [...new Set([...existing.observedRequestIDs, ...endpoint.observedRequestIDs])]
+    if (existing.observedRequestIDs.length) {
+      existing.observedInTraffic = true
+      existing.confidence = "observed"
+    }
+  }
   for (const request of requests) {
     const url = safeURL(request.urlTemplate)
     const origin = request.origin ?? url?.origin ?? null
@@ -593,7 +606,10 @@ export function createJavaScriptTesterCases(
     queryParameters: string[]; bodyParameters: string[]; headerNames: string[]; authSignals: string[];
     cookieSignals: string[]; observedRequestIDs: string[]; recommendedChecks: string[]
   }): JavaScriptTesterCase => {
-    const id = "tester-case:" + createHash("sha256").update(input.sourceFile + "\0" + input.candidateID).digest("hex").slice(0, 20)
+    // Keep case identity stable when a new analysis adds/removes parameter/header hints.
+    const id = "tester-case:" + createHash("sha256").update(JSON.stringify([
+      input.sourceFile, input.sourceLine, input.method, input.host?.toLowerCase() ?? null, normalizedTemplateShape(input.path),
+    ])).digest("hex").slice(0, 20)
     const old = previous.get(id)
     const titles = [
       "Capture or inspect the baseline request and response",

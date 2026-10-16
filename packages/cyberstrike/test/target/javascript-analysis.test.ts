@@ -66,6 +66,30 @@ test("extracts XHR headers and URLSearchParams prepared within the calling funct
   expect(JSON.stringify(request)).not.toContain("tenantId")
 })
 
+test("extracts XHR headers and query keys from a named URLSearchParams variable", () => {
+  const source = [
+    'function loadRecords() {',
+    '  const xhr = new XMLHttpRequest()',
+    '  const params = new URLSearchParams()',
+    '  params.append("page", currentPage)',
+    '  params.append("filter", activeFilter)',
+    '  xhr.open("GET", "/api/records")',
+    '  xhr.setRequestHeader("X-CSRF-Token", csrfToken)',
+    '  xhr.setRequestHeader("X-Tenant-ID", tenantId)',
+    '  xhr.send()',
+    '}',
+  ].join("\\n")
+  const request = analyzeJavaScriptSource(source).requests[0]!
+  expect(request.method).toBe("GET")
+  expect(request.sourceFunction).toBe("loadRecords")
+  expect(request.queryParameters).toContain("page")
+  expect(request.queryParameters).toContain("filter")
+  expect(request.headerNames).toContain("X-CSRF-Token")
+  expect(request.headerNames).toContain("X-Tenant-ID")
+  expect(JSON.stringify(request)).not.toContain("csrfToken")
+  expect(JSON.stringify(request)).not.toContain("tenantId")
+})
+
 test("preserves explicit scheme and port in absolute request candidates", () => {
   const request = analyzeJavaScriptSource('fetch("http://api.example.com:8080/v2/profile")').requests[0]!
   expect(request.urlTemplate).toBe("http://api.example.com:8080/v2/profile")

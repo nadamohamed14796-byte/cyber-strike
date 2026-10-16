@@ -163,6 +163,14 @@ function configObjectFields(text: string, property: string, source: string, befo
   return [...fields].slice(0, 100)
 }
 
+function urlSearchParamsVariables(text: string): string[] {
+  const names = new Set<string>()
+  for (const match of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+URLSearchParams\b/g)) {
+    if (match[1]) names.add(match[1])
+  }
+  return [...names]
+}
+
 function bodyVariableNames(text: string): string[] {
   const names = new Set<string>()
   for (const match of text.matchAll(/(?:^|[,{\n])\s*(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?([A-Za-z_$][\w$]*)(?:\s*\))?/gi)) {
@@ -433,6 +441,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...configObjectFields(optionText, "params", source, index),
       ...configObjectFields(optionText, "searchParams", source, index),
       ...Array.from(all.matchAll(/new\s+URLSearchParams\s*\(\s*\{([\s\S]{0,2500}?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+      ...urlSearchParamsVariables(requestContext).flatMap((name) =>
+        Array.from(requestContext.matchAll(new RegExp("\\b" + name + "\\s*\\.\\s*(?:set|append|get)\\s*\\(\\s*[\"']([^\"']{1,100})[\"']", "gi")), (m) => m[1]!),
+      ),
     )
     if (/\b(?:searchParams|URLSearchParams)\b/i.test(all)) {
       for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']{1,100})["']/gi)) endpoint.queryParameters.push(m[1]!)

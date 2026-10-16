@@ -238,11 +238,13 @@ test("merges structured requests into endpoint inventory when literal extraction
   expect(endpoints[0]?.observedInTraffic).toBe(true)
 })
 
-test("merges equivalent named route placeholders instead of making duplicate endpoint records", () => {
-  const staticEndpoints = [{
-    id: "endpoint:static", literal: "/api/users/{param}", host: null, origin: null, path: "/api/users/{param}",
-    sourceFiles: ["javascript/routes.js"], observedRequestIDs: [], observedInTraffic: false, confidence: "candidate" as const,
-  }]
+test("merges equivalent named route placeholders and unions all source evidence", () => {
+  const staticEndpoints = [
+    { id: "endpoint:static-a", literal: "/api/users/{param}", host: null, origin: null, path: "/api/users/{param}",
+      sourceFiles: ["javascript/routes.js"], observedRequestIDs: ["req-users"], observedInTraffic: true, confidence: "observed" as const },
+    { id: "endpoint:static-b", literal: "/api/users/{user}", host: null, origin: null, path: "/api/users/{user}",
+      sourceFiles: ["javascript/vendor.js"], observedRequestIDs: [], observedInTraffic: false, confidence: "candidate" as const },
+  ]
   const endpoints = mergeStructuredJavaScriptEndpoints(staticEndpoints, [{
     id: "js-request:user", sourceFunction: "loadUser", method: "GET",
     urlTemplate: "/api/users/{userId}", host: null, origin: null, path: "/api/users/{userId}",
@@ -251,7 +253,9 @@ test("merges equivalent named route placeholders instead of making duplicate end
     confidence: "candidate", sourceFile: "javascript/users.js", observedRequestIDs: [],
   }])
   expect(endpoints).toHaveLength(1)
-  expect(endpoints[0]?.sourceFiles).toEqual(["javascript/routes.js", "javascript/users.js"])
+  expect(endpoints[0]?.sourceFiles).toEqual(["javascript/routes.js", "javascript/vendor.js", "javascript/users.js"])
+  expect(endpoints[0]?.observedRequestIDs).toContain("req-users")
+  expect(endpoints[0]?.observedInTraffic).toBe(true)
 })
 
 test("generates an idempotent tester survey with request shape and resumable check progress", () => {
