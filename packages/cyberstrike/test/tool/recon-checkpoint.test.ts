@@ -12,6 +12,7 @@ const phases: ReconPhase[] = [
   "asset_discovery",
   "live_hosts_ports",
   "url_collection",
+  "parameter_discovery",
   "javascript_analysis",
   "endpoint_inventory",
   "vulnerability_testing",
@@ -54,6 +55,14 @@ test("unavailable non-scope phases are explicit terminal checkpoints", () => {
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
   state.live_hosts_ports = { status: "failed", reason: "Scanner failed" }
   expect(unresolvedReconPrerequisites("url_collection", state)).toContain("live_hosts_ports")
+})
+
+test("parameter discovery is a distinct prerequisite before endpoint inventory", () => {
+  const state = records("complete")
+  state.parameter_discovery = { status: "pending" }
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("parameter_discovery")
+  state.parameter_discovery = { status: "complete", summary: "parameter inventory saved" }
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
 })
 
 test("endpoint inventory cannot be bypassed with unavailable status", () => {
