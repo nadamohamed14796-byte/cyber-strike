@@ -17,6 +17,8 @@ import { Shell } from "@/shell/shell"
 import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
+import { TargetMemory } from "../target"
+import { reconPhaseGate, type ReconPhase } from "./recon-checkpoint"
 
 const MAX_METADATA_LENGTH = 30_000
 
@@ -36,6 +38,92 @@ function isBinaryBuffer(buf: Buffer): boolean {
   }
   return nonPrintable / buf.length > 0.3
 }
+
+const SCANNER_PHASES: Record<string, ReconPhase> = {
+  subfinder: "asset_discovery",
+  amass: "asset_discovery",
+  assetfinder: "asset_discovery",
+  sublist3r: "asset_discovery",
+  nmap: "live_hosts_ports",
+  masscan: "live_hosts_ports",
+  naabu: "live_hosts_ports",
+  httpx: "live_hosts_ports",
+  dnsx: "live_hosts_ports",
+  katana: "url_collection",
+  gau: "url_collection",
+  waybackurls: "url_collection",
+  hakrawler: "url_collection",
+  gospider: "url_collection",
+  paramspider: "url_collection",
+  arjun: "endpoint_inventory",
+  nuclei: "vulnerability_testing",
+  ffuf: "vulnerability_testing",
+  feroxbuster: "vulnerability_testing",
+  gobuster: "vulnerability_testing",
+  dirsearch: "vulnerability_testing",
+  dirb: "vulnerability_testing",
+  nikto: "vulnerability_testing",
+  sqlmap: "vulnerability_testing",
+  dalfox: "vulnerability_testing",
+  wpscan: "vulnerability_testing",
+}
+
+function scannerTargets(command: string[], commandText: string): string[] {
+  const candidates = new Set<string>()
+  for (const match of commandText.matchAll(/https?:\\/\\/[^\\s"'<>\\x60]+/gi)) {
+    const value = match[0].replace(/[),;]+$/, "")
+    candidates.add(value)
+  }
+  const targetFlags = new Set(["-u", "--url", "-target", "--target", "-host", "--host", "-d", "--domain", "-h"])
+  for (let i = 0; i < command.length; i++) {
+    if (!targetFlags.has(command[i]!.toLowerCase())) continue
+    const value = command[i + 1]
+    if (!value || value.startsWith("-")) continue
+    if (/^https?:\\/\\//i.test(value)) candidates.add(value)
+    else if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}(?::\\d{1,5})?(?:\\/[^\\s]*)?$/i.test(value)) {
+      candidates.add("https://" + value)
+    }
+  }
+  // Nmap-style tools accept hosts as positional arguments.
+  for (const value of command) {
+    if (value.startsWith("-") || value.includes("/") || value.includes("=") || value.includes(".txt") || value.includes(".list")) continue
+    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}(?::\\d{1,5})?$/i.test(value)) candidates.add("https://" + value)
+  }
+  return [...candidates]
+}
+
+async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
+  const scannerIndex = command.findIndex((value) => SCANNER_PHASES[path.basename(value).toLowerCase()] !== undefined)
+  if (scannerIndex < 0) return
+  const scanner = path.basename(command[scannerIndex]!).toLowerCase()
+  const args = command.slice(scannerIndex + 1)
+  if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
+      !args.some((value) => /^https?:\\/\\//i.test(value))) return
+  const phase = SCANNER_PHASES[scanner]!
+  const targets = scannerTargets(command.slice(scannerIndex), commandText)
+  if (!targets.length) {
+    throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s). Target-list/file mode is blocked until each target can be checked against persisted scope and phase checkpoints.")
+  }
+  for (const target of targets) {
+    let url: string
+    try {
+      const parsed = new URL(target)
+      if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) throw new Error("unsupported URL")
+      url = parsed.toString()
+    } catch {
+      throw new Error("Recon execution gate blocked " + scanner + ": could not normalize target " + target)
+    }
+    const decision = await TargetMemory.checkURLScope(url)
+    if (!decision.allowed || !decision.workspace) {
+      throw new Error("Recon execution gate blocked " + scanner + " for " + url + ": persisted scope rejected the target (" + decision.reason + "). No scanner command was started.")
+    }
+    const gate = await reconPhaseGate(decision.workspace, phase)
+    if (!gate.allowed) {
+      throw new Error("Recon execution gate blocked " + scanner + " for " + url + ": " + gate.reason + " Checkpoint: " + gate.manifestPath + ". No scanner command was started.")
+    }
+  }
+}
+
 const DEFAULT_TIMEOUT = Flag.CYBERSTRIKE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
 
 export const log = Log.create({ service: "bash-tool" })
@@ -128,6 +216,9 @@ export const BashTool = Tool.define("bash", async () => {
           }
           command.push(child.text)
         }
+
+        // Enforce target scope + durable phase gates before known recon/scanner binaries start.
+        await assertScannerReconGate(command, commandText)
 
         // not an exhaustive list, but covers most common cases
         if (["cd", "rm", "cp", "mv", "mkdir", "touch", "chmod", "chown", "cat"].includes(command[0])) {
