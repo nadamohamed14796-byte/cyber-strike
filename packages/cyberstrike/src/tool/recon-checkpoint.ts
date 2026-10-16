@@ -95,7 +95,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if (unresolved.length) {
           return { title: "Recon phase blocked by prerequisites", output: "Cannot begin " + phase + ". Resolve earlier phases first: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "prerequisites_unresolved", unresolved } }
         }
-        if (record.status === "complete" || record.status === "unavailable") {
+        if (record.status === "complete" || (record.status === "unavailable" && phase !== "scope_validation" && phase !== "workspace_setup")) {
           return { title: "Recon phase already resolved", output: phase + " is already " + record.status + ". Inspect its artifacts; do not repeat expensive work unless new evidence invalidates this checkpoint.", metadata: { saved: false, reason: "phase_already_resolved", phase, status: record.status } }
         }
         run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
