@@ -180,7 +180,7 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(extracted?.failed_tests).toEqual(["A modified identifier returns the same authorized public object."])
       expect(extracted?.pattern_name).toBe("Cross-account object ownership check")
       expect(extracted?.test_procedure).toHaveLength(3)
-      expect(knowledge?.metadata?.model_study_version).toBe(2)
+      expect(knowledge?.metadata?.model_study_version).toBe(3)
       expect(knowledge?.metadata?.excerpt).toContain("two controlled accounts")
 
       // Verify the hunt-time retrieval tool exposes the actual structured lesson,
@@ -201,7 +201,7 @@ test("agent-led research study persists model analysis and completes its queue l
       
       const completedQueueRow = ResearchQueue.find(sourceID, sourceURL)
       expect(completedQueueRow?.status).toBe("learned")
-      expect(completedQueueRow?.payload?.model_study_version).toBe(2)
+      expect(completedQueueRow?.payload?.model_study_version).toBe(3)
       expect(ResearchQueue.stats(sourceID).model_study_learned).toBe(1)
       expect(ResearchQueue.stats(sourceID).model_study_completed).toBe(1)
       expect(ResearchQueue.stats(sourceID).model_study_pending).toBe(0)
@@ -834,13 +834,13 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(queued?.status).toBe("queued")
       expect(queued?.payload?.legacy_knowledge_id).toBe(legacy.id)
       expect(queued?.payload?.cached_text).toBe(excerpt)
-      expect(queued?.payload?.model_study_requested_version).toBe(2)
+      expect(queued?.payload?.model_study_requested_version).toBe(3)
 
       const currentKnowledge = Database.use((db) =>
         db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, legacy.id)).get(),
       )
       expect(currentKnowledge?.status).toBe("observed")
-      expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(2)
+      expect(currentKnowledge?.metadata?.model_study_requested_version).toBe(3)
 
       await queueLegacyKnowledgeForModelStudy(sourceID)
       const stillQueued = ResearchQueue.find(sourceID, sourceURL)
@@ -894,15 +894,15 @@ test("model-led update queues legacy shared reports once without refetching or c
         db.select().from(ReportKnowledgeTable).where(eq(ReportKnowledgeTable.id, legacy.id)).get(),
       )
       expect(finishedLegacy?.status).toBe("observed")
-      expect(finishedLegacy?.metadata?.model_study_version).toBe(2)
+      expect(finishedLegacy?.metadata?.model_study_version).toBe(3)
       expect(finishedLegacy?.metadata?.model_study_decision).toBe("rejected")
       const finishedQueue = ResearchQueue.find(sourceID, sourceURL)
       expect(finishedQueue?.status).toBe("rejected")
-      expect(finishedQueue?.payload?.model_study_version).toBe(2)
+      expect(finishedQueue?.payload?.model_study_version).toBe(3)
       await queueLegacyKnowledgeForModelStudy(sourceID)
       const noDuplicateRequeue = ResearchQueue.find(sourceID, sourceURL)
       expect(noDuplicateRequeue?.status).toBe("rejected")
-      expect(noDuplicateRequeue?.payload?.model_study_version).toBe(2)
+      expect(noDuplicateRequeue?.payload?.model_study_version).toBe(3)
       await Instance.dispose()
     },
   })
