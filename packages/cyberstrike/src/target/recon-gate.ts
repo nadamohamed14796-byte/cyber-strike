@@ -9,6 +9,7 @@ export const RECON_PHASES = [
   "asset_discovery",
   "live_hosts_ports",
   "url_collection",
+  "parameter_discovery",
   "javascript_analysis",
   "endpoint_inventory",
   "vulnerability_testing",
