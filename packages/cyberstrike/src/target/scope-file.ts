@@ -6,9 +6,11 @@ export function parseScopeFileContents(contents: string): string[] {
   for (const [index, rawLine] of contents.replace(/^\uFEFF/, "").split(/\r?\n/).entries()) {
     const value = rawLine.trim()
     if (!value || value.startsWith("#") || value.startsWith("//")) continue
-    if (/\s/.test(value)) {
-      throw new Error("Invalid scope file entry at line " + (index + 1) + ": entries must be one scope expression per line (domain, wildcard, URL/path, host:port, IP/CIDR, or another program scope identifier).")
+    if (value.length > 1000) {
+      throw new Error("Scope file entry at line " + (index + 1) + " exceeds the 1000-character entry limit.")
     }
+    // Preserve unfamiliar typed/structured entries as raw evidence. The scope
+    // matcher only authorizes syntaxes it can interpret; opaque entries fail closed.
     entries.push(value)
   }
   if (entries.length === 0) throw new Error("Scope file contains no usable entries.")
