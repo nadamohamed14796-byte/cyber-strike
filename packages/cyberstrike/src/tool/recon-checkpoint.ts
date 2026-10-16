@@ -86,6 +86,43 @@ export function unresolvedReconPrerequisites(phase: ReconPhase, phases: Record<R
   return unresolved
 }
 
+/**
+ * Fail-closed runtime gate used by active web-recon programs. It resolves child
+ * asset workspaces to the canonical root and checks the durable run manifest.
+ */
+export async function reconPhaseGate(
+  workspace: import("../target").Workspace,
+  sessionID: string,
+  requiredPhase: ReconPhase,
+): Promise<{ allowed: boolean; reason: string; manifestPath: string }> {
+  const all = TargetMemory.list()
+  const byID = new Map(all.map((item) => [item.id, item]))
+  let root = workspace
+  const seen = new Set<string>()
+  while (root.parentTargetID && !seen.has(root.id)) {
+    seen.add(root.id)
+    const parent = byID.get(root.parentTargetID)
+    if (!parent) break
+    root = parent
+  }
+  const runID = createHash("sha256").update(root.id).digest("hex").slice(0, 20)
+  const manifestPath = path.join(root.workspacePath, "runs", "recon-" + runID + ".json")
+  let run: ReconRun
+  try {
+    run = parseRun(await fs.readFile(manifestPath, "utf-8"), root.id, root.targetURL, sessionID)
+  } catch (error) {
+    return { allowed: false, reason: "No valid recon checkpoint manifest exists for the root target (" + (error instanceof Error ? error.message : String(error)) + ").", manifestPath }
+  }
+  if (run.phases[requiredPhase].status !== "running") {
+    return { allowed: false, reason: "Required phase " + requiredPhase + " must be explicitly started; current status is " + run.phases[requiredPhase].status + ".", manifestPath }
+  }
+  const unresolved = unresolvedReconPrerequisites(requiredPhase, run.phases)
+  if (unresolved.length) {
+    return { allowed: false, reason: "Required earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + run.phases[phase].status).join(", "), manifestPath }
+  }
+  return { allowed: true, reason: "phase gate passed", manifestPath }
+}
+
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
   description: [
     "Persist and enforce the ordered reconnaissance run state in the target workspace. This is a workflow control, not a scanner.",
