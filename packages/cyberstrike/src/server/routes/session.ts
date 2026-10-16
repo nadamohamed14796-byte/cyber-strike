@@ -234,8 +234,28 @@ function buildPromptWithCredentialContext(
   accessContext?: AccessContextInput,
   operationContext?: { protocol: string; operation: string },
   observedValues?: Observation.EndpointTree,
+  requestContext?: { requestID: string; method: string; origin?: string; path: string; responseStatus?: number },
 ): string {
   const lines: string[] = []
+
+  if (requestContext) {
+    lines.push("## Request Task Identity")
+    lines.push("- Request ID: " + requestContext.requestID)
+    lines.push("- Method: " + requestContext.method)
+    lines.push("- Origin: " + (requestContext.origin ?? "unknown"))
+    lines.push("- Path (query values omitted): " + requestContext.path.split("?")[0])
+    lines.push("- Baseline response status: " + (requestContext.responseStatus ?? "unknown"))
+    lines.push("")
+    lines.push("## Required Evidence-Driven Analysis and Memory")
+    lines.push("This is one independent captured-request task. Analyze this request only; do not launch full-target recon or unrelated scans.")
+    lines.push("Inspect existing target/session context and relevant endpoint/JavaScript evidence before selecting a test. Reuse prior results and do not repeat tests already resolved.")
+    lines.push("Separate observed facts, hypotheses, and confirmed impact. A missing header, scanner signal, unusual status, endpoint existence, or static JavaScript sink is not by itself a confirmed vulnerability.")
+    lines.push("For INFO/LOW hardening signals, preserve the observation and investigate whether a concrete, in-scope attack path crosses a real security boundary. Use baseline/negative controls and safe, hypothesis-driven variations; never invent a chain or inflate severity. Raise severity only after demonstrating realistic impact and reproducible evidence. If no impact is demonstrated, keep it INFO/LOW and state why.")
+    lines.push("Record meaningful test attempts with verification_attempt using a stable hypothesis key, distinct strategy/variant, rationale, actual observed result, and evidence reference. Use validate_finding for candidate findings when evidence is sufficient; never mark false positive because tests failed or evidence is missing.")
+    lines.push("When this request changes target understanding, save or update a concise target_note with Request ID, exact endpoint, relevant role/auth context, evidence/artifact IDs, hypothesis, tests and outcomes, confidence/status, impact if any, unresolved questions, and the next discriminating test. Include useful negative results to prevent repeated work. Do not write generic 'tested X' notes or copy raw secrets. The automatic captured-request note is only an evidence index, not the analysis note.")
+    lines.push("If no meaningful security signal or new reusable observation exists, do not create a generic semantic note; finish with a short evidence-grounded conclusion.")
+    lines.push("")
+  }
 
   // Protocol/operation banner — this request is a body-dispatched operation
   // (GraphQL/JSON-RPC), not a plain REST endpoint. Route protocol-aware tests
@@ -1324,6 +1344,13 @@ export const SessionRoutes = lazy(() =>
                 ? { protocol: normalized.protocol, operation: normalized.operation }
                 : undefined,
               Observation.endpointTree(sessionID, normalized.keyHash),
+              {
+                requestID: req.id,
+                method: normalized.method,
+                origin: normalized.origin ?? undefined,
+                path: normalized.normalizedPath,
+                responseStatus: req.response_status ?? undefined,
+              },
             )
             return coverage ? `${coverage}\n\n${base}` : base
           }
