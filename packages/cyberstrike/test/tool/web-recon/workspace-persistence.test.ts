@@ -5,6 +5,7 @@ import { tmpdir } from "../../fixture/fixture"
 import { Instance } from "../../../src/project/instance"
 import { TargetMemory } from "../../../src/target"
 import { WebReconTool } from "../../../src/tool/web-recon"
+import { ReconCheckpointTool } from "../../../src/tool/recon-checkpoint"
 
 test("web_recon persists results and synchronizes target notes in the canonical workspace", async () => {
   await using tmp = await tmpdir()
@@ -34,6 +35,31 @@ test("web_recon persists results and synchronizes target notes in the canonical 
           authorizationSource: "Local unit-test fixture",
           authorizationReference: "https://example.test/security-policy",
         })
+        const checkpointContext = {
+          sessionID: "ses_web_recon_workspace_persistence",
+          messageID: "msg_web_recon_workspace_persistence",
+          agent: "test",
+          abort: new AbortController().signal,
+          messages: [],
+          ask: async () => {},
+          metadata: () => {},
+        } as never
+        const checkpointTool = await ReconCheckpointTool.init()
+        const checkpoint = async (
+          action: "begin" | "complete" | "unavailable",
+          phase: "scope_validation" | "workspace_setup" | "asset_discovery" | "live_hosts_ports" | "url_collection",
+          summary?: string,
+          reason?: string,
+        ) => checkpointTool.execute({ action, target_url: target, phase, summary, reason }, checkpointContext)
+        for (const phase of ["scope_validation", "workspace_setup"] as const) {
+          expect((await checkpoint("begin", phase)).metadata.saved).toBe(true)
+          expect((await checkpoint("complete", phase, phase + " verified for local fixture")).metadata.saved).toBe(true)
+        }
+        for (const phase of ["asset_discovery", "live_hosts_ports"] as const) {
+          expect((await checkpoint("begin", phase)).metadata.saved).toBe(true)
+          expect((await checkpoint("unavailable", phase, undefined, "Not applicable to the localhost fixture")).metadata.saved).toBe(true)
+        }
+        expect((await checkpoint("begin", "url_collection")).metadata.saved).toBe(true)
         const tool = await WebReconTool.init()
         const result = await tool.execute({
           program: "robots_scan",

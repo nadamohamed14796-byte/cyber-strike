@@ -533,21 +533,22 @@ function applyTargetNoteToMarkdown(notesFile: string, note: TargetNote): string 
     return notesFile + entry
   }
 
-  // Update only generated metadata and preserve all surrounding human edits.
-  const provenanceStart = notesFile.indexOf("- Type: ", markerIndex)
-  const provenanceEnd = provenanceStart >= 0 ? notesFile.indexOf("\n\n", provenanceStart) : -1
-  if (provenanceStart < 0 || provenanceEnd <= provenanceStart) return notesFile
-  const metadata = notesFile.slice(provenanceStart, provenanceEnd).split("\n")
-  const statusIndex = metadata.findIndex((line) => line.startsWith("- Status: "))
-  if (statusIndex >= 0) metadata[statusIndex] = "- Status: " + note.status
-  const tagsIndex = metadata.findIndex((line) => line.startsWith("- Tags: "))
-  if (note.tags.length) {
-    if (tagsIndex >= 0) metadata[tagsIndex] = "- Tags: " + note.tags.join(", ")
-    else metadata.push("- Tags: " + note.tags.join(", "))
-  } else if (tagsIndex >= 0) {
-    metadata.splice(tagsIndex, 1)
-  }
-  return notesFile.slice(0, provenanceStart) + metadata.join("\n") + notesFile.slice(provenanceEnd)
+  // Refresh the generated note block from SQLite, including its body. Text outside
+  // marked blocks remains untouched, so unrelated operator notes survive reconciliation.
+  const nextMarker = notesFile.indexOf("<!-- cyberstrike-target-note:", markerIndex + marker.length)
+  let blockEnd = nextMarker >= 0 ? nextMarker : notesFile.length
+  while (blockEnd > markerIndex && notesFile[blockEnd - 1] === "\n") blockEnd--
+  const timestamp = new Date(note.timeCreated).toISOString()
+  const heading = note.title ? "### " + note.title : "### " + timestamp
+  const provenance = [
+    "- Type: " + note.kind,
+    "- Status: " + note.status,
+    "- Source: " + note.source,
+    ...(note.sourceURL ? ["- Source URL: " + note.sourceURL] : []),
+    ...(note.tags.length ? ["- Tags: " + note.tags.join(", ")] : []),
+  ]
+  const entry = [marker, heading, "", provenance.join("\n"), "", note.content].join("\n")
+  return notesFile.slice(0, markerIndex) + entry + "\n" + notesFile.slice(blockEnd)
 }
 
 /** Reconcile SQLite notes into notes.md without replacing user-authored text. */
