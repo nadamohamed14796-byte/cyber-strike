@@ -116,6 +116,49 @@ Use this skill.
     }
   })
 
+  test("execute resolves directory aliases when metadata uses another name", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillDir = path.join(dir, ".cyberstrike", "skill", "wstg-authz-04")
+        await Bun.write(
+          path.join(skillDir, "SKILL.md"),
+          `---
+name: readable-authorization-guide
+description: Skill available through a directory alias.
+---
+
+# Authorization methodology
+
+DYNAMIC_SKILL_ALIAS_REGRESSION_MARKER
+`,
+        )
+      },
+    })
+
+    const home = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const result = await tool.execute(
+            { action: "load", name: "wstg-authz-04" },
+            { ...baseCtx, ask: async () => {} },
+          )
+          expect(result.title).toBe("Loaded skill: readable-authorization-guide")
+          expect(result.output).toContain("DYNAMIC_SKILL_ALIAS_REGRESSION_MARKER")
+          expect(result.metadata.name).toBe("readable-authorization-guide")
+          SkillContext.unload("readable-authorization-guide")
+        },
+      })
+    } finally {
+      if (home === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = home
+    }
+  })
+
   test("skill remains loaded when companion-file enumeration fails", async () => {
     await using tmp = await tmpdir({
       git: true,

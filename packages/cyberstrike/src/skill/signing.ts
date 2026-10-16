@@ -27,6 +27,11 @@ export namespace SkillSigning {
     signature?: string
     signed_by?: string
   }): Promise<VerificationStatus> {
+    const claimsOfficial = skill.signed_by === "cyberstrike-official"
+    if (claimsOfficial && (!skill.sha256 || !skill.signature)) {
+      log.warn("official skill is missing its required hash or signature")
+      return "tampered"
+    }
     if (!skill.sha256) return "unverified"
 
     const computed = await computeHash(skill.content)
@@ -35,7 +40,7 @@ export namespace SkillSigning {
       return "tampered"
     }
 
-    if (skill.signed_by !== "cyberstrike-official" || !skill.signature) return "community"
+    if (!claimsOfficial) return "community"
 
     try {
       const raw = Buffer.from(OFFICIAL_PUBLIC_KEY_B64, "base64")

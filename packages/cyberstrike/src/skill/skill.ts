@@ -72,6 +72,19 @@ export namespace Skill {
     const dirs = new Set<string>()
 
     const addSkill = async (match: string) => {
+      try {
+        await loadSkill(match)
+      } catch (error) {
+        log.error("failed to load skill; continuing with remaining skills", { skill: match, error })
+        Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({
+            message: `Failed to load skill at ${match}; skipping it and continuing with other skills.`,
+          }).toObject(),
+        })
+      }
+    }
+
+    const loadSkill = async (match: string) => {
       const md = await ConfigMarkdown.parse(match).catch((err) => {
         const message = ConfigMarkdown.FrontmatterError.isInstance(err)
           ? err.data.message
@@ -84,7 +97,13 @@ export namespace Skill {
       if (!md) return
 
       const parsed = Info.pick({ name: true, description: true }).safeParse(md.data)
-      if (!parsed.success) return
+      if (!parsed.success) {
+        log.warn("skill metadata is invalid; skipping", {
+          path: match,
+          issues: parsed.error.issues.map((issue) => ({ path: issue.path, code: issue.code })),
+        })
+        return
+      }
 
       // Warn on duplicate skill names
       if (skills[parsed.data.name]) {

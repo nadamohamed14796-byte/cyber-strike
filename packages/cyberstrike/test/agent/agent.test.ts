@@ -11,6 +11,43 @@ function evalPerm(agent: Agent.Info | undefined, permission: string): Permission
   return PermissionNext.evaluate(permission, "*", agent.permission).action
 }
 
+test("embedded vulnerability-agent skills resolve directory aliases", async () => {
+  await using tmp = await tmpdir({
+    git: true,
+    init: async (dir) => {
+      const skillDir = path.join(dir, ".cyberstrike", "skill", "wstg-authz-04")
+      await Bun.write(
+        path.join(skillDir, "SKILL.md"),
+        `---
+name: readable-authorization-guide
+description: Skill available through a directory alias.
+---
+
+# Authorization methodology
+
+EMBEDDED_SKILL_ALIAS_REGRESSION_MARKER
+`,
+      )
+    },
+  })
+
+  const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+  process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const tester = await Agent.get("proxy-tester-idor")
+        expect(tester?.prompt).toContain("EMBEDDED_SKILL_ALIAS_REGRESSION_MARKER")
+        expect(tester?.prompt).toContain('<skill name="wstg-authz-04">')
+      },
+    })
+  } finally {
+    if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+  }
+})
+
 test("returns default native agents when no config", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({

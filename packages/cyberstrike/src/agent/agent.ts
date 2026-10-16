@@ -55,6 +55,7 @@ import { mergeDeep, pipe, sortBy, values } from "remeda"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
+import { SkillIndex } from "../skill/index-engine"
 
 // ============================================================================
 // Skill injection for vulnerability testing sub-agents
@@ -89,7 +90,15 @@ async function loadVulnAgent(
   // First line of description for agent.ts, full description for future use
   const shortDesc = description.split("\n")[0].trim()
 
-  const skills = await Promise.all(skillNames.map((name) => Skill.get(name)))
+  if (skillNames.length > 0) await SkillIndex.ensureBuilt()
+  const skills = await Promise.all(
+    skillNames.map(async (name) => {
+      const direct = await Skill.get(name)
+      if (direct) return direct
+      const canonical = SkillIndex.resolveReference(name)
+      return canonical ? Skill.get(canonical) : undefined
+    }),
+  )
   const skillBlocks: string[] = []
   for (let i = 0; i < skillNames.length; i++) {
     const skill = skills[i]
