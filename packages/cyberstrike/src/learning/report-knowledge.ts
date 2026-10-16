@@ -810,13 +810,28 @@ export namespace ReportKnowledge {
       const classificationMethod = typeof extracted.classification_method === "string"
         ? extracted.classification_method
         : undefined
+      const huntSignal = metadata.hunt_signal && typeof metadata.hunt_signal === "object"
+        ? metadata.hunt_signal as Record<string, unknown>
+        : {}
+      // Search the model-authored, source-specific pattern and operational trigger
+      // separately from the generic excerpt. This lets a report whose title/class
+      // differs from the current observation match because its exact mechanism does.
+      const modelDefinedPatternCorpus = [
+        huntSignal.name,
+        huntSignal.summary,
+        huntSignal.trigger,
+        huntSignal.procedure,
+        huntSignal.patterns,
+        metadata.document_note,
+      ].filter(Boolean).map((value) => typeof value === "string" ? value : JSON.stringify(value)).join(" ")
       return concreteClasses.some((signal) => {
         const pattern = SPECIFIC_QUERY_PATTERNS.find(([name]) => name === signal)?.[1]
         const titleMatches = Boolean(pattern?.test(row.title))
         const currentClassificationMatches =
           ["title-first-dominant-body-v1", "title-first-dominant-body-v2"].includes(classificationMethod ?? "") &&
-        normalize(row.vulnerability_class) === signal
-        return titleMatches || currentClassificationMatches
+          normalize(row.vulnerability_class) === signal
+        const modelPatternMatches = Boolean(pattern?.test(modelDefinedPatternCorpus))
+        return titleMatches || currentClassificationMatches || modelPatternMatches
       })
     }
     return requested.some((signal) => {
