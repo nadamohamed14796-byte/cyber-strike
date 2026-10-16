@@ -45,7 +45,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     const network = ipv6ToBigInt(ipv6Cidr[1])
     const hostname = parseHostname(value)
     const address = hostname ? ipv6ToBigInt(hostname) : null
-    if (prefix < 0 || prefix > 128 || !network || address === null) {
+    if (prefix < 0 || prefix > 128 || network === null || address === null) {
       return { matches: false, reason: "invalid IPv6 CIDR or target address" }
     }
     const mask = prefix === 0 ? 0n : ((1n << 128n) - 1n) ^ ((1n << BigInt(128 - prefix)) - 1n)
