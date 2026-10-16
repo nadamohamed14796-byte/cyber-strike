@@ -1339,7 +1339,17 @@ export const SessionRoutes = lazy(() =>
           } else {
             const agentName = body.agent ?? "proxy-agent"
             const source = `${normalized.method} ${normalized.normalizedPath}`
-            IngestQueue.enqueue(sessionID, async () => {
+            // Give every captured request its own child session. The old queue was keyed
+            // by the shared parent session, so one slow extension request blocked every
+            // later request and changed the parent session active status/model context.
+            // Child sessions run independently while session-tree-aware tools continue to
+            // read/write shared root request, credential, observation and target memory.
+            const childSession = await Session.create({
+              parentID: sessionID,
+              title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)}` ,
+            })
+            const childSessionID = childSession.id
+            IngestQueue.enqueue(childSessionID, async () => {
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
@@ -1349,13 +1359,13 @@ export const SessionRoutes = lazy(() =>
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
                 await SessionPrompt.prompt({
-                  sessionID,
+                  sessionID: childSessionID,
                   agent: agentName,
                   model: body.model,
                   excludeHistory: true,
                   parts: [{ type: "text", text: promptText }],
                 })
-                const model = body.model ?? (await SessionPrompt.lastModel(sessionID))
+                const model = body.model ?? (await SessionPrompt.lastModel(childSessionID))
                 await IngestSummary.write({
                   sessionID,
                   agent: agentName,
