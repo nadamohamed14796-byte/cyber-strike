@@ -43,6 +43,17 @@ test("Medium source follows the curated author, not unrelated Medium articles", 
   expect(isResearchCandidate("https://medium.com/tag/bug-bounty", trickster0)).toBe(false)
 })
 
+test("general Medium security feed accepts individual articles but excludes listing/profile pages", () => {
+  const source = RESEARCH_SOURCES.find((item) => item.id === "medium-security")!
+  expect(isResearchCandidate("https://medium.com/tag/bug-bounty", source)).toBe(false)
+  expect(isResearchCandidate("https://medium.com/@researcher/idor-writeup-123abc", source)).toBe(true)
+  expect(isResearchCandidate("https://researcher.medium.com/how-i-found-xss-123abc", source)).toBe(true)
+  expect(isResearchCandidate("https://medium.com/@researcher", source)).toBe(false)
+  expect(isResearchCandidate("https://medium.com/search?q=xss", source)).toBe(false)
+  expect(researchSourceHostAllowed("https://researcher.medium.com/an-idor-report", source)).toBe(true)
+  expect(researchSourceHostAllowed("https://unrelated.example/an-idor-report", source)).toBe(false)
+})
+
 test("legacy generic Medium source IDs do not reopen platform-wide crawling", () => {
   const legacyGenericMedium = { ...trickster0, id: "medium" }
   expect(isResearchCandidate("https://medium.com/@anotherwriter/general-security-post", legacyGenericMedium)).toBe(false)
