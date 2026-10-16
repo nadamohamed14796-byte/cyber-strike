@@ -66,6 +66,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
     !hasLegacyPhaseSet ||
     (hasParameterPhase && !validStatus(phases.parameter_discovery))
   ) throw new Error("Recon run manifest has invalid identity or schema; refusing to overwrite it.")
+  if (!phases) throw new Error("Recon run manifest has no phase records; refusing to overwrite it.")
 
   // Older persisted runs predate the dedicated parameter-discovery phase. Migrate
   // them in memory and invalidate downstream completion so endpoint inventory and
