@@ -913,7 +913,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       return normalized ? [normalized] : []
     }),
   )
-  const results: Array<{ source: string; pages: number; candidates: number; added: number; blocked_auth: number; error_count: number; errors: string[] }> = []
+  const results: Array<{ source: string; pages: number; candidates: number; added: number; document_types: Record<string, number>; blocked_auth: number; error_count: number; errors: string[] }> = []
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
