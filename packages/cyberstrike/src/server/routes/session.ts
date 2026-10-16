@@ -1377,6 +1377,59 @@ export const SessionRoutes = lazy(() =>
                   after: IngestSummary.snapshot(sessionID),
                 })
 
+                // Persist a compact target-local evidence note for every captured request,
+                // not only JavaScript responses. The full request remains in SQLite; notes
+                // contain stable IDs, parameter names and response metadata, never raw secrets.
+                if (normalized.origin) {
+                  try {
+                    const observedURL = new URL(normalized.normalizedPath, normalized.origin)
+                    const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
+                    if (scopeDecision.allowed && scopeDecision.workspace) {
+                      const queryNames = [...new Set([...observedURL.searchParams.keys()])].sort()
+                      const requestNoteContent = [
+                        "# Captured Request Observation",
+                        "",
+                        "- Request ID: " + req.id,
+                        "- Child analysis session: " + childSessionID,
+                        "- Method: " + normalized.method,
+                        "- Origin: " + observedURL.origin,
+                        "- Path: " + observedURL.pathname,
+                        "- Query parameter names: " + (queryNames.length ? queryNames.join(", ") : "none"),
+                        "- Response status: " + (req.response_status ?? "unknown"),
+                        "- Response content type: " + (req.response_content_type ?? "unknown"),
+                        "- Response size: " + (req.response_size ?? "unknown"),
+                        "",
+                        "The full captured request/response remains in the request store under the Request ID. This note is an index into target evidence, not a vulnerability finding. The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
+                      ].join("\\n")
+                      await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
+                        kind: "evidence",
+                        title: ("Captured request " + normalized.method + " " + normalized.normalizedPath.split("?")[0]).slice(0, 180),
+                        content: requestNoteContent,
+                        source: "extension-request:" + req.id,
+                        sourceURL: observedURL.origin + observedURL.pathname,
+                        status: "observed",
+                        tags: ["extension-request", "request-observation", normalized.method.toLowerCase()],
+                        upsertByIdentity: true,
+                      })
+                    } else {
+                      log.info("request evidence note skipped by persisted scope", {
+                        sessionID,
+                        childSessionID,
+                        requestID: req.id,
+                        reason: scopeDecision.reason,
+                      })
+                    }
+                  } catch (error) {
+                    // A note failure must not erase the successfully completed request analysis.
+                    log.warn("request evidence note persistence failed", {
+                      sessionID,
+                      childSessionID,
+                      requestID: req.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                  }
+                }
+
                 // JavaScript response captures automatically refresh the target's static
                 // analysis/correlation graph after the request agent finishes. The builder
                 // reads only already-captured, in-scope traffic and persists redacted metadata.
