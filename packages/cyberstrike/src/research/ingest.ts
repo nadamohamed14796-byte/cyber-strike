@@ -18,7 +18,7 @@ function paginationSeriesKey(source: ResearchSource, value: string) {
   const url = new URL(value)
   if (source.id === "hackerone-hacktivity" && url.pathname.includes("/overview")) {
     url.searchParams.delete("pageIndex")
-  } else if (["hackerone-hacktivity", "bugcrowd-crowdstream", "github"].includes(source.id)) {
+  } else if (["hackerone-hacktivity", "bugcrowd-crowdstream", "github", "medium-security"].includes(source.id)) {
     url.searchParams.delete("page")
   } else {
     url.pathname = url.pathname.replace(/\/page\/\d+\/?$/i, "")
