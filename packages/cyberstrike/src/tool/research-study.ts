@@ -182,6 +182,15 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
   const supplied = note.document_note && typeof note.document_note === "object"
     ? sanitizeStructuredNote(note.document_note) as Record<string, unknown>
     : {}
+  const sectionName = documentType === "report" ? "report"
+    : documentType === "writeup" ? "writeup"
+      : documentType === "reference" ? "reference"
+        : documentType === "academy" ? "academy"
+          : documentType === "blog" || documentType === "research" ? "research"
+            : "mixed_or_uncertain"
+  const typedSection = supplied[sectionName] && typeof supplied[sectionName] === "object"
+    ? supplied[sectionName] as Record<string, unknown>
+    : supplied
   const common = {
     schema_version: 1,
     document_type: documentType,
@@ -196,7 +205,7 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
       request_response: extracted.request_response_evidence, reproduction: extracted.reproduction_steps,
       root_cause: extracted.root_cause, impact: extracted.impact,
       verification_status: extracted.verification_status, remediation: extracted.remediation,
-      false_positive_cautions: extracted.false_positive_cautions, submitted: supplied,
+      false_positive_cautions: extracted.false_positive_cautions, ...typedSection,
     } }
   }
   if (documentType === "writeup") {
@@ -207,7 +216,7 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
       decisive_evidence: extracted.decisive_evidence, causal_explanation: extracted.root_cause,
       impact: extracted.impact, lessons: extracted.lesson,
       applicability: extracted.applicability_conditions,
-      non_applicability: extracted.non_applicability_conditions, submitted: supplied,
+      non_applicability: extracted.non_applicability_conditions, ...typedSection,
     } }
   }
   if (documentType === "reference") {
@@ -216,7 +225,7 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
       payload_collection: extracted.poc_snippet, prerequisites: extracted.prerequisites,
       expected_positive_signals: extracted.expected_positive_signals,
       expected_negative_signals: extracted.expected_negative_signals,
-      false_positive_cautions: extracted.false_positive_cautions, submitted: supplied,
+      false_positive_cautions: extracted.false_positive_cautions, ...typedSection,
     } }
   }
   if (documentType === "academy") {
@@ -224,7 +233,7 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
       objective: extracted.lesson, lab_condition: extracted.initial_observation,
       intended_class: extracted.vulnerability_class, reproduction_logic: extracted.reproduction_steps,
       evidence_signal: extracted.verification_signals, prerequisites: extracted.prerequisites,
-      boundaries: extracted.limitations, submitted: supplied,
+      boundaries: extracted.limitations, ...typedSection,
     } }
   }
   if (documentType === "blog" || documentType === "research") {
@@ -233,13 +242,13 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
       threat_model: extracted.attack_vector, assumptions: extracted.prerequisites,
       technique: extracted.test_procedure, defensive_implications: extracted.remediation,
       validation_signals: extracted.verification_signals, limitations: extracted.limitations,
-      submitted: supplied,
+      ...typedSection,
     } }
   }
   return { ...common, mixed_or_uncertain: {
     supported_observations: extracted.initial_observation, supported_techniques: extracted.test_procedure,
     evidence: extracted.decisive_evidence, uncertainty: extracted.unresolved_questions,
-    submitted: supplied,
+    ...typedSection,
   } }
 }
 
