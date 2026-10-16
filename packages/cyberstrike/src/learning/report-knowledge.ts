@@ -210,8 +210,10 @@ export namespace ReportKnowledge {
    * The study marker is independent of heuristic extraction_version so older records
    * can be revisited once without repeatedly flooding the durable queue.
    */
-  export function externalRecordsForModelStudy(_legacyLimit = 100, modelStudyVersion = 1, sourceHosts?: string[], sourceID?: string) {
-    // Legacy limit argument is compatibility-only; enumerate all eligible records.
+  export function externalRecordsForModelStudy(legacyLimit = 100, modelStudyVersion = 1, sourceHosts?: string[], sourceID?: string) {
+    // This is a per-call batch size, not a total-work ceiling. The model-study
+    // worker must keep requesting batches until every eligible legacy record is drained.
+    const batchSize = Math.max(1, Math.floor(Number.isFinite(legacyLimit) ? legacyLimit : 100))
     const currentVersion = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : 1))
     return Database.use((db) => {
       const conditions = [
@@ -255,6 +257,7 @@ export namespace ReportKnowledge {
           return !(typeof studied === "number" && studied >= currentVersion) &&
             !(typeof requested === "number" && requested >= currentVersion)
         })
+        .slice(0, batchSize)
     })
   }
 
