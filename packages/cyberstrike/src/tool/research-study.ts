@@ -109,7 +109,7 @@ const ResearchStudyParameters = z.object({
   public_id: z.string().regex(/^RPT-\d{1,12}$/).optional(),
   lease_owner: z.string().min(8).max(200).optional(),
   offset: z.number().int().min(0).optional().describe("JavaScript string offset (UTF-16 code units) from the previous next_offset, not a UTF-8 byte offset; defaults to zero."),
-  items: z.array(StudyItem).max(5).optional(),
+  items: z.array(StudyItem).optional(),
 })
 
 const KNOWN_CLASSES = new Set([
@@ -851,7 +851,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
     }
 
     if (params.action === "next") {
-      const batch = await claimResearchBatch({ ...params, sessionIDs })
+      const batch = await claimResearchBatch({ source: params.source, sessionIDs })
       return output(
         batch.batch_size ? "Read public research batch for model study" : "No claimable research items",
         JSON.stringify(batch, null, 2),
@@ -1202,7 +1202,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       result.result === "learned" || result.result === "rejected",
     )
     const nextBatch = params.continue_after_save && canContinue
-      ? await claimResearchBatch({ source: params.source, limit: 1, sessionIDs })
+      ? await claimResearchBatch({ source: params.source, sessionIDs })
       : undefined
     const finalSummary = nextBatch ? { ...summary, next_batch: nextBatch } : summary
     return output("Model-led research study saved", JSON.stringify(finalSummary, null, 2), finalSummary)
