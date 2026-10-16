@@ -104,6 +104,8 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   }
   const scanner = path.basename(command[scannerIndex]!).toLowerCase()
   const args = command.slice(scannerIndex + 1)
+  if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
+      !args.some((value) => /^https?:\/\//i.test(value))) return
   if (["katana", "hakrawler", "gospider"].includes(scanner)) {
     throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl can follow off-scope links. Use the scope-aware browser/recon pipeline so every discovered URL is checked before a request.")
   }
@@ -122,8 +124,6 @@ async function assertScannerReconGate(command: string[], commandText: string): P
       throw new Error("Recon execution gate blocked " + scanner + ": port list must contain valid ports from 1 to 65535.")
     }
   }
-  if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
-      !args.some((value) => /^https?:\/\//i.test(value))) return
   const phase = SCANNER_PHASES[scanner]!
   const targets = scannerTargets(command.slice(scannerIndex), commandText)
   if (!targets.length) {
