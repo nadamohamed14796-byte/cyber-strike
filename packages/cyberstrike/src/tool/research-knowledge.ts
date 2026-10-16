@@ -15,6 +15,15 @@ function clip(value: unknown, max = 1800) {
   return ""
 }
 
+function renderStructured(value: unknown, max = 4200) {
+  if (value === undefined || value === null) return ""
+  try {
+    return JSON.stringify(value, null, 2).slice(0, max)
+  } catch {
+    return ""
+  }
+}
+
 const ResearchKnowledgeParameters = z.object({
     signal: z.string().min(2).describe("Observed technical or behavioral signal to match against global research"),
     vulnerability_class: z.string().optional().describe("Likely class such as idor, xss, ssrf, auth-bypass, business-logic, cache-poisoning"),
@@ -130,6 +139,8 @@ export const ResearchKnowledgeTool = Tool.define<typeof ResearchKnowledgeParamet
         "- **HUNT SIGNAL — do not use when:** " + (clip(huntSignal.non_applicability_conditions, 1000) || clip(extracted.non_applicability_conditions, 1000) || "not recorded"),
         "- **HUNT SIGNAL — false-positive / stop rules:** " + (clip(huntSignal.false_positive_cautions, 1400) || clip(extracted.false_positive_cautions, 1400) || "not recorded"),
         "- **HUNT SIGNAL — provenance/confidence:** " + (clip(huntSignal.verification_status, 200) || clip(extracted.verification_status, 200) || "unknown") + "; trust " + (typeof huntSignal.source_trust === "number" ? huntSignal.source_trust + "/100" : "unknown") + "; evidence " + (clip(huntSignal.confidence_basis, 1000) || clip(extracted.decisive_evidence, 1000) || "not recorded"),
+        "- **MODEL-DEFINED HUNT PATTERNS (source-specific; not a fixed taxonomy):**\n" + (renderStructured(huntSignal.patterns) || "No custom patterns were recorded; use shared fields cautiously."),
+        "- **Typed source note:**\n" + (renderStructured(metadata.document_note, 3200) || "not stored"),
         "- Source excerpt: " + (clip(metadata.excerpt) || "not stored"),
       ].join("\n")
     })
