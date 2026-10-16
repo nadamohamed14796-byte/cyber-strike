@@ -242,19 +242,33 @@ export namespace Skill {
       }
     }
 
-    // Download and load skills from URLs
+    // Download and load skills from URLs. One unavailable optional source must
+    // not reject Skill.state() and make every local skill unavailable.
     for (const url of config.skills?.urls ?? []) {
-      const list = await Discovery.pull(url)
-      for (const dir of list) {
-        dirs.add(dir)
-        for await (const match of SKILL_GLOB.scan({
-          cwd: dir,
-          absolute: true,
-          onlyFiles: true,
-          followSymlinks: true,
-        })) {
-          await addSkill(match)
+      try {
+        const list = await Discovery.pull(url)
+        for (const dir of list) {
+          dirs.add(dir)
+          for await (const match of SKILL_GLOB.scan({
+            cwd: dir,
+            absolute: true,
+            onlyFiles: true,
+            followSymlinks: true,
+          })) {
+            await addSkill(match)
+          }
         }
+      } catch (error) {
+        let source = "invalid URL"
+        try {
+          source = new URL(url).host
+        } catch {
+          // Keep malformed or credential-bearing URL values out of logs.
+        }
+        log.error("failed to load configured skill source; continuing with other sources", {
+          source,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
 
