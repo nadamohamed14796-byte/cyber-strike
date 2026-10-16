@@ -70,7 +70,7 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
 
 function scannerTargets(command: string[], commandText: string): string[] {
   const candidates = new Set<string>()
-  for (const match of commandText.matchAll(/https?:\\/\\/[^\\s"'<>\\x60]+/gi)) {
+  for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>\x60]+/gi)) {
     const value = match[0].replace(/[),;]+$/, "")
     candidates.add(value)
   }
@@ -79,15 +79,15 @@ function scannerTargets(command: string[], commandText: string): string[] {
     if (!targetFlags.has(command[i]!.toLowerCase())) continue
     const value = command[i + 1]
     if (!value || value.startsWith("-")) continue
-    if (/^https?:\\/\\//i.test(value)) candidates.add(value)
-    else if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}(?::\\d{1,5})?(?:\\/[^\\s]*)?$/i.test(value)) {
+    if (/^https?:\/\//i.test(value)) candidates.add(value)
+    else if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(value)) {
       candidates.add("https://" + value)
     }
   }
   // Nmap-style tools accept hosts as positional arguments.
   for (const value of command) {
     if (value.startsWith("-") || value.includes("/") || value.includes("=") || value.includes(".txt") || value.includes(".list")) continue
-    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}(?::\\d{1,5})?$/i.test(value)) candidates.add("https://" + value)
+    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?$/i.test(value)) candidates.add("https://" + value)
   }
   return [...candidates]
 }
@@ -98,7 +98,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   const scanner = path.basename(command[scannerIndex]!).toLowerCase()
   const args = command.slice(scannerIndex + 1)
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
-      !args.some((value) => /^https?:\\/\\//i.test(value))) return
+      !args.some((value) => /^https?:\/\//i.test(value))) return
   const phase = SCANNER_PHASES[scanner]!
   const targets = scannerTargets(command.slice(scannerIndex), commandText)
   if (!targets.length) {
