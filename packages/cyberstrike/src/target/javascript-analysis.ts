@@ -383,6 +383,11 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const normalizedEndpoint = normalizeEndpoint(literalMatch[1]!)
     if (!normalizedEndpoint) continue
     const endpoint = requestConfig ? normalizedEndpoint : addConcatenatedPathParameters(normalizedEndpoint, urlExpression)
+    const currentFunctionRange = functionRanges.filter((range) => range.start <= index && index <= range.end)
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
+    const contextStart = Math.max(currentFunctionRange?.start ?? 0, index - 1500)
+    const contextEnd = Math.min(currentFunctionRange?.end ?? source.length - 1, close + 1800)
+    const requestContext = source.slice(contextStart, contextEnd)
     const isFetch = callee === "fetch"
     const isBodyMethod = /\.(?:post|put|patch)$/i.test(callee)
     const options = isXHR ? "" : requestConfig ? args[0] ?? "" : callee.endsWith(".request") ? args.slice(1).join(",")
@@ -395,9 +400,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const headers = [
       ...configObjectFields(optionText, "headers", source, index),
       ...Array.from(optionText.matchAll(/\[\s*\[\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
-      ...Array.from(optionText.matchAll(/(?:headers|requestHeaders)\s*\.\s*(?:set|append)\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
-      ...Array.from(optionText.matchAll(/\.setRequestHeader\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
-      ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|Set-Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/(?:headers|requestHeaders)\s*\.\s*(?:set|append)\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/\.setRequestHeader\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/\b(Authorization|Cookie|Set-Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
     const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch ? options : ""
     const directObject = isBodyMethod && bodyArgs.trim().startsWith("{")
@@ -411,7 +416,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...(isBodyMethod && !requestConfig && /^[A-Za-z_$][\w$]*$/.test((args[1] ?? "").trim())
         ? objectBindingFields(source, (args[1] ?? "").trim(), index) : []),
     ]
-    const all = optionText + "\n" + bodyArgs
+    const all = optionText + "\n" + bodyArgs + "\n" + requestContext
     const authSignals: string[] = [], cookieSignals: string[] = []
     if (/\bAuthorization\b/i.test(all)) authSignals.push("authorization-header")
     if (/\bBearer\b/i.test(all)) authSignals.push("bearer-token")
@@ -433,7 +438,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']{1,100})["']/gi)) endpoint.queryParameters.push(m[1]!)
     }
     const line = lineNumber(lineStarts, index)
-    const sourceFunction = functionRanges.filter((range) => range.start <= index && index <= range.end).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]?.name ?? null
+    const sourceFunction = currentFunctionRange?.name ?? null
     const item: JavaScriptRequestCandidate = {
       id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers)])).digest("hex").slice(0, 16),
       sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, origin: endpoint.origin, path: endpoint.path,

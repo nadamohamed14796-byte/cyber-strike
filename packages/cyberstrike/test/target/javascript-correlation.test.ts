@@ -228,7 +228,7 @@ test("merges structured requests into endpoint inventory when literal extraction
     queryParameters: ["expand"], bodyParameters: [], headerNames: ["X-Tenant-ID"],
     authSignals: [], cookieSignals: [], authAssessment: "no-static-auth-signal",
     sourceLine: 18, confidence: "candidate", sourceFile: "javascript/settings.js",
-    observedRequestIDs: ["request-settings-1"], recommendedChecks: [],
+    observedRequestIDs: ["request-settings-1"],
   }])
   expect(endpoints).toHaveLength(1)
   expect(endpoints[0]?.origin).toBe("http://api.example.com:8080")
@@ -248,7 +248,7 @@ test("merges equivalent named route placeholders instead of making duplicate end
     urlTemplate: "/api/users/{userId}", host: null, origin: null, path: "/api/users/{userId}",
     pathParameters: ["userId"], queryParameters: [], bodyParameters: [], headerNames: [],
     authSignals: [], cookieSignals: [], authAssessment: "no-static-auth-signal", sourceLine: 3,
-    confidence: "candidate", sourceFile: "javascript/users.js", observedRequestIDs: [], recommendedChecks: [],
+    confidence: "candidate", sourceFile: "javascript/users.js", observedRequestIDs: [],
   }])
   expect(endpoints).toHaveLength(1)
   expect(endpoints[0]?.sourceFiles).toEqual(["javascript/routes.js", "javascript/users.js"])
