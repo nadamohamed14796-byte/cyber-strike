@@ -39,7 +39,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
 
   // IPv6 CIDR matching is separate from IPv4 CIDR parsing to avoid treating
   // malformed network entries as ordinary hostnames.
-  const ipv6Cidr = allowed.match(/^\\[?([0-9a-f:.]+)\\]?\\/(\\d{1,3})$/i)
+  const ipv6Cidr = allowed.match(/^\[?([0-9a-f:.]+)\]?\/(\d{1,3})$/i)
   if (ipv6Cidr && ipv6Cidr[1].includes(":")) {
     const prefix = Number(ipv6Cidr[2])
     const network = ipv6ToBigInt(ipv6Cidr[1])
@@ -166,7 +166,7 @@ function ipv4ToNumber(input: string): number | null {
 
 /** Parse a valid IPv6 literal (including compressed and IPv4-mapped forms) as a 128-bit integer. */
 function ipv6ToBigInt(input: string): bigint | null {
-  let value = input.trim().toLowerCase().replace(/^\\[|\\]$/g, "")
+  let value = input.trim().toLowerCase().replace(/^\[|\]$/g, "")
   if (!value.includes(":")) return null
   if (value.includes(".")) {
     const splitAt = value.lastIndexOf(":")
