@@ -27,8 +27,11 @@ describe("parseScopeFileContents", () => {
     expect(parseScopeFileContents("\uFEFFatt.com\napi.att.com")).toEqual(["att.com", "api.att.com"])
   })
 
-  test("rejects entries containing internal whitespace with the source line number", () => {
-    expect(() => parseScopeFileContents("att.com\nnot a host\n")).toThrow("line 2")
+  test("preserves unfamiliar typed scope entries instead of aborting the entire import", () => {
+    expect(parseScopeFileContents("att.com\nAndroid application: com.example.mobile\n")).toEqual([
+      "att.com",
+      "Android application: com.example.mobile",
+    ])
   })
 
   test("rejects files with no usable entries", () => {
