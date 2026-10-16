@@ -54,7 +54,7 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   waybackurls: "url_collection",
   hakrawler: "url_collection",
   gospider: "url_collection",
-  paramspider: "url_collection",
+  paramspider: "parameter_discovery",
   curl: "url_collection",
   wget: "url_collection",
   arjun: "parameter_discovery",
