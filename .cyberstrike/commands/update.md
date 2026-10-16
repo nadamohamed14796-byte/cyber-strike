@@ -42,8 +42,10 @@ Use these URLs as the initial discovery roots. They are the configured source se
 - **NahamSec** — `nahamsec`: https://nahamsec.com/
 - **Assetnote research** — `assetnote`: https://blog.assetnote.io/
 - **ProjectDiscovery research** — `projectdiscovery`: https://projectdiscovery.io/blog
+- **Medium security-topic feeds** — `medium-security`: https://medium.com/tag/bug-bounty, https://medium.com/tag/web-security, https://medium.com/tag/penetration-testing, https://medium.com/tag/vulnerability
+  - Follow individual security articles from these feeds, including author subdomains. Do not crawl Medium sitemaps, profile roots, recommendations, or unrelated articles; use the configured session if content requires login.
 - **Trickster0 curated Medium author feed** — `trickster0`: https://trickster0.medium.com/
-  - This is a Medium-hosted, security-filtered feed, not permission to crawl unrelated Medium authors or generic Medium tags.
+  - This remains a separate author-scoped feed.
 - **EdOverflow** — `edoverflow`: https://edoverflow.com/
 - **DEVCORE / Orange Tsai** — `devcore`: https://devco.re/en/
 - **LiveOverflow** — `liveoverflow`: https://liveoverflow.com/
