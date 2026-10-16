@@ -25,6 +25,15 @@ describe("research pagination adapters", () => {
     expect(isDiscoveryPaginationURL(source, "https://www.intigriti.com/researchers/blog/page/1001")).toBe(true)
   })
 
+  test("continues Medium security topic feeds without a fixed page ceiling", () => {
+    const source = RESEARCH_SOURCES.find((item) => item.id === "medium-security")!
+    expect(nextDiscoveryPage(source, "https://medium.com/tag/bug-bounty?page=1000")).toBe(
+      "https://medium.com/tag/bug-bounty?page=1001",
+    )
+    expect(isDiscoveryPaginationURL(source, "https://medium.com/tag/bug-bounty?page=1001")).toBe(true)
+    expect(nextDiscoveryPage(source, "https://medium.com/@researcher/idor-writeup")).toBeUndefined()
+  })
+
   test("increments query pagination and rejects malformed page numbers", () => {
     const source = RESEARCH_SOURCES.find((item) => item.id === "github")!
     expect(nextDiscoveryPage(source, "https://github.com/search?q=bug+bounty&page=1000")).toBe(
