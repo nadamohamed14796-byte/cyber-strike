@@ -871,13 +871,9 @@ export async function syncResearchSource(
       queueStats.crawl_page_auth_blocked > 0 || queueStats.blocked_auth > 0
     if (discoveryBlocked || current.pages < pageWindow) break
 
-    const nextWindow = pageWindow * 2
-    if (!Number.isSafeInteger(nextWindow) || nextWindow <= pageWindow) {
-      discovery.errors.push("runtime integer range exhausted before pagination was proven complete")
-      discoveryBlocked = true
-      break
-    }
-    pageWindow = nextWindow
+    // Grow only the per-call continuation window; this never caps the total
+    // number of pages or documents collected across resumable passes.
+    pageWindow = pageWindow * 2
   }
 
   // Phase 2: only after discovery has stopped, study every claimable cached item.
@@ -942,10 +938,11 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
   const { ResearchQueue } = await import("./queue")
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   if (!sources.length) throw new Error("unknown research source: " + input.sourceID)
-  // Page and depth values are per-pass continuation windows only. The caller
-  // expands page windows until exhaustion; no global page/depth ceiling applies.
+  // Pages are a per-call continuation window for agent/tool reliability, not a
+  // total-work ceiling. The durable cycle expands windows and resumes until exhausted.
+  // Depth is accepted for old callers only; traversal has no depth ceiling.
   const maxPages = Math.max(1, Math.floor(Number.isFinite(input.pages) ? input.pages! : 100))
-  const maxDepth = Math.max(0, Math.floor(Number.isFinite(input.depth) ? input.depth! : Number.MAX_SAFE_INTEGER))
+  void input.depth
   // Backfill-aware dedupe: older versions learned reports directly into ReportKnowledge
   // before the durable queue existed. Do not download those URLs again just because
   // they have no corresponding queue row.
@@ -974,7 +971,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     let errorCount = 0
     const add = (value: string, depth: number) => {
       const url = normalizeUrl(value)
-      if (!url || url.length > 4096 || depth > maxDepth || queued.has(url) || visited.has(url)) return
+      if (!url || url.length > 4096 || queued.has(url) || visited.has(url)) return
       try {
         const parsed = new URL(url)
         if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) return
