@@ -21,6 +21,18 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable"
 }
 
+const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, string>> = {
+  asset_discovery: "assets",
+  live_hosts_ports: "recon",
+  url_collection: "urls",
+  directory_fuzzing: "directories",
+  parameter_discovery: "parameters",
+  parameter_fuzzing: "parameters",
+  javascript_analysis: "javascript",
+  endpoint_inventory: "endpoints",
+  reporting: "reports",
+}
+
 const Parameters = z.object({
   action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
@@ -35,7 +47,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
   description: [
     "Persist and enforce the ordered reconnaissance run state in the target workspace. This is a workflow control, not a scanner.",
     "Call status before deciding what to do. Call begin before each phase and complete/unavailable/block/fail after it, with real counts, artifact paths, and a concise evidence-based summary or reason.",
-    "Phases are strictly ordered: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting. Directory and parameter fuzzing are distinct recon phases; save their outputs and wordlist/settings under the target workspace. Scope validation, workspace setup, and endpoint inventory must be complete, never unavailable. Other data-collection phases may be explicitly unavailable with a reason, but blocked/failed phases must be retried or explicitly resolved. Do not rerun a completed phase without new evidence or an explicit reason; vulnerability testing cannot begin until endpoint inventory is complete.",
+    "Phases are strictly ordered: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting. Every completed phase must supply an artifact under its designated workspace area. Directory/parameter fuzzing must save the wordlist, mode, request settings, and normalized results; JavaScript analysis must link source assets and extracted request shapes. The reporting phase must save the consolidated final Recon document to reports/recon-final.md and include that exact path in its checkpoint. Scope validation, workspace setup, and endpoint inventory must be complete, never unavailable. Other data-collection phases may be explicitly unavailable with a reason, but blocked/failed phases must be retried or explicitly resolved. Do not rerun a completed phase without new evidence or an explicit reason; vulnerability testing cannot begin until endpoint inventory is complete.",
     "Do not mark a phase complete just because a command ran. Confirm its output and save artifacts first. Expensive vulnerability scanning must not start before the inventory phases are resolved. Existing run manifests resume across turns for the same target and root session.",
     "Every saved artifact path must be inside this target's canonical workspace. This tool does not authorize requests; use scope_check and the persisted scope policy for every active request.",
   ].join("\n"),
@@ -131,7 +143,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               return { title: "Workspace setup rejected", output: "Cannot mark workspace_setup complete; required workspace file is missing or unsafe: " + relative + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "workspace_integrity_failed", file: relative } }
             }
           }
-          for (const relative of ["scope", "assets", "recon", "urls", "requests", "javascript", "endpoints", "testing", "findings", "evidence", "reports", "scans", "runs", "logs", "sessions", "research"]) {
+          for (const relative of ["scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints", "testing", "findings", "evidence", "reports", "scans", "runs", "logs", "sessions", "research"]) {
             const candidate = path.join(workspace.workspacePath, relative)
             try {
               const info = await fs.lstat(candidate)
@@ -146,6 +158,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         }
         if (status === "complete" && params.artifacts?.length) {
           const realWorkspace = await fs.realpath(workspace.workspacePath)
+          let finalReconReportVerified = false
           for (const artifact of params.artifacts) {
             if (artifact.includes("\\") || artifact.split("/").some((part) => part === "..")) {
               return { title: "Recon checkpoint rejected", output: "Artifact path must remain inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "unsafe_artifact_path" } }
@@ -154,6 +167,11 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             const relative = path.relative(realWorkspace, candidate)
             if (!relative || relative === "." || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
               return { title: "Recon checkpoint rejected", output: "Artifact path must point to a file inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "artifact_outside_workspace" } }
+            }
+            const resolvedArtifactPath = relative.split(path.sep).join("/")
+            const requiredArea = RECON_PHASE_ARTIFACT_AREAS[phase]
+            if (requiredArea && !resolvedArtifactPath.startsWith(requiredArea + "/")) {
+              return { title: "Recon checkpoint rejected", output: "Phase " + phase + " must save its verified output under " + requiredArea + "/; got " + artifact, metadata: { saved: false, reason: "artifact_in_wrong_area", required_area: requiredArea } }
             }
             let info
             let realArtifact: string
@@ -168,6 +186,10 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             if (resolvedRelative === ".." || resolvedRelative.startsWith(".." + path.sep) || path.isAbsolute(resolvedRelative)) {
               return { title: "Recon checkpoint rejected", output: "Artifact resolves outside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "artifact_symlink_escape" } }
             }
+            if (phase === "reporting" && resolvedRelative.split(path.sep).join("/") === "reports/recon-final.md") finalReconReportVerified = true
+          }
+          if (phase === "reporting" && !finalReconReportVerified) {
+            return { title: "Recon report rejected", output: "The reporting phase requires a verified reports/recon-final.md artifact. Include that exact path and complete report before marking Recon finished.", metadata: { saved: false, reason: "final_recon_report_required" } }
           }
         }
         run.phases[phase] = {

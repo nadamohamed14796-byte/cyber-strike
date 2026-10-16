@@ -6,7 +6,7 @@ import { TargetMemory } from "../target"
 import { Tool } from "./tool"
 
 const AREAS = [
-  "scope", "assets", "recon", "urls", "requests", "javascript", "endpoints",
+  "scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints",
   "testing", "findings", "evidence", "reports", "scans", "runs", "logs",
   "sessions", "research",
 ] as const
