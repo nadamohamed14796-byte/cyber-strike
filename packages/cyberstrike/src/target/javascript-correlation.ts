@@ -301,7 +301,7 @@ export interface JavaScriptEndpointCandidate {
  * A matching path is evidence the route was observed, not proof that this
  * particular JavaScript file executed the request.
  */
-function matchesEndpointPathTemplate(template: string, observedPath: string): boolean {
+export function matchesEndpointPathTemplate(template: string, observedPath: string): boolean {
   const normalize = (value: string) => {
     const path = value.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/")
     return path.length > 1 ? path.replace(/\/+$/, "") : "/"
