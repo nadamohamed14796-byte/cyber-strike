@@ -127,6 +127,15 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               return { title: "Workspace setup rejected", output: "Cannot mark workspace_setup complete; required workspace file is missing or unsafe: " + relative + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "workspace_integrity_failed", file: relative } }
             }
           }
+          for (const relative of ["scope", "assets", "recon", "urls", "requests", "javascript", "endpoints", "testing", "findings", "evidence", "reports", "scans", "runs", "logs", "sessions", "research"]) {
+            const candidate = path.join(workspace.workspacePath, relative)
+            try {
+              const info = await fs.lstat(candidate)
+              if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("not a regular directory")
+            } catch (error) {
+              return { title: "Workspace setup rejected", output: "Cannot mark workspace_setup complete; required workspace directory is missing or unsafe: " + relative + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "workspace_integrity_failed", directory: relative } }
+            }
+          }
         }
         if (status === "complete" && !["scope_validation", "workspace_setup"].includes(phase) && !params.artifacts?.length) {
           return { title: "Recon checkpoint rejected", output: "This phase requires at least one verified artifact path before it can be marked complete. If the source/tool is genuinely unavailable or there were no applicable assets, use unavailable with a reason.", metadata: { saved: false, reason: "artifact_required" } }
