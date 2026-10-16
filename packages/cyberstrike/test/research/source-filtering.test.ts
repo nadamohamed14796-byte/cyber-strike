@@ -127,12 +127,38 @@ test("source exclusions apply even when a source has no include-term policy", ()
   ).toBe(true)
 })
 
-test("does not classify root landing pages, GitHub tree listings, or all-labs indexes as learnable articles", () => {
+test("does not classify feed, repository, tree, or all-labs indexes as learnable articles", () => {
+  const genericGitHub = RESEARCH_SOURCES.find((source) => source.id === "github")!
+  const srcHunter = RESEARCH_SOURCES.find((source) => source.id === "src-hunter-skill")!
+  const securityCipher = RESEARCH_SOURCES.find((source) => source.id === "securitycipher-bounty-writeups")!
+  const bugcrowd = RESEARCH_SOURCES.find((source) => source.id === "bugcrowd-crowdstream")!
+  const infosec = RESEARCH_SOURCES.find((source) => source.id === "infosec-writeups")!
+
   expect(isIndexLikeResearchUrl("https://trickster0.medium.com/")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/all-labs")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/authentication")).toBe(false)
-  expect(isIndexLikeResearchUrl("https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports")).toBe(true)
-  expect(isIndexLikeResearchUrl("https://github.com/MyuriKanao/src-hunter-skill/blob/main/references/h1-reports/raw/reports/report.md")).toBe(false)
+
+  const repoRoot = "https://github.com/MyuriKanao/src-hunter-skill"
+  const reportsDir = repoRoot + "/tree/main/references/h1-reports/raw/reports"
+  const reportFile = repoRoot + "/blob/main/references/h1-reports/raw/reports/report.md"
+  expect(isResearchCandidate(repoRoot, genericGitHub)).toBe(true)
+  expect(isResearchCandidate(repoRoot, srcHunter)).toBe(true)
+  expect(isIndexLikeResearchUrl(repoRoot)).toBe(true)
+  expect(isIndexLikeResearchUrl(reportsDir)).toBe(true)
+  expect(isResearchCandidate(reportsDir, srcHunter)).toBe(true)
+  expect(isIndexLikeResearchUrl(reportFile)).toBe(false)
+  expect(isResearchCandidate(reportFile, srcHunter)).toBe(true)
+
+  const securityCipherIndex = "https://securitycipher.com/bounty-writeups/"
+  expect(isIndexLikeResearchUrl(securityCipherIndex)).toBe(true)
+  expect(isResearchCandidate(securityCipherIndex, securityCipher)).toBe(false)
+  expect(isIndexLikeResearchUrl("https://securitycipher.com/bounty-writeups/2026/example-report")).toBe(false)
+  expect(isResearchCandidate("https://securitycipher.com/bounty-writeups/2026/example-report", securityCipher)).toBe(true)
+
+  expect(isIndexLikeResearchUrl("https://bugcrowd.com/crowdstream")).toBe(true)
+  expect(isResearchCandidate("https://bugcrowd.com/crowdstream", bugcrowd)).toBe(false)
+  expect(isIndexLikeResearchUrl("https://infosecwriteups.com/tagged/bug-bounty")).toBe(true)
+  expect(isResearchCandidate("https://infosecwriteups.com/tagged/bug-bounty", infosec)).toBe(false)
 })
 
 test("hyphenated vulnerability names pass curated source relevance filters", () => {

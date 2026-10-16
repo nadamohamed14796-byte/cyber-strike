@@ -202,7 +202,14 @@ export function isIndexLikeResearchUrl(url: string) {
     const path = parsed.pathname.toLowerCase().replace(/\/+$/, "") || "/"
     // Root landing pages are discovery seeds, not automatically learnable articles.
     if (path === "/") return true
-    if (parsed.hostname.toLowerCase() === "github.com" && /\/tree\/[^/]+(?:\/|$)/i.test(path)) return true
+    if (parsed.hostname.toLowerCase() === "github.com") {
+      const segments = path.split("/").filter(Boolean)
+      // Repository and /tree/ URLs are discovery indexes, never standalone reports.
+      if (segments.length === 2 || /\/tree\/[^/]+(?:\/|$)/i.test(path)) return true
+    }
+    // Feed roots are traversable indexes; their child article paths remain eligible.
+    if (/\/(?:crowdstream|bounty-writeups)\/?$/i.test(path)) return true
+    if (/\/tagged\/[^/]+\/?$/i.test(path)) return true
     if (/[?&](page|p|offset|start|pageindex)=\d+/i.test(parsed.search)) return true
     if (/\/page\/\d+\/?$/i.test(path)) return true
     if (/\/(all-labs|all-topics|all-courses|all-resources|latest|popular)(\/)?$/.test(path)) return true
@@ -237,6 +244,12 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
     // itself needs at least two path segments to distinguish an article from a profile.
     if (host === "medium.com" ? segments.length < 2 : segments.length < 1) return false
     return true
+  }
+  // GitHub repo roots are traversable discovery pages. isIndexLikeResearchUrl
+  // keeps them out of the model-learning queue while allowing their tree/blob children.
+  if (parsed.hostname.toLowerCase() === "github.com") {
+    const segments = path.split("/").filter(Boolean)
+    if (segments.length === 2) return true
   }
   // These editorial sites publish individual posts at varied URL shapes (slugs or dates),
   // so their article links cannot be identified reliably by generic path keywords alone.

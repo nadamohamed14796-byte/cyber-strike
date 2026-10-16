@@ -112,7 +112,7 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
     hosts: ["pentester.land"],
     trust: 90,
   },
-  // The generic Medium tag crawler is intentionally omitted because it produced excessive off-topic articles.
+  // Medium topic feeds are configured separately below with strict relevance filters and no sitemap crawling.
   {
     id: "infosec-writeups",
     name: "InfoSec Write-ups",
