@@ -814,12 +814,12 @@ export namespace JavaScriptCorrelation {
       // multi-host sessions. Do not attach them to whichever target happens to share a path.
       if (!finding.target_id) continue
       const endpointValue = endpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "")
-      const endpointURL = safeURL(endpointValue)
-      const endpointPath = (endpointURL?.pathname ?? endpointValue).split(/[?#]/, 1)[0]!
+      const pathEndpointURL = safeURL(endpointValue)
+      const endpointPath = (pathEndpointURL?.pathname ?? endpointValue).split(/[?#]/, 1)[0]!
       const matchesAttributedRequest = relevantRequests.some((request) => {
         if (requestTargetWorkspaceIDs.get(request.id) !== finding.target_id) return false
         const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
-        if (endpointURL && requestURL?.origin !== endpointURL.origin) return false
+        if (pathEndpointURL && requestURL?.origin !== pathEndpointURL.origin) return false
         return matchesEndpointPathTemplate(endpointPath, request.normalized_path)
       })
       if (matchesAttributedRequest) findings.push(finding)
