@@ -184,7 +184,6 @@ function normalizeScopeItem(input: string): string {
     if (!bareHost || (!ipv6Host && !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(bareHost))) {
       throw new Error("Invalid hostname in scope URL: " + value)
     }
-    url.hostname = (wildcardHost ? "*." : "") + bareHost
     url.pathname = url.pathname.replace(/\/+$/, "") || "/"
     return url.toString().replace(/\/$/, url.pathname === "/" ? "" : "/")
   }
