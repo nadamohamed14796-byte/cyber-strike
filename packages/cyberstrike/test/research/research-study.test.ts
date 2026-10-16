@@ -979,7 +979,7 @@ test("research study is blocked until every source has a durable collection outc
         sourceID: "portswigger",
         sourceURL: "https://portswigger.net/web-security/access-control/idor?cycle-gate=" + marker,
         title: "Cycle gate fixture",
-        payload: { cached_text: "A safely cached fixture document with enough text for the study queue." },
+        payload: { cached_text: "A safely cached fixture document used to test the durable collection-to-study transition. The study worker must claim the full sanitized document only after all configured sources have reached a terminal collection state. Repeated references and source indexes remain out of this queue. ".repeat(4) },
       })
       expect(queued.created).toBe(true)
       const tool = await ResearchStudyTool.init()
