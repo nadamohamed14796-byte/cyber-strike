@@ -232,7 +232,6 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
     if (path === "/" || /^\/(?:tag|topic|topics|search|about|membership|plans|me|following|latest|popular)(?:\/|$)/i.test(path)) return false
     const segments = path.split("/").filter(Boolean)
     if (segments.length < 2) return false
-    if (/^@[^/]+$/i.test(segments[0] ?? "")) return false
     return true
   }
   // These editorial sites publish individual posts at varied URL shapes (slugs or dates),
