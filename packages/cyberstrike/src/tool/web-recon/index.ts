@@ -1,7 +1,6 @@
 import z from "zod"
 import path from "node:path"
 import { Tool } from "../tool"
-import { Session } from "../../session"
 import { reconPhaseGate, type ReconPhase } from "../recon-checkpoint"
 import { TargetMemory, type Workspace } from "../../target"
 import { redactTargetNoteSecrets } from "../../target/redact"
@@ -202,7 +201,7 @@ export const WebReconTool = Tool.define("web_recon", {
         const sessionScopeCheck: ScopeCheck = async (url) => {
           const decision = await TargetMemory.checkURLScope(url)
           if (!decision.allowed || !decision.workspace) return false
-          const gate = await reconPhaseGate(decision.workspace, Session.root(ctx.sessionID), "vulnerability_testing")
+          const gate = await reconPhaseGate(decision.workspace, "vulnerability_testing")
           if (!gate.allowed) return false
           sessionScopeWorkspaceIDs.add(decision.workspace.id)
           return true
@@ -256,7 +255,7 @@ export const WebReconTool = Tool.define("web_recon", {
           : program === "tech_detect"
             ? "live_hosts_ports"
             : "vulnerability_testing"
-      const gate = await reconPhaseGate(targetWorkspace!, Session.root(ctx.sessionID), requiredPhase)
+      const gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
       if (!gate.allowed) {
         return fail([
           "[-] Recon phase gate blocked " + program + ".",
