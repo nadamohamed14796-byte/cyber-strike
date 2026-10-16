@@ -35,9 +35,40 @@ function cleanError(value: string) {
   return value.replace(/(authorization|proxy-authorization|cookie|set-cookie|password|passwd|token|secret|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "$1: [REDACTED]").slice(0, 1000)
 }
 
+
+function summarizeSourceState(state: ResearchSourceCycleState | undefined) {
+  if (!state) return null
+  const { passes, ...totals } = state
+  return {
+    ...totals,
+    passes_count: passes?.length ?? 0,
+    last_pass: passes?.at(-1) ?? null,
+  }
+}
+
+function summarizeCycleRow(row: typeof ResearchCycleTable.$inferSelect) {
+  return {
+    cycle_id: row.cycle_id,
+    phase: row.phase,
+    source_ids: row.source_ids,
+    source_states: Object.fromEntries(
+      row.source_ids.map((id) => [id, summarizeSourceState(row.source_states[id])]),
+    ),
+    started_at: row.started_at,
+    updated_at: row.updated_at,
+    finished_at: row.finished_at,
+  }
+}
+
 export namespace ResearchCycle {
   export function current() {
     return Database.use((db) => db.select().from(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).get() ?? null)
+  }
+
+  /** Compact read surface; the full per-pass ledger remains durable in SQLite. */
+  export function summary() {
+    const row = current()
+    return row ? summarizeCycleRow(row) : null
   }
 
   /** Start a durable, explicit collect-then-study cycle across the selected sources. */
@@ -99,8 +130,8 @@ export namespace ResearchCycle {
     return Database.transaction((db) => {
       const current = db.select().from(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).get()
       if (!current || current.cycle_id !== input.cycleID) return { ok: false as const, reason: "cycle_missing_or_stale" as const }
-      if (current.phase !== "collecting") return { ok: false as const, reason: "collection_phase_already_closed" as const, cycle: current }
-      if (!current.source_ids.includes(input.sourceID)) return { ok: false as const, reason: "source_not_selected" as const, cycle: current }
+      if (current.phase !== "collecting") return { ok: false as const, reason: "collection_phase_already_closed" as const, cycle: summarizeCycleRow(current) }
+      if (!current.source_ids.includes(input.sourceID)) return { ok: false as const, reason: "source_not_selected" as const, cycle: summarizeCycleRow(current) }
 
       const previous = current.source_states[input.sourceID] ?? emptySourceState()
       if (window !== previous.next_page_window) {
@@ -167,9 +198,9 @@ export namespace ResearchCycle {
       return {
         ok: true as const,
         phase: updated.phase as ResearchCyclePhase,
-        source_state: nextSource,
+        source_state: summarizeSourceState(nextSource),
         waiting_sources: updated.source_ids.filter((id) => !terminal(updated.source_states[id]?.status)),
-        cycle: updated,
+        cycle: summarizeCycleRow(updated),
       }
     })
   }

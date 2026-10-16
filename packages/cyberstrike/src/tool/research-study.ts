@@ -176,7 +176,7 @@ function statistics(sourceID?: string) {
   return {
     queue: ResearchQueue.stats(sourceID),
     knowledge: ReportKnowledge.stats(),
-    cycle: ResearchCycle.current(),
+    cycle: ResearchCycle.summary(),
   }
 }
 
@@ -659,7 +659,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         cycle_id: cycle.cycle_id,
         phase: cycle.phase,
         source_ids: cycle.source_ids,
-        source_states: cycle.source_states,
+        source_states: ResearchCycle.summary()?.source_states ?? {},
         started_at: cycle.started_at,
         instruction: cycle.phase === "collecting" ? "Resume only sources still pending/collecting; skip terminal sources and keep collecting before study." : cycle.phase === "studying" ? "Collection is already closed; resume the queue drain and final verification without restarting discovery." : "This cycle is already finalized.",
       }
@@ -689,7 +689,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         return output("Research collection cycle required", "Call action=begin and pass the returned cycle_id before discovery. A stale or missing cycle cannot update collection progress.", { error: "cycle_missing_or_stale" })
       }
       if (cycle.phase !== "collecting") {
-        return output("Research collection is already closed", "Do not add discovery results to a study/finalized cycle. Start a new cycle if another collection pass is required.", { error: "collection_phase_closed", cycle })
+        return output("Research collection is already closed", "Do not add discovery results to a study/finalized cycle. Start a new cycle if another collection pass is required.", { error: "collection_phase_closed", cycle: ResearchCycle.summary() })
       }
       if (!params.source) {
         return output("A single source ID is required", "Discover one configured source per call so progress and blockers are recorded independently.", { error: "source_required" })
