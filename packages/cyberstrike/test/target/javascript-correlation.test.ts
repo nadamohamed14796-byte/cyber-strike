@@ -174,6 +174,21 @@ test("explicit JavaScript asset filtering matches exact origin and path", () => 
   }, "javascript:alert(1)")).toBe(false)
 })
 
+test("absolute endpoint literals preserve scheme and port during correlation", () => {
+  const endpoints = correlateStaticJavaScriptEndpoints(
+    [{ relativePath: "javascript/app.js", basename: "app.js", sha256: "a", bytes: 10, endpointLiterals: ["https://api.example.com:8443/v1/profile"] }],
+    [
+      { id: "req-https", method: "GET", host: "api.example.com", url: "https://api.example.com/v1/profile", normalizedPath: "/v1/profile", responseStatus: 200 },
+      { id: "req-port", method: "GET", host: "api.example.com:8443", url: "https://api.example.com:8443/v1/profile", normalizedPath: "/v1/profile", responseStatus: 200 },
+      { id: "req-http", method: "GET", host: "api.example.com:8443", url: "http://api.example.com:8443/v1/profile", normalizedPath: "/v1/profile", responseStatus: 200 },
+    ],
+    "app.example.com",
+  )
+  expect(endpoints).toHaveLength(1)
+  expect(endpoints[0].origin).toBe("https://api.example.com:8443")
+  expect(endpoints[0].observedRequestIDs).toEqual(["req-port"])
+})
+
 test("persists deduplicated endpoint candidates and links only host-compatible captured requests", () => {
   const endpoints = correlateStaticJavaScriptEndpoints(
     [
