@@ -3,6 +3,8 @@ import path from "path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { Agent } from "../../src/agent/agent"
+import { Skill } from "../../src/skill"
+import { SkillIndex } from "../../src/skill/index-engine"
 import { PermissionNext } from "../../src/permission/next"
 
 // Helper to evaluate permission for a tool with wildcard pattern
@@ -47,6 +49,31 @@ EMBEDDED_SKILL_ALIAS_REGRESSION_MARKER
     else process.env.CYBERSTRIKE_TEST_HOME = previousHome
   }
 })
+
+test("every built-in agent skill reference resolves to a loadable skill", async () => {
+  const repoRoot = path.resolve(import.meta.dir, "../../../..")
+  const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+  delete process.env.CYBERSTRIKE_TEST_HOME
+  try {
+    await Instance.provide({
+      directory: repoRoot,
+      fn: async () => {
+        await SkillIndex.rebuild()
+        for (const agent of await Agent.list()) {
+          for (const reference of agent.skills ?? []) {
+            const direct = await Skill.get(reference)
+            const canonical = SkillIndex.resolveReference(reference)
+            const resolved = direct ?? (canonical ? await Skill.get(canonical) : undefined)
+            expect(resolved, `agent "${agent.name}" references unresolved skill "${reference}"`).toBeDefined()
+          }
+        }
+      },
+    })
+  } finally {
+    if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+  }
+}, 60000)
 
 test("returns default native agents when no config", async () => {
   await using tmp = await tmpdir()
