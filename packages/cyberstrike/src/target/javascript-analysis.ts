@@ -98,6 +98,118 @@ const fieldNames = (value: string) => cleanUnique(
   Array.from(value.matchAll(/(?:^|[,{\n])\s*["']?([A-Za-z_$][\w$-]{0,99})["']?\s*:/g), (m) => m[1]!),
 ).slice(0, 100)
 
+
+/** Match a brace-delimited object while ignoring strings and comments. */
+function matchingObjectBrace(source: string, open: number, maxLength = 10000): number {
+  let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false
+  const limit = Math.min(source.length, open + maxLength)
+  for (let i = open; i < limit; i++) {
+    const ch = source[i]!, next = source[i + 1]
+    if (lineComment) { if (ch === "\n") lineComment = false; continue }
+    if (blockComment) { if (ch === "*" && next === "/") { blockComment = false; i++ }; continue }
+    if (quote) { if (escaped) escaped = false; else if (ch === "\\") escaped = true; else if (ch === quote) quote = ""; continue }
+    if (ch === "/" && next === "/") { lineComment = true; i++; continue }
+    if (ch === "/" && next === "*") { blockComment = true; i++; continue }
+    if (ch === "'" || ch === '"' || ch === "\x60") { quote = ch; continue }
+    if (ch === "{") depth++
+    if (ch === "}" && --depth === 0) return i
+  }
+  return -1
+}
+
+function objectPropertyNames(value: string): string[] {
+  const names = new Set(fieldNames(value))
+  for (const part of splitTopLevelArguments(value)) {
+    const match = part.trim().match(/^(?:["']([^"']{1,100})["']|([A-Za-z_$][\w$-]{0,99}))\s*(?:\??:|$)/)
+    const name = match?.[1] ?? match?.[2]
+    if (name && /^[A-Za-z_$][\w$-]{0,99}$/.test(name)) names.add(name)
+  }
+  return [...names].slice(0, 100)
+}
+
+function objectBindingFields(source: string, name: string, beforeIndex: number): string[] {
+  if (!/^[A-Za-z_$][\w$]*$/.test(name)) return []
+  const pattern = new RegExp("\\b(?:const|let|var)\\s+" + name + "\\s*=\\s*\\{", "g")
+  let match: RegExpExecArray | null
+  let bestIndex = -1
+  let fields: string[] = []
+  while ((match = pattern.exec(source))) {
+    const at = match.index ?? 0
+    if (at >= beforeIndex) break
+    const open = source.indexOf("{", at)
+    const close = matchingObjectBrace(source, open)
+    if (close < 0 || close >= beforeIndex || at <= bestIndex) continue
+    bestIndex = at
+    fields = objectPropertyNames(source.slice(open + 1, close))
+  }
+  return fields
+}
+
+function configObjectFields(text: string, property: string, source: string, beforeIndex: number): string[] {
+  const fields = new Set<string>()
+  const direct = new RegExp("\\b" + property + "\\s*:\\s*\\{", "g")
+  let match: RegExpExecArray | null
+  while ((match = direct.exec(text))) {
+    const open = text.indexOf("{", match.index)
+    const close = matchingObjectBrace(text, open)
+    if (close >= 0) for (const key of objectPropertyNames(text.slice(open + 1, close))) fields.add(key)
+  }
+  const reference = new RegExp("\\b" + property + "\\s*:\\s*([A-Za-z_$][\\w$]*)\\b").exec(text)
+  if (reference?.[1]) for (const key of objectBindingFields(source, reference[1], beforeIndex)) fields.add(key)
+  const shorthand = new RegExp("(?:^|[,{])\\s*" + property + "\\s*(?=,|})").test(text)
+  if (shorthand) for (const key of objectBindingFields(source, property, beforeIndex)) fields.add(key)
+  return [...fields].slice(0, 100)
+}
+
+function bodyVariableNames(text: string): string[] {
+  const names = new Set<string>()
+  for (const match of text.matchAll(/(?:^|[,{\n])\s*(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?([A-Za-z_$][\w$]*)(?:\s*\))?/gi)) {
+    const name = match[1]
+    if (name && !["true", "false", "null", "undefined", "JSON"].includes(name)) names.add(name)
+  }
+  return [...names]
+}
+
+/** Resolve function body spans, so a later top-level request is not assigned to an earlier function. */
+function staticFunctionRanges(source: string, functions: JavaScriptFunctionCandidate[], offsets: Map<string, number>): Array<{ name: string; start: number; end: number }> {
+  const ranges: Array<{ name: string; start: number; end: number }> = []
+  for (const fn of functions) {
+    const offset = offsets.get(fn.line + ":" + fn.name)
+    if (offset === undefined) continue
+    const view = source.slice(offset, Math.min(source.length, offset + 10000))
+    const arrowRel = view.indexOf("=>")
+    const parenRel = view.indexOf("(")
+    if (arrowRel >= 0 && (parenRel < 0 || arrowRel < view.indexOf("{") || view.indexOf("{") < 0)) {
+      const arrow = offset + arrowRel
+      let bodyStart = arrow + 2
+      while (/\s/.test(source[bodyStart] ?? "")) bodyStart++
+      let bodyEnd = -1
+      if (source[bodyStart] === "{") bodyEnd = matchingObjectBrace(source, bodyStart)
+      else {
+        const semicolon = source.indexOf(";", bodyStart)
+        const newline = source.indexOf("\n", bodyStart)
+        bodyEnd = source.length
+        if (semicolon >= 0) bodyEnd = Math.min(bodyEnd, semicolon)
+        if (newline >= 0) bodyEnd = Math.min(bodyEnd, newline)
+      }
+      if (bodyEnd >= bodyStart) ranges.push({ name: fn.name, start: bodyStart, end: bodyEnd })
+      continue
+    }
+    if (parenRel < 0) continue
+    const openParen = offset + parenRel
+    const closeParen = findCallEnd(source, openParen, 10000)
+    if (closeParen < 0) continue
+    const openBrace = source.indexOf("{", closeParen + 1)
+    if (openBrace < 0 || openBrace - closeParen > 3000) continue
+    const semicolon = source.indexOf(";", closeParen + 1)
+    const arrow = source.indexOf("=>", closeParen + 1)
+    if ((semicolon >= 0 && semicolon < openBrace) || (arrow >= 0 && arrow < openBrace)) continue
+    const closeBrace = matchingObjectBrace(source, openBrace)
+    if (closeBrace >= openBrace) ranges.push({ name: fn.name, start: openBrace, end: closeBrace })
+  }
+  return ranges
+}
+
 function normalizeEndpoint(value: string) {
   const input = value.trim()
   if (!input || input.length > 2048 || /^(?:data|javascript|file|blob):/i.test(input)) return undefined
@@ -210,6 +322,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   const lineStarts = [0]
   for (let i = 0; i < source.length; i++) if (source.charCodeAt(i) === 10) lineStarts.push(i + 1)
   const functions: JavaScriptFunctionCandidate[] = []
+  const functionOffsets = new Map<string, number>()
   const fnPatterns = [
     /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g,
     /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>/g,
@@ -225,6 +338,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
       .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p))).slice(0, 40)
     functions.push({ name, line, parameters })
+    functionOffsets.set(key, match.index ?? 0)
     if (functions.length >= 300) break
   }
   // Capture class/object shorthand methods and accessors as well as declarations and arrows.
@@ -239,9 +353,11 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
       .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p))).slice(0, 40)
     functions.push({ name, line, parameters })
+    functionOffsets.set(key, match.index ?? 0)
     if (functions.length >= 300) break
   }
   functions.sort((a, b) => a.line - b.line)
+  const functionRanges = staticFunctionRanges(source, functions, functionOffsets)
 
   const requests: JavaScriptRequestCandidate[] = []
   const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
@@ -273,18 +389,23 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const inferredFetchMethod = isFetch && !hasDynamicMethodOption ? "GET" : undefined
     const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : inferredFetchMethod) ?? "").toUpperCase() || null
     const headers = [
-      ...Array.from(optionText.matchAll(/\bheaders\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1]!)).flat(),
-      ...Array.from(optionText.matchAll(/\.set\s*\(\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
-      ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
+      ...configObjectFields(optionText, "headers", source, index),
+      ...Array.from(optionText.matchAll(/\[\s*\[\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
+      ...Array.from(optionText.matchAll(/(?:headers|requestHeaders)\s*\.\s*(?:set|append)\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
+      ...Array.from(optionText.matchAll(/\.setRequestHeader\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
+      ...Array.from(optionText.matchAll(/\b(Authorization|Cookie|Set-Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
     const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch ? options : ""
     const directObject = isBodyMethod && bodyArgs.trim().startsWith("{")
       ? bodyArgs.trim().slice(1, bodyArgs.trim().lastIndexOf("}")) : ""
     const bodySource = options + "\n" + bodyArgs + (requestConfig ? "\n" + (args[0] ?? "") : "")
     const bodyParams = [
-      ...fieldNames(directObject),
-      ...Array.from(bodySource.matchAll(/\b(?:body|data)\s*:\s*(?:JSON\.stringify\s*\(\s*)?\{([\s\S]{0,2500}?)\}/gi), (m) => fieldNames(m[1] ?? "")).flat(),
-      ...Array.from(bodySource.matchAll(/JSON\.stringify\s*\(\s*\{([\s\S]{0,2500}?)\}\s*\)/gi), (m) => fieldNames(m[1] ?? "")).flat(),
+      ...objectPropertyNames(directObject),
+      ...Array.from(bodySource.matchAll(/\b(?:body|data)\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+      ...Array.from(bodySource.matchAll(/JSON\.stringify\s*\(\s*\{([\s\S]{0,2500}?)\}\s*\)/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+      ...bodyVariableNames(bodySource).flatMap((name) => objectBindingFields(source, name, index)),
+      ...(isBodyMethod && !requestConfig && /^[A-Za-z_$][\w$]*$/.test((args[1] ?? "").trim())
+        ? objectBindingFields(source, (args[1] ?? "").trim(), index) : []),
     ]
     const all = optionText + "\n" + bodyArgs
     const authSignals: string[] = [], cookieSignals: string[] = []
@@ -299,13 +420,18 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     }
     if (/\bdocument\.cookie\b/i.test(all)) cookieSignals.push("document-cookie-access")
     if (/\bCookie\b|\bcookie\s*:/i.test(all)) cookieSignals.push("cookie-header-signal")
+    endpoint.queryParameters.push(
+      ...configObjectFields(optionText, "params", source, index),
+      ...configObjectFields(optionText, "searchParams", source, index),
+      ...Array.from(all.matchAll(/new\s+URLSearchParams\s*\(\s*\{([\s\S]{0,2500}?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+    )
     if (/\b(?:searchParams|URLSearchParams)\b/i.test(all)) {
       for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']{1,100})["']/gi)) endpoint.queryParameters.push(m[1]!)
     }
     const line = lineNumber(lineStarts, index)
-    const sourceFunction = [...functions].reverse().find((fn) => fn.line <= line)?.name ?? null
+    const sourceFunction = functionRanges.filter((range) => range.start <= index && index <= range.end).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]?.name ?? null
     const item: JavaScriptRequestCandidate = {
-      id: "js-request:" + createHash("sha256").update(line + ":" + endpoint.urlTemplate + ":" + (method ?? "?")).digest("hex").slice(0, 16),
+      id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers)])).digest("hex").slice(0, 16),
       sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, path: endpoint.path,
       pathParameters: endpoint.pathParameters, queryParameters: cleanUnique(endpoint.queryParameters),
       bodyParameters: cleanUnique(bodyParams).slice(0, 100), headerNames: cleanUnique(headers).slice(0, 100),
@@ -374,7 +500,8 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
       "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated.",
       "Static sink signals are triage candidates, can be false positives in comments/vendor code, and do not prove taint or exploitability.",
-      "Function attribution is a nearest-preceding-function hint, not a proven runtime call relationship.",
+      "Function attribution uses bounded lexical body spans; minified or complex TypeScript syntax may remain unattributed.",
+      ...(input.length > 1_000_000 ? ["Source was bounded to the first 1 MB for static analysis."] : []),
     ],
   }
 }

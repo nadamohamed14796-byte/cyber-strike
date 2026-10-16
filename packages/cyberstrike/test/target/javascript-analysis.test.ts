@@ -186,6 +186,38 @@ test("flags browser token storage, cookie writes, and wildcard postMessage as ca
   expect(JSON.stringify(result)).not.toContain("access_token")
 })
 
+test("resolves variable-backed query, headers, and body objects", () => {
+  const source = [
+    'const query = { page: 2, status: "active" }',
+    'const headers = { Authorization: authToken, "X-Tenant-ID": tenantId }',
+    'const payload = { displayName: user.name, locale: "en", role: "member" }',
+    'client.post("/api/records", payload, { params: query, headers })',
+  ].join("\n")
+  const request = analyzeJavaScriptSource(source).requests[0]!
+  expect(request.queryParameters).toContain("page")
+  expect(request.queryParameters).toContain("status")
+  expect(request.headerNames).toContain("Authorization")
+  expect(request.headerNames).toContain("X-Tenant-ID")
+  expect(request.bodyParameters).toContain("displayName")
+  expect(request.bodyParameters).toContain("locale")
+  expect(request.bodyParameters).toContain("role")
+  expect(JSON.stringify(request)).not.toContain("authToken")
+  expect(JSON.stringify(request)).not.toContain("tenantId")
+  expect(JSON.stringify(request)).not.toContain("member")
+})
+
+test("does not assign a top-level request to a function whose body already ended", () => {
+  const source = [
+    'function first() { fetch("/api/first") }',
+    'const outside = fetch("/api/outside")',
+    'const second = () => { fetch("/api/second") }',
+  ].join("\n")
+  const requests = analyzeJavaScriptSource(source).requests
+  expect(requests.find((item) => item.path === "/api/first")?.sourceFunction).toBe("first")
+  expect(requests.find((item) => item.path === "/api/outside")?.sourceFunction).toBe(null)
+  expect(requests.find((item) => item.path === "/api/second")?.sourceFunction).toBe("second")
+})
+
 test("retains target-local hard-coded secret evidence with a fingerprint and candidate status", () => {
   const secret = "secret-value-must-never-be-retained"
   const result = analyzeJavaScriptSource('const config = { api_key: "' + secret + '" }')
