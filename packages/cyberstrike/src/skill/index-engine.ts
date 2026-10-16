@@ -61,9 +61,11 @@ export namespace SkillIndex {
 
     const nameTechnique = /^((?:T\d{4})(?:\.\d{3})?)(?:[_-]|$)/i.exec(entry.name)?.[1]
     if (nameTechnique) addReference(state, nameTechnique, entry.name)
-    for (const tag of entry.tags) {
-      if (TECHNIQUE_ID.test(tag.trim())) addReference(state, tag, entry.name)
-    }
+    // Exact tag aliases are used by methodology routing and agent tool calls.
+    // Shared tags stay ambiguous because resolveInState only accepts unique aliases.
+    for (const tag of entry.tags) addReference(state, tag, entry.name)
+    for (const tech of entry.tech_stack) addReference(state, tech, entry.name)
+    for (const cwe of entry.cwe_ids) addReference(state, cwe, entry.name)
   }
 
   function resolveInState(reference: string, state: IndexState): string | undefined {

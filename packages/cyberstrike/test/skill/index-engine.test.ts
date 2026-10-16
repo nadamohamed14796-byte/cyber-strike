@@ -85,6 +85,7 @@ Skill body for ${name}.
         expect(SkillIndex.resolveReference("T1552.005")).toBe("T1552.005_cloud-instance-metadata-api")
         expect(SkillIndex.resolveReference("AWS-POSTEXPLOIT")).toBe("aws-postexploit")
         expect(SkillIndex.resolveReference("attack-triage-validation")).toBe("triage-validation")
+        expect(SkillIndex.resolveReference("triage")).toBe("triage-validation")
         expect(SkillIndex.chainsFrom("prefixed-workflow").map((item) => item.target)).toEqual(["triage-validation"])
         expect(SkillIndex.chainsFrom("external-control-metadata")).toEqual([])
         expect(SkillIndex.resolveReference("cis-demo-control-v1-1")).toBe("Demo benchmark control 1.1")
