@@ -94,7 +94,7 @@ test("extracts XHR headers and query keys from a named URLSearchParams variable"
     '  xhr.setRequestHeader("X-Tenant-ID", tenantId)',
     '  xhr.send()',
     '}',
-  ].join("\\n")
+  ].join("\n")
   const request = analyzeJavaScriptSource(source).requests[0]!
   expect(request.method).toBe("GET")
   expect(request.sourceFunction).toBe("loadRecords")
