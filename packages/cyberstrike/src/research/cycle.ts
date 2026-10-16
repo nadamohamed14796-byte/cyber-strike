@@ -50,10 +50,26 @@ function summarizeSourceState(state: ResearchSourceCycleState | undefined) {
 }
 
 function summarizeCycleRow(row: typeof ResearchCycleTable.$inferSelect) {
+  const sourceStates = row.source_ids.map((id) => row.source_states[id]).filter(Boolean)
+  const documentTypes: Record<string, number> = {}
+  for (const state of sourceStates) {
+    for (const [type, count] of Object.entries(state.document_types ?? {})) {
+      documentTypes[type] = safeCount(documentTypes[type] ?? 0) + safeCount(count)
+    }
+  }
+  const reportsFound = safeCount(documentTypes.report ?? 0)
+  const writeupsFound = safeCount(documentTypes.writeup ?? 0)
   return {
     cycle_id: row.cycle_id,
     phase: row.phase,
     source_ids: row.source_ids,
+    // These are unique newly queued documents for this cycle, not lifetime queue totals,
+    // page views, archive links, or study decisions.
+    unique_documents_found: sourceStates.reduce((sum, state) => sum + safeCount(state.queued_new), 0),
+    reports_found: reportsFound,
+    writeups_found: writeupsFound,
+    reports_and_writeups_found: reportsFound + writeupsFound,
+    documents_by_type: documentTypes,
     source_states: Object.fromEntries(
       row.source_ids.map((id) => [id, summarizeSourceState(row.source_states[id])]),
     ),
