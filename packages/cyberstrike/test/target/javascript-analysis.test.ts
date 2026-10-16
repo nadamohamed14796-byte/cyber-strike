@@ -42,6 +42,12 @@ test("extracts parameters and auth clues without retaining header values", () =>
   expect(JSON.stringify(result)).not.toContain("not-a-real-key")
 })
 
+test("preserves explicit scheme and port in absolute request candidates", () => {
+  const request = analyzeJavaScriptSource('fetch("http://api.example.com:8080/v2/profile")').requests[0]!
+  expect(request.urlTemplate).toBe("http://api.example.com:8080/v2/profile")
+  expect(request.origin).toBe("http://api.example.com:8080")
+})
+
 test("extracts axios methods and request body field names", () => {
   const result = analyzeJavaScriptSource('axios.post("/api/items", { title: "demo", visibility: "private" })')
   expect(result.requests[0]?.method).toBe("POST")

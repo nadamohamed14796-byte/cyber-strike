@@ -11,6 +11,8 @@ export interface JavaScriptRequestCandidate {
   method: string | null
   urlTemplate: string
   host: string | null
+  /** Explicit HTTP origin, retained so scheme and non-default ports are never guessed. */
+  origin?: string | null
   path: string
   pathParameters: string[]
   queryParameters: string[]
@@ -227,11 +229,13 @@ function normalizeEndpoint(value: string) {
     .replace(/\$\{\s*([A-Za-z_$][\w$]*)[^}]*\}/g, "{$1}")
     .replace(/:([A-Za-z_$][\w$]*)/g, "{$1}")
   let host: string | null = null
+  let origin: string | null = null
   if (/^https?:\/\//i.test(path)) {
     try {
       const url = new URL(path)
       if (url.username || url.password) return undefined
       host = url.host.toLowerCase()
+      origin = url.origin.toLowerCase()
       path = url.pathname || "/"
     } catch { return undefined }
   } else if (!path.startsWith("/")) return undefined
@@ -239,7 +243,7 @@ function normalizeEndpoint(value: string) {
   const normalizedPath = normalizeJavaScriptEndpointPath(path)
   path = normalizedPath.path
   const pathParameters = cleanUnique([...dynamic, ...normalizedPath.pathParameters]).slice(0, 80)
-  return { host, path, urlTemplate: (host ? "https://" + host : "") + path, pathParameters, queryParameters }
+  return { host, origin, path, urlTemplate: (origin ?? (host ? "https://" + host : "")) + path, pathParameters, queryParameters }
 }
 
 function addConcatenatedPathParameters(
@@ -273,7 +277,7 @@ function addConcatenatedPathParameters(
   return {
     ...endpoint,
     path,
-    urlTemplate: (endpoint.host ? "https://" + endpoint.host : "") + path,
+    urlTemplate: (endpoint.origin ?? (endpoint.host ? "https://" + endpoint.host : "")) + path,
     pathParameters: cleanUnique(pathParameters).slice(0, 80),
   }
 }
@@ -432,7 +436,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const sourceFunction = functionRanges.filter((range) => range.start <= index && index <= range.end).sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]?.name ?? null
     const item: JavaScriptRequestCandidate = {
       id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers)])).digest("hex").slice(0, 16),
-      sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, path: endpoint.path,
+      sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, origin: endpoint.origin, path: endpoint.path,
       pathParameters: endpoint.pathParameters, queryParameters: cleanUnique(endpoint.queryParameters),
       bodyParameters: cleanUnique(bodyParams).slice(0, 100), headerNames: cleanUnique(headers).slice(0, 100),
       authSignals: cleanUnique(authSignals), cookieSignals: cleanUnique(cookieSignals),

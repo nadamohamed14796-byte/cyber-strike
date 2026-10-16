@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -219,6 +219,40 @@ test("persists deduplicated endpoint candidates and links only host-compatible c
   expect(profile?.observedRequestIDs).not.toContain("req-2")
 })
 
+
+test("merges structured requests into endpoint inventory when literal extraction misses the route", () => {
+  const endpoints = mergeStructuredJavaScriptEndpoints([], [{
+    id: "js-request:custom-client", sourceFunction: "loadSettings", method: "GET",
+    urlTemplate: "http://api.example.com:8080/internal/settings", host: "api.example.com:8080",
+    origin: "http://api.example.com:8080", path: "/internal/settings", pathParameters: [],
+    queryParameters: ["expand"], bodyParameters: [], headerNames: ["X-Tenant-ID"],
+    authSignals: [], cookieSignals: [], authAssessment: "no-static-auth-signal",
+    sourceLine: 18, confidence: "candidate", sourceFile: "javascript/settings.js",
+    observedRequestIDs: ["request-settings-1"], recommendedChecks: [],
+  }])
+  expect(endpoints).toHaveLength(1)
+  expect(endpoints[0]?.origin).toBe("http://api.example.com:8080")
+  expect(endpoints[0]?.path).toBe("/internal/settings")
+  expect(endpoints[0]?.sourceFiles).toContain("javascript/settings.js")
+  expect(endpoints[0]?.observedRequestIDs).toContain("request-settings-1")
+  expect(endpoints[0]?.observedInTraffic).toBe(true)
+})
+
+test("merges equivalent named route placeholders instead of making duplicate endpoint records", () => {
+  const staticEndpoints = [{
+    id: "endpoint:static", literal: "/api/users/{param}", host: null, origin: null, path: "/api/users/{param}",
+    sourceFiles: ["javascript/routes.js"], observedRequestIDs: [], observedInTraffic: false, confidence: "candidate" as const,
+  }]
+  const endpoints = mergeStructuredJavaScriptEndpoints(staticEndpoints, [{
+    id: "js-request:user", sourceFunction: "loadUser", method: "GET",
+    urlTemplate: "/api/users/{userId}", host: null, origin: null, path: "/api/users/{userId}",
+    pathParameters: ["userId"], queryParameters: [], bodyParameters: [], headerNames: [],
+    authSignals: [], cookieSignals: [], authAssessment: "no-static-auth-signal", sourceLine: 3,
+    confidence: "candidate", sourceFile: "javascript/users.js", observedRequestIDs: [], recommendedChecks: [],
+  }])
+  expect(endpoints).toHaveLength(1)
+  expect(endpoints[0]?.sourceFiles).toEqual(["javascript/routes.js", "javascript/users.js"])
+})
 
 test("generates an idempotent tester survey with request shape and resumable check progress", () => {
   const candidate = {

@@ -315,6 +315,53 @@ export function matchesEndpointPathTemplate(template: string, observedPath: stri
   )
 }
 
+
+function normalizedTemplateShape(inputPath: string): string {
+  return inputPath.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/").split("/").map((segment) =>
+    /^\{[^}]+\}$/.test(segment) ? "{}" : segment,
+  ).join("/").replace(/\/+$/, "") || "/"
+}
+
+/** Merge structured request calls into endpoint inventory, including uncommon client/config forms. */
+export function mergeStructuredJavaScriptEndpoints(
+  staticEndpoints: JavaScriptEndpointCandidate[],
+  requests: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[] }>,
+): JavaScriptEndpointCandidate[] {
+  const byKey = new Map<string, JavaScriptEndpointCandidate>()
+  const keyOf = (origin: string | null, route: string) => (origin?.toLowerCase() ?? "*") + normalizedTemplateShape(route)
+  for (const endpoint of staticEndpoints) byKey.set(keyOf(endpoint.origin, endpoint.path), endpoint)
+  for (const request of requests) {
+    const url = safeURL(request.urlTemplate)
+    const origin = request.origin ?? url?.origin ?? null
+    const host = url?.hostname ?? (request.host ? request.host.split(":")[0] ?? request.host : null)
+    const key = keyOf(origin, request.path)
+    let endpoint = byKey.get(key)
+    if (!endpoint) {
+      endpoint = {
+        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+        literal: request.urlTemplate,
+        host,
+        origin,
+        path: request.path,
+        sourceFiles: [],
+        observedRequestIDs: [],
+        observedInTraffic: false,
+        confidence: "candidate",
+      }
+      byKey.set(key, endpoint)
+    }
+    if (!endpoint.sourceFiles.includes(request.sourceFile)) endpoint.sourceFiles.push(request.sourceFile)
+    for (const requestID of request.observedRequestIDs) {
+      if (!endpoint.observedRequestIDs.includes(requestID)) endpoint.observedRequestIDs.push(requestID)
+    }
+    if (endpoint.observedRequestIDs.length) {
+      endpoint.observedInTraffic = true
+      endpoint.confidence = "observed"
+    }
+  }
+  return [...byKey.values()].slice(0, 1000)
+}
+
 export function correlateStaticJavaScriptEndpoints(
   sourceFiles: JavaScriptSourceFile[],
   requests: Array<{ id: string; method: string; host: string | null; url: string | null; normalizedPath: string; responseStatus: number | null }>,
@@ -1095,7 +1142,10 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
-    graph.endpointCandidates = correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname)
+    graph.endpointCandidates = mergeStructuredJavaScriptEndpoints(
+      correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname),
+      graph.javascriptAnalysis.requestCandidates,
+    )
     for (const endpoint of graph.endpointCandidates) {
       for (const sourceFile of endpoint.sourceFiles) {
         graph.edges.push({
