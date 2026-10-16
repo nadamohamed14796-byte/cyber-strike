@@ -37,6 +37,23 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       : { matches: false, reason: `IPv4 address ${hostname} is outside CIDR ${allowed}` }
   }
 
+  // IPv6 CIDR matching is separate from IPv4 CIDR parsing to avoid treating
+  // malformed network entries as ordinary hostnames.
+  const ipv6Cidr = allowed.match(/^\\[?([0-9a-f:.]+)\\]?\\/(\\d{1,3})$/i)
+  if (ipv6Cidr && ipv6Cidr[1].includes(":")) {
+    const prefix = Number(ipv6Cidr[2])
+    const network = ipv6ToBigInt(ipv6Cidr[1])
+    const hostname = parseHostname(value)
+    const address = hostname ? ipv6ToBigInt(hostname) : null
+    if (prefix < 0 || prefix > 128 || !network || address === null) {
+      return { matches: false, reason: "invalid IPv6 CIDR or target address" }
+    }
+    const mask = prefix === 0 ? 0n : ((1n << 128n) - 1n) ^ ((1n << BigInt(128 - prefix)) - 1n)
+    return (address & mask) === (network & mask)
+      ? { matches: true, reason: `IPv6 address is within CIDR ${allowed}` }
+      : { matches: false, reason: `IPv6 address is outside CIDR ${allowed}` }
+  }
+
   // Explicit URL scope entries can constrain scheme, port, and path. They must
   // never be reduced to a hostname because that would silently broaden permission.
   if (/^https?:\/\//i.test(allowed)) {
@@ -145,4 +162,29 @@ function ipv4ToNumber(input: string): number | null {
     octets.push(octet)
   }
   return octets.reduce((acc, octet) => ((acc << 8) | octet) >>> 0, 0)
+}
+
+/** Parse a valid IPv6 literal (including compressed and IPv4-mapped forms) as a 128-bit integer. */
+function ipv6ToBigInt(input: string): bigint | null {
+  let value = input.trim().toLowerCase().replace(/^\\[|\\]$/g, "")
+  if (!value.includes(":")) return null
+  if (value.includes(".")) {
+    const splitAt = value.lastIndexOf(":")
+    const ipv4 = ipv4ToNumber(value.slice(splitAt + 1))
+    if (splitAt < 0 || ipv4 === null) return null
+    const high = ((ipv4 >>> 16) & 0xffff).toString(16)
+    const low = (ipv4 & 0xffff).toString(16)
+    value = value.slice(0, splitAt + 1) + high + ":" + low
+  }
+  if ((value.match(/::/g) ?? []).length > 1) return null
+  const compressed = value.includes("::")
+  const [leftText, rightText = ""] = value.split("::")
+  const left = leftText ? leftText.split(":") : []
+  const right = rightText ? rightText.split(":") : []
+  const missing = 8 - left.length - right.length
+  if ((compressed && missing < 1) || (!compressed && missing !== 0)) return null
+  const groups = compressed ? [...left, ...Array(missing).fill("0"), ...right] : left
+  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/.test(group))) return null
+  try { return BigInt("0x" + groups.map((group) => group.padStart(4, "0")).join("")) }
+  catch { return null }
 }
