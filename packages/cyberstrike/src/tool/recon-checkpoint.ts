@@ -133,8 +133,18 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
   parameters: Parameters,
   async execute(params, ctx) {
     try {
-      const workspace = await TargetMemory.get(params.target_url)
-      if (!workspace) return { title: "Recon checkpoint unavailable", output: "No existing target workspace. Initialize the canonical target with target_workspace first.", metadata: { saved: false, reason: "workspace_missing" } }
+      const requestedWorkspace = await TargetMemory.get(params.target_url)
+      if (!requestedWorkspace) return { title: "Recon checkpoint unavailable", output: "No existing target workspace. Initialize the canonical target with target_workspace first.", metadata: { saved: false, reason: "workspace_missing" } }
+      const allWorkspaces = TargetMemory.list()
+      const byID = new Map(allWorkspaces.map((item) => [item.id, item]))
+      let workspace = requestedWorkspace
+      const visitedParents = new Set<string>()
+      while (workspace.parentTargetID && !visitedParents.has(workspace.id)) {
+        visitedParents.add(workspace.id)
+        const parent = byID.get(workspace.parentTargetID)
+        if (!parent) break
+        workspace = parent
+      }
 
       const sessionID = Session.root(ctx.sessionID)
       // One resumable run per canonical target workspace, including across new root sessions.
