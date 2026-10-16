@@ -59,7 +59,7 @@ function initialRun(targetURL: string, targetID: string, sessionID: string): Rec
   return { schemaVersion: 1, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
 }
 
-function parseRun(raw: string, workspaceID: string, targetURL: string, sessionID: string): ReconRun {
+function parseRun(raw: string, workspaceID: string, targetURL: string): ReconRun {
   const parsed = JSON.parse(raw) as ReconRun
   if (
     parsed?.schemaVersion !== 1 ||
@@ -92,7 +92,6 @@ export function unresolvedReconPrerequisites(phase: ReconPhase, phases: Record<R
  */
 export async function reconPhaseGate(
   workspace: import("../target").Workspace,
-  sessionID: string,
   requiredPhase: ReconPhase,
 ): Promise<{ allowed: boolean; reason: string; manifestPath: string }> {
   const all = TargetMemory.list()
@@ -109,7 +108,7 @@ export async function reconPhaseGate(
   const manifestPath = path.join(root.workspacePath, "runs", "recon-" + runID + ".json")
   let run: ReconRun
   try {
-    run = parseRun(await fs.readFile(manifestPath, "utf-8"), root.id, root.targetURL, sessionID)
+    run = parseRun(await fs.readFile(manifestPath, "utf-8"), root.id, root.targetURL)
   } catch (error) {
     return { allowed: false, reason: "No valid recon checkpoint manifest exists for the root target (" + (error instanceof Error ? error.message : String(error)) + ").", manifestPath }
   }
@@ -145,7 +144,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       const absolutePath = path.join(workspace.workspacePath, relativePath)
       let run: ReconRun
       try {
-        run = parseRun(await fs.readFile(absolutePath, "utf-8"), workspace.id, workspace.targetURL, sessionID)
+        run = parseRun(await fs.readFile(absolutePath, "utf-8"), workspace.id, workspace.targetURL)
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
         run = initialRun(workspace.targetURL, workspace.id, sessionID)
