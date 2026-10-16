@@ -189,15 +189,13 @@ function configuredSources(sessionIDs: readonly string[] = []) {
 }
 
 async function drainBatchedCount(run: () => number | Promise<number>) {
-  const batchLimit = 500
   let total = 0
   while (true) {
     const reported = await run()
-    const count = Number.isFinite(reported) ? Math.max(0, Math.min(batchLimit, Math.floor(reported))) : 0
+    const count = Number.isFinite(reported) ? Math.max(0, Math.floor(reported)) : 0
     total += count
-    // The queue helpers report only successful row transitions. Continue even
-    // after a partial batch: a concurrent worker may have won some rows, leaving
-    // others eligible. Zero means no row changed and ends the drain.
+    // Queue recovery helpers now process every eligible row per transaction.
+    // A zero transition count means the durable eligible set is exhausted.
     if (count === 0) return total
   }
 }
