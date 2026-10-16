@@ -907,3 +907,56 @@ test("model-led update queues legacy shared reports once without refetching or c
     },
   })
 })
+
+
+test("explicit research reset removes queued imports and external research but preserves target findings", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const localID = ReportKnowledge.ingest({
+        title: "Local target finding " + marker,
+        severity: "high",
+        sourceKind: "finding",
+        lesson: "Evidence observed on the user's authorized target.",
+      })
+      const externalID = ReportKnowledge.ingest({
+        title: "Imported public research " + marker,
+        severity: "medium",
+        sourceKind: "external_report",
+        sourceURL: "https://portswigger.net/web-security/access-control/idor?reset-test=" + marker,
+        lesson: "Reusable public methodology example.",
+      })
+      expect(localID).toBeTruthy()
+      expect(externalID).toBeTruthy()
+      ResearchQueue.enqueue({
+        sourceID: "portswigger",
+        sourceURL: "https://portswigger.net/web-security/access-control/idor?queued-reset=" + marker,
+        title: "Queued public report " + marker,
+        payload: { cached_text: "Sanitized fixture content" },
+      })
+
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_research_reset_" + marker.replace(/-/g, "").slice(0, 16),
+        messageID: "msg_research_reset_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const result = await tool.execute({ action: "reset" }, context)
+      const summary = JSON.parse(result.output)
+      expect(summary.queue_rows_removed).toBe(1)
+      expect(summary.external_research_records_removed).toBe(1)
+      expect(ResearchQueue.stats().total).toBe(0)
+      expect(Database.use((db) => db.select().from(ReportKnowledgeTable)
+        .where(eq(ReportKnowledgeTable.id, externalID!)).get())).toBeUndefined()
+      expect(Database.use((db) => db.select().from(ReportKnowledgeTable)
+        .where(eq(ReportKnowledgeTable.id, localID!)).get())).toBeDefined()
+      await Instance.dispose()
+    },
+  })
+})
