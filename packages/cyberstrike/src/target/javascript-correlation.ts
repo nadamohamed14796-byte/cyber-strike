@@ -295,6 +295,19 @@ export interface JavaScriptEndpointCandidate {
  * A matching path is evidence the route was observed, not proof that this
  * particular JavaScript file executed the request.
  */
+function matchesEndpointPathTemplate(template: string, observedPath: string): boolean {
+  const normalize = (value: string) => {
+    const path = value.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/")
+    return path.length > 1 ? path.replace(/\/+$/, "") : "/"
+  }
+  const expected = normalize(template).split("/").filter(Boolean)
+  const observed = normalize(observedPath).split("/").filter(Boolean)
+  if (expected.length !== observed.length) return false
+  return expected.every((segment, index) =>
+    /^\{[^}]+\}$/.test(segment) ? Boolean(observed[index]) : segment === observed[index],
+  )
+}
+
 export function correlateStaticJavaScriptEndpoints(
   sourceFiles: JavaScriptSourceFile[],
   requests: Array<{ id: string; method: string; host: string | null; url: string | null; normalizedPath: string; responseStatus: number | null }>,
@@ -332,14 +345,9 @@ export function correlateStaticJavaScriptEndpoints(
         // must match their explicit host. Do not cross-correlate identical paths on a CDN.
         if (host ? requestHost !== host : requestHost !== targetHost.toLowerCase()) continue
         const observedPath = request.normalizedPath.split(/[?#]/, 1)[0]
-        const base = endpointPath.replace(/\{[^}]+\}/g, "").replace(/\/$/, "")
-        const staticPrefix = endpointPath.replace(/\{[^}]+\}/g, "")
-        const matches =
-          base.length > 4 &&
-          (observedPath === endpointPath ||
-            observedPath === base ||
-            observedPath.startsWith(base + "/") ||
-            (staticPrefix.length > 4 && staticPrefix.startsWith(observedPath.replace(/\{[^}]+\}/g, ""))))
+        // Require an exact segment-count/template match. Prefix overlap such as
+        // /api/user -> /api/users/123 is not evidence that the endpoint was observed.
+        const matches = matchesEndpointPathTemplate(endpointPath, observedPath)
         if (matches && !candidate.observedRequestIDs.includes(request.id)) {
           candidate.observedRequestIDs.push(request.id)
         }
