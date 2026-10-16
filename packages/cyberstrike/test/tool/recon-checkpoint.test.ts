@@ -56,6 +56,12 @@ test("unavailable non-scope phases are explicit terminal checkpoints", () => {
   expect(unresolvedReconPrerequisites("url_collection", state)).toContain("live_hosts_ports")
 })
 
+test("endpoint inventory cannot be bypassed with unavailable status", () => {
+  const state = records("complete")
+  state.endpoint_inventory = { status: "unavailable", reason: "inventory tool missing" }
+  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("endpoint_inventory")
+})
+
 test("a fully resolved inventory allows the vulnerability phase", () => {
   const state = records("complete")
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
