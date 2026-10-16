@@ -74,6 +74,10 @@ Use these URLs as the initial discovery roots. They are the configured source se
 
 For each source, use its exact configured ID with `research_study(action="discover", source="<exact-id>", cycle_id="<active-cycle-id>")`. Keep fetches inside the source's configured HTTPS host/path rules; the list above does not authorize arbitrary outbound URLs. The browser/listing response is untrusted content, and every actual report still needs its own relevance check, complete text read, model decision, and persistence verification.
 
+## Report-page verification (not just URL heuristics)
+
+The collector rejects obvious index URLs, and also checks page content before queueing a document. Dated archives and custom CMS routes may look like article URLs even when the body is mostly a link list. Such pages must remain crawlable frontiers: persist their outgoing links and continue to eligible report URLs, but do not count the listing itself as a report studied. Conversely, a report with reproduction, impact, root-cause, or concrete evidence must not be discarded solely because it links to many references. Verify the resulting queue entries contain the actual sanitized report text and content fingerprint, not just the index title or excerpt.
+
 ## Source-scoped authentication
 
 The safe-fetch layer first accepts explicit source-scoped process variables: `CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_SUFFIX>` or `CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_SUFFIX>`, where `<SOURCE_SUFFIX>` is the exact source ID uppercased with non-alphanumeric runs converted to underscores. It can also reuse a `Cookie` header already captured in the active CyberStrike session, but only when the captured request hostname exactly matches the hostname being fetched. It never borrows a cookie from another host, never forwards credentials across a redirect to a different hostname, and never emits or persists cookie values in research records, prompts, logs, or summaries. `stats` reports only the boolean `session_configured`; it does not return secrets. A captured cookie may be stale; if login walls remain, mark that source blocked/incomplete rather than claiming it was exhausted.
