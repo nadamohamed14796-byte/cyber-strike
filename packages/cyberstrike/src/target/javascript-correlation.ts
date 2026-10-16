@@ -232,6 +232,7 @@ export function extractCapturedJavaScriptSources(
     responseContentType?: string | null
     responseBody?: string | null
   }>,
+  analysisCache?: Map<string, JavaScriptSourceAnalysis>,
 ): JavaScriptSourceFile[] {
   const output: JavaScriptSourceFile[] = []
   const seen = new Set<string>()
@@ -265,6 +266,11 @@ export function extractCapturedJavaScriptSources(
     seen.add(digest)
     totalBytes += bytes
     const basename = (url.pathname.split("/").filter(Boolean).pop() || "captured.js").replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
+    let analysis = analysisCache?.get(digest)
+    if (!analysis) {
+      analysis = analyzeJavaScriptSource(body)
+      analysisCache?.set(digest, analysis)
+    }
     output.push({
       relativePath: "captured/" + url.hostname.toLowerCase() + "/" + basename + "-" + digest.slice(0, 8),
       basename,
@@ -272,7 +278,7 @@ export function extractCapturedJavaScriptSources(
       bytes,
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
       sourceRequestID: request.id,
-      analysis: analyzeJavaScriptSource(body),
+      analysis,
     })
   }
   return output
@@ -362,7 +368,7 @@ export function correlateStaticJavaScriptEndpoints(
 }
 
 /** Inventory only local JS source files; never follow symlinks or execute their contents. */
-async function inventoryJavaScriptFiles(root: string): Promise<JavaScriptSourceFile[]> {
+async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
   let totalBytes = 0
   async function visit(directory: string, depth: number): Promise<void> {
@@ -386,13 +392,19 @@ async function inventoryJavaScriptFiles(root: string): Promise<JavaScriptSourceF
       if (stat.size < 0 || stat.size > 1024 * 1024 || totalBytes + stat.size > 5 * 1024 * 1024) continue
       const content = await fs.readFile(fullPath, "utf-8")
       totalBytes += Buffer.byteLength(content, "utf-8")
+      const digest = createHash("sha256").update(content).digest("hex")
+      let analysis = analysisCache?.get(digest)
+      if (!analysis) {
+        analysis = analyzeJavaScriptSource(content)
+        analysisCache?.set(digest, analysis)
+      }
       output.push({
         relativePath: path.relative(path.dirname(root), fullPath).split(path.sep).join("/"),
         basename: entry.name,
-        sha256: createHash("sha256").update(content).digest("hex"),
+        sha256: digest,
         bytes: Buffer.byteLength(content, "utf-8"),
         endpointLiterals: extractStaticJavaScriptEndpoints(content),
-        analysis: analyzeJavaScriptSource(content),
+        analysis,
       })
     }
   }
@@ -523,9 +535,30 @@ export namespace JavaScriptCorrelation {
       }
     }
 
+    const filenameHost = (explicitJS?.hostname ?? new URL(workspace.targetURL).hostname).replace(/[^a-z0-9.-]/gi, "-").slice(0, 50)
+    const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
+    const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, snapshotSelector])).digest("hex").slice(0, 12)
+    const graphFilename = filenameHost + "-" + digest + ".json"
+    const endpointFilename = graphFilename
+    const analysisCache = new Map<string, JavaScriptSourceAnalysis>()
+    const previousGraphPath = path.join(workspace.workspacePath, "javascript", graphFilename)
+    try {
+      const info = await fs.lstat(previousGraphPath)
+      if (info.isFile() && !info.isSymbolicLink()) {
+        const previous = JSON.parse(await fs.readFile(previousGraphPath, "utf-8")) as JavaScriptCorrelationGraph
+        if (previous.schemaVersion === 1 && previous.targetURL === workspace.targetURL && previous.sessionID === rootSessionID) {
+          for (const source of previous.sourceFiles ?? []) {
+            if (source.sha256 && source.analysis) analysisCache.set(source.sha256, source.analysis)
+          }
+        }
+      }
+    } catch {
+      // A missing/invalid old graph only disables the optimization; current evidence is still analyzed.
+    }
+
     // An explicit asset URL must narrow source analysis, and must have been observed
     // and pass the same persisted scope/hierarchy gate as captured traffic.
-    const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"))
+    const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"), analysisCache)
 
     const projectID = Instance.project.id
     const sessionIDsSet = new Set<string>([rootSessionID])
@@ -684,6 +717,7 @@ export namespace JavaScriptCorrelation {
         responseContentType: request.response_content_type,
         responseBody: request.processed_response,
       })),
+      analysisCache,
     )
     const localSourceKeys = new Set(sourceFiles.map((file) => file.sha256))
     const mergedSourceFiles = [
@@ -1054,13 +1088,8 @@ export namespace JavaScriptCorrelation {
       tags: ["javascript", "correlation", "request-response", "finding"],
     })
 
-    const filenameHost = (explicitJS?.hostname ?? new URL(workspace.targetURL).hostname).replace(/[^a-z0-9.-]/gi, "-").slice(0, 50)
-    const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
-    const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, snapshotSelector])).digest("hex").slice(0, 12)
     // Refresh stable per-target/session outputs atomically, refusing symlink
     // parents or files that could redirect writes outside the workspace.
-    const graphFilename = filenameHost + "-" + digest + ".json"
-    const endpointFilename = filenameHost + "-" + digest + ".json"
     const graphPath = await TargetMemory.writeWorkspaceFile(
       workspace,
       path.posix.join("javascript", graphFilename),
