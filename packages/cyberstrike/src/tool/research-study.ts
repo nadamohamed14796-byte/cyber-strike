@@ -19,7 +19,7 @@ import {
 import { isNonRetryableResearchError, researchSourceHasCredentials } from "../research/safe-fetch"
 import { ResearchQueue } from "../research/queue"
 import { ResearchQueueTable } from "../research/queue.sql"
-import { ResearchCycleTable } from "../research/cycle.sql"
+import { ResearchCycleDuplicateTable, ResearchCycleTable } from "../research/cycle.sql"
 import { ResearchCycle } from "../research/cycle"
 import { Session } from "../session"
 import { Tool } from "./tool"
@@ -628,6 +628,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       const reset = Database.transaction((db) => {
         const queueRows = db.select({ sequence: ResearchQueueTable.sequence }).from(ResearchQueueTable).all()
         const cycleRows = db.select({ id: ResearchCycleTable.id }).from(ResearchCycleTable).all()
+        const duplicateRows = db.select({ id: ResearchCycleDuplicateTable.id }).from(ResearchCycleDuplicateTable).all()
         const externalRows = db.select({ id: ReportKnowledgeTable.id }).from(ReportKnowledgeTable)
           .where(eq(ReportKnowledgeTable.source_kind, "external_report")).all()
         const externalIDs = externalRows.map((row) => row.id)
@@ -636,8 +637,9 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           db.delete(ReportKnowledgeTable).where(inArray(ReportKnowledgeTable.id, externalIDs)).run()
         }
         db.delete(ResearchQueueTable).run()
+        db.delete(ResearchCycleDuplicateTable).run()
         db.delete(ResearchCycleTable).run()
-        return { queue_rows_removed: queueRows.length, external_research_records_removed: externalIDs.length, active_cycle_rows_removed: cycleRows.length }
+        return { queue_rows_removed: queueRows.length, external_research_records_removed: externalIDs.length, active_cycle_rows_removed: cycleRows.length, duplicate_ledger_rows_removed: duplicateRows.length }
       })
       return output(
         "Research workspace reset",
@@ -727,7 +729,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           candidates: item.candidates,
           queuedNew: item.added,
           documentTypes: item.document_types,
-          duplicateURLsSkipped: item.duplicate_urls_skipped,
+          duplicateURLs: item.duplicate_urls,
           blockedAuth: item.blocked_auth,
           errorCount: item.error_count,
           errors: item.errors,

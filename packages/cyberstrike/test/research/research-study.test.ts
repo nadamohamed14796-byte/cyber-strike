@@ -7,7 +7,7 @@ import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learn
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
-import { ResearchCycleTable } from "../../src/research/cycle.sql"
+import { ResearchCycleDuplicateTable, ResearchCycleTable } from "../../src/research/cycle.sql"
 import { ResearchCycle } from "../../src/research/cycle"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
@@ -40,6 +40,7 @@ beforeEach(() => {
     db.delete(ResearchQueueTable).run()
     db.delete(ReportKnowledgeEventTable).run()
     db.delete(ReportKnowledgeTable).run()
+    db.delete(ResearchCycleDuplicateTable).run()
     db.delete(ResearchCycleTable).run()
   })
 })
@@ -941,7 +942,7 @@ test("begin resumes a collecting cycle without discarding source progress", asyn
       const sourceID = ids[0]!
       ResearchCycle.recordDiscovery({
         cycleID: first.cycle_id, sourceID, pageWindow: 20, pages: 20, candidates: 7, queuedNew: 2,
-        documentTypes: { writeup: 3, report: 2 }, duplicateURLsSkipped: 4,
+        documentTypes: { writeup: 3, report: 2 }, duplicateURLs: ["https://hackerone.com/reports/101", "https://hackerone.com/reports/102", "https://hackerone.com/reports/103", "https://hackerone.com/reports/104"],
         blockedAuth: 0, errorCount: 0, errors: [],
       })
       const resumed = ResearchCycle.begin(ids)
@@ -952,6 +953,28 @@ test("begin resumes a collecting cycle without discarding source progress", asyn
       expect(resumed.source_states[sourceID]?.next_page_window).toBe(40)
       expect(resumed.source_states[sourceID]?.document_types).toEqual({ writeup: 3, report: 2 })
       expect(resumed.source_states[sourceID]?.duplicate_urls_skipped).toBe(4)
+
+      const secondPass = ResearchCycle.recordDiscovery({
+        cycleID: first.cycle_id,
+        sourceID,
+        pageWindow: 40,
+        pages: 40,
+        candidates: 3,
+        queuedNew: 0,
+        documentTypes: {},
+        duplicateURLs: [
+          "https://hackerone.com/reports/101",
+          "https://hackerone.com/reports/102",
+          "https://hackerone.com/reports/103",
+          "https://hackerone.com/reports/104",
+          "https://hackerone.com/reports/105",
+        ],
+        blockedAuth: 0,
+        errorCount: 0,
+        errors: [],
+      })
+      expect(secondPass).toMatchObject({ ok: true, source_state: { duplicate_urls_skipped: 5, next_page_window: 80 } })
+      expect(ResearchCycle.current()?.source_states[sourceID]?.passes.at(-1)?.duplicate_urls_skipped).toBe(1)
       await Instance.dispose()
     },
   })
@@ -1093,12 +1116,26 @@ test("explicit research reset removes queued imports and external research but p
         metadata: () => {},
         ask: async () => {},
       } as any
-      ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
+      const resetCycle = ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
+      ResearchCycle.recordDiscovery({
+        cycleID: resetCycle.cycle_id,
+        sourceID: RESEARCH_SOURCES[0]!.id,
+        pageWindow: 20,
+        pages: 20,
+        candidates: 0,
+        queuedNew: 0,
+        duplicateURLs: ["https://hackerone.com/reports/777777"],
+        blockedAuth: 0,
+        errorCount: 0,
+        errors: [],
+      })
+      expect(Database.use((db) => db.select().from(ResearchCycleDuplicateTable).all())).toHaveLength(1)
       const result = await executeResearchTool(tool, { action: "reset", pages: 1, depth: 0, limit: 1, continue_after_save: false }, context)
       const summary = JSON.parse(result.output)
       expect(summary.queue_rows_removed).toBe(1)
       expect(summary.external_research_records_removed).toBe(1)
       expect(ResearchCycle.current()).toBeNull()
+      expect(Database.use((db) => db.select().from(ResearchCycleDuplicateTable).all())).toHaveLength(0)
       expect(ResearchQueue.stats().total).toBe(0)
       expect(Database.use((db) => db.select().from(ReportKnowledgeTable)
         .where(eq(ReportKnowledgeTable.id, externalID!)).get())).toBeUndefined()

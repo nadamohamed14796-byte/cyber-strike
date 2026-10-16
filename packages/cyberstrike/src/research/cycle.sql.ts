@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 
 export type ResearchCyclePhase = "collecting" | "studying" | "complete" | "partial"
 export type ResearchSourceCycleStatus = "pending" | "collecting" | "complete" | "partial" | "blocked"
@@ -43,3 +43,15 @@ export const ResearchCycleTable = sqliteTable("research_cycle", {
   updated_at: integer().notNull(),
   finished_at: integer(),
 })
+
+/** Durable dedupe ledger; duplicate counts stay unique across resumed crawl windows. */
+export const ResearchCycleDuplicateTable = sqliteTable("research_cycle_duplicate", {
+  id: text().primaryKey(),
+  cycle_id: text().notNull(),
+  source_id: text().notNull(),
+  source_url: text().notNull(),
+  recorded_at: integer().notNull(),
+}, (table) => [
+  uniqueIndex("research_cycle_duplicate_unique_idx").on(table.cycle_id, table.source_id, table.source_url),
+  index("research_cycle_duplicate_cycle_idx").on(table.cycle_id, table.source_id),
+])

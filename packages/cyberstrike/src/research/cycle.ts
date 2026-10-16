@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm"
 import { Database } from "../storage/db"
-import { ResearchCycleTable, type ResearchCyclePass, type ResearchCyclePhase, type ResearchSourceCycleState, type ResearchSourceCycleStatus } from "./cycle.sql"
+import { ResearchCycleDuplicateTable, ResearchCycleTable, type ResearchCyclePass, type ResearchCyclePhase, type ResearchSourceCycleState, type ResearchSourceCycleStatus } from "./cycle.sql"
 
 const ACTIVE_ROW_ID = "active"
 
@@ -88,6 +88,7 @@ export namespace ResearchCycle {
         if (!sameSources) throw new Error("An active research cycle exists with a different source set; resume it or explicitly reset it before starting another cycle.")
         return existing
       }
+      db.delete(ResearchCycleDuplicateTable).run()
       db.delete(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).run()
       return db.insert(ResearchCycleTable).values({
         id: ACTIVE_ROW_ID,
@@ -104,8 +105,12 @@ export namespace ResearchCycle {
 
   export function clear() {
     return Database.transaction((db) => {
+      const current = db.select().from(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).get()
       const rows = db.select({ id: ResearchCycleTable.id }).from(ResearchCycleTable)
         .where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).all()
+      if (current) {
+        db.delete(ResearchCycleDuplicateTable).where(eq(ResearchCycleDuplicateTable.cycle_id, current.cycle_id)).run()
+      }
       db.delete(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).run()
       return rows.length
     })
@@ -120,7 +125,7 @@ export namespace ResearchCycle {
     candidates: number
     queuedNew: number
     documentTypes?: Record<string, number>
-    duplicateURLsSkipped?: number
+    duplicateURLs?: string[]
     blockedAuth: number
     errorCount: number
     errors: string[]
@@ -152,13 +157,34 @@ export namespace ResearchCycle {
       for (const [name, count] of Object.entries(documentTypes)) {
         aggregateDocumentTypes[name] = safeCount(aggregateDocumentTypes[name] ?? 0) + count
       }
+      let newlyUniqueDuplicates = 0
+      for (const candidate of new Set(input.duplicateURLs ?? [])) {
+        if (typeof candidate !== "string" || candidate.length > 4096) continue
+        let parsed: URL
+        try {
+          parsed = new URL(candidate)
+        } catch {
+          continue
+        }
+        if (parsed.protocol !== "https:" || parsed.username || parsed.password) continue
+        parsed.hash = ""
+        const inserted = db.insert(ResearchCycleDuplicateTable).values({
+          id: crypto.randomUUID(),
+          cycle_id: input.cycleID,
+          source_id: input.sourceID,
+          source_url: parsed.toString(),
+          recorded_at: now,
+        }).onConflictDoNothing().returning({ id: ResearchCycleDuplicateTable.id }).get()
+        if (inserted) newlyUniqueDuplicates++
+      }
+
       const pass: ResearchCyclePass = {
         page_window: window,
         pages,
         candidates: safeCount(input.candidates),
         queued_new: safeCount(input.queuedNew),
         document_types: documentTypes,
-        duplicate_urls_skipped: safeCount(input.duplicateURLsSkipped ?? 0),
+        duplicate_urls_skipped: newlyUniqueDuplicates,
         blocked_auth: safeCount(input.blockedAuth),
         error_count: safeCount(input.errorCount),
         errors: input.errors.slice(0, 3).map(cleanError),

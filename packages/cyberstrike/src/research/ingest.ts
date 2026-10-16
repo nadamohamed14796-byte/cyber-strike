@@ -946,7 +946,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       return normalized ? [normalized] : []
     }),
   )
-  const results: Array<{ source: string; pages: number; candidates: number; added: number; document_types: Record<string, number>; duplicate_urls_skipped: number; blocked_auth: number; error_count: number; errors: string[] }> = []
+  const results: Array<{ source: string; pages: number; candidates: number; added: number; document_types: Record<string, number>; duplicate_urls_skipped: number; duplicate_urls: string[]; blocked_auth: number; error_count: number; errors: string[] }> = []
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
@@ -1190,7 +1190,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       }
       if (current.depth >= maxDepth) continue
     }
-    results.push({ source: source.id, pages, candidates, added, document_types: collectedTypes, duplicate_urls_skipped: duplicateURLs.size, blocked_auth: blockedAuth, error_count: errorCount, errors })
+    results.push({ source: source.id, pages, candidates, added, document_types: collectedTypes, duplicate_urls_skipped: duplicateURLs.size, duplicate_urls: [...duplicateURLs], blocked_auth: blockedAuth, error_count: errorCount, errors })
   }
   return results
 }
