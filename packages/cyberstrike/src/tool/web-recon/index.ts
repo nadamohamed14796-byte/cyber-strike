@@ -340,6 +340,7 @@ export const WebReconTool = Tool.define("web_recon", {
             sourceURL: params.target,
             status: "observed",
             tags: ["recon", program],
+            upsertByIdentity: true,
           })
           notesSaved = true
           finalOutput += "\n\n[+] Target artifact saved: " + artifactPath
