@@ -95,9 +95,18 @@ function scannerTargets(command: string[], commandText: string): string[] {
 
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = command.findIndex((value) => SCANNER_PHASES[path.basename(value).toLowerCase()] !== undefined)
-  if (scannerIndex < 0) return
+  if (scannerIndex < 0) {
+    const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) => new RegExp("(^|[\\\\s;&|])" + name + "([\\\\s;&|]|$)", "i").test(commandText))
+    if (wrappedScanner) {
+      throw new Error("Recon execution gate blocked an indirect/wrapped " + wrappedScanner + " invocation. Run the scanner as a direct command so target scope and phase prerequisites can be checked.")
+    }
+    return
+  }
   const scanner = path.basename(command[scannerIndex]!).toLowerCase()
   const args = command.slice(scannerIndex + 1)
+  if (args.some((value) => ["-l", "-list", "--list", "-dl", "-il", "-targets", "--targets-file"].includes(value.toLowerCase()))) {
+    throw new Error("Recon execution gate blocked " + scanner + ": target-list input is not accepted until every entry can be individually scope-checked and tied to the current phase manifest.")
+  }
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
       !args.some((value) => /^https?:\/\//i.test(value))) return
   const phase = SCANNER_PHASES[scanner]!
