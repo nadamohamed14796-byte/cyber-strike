@@ -310,6 +310,32 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
     trust: 90,
   },
   {
+    id: "medium-security",
+    name: "Medium Security Write-ups",
+    kind: "writeup",
+    seedUrls: [
+      "https://medium.com/tag/bug-bounty",
+      "https://medium.com/tag/web-security",
+      "https://medium.com/tag/penetration-testing",
+      "https://medium.com/tag/vulnerability",
+    ],
+    // Follow security articles linked from curated Medium topic feeds, including author subdomains.
+    // Do not crawl Medium's platform-wide sitemap or unrelated authors' root/profile pages.
+    hosts: ["medium.com"],
+    sitemapHosts: [],
+    trust: 80,
+    includeTerms: [
+      "bug bounty", "security vulnerability", "security research", "writeup", "write-up",
+      "proof of concept", "responsible disclosure", "penetration testing", "web security",
+      "idor", "xss", "ssrf", "csrf", "sql injection", "sqli", "xxe", "ssti",
+      "access control", "authorization bypass", "account takeover", "privilege escalation",
+      "information disclosure", "race condition", "request smuggling", "prototype pollution",
+      "path traversal", "subdomain takeover", "mass assignment", "nosql injection",
+      "cors", "host header injection", "mfa bypass", "rate limit bypass",
+    ],
+    excludeTerms: ["job alert", "career advice", "general news", "personal update"],
+  },
+  {
     id: "edoverflow",
     name: "EdOverflow",
     kind: "writeup",
