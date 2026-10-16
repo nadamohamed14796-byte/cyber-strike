@@ -4,6 +4,8 @@ type CompiledScopeItems = {
   exactHosts: Set<string>
   wildcardDomains: Set<string>
   cidrs: string[]
+  urlPatterns: string[]
+  hostPorts: string[]
 }
 const compiledScopeItemsCache = new WeakMap<string[], CompiledScopeItems>()
 
@@ -15,12 +17,16 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
   const exactHosts = new Set<string>()
   const wildcardDomains = new Set<string>()
   const cidrs: string[] = []
+  const urlPatterns: string[] = []
+  const hostPorts: string[] = []
   for (const item of items) {
-    if (item.includes("/")) cidrs.push(item)
+    if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
+    else if (/^\d+(?:\.\d+){3}\/.+$/.test(item)) cidrs.push(item)
+    else if (/^[^:/]+:\d{1,5}$/.test(item)) hostPorts.push(item)
     else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2))
     else exactHosts.add(item)
   }
-  const compiled = { exactHosts, wildcardDomains, cidrs }
+  const compiled = { exactHosts, wildcardDomains, cidrs, urlPatterns, hostPorts }
   compiledScopeItemsCache.set(items, compiled)
   return compiled
 }
@@ -40,8 +46,8 @@ export function matchingScopeItems(candidate: URL | string, items: string[]): st
     const suffix = labels.slice(offset).join(".")
     if (index.wildcardDomains.has(suffix)) matches.push("*." + suffix)
   }
-  for (const cidr of index.cidrs) {
-    if (checkMatch(url.href, cidr).matches) matches.push(cidr)
+  for (const pattern of [...index.urlPatterns, ...index.hostPorts, ...index.cidrs]) {
+    if (checkMatch(url.href, pattern).matches) matches.push(pattern)
   }
   return matches
 }
