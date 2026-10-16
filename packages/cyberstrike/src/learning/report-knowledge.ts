@@ -210,8 +210,8 @@ export namespace ReportKnowledge {
    * The study marker is independent of heuristic extraction_version so older records
    * can be revisited once without repeatedly flooding the durable queue.
    */
-  export function externalRecordsForModelStudy(limit = 100, modelStudyVersion = 1, sourceHosts?: string[], sourceID?: string) {
-    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+  export function externalRecordsForModelStudy(_legacyLimit = 100, modelStudyVersion = 1, sourceHosts?: string[], sourceID?: string) {
+    // Legacy limit argument is compatibility-only; enumerate all eligible records.
     const currentVersion = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : 1))
     return Database.use((db) => {
       const conditions = [
@@ -255,7 +255,6 @@ export namespace ReportKnowledge {
           return !(typeof studied === "number" && studied >= currentVersion) &&
             !(typeof requested === "number" && requested >= currentVersion)
         })
-        .slice(0, bounded)
     })
   }
 
