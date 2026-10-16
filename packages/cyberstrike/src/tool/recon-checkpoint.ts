@@ -72,6 +72,10 @@ function parseRun(raw: string, workspaceID: string, targetURL: string): ReconRun
   return parsed
 }
 
+export function reconRunID(targetID: string): string {
+  return createHash("sha256").update(targetID).digest("hex").slice(0, 20)
+}
+
 function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable"
 }
@@ -108,7 +112,7 @@ export async function reconPhaseGate(
     if (!parent) break
     root = parent
   }
-  const runID = createHash("sha256").update(root.id).digest("hex").slice(0, 20)
+  const runID = reconRunID(root.id)
   const manifestPath = path.join(root.workspacePath, "runs", "recon-" + runID + ".json")
   let run: ReconRun
   try {
@@ -152,7 +156,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
 
       const sessionID = Session.root(ctx.sessionID)
       // One resumable run per canonical target workspace, including across new root sessions.
-      const runID = createHash("sha256").update(workspace.id).digest("hex").slice(0, 20)
+      const runID = reconRunID(workspace.id)
       const filename = "recon-" + runID + ".json"
       const relativePath = "runs/" + filename
       const absolutePath = path.join(workspace.workspacePath, relativePath)
