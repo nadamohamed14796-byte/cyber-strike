@@ -44,9 +44,12 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   if (allowed.startsWith("*.")) {
     const domain = parseHostname(allowed.slice(2))
     if (!domain) return { matches: false, reason: `invalid wildcard scope ${allowed}` }
-    // A wildcard grants only subdomains. The apex must be listed explicitly
-    // when it is in scope; otherwise this broadens scope beyond the operator's entry.
-    if (hostname.endsWith("." + domain)) return { matches: true, reason: `subdomain matches wildcard ${allowed}` }
+    // CyberStrike treats an explicit *.example.com entry as the program's
+    // domain family, including the apex. Match label boundaries so this never
+    // admits lookalikes such as notexample.com or example.com.attacker.test.
+    if (hostname === domain || hostname.endsWith("." + domain)) {
+      return { matches: true, reason: `host matches wildcard domain family ${allowed}` }
+    }
     return { matches: false, reason: `does not match wildcard ${allowed}` }
   }
 

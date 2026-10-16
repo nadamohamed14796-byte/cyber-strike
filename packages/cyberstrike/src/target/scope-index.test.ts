@@ -9,11 +9,13 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://login.att.com/", entries)).toEqual(["login.att.com"])
   })
 
-  test("matches explicit wildcards only on subdomains, including nested wildcard rules", () => {
+  test("matches explicit wildcards on the apex and subdomains, including nested wildcard rules", () => {
     const entries = ["*.att.com", "*.api.att.com"]
-    expect(matchingScopeItems("https://att.com/", entries)).toEqual([])
+    expect(matchingScopeItems("https://att.com/", entries)).toEqual(["*.att.com"])
     expect(matchingScopeItems("https://www.att.com/", entries)).toEqual(["*.att.com"])
+    expect(matchingScopeItems("https://api.att.com/", entries)).toEqual(["*.api.att.com", "*.att.com"])
     expect(matchingScopeItems("https://v1.api.att.com/", entries)).toEqual(["*.api.att.com", "*.att.com"])
+    expect(matchingScopeItems("https://notatt.com/", entries)).toEqual([])
   })
 
   test("matches IPv4 CIDRs and refuses addresses outside the range", () => {

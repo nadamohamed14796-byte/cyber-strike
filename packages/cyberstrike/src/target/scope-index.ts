@@ -33,10 +33,10 @@ export function matchingScopeItems(candidate: URL | string, items: string[]): st
   const matches: string[] = []
   if (index.exactHosts.has(hostname)) matches.push(hostname)
 
-  // A wildcard only matches subdomains, never its apex. Walk URL suffixes instead
-  // of iterating all wildcard patterns.
+  // An explicit wildcard represents the whole domain family, including the
+  // apex. Walk URL suffixes instead of iterating all wildcard patterns.
   const labels = hostname.split(".")
-  for (let offset = 1; offset < labels.length; offset++) {
+  for (let offset = 0; offset < labels.length; offset++) {
     const suffix = labels.slice(offset).join(".")
     if (index.wildcardDomains.has(suffix)) matches.push("*." + suffix)
   }
