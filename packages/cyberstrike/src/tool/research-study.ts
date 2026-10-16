@@ -887,6 +887,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         cycle_id: finished.cycle_id,
         phase: finished.phase,
         completed: finished.phase === "complete",
+        collection_summary: ResearchCycle.summary(),
         collection_partial_sources: incompleteSources,
         unresolved_blockers: { blocked_auth: queue.blocked_auth + queue.crawl_page_auth_blocked, blocked_size: queue.blocked_size, blocked_fetch: queue.blocked_fetch, crawl_page_errors: queue.crawl_page_errors },
         queue,
