@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { RESEARCH_SOURCES, researchSourceHostAllowed, researchSourcePathAllowed, resolveResearchSourceForURL } from "../../src/research/sources"
-import { isIndexLikeResearchUrl, isResearchCandidate, linksOf, sourceRelevance } from "../../src/research/ingest"
+import { isIndexLikeResearchContent, isIndexLikeResearchUrl, isResearchCandidate, linksOf, sourceRelevance } from "../../src/research/ingest"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage } from "../../src/research/adapters"
 
 const trickster0 = RESEARCH_SOURCES.find((source) => source.id === "trickster0")!
@@ -222,4 +222,29 @@ test("HackerOne recovers report URLs embedded in client-rendered listing state",
   expect(links).toContain("https://hackerone.com/reports/12345")
   expect(links).toContain("https://hackerone.com/reports/67890")
   expect(links.some((url) => url.endsWith("/reports/new"))).toBe(false)
+})
+
+
+test("content-shaped archives are traversed but not treated as complete reports", () => {
+  const indexText = "Recent bug bounty writeups and disclosed reports. Browse the latest submissions and research articles."
+  expect(isIndexLikeResearchContent({
+    title: "Bug Bounty Archive",
+    text: indexText,
+    discoveredLinkCount: 28,
+  })).toBe(true)
+
+  // A real report with reproduction and impact evidence remains learnable even
+  // when it links to many related references.
+  expect(isIndexLikeResearchContent({
+    title: "IDOR in account export",
+    text: "Steps to reproduce: change the account ID. Impact: another user's private export is returned.",
+    discoveredLinkCount: 28,
+  })).toBe(false)
+
+  // Avoid classifying ordinary prose pages as indexes based on a small link set.
+  expect(isIndexLikeResearchContent({
+    title: "How I found an authorization bypass",
+    text: "I tested the endpoint and confirmed that changing the account identifier exposed another user's data.",
+    discoveredLinkCount: 4,
+  })).toBe(false)
 })
