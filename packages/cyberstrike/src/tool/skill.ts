@@ -12,7 +12,7 @@ import { iife } from "@/util/iife"
 import { Agent } from "../agent/agent"
 import { Instance } from "../project/instance"
 
-const accessibleCache = new Map<string, Skill.Info[]>()
+const accessibleCache = new Map<string, { catalog: ReturnType<typeof Skill.state>; permissionFingerprint: string; skills: Skill.Info[] }>()
 
 export const SkillTool = Tool.define("skill", async (ctx) => {
   // Lazy load skills only when tool is executed
@@ -60,21 +60,25 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     async execute(params: z.infer<typeof parameters>, ctx) {
       await SkillIndex.ensureBuilt()
 
-      const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
-      if (!accessibleCache.has(agentKey)) {
-        const skills = await Skill.all()
-        const agentInfo = await Agent.get(ctx.agent)
-        accessibleCache.set(
-          agentKey,
-          agentInfo?.permission
+      const agentKey = `${Instance.directory}\\0${ctx.agent ?? ""}`
+      const catalog = Skill.state()
+      const skills = await Skill.all()
+      const agentInfo = await Agent.get(ctx.agent)
+      const permissionFingerprint = JSON.stringify(agentInfo?.permission ?? null)
+      const cached = accessibleCache.get(agentKey)
+      if (!cached || cached.catalog !== catalog || cached.permissionFingerprint !== permissionFingerprint) {
+        accessibleCache.set(agentKey, {
+          catalog,
+          permissionFingerprint,
+          skills: agentInfo?.permission
             ? skills.filter((skill) => {
                 const rule = PermissionNext.evaluate("skill", skill.name, agentInfo.permission)
                 return rule.action !== "deny"
               })
             : skills,
-        )
+        })
       }
-      const accessibleSkills = accessibleCache.get(agentKey)!
+      const accessibleSkills = accessibleCache.get(agentKey)!.skills
 
       if (params.action === "list") {
         if (params.loaded) {

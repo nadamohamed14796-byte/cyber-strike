@@ -22,6 +22,7 @@ export namespace SkillIndex {
   }
 
   type IndexState = {
+    catalog?: ReturnType<typeof Skill.state>
     entries: Map<string, Entry>
     tagIndex: Map<string, Set<string>>
     techIndex: Map<string, Set<string>>
@@ -30,7 +31,7 @@ export namespace SkillIndex {
     referenceIndex: Map<string, Set<string>>
   }
   const states = new Map<string, IndexState>()
-  const builds = new Map<string, Promise<void>>()
+  const builds = new Map<string, { catalog: ReturnType<typeof Skill.state>; promise: Promise<void> }>()
   const emptyState = (): IndexState => ({
     entries: new Map(),
     tagIndex: new Map(),
@@ -130,22 +131,28 @@ export namespace SkillIndex {
   }
 
   export async function ensureBuilt() {
-    if (states.has(Instance.directory)) return
+    const directory = Instance.directory
+    const catalog = Skill.state()
+    if (states.get(directory)?.catalog === catalog) return
     await rebuild()
   }
 
   export async function rebuild() {
     const directory = Instance.directory
+    const catalog = Skill.state()
     const pending = builds.get(directory)
-    if (pending) return pending
+    if (pending?.catalog === catalog) return pending.promise
     const build = (async () => {
       const next = emptyState()
+      next.catalog = catalog
       const skills = await Skill.all()
       for (const skill of skills) {
         const entry = toEntry(skill)
         next.entries.set(entry.name, entry)
         indexEntry(entry, next)
       }
+      // A disposed/recreated project must not let an older async build overwrite the new catalog.
+      if (Skill.state() !== catalog) return
       states.set(directory, next)
       const referenceProblems = validateReferences()
       if (referenceProblems.length) {
@@ -157,8 +164,12 @@ export namespace SkillIndex {
       }
       log.info("skill index built", { directory, count: next.entries.size })
     })()
-    builds.set(directory, build)
-    try { await build } finally { if (builds.get(directory) === build) builds.delete(directory) }
+    builds.set(directory, { catalog, promise: build })
+    try {
+      await build
+    } finally {
+      if (builds.get(directory)?.promise === build) builds.delete(directory)
+    }
   }
 
   export function get(name: string): Entry | undefined {

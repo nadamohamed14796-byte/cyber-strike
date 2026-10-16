@@ -6,7 +6,7 @@ import { Instance } from "../project/instance"
 export namespace SkillContext {
   const log = Log.create({ service: "skill-context" })
 
-  const loaded = new Map<string, { name: string; directory: string; content: string; tokens: number }>()
+  const loaded = new Map<string, { name: string; directory: string; catalog: ReturnType<typeof Skill.state>; content: string; tokens: number }>()
 
   function key(name: string) {
     return `${Instance.directory}\\0${name}`
@@ -18,7 +18,10 @@ export namespace SkillContext {
 
   export async function load(name: string): Promise<string | undefined> {
     const id = key(name)
-    if (loaded.has(id)) return loaded.get(id)!.content
+    const catalog = Skill.state()
+    const cached = loaded.get(id)
+    if (cached?.catalog === catalog) return cached.content
+    if (cached) loaded.delete(id)
 
     const skill = await Skill.get(name)
     if (!skill) {
@@ -27,7 +30,7 @@ export namespace SkillContext {
     }
 
     const tokens = estimateTokens(skill.content)
-    loaded.set(id, { name, directory: Instance.directory, content: skill.content, tokens })
+    loaded.set(id, { name, directory: Instance.directory, catalog, content: skill.content, tokens })
     log.info("skill loaded into context", { name, tokens })
     return skill.content
   }
@@ -43,17 +46,24 @@ export namespace SkillContext {
   }
 
   export function active(): string[] {
-    return Array.from(loaded.values()).filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name)
+    const catalog = Skill.state()
+    return Array.from(loaded.values())
+      .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
+      .map((entry) => entry.name)
   }
 
   export function tokenCount(): number {
     let total = 0
-    for (const entry of loaded.values()) if (entry.directory === Instance.directory) total += entry.tokens
+    const catalog = Skill.state()
+    for (const entry of loaded.values()) {
+      if (entry.directory === Instance.directory && entry.catalog === catalog) total += entry.tokens
+    }
     return total
   }
 
   export function isLoaded(name: string): boolean {
-    return loaded.has(key(name))
+    const entry = loaded.get(key(name))
+    return Boolean(entry && entry.catalog === Skill.state())
   }
 
   export function clear() {
@@ -72,8 +82,11 @@ export namespace SkillContext {
   ): Suggestion[] {
     const result: Suggestion[] = []
     const suggested = new Set<string>()
+    const catalog = Skill.state()
     const active = new Set(
-      Array.from(loaded.values()).filter((entry) => entry.directory === Instance.directory).map((entry) => entry.name),
+      Array.from(loaded.values())
+        .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
+        .map((entry) => entry.name),
     )
 
     function addWithPrerequisites(

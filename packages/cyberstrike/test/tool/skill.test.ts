@@ -7,6 +7,7 @@ import type { Tool } from "../../src/tool/tool"
 import { Instance } from "../../src/project/instance"
 import { SkillTool } from "../../src/tool/skill"
 import { SkillContext } from "../../src/skill/context"
+import { SkillIndex } from "../../src/skill/index-engine"
 import { tmpdir } from "../fixture/fixture"
 
 const baseCtx: Omit<Tool.Context, "ask"> = {
@@ -156,6 +157,78 @@ DYNAMIC_SKILL_ALIAS_REGRESSION_MARKER
     } finally {
       if (home === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
       else process.env.CYBERSTRIKE_TEST_HOME = home
+    }
+  })
+
+  test("skill caches refresh after an instance is disposed and recreated at the same path", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillDir = path.join(dir, ".cyberstrike", "skill", "refreshable-skill")
+        await fs.mkdir(skillDir, { recursive: true })
+        await Bun.write(
+          path.join(skillDir, "SKILL.md"),
+          `---
+name: refreshable-skill
+description: Old description.
+tags: ["old-tag"]
+---
+
+OLD_SKILL_CATALOG_MARKER
+`,
+        )
+      },
+    })
+
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    const tool = await SkillTool.init()
+    const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const listing = await tool.execute({ action: "list" }, ctx)
+          expect(listing.output).toContain("Old description.")
+          const loaded = await tool.execute({ action: "load", name: "refreshable-skill" }, ctx)
+          expect(loaded.output).toContain("OLD_SKILL_CATALOG_MARKER")
+          expect(SkillContext.active()).toContain("refreshable-skill")
+          expect(SkillIndex.byTag("old-tag").map((skill) => skill.name)).toContain("refreshable-skill")
+          await Instance.dispose()
+        },
+      })
+
+      await Bun.write(
+        path.join(tmp.path, ".cyberstrike", "skill", "refreshable-skill", "SKILL.md"),
+        `---
+name: refreshable-skill
+description: Updated description.
+tags: ["new-tag"]
+---
+
+NEW_SKILL_CATALOG_MARKER
+`,
+      )
+
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const listing = await tool.execute({ action: "list" }, ctx)
+          expect(listing.output).toContain("Updated description.")
+          expect(listing.output).not.toContain("Old description.")
+          expect(SkillIndex.byTag("new-tag").map((skill) => skill.name)).toContain("refreshable-skill")
+          expect(SkillIndex.byTag("old-tag")).toEqual([])
+          const loaded = await tool.execute({ action: "load", name: "refreshable-skill" }, ctx)
+          expect(loaded.output).toContain("NEW_SKILL_CATALOG_MARKER")
+          expect(loaded.output).not.toContain("OLD_SKILL_CATALOG_MARKER")
+          expect(SkillContext.active()).toEqual(["refreshable-skill"])
+          expect(SkillContext.isLoaded("refreshable-skill")).toBe(true)
+          await Instance.dispose()
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
     }
   })
 
