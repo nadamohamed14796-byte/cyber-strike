@@ -17,6 +17,8 @@ const TARGET_DIRECTORIES = [
   "assets",
   "recon",
   "urls",
+  "directories",
+  "parameters",
   "requests",
   "javascript",
   "endpoints",

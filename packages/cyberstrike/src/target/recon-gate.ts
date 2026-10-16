@@ -9,7 +9,9 @@ export const RECON_PHASES = [
   "asset_discovery",
   "live_hosts_ports",
   "url_collection",
+  "directory_fuzzing",
   "parameter_discovery",
+  "parameter_fuzzing",
   "javascript_analysis",
   "endpoint_inventory",
   "vulnerability_testing",
@@ -55,35 +57,41 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   const phases = parsed?.phases as Partial<Record<ReconPhase, ReconPhaseRecord>> | undefined
   const validStatus = (record: ReconPhaseRecord | undefined) =>
     !!record && ["pending", "running", "complete", "blocked", "failed", "unavailable"].includes(record.status)
-  const legacyPhases = RECON_PHASES.filter((phase) => phase !== "parameter_discovery")
-  const hasLegacyPhaseSet = !!phases && legacyPhases.every((phase) => validStatus(phases[phase]))
-  const hasParameterPhase = !!phases && Object.prototype.hasOwnProperty.call(phases, "parameter_discovery")
+  // Three phases were added as explicit checkpoints. Older manifests are migrated
+  // in memory, and downstream completion is invalidated from the earliest missing phase.
+  const introducedPhases = ["directory_fuzzing", "parameter_discovery", "parameter_fuzzing"] as const
+  const stableLegacyPhases = RECON_PHASES.filter((phase) => !(introducedPhases as readonly string[]).includes(phase))
+  const hasLegacyPhaseSet = !!phases && stableLegacyPhases.every((phase) => validStatus(phases[phase]))
+  const invalidIntroducedPhase = !!phases && introducedPhases.some((phase) =>
+    Object.prototype.hasOwnProperty.call(phases, phase) && !validStatus(phases[phase]),
+  )
   if (
     parsed?.schemaVersion !== 1 ||
     parsed.targetID !== workspaceID ||
     parsed.targetURL !== targetURL ||
     typeof parsed.sessionID !== "string" ||
     !hasLegacyPhaseSet ||
-    (hasParameterPhase && !validStatus(phases.parameter_discovery))
+    invalidIntroducedPhase
   ) throw new Error("Recon run manifest has invalid identity or schema; refusing to overwrite it.")
   if (!phases) throw new Error("Recon run manifest has no phase records; refusing to overwrite it.")
 
-  // Older persisted runs predate the dedicated parameter-discovery phase. Migrate
-  // them in memory and invalidate downstream completion so endpoint inventory and
-  // later testing cannot silently bypass the newly required handoff.
-  if (!hasParameterPhase) {
-    phases.parameter_discovery = {
-      status: "pending",
-      reason: "New required phase: discover and persist parameters before rebuilding endpoint inventory.",
+  const missingPhases = introducedPhases.filter((phase) => !Object.prototype.hasOwnProperty.call(phases, phase))
+  if (missingPhases.length) {
+    for (const phase of missingPhases) {
+      phases[phase] = {
+        status: "pending",
+        reason: "New required recon phase: " + phase + ". Existing downstream completion must be revalidated.",
+      }
     }
-    for (const phase of ["endpoint_inventory", "vulnerability_testing", "reporting"] as const) {
+    const earliestMissing = Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
+    for (const phase of RECON_PHASES.slice(earliestMissing + 1)) {
       const previous = phases[phase]
       if (previous && previous.status !== "pending") {
         phases[phase] = {
           ...previous,
           status: "pending",
           finishedAt: undefined,
-          reason: "Re-run required after adding the parameter_discovery phase.",
+          reason: "Re-run required after adding earlier recon phase(s): " + missingPhases.join(", ") + ".",
         }
       }
     }

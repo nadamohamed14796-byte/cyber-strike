@@ -57,13 +57,13 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   paramspider: "parameter_discovery",
   curl: "url_collection",
   wget: "url_collection",
-  arjun: "parameter_discovery",
+  arjun: "parameter_fuzzing",
   nuclei: "vulnerability_testing",
-  ffuf: "vulnerability_testing",
-  feroxbuster: "vulnerability_testing",
-  gobuster: "vulnerability_testing",
-  dirsearch: "vulnerability_testing",
-  dirb: "vulnerability_testing",
+  ffuf: "directory_fuzzing",
+  feroxbuster: "directory_fuzzing",
+  gobuster: "directory_fuzzing",
+  dirsearch: "directory_fuzzing",
+  dirb: "directory_fuzzing",
   nikto: "vulnerability_testing",
   sqlmap: "vulnerability_testing",
   dalfox: "vulnerability_testing",
@@ -127,6 +127,18 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     }
   }
   let phase = SCANNER_PHASES[scanner]!
+  // Route ffuf into the correct recon checkpoint based on its URL placeholder.
+  // Body/mutating ffuf requests remain active testing, not discovery.
+  if (scanner === "ffuf") {
+    const urlIndex = args.findIndex((value) => ["-u", "--url"].includes(value.toLowerCase()))
+    const url = urlIndex >= 0 ? args[urlIndex + 1] ?? "" : ""
+    const methodIndex = args.findIndex((value) => ["-x", "--request"].includes(value.toLowerCase()))
+    const explicitMethod = methodIndex >= 0 ? args[methodIndex + 1]?.toUpperCase() : undefined
+    const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form"].includes(value))
+    if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
+    else if (url.includes("?") && /FUZZ/i.test(url.slice(url.indexOf("?")))) phase = "parameter_fuzzing"
+    else phase = "directory_fuzzing"
+  }
   // Plain retrieval belongs to URL collection; mutating/non-safe HTTP methods
   // are active vulnerability testing and must wait for the final inventory gate.
   if (scanner === "curl") {

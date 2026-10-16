@@ -13,7 +13,9 @@ const phases: ReconPhase[] = [
   "asset_discovery",
   "live_hosts_ports",
   "url_collection",
+  "directory_fuzzing",
   "parameter_discovery",
+  "parameter_fuzzing",
   "javascript_analysis",
   "endpoint_inventory",
   "vulnerability_testing",
@@ -44,10 +46,23 @@ test("scope must be completed, not unavailable, before discovery or testing", ()
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("scope_validation")
 })
 
-test("phase order includes parameter discovery after URL collection", () => {
-  expect(phases.indexOf("parameter_discovery")).toBe(phases.indexOf("url_collection") + 1)
-  expect(phases.indexOf("javascript_analysis")).toBe(phases.indexOf("parameter_discovery") + 1)
+test("phase order separates directory and parameter fuzzing from passive discovery", () => {
+  expect(phases.indexOf("directory_fuzzing")).toBe(phases.indexOf("url_collection") + 1)
+  expect(phases.indexOf("parameter_discovery")).toBe(phases.indexOf("directory_fuzzing") + 1)
+  expect(phases.indexOf("parameter_fuzzing")).toBe(phases.indexOf("parameter_discovery") + 1)
+  expect(phases.indexOf("javascript_analysis")).toBe(phases.indexOf("parameter_fuzzing") + 1)
   expect(phases.indexOf("endpoint_inventory")).toBe(phases.indexOf("javascript_analysis") + 1)
+})
+
+test("directory and parameter fuzzing are ordered prerequisites", () => {
+  const state = records("complete")
+  state.directory_fuzzing = { status: "pending" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("directory_fuzzing")
+  state.directory_fuzzing = { status: "complete" }
+  state.parameter_fuzzing = { status: "pending" }
+  expect(unresolvedReconPrerequisites("javascript_analysis", state)).toContain("parameter_fuzzing")
+  state.parameter_fuzzing = { status: "complete" }
+  expect(unresolvedReconPrerequisites("javascript_analysis", state)).toEqual([])
 })
 
 test("workspace setup cannot be bypassed by marking it unavailable", () => {
@@ -85,13 +100,20 @@ test("a fully resolved inventory allows the vulnerability phase", () => {
 
 test("legacy manifests migrate to require parameter discovery and revalidate downstream phases", () => {
   const legacy = initialReconRun("https://example.com", "target-root-1", "session-1")
+  delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).directory_fuzzing
   delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).parameter_discovery
+  delete (legacy.phases as Partial<Record<ReconPhase, ReconPhaseRecord>>).parameter_fuzzing
+  legacy.phases.parameter_discovery = { status: "complete", summary: "old parameter list" }
+  legacy.phases.javascript_analysis = { status: "complete", summary: "old JS analysis" }
   legacy.phases.endpoint_inventory = { status: "complete", summary: "old endpoint inventory", artifacts: ["endpoints/old.json"] }
   legacy.phases.vulnerability_testing = { status: "complete", summary: "old tests", artifacts: ["testing/old.json"] }
   legacy.phases.reporting = { status: "complete", summary: "old report", artifacts: ["reports/old.md"] }
 
   const migrated = parseReconRun(JSON.stringify(legacy), "target-root-1", "https://example.com")
+  expect(migrated.phases.directory_fuzzing.status).toBe("pending")
   expect(migrated.phases.parameter_discovery.status).toBe("pending")
+  expect(migrated.phases.parameter_fuzzing.status).toBe("pending")
+  expect(migrated.phases.javascript_analysis.status).toBe("pending")
   expect(migrated.phases.endpoint_inventory.status).toBe("pending")
   expect(migrated.phases.vulnerability_testing.status).toBe("pending")
   expect(migrated.phases.reporting.status).toBe("pending")
