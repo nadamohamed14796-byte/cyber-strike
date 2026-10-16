@@ -39,7 +39,9 @@ describe("scope_check IPv4 CIDR matching", () => {
     expect(checkMatch("https://api.example.com/v1", "example.com").matches).toBe(false)
     expect(checkMatch("https://example.com.attacker.test/path", "*.example.com").matches).toBe(false)
     expect(checkMatch("https://api.example.com/path", "*.example.com").matches).toBe(true)
-    expect(checkMatch("example.com", "*.example.com").matches).toBe(false)
+    // The explicit wildcard denotes the domain family, including its apex.
+    expect(checkMatch("example.com", "*.example.com").matches).toBe(true)
+    expect(checkMatch("notexample.com", "*.example.com").matches).toBe(false)
   })
 })
 
