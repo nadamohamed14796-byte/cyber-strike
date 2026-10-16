@@ -128,6 +128,8 @@ The run is complete only when the durable cycle confirms **every selected source
 
 ## Required final report format
 
+Report `reports_found`, `writeups_found`, `reports_and_writeups_found`, and `unique_documents_found` from the current cycle summary. Keep these per-run counts separate from lifetime queue totals. If the current cycle summary is unavailable, report the counts as unavailable; do not estimate them.
+
 Use these headings in this order so the result is auditable:
 
 1. **Overall status** — complete, partial, or blocked; never use “complete” if any configured source or required queue work is unresolved. There is no crawl-budget-capped completion state: keep going until the accessible frontier is exhausted or a concrete blocker is recorded.
