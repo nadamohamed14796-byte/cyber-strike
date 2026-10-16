@@ -167,28 +167,28 @@ function currentOwnerKey(): string {
 function normalizeScopeItem(input: string): string {
   const value = input?.trim()
   if (!value) throw new Error("Scope entries cannot be empty.")
-  if (/[\\u0000-\\u0020\\u007f]/.test(value)) throw new Error("Scope entries cannot contain whitespace or control characters.")
+  if (/[\u0000-\u0020\u007f]/.test(value)) throw new Error("Scope entries cannot contain whitespace or control characters.")
 
   // Preserve explicit URL boundaries (scheme, port and path); stripping these
   // would broaden a narrow program scope to the whole host.
-  if (/^https?:\\/\\//i.test(value)) {
+  if (/^https?:\/\//i.test(value)) {
     let url: URL
     try { url = new URL(value) } catch { throw new Error("Invalid scope URL: " + value) }
     if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password || url.search || url.hash) {
       throw new Error("Scope URLs must be credential-free HTTP(S) URLs without queries or fragments.")
     }
-    const host = url.hostname.toLowerCase().replace(/\\.$/, "")
+    const host = url.hostname.toLowerCase().replace(/\.$/, "")
     const wildcardHost = host.startsWith("*.")
     const bareHost = wildcardHost ? host.slice(2) : host
-    if (!bareHost || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(bareHost)) {
+    if (!bareHost || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(bareHost)) {
       throw new Error("Invalid hostname in scope URL: " + value)
     }
     url.hostname = (wildcardHost ? "*." : "") + bareHost
-    url.pathname = url.pathname.replace(/\\/+$/, "") || "/"
-    return url.toString().replace(/\\/$/, url.pathname === "/" ? "" : "/")
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/"
+    return url.toString().replace(/\/$/, url.pathname === "/" ? "" : "/")
   }
 
-  const cidr = value.match(/^(\\d{1,3}(?:\\.\\d{1,3}){3})\\/(\\d{1,2})$/)
+  const cidr = value.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
   if (cidr) {
     const octets = cidr[1].split(".").map(Number)
     const prefix = Number(cidr[2])
@@ -200,14 +200,14 @@ function normalizeScopeItem(input: string): string {
 
   // Host:port is a valid service scope entry and is intentionally distinct from
   // a bare domain, which matches that hostname independent of port.
-  const hostPort = value.match(/^([^:/]+):(\\d{1,5})$/)
+  const hostPort = value.match(/^([^:/]+):(\d{1,5})$/)
   if (hostPort) {
     const port = Number(hostPort[2])
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid scope port: " + value)
     let hostname: string
-    try { hostname = new URL("https://" + hostPort[1]).hostname.toLowerCase().replace(/\\.$/, "") }
+    try { hostname = new URL("https://" + hostPort[1]).hostname.toLowerCase().replace(/\.$/, "") }
     catch { throw new Error("Invalid hostname in scope entry: " + value) }
-    if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(hostname)) {
+    if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(hostname)) {
       throw new Error("Invalid hostname in scope entry: " + value)
     }
     return hostname + ":" + port
@@ -224,9 +224,9 @@ function normalizeScopeItem(input: string): string {
     if (/^[a-z0-9][a-z0-9._:@+-]{0,254}$/i.test(value)) return value
     throw new Error("Invalid domain, IP, or scope identifier: " + value)
   }
-  hostname = hostname.replace(/\\.$/, "")
+  hostname = hostname.replace(/\.$/, "")
   if (!hostname || hostname.includes(":") || hostname.startsWith(".") || hostname.endsWith(".") ||
-    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(hostname)) {
+    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(hostname)) {
     throw new Error("Invalid domain or IP scope entry: " + value)
   }
   return (wildcard ? "*." : "") + hostname
