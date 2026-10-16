@@ -18,11 +18,12 @@ const PHASES = [
   "reporting",
 ] as const
 
-type Phase = typeof PHASES[number]
-type PhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable"
+export type ReconPhase = typeof PHASES[number]
+type Phase = ReconPhase
+export type ReconPhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable"
 
-type PhaseRecord = {
-  status: PhaseStatus
+export type ReconPhaseRecord = {
+  status: ReconPhaseStatus
   startedAt?: string
   finishedAt?: string
   summary?: string
@@ -39,7 +40,7 @@ type ReconRun = {
   createdAt: string
   updatedAt: string
   currentPhase: Phase | null
-  phases: Record<Phase, PhaseRecord>
+  phases: Record<Phase, ReconPhaseRecord>
 }
 
 const Parameters = z.object({
@@ -53,7 +54,7 @@ const Parameters = z.object({
 })
 
 function initialRun(targetURL: string, targetID: string, sessionID: string): ReconRun {
-  const phases = Object.fromEntries(PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<Phase, PhaseRecord>
+  const phases = Object.fromEntries(PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<Phase, ReconPhaseRecord>
   const now = new Date().toISOString()
   return { schemaVersion: 1, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
 }
@@ -71,8 +72,18 @@ function parseRun(raw: string, workspaceID: string, targetURL: string, sessionID
   return parsed
 }
 
-function terminal(status: PhaseStatus): boolean {
+function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable"
+}
+
+/** Pure prerequisite check shared by the runtime gate and unit tests. */
+export function unresolvedReconPrerequisites(phase: ReconPhase, phases: Record<ReconPhase, ReconPhaseRecord>): ReconPhase[] {
+  const earlier = PHASES.slice(0, PHASES.indexOf(phase))
+  const unresolved = earlier.filter((item) => !terminal(phases[item].status))
+  if (phase !== "scope_validation" && phase !== "workspace_setup" && phases.scope_validation.status !== "complete" && !unresolved.includes("scope_validation")) {
+    unresolved.unshift("scope_validation")
+  }
+  return unresolved
 }
 
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
@@ -119,11 +130,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       const phaseIndex = PHASES.indexOf(phase)
 
       if (params.action === "begin") {
-        if (phase !== "scope_validation" && phase !== "workspace_setup" && run.phases.scope_validation.status !== "complete") {
-          return { title: "Recon phase blocked: scope not validated", output: "Cannot begin " + phase + " until scope_validation is complete. An unavailable/blocked scope is not authorization for discovery or testing.", metadata: { saved: false, reason: "scope_not_validated", scope_status: run.phases.scope_validation.status } }
-        }
-        const earlier = PHASES.slice(0, phaseIndex)
-        const unresolved = earlier.filter((item) => !terminal(run.phases[item].status))
+        const unresolved = unresolvedReconPrerequisites(phase, run.phases)
         if (unresolved.length) {
           return { title: "Recon phase blocked by prerequisites", output: "Cannot begin " + phase + ". Resolve earlier phases first: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "prerequisites_unresolved", unresolved } }
         }
