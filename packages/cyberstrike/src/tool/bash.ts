@@ -87,7 +87,8 @@ function scannerTargets(command: string[], commandText: string): string[] {
   // Nmap-style tools accept hosts as positional arguments.
   for (const value of command) {
     if (value.startsWith("-") || value.includes("/") || value.includes("=") || value.includes(".txt") || value.includes(".list")) continue
-    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?$/i.test(value)) candidates.add("https://" + value)
+    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?$/i.test(value) ||
+        /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(value)) candidates.add("https://" + value)
   }
   return [...candidates]
 }
