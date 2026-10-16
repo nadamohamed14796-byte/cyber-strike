@@ -37,6 +37,59 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       : { matches: false, reason: `IPv4 address ${hostname} is outside CIDR ${allowed}` }
   }
 
+  // Explicit URL scope entries can constrain scheme, port, and path. They must
+  // never be reduced to a hostname because that would silently broaden permission.
+  if (/^https?:\/\//i.test(allowed)) {
+    let candidateURL: URL
+    let scopeURL: URL
+    try {
+      candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL(`https://${value}`)
+      scopeURL = new URL(allowed)
+    } catch {
+      return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
+    }
+    if ((candidateURL.protocol !== "http:" && candidateURL.protocol !== "https:") ||
+      (scopeURL.protocol !== "http:" && scopeURL.protocol !== "https:") ||
+      candidateURL.username || candidateURL.password || scopeURL.username || scopeURL.password) {
+      return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
+    }
+    const scopeHost = scopeURL.hostname.toLowerCase().replace(/\.$/, "")
+    const targetHost = candidateURL.hostname.toLowerCase().replace(/\.$/, "")
+    const hostMatches = scopeHost.startsWith("*.")
+      ? targetHost === scopeHost.slice(2) || targetHost.endsWith("." + scopeHost.slice(2))
+      : targetHost === scopeHost
+    if (!hostMatches) return { matches: false, reason: "hostname does not match explicit URL scope" }
+    if (candidateURL.protocol !== scopeURL.protocol) return { matches: false, reason: "protocol does not match explicit URL scope" }
+    if (candidateURL.port !== scopeURL.port) return { matches: false, reason: "port does not match explicit URL scope" }
+    const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
+    const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
+    const pathWildcard = scopePath.endsWith("/*")
+    const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
+    const pathMatches = pathWildcard
+      ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
+      : targetPath === pathPrefix
+    return pathMatches
+      ? { matches: true, reason: "matches explicit URL scope including scheme, port, and path" }
+      : { matches: false, reason: "path does not match explicit URL scope" }
+  }
+
+  // A host:port entry constrains the network service while accepting either scheme.
+  const hostPort = allowed.match(/^([^:/]+):(\d{1,5})$/)
+  if (hostPort) {
+    const hostname = parseHostname(value)
+    if (!hostname) return { matches: false, reason: "target is not a valid domain, IP address, or HTTP(S) URL" }
+    let targetURL: URL
+    try { targetURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL(`https://${value}`) }
+    catch { return { matches: false, reason: "target URL is invalid" } }
+    const expectedHost = hostPort[1].toLowerCase().replace(/\.$/, "")
+    const expectedPort = Number(hostPort[2])
+    if (!Number.isInteger(expectedPort) || expectedPort < 1 || expectedPort > 65535)
+      return { matches: false, reason: "invalid port in scope entry" }
+    return hostname === expectedHost && Number(targetURL.port || (targetURL.protocol === "https:" ? 443 : 80)) === expectedPort
+      ? { matches: true, reason: "exact hostname and port match" }
+      : { matches: false, reason: "hostname or port does not match scope entry" }
+  }
+
   const hostname = parseHostname(value)
   if (!hostname) return { matches: false, reason: "target is not a valid domain, IP address, or HTTP(S) URL" }
 
