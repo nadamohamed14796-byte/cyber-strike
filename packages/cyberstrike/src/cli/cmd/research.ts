@@ -53,6 +53,7 @@ export const ResearchCommand = cmd({
           if (!sources.length) throw new Error("unknown research source: " + args.source)
 
           const totals = { pages: 0, candidates: 0, queued: 0, learned: 0, skipped: 0, failed: 0, blockedAuth: 0, errors: 0 }
+          const collectedTypes: Record<string, number> = {}
           const incomplete: Array<{ source: string; reason: string }> = []
           const studySources: string[] = []
 
@@ -91,6 +92,9 @@ export const ResearchCommand = cmd({
               totals.pages += result.pages
               totals.candidates += result.candidates
               totals.queued += result.added
+              for (const [type, count] of Object.entries(result.document_types ?? {})) {
+                collectedTypes[type] = (collectedTypes[type] ?? 0) + count
+              }
               totals.blockedAuth += result.blocked_auth
               totals.errors += result.error_count
               prompts.log.info(source.id + ": visited_pages=" + result.pages +
@@ -133,6 +137,7 @@ export const ResearchCommand = cmd({
           prompts.log.success("COLLECTION PHASE FINISHED: visited_pages=" + totals.pages +
             ", report/write-up links seen=" + totals.candidates +
             ", new documents cached for study=" + totals.queued +
+            ", collected document types=" + JSON.stringify(collectedTypes) +
             ", authentication blocks=" + totals.blockedAuth +
             ", discovery errors=" + totals.errors)
           prompts.log.step("Beginning study phase only after collection stopped for every selected source")
