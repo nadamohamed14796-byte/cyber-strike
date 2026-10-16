@@ -744,7 +744,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           queued_new: item.added,
           document_types: item.document_types,
           // The cycle-level number is uniquely deduplicated across all passes/resumes.
-          duplicate_urls_skipped: state.ok ? state.source_state.duplicate_urls_skipped : sourceState.duplicate_urls_skipped,
+          duplicate_urls_skipped: state.ok && state.source_state ? state.source_state.duplicate_urls_skipped : sourceState.duplicate_urls_skipped,
           duplicate_urls_seen_in_pass: item.duplicate_urls_skipped,
           session_configured: researchSourceHasCredentials(RESEARCH_SOURCES.find((source) => source.id === item.source) ?? { id: item.source }, sessionIDs),
           blocked_auth: item.blocked_auth,
