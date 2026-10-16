@@ -797,14 +797,13 @@ export async function syncResearchSource(
   const discovery = { pages: 0, candidates: 0, added: 0, blocked_auth: 0, errors: [] as string[] }
   const learned = { learned: 0, skipped: 0, failed: 0, blocked_auth: 0, requeued_legacy: 0, errors: [] as string[] }
 
-  // Page windows expand without a global ceiling. The source is complete only
-  // when a pass leaves unused window capacity and the durable state has no blockers.
+  // Phase 1: exhaust the source's reachable discovery frontier and persist every
+  // accessible candidate with its sanitized cached text. Do not study any item
+  // while the source is still being crawled: this keeps collection and analysis
+  // deterministic and makes the fetched/studied totals independently auditable.
+  let discoveryBlocked = false
   while (true) {
-    const pass = await discoverResearch({
-      sourceID: source.id,
-      pages: pageWindow,
-      depth: Number.MAX_SAFE_INTEGER,
-    })
+    const pass = await discoverResearch({ sourceID: source.id, pages: pageWindow, depth: Number.MAX_SAFE_INTEGER })
     const current = pass[0]
     if (!current) break
     discovery.pages += current.pages
@@ -813,37 +812,39 @@ export async function syncResearchSource(
     discovery.blocked_auth += current.blocked_auth
     discovery.errors.push(...current.errors.slice(0, Math.max(0, 5 - discovery.errors.length)))
 
-    // Drain all claimable rows after each pass. batchLimit limits one claim only,
-    // never the total number of reports processed by this sync.
-    while (true) {
-      const batch = await learnResearchQueue({ limit: batchLimit, sourceID: source.id })
-      learned.learned += batch.learned
-      learned.skipped += batch.skipped
-      learned.failed += batch.failed
-      learned.blocked_auth += batch.blocked_auth
-      learned.requeued_legacy += batch.requeued_legacy
-      learned.errors.push(...batch.errors.slice(0, Math.max(0, 5 - learned.errors.length)))
-      if (batch.claimed === 0) break
-    }
-
     const queueStats = ResearchQueue.stats(source.id)
-    const blocked =
-      current.error_count > 0 ||
-      current.blocked_auth > 0 ||
-      queueStats.crawl_page_errors > 0 ||
-      queueStats.crawl_page_auth_blocked > 0 ||
-      queueStats.blocked_auth > 0 ||
-      queueStats.retry > 0 ||
-      queueStats.studying > 0
-    if (blocked || current.pages < pageWindow) break
+    discoveryBlocked = current.error_count > 0 || current.blocked_auth > 0 || queueStats.crawl_page_errors > 0 ||
+      queueStats.crawl_page_auth_blocked > 0 || queueStats.blocked_auth > 0
+    if (discoveryBlocked || current.pages < pageWindow) break
 
     const nextWindow = pageWindow * 2
     if (!Number.isSafeInteger(nextWindow) || nextWindow <= pageWindow) {
       discovery.errors.push("runtime integer range exhausted before pagination was proven complete")
+      discoveryBlocked = true
       break
     }
     pageWindow = nextWindow
   }
+
+  // Phase 2: only after discovery has stopped, study every claimable cached item.
+  // `batchLimit` is a per-claim size, not a total-work limit; the loop has no
+  // report-count ceiling and resumes until the durable queue has no claimable rows.
+  while (true) {
+    const batch = await learnResearchQueue({ limit: batchLimit, sourceID: source.id })
+    learned.learned += batch.learned
+    learned.skipped += batch.skipped
+    learned.failed += batch.failed
+    learned.blocked_auth += batch.blocked_auth
+    learned.requeued_legacy += batch.requeued_legacy
+    learned.errors.push(...batch.errors.slice(0, Math.max(0, 5 - learned.errors.length)))
+    if (batch.claimed === 0) break
+  }
+
+  const finalQueueStats = ResearchQueue.stats(source.id)
+  if (finalQueueStats.retry > 0 || finalQueueStats.studying > 0) {
+    discovery.errors.push("study queue has retry or active/stale lease rows remaining")
+  }
+  void discoveryBlocked
 
   return {
     source: source.id,
