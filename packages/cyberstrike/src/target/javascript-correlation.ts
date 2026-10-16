@@ -289,6 +289,7 @@ export interface JavaScriptEndpointCandidate {
   id: string
   literal: string
   host: string | null
+  origin: string | null
   path: string
   sourceFiles: string[]
   observedRequestIDs: string[]
@@ -326,13 +327,15 @@ export function correlateStaticJavaScriptEndpoints(
       const endpointPath = (endpointURL?.pathname ?? literal.split(/[?#]/, 1)[0]).replace(/\/{2,}/g, "/")
       if (!endpointPath.startsWith("/")) continue
       const host = endpointURL?.hostname.toLowerCase() ?? null
-      const key = (host ?? "*") + endpointPath
+      const origin = endpointURL?.origin.toLowerCase() ?? null
+      const key = (origin ?? "*") + endpointPath
       let candidate = candidates.get(key)
       if (!candidate) {
         candidate = {
           id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
           literal,
           host,
+          origin,
           path: endpointPath,
           sourceFiles: [],
           observedRequestIDs: [],
@@ -350,6 +353,7 @@ export function correlateStaticJavaScriptEndpoints(
         // Relative literals resolve against the application host; absolute literals
         // must match their explicit host. Do not cross-correlate identical paths on a CDN.
         if (host ? requestHost !== host : requestHost !== targetHost.toLowerCase()) continue
+        if (origin && requestURL?.origin.toLowerCase() !== origin) continue
         const observedPath = request.normalizedPath.split(/[?#]/, 1)[0]
         // Require an exact segment-count/template match. Prefix overlap such as
         // /api/user -> /api/users/123 is not evidence that the endpoint was observed.
@@ -1152,6 +1156,7 @@ export namespace JavaScriptCorrelation {
         "",
         "- Candidate ID: " + endpoint.id,
         "- Target: " + workspace.targetURL,
+        "- Origin: " + (endpoint.origin ?? "(relative or same-origin route)"),
         "- Host: " + (endpoint.host ?? "(relative or same-origin route)"),
         "- Path/template: " + endpoint.path,
         "- Observation status: " + (endpoint.observedInTraffic ? "path overlap observed in captured traffic" : "static JavaScript candidate; not yet observed in captured traffic"),
@@ -1174,7 +1179,7 @@ export namespace JavaScriptCorrelation {
         title: ("Endpoint " + (endpoint.host ?? "relative") + endpoint.path).slice(0, 180),
         content: endpointNoteContent,
         source: "javascript-correlation:" + endpoint.id,
-        sourceURL: endpoint.host ? "https://" + endpoint.host + endpoint.path : undefined,
+        sourceURL: endpoint.origin ? endpoint.origin + endpoint.path : undefined,
         status: endpoint.observedInTraffic ? "observed" : "unverified",
         tags: ["endpoint", "javascript", endpoint.observedInTraffic ? "traffic-observed" : "static-candidate"],
         upsertByIdentity: true,
