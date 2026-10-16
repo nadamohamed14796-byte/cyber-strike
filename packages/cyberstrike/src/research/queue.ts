@@ -216,7 +216,8 @@ export namespace ResearchQueue {
   export function requeueLearnedForModelStudy(limit = 100, sourceID?: string, modelStudyVersion = RESEARCH_MODEL_STUDY_VERSION) {
     const now = Date.now()
     const version = Math.max(1, Math.floor(Number.isFinite(modelStudyVersion) ? modelStudyVersion : RESEARCH_MODEL_STUDY_VERSION))
-    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    // Compatibility argument only: process all eligible rows, with no total-work cap.
+    void limit
     return Database.transaction((db) => {
       const candidates = db.select().from(ResearchQueueTable).where(and(
         inArray(ResearchQueueTable.status, ["learned", "rejected"]),
@@ -232,7 +233,7 @@ export namespace ResearchQueue {
         if (typeof studied === "number" && studied >= version) return false
         if (row.status === "rejected" && !["no recognizable security topic", "page failed research relevance gate"].includes(row.last_error ?? "")) return false
         return true
-      }).slice(0, bounded)
+      })
 
       let updatedCount = 0
       for (const row of candidates) {
@@ -509,7 +510,9 @@ export namespace ResearchQueue {
           ...(sourceID ? [eq(ResearchQueueTable.source_id, sourceID)] : []),
           ...(minAgeMs > 0 ? [lt(ResearchQueueTable.updated_at, now - minAgeMs)] : []),
         ))
-        .orderBy(asc(ResearchQueueTable.sequence)).limit(Math.max(1, Math.min(500, Math.floor(limit)))).all()
+        .orderBy(asc(ResearchQueueTable.sequence)).all()
+      // Recover every eligible auth-blocked row in this pass.
+      void limit
       let updatedCount = 0
       for (const row of rows) {
         const isCrawlPage = row.payload?.crawl_page === true
@@ -545,7 +548,8 @@ export namespace ResearchQueue {
    */
   export function requeueLegacyRejected(limit = 100, sourceID?: string) {
     const now = Date.now()
-    const bounded = Math.max(1, Math.min(500, Math.floor(Number.isFinite(limit) ? limit : 100)))
+    // Compatibility argument only: recover all eligible legacy rows.
+    void limit
     return Database.transaction((db) => {
       const candidates = db.select().from(ResearchQueueTable)
         .where(sourceID
@@ -563,8 +567,7 @@ export namespace ResearchQueue {
           return row.last_error === "no recognizable security topic" ||
             row.last_error === "page failed research relevance gate"
         })
-        .slice(0, bounded)
-
+        
       let updatedCount = 0
       for (const row of candidates) {
         const updated = db.update(ResearchQueueTable).set({
