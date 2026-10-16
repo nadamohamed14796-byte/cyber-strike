@@ -167,7 +167,7 @@ function currentOwnerKey(): string {
 function normalizeScopeItem(input: string): string {
   const value = input?.trim()
   if (!value) throw new Error("Scope entries cannot be empty.")
-  if (/[\u0000-\u0020\u007f]/.test(value)) throw new Error("Scope entries cannot contain whitespace or control characters.")
+  if (/[\u0000-\u001f\u007f]/.test(value)) throw new Error("Scope entries cannot contain control characters.")
 
   // Preserve explicit URL boundaries (scheme, port and path); stripping these
   // would broaden a narrow program scope to the whole host.
@@ -246,7 +246,10 @@ function normalizeScopeItem(input: string): string {
   } catch {
     // Keep unsupported non-web scope identifiers available as raw scope evidence,
     // but scope_match will not authorize HTTP requests based on an unknown syntax.
-    if (/^[a-z0-9][a-z0-9._:@+-]{0,254}$/i.test(value)) return value
+    // Keep unfamiliar program-specific labels and structured entries intact as
+    // scope evidence. They will not match HTTP targets unless a supported matcher
+    // can interpret them, so acceptance never turns an unknown format into access.
+    if (value.length <= 1000 && !/[\u0000-\u001f\u007f]/.test(value)) return value
     throw new Error("Invalid domain, IP, or scope identifier: " + value)
   }
   hostname = hostname.replace(/\.$/, "")
