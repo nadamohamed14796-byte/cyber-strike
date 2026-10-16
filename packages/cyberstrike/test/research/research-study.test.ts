@@ -880,7 +880,7 @@ test("model-led update queues legacy shared reports once without refetching or c
         metadata: () => {},
         ask: async () => {},
       } as any
-      const next = await studyTool.execute({
+      const next = await executeResearchTool(studyTool, {
         action: "next",
         source: sourceID,
         pages: 1,
@@ -897,7 +897,7 @@ test("model-led update queues legacy shared reports once without refetching or c
       expect(claimed.source_url).toBe(sourceURL)
       expect(claimed.public_id).toMatch(/^RPT-\d+$/)
 
-      const save = await studyTool.execute({
+      const save = await executeResearchTool(studyTool, {
         action: "save",
         source: sourceID,
         pages: 1,
@@ -996,7 +996,7 @@ test("research study is blocked until every source has a durable collection outc
       const premature = await executeResearchTool(tool, {
         action: "next", cycle_id: cycle.cycle_id, pages: 1, depth: 1, limit: 1, continue_after_save: false,
       }, context)
-      expect(premature.output).toContain("Study phase is not open")
+      expect(premature.output).toContain("Do not claim or save research items")
       expect(ResearchQueue.stats("portswigger").queued).toBe(1)
 
       for (const source of RESEARCH_SOURCES) {
