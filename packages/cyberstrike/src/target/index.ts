@@ -538,7 +538,12 @@ function applyTargetNoteToMarkdown(notesFile: string, note: TargetNote): string 
   // Refresh the generated note block from SQLite, including its body. Text outside
   // marked blocks remains untouched, so unrelated operator notes survive reconciliation.
   const nextMarker = notesFile.indexOf("<!-- cyberstrike-target-note:", markerIndex + marker.length)
-  let blockEnd = nextMarker >= 0 ? nextMarker : notesFile.length
+  // Preserve operator-authored text appended after the final generated note body.
+  let blockEnd = nextMarker
+  if (blockEnd < 0) {
+    const bodyIndex = notesFile.indexOf(note.content, markerIndex + marker.length)
+    blockEnd = bodyIndex >= 0 ? bodyIndex + note.content.length : notesFile.length
+  }
   while (blockEnd > markerIndex && notesFile[blockEnd - 1] === "\n") blockEnd--
   const timestamp = new Date(note.timeCreated).toISOString()
   const heading = note.title ? "### " + note.title : "### " + timestamp

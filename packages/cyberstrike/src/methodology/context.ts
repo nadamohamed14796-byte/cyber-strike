@@ -18,7 +18,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   passive_recon: [],
   active_recon: [],
   technology_profiling: [
-    "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09",
+    "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09", "wstg-recon-config",
     "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
     "attack-nestjs", "attack-nextjs", "attack-nodejs", "attack-springboot",
     "attack-wordpress", "attack-exchange-owa", "attack-zimbra", "attack-hikvision-isapi",
