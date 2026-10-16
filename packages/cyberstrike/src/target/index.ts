@@ -188,6 +188,17 @@ function normalizeScopeItem(input: string): string {
     return url.toString().replace(/\/$/, url.pathname === "/" ? "" : "/")
   }
 
+  const ipv6Cidr = value.match(/^\[?([0-9a-f:.]+)\]?\/(\d{1,3})$/i)
+  if (ipv6Cidr && ipv6Cidr[1].includes(":")) {
+    const prefix = Number(ipv6Cidr[2])
+    if (prefix < 0 || prefix > 128) throw new Error("Invalid IPv6 CIDR scope entry: " + value)
+    const rawIPv6 = ipv6Cidr[1].replace(/^\[|\]$/g, "")
+    let hostname: string
+    try { hostname = new URL("https://[" + rawIPv6 + "]").hostname.toLowerCase() }
+    catch { throw new Error("Invalid IPv6 CIDR scope entry: " + value) }
+    return hostname + "/" + prefix
+  }
+
   const cidr = value.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
   if (cidr) {
     const octets = cidr[1].split(".").map(Number)
