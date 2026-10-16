@@ -9,6 +9,7 @@ import {
   parseReconRun as parseRun,
   reconRunID,
   unresolvedReconPrerequisites,
+  type ReconPhase,
   type ReconPhaseStatus,
   type ReconRunManifest as ReconRun,
 } from "../target/recon-gate"
