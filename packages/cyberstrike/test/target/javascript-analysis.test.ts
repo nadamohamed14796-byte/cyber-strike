@@ -329,7 +329,7 @@ test("does not attribute top-level risk sinks to the previously closed function"
     '  document.body.innerHTML = "<p>card</p>"',
     "}",
     'document.body.innerHTML = "<p>top-level</p>"',
-  ].join("\\n")
+  ].join("\n")
   const signals = analyzeJavaScriptSource(source).riskSignals.filter((signal) => signal.kind === "dom-html-sink")
   expect(signals).toHaveLength(2)
   expect(signals.find((signal) => signal.functionName === "renderCard")).toBeDefined()
