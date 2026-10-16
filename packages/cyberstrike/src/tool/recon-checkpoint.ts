@@ -1,0 +1,178 @@
+import fs from "node:fs/promises"
+import path from "node:path"
+import { createHash } from "node:crypto"
+import z from "zod"
+import { Session } from "../session"
+import { TargetMemory } from "../target"
+import { Tool } from "./tool"
+
+const PHASES = [
+  "scope_validation",
+  "workspace_setup",
+  "asset_discovery",
+  "live_hosts_ports",
+  "url_collection",
+  "javascript_analysis",
+  "endpoint_inventory",
+  "vulnerability_testing",
+  "reporting",
+] as const
+
+type Phase = typeof PHASES[number]
+type PhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable"
+
+type PhaseRecord = {
+  status: PhaseStatus
+  startedAt?: string
+  finishedAt?: string
+  summary?: string
+  reason?: string
+  counts?: Record<string, number>
+  artifacts?: string[]
+}
+
+type ReconRun = {
+  schemaVersion: 1
+  targetURL: string
+  targetID: string
+  sessionID: string
+  createdAt: string
+  updatedAt: string
+  currentPhase: Phase | null
+  phases: Record<Phase, PhaseRecord>
+}
+
+const Parameters = z.object({
+  action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable"]),
+  target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
+  phase: z.enum(PHASES).optional(),
+  summary: z.string().max(4000).optional(),
+  reason: z.string().max(2000).optional(),
+  counts: z.record(z.string(), z.number().finite().nonnegative()).optional(),
+  artifacts: z.array(z.string().min(1).max(1000)).max(100).optional(),
+})
+
+function initialRun(targetURL: string, targetID: string, sessionID: string): ReconRun {
+  const phases = Object.fromEntries(PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<Phase, PhaseRecord>
+  const now = new Date().toISOString()
+  return { schemaVersion: 1, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
+}
+
+function parseRun(raw: string, workspaceID: string, targetURL: string, sessionID: string): ReconRun {
+  const parsed = JSON.parse(raw) as ReconRun
+  if (
+    parsed?.schemaVersion !== 1 ||
+    parsed.targetID !== workspaceID ||
+    parsed.targetURL !== targetURL ||
+    parsed.sessionID !== sessionID ||
+    !parsed.phases ||
+    !PHASES.every((phase) => parsed.phases[phase] && ["pending", "running", "complete", "blocked", "failed", "unavailable"].includes(parsed.phases[phase].status))
+  ) throw new Error("Recon run manifest has invalid identity or schema; refusing to overwrite it.")
+  return parsed
+}
+
+function terminal(status: PhaseStatus): boolean {
+  return status === "complete" || status === "unavailable"
+}
+
+export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
+  description: [
+    "Persist and enforce the ordered reconnaissance run state in the target workspace. This is a workflow control, not a scanner.",
+    "Call status before deciding what to do. Call begin before each phase and complete/unavailable/block/fail after it, with real counts, artifact paths, and a concise evidence-based summary or reason.",
+    "Phases are strictly ordered: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting. A later phase cannot begin until all earlier phases are complete or explicitly unavailable. Blocked/failed phases must be retried or explicitly resolved; they cannot be silently skipped.",
+    "Do not mark a phase complete just because a command ran. Confirm its output and save artifacts first. Expensive vulnerability scanning must not start before the inventory phases are resolved. Existing run manifests resume across turns for the same target and root session.",
+    "Every saved artifact path must be inside this target's canonical workspace. This tool does not authorize requests; use scope_check and the persisted scope policy for every active request.",
+  ].join("\n"),
+  parameters: Parameters,
+  async execute(params, ctx) {
+    try {
+      const workspace = await TargetMemory.get(params.target_url)
+      if (!workspace) return { title: "Recon checkpoint unavailable", output: "No existing target workspace. Initialize the canonical target with target_workspace first.", metadata: { saved: false, reason: "workspace_missing" } }
+
+      const sessionID = Session.root(ctx.sessionID)
+      const runID = createHash("sha256").update(workspace.id + "\0" + sessionID).digest("hex").slice(0, 20)
+      const filename = "recon-" + runID + ".json"
+      const relativePath = "runs/" + filename
+      const absolutePath = path.join(workspace.workspacePath, relativePath)
+      let run: ReconRun
+      try {
+        run = parseRun(await fs.readFile(absolutePath, "utf-8"), workspace.id, workspace.targetURL, sessionID)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        run = initialRun(workspace.targetURL, workspace.id, sessionID)
+      }
+
+      if (params.action === "status") {
+        const lines = PHASES.map((phase) => {
+          const record = run.phases[phase]
+          return phase + ": " + record.status +
+            (record.summary ? " — " + record.summary : "") +
+            (record.reason ? " (reason: " + record.reason + ")" : "") +
+            (record.artifacts?.length ? " [artifacts: " + record.artifacts.join(", ") + "]" : "")
+        })
+        return { title: "Recon run status", output: ["Target: " + run.targetURL, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...lines].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, manifest: absolutePath, current_phase: run.currentPhase, phases: run.phases } }
+      }
+
+      if (!params.phase) return { title: "Recon checkpoint rejected", output: "phase is required for this action.", metadata: { saved: false, reason: "phase_required" } }
+      const phase = params.phase
+      const record = run.phases[phase]
+      const phaseIndex = PHASES.indexOf(phase)
+
+      if (params.action === "begin") {
+        const earlier = PHASES.slice(0, phaseIndex)
+        const unresolved = earlier.filter((item) => !terminal(run.phases[item].status))
+        if (unresolved.length) {
+          return { title: "Recon phase blocked by prerequisites", output: "Cannot begin " + phase + ". Resolve earlier phases first: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "prerequisites_unresolved", unresolved } }
+        }
+        if (record.status === "complete" || record.status === "unavailable") {
+          return { title: "Recon phase already resolved", output: phase + " is already " + record.status + ". Inspect its artifacts; do not repeat expensive work unless new evidence invalidates this checkpoint.", metadata: { saved: false, reason: "phase_already_resolved", phase, status: record.status } }
+        }
+        run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
+        run.currentPhase = phase
+      } else {
+        if (record.status !== "running") {
+          return { title: "Recon checkpoint rejected", output: "Phase " + phase + " is " + record.status + ", not running. Call begin first; the manifest was not changed.", metadata: { saved: false, reason: "phase_not_running", phase, status: record.status } }
+        }
+        if ((params.action === "block" || params.action === "fail" || params.action === "unavailable") && !params.reason?.trim()) {
+          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, or unavailable.", metadata: { saved: false, reason: "reason_required" } }
+        }
+        const status: PhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : "unavailable"
+        if (status === "complete" && !params.summary?.trim()) {
+          return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
+        }
+        run.phases[phase] = {
+          ...record,
+          status,
+          finishedAt: new Date().toISOString(),
+          summary: params.summary?.trim() ?? record.summary,
+          reason: params.reason?.trim(),
+          counts: params.counts ?? record.counts,
+          artifacts: params.artifacts ?? record.artifacts,
+        }
+        run.currentPhase = null
+      }
+
+      run.updatedAt = new Date().toISOString()
+      await TargetMemory.writeWorkspaceFile(workspace, relativePath, JSON.stringify(run, null, 2) + "\n")
+      const indexPath = path.join(workspace.workspacePath, "runs", "index.json")
+      let index: { schemaVersion: number; targetURL: string; runs: Array<Record<string, unknown>> }
+      try {
+        const parsed = JSON.parse(await fs.readFile(indexPath, "utf-8"))
+        if (parsed?.schemaVersion !== 1 || parsed.targetURL !== workspace.targetURL || !Array.isArray(parsed.runs)) throw new Error("Invalid run index identity or schema.")
+        index = parsed
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        index = { schemaVersion: 1, targetURL: workspace.targetURL, runs: [] }
+      }
+      const entry = { runID, sessionID, manifest: relativePath, currentPhase: run.currentPhase, updatedAt: run.updatedAt, completedPhases: PHASES.filter((item) => terminal(run.phases[item].status)).length, totalPhases: PHASES.length }
+      const existing = index.runs.findIndex((item) => item.runID === runID)
+      if (existing >= 0) index.runs[existing] = entry
+      else index.runs.push(entry)
+      await TargetMemory.writeWorkspaceFile(workspace, "runs/index.json", JSON.stringify(index, null, 2) + "\n")
+
+      return { title: "Recon checkpoint saved", output: ["Target: " + workspace.targetURL, "Phase: " + phase, "Status: " + run.phases[phase].status, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...(run.phases[phase].artifacts?.length ? ["Artifacts: " + run.phases[phase].artifacts.join(", ")] : []), ...(run.phases[phase].reason ? ["Reason: " + run.phases[phase].reason] : [])].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, phase, status: run.phases[phase].status, manifest: absolutePath, current_phase: run.currentPhase } }
+    } catch (error) {
+      return { title: "Recon checkpoint failed", output: error instanceof Error ? error.message : String(error), metadata: { saved: false, error: true } }
+    }
+  },
+})
