@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import path from "node:path"
 import fs from "node:fs/promises"
-import { and, asc, desc, eq, inArray } from "../storage/db"
+import { and, asc, desc, eq, inArray, isNull } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { redactTargetNoteLine, redactTargetNoteSecrets } from "./redact"
@@ -137,6 +137,8 @@ export interface NoteInput {
   sourceURL?: string
   status?: TargetNoteStatus
   tags?: string[]
+  /** Update the existing note with the same provenance/title instead of creating snapshot duplicates. */
+  upsertByIdentity?: boolean
 }
 
 export interface TargetNote {
@@ -1589,6 +1591,40 @@ export namespace TargetMemory {
     const contentHash = createHash("sha256")
       .update([kind, title ?? "", source, sourceURL ?? "", content].join("\0"))
       .digest("hex")
+
+    if (input.upsertByIdentity) {
+      const existing = Database.use((db) =>
+        db.select().from(TargetNoteTable).where(and(
+          eq(TargetNoteTable.target_id, workspace.id),
+          eq(TargetNoteTable.kind, kind),
+          title ? eq(TargetNoteTable.title, title) : isNull(TargetNoteTable.title),
+          eq(TargetNoteTable.source, source),
+          sourceURL ? eq(TargetNoteTable.source_url, sourceURL) : isNull(TargetNoteTable.source_url),
+        )).orderBy(desc(TargetNoteTable.time_updated)).get(),
+      )
+      if (existing) {
+        const existingTags = (existing.tags as string[] | null) ?? []
+        const nextStatus = input.status ?? existing.status
+        const nextTags = input.tags === undefined ? existingTags : tags
+        const changed =
+          existing.content !== content ||
+          existing.content_hash !== contentHash ||
+          nextStatus !== existing.status ||
+          JSON.stringify(nextTags) !== JSON.stringify(existingTags)
+        const row = changed
+          ? Database.use((db) => db.update(TargetNoteTable).set({
+              content,
+              content_hash: contentHash,
+              status: nextStatus,
+              tags: nextTags,
+              time_updated: now,
+            }).where(eq(TargetNoteTable.id, existing.id)).returning().get() ?? existing)
+          : existing
+        const note = mapNote(row)
+        await syncTargetNotesMarkdown(workspace)
+        return { workspace, note, created: false, updated: changed }
+      }
+    }
 
     const saved = Database.transaction((db) => {
       const inserted = db
