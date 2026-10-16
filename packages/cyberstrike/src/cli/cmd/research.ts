@@ -53,7 +53,12 @@ export const ResearchCommand = cmd({
           if (!sources.length) throw new Error("unknown research source: " + args.source)
 
           const totals = { pages: 0, candidates: 0, queued: 0, learned: 0, skipped: 0, failed: 0, blockedAuth: 0, errors: 0 }
+          const documentTypeNames: Record<string, string> = {
+            report: "Reports", writeup: "Write-ups", blog: "Blogs", academy: "Academy/Labs",
+            reference: "References/Cheat sheets", research: "Security research", mixed: "Mixed documents", uncertain: "Uncertain classification",
+          }
           const collectedTypes: Record<string, number> = {}
+          const perSourceCollection: Record<string, { pages: number; candidates: number; documents: number; types: Record<string, number>; blockedAuth: number; errors: number }> = {}
           const incomplete: Array<{ source: string; reason: string }> = []
           const studySources: string[] = []
 
@@ -61,6 +66,7 @@ export const ResearchCommand = cmd({
           // starting model-led study. The page window is only a continuation batch;
           // it doubles until the frontier is exhausted and is never a total-page cap.
           for (const source of sources) {
+            const sourceTotals = perSourceCollection[source.id] = { pages: 0, candidates: 0, documents: 0, types: {}, blockedAuth: 0, errors: 0 }
             prompts.log.step("Collecting source: " + source.id)
             while (true) {
               const resumed = await retryAuthenticatedResearch({ sourceID: source.id, limit: 500 })
@@ -92,11 +98,17 @@ export const ResearchCommand = cmd({
               totals.pages += result.pages
               totals.candidates += result.candidates
               totals.queued += result.added
+              sourceTotals.pages += result.pages
+              sourceTotals.candidates += result.candidates
+              sourceTotals.documents += result.added
               for (const [type, count] of Object.entries(result.document_types ?? {})) {
                 collectedTypes[type] = (collectedTypes[type] ?? 0) + count
+                sourceTotals.types[type] = (sourceTotals.types[type] ?? 0) + count
               }
               totals.blockedAuth += result.blocked_auth
               totals.errors += result.error_count
+              sourceTotals.blockedAuth += result.blocked_auth
+              sourceTotals.errors += result.error_count
               prompts.log.info(source.id + ": visited_pages=" + result.pages +
                 " continuation_window=" + pageWindow + " report_links_seen=" + result.candidates +
                 " documents_collected_new=" + result.added + " blocked_auth=" + result.blocked_auth +
@@ -134,12 +146,29 @@ export const ResearchCommand = cmd({
             studySources.push(source.id)
           }
 
-          prompts.log.success("COLLECTION PHASE FINISHED: visited_pages=" + totals.pages +
-            ", report/write-up links seen=" + totals.candidates +
-            ", new documents cached for study=" + totals.queued +
-            ", collected document types=" + JSON.stringify(collectedTypes) +
-            ", authentication blocks=" + totals.blockedAuth +
-            ", discovery errors=" + totals.errors)
+          prompts.log.success("COLLECTION PHASE FINISHED — DOCUMENT COUNT SUMMARY")
+          prompts.log.info("TOTALS: " + totals.queued + " new individual documents cached for study; " + totals.candidates + " candidate links seen (links are not counted as documents); " + totals.pages + " pages visited.")
+          prompts.log.info("DOCUMENT BREAKDOWN:")
+          for (const type of ["report", "writeup", "blog", "academy", "reference", "research", "mixed", "uncertain"]) {
+            prompts.log.info("  " + (documentTypeNames[type] ?? type) + ": " + (collectedTypes[type] ?? 0))
+          }
+          prompts.log.info("BY SOURCE:")
+          for (const source of sources) {
+            const stats = perSourceCollection[source.id]
+            if (!stats) continue
+            prompts.log.info("  " + source.id + ": " + stats.documents + " documents (" +
+              ["report", "writeup", "blog", "academy", "reference", "research", "mixed", "uncertain"]
+                .map((type) => (documentTypeNames[type] ?? type) + "=" + (stats.types[type] ?? 0)).join(", ") +
+              "); pages=" + stats.pages + "; candidate_links=" + stats.candidates +
+              "; auth_blocks=" + stats.blockedAuth + "; errors=" + stats.errors)
+          }
+          prompts.log.info("COLLECTION ISSUES: authentication blocks=" + totals.blockedAuth + "; discovery errors=" + totals.errors)
+          if (incomplete.length) {
+            prompts.log.warn("COLLECTION STATUS: PARTIAL — some sources were blocked or had errors.")
+            for (const item of incomplete) prompts.log.warn("  " + item.source + ": " + item.reason)
+          } else {
+            prompts.log.success("COLLECTION STATUS: all selected sources exhausted their accessible discovery frontier.")
+          }
           prompts.log.step("Beginning study phase only after collection stopped for every selected source")
 
           // PHASE 2 — STUDY. No page fetching/discovery happens in this loop.
