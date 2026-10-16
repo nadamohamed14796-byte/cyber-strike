@@ -168,6 +168,81 @@ function boundedList(values: string[] | undefined, max: number): string[] {
     .filter((value): value is string => typeof value === "string" && value.length > 0)
 }
 
+function sanitizeStructuredNote(value: unknown): unknown {
+  if (typeof value === "string") return redactResearchSecrets(value)
+  if (Array.isArray(value)) return value.map(sanitizeStructuredNote)
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .map(([key, entry]) => [key, sanitizeStructuredNote(entry)]))
+  }
+  return value
+}
+
+function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>, extracted: Record<string, unknown>) {
+  const supplied = note.document_note && typeof note.document_note === "object"
+    ? sanitizeStructuredNote(note.document_note) as Record<string, unknown>
+    : {}
+  const common = {
+    schema_version: 1,
+    document_type: documentType,
+    lesson: extracted.lesson,
+    retrieval_signals: extracted.retrieval_signals,
+  }
+  if (documentType === "report") {
+    return { ...common, report: {
+      vulnerability_class: extracted.vulnerability_class, cwe_id: extracted.cwe_id,
+      severity: extracted.severity, affected_components: extracted.affected_components,
+      observation: extracted.initial_observation, prerequisites: extracted.prerequisites,
+      request_response: extracted.request_response_evidence, reproduction: extracted.reproduction_steps,
+      root_cause: extracted.root_cause, impact: extracted.impact,
+      verification_status: extracted.verification_status, remediation: extracted.remediation,
+      false_positive_cautions: extracted.false_positive_cautions, submitted: supplied,
+    } }
+  }
+  if (documentType === "writeup") {
+    return { ...common, writeup: {
+      discovery_signal: extracted.initial_observation, hypotheses: extracted.hypotheses,
+      investigation: { attempted: extracted.attempted_tests, successful: extracted.successful_tests,
+        failed: extracted.failed_tests, rejected_hypotheses: extracted.rejected_hypotheses },
+      decisive_evidence: extracted.decisive_evidence, causal_explanation: extracted.root_cause,
+      impact: extracted.impact, lessons: extracted.lesson,
+      applicability: extracted.applicability_conditions,
+      non_applicability: extracted.non_applicability_conditions, submitted: supplied,
+    } }
+  }
+  if (documentType === "reference") {
+    return { ...common, reference: {
+      topic: extracted.vulnerability_class, techniques: extracted.test_procedure,
+      payload_collection: extracted.poc_snippet, prerequisites: extracted.prerequisites,
+      expected_positive_signals: extracted.expected_positive_signals,
+      expected_negative_signals: extracted.expected_negative_signals,
+      false_positive_cautions: extracted.false_positive_cautions, submitted: supplied,
+    } }
+  }
+  if (documentType === "academy") {
+    return { ...common, academy: {
+      objective: extracted.lesson, lab_condition: extracted.initial_observation,
+      intended_class: extracted.vulnerability_class, reproduction_logic: extracted.reproduction_steps,
+      evidence_signal: extracted.verification_signals, prerequisites: extracted.prerequisites,
+      boundaries: extracted.limitations, submitted: supplied,
+    } }
+  }
+  if (documentType === "blog" || documentType === "research") {
+    return { ...common, research: {
+      core_insight: extracted.lesson, mechanism: extracted.root_cause,
+      threat_model: extracted.attack_vector, assumptions: extracted.prerequisites,
+      technique: extracted.test_procedure, defensive_implications: extracted.remediation,
+      validation_signals: extracted.verification_signals, limitations: extracted.limitations,
+      submitted: supplied,
+    } }
+  }
+  return { ...common, mixed_or_uncertain: {
+    supported_observations: extracted.initial_observation, supported_techniques: extracted.test_procedure,
+    evidence: extracted.decisive_evidence, uncertainty: extracted.unresolved_questions,
+    submitted: supplied,
+  } }
+}
+
 function output(title: string, text: string, metadata: Record<string, unknown> = {}) {
   return { title, output: text, metadata }
 }
@@ -1111,6 +1186,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
             ? claim.payload.duplicate_content_sources.filter((value): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value))
             : [],
           extracted,
+          document_note: buildDocumentNote(documentType, note, extracted),
         },
       })
       if (!ingested) {
