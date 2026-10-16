@@ -112,7 +112,7 @@ function titleOf(html: string, fallback: string) {
  * Fetch one queued public research URL through the same source-scoped SSRF-safe
  * fetcher used by discovery, returning only sanitized plain text.
  */
-export async function fetchResearchSourceForStudy(sourceID: string, sourceURL: string) {
+export async function fetchResearchSourceForStudy(sourceID: string, sourceURL: string, sessionIDs: readonly string[] = []) {
   const source = RESEARCH_SOURCES.find((entry) => entry.id === sourceID)
   if (!source) throw new Error("unknown research source id")
   const normalized = normalizeUrl(sourceURL)
@@ -121,7 +121,7 @@ export async function fetchResearchSourceForStudy(sourceID: string, sourceURL: s
   if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) {
     throw new Error("research URL is outside the configured HTTPS source hosts")
   }
-  const html = await fetchText(normalized, source)
+  const html = await fetchText(normalized, source, undefined, sessionIDs)
   const title = redactResearchSecrets(titleOf(html, normalized))
   const text = redactResearchSecrets(cleanHtml(html))
   if (looksLikeResearchAuthenticationWall(normalized, title, text, html)) {
@@ -789,6 +789,8 @@ export function retryAuthBlockedWithBudget<S extends { id: string }>(
 export async function retryAuthenticatedResearch(input: {
   sourceID?: string
   limit?: number
+  /** Active CyberStrike session IDs provide cookies only for the exact host they were captured from. */
+  sessionIDs?: readonly string[]
   /** Explicit operator action may bypass cooldown, but never the configured-session requirement. */
   retryImmediately?: boolean
 } = {}) {
@@ -799,7 +801,7 @@ export async function retryAuthenticatedResearch(input: {
   return retryAuthBlockedWithBudget(
     sources,
     limit,
-    researchSourceHasCredentials,
+    (source) => researchSourceHasCredentials(source, input.sessionIDs),
     (remaining, sourceID, cooldown) => ResearchQueue.retryAuthenticationBlocked(remaining, sourceID, cooldown),
     minAgeMs,
   )
@@ -912,7 +914,7 @@ export async function syncResearch(input: { sourceID?: string } & ResearchSyncOp
 }
 
 /** Discovery-only worker: persist candidate URLs without doing knowledge extraction. */
-export async function discoverResearch(input: { sourceID?: string; pages?: number; depth?: number; agentLed?: boolean } = {}) {
+export async function discoverResearch(input: { sourceID?: string; pages?: number; depth?: number; agentLed?: boolean; sessionIDs?: readonly string[] } = {}) {
   const { ResearchQueue } = await import("./queue")
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
   if (!sources.length) throw new Error("unknown research source: " + input.sourceID)
@@ -1021,7 +1023,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       }
       pages++
       try {
-        const html = await fetchText(current.url, source)
+        const html = await fetchText(current.url, source, undefined, input.sessionIDs)
         const title = redactResearchSecrets(titleOf(html, current.url))
         const text = redactResearchSecrets(cleanHtml(html))
         if (looksLikeResearchAuthenticationWall(current.url, title, text, html)) {
@@ -1179,7 +1181,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
 }
 
 /** Learning-only worker: claim persisted candidates, extract a lesson, and record a terminal/retry state. */
-export async function learnResearchQueue(input: { limit?: number; workerID?: string; sourceID?: string } = {}) {
+export async function learnResearchQueue(input: { limit?: number; workerID?: string; sourceID?: string; sessionIDs?: readonly string[] } = {}) {
   const { ResearchQueue } = await import("./queue")
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
   const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
@@ -1199,7 +1201,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
   // Reuse the same source-scoped retry path as CLI/update instead of retrying
   // 100 rows independently per source. This keeps auth recovery bounded globally
   // and preserves the cooldown/session-configuration gates in one place.
-  await retryAuthenticatedResearch({ sourceID: input.sourceID, limit })
+  await retryAuthenticatedResearch({ sourceID: input.sourceID, limit, sessionIDs: input.sessionIDs })
 
   for (let i = 0; i < limit; i++) {
     const item = ResearchQueue.claimNext(workerID, input.sourceID)
@@ -1225,7 +1227,7 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
         // Older queue rows may contain an excerpt only. Refetch them through the
         // allowlisted SSRF-safe fetcher; never feed the truncated prefix into even
         // the legacy heuristic learner as though it represented the full resource.
-        html = await fetchText(item.source_url, source)
+        html = await fetchText(item.source_url, source, undefined, input.sessionIDs)
         text = redactResearchSecrets(cleanHtml(html))
         title = redactResearchSecrets(titleOf(html, item.source_url))
       }

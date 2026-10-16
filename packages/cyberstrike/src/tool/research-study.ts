@@ -21,6 +21,7 @@ import { ResearchQueue } from "../research/queue"
 import { ResearchQueueTable } from "../research/queue.sql"
 import { ResearchCycleTable } from "../research/cycle.sql"
 import { ResearchCycle } from "../research/cycle"
+import { Session } from "../session"
 import { Tool } from "./tool"
 
 const RESEARCH_TEXT_CHUNK_MAX_BYTES = 4 * 1024
@@ -179,8 +180,13 @@ function statistics(sourceID?: string) {
   }
 }
 
-function configuredSources() {
-  return RESEARCH_SOURCES.map(({ id, name, kind }) => ({ id, name, kind, session_configured: researchSourceHasCredentials({ id }) }))
+function configuredSources(sessionIDs: readonly string[] = []) {
+  return RESEARCH_SOURCES.map((source) => ({
+    id: source.id,
+    name: source.name,
+    kind: source.kind,
+    session_configured: researchSourceHasCredentials(source, sessionIDs),
+  }))
 }
 
 async function drainBatchedCount(run: () => number | Promise<number>) {
@@ -197,7 +203,7 @@ async function drainBatchedCount(run: () => number | Promise<number>) {
   }
 }
 
-async function claimResearchBatch(params: { source?: string; limit: number }) {
+async function claimResearchBatch(params: { source?: string; limit: number; sessionIDs?: readonly string[] }) {
       // One claim per tool response keeps even adversarially escaped untrusted text
       // under the framework's 50 KiB truncation threshold. The caller must continue
       // next/read/save cycles until exhaustion; this is not a total-work limit.
@@ -250,7 +256,7 @@ async function claimResearchBatch(params: { source?: string; limit: number }) {
           (typeof claim.payload.content_length === "number" && claim.payload.content_length > text.length)
         if (!text || cachedTextIsIncomplete) {
           try {
-            const fetched = await fetchResearchSourceForStudy(claim.source_id, claim.source_url)
+            const fetched = await fetchResearchSourceForStudy(claim.source_id, claim.source_url, params.sessionIDs)
             title = fetched.title
             text = fetched.text
             contentFingerprint = fetched.contentFingerprint
@@ -573,9 +579,9 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
   return result
 }
 
-async function backfillResearch(sourceID?: string) {
+async function backfillResearch(sourceID?: string, sessionIDs: readonly string[] = []) {
   const authResumed = await drainBatchedCount(() =>
-    retryAuthenticatedResearch({ sourceID, limit: 500 }),
+    retryAuthenticatedResearch({ sourceID, limit: 500, sessionIDs }),
   )
   const legacyRejectedRequeued = await drainBatchedCount(() =>
     ResearchQueue.requeueLegacyRejected(500, sourceID),
@@ -606,6 +612,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
   ].join("\n"),
   parameters: ResearchStudyParameters,
   async execute(params, ctx) {
+    const sessionIDs = [...new Set([ctx.sessionID, Session.root(ctx.sessionID)].filter((value): value is string => !!value))]
     if (params.source && !RESEARCH_SOURCES.some((entry) => entry.id === params.source)) {
       return output("Unknown research source", "No configured research source has ID: " + params.source, { error: "unknown_source" })
     }
@@ -669,14 +676,14 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         ...statistics(params.source),
         cycle: ResearchCycle.summary(),
         queue_source_filter: params.source ?? null,
-        configured_sources: configuredSources(),
+        configured_sources: configuredSources(sessionIDs),
       }
       return output("Research study status", JSON.stringify(summary, null, 2), summary)
     }
 
     if (params.action === "backfill") {
       const summary = {
-        ...(await backfillResearch(params.source)),
+        ...(await backfillResearch(params.source, sessionIDs)),
         queue_source_filter: params.source ?? null,
         current: statistics(params.source),
       }
@@ -706,8 +713,8 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         return output("Discovery window must expand in sequence", "Continue the per-source collection window exactly as recorded. The first window is 20; every saturated window doubles. This is not a total-work limit.", { error: "page_window_out_of_sequence", source: params.source, requested_page_window: params.pages, expected_page_window: sourceState.next_page_window, source_state: sourceState })
       }
 
-      const legacyBackfill = await backfillResearch(params.source)
-      const results = await discoverResearch({ sourceID: params.source, pages: params.pages, depth: params.depth, agentLed: true })
+      const legacyBackfill = await backfillResearch(params.source, sessionIDs)
+      const results = await discoverResearch({ sourceID: params.source, pages: params.pages, depth: params.depth, agentLed: true, sessionIDs })
       const recorded = results.map((item) => {
         const queue = ResearchQueue.stats(item.source)
         const unresolvedAuth = queue.blocked_auth + queue.crawl_page_auth_blocked
@@ -735,7 +742,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           queued_new: item.added,
           document_types: item.document_types,
           duplicate_urls_skipped: item.duplicate_urls_skipped,
-          session_configured: researchSourceHasCredentials({ id: item.source }),
+          session_configured: researchSourceHasCredentials(RESEARCH_SOURCES.find((source) => source.id === item.source) ?? { id: item.source }, sessionIDs),
           blocked_auth: item.blocked_auth,
           error_count: item.error_count,
           errors: item.errors.slice(0, 3),
@@ -844,7 +851,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
     }
 
     if (params.action === "next") {
-      const batch = await claimResearchBatch(params)
+      const batch = await claimResearchBatch({ ...params, sessionIDs })
       return output(
         batch.batch_size ? "Read public research batch for model study" : "No claimable research items",
         JSON.stringify(batch, null, 2),
@@ -1194,7 +1201,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       result.result === "learned" || result.result === "rejected",
     )
     const nextBatch = params.continue_after_save && canContinue
-      ? await claimResearchBatch({ source: params.source, limit: 1 })
+      ? await claimResearchBatch({ source: params.source, limit: 1, sessionIDs })
       : undefined
     const finalSummary = nextBatch ? { ...summary, next_batch: nextBatch } : summary
     return output("Model-led research study saved", JSON.stringify(finalSummary, null, 2), finalSummary)
