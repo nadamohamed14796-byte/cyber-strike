@@ -866,8 +866,21 @@ export namespace ResearchQueue {
         typeof row.payload?.model_study_version === "number" &&
         row.payload.model_study_version >= RESEARCH_MODEL_STUDY_VERSION,
       )
+      const documentsByType: Record<string, number> = {
+        report: 0, writeup: 0, blog: 0, academy: 0, reference: 0, research: 0, mixed: 0, uncertain: 0, unclassified: 0,
+      }
+      for (const row of reportRows) {
+        const type = row.payload?.document_type
+        if (typeof type === "string" && Object.prototype.hasOwnProperty.call(documentsByType, type)) documentsByType[type]++
+        else documentsByType.unclassified++
+      }
       const counts: Record<string, number> = {
         total: reportRows.length,
+        unique_documents_found: reportRows.length,
+        reports_found: documentsByType.report,
+        writeups_found: documentsByType.writeup,
+        reports_and_writeups_found: documentsByType.report + documentsByType.writeup,
+        documents_by_type: documentsByType,
         crawl_pages: crawlPageRows.length,
         crawl_page_errors: crawlPageRows.filter((row) => row.payload?.crawl_error === true).length,
         crawl_page_auth_blocked: crawlPageRows.filter((row) =>
