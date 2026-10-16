@@ -176,7 +176,6 @@ function statistics(sourceID?: string) {
   return {
     queue: ResearchQueue.stats(sourceID),
     knowledge: ReportKnowledge.stats(),
-    cycle: ResearchCycle.summary(),
   }
 }
 
@@ -668,6 +667,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
     if (params.action === "stats") {
       const summary = {
         ...statistics(params.source),
+        cycle: ResearchCycle.summary(),
         queue_source_filter: params.source ?? null,
         configured_sources: configuredSources(),
       }

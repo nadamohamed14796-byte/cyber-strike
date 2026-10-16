@@ -769,7 +769,7 @@ test("research queue deduplicates identical content across different URLs and ke
         sourceURL: duplicateURL,
         title: "Copied IDOR write-up",
       })?.alias_recorded).toBe(false)
-      expect(ResearchQueue.stats().total).toBe(1)
+      expect(ResearchQueue.stats("original-source").total).toBe(1)
       const claim = ResearchQueue.claimNext("content-dedupe-test", "original-source")
       expect(claim?.sequence).toBe(original.sequence)
       if (!claim) throw new Error("expected the canonical content row to remain studyable")
