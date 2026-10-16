@@ -9,8 +9,6 @@ import {
   parseReconRun as parseRun,
   reconRunID,
   unresolvedReconPrerequisites,
-  type ReconPhase as Phase,
-  type ReconPhaseRecord,
   type ReconPhaseStatus,
   type ReconRunManifest as ReconRun,
 } from "../target/recon-gate"
@@ -28,47 +26,6 @@ const Parameters = z.object({
   counts: z.record(z.string(), z.number().finite().nonnegative()).optional(),
   artifacts: z.array(z.string().min(1).max(1000)).max(100).optional(),
 })
-
-function initialRun(targetURL: string, targetID: string, sessionID: string): ReconRun {
-  const phases = Object.fromEntries(PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<Phase, ReconPhaseRecord>
-  const now = new Date().toISOString()
-  return { schemaVersion: 1, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
-}
-
-function parseRun(raw: string, workspaceID: string, targetURL: string): ReconRun {
-  const parsed = JSON.parse(raw) as ReconRun
-  if (
-    parsed?.schemaVersion !== 1 ||
-    parsed.targetID !== workspaceID ||
-    parsed.targetURL !== targetURL ||
-    typeof parsed.sessionID !== "string" ||
-    !parsed.phases ||
-    !PHASES.every((phase) => parsed.phases[phase] && ["pending", "running", "complete", "blocked", "failed", "unavailable"].includes(parsed.phases[phase].status))
-  ) throw new Error("Recon run manifest has invalid identity or schema; refusing to overwrite it.")
-  return parsed
-}
-
-export function reconRunID(targetID: string): string {
-  return createHash("sha256").update(targetID).digest("hex").slice(0, 20)
-}
-
-function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "unavailable"
-}
-
-/** Pure prerequisite check shared by the runtime gate and unit tests. */
-export function unresolvedReconPrerequisites(phase: ReconPhase, phases: Record<ReconPhase, ReconPhaseRecord>): ReconPhase[] {
-  const earlier = PHASES.slice(0, PHASES.indexOf(phase))
-  const unresolved = earlier.filter((item) =>
-    item === "scope_validation" || item === "workspace_setup"
-      ? phases[item].status !== "complete"
-      : !terminal(phases[item].status),
-  )
-  if (phase !== "scope_validation" && phase !== "workspace_setup" && phases.scope_validation.status !== "complete" && !unresolved.includes("scope_validation")) {
-    unresolved.unshift("scope_validation")
-  }
-  return unresolved
-}
 
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
   description: [
