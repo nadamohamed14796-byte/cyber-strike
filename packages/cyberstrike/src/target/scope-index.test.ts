@@ -18,6 +18,14 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://notatt.com/", entries)).toEqual([])
   })
 
+  test("matches explicit URL paths and host ports without losing boundaries", () => {
+    const entries = ["https://api.att.com/v2/*", "api.att.com:8443"]
+    expect(matchingScopeItems("https://api.att.com/v2/users", entries)).toEqual(["https://api.att.com/v2/*"])
+    expect(matchingScopeItems("https://api.att.com/v20/users", entries)).toEqual([])
+    expect(matchingScopeItems("https://api.att.com:8443/", entries)).toEqual(["api.att.com:8443"])
+    expect(matchingScopeItems("https://api.att.com:9443/", entries)).toEqual([])
+  })
+
   test("matches IPv4 CIDRs and refuses addresses outside the range", () => {
     const entries = ["192.0.2.0/24"]
     expect(matchingScopeItems("https://192.0.2.17/", entries)).toEqual(["192.0.2.0/24"])
