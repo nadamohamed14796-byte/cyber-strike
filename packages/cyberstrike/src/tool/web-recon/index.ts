@@ -1,6 +1,8 @@
 import z from "zod"
 import path from "node:path"
 import { Tool } from "../tool"
+import { Session } from "../../session"
+import { reconPhaseGate, type ReconPhase } from "../recon-checkpoint"
 import { TargetMemory, type Workspace } from "../../target"
 import { redactTargetNoteSecrets } from "../../target/redact"
 import type { ScopeCheck } from "./shared"
@@ -199,8 +201,11 @@ export const WebReconTool = Tool.define("web_recon", {
       try {
         const sessionScopeCheck: ScopeCheck = async (url) => {
           const decision = await TargetMemory.checkURLScope(url)
-          if (decision.allowed && decision.workspace) sessionScopeWorkspaceIDs.add(decision.workspace.id)
-          return decision.allowed
+          if (!decision.allowed || !decision.workspace) return false
+          const gate = await reconPhaseGate(decision.workspace, Session.root(ctx.sessionID), "vulnerability_testing")
+          if (!gate.allowed) return false
+          sessionScopeWorkspaceIDs.add(decision.workspace.id)
+          return true
         }
         result = await sessionScan(ctx.sessionID, params.timeout_seconds, ctx.abort, async (origins) => {
           await ctx.ask({
@@ -243,6 +248,23 @@ export const WebReconTool = Tool.define("web_recon", {
         // nesting the unrelated hostname or manufacturing a second authorization manifest.
       } catch (error) {
         return fail("[-] Could not prepare the canonical target workspace before reconnaissance: " + (error instanceof Error ? error.message : String(error)) + ". No network probes were sent.")
+      }
+
+      const requiredPhase: ReconPhase =
+        ["sitemap_scan", "robots_scan", "openapi_scan", "graphql_probe"].includes(program)
+          ? "url_collection"
+          : program === "tech_detect"
+            ? "live_hosts_ports"
+            : "vulnerability_testing"
+      const gate = await reconPhaseGate(targetWorkspace!, Session.root(ctx.sessionID), requiredPhase)
+      if (!gate.allowed) {
+        return fail([
+          "[-] Recon phase gate blocked " + program + ".",
+          gate.reason,
+          "Checkpoint manifest: " + gate.manifestPath,
+          "No network probes were sent by this program.",
+          "Use recon_checkpoint to resume the ordered phases and explicitly begin " + requiredPhase + " after prerequisites are verified.",
+        ].join("\n"))
       }
 
       await ctx.ask({
