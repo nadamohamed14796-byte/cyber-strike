@@ -21,7 +21,7 @@ type ResearchCredentialSource = Pick<ResearchSource, "id"> & Partial<Pick<Resear
 function safeCookieValue(value: unknown) {
   if (typeof value !== "string") return undefined
   const cookie = value.trim()
-  return cookie && cookie.length <= 16_384 && !/[\\r\\n\\0]/.test(cookie) ? cookie : undefined
+  return cookie && cookie.length <= 16_384 && !/[\r\n\0]/.test(cookie) ? cookie : undefined
 }
 
 function cookieFromHeaders(headers: Record<string, string> | null | undefined) {
@@ -33,8 +33,8 @@ function cookieFromHeaders(headers: Record<string, string> | null | undefined) {
 /** Extract only the Cookie header from a captured request; never return or log the raw request. */
 function cookieFromRawRequest(rawRequest: string | null | undefined) {
   if (!rawRequest) return undefined
-  const headerBlock = rawRequest.split(/\\r?\\n\\r?\\n/, 1)[0] ?? ""
-  const lines = headerBlock.split(/\\r?\\n/)
+  const headerBlock = rawRequest.split(/\r?\n\r?\n/, 1)[0] ?? ""
+  const lines = headerBlock.split(/\r?\n/)
   for (const line of lines.slice(1)) {
     const separator = line.indexOf(":")
     if (separator < 1 || line.slice(0, separator).trim().toLowerCase() !== "cookie") continue
@@ -76,11 +76,11 @@ function capturedSessionRequests(sessionIDs: readonly string[], hostname?: strin
  * copied to research queue rows, prompts, logs, or knowledge records.
  */
 export function researchSessionCookieForHost(sessionIDs: readonly string[], hostname: string) {
-  const normalizedHost = hostname.trim().toLowerCase().replace(/\\.$/, "")
+  const normalizedHost = hostname.trim().toLowerCase().replace(/\.$/, "")
   if (!normalizedHost || /[^a-z0-9.:-]/i.test(normalizedHost)) return undefined
   const rows = capturedSessionRequests(sessionIDs, normalizedHost)
   for (const row of rows) {
-    if (!row.host || row.host.toLowerCase().replace(/\\.$/, "") !== normalizedHost) continue
+    if (!row.host || row.host.toLowerCase().replace(/\.$/, "") !== normalizedHost) continue
     const cookie = cookieFromHeaders(row.credentialHeaders) ?? cookieFromRawRequest(row.rawRequest)
     if (cookie) return cookie
   }
@@ -92,7 +92,7 @@ export function researchSessionCookieHosts(sessionIDs: readonly string[]) {
   const rows = capturedSessionRequests(sessionIDs)
   const hosts = new Set<string>()
   for (const row of rows) {
-    const hostname = row.host?.trim().toLowerCase().replace(/\\.$/, "")
+    const hostname = row.host?.trim().toLowerCase().replace(/\.$/, "")
     if (!hostname) continue
     if (cookieFromHeaders(row.credentialHeaders) || cookieFromRawRequest(row.rawRequest)) hosts.add(hostname)
   }
