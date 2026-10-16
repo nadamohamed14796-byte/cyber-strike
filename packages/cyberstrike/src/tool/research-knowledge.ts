@@ -63,7 +63,10 @@ export const ResearchKnowledgeTool = Tool.define<typeof ResearchKnowledgeParamet
     const output = rows.map((row, i) => {
       const metadata = row.metadata ?? {}
       const extracted = (metadata.extracted && typeof metadata.extracted === "object" ? metadata.extracted : {}) as Record<string, unknown>
-      const signals = Array.isArray(extracted.retrieval_signals) ? extracted.retrieval_signals.filter((v): v is string => typeof v === "string") : []
+      const huntSignal = (metadata.hunt_signal && typeof metadata.hunt_signal === "object" ? metadata.hunt_signal : {}) as Record<string, unknown>
+      const signals = Array.isArray(huntSignal.retrieval_signals)
+        ? huntSignal.retrieval_signals.filter((v): v is string => typeof v === "string")
+        : Array.isArray(extracted.retrieval_signals) ? extracted.retrieval_signals.filter((v): v is string => typeof v === "string") : []
       const coverage = extracted.extraction_coverage && typeof extracted.extraction_coverage === "object"
         ? extracted.extraction_coverage as Record<string, unknown>
         : {}
@@ -118,6 +121,15 @@ export const ResearchKnowledgeTool = Tool.define<typeof ResearchKnowledgeParamet
         "- Remediation/mitigation: " + (clip(extracted.remediation, 1400) || "not extracted"),
         "- Assumptions/limitations: " + (clip(extracted.limitations, 1600) || "not extracted"),
         "- Retrieval signals: " + (signals.join(", ") || "not extracted"),
+        "- **HUNT SIGNAL — invoke when:** " + (clip(huntSignal.trigger, 1000) || clip(extracted.trigger_signal, 1000) || "no explicit trigger recorded; use other evidence cautiously"),
+        "- **HUNT SIGNAL — next procedure:** " + (clip(huntSignal.procedure, 2200) || clip(extracted.test_procedure, 2200) || "no procedure recorded"),
+        "- **HUNT SIGNAL — expected positive branch:** " + (clip(huntSignal.expected_positive_signals, 1400) || clip(extracted.expected_positive_signals, 1400) || "not recorded"),
+        "- **HUNT SIGNAL — expected negative branch:** " + (clip(huntSignal.expected_negative_signals, 1400) || clip(extracted.expected_negative_signals, 1400) || "not recorded"),
+        "- **HUNT SIGNAL — evidence required:** " + (clip(huntSignal.evidence_requirements, 1400) || clip(extracted.evidence_requirements, 1400) || "not recorded"),
+        "- **HUNT SIGNAL — applicable when:** " + (clip(huntSignal.applicability_conditions, 1000) || clip(extracted.applicability_conditions, 1000) || "not recorded"),
+        "- **HUNT SIGNAL — do not use when:** " + (clip(huntSignal.non_applicability_conditions, 1000) || clip(extracted.non_applicability_conditions, 1000) || "not recorded"),
+        "- **HUNT SIGNAL — false-positive / stop rules:** " + (clip(huntSignal.false_positive_cautions, 1400) || clip(extracted.false_positive_cautions, 1400) || "not recorded"),
+        "- **HUNT SIGNAL — provenance/confidence:** " + (clip(huntSignal.verification_status, 200) || clip(extracted.verification_status, 200) || "unknown") + "; trust " + (typeof huntSignal.source_trust === "number" ? huntSignal.source_trust + "/100" : "unknown") + "; evidence " + (clip(huntSignal.confidence_basis, 1000) || clip(extracted.decisive_evidence, 1000) || "not recorded"),
         "- Source excerpt: " + (clip(metadata.excerpt) || "not stored"),
       ].join("\n")
     })
