@@ -151,11 +151,6 @@ export function rankSkillsForPhase(
         score += 35
       }
     }
-    if (phaseId === "passive_recon" || phaseId === "active_recon") {
-      if (/\brecon\b|reconnaissance|subdomain|osint|enumeration|port scan|vhost|virtual host/.test(searchable)) {
-        score += 55
-      }
-    }
     // A single generic token (for example "tech" from "tech-profile") is not enough
     // to select an otherwise unrelated skill. Require either multiple token matches
     // or a substantive exact/tag/description/technology signal.
@@ -165,21 +160,6 @@ export function rankSkillsForPhase(
   ranked.sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
   const selected: RankedPhaseSkill[] = []
   const seen = new Set<string>()
-
-  // Recon preflight has a hard coverage requirement: reserve one slot for a
-  // recon-specific skill even when a generic high-scoring skill ranks first.
-  if (phaseId === "passive_recon" || phaseId === "active_recon") {
-    const recon = ranked.find(({ entry }) => {
-      const text = normalizeSkillText([
-        entry.name, entry.category ?? "", entry.description, ...entry.tags,
-      ].join(" "))
-      return /\brecon\b|reconnaissance|subdomain|osint|enumeration|port scan|vhost|virtual host/.test(text)
-    })
-    if (recon) {
-      selected.push(recon)
-      seen.add(recon.entry.name)
-    }
-  }
 
   for (const item of ranked) {
     if (selected.length >= Math.max(0, limit)) break
@@ -202,7 +182,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       "## Canonical Recon Methodology",
       "Follow the single ordered workflow injected from methodology/recon.ts. Do not search for or load overlapping recon-specific skills; the canonical methodology already consolidates scope validation, asset/subdomain discovery, service profiling, URL and parameter collection, JavaScript analysis, endpoint inventory, browser-extension correlation, and checkpoint/resume rules.",
       "Use recon_checkpoint and the persisted scope gate as execution controls. Record outputs and provenance in the target workspace before advancing phases.",
-    ].join("\\n")
+    ].join("\n")
   }
   const lines = [
     "## Required Skill Preflight",
