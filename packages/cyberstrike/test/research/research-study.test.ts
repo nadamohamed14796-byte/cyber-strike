@@ -182,6 +182,17 @@ test("agent-led research study persists model analysis and completes its queue l
           verification_signals: ["The second account receives the exact private object owned by the first account."],
           false_positive_cautions: ["The object may intentionally be public or shared with both accounts."],
           retrieval_signals: ["idor", "object-identifier", "authorization-boundary", "CWE-639"],
+          hunt_patterns: [{
+            observed_signature: "Authenticated request contains a caller-controlled object ID and returns a record with an explicit owner identity.",
+            identity_relationship: { requester: "second controlled account", object_owner: "first controlled account" },
+            matching_conditions: ["The record is private and not intentionally shared."],
+            decision_branches: [
+              { when: "Second account receives the first account's private record", next: "Capture ownership evidence and verify the access boundary." },
+              { when: "The record is public or intentionally shared", next: "Do not classify this as IDOR; record the negative evidence." },
+            ],
+            evidence_to_capture: ["Owner baseline", "Second-account response", "Object ownership field"],
+            confidence_limit: "Educational example; independently verify the behavior on the current authorized target.",
+          }],
         }],
       }, context)
 
@@ -198,6 +209,14 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(knowledge?.cwe_id).toBe("CWE-639")
       expect(knowledge?.metadata?.study_method).toBe("llm-assisted-agent-command-v1")
       expect(knowledge?.metadata?.document_type).toBe("academy")
+      const huntSignal = knowledge?.metadata?.hunt_signal as Record<string, unknown> | undefined
+      expect(huntSignal?.trigger).toContain("caller-controlled")
+      expect(huntSignal?.patterns).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          observed_signature: expect.stringContaining("caller-controlled object ID"),
+          identity_relationship: expect.objectContaining({ requester: "second controlled account" }),
+        }),
+      ]))
       const extracted = knowledge?.metadata?.extracted as Record<string, unknown> | undefined
       expect(extracted?.document_type).toBe("academy")
       expect(extracted?.failed_tests).toEqual(["A modified identifier returns the same authorized public object."])
@@ -221,6 +240,9 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(retrieved.output).toContain("Failed tests described by source: A modified identifier returns the same authorized public object.")
       expect(retrieved.output).toContain("Reusable pattern: Cross-account object ownership check")
       expect(retrieved.output).toContain("Ordered test procedure: Capture the owner's baseline request.")
+      expect(retrieved.output).toContain("MODEL-DEFINED HUNT PATTERNS")
+      expect(retrieved.output).toContain("identity_relationship")
+      expect(retrieved.output).toContain("confidence_limit")
       
       const completedQueueRow = ResearchQueue.find(sourceID, sourceURL)
       expect(completedQueueRow?.status).toBe("learned")
