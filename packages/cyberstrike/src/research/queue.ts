@@ -26,6 +26,11 @@ function publicID(sequence: number) {
   return "RPT-" + String(sequence).padStart(6, "0")
 }
 
+function fingerprintFromPayload(payload?: Record<string, unknown>) {
+  const value = payload?.content_fingerprint
+  return typeof value === "string" && /^[a-f0-9]{40}$/i.test(value) ? value.toLowerCase() : undefined
+}
+
 export namespace ResearchQueue {
   export function enqueue(input: {
     sourceID: string
@@ -49,6 +54,7 @@ export namespace ResearchQueue {
           const promoted = db.update(ResearchQueueTable).set({
             title: input.title ?? existing.title,
             payload: input.payload ?? {},
+            content_fingerprint: fingerprintFromPayload(input.payload) ?? existing.content_fingerprint,
             status: "queued",
             attempts: 0,
             last_error: null,
@@ -71,6 +77,7 @@ export namespace ResearchQueue {
           source_id: input.sourceID,
           source_url: input.sourceURL,
           title: input.title ?? null,
+          content_fingerprint: fingerprintFromPayload(input.payload) ?? null,
           payload: input.payload ?? {},
           status: "queued",
           attempts: 0,
@@ -118,6 +125,7 @@ export namespace ResearchQueue {
           source_id: input.sourceID,
           source_url: input.sourceURL,
           title: input.title,
+          content_fingerprint: fingerprintFromPayload(payload) ?? null,
           payload,
           status: "queued",
           attempts: 0,
@@ -183,6 +191,7 @@ export namespace ResearchQueue {
       const requeued = existing.status !== "queued" && existing.status !== "retry"
       const updated = db.update(ResearchQueueTable).set({
         title: input.title || existing.title,
+        content_fingerprint: fingerprintFromPayload(payload) ?? existing.content_fingerprint,
         payload,
         status: "queued",
         attempts: requeued ? 0 : existing.attempts,
@@ -249,6 +258,66 @@ export namespace ResearchQueue {
   export function find(sourceID: string, sourceURL: string) {
     return Database.use((db) => db.select().from(ResearchQueueTable)
       .where(and(eq(ResearchQueueTable.source_id, sourceID), eq(ResearchQueueTable.source_url, sourceURL))).get())
+  }
+
+  /**
+   * Detect identical sanitized source content across different URLs and retain the
+   * alternate source as provenance on the canonical queued document. A content hash
+   * is indexed in SQLite, so this does not require scanning the whole queue per page.
+   */
+  export function recordContentDuplicate(input: {
+    contentFingerprint: string
+    sourceID: string
+    sourceURL: string
+    title?: string
+  }) {
+    const fingerprint = input.contentFingerprint.toLowerCase()
+    if (!/^[a-f0-9]{40}$/.test(fingerprint)) return null
+    const now = Date.now()
+    return Database.transaction((db) => {
+      const matches = db.select().from(ResearchQueueTable)
+        .where(eq(ResearchQueueTable.content_fingerprint, fingerprint))
+        .orderBy(asc(ResearchQueueTable.sequence))
+        .all()
+      const canonical = matches.find((row) =>
+        row.payload?.crawl_page !== true && row.source_url !== input.sourceURL,
+      )
+      if (!canonical) return null
+      const payload = canonical.payload ?? {}
+      const previousAliases = Array.isArray(payload.duplicate_content_sources)
+        ? payload.duplicate_content_sources.filter((value): value is Record<string, unknown> =>
+            !!value && typeof value === "object" && !Array.isArray(value),
+          )
+        : []
+      const alreadyRecorded = previousAliases.some((value) =>
+        value.source_id === input.sourceID && value.source_url === input.sourceURL,
+      )
+      const alias = {
+        source_id: input.sourceID,
+        source_url: input.sourceURL,
+        title: input.title?.slice(0, 500) ?? null,
+        duplicate_fingerprint: fingerprint,
+        first_seen_at: now,
+      }
+      const updatedPayload = {
+        ...payload,
+        duplicate_content_sources: alreadyRecorded ? previousAliases : [...previousAliases, alias],
+        duplicate_content_count: alreadyRecorded ? previousAliases.length : previousAliases.length + 1,
+      }
+      const updated = db.update(ResearchQueueTable).set({
+        payload: updatedPayload,
+        updated_at: now,
+      }).where(eq(ResearchQueueTable.sequence, canonical.sequence)).returning().get()
+      if (!updated) return null
+      return {
+        id: publicID(updated.sequence),
+        sequence: updated.sequence,
+        source_id: updated.source_id,
+        source_url: updated.source_url,
+        duplicate: true as const,
+        alias_recorded: !alreadyRecorded,
+      }
+    })
   }
 
   export function isFreshCrawlPage(sourceID: string, sourceURL: string, now = Date.now(), maxAge = CRAWL_PAGE_TTL_MS) {
@@ -659,6 +728,7 @@ export namespace ResearchQueue {
       }
       const updated = db.update(ResearchQueueTable).set({
         title: input.title.slice(0, 500),
+        content_fingerprint: input.contentFingerprint.toLowerCase(),
         payload,
         updated_at: now,
       }).where(and(

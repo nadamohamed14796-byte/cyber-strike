@@ -722,3 +722,59 @@ test("research queue records oversized source blockers as terminal and visible",
     },
   })
 })
+
+
+test("research queue deduplicates identical content across different URLs and keeps source provenance", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const fingerprint = "c".repeat(40)
+      const originalURL = "https://research.example.test/original-writeup"
+      const duplicateURL = "https://mirror.example.test/copied-writeup"
+      const original = ResearchQueue.enqueue({
+        sourceID: "original-source",
+        sourceURL: originalURL,
+        title: "Original IDOR write-up",
+        payload: {
+          content_fingerprint: fingerprint,
+          cached_text: "Full sanitized content. ".repeat(20),
+          document_type: "writeup",
+        },
+      })
+      expect(original.created).toBe(true)
+      const duplicate = ResearchQueue.recordContentDuplicate({
+        contentFingerprint: fingerprint,
+        sourceID: "mirror-source",
+        sourceURL: duplicateURL,
+        title: "Copied IDOR write-up",
+      })
+      expect(duplicate).toMatchObject({
+        id: original.id,
+        source_id: "original-source",
+        source_url: originalURL,
+        duplicate: true,
+        alias_recorded: true,
+      })
+      const stored = ResearchQueue.find("original-source", originalURL)
+      expect(stored?.payload?.duplicate_content_count).toBe(1)
+      expect(stored?.payload?.duplicate_content_sources).toContainEqual(expect.objectContaining({
+        source_id: "mirror-source",
+        source_url: duplicateURL,
+        duplicate_fingerprint: fingerprint,
+      }))
+      expect(ResearchQueue.recordContentDuplicate({
+        contentFingerprint: fingerprint,
+        sourceID: "mirror-source",
+        sourceURL: duplicateURL,
+        title: "Copied IDOR write-up",
+      })?.alias_recorded).toBe(false)
+      expect(ResearchQueue.stats().total).toBe(1)
+      const claim = ResearchQueue.claimNext("content-dedupe-test", "original-source")
+      expect(claim?.sequence).toBe(original.sequence)
+      if (!claim) throw new Error("expected the canonical content row to remain studyable")
+      expect(ResearchQueue.complete(claim.sequence, claim.lease_owner, "learned")?.status).toBe("learned")
+      await Instance.dispose()
+    },
+  })
+})

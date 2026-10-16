@@ -1069,32 +1069,43 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           const canQueue = relevance.accepted || (input.agentLed === true && !relevance.excluded)
           if (canQueue && !isIndexLikeResearchUrl(current.url)) {
             const documentType = classifyResearchDocumentType(title, text, source.kind)
-            const row = ResearchQueue.enqueue({
+            const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
+            const contentDuplicate = ResearchQueue.recordContentDuplicate({
+              contentFingerprint,
               sourceID: source.id,
               sourceURL: current.url,
               title,
-              payload: {
-                source_name: source.name,
-                source_kind: source.kind,
-                source_trust: source.trust,
-                document_type: documentType,
-                crawl_depth: current.depth,
-                candidate_score: candidateScore(current.url, source),
-                source_relevance_precheck: { accepted: relevance.accepted, score: relevance.score, agent_review_requested: !relevance.accepted },
-                // Discovery already fetched and sanitized this full resource. Preserve the
-                // complete text in the durable queue so model study does not need to refetch it.
-                // The active-model tool returns bounded sequential chunks to fit tool output limits.
-                cached_text: text,
-                cached_text_truncated: false,
-                content_length: text.length,
-                content_fingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
-              },
             })
-            if (row.created) {
-              added++
-              collectedTypes[documentType] = (collectedTypes[documentType] ?? 0) + 1
-            } else {
+            if (contentDuplicate) {
               duplicateURLs.add(current.url)
+            } else {
+              const row = ResearchQueue.enqueue({
+                sourceID: source.id,
+                sourceURL: current.url,
+                title,
+                payload: {
+                  source_name: source.name,
+                  source_kind: source.kind,
+                  source_trust: source.trust,
+                  document_type: documentType,
+                  crawl_depth: current.depth,
+                  candidate_score: candidateScore(current.url, source),
+                  source_relevance_precheck: { accepted: relevance.accepted, score: relevance.score, agent_review_requested: !relevance.accepted },
+                  // Discovery already fetched and sanitized this full resource. Preserve the
+                  // complete text in the durable queue so model study does not need to refetch it.
+                  // The active-model tool returns bounded sequential chunks to fit tool output limits.
+                  cached_text: text,
+                  cached_text_truncated: false,
+                  content_length: text.length,
+                  content_fingerprint: contentFingerprint,
+                },
+              })
+              if (row.created) {
+                added++
+                collectedTypes[documentType] = (collectedTypes[documentType] ?? 0) + 1
+              } else {
+                duplicateURLs.add(current.url)
+              }
             }
           }
         }

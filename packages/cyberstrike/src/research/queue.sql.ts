@@ -7,6 +7,7 @@ export const ResearchQueueTable = sqliteTable(
     source_id: text().notNull(),
     source_url: text().notNull(),
     title: text(),
+    content_fingerprint: text(),
     payload: text({ mode: "json" }).$type<Record<string, unknown>>().notNull().default({}),
     status: text().notNull().default("queued"),
     attempts: integer().notNull().default(0),
@@ -23,5 +24,6 @@ export const ResearchQueueTable = sqliteTable(
     index("research_queue_status_idx").on(table.status),
     index("research_queue_lease_idx").on(table.lease_until),
     index("research_queue_sequence_idx").on(table.sequence),
+    index("research_queue_content_fingerprint_idx").on(table.content_fingerprint),
   ],
 )
