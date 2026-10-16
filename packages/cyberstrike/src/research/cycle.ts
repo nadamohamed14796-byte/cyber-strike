@@ -66,7 +66,12 @@ export namespace ResearchCycle {
   }
 
   export function clear() {
-    return Database.transaction((db) => db.delete(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).run().changes)
+    return Database.transaction((db) => {
+      const rows = db.select({ id: ResearchCycleTable.id }).from(ResearchCycleTable)
+        .where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).all()
+      db.delete(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).run()
+      return rows.length
+    })
   }
 
   /** Save every discovery pass before returning to the agent. */
