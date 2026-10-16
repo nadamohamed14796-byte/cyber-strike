@@ -18,6 +18,12 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://notatt.com/", entries)).toEqual([])
   })
 
+  test("matches IPv6 CIDR ranges", () => {
+    const entries = ["2001:db8::/32"]
+    expect(matchingScopeItems("https://[2001:db8::1]/", entries)).toEqual(["2001:db8::/32"])
+    expect(matchingScopeItems("https://[2001:db9::1]/", entries)).toEqual([])
+  })
+
   test("matches explicit URL paths and host ports without losing boundaries", () => {
     const entries = ["https://api.att.com/v2/*", "api.att.com:8443"]
     expect(matchingScopeItems("https://api.att.com/v2/users", entries)).toEqual(["https://api.att.com/v2/*"])
