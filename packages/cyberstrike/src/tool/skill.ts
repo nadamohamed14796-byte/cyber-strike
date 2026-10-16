@@ -232,6 +232,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       const base = pathToFileURL(dir).href
 
       const limit = 10
+      // Companion-file discovery is best-effort: filesystem/ripgrep failures must
+      // not turn a successfully loaded SKILL.md into a failed skill invocation.
+      // Cancellation remains fatal so aborted tool calls never report success.
       const files = await iife(async () => {
         const arr: string[] = []
         for await (const file of Ripgrep.files({
@@ -245,7 +248,12 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           if (arr.length >= limit) break
         }
         return arr
-      }).then((f) => f.map((file) => `<file>${file}</file>`).join("\n"))
+      })
+        .then((f) => f.map((file) => `<file>${file}</file>`).join("\n"))
+        .catch((error) => {
+          if (ctx.abort.aborted) throw error
+          return "<file-list-unavailable>Skill content loaded; companion-file listing failed.</file-list-unavailable>"
+        })
 
       const chains = SkillIndex.chainsFrom(skill.name)
       const chainInfo =
