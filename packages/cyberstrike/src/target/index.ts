@@ -198,6 +198,20 @@ function normalizeScopeItem(input: string): string {
     return octets.join(".") + "/" + prefix
   }
 
+  // Preserve exact IPv6 literals as bracketed URL hostnames so URL matching can
+  // compare them without confusing colons with a service-port separator.
+  if (value.includes(":") && !value.includes("/") && !/^https?:\\/\\//i.test(value)) {
+    const rawIPv6 = value.replace(/^\\[|\\]$/g, "")
+    if (rawIPv6.includes(":")) {
+      try {
+        const ipv6URL = new URL("https://[" + rawIPv6 + "]")
+        if (ipv6URL.hostname.startsWith("[") && ipv6URL.hostname.endsWith("]")) return ipv6URL.hostname.toLowerCase()
+      } catch {
+        // Continue to host:port or the opaque-scope preservation path.
+      }
+    }
+  }
+
   // Host:port is a valid service scope entry and is intentionally distinct from
   // a bare domain, which matches that hostname independent of port.
   const hostPort = value.match(/^([^:/]+):(\d{1,5})$/)
