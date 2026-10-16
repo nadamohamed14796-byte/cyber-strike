@@ -36,6 +36,12 @@ test("scope must be completed, not unavailable, before discovery or testing", ()
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("scope_validation")
 })
 
+test("workspace setup cannot be bypassed by marking it unavailable", () => {
+  const state = records("complete")
+  state.workspace_setup = { status: "unavailable", reason: "workspace files missing" }
+  expect(unresolvedReconPrerequisites("asset_discovery", state)).toContain("workspace_setup")
+})
+
 test("unavailable non-scope phases are explicit terminal checkpoints", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "unavailable", reason: "No JavaScript assets were observed" }
