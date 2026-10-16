@@ -21,7 +21,7 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
   const hostPorts: string[] = []
   for (const item of items) {
     if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
-    else if (/^\d+(?:\.\d+){3}\/.+$/.test(item)) cidrs.push(item)
+    else if (/^\d+(?:\.\d+){3}\/.+$/.test(item) || (item.includes("/") && item.includes(":"))) cidrs.push(item)
     else if (/^[^:/]+:\d{1,5}$/.test(item)) hostPorts.push(item)
     else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2))
     else exactHosts.add(item)
