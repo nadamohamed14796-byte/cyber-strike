@@ -809,13 +809,15 @@ export namespace JavaScriptCorrelation {
       // Legacy path-only findings without a target foreign key are ambiguous across
       // multi-host sessions. Do not attach them to whichever target happens to share a path.
       if (!finding.target_id) continue
-      const endpointPath = endpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "").split(/[?#]/, 1)[0]!
-      const matchesAttributedRequest = relevantRequests.some((request) =>
-        requestTargetWorkspaceIDs.get(request.id) === finding.target_id &&
-        (request.normalized_path === endpointPath ||
-          request.normalized_path.includes(endpointPath) ||
-          endpointPath.includes(request.normalized_path)),
-      )
+      const endpointValue = endpoint.replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)\s+/i, "")
+      const endpointURL = safeURL(endpointValue)
+      const endpointPath = (endpointURL?.pathname ?? endpointValue).split(/[?#]/, 1)[0]!
+      const matchesAttributedRequest = relevantRequests.some((request) => {
+        if (requestTargetWorkspaceIDs.get(request.id) !== finding.target_id) return false
+        const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+        if (endpointURL && requestURL?.origin !== endpointURL.origin) return false
+        return matchesEndpointPathTemplate(endpointPath, request.normalized_path)
+      })
       if (matchesAttributedRequest) findings.push(finding)
     }
 
@@ -1034,10 +1036,7 @@ export namespace JavaScriptCorrelation {
         if (finding.targetID && requestTargetWorkspaceIDs.get(request.id) !== finding.targetID) return false
         const requestURL = safeURL(request.url)
         if (endpointURL && requestURL?.origin !== endpointURL.origin) return false
-        return endpointPath === request.normalizedPath ||
-          request.normalizedPath === endpointPath ||
-          (endpointPath.startsWith("/") && request.normalizedPath.startsWith(endpointPath)) ||
-          (endpointPath.length > 2 && request.normalizedPath.includes(endpointPath))
+        return matchesEndpointPathTemplate(endpointPath, request.normalizedPath)
       })
       for (const request of matching) {
         graph.edges.push({
