@@ -373,7 +373,7 @@ export function classifyResearchDocumentType(
   title: string,
   text: string,
   configuredKind: ResearchSourceKind,
-): "report" | "writeup" | "blog" | "academy" | "reference" | "research" | "mixed" | "uncertain" {
+): "report" | "writeup" | "blog" | "academy" | "cheatsheet" | "reference" | "research" | "mixed" | "uncertain" {
   const normalizedTitle = title.toLowerCase()
   const sample = (title + "\n" + text.slice(0, 12000)).toLowerCase()
   const explicitReportTitle = /\b(?:vulnerability report|bug bounty report|security report|disclosure report)\b/.test(normalizedTitle)
@@ -402,6 +402,7 @@ export function classifyResearchDocumentType(
     ["writeup", writeupSignals] as const,
     ["blog", blogSignals] as const,
     ["research", researchSignals ? 2 : 0] as const,
+    ["cheatsheet", cheatsheetSignals ? 3 : 0] as const,
     ["reference", referenceSignals ? 2 : 0] as const,
     ["academy", academySignals ? 3 : 0] as const,
   ].sort((a, b) => b[1] - a[1])
@@ -1106,7 +1107,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
 
         // Match the learner's minimum text length so short pages are rejected
         // during discovery instead of occupying a durable queue slot first.
-        if (text.length >= 250 && (current.depth === 0 || isResearchCandidate(current.url, source))) {
+        if (text.length >= 250 && (current.depth === 0 || isResearchCandidate(current.url, source) || input.agentLed === true)) {
           const relevance = sourceRelevance(current.url, title, text, source)
           const canQueue = relevance.accepted || (input.agentLed === true && !relevance.excluded)
           if (canQueue && !isIndexLikeResearchUrl(current.url) && !isIndexLikeResearchContent({
