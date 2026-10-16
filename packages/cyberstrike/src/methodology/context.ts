@@ -18,7 +18,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   passive_recon: [],
   active_recon: [],
   technology_profiling: [
-    "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09", "wstg-recon-config",
+    "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09",
     "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
     "attack-nestjs", "attack-nextjs", "attack-nodejs", "attack-springboot",
     "attack-wordpress", "attack-exchange-owa", "attack-zimbra", "attack-hikvision-isapi",
@@ -63,7 +63,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "API security", "GraphQL", "REST API",
   ],
   infrastructure: [
-    "recon-asn-infrastructure", "recon-origin-ip-discovery", "attack-cloud-misconfig",
+    "attack-cloud-misconfig",
     "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-docker-privesc",
     "k8s-assessment", "ad-security", "attack-ldap", "attack-ntlm-info",
     "aws-postexploit", "azure-postexploit", "gcp-postexploit", "k8s-postexploit",
@@ -102,6 +102,7 @@ export function rankSkillsForPhase(
   limit = 10,
   observedTechStack: string[] = [],
 ): Array<{ name: string; description: string; query: string; score: number }> {
+  if (phaseId === "scope_analysis" || phaseId === "passive_recon" || phaseId === "active_recon") return []
   const queries = skillQueriesForPhase(phaseId)
   const observedTechnologies = observedTechStack.map(normalizeSkillText).filter(Boolean)
   const phase = Phase.get(phaseId)
@@ -196,12 +197,18 @@ export function rankSkillsForPhase(
 }
 
 async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): Promise<string> {
+  if (phaseId === "scope_analysis" || phaseId === "passive_recon" || phaseId === "active_recon") {
+    return [
+      "## Canonical Recon Methodology",
+      "Follow the single ordered workflow injected from methodology/recon.ts. Do not search for or load overlapping recon-specific skills; the canonical methodology already consolidates scope validation, asset/subdomain discovery, service profiling, URL and parameter collection, JavaScript analysis, endpoint inventory, browser-extension correlation, and checkpoint/resume rules.",
+      "Use recon_checkpoint and the persisted scope gate as execution controls. Record outputs and provenance in the target workspace before advancing phases.",
+    ].join("\\n")
+  }
   const lines = [
     "## Required Skill Preflight",
     "Before doing phase work, use the `skill` tool action=`search` to discover relevant skills for each distinct task, then action=`load` with the exact skill name. Wait for each tool result and verify the skill content was returned before claiming it is loaded.",
     "The candidate list below is a ranked shortlist, not the complete catalog. Search again for every applicable subtask, observed technology/framework, protocol, and vulnerability class; load all skills that materially apply to the current evidence, not unrelated skills from the whole catalog.",
     "Load the general phase methodology plus specialized skills for each distinct work area. A recommendation is not a loaded skill, and a generic skill does not satisfy coverage for a specialized task. Re-check the catalog when new endpoints, assets, authentication flows, technologies, or vulnerability signals appear.",
-    "For passive_recon and active_recon, load recon-methodology (or the closest available methodology skill) and at least one task-specific recon skill before reconnaissance. Search and load additional relevant skills for subdomain/DNS, service/port discovery, virtual hosts, CMS/framework detection, origin-IP, email/DNS security, exposed repositories, historical URLs, visual recon, and takeover checks when applicable. Do not claim a task was covered merely because a skill was recommended.",
     "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
   ]
 
