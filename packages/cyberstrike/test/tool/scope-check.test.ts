@@ -5,6 +5,13 @@ import { TargetMemory } from "../../src/target"
 import { tmpdir } from "../fixture/fixture"
 
 describe("scope_check IPv4 CIDR matching", () => {
+  test("supports IPv6 literals and CIDR ranges", () => {
+    expect(checkMatch("https://[2001:db8::1]/", "2001:db8::/32").matches).toBe(true)
+    expect(checkMatch("https://[2001:db8:1::1]/", "2001:db8::/32").matches).toBe(false)
+    expect(checkMatch("https://[2001:db8::1]/", "2001:db8::/129").matches).toBe(false)
+    expect(checkMatch("https://[2001:db8::1]/", "[2001:db8::1]").matches).toBe(true)
+  })
+
   test("supports explicit URL scope with exact scheme, port, and path boundaries", () => {
     expect(checkMatch("https://example.com/api/users", "https://example.com/api/*").matches).toBe(true)
     expect(checkMatch("https://example.com/api/users/1", "https://example.com/api/*").matches).toBe(true)
