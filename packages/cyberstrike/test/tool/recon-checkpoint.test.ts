@@ -44,6 +44,12 @@ test("scope must be completed, not unavailable, before discovery or testing", ()
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("scope_validation")
 })
 
+test("phase order includes parameter discovery after URL collection", () => {
+  expect(phases.indexOf("parameter_discovery")).toBe(phases.indexOf("url_collection") + 1)
+  expect(phases.indexOf("javascript_analysis")).toBe(phases.indexOf("parameter_discovery") + 1)
+  expect(phases.indexOf("endpoint_inventory")).toBe(phases.indexOf("javascript_analysis") + 1)
+})
+
 test("workspace setup cannot be bypassed by marking it unavailable", () => {
   const state = records("complete")
   state.workspace_setup = { status: "unavailable", reason: "workspace files missing" }
