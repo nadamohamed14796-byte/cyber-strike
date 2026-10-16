@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import {
+  reconRunID,
   unresolvedReconPrerequisites,
   type ReconPhase,
   type ReconPhaseRecord,
@@ -20,6 +21,11 @@ const phases: ReconPhase[] = [
 function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPhase, ReconPhaseRecord> {
   return Object.fromEntries(phases.map((phase) => [phase, { status }])) as Record<ReconPhase, ReconPhaseRecord>
 }
+
+test("recon run identity is stable across session resumes", () => {
+  expect(reconRunID("target-root-1")).toBe(reconRunID("target-root-1"))
+  expect(reconRunID("target-root-1")).not.toBe(reconRunID("different-target"))
+})
 
 test("recon phases cannot skip pending prerequisites", () => {
   const state = records()
