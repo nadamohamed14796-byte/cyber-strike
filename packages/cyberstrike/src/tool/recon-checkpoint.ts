@@ -130,6 +130,12 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       const phaseIndex = PHASES.indexOf(phase)
 
       if (params.action === "begin") {
+        if (phase !== "scope_validation" && phase !== "workspace_setup") {
+          const scopeDecision = await TargetMemory.checkURLScope(workspace.targetURL)
+          if (!scopeDecision.allowed || scopeDecision.workspace?.id !== workspace.id) {
+            return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the canonical target workspace does not pass its current persisted scope gate: " + scopeDecision.reason, metadata: { saved: false, reason: "persisted_scope_rejected", scope_reason: scopeDecision.reason } }
+          }
+        }
         const unresolved = unresolvedReconPrerequisites(phase, run.phases)
         if (unresolved.length) {
           return { title: "Recon phase blocked by prerequisites", output: "Cannot begin " + phase + ". Resolve earlier phases first: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "prerequisites_unresolved", unresolved } }
