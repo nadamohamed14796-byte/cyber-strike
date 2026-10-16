@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
+import fs from "node:fs/promises"
 import { pathToFileURL } from "url"
 import type { PermissionNext } from "../../src/permission/next"
 import type { Tool } from "../../src/tool/tool"
@@ -114,4 +115,54 @@ Use this skill.
       process.env.CYBERSTRIKE_TEST_HOME = home
     }
   })
+
+  test("skill remains loaded when companion-file enumeration fails", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillDir = path.join(dir, ".cyberstrike", "skill", "listing-failure-skill")
+        await Bun.write(
+          path.join(skillDir, "SKILL.md"),
+          `---
+name: listing-failure-skill
+description: Skill whose companion listing fails.
+---
+# Listing Failure Skill
+The skill body must still load.
+`,
+        )
+      },
+    })
+
+    const home = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          // Prime the skill catalog, then remove only its directory. The cached
+          // SKILL.md remains available while Ripgrep.files must fail on ENOENT.
+          const skillDir = path.join(tmp.path, ".cyberstrike", "skill", "listing-failure-skill")
+          expect((await (await import("../../src/skill")).Skill.all()).some((skill) => skill.name === "listing-failure-skill")).toBe(true)
+          await fs.rm(skillDir, { recursive: true, force: true })
+
+          const tool = await SkillTool.init()
+          const ctx: Tool.Context = {
+            ...baseCtx,
+            ask: async () => {},
+          }
+          const result = await tool.execute({ action: "load", name: "listing-failure-skill" }, ctx)
+
+          expect(SkillContext.isLoaded("listing-failure-skill")).toBe(true)
+          expect(result.title).toBe("Loaded skill: listing-failure-skill")
+          expect(result.output).toContain("The skill body must still load.")
+          expect(result.output).toContain("<file-list-unavailable>")
+          SkillContext.unload("listing-failure-skill")
+        },
+      })
+    } finally {
+      process.env.CYBERSTRIKE_TEST_HOME = home
+    }
+  })
+
 })
