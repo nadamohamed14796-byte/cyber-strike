@@ -489,11 +489,42 @@ export interface JavaScriptCorrelationGraph {
  * performs no HTTP requests and stores only redacted, size-limited response previews.
  */
 export namespace JavaScriptCorrelation {
+  export type BuildResult = {
+    graph: JavaScriptCorrelationGraph
+    workspacePath: string
+    graphPath: string
+    endpointPath: string
+    noteID: string
+  }
+
+  const buildQueues = new Map<string, Promise<BuildResult>>()
+
   export async function build(input: {
     sessionID: string
     targetURL: string
     javascriptURL?: string
-  }): Promise<{ graph: JavaScriptCorrelationGraph; workspacePath: string; graphPath: string; endpointPath: string; noteID: string }> {
+  }): Promise<BuildResult> {
+    const rootSessionID = Session.root(input.sessionID)
+    const targetURL = TargetMemory.normalize(input.targetURL).targetURL
+    const selector = input.javascriptURL ? safeURL(input.javascriptURL)?.origin + safeURL(input.javascriptURL)?.pathname : "all-assets"
+    const key = rootSessionID + "\\0" + targetURL + "\\0" + selector
+    const previous = buildQueues.get(key)
+    const current = (previous ? previous.catch(() => undefined) : Promise.resolve(undefined)).then(() =>
+      buildInternal(input),
+    )
+    buildQueues.set(key, current)
+    try {
+      return await current
+    } finally {
+      if (buildQueues.get(key) === current) buildQueues.delete(key)
+    }
+  }
+
+  async function buildInternal(input: {
+    sessionID: string
+    targetURL: string
+    javascriptURL?: string
+  }): Promise<BuildResult> {
     const rootSessionID = Session.root(input.sessionID)
     const normalizedTarget = TargetMemory.normalize(input.targetURL)
     const explicitJS = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
