@@ -197,6 +197,26 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if (status === "complete" && !params.summary?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
         }
+        if (status === "complete" && phase === "scope_validation") {
+          const decision = await TargetMemory.checkURLScope(workspace.targetURL)
+          if (!decision.allowed || decision.workspace?.id !== workspace.id) {
+            return { title: "Scope validation rejected", output: "Cannot mark scope_validation complete: the persisted scope gate did not authorize the canonical target URL. " + decision.reason, metadata: { saved: false, reason: "scope_validation_failed", scope_reason: decision.reason } }
+          }
+        }
+        if (status === "complete" && phase === "workspace_setup") {
+          for (const relative of ["target.json", "workspace.json", "notes.md", "scope/scope.json"]) {
+            const candidate = path.join(workspace.workspacePath, relative)
+            try {
+              const info = await fs.lstat(candidate)
+              if (!info.isFile() || info.isSymbolicLink()) throw new Error("not a regular file")
+            } catch (error) {
+              return { title: "Workspace setup rejected", output: "Cannot mark workspace_setup complete; required workspace file is missing or unsafe: " + relative + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "workspace_integrity_failed", file: relative } }
+            }
+          }
+        }
+        if (status === "complete" && !["scope_validation", "workspace_setup"].includes(phase) && !params.artifacts?.length) {
+          return { title: "Recon checkpoint rejected", output: "This phase requires at least one verified artifact path before it can be marked complete. If the source/tool is genuinely unavailable or there were no applicable assets, use unavailable with a reason.", metadata: { saved: false, reason: "artifact_required" } }
+        }
         if (status === "complete" && params.artifacts?.length) {
           const realWorkspace = await fs.realpath(workspace.workspacePath)
           for (const artifact of params.artifacts) {
