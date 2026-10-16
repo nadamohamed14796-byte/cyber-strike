@@ -55,7 +55,7 @@ const StudyItem = z.object({
   lease_owner: z.string().min(8).max(200),
   decision: z.enum(["learned", "rejected"]),
   reason: z.string().max(800).optional(),
-  document_type: z.enum(["report", "writeup", "blog", "academy", "reference", "research", "mixed", "uncertain"]).optional(),
+  document_type: z.enum(["report", "writeup", "blog", "academy", "cheatsheet", "reference", "research", "mixed", "uncertain"]).optional(),
   vulnerability_class: z.string().max(64).optional(),
   cwe_id: z.string().regex(/^CWE-\d{1,5}$/i).optional(),
   severity: z.enum(["critical", "high", "medium", "low", "informational", "unknown"]).optional(),
@@ -184,7 +184,8 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
     : {}
   const sectionName = documentType === "report" ? "report"
     : documentType === "writeup" ? "writeup"
-      : documentType === "reference" ? "reference"
+      : documentType === "cheatsheet" ? "cheatsheet"
+        : documentType === "reference" ? "reference"
         : documentType === "academy" ? "academy"
           : documentType === "blog" || documentType === "research" ? "research"
             : "mixed_or_uncertain"
@@ -217,6 +218,15 @@ function buildDocumentNote(documentType: string, note: z.infer<typeof StudyItem>
       impact: extracted.impact, lessons: extracted.lesson,
       applicability: extracted.applicability_conditions,
       non_applicability: extracted.non_applicability_conditions, ...typedSection,
+    } }
+  }
+  if (documentType === "cheatsheet") {
+    return { ...common, cheatsheet: {
+      topic: extracted.vulnerability_class, techniques: extracted.test_procedure,
+      payload_collection: extracted.poc_snippet, prerequisites: extracted.prerequisites,
+      expected_positive_signals: extracted.expected_positive_signals,
+      expected_negative_signals: extracted.expected_negative_signals,
+      false_positive_cautions: extracted.false_positive_cautions, ...typedSection,
     } }
   }
   if (documentType === "reference") {
