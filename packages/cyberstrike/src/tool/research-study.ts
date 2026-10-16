@@ -96,6 +96,10 @@ const StudyItem = z.object({
   negative_evidence: z.string().max(1800).optional(),
   limitations: z.string().max(1800).optional(),
   retrieval_signals: z.array(z.string().max(120)).max(16).optional(),
+  // Model-defined signal patterns are intentionally extensible. Different write-ups
+  // expose different useful dimensions (encoding, tenant boundaries, parser behavior,
+  // state transitions, etc.); the model chooses keys that fit the evidence.
+  hunt_patterns: z.array(z.record(z.string(), z.unknown())).optional(),
   document_note: z.record(z.string(), z.unknown()).optional(),
 })
 
@@ -1213,6 +1217,11 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
             schema_version: 1,
             name: boundedText(note.pattern_name, 180),
             summary: boundedText(note.pattern_summary, 1200),
+            // Preserve the model's source-specific pattern dimensions instead of
+            // flattening every finding into a fixed vulnerability taxonomy.
+            patterns: Array.isArray(note.hunt_patterns)
+              ? sanitizeStructuredNote(note.hunt_patterns)
+              : [],
             trigger: boundedText(note.trigger_signal, 800) ?? boundedText(note.initial_observation, 800),
             vulnerability_class: vulnerabilityClass,
             cwe_id: cweID,
