@@ -12,6 +12,8 @@ The `pages` argument is a per-pass work window, not a global cap. Expand it repe
 
 ## 1. Establish exact source IDs and initial state
 
+**Explicit clean-slate request:** if the user explicitly asked in this task to delete the old public-research collection and start over, call `research_study(action="reset")` exactly once before reading stats. This removes the old research queue and imported `external_report` knowledge only; it must preserve target findings, session-local knowledge, target workspaces, and unrelated data. Report the exact removed counts. Never reset automatically on ordinary `/update` runs.
+
 1. Call `research_study(action="stats")`.
 2. Record initial queue/knowledge counts and read `configured_sources`. Use the exact `id` values returned there; never guess aliases such as `hackerone` or `default`.
 3. Before crawling, call `research_study(action="backfill")` without a source filter. This does no network discovery: it drains older learned/rejected queue states, retries auth-blocked rows only when a source-scoped session is configured, and queues every safely attributable legacy public-knowledge record for active-model study. Inspect all returned counters, `legacy_knowledge_skip_examples`, and `legacy_knowledge_errors`. A skip is a terminal, reasoned decision; an error/stalled backfill is not completion.
