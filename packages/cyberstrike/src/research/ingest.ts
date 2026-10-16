@@ -943,7 +943,6 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
   // Depth is accepted for old callers only; traversal has no depth ceiling.
   const maxPages = Math.max(1, Math.floor(Number.isFinite(input.pages) ? input.pages! : 100))
   void input.depth
-  const maxDepth = Number.POSITIVE_INFINITY
   // Backfill-aware dedupe: older versions learned reports directly into ReportKnowledge
   // before the durable queue existed. Do not download those URLs again just because
   // they have no corresponding queue row.
@@ -976,7 +975,12 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       try {
         const parsed = new URL(url)
         if (parsed.protocol !== "https:" || !hostAllowed(parsed, source)) return
-        if (depth > 0 && !isResearchCandidate(url, source) && !isDiscoveryPaginationURL(source, url)) return
+        // Crawl every non-static link that remains inside this source's explicit
+        // HTTPS host/path boundary. URL heuristics decide what may be queued as a
+        // study candidate, not what the crawler is allowed to inspect: a landing page
+        // may link to a real report whose slug gives no vulnerability hint.
+        // The page is fetched, its content is examined, and its outgoing links become
+        // further frontier items; only model-relevant pages enter the study queue.
       } catch {
         return
       }
@@ -1199,7 +1203,6 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           if (errors.length < 5) errors.push(current.url + " — " + message)
         }
       }
-      if (current.depth >= maxDepth) continue
     }
     results.push({ source: source.id, pages, candidates, added, document_types: collectedTypes, duplicate_urls_skipped: duplicateURLs.size, duplicate_urls: [...duplicateURLs], blocked_auth: blockedAuth, error_count: errorCount, errors })
   }
