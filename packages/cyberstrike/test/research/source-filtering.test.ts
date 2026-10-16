@@ -90,7 +90,16 @@ test("Medium source relevance rejects off-topic content but retains bounty write
   ).toBe(false)
 })
 
-test("SecurityCipher discovery is hard-bounded to the bounty-writeups directory", () => {\n  const source = RESEARCH_SOURCES.find((item) => item.id === "securitycipher-bounty-writeups")!\n  expect(source.allowedPathPrefixes).toEqual(["/bounty-writeups"])\n  expect(researchSourcePathAllowed("https://securitycipher.com/bounty-writeups/", source)).toBe(true)\n  expect(researchSourcePathAllowed("https://securitycipher.com/bounty-writeups/2026/example-report", source)).toBe(true)\n  expect(researchSourcePathAllowed("https://securitycipher.com/blog/example", source)).toBe(false)\n  expect(isResearchCandidate("https://securitycipher.com/bounty-writeups/2026/example-report", source)).toBe(true)\n  expect(isResearchCandidate("https://securitycipher.com/blog/example", source)).toBe(false)\n})\n
+test("SecurityCipher discovery is hard-bounded to the bounty-writeups directory", () => {
+  const source = RESEARCH_SOURCES.find((item) => item.id === "securitycipher-bounty-writeups")!
+  expect(source.allowedPathPrefixes).toEqual(["/bounty-writeups"])
+  expect(researchSourcePathAllowed("https://securitycipher.com/bounty-writeups/", source)).toBe(true)
+  expect(researchSourcePathAllowed("https://securitycipher.com/bounty-writeups/2026/example-report", source)).toBe(true)
+  expect(researchSourcePathAllowed("https://securitycipher.com/blog/example", source)).toBe(false)
+  expect(isResearchCandidate("https://securitycipher.com/bounty-writeups/2026/example-report", source)).toBe(true)
+  expect(isResearchCandidate("https://securitycipher.com/blog/example", source)).toBe(false)
+})
+
 test("source exclusions apply even when a source has no include-term policy", () => {
   const { includeTerms: _includeTerms, ...base } = trickster0
   const exclusionOnlySource = {
