@@ -208,6 +208,8 @@ export const RESEARCH_SOURCES: ResearchSource[] = [
       "api security",
       "recon",
     ],
+    // This feed must never wander into the rest of the site; includePaths alone is only a ranking hint.
+    allowedPathPrefixes: ["/bounty-writeups"],
     includePaths: ["/bounty-writeups/"],
     excludePaths: ["/wp-admin/", "/wp-login.php"],
   },

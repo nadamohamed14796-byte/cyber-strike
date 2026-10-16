@@ -216,6 +216,7 @@ export function isIndexLikeResearchUrl(url: string) {
 
 export function isResearchCandidate(url: string, source: ResearchSource) {
   const parsed = new URL(url)
+  if (!researchSourcePathAllowed(parsed, source)) return false
   const path = parsed.pathname.toLowerCase()
   // The legacy Trickster0 source is intentionally author-scoped.
   if (source.id === "trickster0") {
