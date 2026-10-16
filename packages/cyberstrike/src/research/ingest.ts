@@ -913,6 +913,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
     let pages = 0
     let candidates = 0
     let added = 0
+    const collectedTypes: Record<string, number> = {}
     let blockedAuth = 0
     let errorCount = 0
     const add = (value: string, depth: number) => {
@@ -1031,6 +1032,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           const relevance = sourceRelevance(current.url, title, text, source)
           const canQueue = relevance.accepted || (input.agentLed === true && !relevance.excluded)
           if (canQueue && !isIndexLikeResearchUrl(current.url)) {
+            const documentType = classifyResearchDocumentType(title, text, source.kind)
             const row = ResearchQueue.enqueue({
               sourceID: source.id,
               sourceURL: current.url,
@@ -1039,6 +1041,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 source_name: source.name,
                 source_kind: source.kind,
                 source_trust: source.trust,
+                document_type: documentType,
                 crawl_depth: current.depth,
                 candidate_score: candidateScore(current.url, source),
                 source_relevance_precheck: { accepted: relevance.accepted, score: relevance.score, agent_review_requested: !relevance.accepted },
@@ -1051,7 +1054,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
                 content_fingerprint: createHash("sha256").update(text).digest("hex").slice(0, 40),
               },
             })
-            if (row.created) added++
+            if (row.created) {
+              added++
+              collectedTypes[documentType] = (collectedTypes[documentType] ?? 0) + 1
+            }
           }
         }
         ResearchQueue.markVisitedPage({
@@ -1104,7 +1110,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       }
       if (current.depth >= maxDepth) continue
     }
-    results.push({ source: source.id, pages, candidates, added, blocked_auth: blockedAuth, error_count: errorCount, errors })
+    results.push({ source: source.id, pages, candidates, added, document_types: collectedTypes, blocked_auth: blockedAuth, error_count: errorCount, errors })
   }
   return results
 }
