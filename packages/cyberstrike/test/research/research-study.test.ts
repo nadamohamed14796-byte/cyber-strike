@@ -7,10 +7,31 @@ import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learn
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchQueue } from "../../src/research/queue"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
+import { ResearchCycleTable } from "../../src/research/cycle.sql"
+import { ResearchCycle } from "../../src/research/cycle"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { queueLegacyKnowledgeForModelStudy, ResearchStudyTool } from "../../src/tool/research-study"
 import { ResearchKnowledgeTool } from "../../src/tool/research-knowledge"
 import { tmpdir } from "../fixture/fixture"
+
+// Direct tool integration tests get an explicitly initialized study-phase cycle when no cycle exists.
+// Dedicated phase-gate tests create a collecting cycle and pass its ID to verify premature study is blocked.
+async function executeResearchTool(tool: any, params: any, context: any) {
+  const needsCycle = ["discover", "next", "read", "save", "complete"].includes(params.action)
+  let cycle = ResearchCycle.current()
+  if (needsCycle && !cycle) {
+    const created = ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
+    for (const source of RESEARCH_SOURCES) {
+      ResearchCycle.recordDiscovery({
+        cycleID: created.cycle_id, sourceID: source.id, pageWindow: 1, pages: 0, candidates: 0, queuedNew: 0,
+        blockedAuth: 0, errorCount: 0, errors: [],
+      })
+    }
+    cycle = ResearchCycle.current()
+  }
+  const cycleID = params.cycle_id ?? (needsCycle ? cycle?.cycle_id : undefined)
+  return tool["execute"]({ ...params, ...(cycleID ? { cycle_id: cycleID } : {}) }, context)
+}
 
 // These integration tests share the worker-local SQLite database. Clear only the
 // research fixtures before each case so queue claims and legacy backfill counts are deterministic.
@@ -19,6 +40,7 @@ beforeEach(() => {
     db.delete(ResearchQueueTable).run()
     db.delete(ReportKnowledgeEventTable).run()
     db.delete(ReportKnowledgeTable).run()
+    db.delete(ResearchCycleTable).run()
   })
 })
 
@@ -100,7 +122,7 @@ test("agent-led research study persists model analysis and completes its queue l
         ask: async () => {},
       } as any
 
-      const next = await tool.execute({
+      const next = await executeResearchTool(tool, {
         action: "next",
         source: sourceID,
         pages: 1,
@@ -115,7 +137,7 @@ test("agent-led research study persists model analysis and completes its queue l
       if (!claimed) throw new Error("the explicitly queued PortSwigger row was not claimed")
       expect(claimed.text).toContain("CWE-639")
 
-      const save = await tool.execute({
+      const save = await executeResearchTool(tool, {
         action: "save",
         source: sourceID,
         pages: 1,
@@ -211,7 +233,7 @@ test("agent-led research study persists model analysis and completes its queue l
       expect(events.some((event) => event.hook === "research-study" && event.outcome === "observed")).toBe(false)
       expect(ReportKnowledge.stats().external).toBeGreaterThanOrEqual(1)
 
-      const status = JSON.parse((await tool.execute({ action: "stats", source: sourceID, pages: 1000, depth: 3, limit: 3, continue_after_save: false }, context)).output)
+      const status = JSON.parse((await executeResearchTool(tool, { action: "stats", source: sourceID, pages: 1000, depth: 3, limit: 3, continue_after_save: false }, context)).output)
       expect(status.queue_source_filter).toBe(sourceID)
       expect(status.queue).toHaveProperty("crawl_page_errors")
       expect(status.queue).toHaveProperty("crawl_page_auth_blocked")
@@ -267,7 +289,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
         metadata: () => {},
         ask: async () => {},
       } as any
-      const next = await tool.execute({
+      const next = await executeResearchTool(tool, {
         action: "next",
         source: sourceID,
         pages: 1,
@@ -287,7 +309,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
 
       // The queue must not accept a learned/rejected decision until every source
       // chunk has been returned and the durable cursor reaches the document end.
-      const prematureSave = await tool.execute({
+      const prematureSave = await executeResearchTool(tool, {
         action: "save",
         source: sourceID,
         pages: 1,
@@ -311,7 +333,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
         limit: 5,
       }).some((row) => row.title.includes(marker))).toBe(false)
 
-      const skippedChunk = await tool.execute({
+      const skippedChunk = await executeResearchTool(tool, {
         action: "read",
         source: sourceID,
         public_id: claimed.public_id,
@@ -329,7 +351,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
       let hasMore = claimed.has_more_text as boolean
       let reads = 0
       while (hasMore) {
-        const read = await tool.execute({
+        const read = await executeResearchTool(tool, {
           action: "read",
           source: sourceID,
           public_id: claimed.public_id,
@@ -354,7 +376,7 @@ test("agent-led study can read every chunk of a long source under the tool outpu
       expect(chunks[chunks.length - 1]).toContain(lastMarker)
       expect(reads).toBeGreaterThan(1)
       expect(ResearchQueue.renewClaim(claimed.public_id, claimed.lease_owner, 20 * 60_000)).toBe(true)
-      const finalSave = await tool.execute({
+      const finalSave = await executeResearchTool(tool, {
         action: "save",
         source: sourceID,
         pages: 1,
@@ -420,7 +442,7 @@ test("agent-led next limits each response to one item even with escape-heavy sou
         })
       }
       const tool = await ResearchStudyTool.init()
-      const next = await tool.execute({
+      const next = await executeResearchTool(tool, {
         action: "next",
         source: sourceID,
         pages: 1,
@@ -463,7 +485,7 @@ test("agent-led study terminally blocks queued URLs outside their configured sou
         ask: async () => {},
       } as any
       const tool = await ResearchStudyTool.init()
-      const response = await tool.execute({
+      const response = await executeResearchTool(tool, {
         action: "next",
         source: "portswigger",
         pages: 1,
@@ -508,7 +530,7 @@ test("preflight skips are counted separately from model-studied reports", async 
         metadata: () => {},
         ask: async () => {},
       } as any
-      const next = await tool.execute({
+      const next = await executeResearchTool(tool, {
         action: "next",
         pages: 5,
         depth: 2,
@@ -566,7 +588,7 @@ test("source-scoped model-study save refuses a lease from another source", async
         metadata: () => {},
         ask: async () => {},
       } as any
-      const next = await tool.execute({
+      const next = await executeResearchTool(tool, {
         action: "next", source: sourceID, pages: 5, depth: 2, limit: 3, continue_after_save: false,
       }, context)
       const batch = JSON.parse(next.output)
@@ -574,7 +596,7 @@ test("source-scoped model-study save refuses a lease from another source", async
       expect(claimed).toBeDefined()
       if (!claimed) throw new Error("the PortSwigger fixture was not claimed")
 
-      const save = await tool.execute({
+      const save = await executeResearchTool(tool, {
         action: "save", source: "hackerone-blog", pages: 5, depth: 2, limit: 3, continue_after_save: false,
         items: [{
           public_id: claimed.public_id,
@@ -640,7 +662,7 @@ test("legacy model-study backfill drains multiple 500-row batches", async () => 
         metadata: () => {},
         ask: async () => {},
       } as any
-      const result = await tool.execute({
+      const result = await executeResearchTool(tool, {
         action: "backfill",
         source: sourceID,
         pages: 5,
@@ -909,6 +931,53 @@ test("model-led update queues legacy shared reports once without refetching or c
 })
 
 
+test("research study is blocked until every source has a durable collection outcome", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const marker = crypto.randomUUID()
+      const cycle = ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
+      const queued = ResearchQueue.enqueue({
+        sourceID: "portswigger",
+        sourceURL: "https://portswigger.net/web-security/access-control/idor?cycle-gate=" + marker,
+        title: "Cycle gate fixture",
+        payload: { cached_text: "A safely cached fixture document with enough text for the study queue." },
+      })
+      expect(queued.created).toBe(true)
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_cycle_gate_" + marker.replace(/-/g, "").slice(0, 16),
+        messageID: "msg_cycle_gate_" + marker.replace(/-/g, "").slice(0, 12),
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+
+      const premature = await executeResearchTool(tool, {
+        action: "next", cycle_id: cycle.cycle_id, pages: 1, depth: 1, limit: 1, continue_after_save: false,
+      }, context)
+      expect(premature.output).toContain("Study phase is not open")
+      expect(ResearchQueue.stats("portswigger").queued).toBe(1)
+
+      for (const source of RESEARCH_SOURCES) {
+        ResearchCycle.recordDiscovery({
+          cycleID: cycle.cycle_id, sourceID: source.id, pageWindow: 1, pages: 0, candidates: 0, queuedNew: 0,
+          blockedAuth: 0, errorCount: 0, errors: [],
+        })
+      }
+      expect(ResearchCycle.current()?.phase).toBe("studying")
+
+      const allowed = await executeResearchTool(tool, {
+        action: "next", cycle_id: cycle.cycle_id, source: "portswigger", pages: 1, depth: 1, limit: 1, continue_after_save: false,
+      }, context)
+      expect(JSON.parse(allowed.output).batch_size).toBe(1)
+      await Instance.dispose()
+    },
+  })
+})
 test("explicit research reset removes queued imports and external research but preserves target findings", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
@@ -947,10 +1016,12 @@ test("explicit research reset removes queued imports and external research but p
         metadata: () => {},
         ask: async () => {},
       } as any
-      const result = await tool.execute({ action: "reset", pages: 1, depth: 0, limit: 1, continue_after_save: false }, context)
+      ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
+      const result = await executeResearchTool(tool, { action: "reset", pages: 1, depth: 0, limit: 1, continue_after_save: false }, context)
       const summary = JSON.parse(result.output)
       expect(summary.queue_rows_removed).toBe(1)
       expect(summary.external_research_records_removed).toBe(1)
+      expect(ResearchCycle.current()).toBeNull()
       expect(ResearchQueue.stats().total).toBe(0)
       expect(Database.use((db) => db.select().from(ReportKnowledgeTable)
         .where(eq(ReportKnowledgeTable.id, externalID!)).get())).toBeUndefined()
