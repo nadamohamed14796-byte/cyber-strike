@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { RESEARCH_SOURCES, researchSourceHostAllowed, researchSourcePathAllowed, resolveResearchSourceForURL } from "../../src/research/sources"
-import { isIndexLikeResearchContent, isIndexLikeResearchUrl, isResearchCandidate, linksOf, sourceRelevance } from "../../src/research/ingest"
+import { classifyResearchDocumentType, isIndexLikeResearchContent, isIndexLikeResearchUrl, isResearchCandidate, linksOf, sourceRelevance } from "../../src/research/ingest"
 import { discoverySeeds, isDiscoveryPaginationURL, nextDiscoveryPage } from "../../src/research/adapters"
 
 const trickster0 = RESEARCH_SOURCES.find((source) => source.id === "trickster0")!
@@ -247,4 +247,23 @@ test("content-shaped archives are traversed but not treated as complete reports"
     text: "I tested the endpoint and confirmed that changing the account identifier exposed another user's data.",
     discoveredLinkCount: 4,
   })).toBe(false)
+})
+
+
+test("cheat sheets are classified separately from narrative write-ups and general references", () => {
+  expect(classifyResearchDocumentType(
+    "Web Payload Cheat Sheet",
+    "A cheat sheet containing payload collection, payload list, and quick reference examples for security testing.",
+    "reference",
+  )).toBe("cheatsheet")
+  expect(classifyResearchDocumentType(
+    "How I found an IDOR",
+    "A write-up describing how I noticed a missing authorization check, tested the endpoint, and confirmed impact.",
+    "writeup",
+  )).toBe("writeup")
+  expect(classifyResearchDocumentType(
+    "API documentation",
+    "Documentation and reference guide describing supported API methods and parameters.",
+    "reference",
+  )).toBe("reference")
 })
