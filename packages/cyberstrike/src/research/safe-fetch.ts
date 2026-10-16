@@ -1,4 +1,6 @@
 import { researchSourceHostAllowed, researchSourcePathAllowed, type ResearchSource } from "./sources"
+import { Database, and, desc, eq, inArray, isNotNull, like, or, sql } from "../storage/db"
+import { RequestTable, WebCredentialTable } from "../session/session.sql"
 import { lookup } from "node:dns/promises"
 import { isIP } from "node:net"
 
@@ -14,11 +16,101 @@ export function isNonRetryableResearchError(error: unknown): boolean {
   return error instanceof NonRetryableResearchError
 }
 
-export function researchSourceHasCredentials(source: Pick<ResearchSource, "id">): boolean {
+type ResearchCredentialSource = Pick<ResearchSource, "id"> & Partial<Pick<ResearchSource, "hosts" | "exactHosts">>
+
+function safeCookieValue(value: unknown) {
+  if (typeof value !== "string") return undefined
+  const cookie = value.trim()
+  return cookie && cookie.length <= 16_384 && !/[\\r\\n\\0]/.test(cookie) ? cookie : undefined
+}
+
+function cookieFromHeaders(headers: Record<string, string> | null | undefined) {
+  if (!headers) return undefined
+  const entry = Object.entries(headers).find(([name]) => name.toLowerCase() === "cookie")
+  return safeCookieValue(entry?.[1])
+}
+
+/** Extract only the Cookie header from a captured request; never return or log the raw request. */
+function cookieFromRawRequest(rawRequest: string | null | undefined) {
+  if (!rawRequest) return undefined
+  const headerBlock = rawRequest.split(/\\r?\\n\\r?\\n/, 1)[0] ?? ""
+  const lines = headerBlock.split(/\\r?\\n/)
+  for (const line of lines.slice(1)) {
+    const separator = line.indexOf(":")
+    if (separator < 1 || line.slice(0, separator).trim().toLowerCase() !== "cookie") continue
+    const cookie = safeCookieValue(line.slice(separator + 1))
+    if (cookie) return cookie
+  }
+  return undefined
+}
+
+function capturedSessionRequests(sessionIDs: readonly string[], hostname?: string) {
+  const ids = [...new Set(sessionIDs.map((id) => id.trim()).filter(Boolean))]
+  if (!ids.length) return []
+  const sessionPredicate = inArray(RequestTable.session_id, ids)
+  const cookiePredicate = or(
+    isNotNull(RequestTable.credential_id),
+    like(RequestTable.raw_request, "%cookie:%"),
+  )!
+  return Database.use((db) => db
+    .select({
+      host: RequestTable.host,
+      rawRequest: RequestTable.raw_request,
+      credentialHeaders: WebCredentialTable.headers,
+    })
+    .from(RequestTable)
+    .leftJoin(WebCredentialTable, and(
+      eq(WebCredentialTable.id, RequestTable.credential_id),
+      eq(WebCredentialTable.session_id, RequestTable.session_id),
+    ))
+    .where(hostname
+      ? and(sessionPredicate, sql`lower(${RequestTable.host}) = ${hostname.toLowerCase()}`, cookiePredicate)
+      : and(sessionPredicate, cookiePredicate))
+    .orderBy(desc(RequestTable.time_updated))
+    .all())
+}
+
+/**
+ * Reuse a cookie already captured by CyberStrike only for requests to the exact
+ * hostname on which it was observed. The secret remains in memory and is never
+ * copied to research queue rows, prompts, logs, or knowledge records.
+ */
+export function researchSessionCookieForHost(sessionIDs: readonly string[], hostname: string) {
+  const normalizedHost = hostname.trim().toLowerCase().replace(/\\.$/, "")
+  if (!normalizedHost || /[^a-z0-9.:-]/i.test(normalizedHost)) return undefined
+  const rows = capturedSessionRequests(sessionIDs, normalizedHost)
+  for (const row of rows) {
+    if (!row.host || row.host.toLowerCase().replace(/\\.$/, "") !== normalizedHost) continue
+    const cookie = cookieFromHeaders(row.credentialHeaders) ?? cookieFromRawRequest(row.rawRequest)
+    if (cookie) return cookie
+  }
+  return undefined
+}
+
+/** Hostnames only; useful for status output without ever disclosing a cookie value. */
+export function researchSessionCookieHosts(sessionIDs: readonly string[]) {
+  const rows = capturedSessionRequests(sessionIDs)
+  const hosts = new Set<string>()
+  for (const row of rows) {
+    const hostname = row.host?.trim().toLowerCase().replace(/\\.$/, "")
+    if (!hostname) continue
+    if (cookieFromHeaders(row.credentialHeaders) || cookieFromRawRequest(row.rawRequest)) hosts.add(hostname)
+  }
+  return [...hosts]
+}
+
+export function researchSourceHasCredentials(source: ResearchCredentialSource, sessionIDs: readonly string[] = []): boolean {
   const suffix = source.id.toUpperCase().replace(/[^A-Z0-9]+/g, "_")
-  return Boolean(
+  if (
     process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + suffix]?.trim() ||
-    process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + suffix]?.trim(),
+    process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + suffix]?.trim()
+  ) return true
+  if (!source.hosts?.length || !sessionIDs.length) return false
+  return researchSessionCookieHosts(sessionIDs).some((hostname) =>
+    researchSourceHostAllowed("https://" + hostname, {
+      hosts: source.hosts!,
+      exactHosts: source.exactHosts,
+    }),
   )
 }
 
@@ -164,11 +256,15 @@ async function readBoundedText(body: ReadableStream<Uint8Array> | null) {
  * Response bodies are size-limited while streaming, before they can consume
  * unbounded memory.
  */
-export async function fetchResearchText(url: string, source: ResearchSource, resolveHost: ResearchLookup = defaultResearchLookup) {
+export async function fetchResearchText(url: string, source: ResearchSource, resolveHost: ResearchLookup = defaultResearchLookup, sessionIDs: readonly string[] = []) {
   const initial = new URL(url)
   if (!hostAllowed(initial, source)) {
     throw new NonRetryableResearchError("blocked research host: " + initial.hostname)
   }
+
+  // Resolve captured session cookies once per exact initial host. A redirect to a
+  // different allowlisted hostname must not inherit these credentials.
+  const capturedCookie = researchSessionCookieForHost(sessionIDs, initial.hostname)
 
   // Bound a whole document fetch, including redirects and retries, so a
   // worker cannot hold a queue lease indefinitely on a slow trusted host.
@@ -200,9 +296,11 @@ export async function fetchResearchText(url: string, source: ResearchSource, res
           // Optional source-scoped operator credentials are never persisted. Do not auto-register or bypass MFA/CAPTCHA.
           const cookie = process.env["CYBERSTRIKE_RESEARCH_COOKIE_" + sourceSuffix]
           const authorization = process.env["CYBERSTRIKE_RESEARCH_AUTHORIZATION_" + sourceSuffix]
-          // Do not forward credentials to a different host reached through an allowlisted redirect.
+          // Source-scoped operator credentials and captured cookies are sent only to
+          // the exact initial hostname, never across a redirect to another host.
           if (current.hostname === initial.hostname) {
-            if (cookie?.trim()) headers.cookie = cookie.trim()
+            const selectedCookie = safeCookieValue(cookie) ?? capturedCookie
+            if (selectedCookie) headers.cookie = selectedCookie
             if (authorization?.trim()) headers.authorization = authorization.trim()
           }
           const response = await fetch(current, { signal: controller.signal, redirect: "manual", headers })
