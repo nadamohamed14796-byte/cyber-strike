@@ -231,7 +231,9 @@ export function isResearchCandidate(url: string, source: ResearchSource) {
     if (host !== "medium.com" && !host.endsWith(".medium.com")) return false
     if (path === "/" || /^\/(?:tag|topic|topics|search|about|membership|plans|me|following|latest|popular)(?:\/|$)/i.test(path)) return false
     const segments = path.split("/").filter(Boolean)
-    if (segments.length < 2) return false
+    // Medium author subdomains publish articles at a single slug path; medium.com
+    // itself needs at least two path segments to distinguish an article from a profile.
+    if (host === "medium.com" ? segments.length < 2 : segments.length < 1) return false
     return true
   }
   // These editorial sites publish individual posts at varied URL shapes (slugs or dates),
