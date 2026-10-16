@@ -237,6 +237,28 @@ export function isIndexLikeResearchUrl(url: string) {
   }
 }
 
+/**
+ * Detect listing pages whose URL does not advertise that they are an index.
+ * URL-only checks miss dated archive pages and custom CMS routes. Keep this
+ * heuristic deliberately conservative: a substantial report body or explicit
+ * reproduction/impact evidence always wins over link density.
+ */
+export function isIndexLikeResearchContent(input: {
+  title: string
+  text: string
+  discoveredLinkCount: number
+}) {
+  const { title, text, discoveredLinkCount } = input
+  if (discoveredLinkCount < 18 || text.trim().length > 1800) return false
+  const body = (title + "\n" + text).toLowerCase()
+  const reportEvidence =
+    /\b(?:steps to reproduce|proof of concept|poc:|impact:|root cause|request\s*\/\s*response|vulnerability details|i discovered|i found|reproduction steps|cve-\d{4}-\d+)\b/.test(body)
+  if (reportEvidence) return false
+  // A dense link list with little original prose is a directory/archive, not a
+  // complete report. Keep the discovered links for traversal; do not study it.
+  return true
+}
+
 export function isResearchCandidate(url: string, source: ResearchSource) {
   const parsed = new URL(url)
   if (!researchSourcePathAllowed(parsed, source)) return false
@@ -1098,7 +1120,11 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         if (text.length >= 250 && (current.depth === 0 || isResearchCandidate(current.url, source))) {
           const relevance = sourceRelevance(current.url, title, text, source)
           const canQueue = relevance.accepted || (input.agentLed === true && !relevance.excluded)
-          if (canQueue && !isIndexLikeResearchUrl(current.url)) {
+          if (canQueue && !isIndexLikeResearchUrl(current.url) && !isIndexLikeResearchContent({
+            title,
+            text,
+            discoveredLinkCount: discoveredLinks.length,
+          })) {
             const documentType = classifyResearchDocumentType(title, text, source.kind)
             const contentFingerprint = createHash("sha256").update(text).digest("hex").slice(0, 40)
             const contentDuplicate = ResearchQueue.recordContentDuplicate({
