@@ -1367,7 +1367,8 @@ export const SessionRoutes = lazy(() =>
                 })
                 const model = body.model ?? (await SessionPrompt.lastModel(childSessionID))
                 await IngestSummary.write({
-                  sessionID,
+                  // Keep completion chatter in the request child session, not the active parent transcript.
+                  sessionID: childSessionID,
                   agent: agentName,
                   model,
                   source,
