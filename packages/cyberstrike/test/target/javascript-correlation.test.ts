@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -25,6 +25,15 @@ test("normalizes numeric identifiers from relative and absolute JS endpoint lite
   expect(endpoints).toContain("https://api.example.com/v1/accounts/{id}")
   expect(endpoints).not.toContain("/api/users/12345")
   expect(endpoints).not.toContain("https://api.example.com/v1/accounts/67890")
+})
+
+test("endpoint correlation requires exact path segments unless a single-segment template is explicit", () => {
+  expect(matchesEndpointPathTemplate("/api/users", "/api/users")).toBe(true)
+  expect(matchesEndpointPathTemplate("/api/users", "/api/users/123")).toBe(false)
+  expect(matchesEndpointPathTemplate("/api/users", "/api/users/123/admin")).toBe(false)
+  expect(matchesEndpointPathTemplate("/api/users/{id}", "/api/users/123")).toBe(true)
+  expect(matchesEndpointPathTemplate("/api/users/{id}", "/api/users/123/admin")).toBe(false)
+  expect(matchesEndpointPathTemplate("/api/users/{id}", "/api/users/")).toBe(false)
 })
 
 test("never persists JavaScript source in correlation response previews", () => {
