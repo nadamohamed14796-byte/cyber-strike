@@ -67,6 +67,36 @@ describe("scope_check IPv4 CIDR matching", () => {
 })
 
 
+
+describe("scope configuration preserves diverse supported scope types", () => {
+  test("normalizes URL paths, ports, IPv6 literals, and IPv6 CIDRs without broadening", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        await TargetMemory.ensure("https://example.com/api")
+        const configured = await TargetMemory.configureScope("https://example.com/api", {
+          include: [
+            "https://example.com/api/*",
+            "api.example.com:8443",
+            "[2001:db8::1]",
+            "2001:db8::/32",
+          ],
+          exclude: ["https://example.com/api/admin/*"],
+          authorizationSource: "test program",
+          authorizationReference: "https://hackerone.com/example",
+        })
+        expect(configured.scope.scopeItems).toContain("https://example.com/api/*")
+        expect(configured.scope.scopeItems).toContain("api.example.com:8443")
+        expect(configured.scope.scopeItems).toContain("[2001:db8::1]")
+        expect(configured.scope.scopeItems).toContain("[2001:db8::]/32")
+        expect(configured.scope.excludedItems).toContain("https://example.com/api/admin/*")
+        await Instance.dispose()
+      },
+    })
+  })
+})
+
 describe("scope_check caller-provided patterns are not authorization", () => {
   test("reports a pattern match without claiming the target is authorized", async () => {
     const info = await ScopeCheckTool.init()
