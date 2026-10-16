@@ -165,7 +165,7 @@ export function linksOf(html: string, base: URL, source: ResearchSource) {
   // inline state rather than href attributes. Recover only concrete numeric report
   // IDs from that embedded state; all URLs still pass the normal host/path boundary.
   if (source.id === "hackerone-hacktivity") {
-    const embedded = html.replace(/\\u002f/gi, "/").replace(/\\\//g, "/")
+    const embedded = html.replace(/\\+u002f/gi, "/").replace(/\\+\//g, "/")
     for (const match of embedded.matchAll(/(?:https?:\/\/(?:www\.)?hackerone\.com)?\/reports?\/(\d+)(?=[/?#"'\\\s]|$)/gi)) {
       const value = normalizeUrl("/reports/" + match[1], base)
       if (!value) continue
