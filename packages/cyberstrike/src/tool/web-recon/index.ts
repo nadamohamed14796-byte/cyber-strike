@@ -250,7 +250,7 @@ export const WebReconTool = Tool.define("web_recon", {
       }
 
       const requiredPhase: ReconPhase =
-        ["sitemap_scan", "robots_scan", "openapi_scan", "graphql_probe"].includes(program)
+        ["sitemap_scan", "robots_scan", "openapi_scan"].includes(program)
           ? "url_collection"
           : program === "tech_detect"
             ? "live_hosts_ports"
