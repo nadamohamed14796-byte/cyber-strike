@@ -435,7 +435,7 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
   // shift as rows are marked.
   while (true) {
     const rows = ReportKnowledge.externalRecordsForModelStudy(
-      500,
+      Number.MAX_SAFE_INTEGER,
       RESEARCH_MODEL_STUDY_VERSION,
       requestedSource?.hosts,
       sourceFilter,
@@ -571,20 +571,20 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
         stalled = true
       }
     }
-    if (stalled || rows.length < 500) break
+    if (stalled || rows.length === 0) break
   }
   return result
 }
 
 async function backfillResearch(sourceID?: string, sessionIDs: readonly string[] = []) {
   const authResumed = await drainBatchedCount(() =>
-    retryAuthenticatedResearch({ sourceID, limit: 500, sessionIDs }),
+    retryAuthenticatedResearch({ sourceID, sessionIDs }),
   )
   const legacyRejectedRequeued = await drainBatchedCount(() =>
-    ResearchQueue.requeueLegacyRejected(500, sourceID),
+    ResearchQueue.requeueLegacyRejected(undefined, sourceID),
   )
   const legacyQueueRequeued = await drainBatchedCount(() =>
-    ResearchQueue.requeueLearnedForModelStudy(500, sourceID, RESEARCH_MODEL_STUDY_VERSION),
+    ResearchQueue.requeueLearnedForModelStudy(undefined, sourceID, RESEARCH_MODEL_STUDY_VERSION),
   )
   const legacyKnowledge = await queueLegacyKnowledgeForModelStudy(sourceID)
   return {
