@@ -119,6 +119,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       const phaseIndex = PHASES.indexOf(phase)
 
       if (params.action === "begin") {
+        if (phase !== "scope_validation" && phase !== "workspace_setup" && run.phases.scope_validation.status !== "complete") {
+          return { title: "Recon phase blocked: scope not validated", output: "Cannot begin " + phase + " until scope_validation is complete. An unavailable/blocked scope is not authorization for discovery or testing.", metadata: { saved: false, reason: "scope_not_validated", scope_status: run.phases.scope_validation.status } }
+        }
         const earlier = PHASES.slice(0, phaseIndex)
         const unresolved = earlier.filter((item) => !terminal(run.phases[item].status))
         if (unresolved.length) {
@@ -139,6 +142,32 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         const status: PhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : "unavailable"
         if (status === "complete" && !params.summary?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
+        }
+        if (status === "complete" && params.artifacts?.length) {
+          const realWorkspace = await fs.realpath(workspace.workspacePath)
+          for (const artifact of params.artifacts) {
+            if (artifact.includes("\\") || artifact.split("/").some((part) => part === "..")) {
+              return { title: "Recon checkpoint rejected", output: "Artifact path must remain inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "unsafe_artifact_path" } }
+            }
+            const candidate = path.isAbsolute(artifact) ? path.resolve(artifact) : path.resolve(realWorkspace, artifact)
+            const relative = path.relative(realWorkspace, candidate)
+            if (!relative || relative === "." || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+              return { title: "Recon checkpoint rejected", output: "Artifact path must point to a file inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "artifact_outside_workspace" } }
+            }
+            let info
+            let realArtifact: string
+            try {
+              info = await fs.lstat(candidate)
+              if (info.isSymbolicLink() || !info.isFile()) throw new Error("not a regular file")
+              realArtifact = await fs.realpath(candidate)
+            } catch (error) {
+              return { title: "Recon checkpoint rejected", output: "Artifact is missing, unsafe, or not a regular file: " + artifact + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "artifact_not_verified" } }
+            }
+            const resolvedRelative = path.relative(realWorkspace, realArtifact)
+            if (resolvedRelative === ".." || resolvedRelative.startsWith(".." + path.sep) || path.isAbsolute(resolvedRelative)) {
+              return { title: "Recon checkpoint rejected", output: "Artifact resolves outside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "artifact_symlink_escape" } }
+            }
+          }
         }
         run.phases[phase] = {
           ...record,
