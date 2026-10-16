@@ -22,16 +22,17 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable"
 }
 
-const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, string>> = {
-  asset_discovery: "assets",
-  live_hosts_ports: "recon",
-  url_collection: "urls",
-  directory_fuzzing: "directories",
-  parameter_discovery: "parameters",
-  parameter_fuzzing: "parameters",
-  javascript_analysis: "javascript",
-  endpoint_inventory: "endpoints",
-  reporting: "reports",
+export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly string[]>> = {
+  asset_discovery: ["assets"],
+  live_hosts_ports: ["recon"],
+  url_collection: ["urls"],
+  directory_fuzzing: ["directories"],
+  parameter_discovery: ["parameters"],
+  parameter_fuzzing: ["parameters"],
+  javascript_analysis: ["javascript"],
+  endpoint_inventory: ["endpoints"],
+  vulnerability_testing: ["testing", "findings", "evidence"],
+  reporting: ["reports"],
 }
 
 const Parameters = z.object({
@@ -170,9 +171,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               return { title: "Recon checkpoint rejected", output: "Artifact path must point to a file inside the canonical target workspace: " + artifact, metadata: { saved: false, reason: "artifact_outside_workspace" } }
             }
             const resolvedArtifactPath = relative.split(path.sep).join("/")
-            const requiredArea = RECON_PHASE_ARTIFACT_AREAS[phase]
-            if (requiredArea && !resolvedArtifactPath.startsWith(requiredArea + "/")) {
-              return { title: "Recon checkpoint rejected", output: "Phase " + phase + " must save its verified output under " + requiredArea + "/; got " + artifact, metadata: { saved: false, reason: "artifact_in_wrong_area", required_area: requiredArea } }
+            const requiredAreas = RECON_PHASE_ARTIFACT_AREAS[phase]
+            if (requiredAreas && !requiredAreas.some((area) => resolvedArtifactPath.startsWith(area + "/"))) {
+              return { title: "Recon checkpoint rejected", output: "Phase " + phase + " must save its verified output under one of " + requiredAreas.map((area) => area + "/").join(", ") + "; got " + artifact, metadata: { saved: false, reason: "artifact_in_wrong_area", required_areas: requiredAreas } }
             }
             let info
             let realArtifact: string

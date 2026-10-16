@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { initialReconRun, parseReconRun } from "../../src/target/recon-gate"
 import {
   reconRunID,
+  RECON_PHASE_ARTIFACT_AREAS,
   unresolvedReconPrerequisites,
   type ReconPhase,
   type ReconPhaseRecord,
@@ -118,4 +119,13 @@ test("legacy manifests migrate to require parameter discovery and revalidate dow
   expect(migrated.phases.vulnerability_testing.status).toBe("pending")
   expect(migrated.phases.reporting.status).toBe("pending")
   expect(migrated.phases.endpoint_inventory.artifacts).toEqual(["endpoints/old.json"])
+})
+
+
+test("vulnerability testing artifacts must be saved in a testing, findings, or evidence area", () => {
+  const areas = RECON_PHASE_ARTIFACT_AREAS.vulnerability_testing
+  expect(areas).toEqual(["testing", "findings", "evidence"])
+  expect(areas?.some((area) => "findings/issue-1.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "evidence/request-1.txt".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "reports/random.md".startsWith(area + "/"))).toBe(false)
 })
