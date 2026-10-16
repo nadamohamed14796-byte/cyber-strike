@@ -8,6 +8,8 @@ export type ResearchCyclePass = {
   pages: number
   candidates: number
   queued_new: number
+  document_types: Record<string, number>
+  duplicate_urls_skipped: number
   blocked_auth: number
   error_count: number
   errors: string[]
@@ -20,6 +22,8 @@ export type ResearchSourceCycleState = {
   pages_visited: number
   candidates_discovered: number
   queued_new: number
+  document_types: Record<string, number>
+  duplicate_urls_skipped: number
   blocked_auth: number
   error_count: number
   unresolved_auth: number

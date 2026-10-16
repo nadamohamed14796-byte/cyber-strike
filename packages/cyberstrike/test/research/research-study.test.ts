@@ -941,6 +941,7 @@ test("begin resumes a collecting cycle without discarding source progress", asyn
       const sourceID = ids[0]!
       ResearchCycle.recordDiscovery({
         cycleID: first.cycle_id, sourceID, pageWindow: 20, pages: 20, candidates: 7, queuedNew: 2,
+        documentTypes: { writeup: 3, report: 2 }, duplicateURLsSkipped: 4,
         blockedAuth: 0, errorCount: 0, errors: [],
       })
       const resumed = ResearchCycle.begin(ids)
@@ -949,6 +950,8 @@ test("begin resumes a collecting cycle without discarding source progress", asyn
       expect(resumed.source_states[sourceID]?.passes.length).toBe(1)
       expect(resumed.source_states[sourceID]?.queued_new).toBe(2)
       expect(resumed.source_states[sourceID]?.next_page_window).toBe(40)
+      expect(resumed.source_states[sourceID]?.document_types).toEqual({ writeup: 3, report: 2 })
+      expect(resumed.source_states[sourceID]?.duplicate_urls_skipped).toBe(4)
       await Instance.dispose()
     },
   })
@@ -1015,6 +1018,43 @@ test("research study is blocked until every source has a durable collection outc
     },
   })
 })
+test("completion remains partial when a source collection was partial even if queue blockers cleared", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const cycle = ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
+      for (const source of RESEARCH_SOURCES) {
+        const partial = source.id === RESEARCH_SOURCES[0]!.id
+        ResearchCycle.recordDiscovery({
+          cycleID: cycle.cycle_id, sourceID: source.id, pageWindow: 20, pages: 0, candidates: 0, queuedNew: 0,
+          blockedAuth: 0, errorCount: partial ? 1 : 0, errors: partial ? ["source page fetch failed"] : [],
+          unresolvedAuth: 0, unresolvedErrors: partial ? 1 : 0,
+        })
+      }
+      expect(ResearchCycle.current()?.phase).toBe("studying")
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_cycle_complete_partial_test",
+        messageID: "msg_cycle_complete_partial",
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+      const result = await executeResearchTool(tool, {
+        action: "complete", cycle_id: cycle.cycle_id, pages: 20, depth: 1, limit: 1, continue_after_save: false,
+      }, context)
+      const summary = JSON.parse(result.output)
+      expect(summary.phase).toBe("partial")
+      expect(summary.completed).toBe(false)
+      expect(summary.collection_partial_sources).toContainEqual(expect.objectContaining({ status: "partial" }))
+      await Instance.dispose()
+    },
+  })
+})
+
 test("explicit research reset removes queued imports and external research but preserves target findings", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({

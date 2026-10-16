@@ -16,7 +16,7 @@ import {
   retryAuthenticatedResearch,
   sourceRelevance,
 } from "../research/ingest"
-import { isNonRetryableResearchError } from "../research/safe-fetch"
+import { isNonRetryableResearchError, researchSourceHasCredentials } from "../research/safe-fetch"
 import { ResearchQueue } from "../research/queue"
 import { ResearchQueueTable } from "../research/queue.sql"
 import { ResearchCycleTable } from "../research/cycle.sql"
@@ -181,7 +181,7 @@ function statistics(sourceID?: string) {
 }
 
 function configuredSources() {
-  return RESEARCH_SOURCES.map(({ id, name, kind }) => ({ id, name, kind }))
+  return RESEARCH_SOURCES.map(({ id, name, kind }) => ({ id, name, kind, session_configured: researchSourceHasCredentials({ id }) }))
 }
 
 async function drainBatchedCount(run: () => number | Promise<number>) {
@@ -719,6 +719,8 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           pages: item.pages,
           candidates: item.candidates,
           queuedNew: item.added,
+          documentTypes: item.document_types,
+          duplicateURLsSkipped: item.duplicate_urls_skipped,
           blockedAuth: item.blocked_auth,
           errorCount: item.error_count,
           errors: item.errors,
@@ -732,6 +734,8 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           candidates: item.candidates,
           queued_new: item.added,
           document_types: item.document_types,
+          duplicate_urls_skipped: item.duplicate_urls_skipped,
+          session_configured: researchSourceHasCredentials({ id: item.source }),
           blocked_auth: item.blocked_auth,
           error_count: item.error_count,
           errors: item.errors.slice(0, 3),
@@ -855,10 +859,28 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         return output("Research cycle still has pending study work", JSON.stringify(summary, null, 2), summary)
       }
       const unresolved = queue.blocked_auth + queue.blocked_size + queue.blocked_fetch + queue.crawl_page_errors + queue.crawl_page_auth_blocked
-      const phase = unresolved > 0 ? "partial" : "complete"
+      const cycle = ResearchCycle.current()
+      const incompleteSources = Object.entries(cycle?.source_states ?? {})
+        .filter(([, state]) => state.status !== "complete")
+        .map(([source, state]) => ({
+          source,
+          status: state.status,
+          unresolved_auth: state.unresolved_auth,
+          unresolved_errors: state.unresolved_errors,
+          last_errors: state.passes?.at(-1)?.errors ?? [],
+        }))
+      const phase = unresolved > 0 || incompleteSources.length > 0 ? "partial" : "complete"
       const finished = ResearchCycle.finish(params.cycle_id!, phase)
       if (!finished) return output("Research cycle could not be finalized", "The active cycle changed or was not in the study phase. Read stats and resume from the persisted cycle state.", { error: "cycle_finish_rejected", current: statistics() })
-      const summary = { cycle_id: finished.cycle_id, phase: finished.phase, completed: finished.phase === "complete", unresolved_blockers: { blocked_auth: queue.blocked_auth + queue.crawl_page_auth_blocked, blocked_size: queue.blocked_size, blocked_fetch: queue.blocked_fetch, crawl_page_errors: queue.crawl_page_errors }, queue, knowledge: ReportKnowledge.stats() }
+      const summary = {
+        cycle_id: finished.cycle_id,
+        phase: finished.phase,
+        completed: finished.phase === "complete",
+        collection_partial_sources: incompleteSources,
+        unresolved_blockers: { blocked_auth: queue.blocked_auth + queue.crawl_page_auth_blocked, blocked_size: queue.blocked_size, blocked_fetch: queue.blocked_fetch, crawl_page_errors: queue.crawl_page_errors },
+        queue,
+        knowledge: ReportKnowledge.stats(),
+      }
       return output("Research cycle finalized", JSON.stringify(summary, null, 2), summary)
     }
     const submitted = params.items ?? []

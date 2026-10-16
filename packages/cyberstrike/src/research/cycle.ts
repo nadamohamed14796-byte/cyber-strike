@@ -11,6 +11,8 @@ function emptySourceState(): ResearchSourceCycleState {
     pages_visited: 0,
     candidates_discovered: 0,
     queued_new: 0,
+    document_types: {},
+    duplicate_urls_skipped: 0,
     blocked_auth: 0,
     error_count: 0,
     unresolved_auth: 0,
@@ -83,6 +85,8 @@ export namespace ResearchCycle {
     pages: number
     candidates: number
     queuedNew: number
+    documentTypes?: Record<string, number>
+    duplicateURLsSkipped?: number
     blockedAuth: number
     errorCount: number
     errors: string[]
@@ -105,11 +109,22 @@ export namespace ResearchCycle {
       if (terminal(previous.status)) {
         return { ok: false as const, reason: "source_already_terminal" as const, source_state: previous }
       }
+      const documentTypes = Object.fromEntries(
+        Object.entries(input.documentTypes ?? {})
+          .filter(([name]) => /^[a-z-]{1,32}$/.test(name))
+          .map(([name, count]) => [name, safeCount(count)]),
+      )
+      const aggregateDocumentTypes = { ...(previous.document_types ?? {}) }
+      for (const [name, count] of Object.entries(documentTypes)) {
+        aggregateDocumentTypes[name] = safeCount(aggregateDocumentTypes[name] ?? 0) + count
+      }
       const pass: ResearchCyclePass = {
         page_window: window,
         pages,
         candidates: safeCount(input.candidates),
         queued_new: safeCount(input.queuedNew),
+        document_types: documentTypes,
+        duplicate_urls_skipped: safeCount(input.duplicateURLsSkipped ?? 0),
         blocked_auth: safeCount(input.blockedAuth),
         error_count: safeCount(input.errorCount),
         errors: input.errors.slice(0, 3).map(cleanError),
@@ -128,10 +143,12 @@ export namespace ResearchCycle {
       }
       const nextSource: ResearchSourceCycleState = {
         status,
-        passes: [...previous.passes, pass],
+        passes: [...(previous.passes ?? []), pass],
         pages_visited: previous.pages_visited + pages,
         candidates_discovered: previous.candidates_discovered + pass.candidates,
         queued_new: previous.queued_new + pass.queued_new,
+        document_types: aggregateDocumentTypes,
+        duplicate_urls_skipped: safeCount(previous.duplicate_urls_skipped ?? 0) + pass.duplicate_urls_skipped,
         blocked_auth: previous.blocked_auth + pass.blocked_auth,
         error_count: previous.error_count + pass.error_count,
         unresolved_auth: unresolvedAuth,

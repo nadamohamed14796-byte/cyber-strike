@@ -915,13 +915,15 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       return normalized ? [normalized] : []
     }),
   )
-  const results: Array<{ source: string; pages: number; candidates: number; added: number; document_types: Record<string, number>; blocked_auth: number; error_count: number; errors: string[] }> = []
+  const results: Array<{ source: string; pages: number; candidates: number; added: number; document_types: Record<string, number>; duplicate_urls_skipped: number; blocked_auth: number; error_count: number; errors: string[] }> = []
 
   for (const source of sources) {
     const queue: Array<{ url: string; depth: number }> = []
     const primarySeeds = new Set(source.seedUrls.map((url) => normalizeUrl(url)).filter((url): url is string => !!url))
     const queued = new Set<string>()
     const visited = new Set<string>()
+    const candidateURLs = new Set<string>()
+    const duplicateURLs = new Set<string>()
     const errors: string[] = []
     const paginationFingerprints = new Map<string, string>()
     let pages = 0
@@ -954,6 +956,10 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       visited.add(current.url)
       const existing = ResearchQueue.find(source.id, current.url)
       const isReportURL = isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)
+      if (isReportURL && !candidateURLs.has(current.url)) {
+        candidateURLs.add(current.url)
+        candidates++
+      }
       // Auth-blocked report and index URLs stay parked until the source session is ready
       // and the retry cooldown allows them. Otherwise every sync/watch cycle hammers login walls.
       if (existing?.status === "blocked_auth") continue
@@ -966,6 +972,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
         // Count cached frontier nodes against this pass's work window too; otherwise
         // a second pass could mistake a mostly cached archive for a short archive.
         pages++
+        duplicateURLs.add(current.url)
         // Even when a report's text is already cached/learned, reuse its saved
         // source-allowlisted outgoing links so larger future page passes can keep
         // walking the graph without refetching that report.
@@ -1042,7 +1049,15 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
           isResearchCandidate(current.url, source) && !isIndexLikeResearchUrl(current.url)
         if (!mediumArticleTerminal) {
           for (const link of discoveredLinks) {
-            candidates++
+            const normalizedLink = normalizeUrl(link)
+            if (normalizedLink && isResearchCandidate(normalizedLink, source) && !isIndexLikeResearchUrl(normalizedLink)) {
+              if (candidateURLs.has(normalizedLink)) {
+                duplicateURLs.add(normalizedLink)
+              } else {
+                candidateURLs.add(normalizedLink)
+                candidates++
+              }
+            }
             add(link, current.depth + 1)
           }
         }
@@ -1078,6 +1093,8 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
             if (row.created) {
               added++
               collectedTypes[documentType] = (collectedTypes[documentType] ?? 0) + 1
+            } else {
+              duplicateURLs.add(current.url)
             }
           }
         }
@@ -1131,7 +1148,7 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
       }
       if (current.depth >= maxDepth) continue
     }
-    results.push({ source: source.id, pages, candidates, added, document_types: collectedTypes, blocked_auth: blockedAuth, error_count: errorCount, errors })
+    results.push({ source: source.id, pages, candidates, added, document_types: collectedTypes, duplicate_urls_skipped: duplicateURLs.size, blocked_auth: blockedAuth, error_count: errorCount, errors })
   }
   return results
 }
