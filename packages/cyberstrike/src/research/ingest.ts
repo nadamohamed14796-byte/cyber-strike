@@ -6,13 +6,6 @@ import { fetchResearchText as fetchText, researchSourceHasCredentials } from "./
 
 const MAX_CANDIDATE_SCORE = 100
 const AUTH_RETRY_COOLDOWN_MS = 10 * 60_000
-const DEFAULT_LIMIT = 50
-const MAX_LIMIT = 500
-
-function boundedInteger(value: number | undefined, fallback: number, minimum: number, maximum: number) {
-  const candidate = value === undefined || !Number.isFinite(value) ? fallback : value
-  return Math.max(minimum, Math.min(Math.floor(candidate), maximum))
-}
 
 function paginationSeriesKey(source: ResearchSource, value: string) {
   const url = new URL(value)
@@ -801,24 +794,17 @@ export function looksLikeResearchAuthenticationWall(url: string, title: string, 
  * Apply auth-blocked retries against one shared cap. Kept pure around the queue
  * operation so the global budget can be tested without sharing the process-wide DB.
  */
-export function retryAuthBlockedWithBudget<S extends { id: string }>(
+export function retryAuthBlockedAcrossSources<S extends { id: string }>(
   sources: readonly S[],
-  requestedLimit: number,
   hasCredentials: (source: S) => boolean,
-  retry: (limit: number, sourceID: string, minAgeMs: number) => number,
+  retry: (sourceID: string, minAgeMs: number) => number,
   minAgeMs: number,
 ): number {
-  let remaining = boundedInteger(requestedLimit, DEFAULT_LIMIT, 1, MAX_LIMIT)
   let total = 0
   for (const source of sources) {
-    if (remaining <= 0) break
     if (!hasCredentials(source)) continue
-    const retried = retry(remaining, source.id, minAgeMs)
-    // Queue implementations must respect the passed limit. Clamp accounting as
-    // a defensive guard against a faulty adapter reporting an invalid count.
-    const used = Number.isFinite(retried) ? Math.max(0, Math.min(remaining, Math.floor(retried))) : 0
-    total += used
-    remaining -= used
+    const retried = retry(source.id, minAgeMs)
+    total += Number.isFinite(retried) ? Math.max(0, Math.floor(retried)) : 0
   }
   return total
 }
@@ -833,13 +819,13 @@ export async function retryAuthenticatedResearch(input: {
 } = {}) {
   const { ResearchQueue } = await import("./queue")
   const sources = input.sourceID ? RESEARCH_SOURCES.filter((source) => source.id === input.sourceID) : RESEARCH_SOURCES
-  const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
   const minAgeMs = input.retryImmediately ? 0 : AUTH_RETRY_COOLDOWN_MS
-  return retryAuthBlockedWithBudget(
+  // Legacy limit input is accepted for compatibility but never caps recovery.
+  void input.limit
+  return retryAuthBlockedAcrossSources(
     sources,
-    limit,
     (source) => researchSourceHasCredentials(source, input.sessionIDs),
-    (remaining, sourceID, cooldown) => ResearchQueue.retryAuthenticationBlocked(remaining, sourceID, cooldown),
+    (sourceID, cooldown) => ResearchQueue.retryAuthenticationBlocked(undefined, sourceID, cooldown),
     minAgeMs,
   )
 }
@@ -859,7 +845,8 @@ export async function syncResearchSource(
   options: ResearchSyncOptions = {},
 ): Promise<ResearchIngestResult> {
   const { ResearchQueue } = await import("./queue")
-  const batchLimit = boundedInteger(options.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  // Legacy limit input is accepted for compatibility but never caps total work.
+  void options.limit
   let pageWindow = Math.max(1, Math.floor(options.pages ?? 20))
   const discovery = { pages: 0, candidates: 0, added: 0, blocked_auth: 0, errors: [] as string[] }
   const learned = { learned: 0, skipped: 0, failed: 0, blocked_auth: 0, requeued_legacy: 0, errors: [] as string[] }
@@ -897,7 +884,7 @@ export async function syncResearchSource(
   // `batchLimit` is a per-claim size, not a total-work limit; the loop has no
   // report-count ceiling and resumes until the durable queue has no claimable rows.
   while (true) {
-    const batch = await learnResearchQueue({ limit: batchLimit, sourceID: source.id })
+    const batch = await learnResearchQueue({ sourceID: source.id })
     learned.learned += batch.learned
     learned.skipped += batch.skipped
     learned.failed += batch.failed
@@ -1225,8 +1212,9 @@ export async function discoverResearch(input: { sourceID?: string; pages?: numbe
 export async function learnResearchQueue(input: { limit?: number; workerID?: string; sourceID?: string; sessionIDs?: readonly string[] } = {}) {
   const { ResearchQueue } = await import("./queue")
   const workerID = input.workerID ?? "learn-" + process.pid + "-" + crypto.randomUUID()
-  const limit = boundedInteger(input.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
-  const legacyRequeued = ResearchQueue.requeueLegacyRejected(limit, input.sourceID)
+  // Legacy limit input is accepted for compatibility but never caps total work.
+  void input.limit
+  const legacyRequeued = ResearchQueue.requeueLegacyRejected(undefined, input.sourceID)
   const result = {
     worker: workerID,
     claimed: 0,
@@ -1242,9 +1230,9 @@ export async function learnResearchQueue(input: { limit?: number; workerID?: str
   // Reuse the same source-scoped retry path as CLI/update instead of retrying
   // 100 rows independently per source. This keeps auth recovery bounded globally
   // and preserves the cooldown/session-configuration gates in one place.
-  await retryAuthenticatedResearch({ sourceID: input.sourceID, limit, sessionIDs: input.sessionIDs })
+  await retryAuthenticatedResearch({ sourceID: input.sourceID, sessionIDs: input.sessionIDs })
 
-  for (let i = 0; i < limit; i++) {
+  while (true) {
     const item = ResearchQueue.claimNext(workerID, input.sourceID)
     if (!item) break
     result.claimed++
