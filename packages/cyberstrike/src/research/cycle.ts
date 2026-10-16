@@ -17,6 +17,7 @@ function emptySourceState(): ResearchSourceCycleState {
     unresolved_errors: 0,
     last_page_window: 0,
     last_pages: 0,
+    next_page_window: 20,
   }
 }
 
@@ -98,6 +99,12 @@ export namespace ResearchCycle {
       if (!current.source_ids.includes(input.sourceID)) return { ok: false as const, reason: "source_not_selected" as const, cycle: current }
 
       const previous = current.source_states[input.sourceID] ?? emptySourceState()
+      if (window !== previous.next_page_window) {
+        return { ok: false as const, reason: "page_window_out_of_sequence" as const, expected_page_window: previous.next_page_window }
+      }
+      if (terminal(previous.status)) {
+        return { ok: false as const, reason: "source_already_terminal" as const, source_state: previous }
+      }
       const pass: ResearchCyclePass = {
         page_window: window,
         pages,
@@ -111,10 +118,13 @@ export namespace ResearchCycle {
       const unresolvedAuth = safeCount(input.unresolvedAuth ?? input.blockedAuth)
       const unresolvedErrors = safeCount(input.unresolvedErrors ?? input.errorCount)
       let status: ResearchSourceCycleStatus = "collecting"
+      const nextPageWindow = window * 2
       if (pages < window) {
         if (unresolvedAuth > 0) status = "blocked"
         else if (pass.error_count > 0 || unresolvedErrors > 0) status = "partial"
         else status = "complete"
+      } else if (!Number.isSafeInteger(nextPageWindow)) {
+        status = "partial"
       }
       const nextSource: ResearchSourceCycleState = {
         status,
@@ -128,6 +138,7 @@ export namespace ResearchCycle {
         unresolved_errors: unresolvedErrors,
         last_page_window: window,
         last_pages: pages,
+        next_page_window: status === "collecting" ? nextPageWindow : previous.next_page_window,
       }
       const sourceStates = { ...current.source_states, [input.sourceID]: nextSource }
       const allTerminal = current.source_ids.every((id) => terminal(sourceStates[id]?.status))

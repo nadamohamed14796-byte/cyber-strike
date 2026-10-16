@@ -697,6 +697,14 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       if (!cycle.source_ids.includes(params.source)) {
         return output("Source not selected for this cycle", "Use an exact source ID returned by action=stats and selected by action=begin.", { error: "source_not_selected", source: params.source, cycle })
       }
+      const sourceState = cycle.source_states[params.source]
+      if (!sourceState) return output("Source state missing", "The cycle ledger does not contain this configured source. Do not proceed without repairing the cycle state.", { error: "source_state_missing", source: params.source })
+      if (["complete", "partial", "blocked"].includes(sourceState.status)) {
+        return output("Source collection already terminal", "This source has a durable terminal collection status. Resume another pending/collecting source or finish the active cycle; start a new cycle only for a new research run.", { error: "source_already_terminal", source: params.source, source_state: sourceState })
+      }
+      if (params.pages !== sourceState.next_page_window) {
+        return output("Discovery window must expand in sequence", "Continue the per-source collection window exactly as recorded. The first window is 20; every saturated window doubles. This is not a total-work limit.", { error: "page_window_out_of_sequence", source: params.source, requested_page_window: params.pages, expected_page_window: sourceState.next_page_window, source_state: sourceState })
+      }
 
       const legacyBackfill = await backfillResearch(params.source)
       const results = await discoverResearch({ sourceID: params.source, pages: params.pages, depth: params.depth, agentLed: true })

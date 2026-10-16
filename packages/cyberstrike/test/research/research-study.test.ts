@@ -23,7 +23,7 @@ async function executeResearchTool(tool: any, params: any, context: any) {
     const created = ResearchCycle.begin(RESEARCH_SOURCES.map((source) => source.id))
     for (const source of RESEARCH_SOURCES) {
       ResearchCycle.recordDiscovery({
-        cycleID: created.cycle_id, sourceID: source.id, pageWindow: 1, pages: 0, candidates: 0, queuedNew: 0,
+        cycleID: created.cycle_id, sourceID: source.id, pageWindow: 20, pages: 0, candidates: 0, queuedNew: 0,
         blockedAuth: 0, errorCount: 0, errors: [],
       })
     }
@@ -940,7 +940,7 @@ test("begin resumes a collecting cycle without discarding source progress", asyn
       const first = ResearchCycle.begin(ids)
       const sourceID = ids[0]!
       ResearchCycle.recordDiscovery({
-        cycleID: first.cycle_id, sourceID, pageWindow: 1, pages: 1, candidates: 7, queuedNew: 2,
+        cycleID: first.cycle_id, sourceID, pageWindow: 20, pages: 20, candidates: 7, queuedNew: 2,
         blockedAuth: 0, errorCount: 0, errors: [],
       })
       const resumed = ResearchCycle.begin(ids)
@@ -948,9 +948,25 @@ test("begin resumes a collecting cycle without discarding source progress", asyn
       expect(resumed.phase).toBe("collecting")
       expect(resumed.source_states[sourceID]?.passes.length).toBe(1)
       expect(resumed.source_states[sourceID]?.queued_new).toBe(2)
+      expect(resumed.source_states[sourceID]?.next_page_window).toBe(40)
       await Instance.dispose()
     },
   })
+})
+test("research collection enforces expanding per-source windows without a global work ceiling", () => {
+  const ids = RESEARCH_SOURCES.map((source) => source.id)
+  const cycle = ResearchCycle.begin(ids)
+  const firstSource = ids[0]!
+  const outOfSequence = ResearchCycle.recordDiscovery({
+    cycleID: cycle.cycle_id, sourceID: firstSource, pageWindow: 1, pages: 0, candidates: 0, queuedNew: 0,
+    blockedAuth: 0, errorCount: 0, errors: [],
+  })
+  expect(outOfSequence).toMatchObject({ ok: false, reason: "page_window_out_of_sequence", expected_page_window: 20 })
+  const fullWindow = ResearchCycle.recordDiscovery({
+    cycleID: cycle.cycle_id, sourceID: firstSource, pageWindow: 20, pages: 20, candidates: 100, queuedNew: 80,
+    blockedAuth: 0, errorCount: 0, errors: [],
+  })
+  expect(fullWindow).toMatchObject({ ok: true, phase: "collecting", source_state: { status: "collecting", next_page_window: 40 } })
 })
 test("research study is blocked until every source has a durable collection outcome", async () => {
   await using dir = await tmpdir({ git: true })
@@ -985,7 +1001,7 @@ test("research study is blocked until every source has a durable collection outc
 
       for (const source of RESEARCH_SOURCES) {
         ResearchCycle.recordDiscovery({
-          cycleID: cycle.cycle_id, sourceID: source.id, pageWindow: 1, pages: 0, candidates: 0, queuedNew: 0,
+          cycleID: cycle.cycle_id, sourceID: source.id, pageWindow: 20, pages: 0, candidates: 0, queuedNew: 0,
           blockedAuth: 0, errorCount: 0, errors: [],
         })
       }

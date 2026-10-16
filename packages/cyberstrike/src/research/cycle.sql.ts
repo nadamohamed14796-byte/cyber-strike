@@ -26,6 +26,7 @@ export type ResearchSourceCycleState = {
   unresolved_errors: number
   last_page_window: number
   last_pages: number
+  next_page_window: number
 }
 
 export const ResearchCycleTable = sqliteTable("research_cycle", {
