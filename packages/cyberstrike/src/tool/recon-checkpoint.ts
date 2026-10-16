@@ -79,7 +79,11 @@ function terminal(status: ReconPhaseStatus): boolean {
 /** Pure prerequisite check shared by the runtime gate and unit tests. */
 export function unresolvedReconPrerequisites(phase: ReconPhase, phases: Record<ReconPhase, ReconPhaseRecord>): ReconPhase[] {
   const earlier = PHASES.slice(0, PHASES.indexOf(phase))
-  const unresolved = earlier.filter((item) => !terminal(phases[item].status))
+  const unresolved = earlier.filter((item) =>
+    item === "scope_validation" || item === "workspace_setup"
+      ? phases[item].status !== "complete"
+      : !terminal(phases[item].status),
+  )
   if (phase !== "scope_validation" && phase !== "workspace_setup" && phases.scope_validation.status !== "complete" && !unresolved.includes("scope_validation")) {
     unresolved.unshift("scope_validation")
   }
