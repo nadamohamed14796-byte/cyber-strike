@@ -200,8 +200,8 @@ function normalizeScopeItem(input: string): string {
 
   // Preserve exact IPv6 literals as bracketed URL hostnames so URL matching can
   // compare them without confusing colons with a service-port separator.
-  if (value.includes(":") && !value.includes("/") && !/^https?:\\/\\//i.test(value)) {
-    const rawIPv6 = value.replace(/^\\[|\\]$/g, "")
+  if (value.includes(":") && !value.includes("/") && !/^https?:\/\//i.test(value)) {
+    const rawIPv6 = value.replace(/^\[|\]$/g, "")
     if (rawIPv6.includes(":")) {
       try {
         const ipv6URL = new URL("https://[" + rawIPv6 + "]")
