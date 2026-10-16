@@ -401,9 +401,22 @@ test("captured session cookies are reused only for the exact host and never forw
           host: "research.example",
           scheme: "https",
           origin: "https://research.example:443",
-          raw_request: "GET /private HTTP/1.1\\r\\nHost: research.example\\r\\n\\r\\n",
+          raw_request: "GET /private HTTP/1.1\r\nHost: research.example\r\n\r\n",
           time_created: now,
           time_updated: now,
+        }).run()
+        db.insert(RequestTable).values({
+          id: "req_raw_cookie_" + marker.slice(0, 18),
+          session_id: sessionID,
+          method: "GET",
+          normalized_path: "/private",
+          status: "captured",
+          host: "raw.example",
+          scheme: "https",
+          origin: "https://raw.example:443",
+          raw_request: "GET /private HTTP/1.1\r\nHost: raw.example\r\nCookie: raw=session-captured\r\n\r\n",
+          time_created: now + 1,
+          time_updated: now + 1,
         }).run()
         db.insert(RequestTable).values({
           id: "req_other_cookie_" + marker.slice(0, 18),
@@ -421,6 +434,7 @@ test("captured session cookies are reused only for the exact host and never forw
       })
 
       expect(researchSessionCookieForHost([sessionID], "research.example")).toBe("session=from-capture")
+      expect(researchSessionCookieForHost([sessionID], "raw.example")).toBe("raw=session-captured")
       expect(researchSessionCookieForHost([sessionID], "sub.research.example")).toBeUndefined()
       expect(researchSourceHasCredentials({ ...source, hosts: ["research.example"] }, [sessionID])).toBe(true)
       expect(researchSourceHasCredentials({ ...source, hosts: ["unrelated.example"] }, [sessionID])).toBe(false)
