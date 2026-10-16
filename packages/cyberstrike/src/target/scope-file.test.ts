@@ -11,7 +11,7 @@ describe("parseScopeFileContents", () => {
   })
 
   test("preserves URL path scopes, service ports, and other compact scope identifiers", () => {
-    expect(parseScopeFileContents("https://example.com/api/*\\napi.example.com:8443\\ncom.example.mobile\\n2001:db8::1")).toEqual([
+    expect(parseScopeFileContents("https://example.com/api/*\napi.example.com:8443\ncom.example.mobile\n2001:db8::1")).toEqual([
       "https://example.com/api/*",
       "api.example.com:8443",
       "com.example.mobile",
