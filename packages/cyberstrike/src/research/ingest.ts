@@ -394,7 +394,8 @@ export function classifyResearchDocumentType(
     /\b(?:why it matters|how it works|overview|explained|lessons learned)\b/,
   ].filter((pattern) => pattern.test(sample)).length
   const academySignals = /\b(?:web security academy|lab solution|lab walkthrough|learning objective|practice lab)\b/.test(sample)
-  const referenceSignals = /\b(?:documentation|reference guide|cheat sheet|payloads all the things|hacktricks)\b/.test(sample)
+  const cheatsheetSignals = /\b(?:cheat[ -]?sheet|payloads all the things|payload collection|payload list|quick reference)\b/.test(sample)
+  const referenceSignals = /\b(?:documentation|reference guide|hacktricks)\b/.test(sample)
   const researchSignals = /\b(?:technical research|root cause|novel technique|security research|research paper|technical analysis)\b/.test(sample)
 
   const scores = [
