@@ -80,6 +80,44 @@ describe("target memory normalization", () => {
   })
 })
 
+test("upserts stable target-note identity instead of accumulating snapshot duplicates", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const targetURL = "https://correlation-notes.example.test"
+      const first = await TargetMemory.addNote(targetURL, {
+        kind: "javascript",
+        title: "JavaScript correlation snapshot - session-root - all assets",
+        content: "One source and two endpoint candidates.",
+        source: "session:session-root",
+        status: "observed",
+        tags: ["javascript", "correlation"],
+        upsertByIdentity: true,
+      })
+      const refreshed = await TargetMemory.addNote(targetURL, {
+        kind: "javascript",
+        title: "JavaScript correlation snapshot - session-root - all assets",
+        content: "Two sources and five endpoint candidates.",
+        source: "session:session-root",
+        status: "observed",
+        tags: ["javascript", "correlation"],
+        upsertByIdentity: true,
+      })
+      const notes = TargetMemory.allNotes(first.workspace.id)
+      expect(first.created).toBe(true)
+      expect(refreshed.created).toBe(false)
+      expect(refreshed.updated).toBe(true)
+      expect(refreshed.note.id).toBe(first.note.id)
+      expect(notes).toHaveLength(1)
+      expect(notes[0]?.content).toContain("five endpoint candidates")
+      const markdown = await fs.readFile(path.join(first.workspace.workspacePath, "notes.md"), "utf-8")
+      expect(markdown.match(/<!-- cyberstrike-target-note:/g) ?? []).toHaveLength(1)
+      expect(markdown).toContain("five endpoint candidates")
+    },
+  })
+})
+
 test("target observation matching requires exact origin and scoped path", () => {
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/api/users")).toBe(true)
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/")).toBe(true)
