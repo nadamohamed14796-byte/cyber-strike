@@ -55,6 +55,8 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   hakrawler: "url_collection",
   gospider: "url_collection",
   paramspider: "url_collection",
+  curl: "url_collection",
+  wget: "url_collection",
   arjun: "endpoint_inventory",
   nuclei: "vulnerability_testing",
   ffuf: "vulnerability_testing",
@@ -124,7 +126,15 @@ async function assertScannerReconGate(command: string[], commandText: string): P
       throw new Error("Recon execution gate blocked " + scanner + ": port list must contain valid ports from 1 to 65535.")
     }
   }
-  const phase = SCANNER_PHASES[scanner]!
+  let phase = SCANNER_PHASES[scanner]!
+  // Plain retrieval belongs to URL collection; mutating/non-safe HTTP methods
+  // are active vulnerability testing and must wait for the final inventory gate.
+  if (scanner === "curl") {
+    const methodIndex = args.findIndex((value) => ["-x", "--request"].includes(value.toLowerCase()))
+    const explicitMethod = methodIndex >= 0 ? args[methodIndex + 1]?.toUpperCase() : undefined
+    const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form"].includes(value))
+    if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
+  }
   const targets = scannerTargets(command.slice(scannerIndex), commandText)
   if (!targets.length) {
     throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s). Target-list/file mode is blocked until each target can be checked against persisted scope and phase checkpoints.")
