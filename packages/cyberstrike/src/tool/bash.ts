@@ -111,7 +111,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   if (["nmap", "masscan", "naabu"].includes(scanner)) {
     const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
     const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
-    if (!portSpec || !/^\\d+(?:,\\d+)*$/.test(portSpec)) {
+    if (!portSpec || !/^\d+(?:,\d+)*$/.test(portSpec)) {
       throw new Error("Recon execution gate blocked " + scanner + ": an explicit comma-separated port list is required; ranges, all-port defaults, and unbounded scans are not allowed by this gate.")
     }
     portScanPorts = [...new Set(portSpec.split(",").map(Number))]
