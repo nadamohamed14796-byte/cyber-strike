@@ -1,7 +1,7 @@
 import z from "zod"
 import path from "node:path"
 import { Tool } from "../tool"
-import { reconPhaseGate, type ReconPhase } from "../recon-checkpoint"
+import { reconPhaseGate, type ReconPhase } from "../../target/recon-gate"
 import { TargetMemory, type Workspace } from "../../target"
 import { redactTargetNoteSecrets } from "../../target/redact"
 import type { ScopeCheck } from "./shared"
