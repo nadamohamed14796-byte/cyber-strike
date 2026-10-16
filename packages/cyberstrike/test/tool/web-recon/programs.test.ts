@@ -71,7 +71,7 @@ test("headerAudit treats missing headers as informational leads, not confirmed v
     const missing = result.findings.filter((finding) => finding.status === "MISSING")
     expect(missing.length).toBeGreaterThan(0)
     expect(missing.every((finding) => finding.severity === "info")).toBe(true)
-    expect(missing.every((finding) => finding.details.includes("not been demonstrated"))).toBe(true)
+    expect(missing.every((finding) => finding.details.includes("hardening observation only"))).toBe(true)
     const weakCsp = result.findings.find((finding) => finding.checkId === "WEB-HDR-CSP-WEAK")
     expect(weakCsp?.severity).toBe("low")
     expect(weakCsp?.details).toContain("not proof of an exploitable XSS")
