@@ -1464,7 +1464,9 @@ export const SessionRoutes = lazy(() =>
                         "- Response content type: " + (req.response_content_type ?? "unknown"),
                         "- Response size: " + (req.response_size ?? "unknown"),
                         "",
-                        "The full captured request/response remains in the request store under the Request ID. Redacted workspace artifact: " + requestArtifact + ". This note is an index into target evidence, not a vulnerability finding. The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
+                        "Interpretation: observed request/response metadata only; this is not a vulnerability finding and does not prove an access-control or input-validation flaw. Unknowns: authorization context, expected behavior, response semantics, and security impact unless the child analysis establishes them.\n" +
+                        "Next analysis: inspect the redacted artifact and canonical request by ID; correlate the exact origin/method/path with the endpoint inventory and JavaScript candidates; compare an authorized baseline/control where appropriate; record concrete evidence and a negative result if behavior is expected. Never infer impact from status code, missing headers, parameter presence, or unusual response alone.\n" +
+                        "The full captured request/response remains in the request store under the Request ID. Redacted workspace artifact: " + requestArtifact + ". The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
                       ].join("\n")
                       await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
                         kind: "evidence",

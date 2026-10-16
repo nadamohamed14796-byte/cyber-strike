@@ -136,7 +136,7 @@ function formatOutput(program: string, result: WebReconResult): { output: string
               `[${i + 1}] ${f.severity} — ${f.title}${f.cwe ? ` (${f.cwe})` : ""}\n    Check: ${f.checkId} | Status: ${f.status} | Resource: ${f.resource}\n    ${f.details}\n    Remediation: ${f.remediation}`,
           )
           .join("\n") +
-        "\n\nCall report_vulnerability for each finding: severity (lowercase), title, description=details, recommendation=remediation" +
+        "\n\nTreat these as leads, not automatically valid bugs. Save INFO/LOW hardening observations and discovery results as target notes with artifact/source IDs. Call report_vulnerability only for a concrete security claim with an affected endpoint and evidence; test plausible impact/chains first, and do not raise severity without demonstrated impact. For a reportable candidate: severity (lowercase), title, description=details, recommendation=remediation" +
         (enriched.some((f) => f.cwe) ? ", cwe_id from parentheses above" : "") +
         "."
       : result.output
@@ -329,31 +329,12 @@ export const WebReconTool = Tool.define("web_recon", {
             kind: "asset",
             title: "Recon run: " + program,
             content: [
-              "## Recon run summary",
-              "",
               "Program: " + program,
               "Requested URL: " + (params.target ?? "authorized origins from the current session"),
               "Completed at: " + completedAt,
               "Run artifact: " + path.relative(targetWorkspace.workspacePath, artifactPath).split(path.sep).join("/"),
-              "Result status: completed; the linked JSON artifact is the full evidence record.",
-              "Finding-like signals returned: " + result.findings.length + " (scanner/check output is a lead, not automatic confirmation).",
-              "Severity distribution: " + (["critical", "high", "medium", "low", "info"].map((severity) => {
-                const count = enriched.filter((finding) => finding.severity === severity).length
-                return count ? severity + "=" + count : undefined
-              }).filter(Boolean).join(", ") || "no severity-tagged signals"),
-              "",
-              "## Signals requiring triage",
-              ...(enriched.length ? enriched.slice(0, 12).flatMap((finding) => [
-                "- [" + finding.severity.toUpperCase() + "/" + finding.status + "] " + finding.title,
-                "  Check/resource: " + finding.checkId + " — " + finding.resource,
-                "  Observed signal: " + finding.details.replace(/\\s+/g, " ").slice(0, 260),
-                "  Suggested remediation: " + finding.remediation.replace(/\\s+/g, " ").slice(0, 180),
-                "  Validation state: unconfirmed by this recon summary; verify the exact behavior with a baseline/control and document impact before approving or escalating severity.",
-              ]) : ["- No finding-like signals were returned by this run. This means only that these checks found no signals; it does not prove the target is free of vulnerabilities."]),
-              ...(enriched.length > 12 ? ["- " + (enriched.length - 12) + " additional signal(s) are preserved in the full run artifact."] : []),
-              "",
-              "## Next step",
-              "Prioritize signals by plausible attacker impact and prerequisites, not by severity label alone. For INFO/LOW observations such as missing headers, keep the original evidence and test a specific, safe exploit hypothesis with a baseline/negative control. Escalate only when a reproducible security boundary violation and meaningful impact are demonstrated; otherwise retain the hardening observation with its limitations.",
+              "Result status: completed; detailed output is in the linked JSON artifact.",
+              "Finding-like signals returned: " + result.findings.length + " (not automatically confirmed as vulnerabilities).",
             ].join("\n"),
             source: "web_recon",
             sourceURL: params.target,
