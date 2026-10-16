@@ -621,6 +621,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       }
       const reset = Database.transaction((db) => {
         const queueRows = db.select({ sequence: ResearchQueueTable.sequence }).from(ResearchQueueTable).all()
+        const cycleRows = db.select({ id: ResearchCycleTable.id }).from(ResearchCycleTable).all()
         const externalRows = db.select({ id: ReportKnowledgeTable.id }).from(ReportKnowledgeTable)
           .where(eq(ReportKnowledgeTable.source_kind, "external_report")).all()
         const externalIDs = externalRows.map((row) => row.id)
@@ -630,7 +631,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         }
         db.delete(ResearchQueueTable).run()
         db.delete(ResearchCycleTable).run()
-        return { queue_rows_removed: queueRows.length, external_research_records_removed: externalIDs.length, active_cycle_rows_removed: 1 }
+        return { queue_rows_removed: queueRows.length, external_research_records_removed: externalIDs.length, active_cycle_rows_removed: cycleRows.length }
       })
       return output(
         "Research workspace reset",
@@ -647,14 +648,20 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       if (params.source) {
         return output("Research cycle begin requires global scope", "Omit source to create a single durable cycle for every configured source.", { error: "source_not_allowed_for_begin" })
       }
-      const cycle = ResearchCycle.begin(RESEARCH_SOURCES.map((entry) => entry.id))
+      let cycle
+      try {
+        cycle = ResearchCycle.begin(RESEARCH_SOURCES.map((entry) => entry.id))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return output("Research cycle could not begin", message, { error: "active_cycle_conflict", current: statistics() })
+      }
       const summary = {
         cycle_id: cycle.cycle_id,
         phase: cycle.phase,
         source_ids: cycle.source_ids,
         source_states: cycle.source_states,
         started_at: cycle.started_at,
-        instruction: "Pass this exact cycle_id to every discover, next, read, save, and complete action.",
+        instruction: cycle.phase === "collecting" ? "Resume only sources still pending/collecting; skip terminal sources and keep collecting before study." : cycle.phase === "studying" ? "Collection is already closed; resume the queue drain and final verification without restarting discovery." : "This cycle is already finalized.",
       }
       return output("Research collection cycle started", JSON.stringify(summary, null, 2), summary)
     }

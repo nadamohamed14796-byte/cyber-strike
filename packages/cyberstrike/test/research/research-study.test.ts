@@ -931,6 +931,27 @@ test("model-led update queues legacy shared reports once without refetching or c
 })
 
 
+test("begin resumes a collecting cycle without discarding source progress", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const ids = RESEARCH_SOURCES.map((source) => source.id)
+      const first = ResearchCycle.begin(ids)
+      const sourceID = ids[0]!
+      ResearchCycle.recordDiscovery({
+        cycleID: first.cycle_id, sourceID, pageWindow: 1, pages: 1, candidates: 7, queuedNew: 2,
+        blockedAuth: 0, errorCount: 0, errors: [],
+      })
+      const resumed = ResearchCycle.begin(ids)
+      expect(resumed.cycle_id).toBe(first.cycle_id)
+      expect(resumed.phase).toBe("collecting")
+      expect(resumed.source_states[sourceID]?.passes.length).toBe(1)
+      expect(resumed.source_states[sourceID]?.queued_new).toBe(2)
+      await Instance.dispose()
+    },
+  })
+})
 test("research study is blocked until every source has a durable collection outcome", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({

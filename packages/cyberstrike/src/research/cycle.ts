@@ -45,6 +45,12 @@ export namespace ResearchCycle {
     const cycleID = crypto.randomUUID()
     const states = Object.fromEntries(sources.map((id) => [id, emptySourceState()]))
     return Database.transaction((db) => {
+      const existing = db.select().from(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).get()
+      if (existing && (existing.phase === "collecting" || existing.phase === "studying")) {
+        const sameSources = existing.source_ids.length === sources.length && existing.source_ids.every((id, index) => id === sources[index])
+        if (!sameSources) throw new Error("An active research cycle exists with a different source set; resume it or explicitly reset it before starting another cycle.")
+        return existing
+      }
       db.delete(ResearchCycleTable).where(eq(ResearchCycleTable.id, ACTIVE_ROW_ID)).run()
       return db.insert(ResearchCycleTable).values({
         id: ACTIVE_ROW_ID,
