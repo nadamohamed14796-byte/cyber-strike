@@ -265,7 +265,18 @@ export namespace Skill {
   })
 
   export async function get(name: string) {
-    return state().then((x) => x.skills[name])
+    return state().then((x) => {
+      // Exact names are canonical. A case-insensitive exact-name fallback makes
+      // skill invocation resilient to model casing mistakes without fuzzy matches.
+      const exact = x.skills[name]
+      if (exact) return exact
+      const normalized = name.trim().toLocaleLowerCase("en-US")
+      if (!normalized) return undefined
+      const matches = Object.values(x.skills).filter(
+        (skill) => skill.name.trim().toLocaleLowerCase("en-US") === normalized,
+      )
+      return matches.length === 1 ? matches[0] : undefined
+    })
   }
 
   export async function all() {

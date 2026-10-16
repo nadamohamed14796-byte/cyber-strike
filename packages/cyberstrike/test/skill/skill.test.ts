@@ -50,6 +50,10 @@ Instructions here.
       const testSkill = skills.find((s) => s.name === "test-skill")
       expect(testSkill).toBeDefined()
       expect(testSkill!.description).toBe("A test skill for verification.")
+      // Models sometimes change identifier casing; only a unique exact-name
+      // match ignoring case should be accepted (never fuzzy substring matching).
+      expect((await Skill.get("TEST-SKILL"))?.name).toBe("test-skill")
+      expect(await Skill.get("test-ski")).toBeUndefined()
       expect(testSkill!.location).toContain("skill/test-skill/SKILL.md")
     },
   })
