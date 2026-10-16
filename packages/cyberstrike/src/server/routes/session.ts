@@ -1414,7 +1414,7 @@ export const SessionRoutes = lazy(() =>
                             }),
                           },
                           evidencePolicy: "Redacted workspace copy for navigation; the canonical captured request remains in SQLite for request-detail/replay tooling.",
-                        }, null, 2) + "\\n")
+                        }, null, 2) + "\n")
                       } catch (error) {
                         log.warn("request artifact persistence failed", {
                           sessionID,
