@@ -214,8 +214,6 @@ export namespace ResearchCycle {
         if (unresolvedAuth > 0) status = "blocked"
         else if (pass.error_count > 0 || unresolvedErrors > 0) status = "partial"
         else status = "complete"
-      } else if (!Number.isSafeInteger(nextPageWindow)) {
-        status = "partial"
       }
       const nextSource: ResearchSourceCycleState = {
         status,
