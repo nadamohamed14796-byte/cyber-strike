@@ -915,14 +915,15 @@ export namespace ResearchQueue {
     })
   }
 
-  export function pending(limit = 50) {
+  export function pending(_legacyLimit = 50) {
+    // Return the complete pending set; callers may paginate at the presentation
+    // layer, but this API must not hide eligible work behind a fixed cap.
     return Database.use((db) =>
       db
         .select()
         .from(ResearchQueueTable)
         .where(inArray(ResearchQueueTable.status, ["queued", "retry", "studying", "blocked_auth"]))
         .orderBy(asc(ResearchQueueTable.sequence))
-        .limit(Math.max(1, Math.min(500, Math.floor(limit))))
         .all()
         .map((row) => ({ ...row, public_id: publicID(row.sequence) })),
     )
