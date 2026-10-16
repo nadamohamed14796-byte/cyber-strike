@@ -49,6 +49,7 @@ import { Shell } from "@/shell/shell"
 import { Truncate } from "@/tool/truncation"
 import { Token } from "@/util/token"
 import { MethodologyContext } from "@/methodology/context"
+import { RECON_METHODOLOGY_PROMPT } from "../methodology/recon"
 import { TargetMemory } from "@/target"
 import { ResearchContext, promptResearchSignals } from "@/learning/research-context"
 import { AgentPerformance } from "@/methodology/performance"
@@ -73,6 +74,7 @@ IMPORTANT:
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 const TARGET_WORKSPACE_WORKFLOW_PROMPT = [
+  RECON_METHODOLOGY_PROMPT,
   "MANDATORY TARGET WORKSPACE AND PERSISTENCE RULES:",
   "When the task involves a named target/program, scope file, domains/subdomains, reconnaissance, vulnerability hunting, or target-specific artifacts, first inspect target_workspace(action=\"show\", target_url=...) or target_workspace(action=\"list\"). If the root workspace does not exist, call target_workspace(action=\"init\", target_url=\"<stable root/program target>\") before recon or active testing.",
   "Use only the exact absolute workspace path returned by target_workspace. Do not invent /root/targets, a random output folder, or rely on the current shell directory. Save text/JSON/CSV outputs with target_artifact in the root workspace or the matching asset workspace; save technical observations tied to current-session evidence with target_note; use target_workspace(action=\"record_summary\") for verified run/scope/checkpoint summaries so notes.md can be updated even when the root target has no captured request yet. Do not claim a save succeeded unless the tool confirms it and the output path is verified.",
