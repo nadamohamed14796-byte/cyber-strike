@@ -60,7 +60,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     async execute(params: z.infer<typeof parameters>, ctx) {
       await SkillIndex.ensureBuilt()
 
-      const agentKey = `${Instance.directory}\\0${ctx.agent ?? ""}`
+      const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
       const catalog = Skill.state()
       const skills = await Skill.all()
       const agentInfo = await Agent.get(ctx.agent)
