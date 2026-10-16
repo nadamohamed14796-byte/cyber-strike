@@ -1206,6 +1206,33 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
             : [],
           extracted,
           document_note: buildDocumentNote(documentType, note, extracted),
+          // A hunt signal is an operational retrieval/playbook record, distinct from
+          // the source narrative. Keep explicit triggers, branching actions, evidence,
+          // applicability and false-positive guards together for hunt-time use.
+          hunt_signal: {
+            schema_version: 1,
+            name: boundedText(note.pattern_name, 180),
+            summary: boundedText(note.pattern_summary, 1200),
+            trigger: boundedText(note.trigger_signal, 800) ?? boundedText(note.initial_observation, 800),
+            vulnerability_class: vulnerabilityClass,
+            cwe_id: cweID,
+            document_type: documentType,
+            procedure: boundedList(note.test_procedure, 700),
+            expected_positive_signals: boundedList(note.expected_positive_signals, 400),
+            expected_negative_signals: boundedList(note.expected_negative_signals, 400),
+            evidence_requirements: boundedList(note.evidence_requirements, 500),
+            applicability_conditions: boundedList(note.applicability_conditions, 500),
+            non_applicability_conditions: boundedList(note.non_applicability_conditions, 500),
+            false_positive_cautions: boundedList(note.false_positive_cautions, 400),
+            prerequisites: boundedText(note.prerequisites, 1800),
+            attack_chain: boundedText(note.attack_chain, 2400),
+            verification_status: note.verification_status ?? "unknown",
+            confidence_basis: boundedText(note.decisive_evidence, 2400),
+            retrieval_signals: boundedList(note.retrieval_signals, 120),
+            source_url: normalizeResearchUrl(claim.source_url),
+            source_title: boundedText(claim.title ?? claim.source_url, 500),
+            source_trust: source.trust,
+          },
         },
       })
       if (!ingested) {
