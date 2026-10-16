@@ -207,6 +207,9 @@ for (const item of targets) {
     },
     entrypoints: ["./src/index.ts", parserWorker, workerPath],
     define: {
+      // Local compiled binaries must still find the catalog in the source checkout;
+      // release builds fall back to the copy installed by the npm package postinstall.
+      CYBERSTRIKE_SKILL_CATALOG_DIR: JSON.stringify(path.resolve(dir, "../../.cyberstrike")),
       CYBERSTRIKE_VERSION: `'${Script.version}'`,
       CYBERSTRIKE_MIGRATIONS: JSON.stringify(migrations),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,

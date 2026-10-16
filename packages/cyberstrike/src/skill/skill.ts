@@ -14,6 +14,8 @@ import { Session } from "@/session"
 import { Discovery } from "./discovery"
 import { SkillSigning } from "./signing"
 
+declare const CYBERSTRIKE_SKILL_CATALOG_DIR: string | undefined
+
 export namespace Skill {
   const log = Log.create({ service: "skill" })
   export const Info = z.object({
@@ -213,8 +215,10 @@ export namespace Skill {
     // so they're always found regardless of Instance.directory (web UI header).
     // Skip in test mode to preserve test isolation.
     if (!process.env.CYBERSTRIKE_TEST_HOME) {
-      const builtinRoot = path.resolve(import.meta.dir, "../../../..")
-      const builtinDir = path.join(builtinRoot, ".cyberstrike")
+      const builtinDir =
+        typeof CYBERSTRIKE_SKILL_CATALOG_DIR === "string" && CYBERSTRIKE_SKILL_CATALOG_DIR.length > 0
+          ? CYBERSTRIKE_SKILL_CATALOG_DIR
+          : path.join(path.resolve(import.meta.dir, "../../../.."), ".cyberstrike")
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,

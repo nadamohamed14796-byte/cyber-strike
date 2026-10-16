@@ -27,8 +27,9 @@ export namespace SkillSigning {
     signature?: string
     signed_by?: string
   }): Promise<VerificationStatus> {
+    const signature = skill.signature
     const claimsOfficial = skill.signed_by === "cyberstrike-official"
-    if (claimsOfficial && (!skill.sha256 || !skill.signature)) {
+    if (claimsOfficial && (!skill.sha256 || !signature)) {
       log.warn("official skill is missing its required hash or signature")
       return "tampered"
     }
@@ -41,11 +42,12 @@ export namespace SkillSigning {
     }
 
     if (!claimsOfficial) return "community"
+    if (!signature) return "tampered" // Narrow the type after the official-claim gate above.
 
     try {
       const raw = Buffer.from(OFFICIAL_PUBLIC_KEY_B64, "base64")
       const key = await crypto.subtle.importKey("raw", raw, { name: "Ed25519" }, false, ["verify"])
-      const sig = Buffer.from(skill.signature, "base64")
+      const sig = Buffer.from(signature, "base64")
       const data = new TextEncoder().encode(skill.sha256)
       const valid = await crypto.subtle.verify("Ed25519", key, sig, data)
       return valid ? "official" : "tampered"
