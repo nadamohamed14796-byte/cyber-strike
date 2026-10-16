@@ -1139,6 +1139,47 @@ export namespace JavaScriptCorrelation {
         javascriptAnalysis: graph.javascriptAnalysis,
       }, null, 2) + "\n",
     )
+
+    // Create one stable, readable note per endpoint candidate so future request
+    // ingestion can update/reuse the same evidence record instead of rediscovering it.
+    for (const endpoint of graph.endpointCandidates) {
+      const relatedRequests = graph.requests.filter((request) => endpoint.observedRequestIDs.includes(request.id))
+      const requestLines = relatedRequests.length
+        ? relatedRequests.map((request) => "- " + request.id + ": " + request.method + " " + (request.url ?? request.normalizedPath) + " — status " + (request.responseStatus ?? "unknown"))
+        : ["- No matching captured request yet."]
+      const endpointNoteContent = [
+        "# Endpoint Evidence",
+        "",
+        "- Candidate ID: " + endpoint.id,
+        "- Target: " + workspace.targetURL,
+        "- Host: " + (endpoint.host ?? "(relative or same-origin route)"),
+        "- Path/template: " + endpoint.path,
+        "- Observation status: " + (endpoint.observedInTraffic ? "path overlap observed in captured traffic" : "static JavaScript candidate; not yet observed in captured traffic"),
+        "- Confidence: " + endpoint.confidence,
+        "- Source JavaScript files: " + (endpoint.sourceFiles.length ? endpoint.sourceFiles.join(", ") : "none recorded"),
+        "- Related captured request IDs: " + (endpoint.observedRequestIDs.length ? endpoint.observedRequestIDs.join(", ") : "none"),
+        "",
+        "## Related request evidence",
+        ...requestLines,
+        "",
+        "## Artifact links",
+        "- JavaScript correlation graph: " + path.relative(workspace.workspacePath, graphPath).split(path.sep).join("/"),
+        "- Endpoint inventory: " + path.relative(workspace.workspacePath, endpointPath).split(path.sep).join("/"),
+        "",
+        "## Interpretation",
+        "This is an endpoint candidate, not a vulnerability finding. Path overlap does not prove the listed JavaScript file executed the request. Verify the exact origin, method, authentication/role context, parameter locations, response behavior, and authorization before testing.",
+      ].join("\n")
+      await TargetMemory.addNote(workspace.targetURL, {
+        kind: "endpoint",
+        title: ("Endpoint " + (endpoint.host ?? "relative") + endpoint.path).slice(0, 180),
+        content: endpointNoteContent,
+        source: "javascript-correlation:" + endpoint.id,
+        sourceURL: endpoint.host ? "https://" + endpoint.host + endpoint.path : undefined,
+        status: endpoint.observedInTraffic ? "observed" : "unverified",
+        tags: ["endpoint", "javascript", endpoint.observedInTraffic ? "traffic-observed" : "static-candidate"],
+        upsertByIdentity: true,
+      })
+    }
     return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, noteID: note.note.id }
   }
 }
