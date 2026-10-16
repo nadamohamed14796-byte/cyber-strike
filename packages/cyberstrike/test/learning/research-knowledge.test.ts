@@ -102,6 +102,38 @@ test("shared research retrieval uses signal tags and excludes target-specific re
       })
       expect(byPathSignal.some((row) => row.id === pathTraversal?.id)).toBe(true)
 
+      const mechanismSpecific = ReportKnowledge.ingestExternalDetailed({
+        title: "A custom parser differential in a request gateway",
+        severity: "medium",
+        vulnerabilityClass: "other",
+        sourceURL: "https://research.example.test/reports/parser-differential",
+        lesson: "A custom gateway transforms the input before the downstream SQL parser receives it.",
+        sourceTrust: 80,
+        tags: ["custom-normalization", "double-decoding"],
+        metadata: {
+          source_trust: 80,
+          extracted: { retrieval_signals: ["custom-normalization", "double-decoding"] },
+          hunt_signal: {
+            schema_version: 1,
+            name: "Double decoding before downstream query parsing",
+            summary: "A gateway and downstream parser interpret encoded delimiters differently.",
+            trigger: "A request parameter is URL-decoded at the gateway and then decoded again by the downstream handler before query parsing.",
+            patterns: [{
+              observed_signature: "Percent-encoded delimiter changes meaning after two decoding passes",
+              transformation_chain: ["gateway URL-decodes input", "handler decodes input again", "query parser receives the transformed value"],
+              candidate_technique: "SQL injection",
+              matching_conditions: ["A controlled harmless marker changes interpretation after the second decode"],
+            }],
+          },
+        },
+      })
+      expect(mechanismSpecific).not.toBeNull()
+      const byMechanism = ReportKnowledge.recommendations({
+        signal: "SQL injection after double URL decoding parser differential",
+        limit: 10,
+      })
+      expect(byMechanism.some((row) => row.id === mechanismSpecific?.id)).toBe(true)
+
       const byReproduction = ReportKnowledge.search({ query: "owner non-owner requests", sourceKind: "external_report", limit: 5 })
       expect(byReproduction.some((row) => row.id === shared?.id)).toBe(true)
       await Instance.dispose()
