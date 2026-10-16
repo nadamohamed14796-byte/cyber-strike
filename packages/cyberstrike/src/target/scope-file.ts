@@ -7,7 +7,7 @@ export function parseScopeFileContents(contents: string): string[] {
     const value = rawLine.trim()
     if (!value || value.startsWith("#") || value.startsWith("//")) continue
     if (/\s/.test(value)) {
-      throw new Error("Invalid scope file entry at line " + (index + 1) + ": entries must be one domain, wildcard, or IPv4 CIDR per line.")
+      throw new Error("Invalid scope file entry at line " + (index + 1) + ": entries must be one scope expression per line (domain, wildcard, URL/path, host:port, IP/CIDR, or another program scope identifier).")
     }
     entries.push(value)
   }
