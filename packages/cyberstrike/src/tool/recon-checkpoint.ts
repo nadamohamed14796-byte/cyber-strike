@@ -65,7 +65,7 @@ function parseRun(raw: string, workspaceID: string, targetURL: string, sessionID
     parsed?.schemaVersion !== 1 ||
     parsed.targetID !== workspaceID ||
     parsed.targetURL !== targetURL ||
-    parsed.sessionID !== sessionID ||
+    typeof parsed.sessionID !== "string" ||
     !parsed.phases ||
     !PHASES.every((phase) => parsed.phases[phase] && ["pending", "running", "complete", "blocked", "failed", "unavailable"].includes(parsed.phases[phase].status))
   ) throw new Error("Recon run manifest has invalid identity or schema; refusing to overwrite it.")
@@ -101,7 +101,8 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       if (!workspace) return { title: "Recon checkpoint unavailable", output: "No existing target workspace. Initialize the canonical target with target_workspace first.", metadata: { saved: false, reason: "workspace_missing" } }
 
       const sessionID = Session.root(ctx.sessionID)
-      const runID = createHash("sha256").update(workspace.id + "\0" + sessionID).digest("hex").slice(0, 20)
+      // One resumable run per canonical target workspace, including across new root sessions.
+      const runID = createHash("sha256").update(workspace.id).digest("hex").slice(0, 20)
       const filename = "recon-" + runID + ".json"
       const relativePath = "runs/" + filename
       const absolutePath = path.join(workspace.workspacePath, relativePath)
@@ -112,6 +113,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
         run = initialRun(workspace.targetURL, workspace.id, sessionID)
       }
+      // The active root session can change after a stop/resume. Keep the manifest's
+      // current owner up to date without creating a duplicate run for this target.
+      run.sessionID = sessionID
 
       if (params.action === "status") {
         const lines = PHASES.map((phase) => {
@@ -152,7 +156,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if ((params.action === "block" || params.action === "fail" || params.action === "unavailable") && !params.reason?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, or unavailable.", metadata: { saved: false, reason: "reason_required" } }
         }
-        const status: PhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : "unavailable"
+        const status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : "unavailable"
         if (status === "complete" && !params.summary?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
         }
