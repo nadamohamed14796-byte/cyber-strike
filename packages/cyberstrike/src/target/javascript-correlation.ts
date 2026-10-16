@@ -346,7 +346,7 @@ export function mergeStructuredJavaScriptEndpoints(
   for (const request of requests) {
     const url = safeURL(request.urlTemplate)
     const origin = request.origin ?? url?.origin ?? null
-    const host = url?.hostname ?? (request.host ? request.host.split(":")[0] ?? request.host : null)
+    const host = url?.host ?? request.host ?? null
     const key = keyOf(origin, request.path)
     let endpoint = byKey.get(key)
     if (!endpoint) {

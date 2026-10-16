@@ -373,6 +373,12 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
 
   const requests: JavaScriptRequestCandidate[] = []
   const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
+  const requestCallSpans = [...source.matchAll(callPattern)].slice(0, 600).map((call) => {
+    const start = call.index ?? 0
+    const open = start + call[0].lastIndexOf("(")
+    const end = findCallEnd(source, open, 7000)
+    return { start, end: end >= 0 ? end + 1 : start + call[0].length }
+  }).sort((a, b) => a.start - b.start)
   for (const match of source.matchAll(callPattern)) {
     const index = match.index ?? 0, callee = (match[1] ?? "").toLowerCase()
     const open = index + match[0].lastIndexOf("(")
@@ -393,9 +399,11 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const endpoint = requestConfig ? normalizedEndpoint : addConcatenatedPathParameters(normalizedEndpoint, urlExpression)
     const currentFunctionRange = functionRanges.filter((range) => range.start <= index && index <= range.end)
       .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
-    const contextStart = Math.max(currentFunctionRange?.start ?? 0, index - 1500)
-    const contextEnd = Math.min(currentFunctionRange?.end ?? source.length - 1, close + 1800)
-    const requestContext = source.slice(contextStart, contextEnd)
+    const previousSpan = [...requestCallSpans].reverse().find((span) => span.end <= index)
+    const nextSpan = requestCallSpans.find((span) => span.start > index)
+    const lowerBound = Math.max(currentFunctionRange?.start ?? 0, index - 1500, previousSpan?.end ?? 0)
+    const upperBound = Math.min(currentFunctionRange?.end ?? source.length - 1, close + 1800, nextSpan?.start ?? source.length)
+    const requestContext = source.slice(lowerBound, Math.max(close + 1, upperBound))
     const isFetch = callee === "fetch"
     const isBodyMethod = /\.(?:post|put|patch)$/i.test(callee)
     const options = isXHR ? "" : requestConfig ? args[0] ?? "" : callee.endsWith(".request") ? args.slice(1).join(",")

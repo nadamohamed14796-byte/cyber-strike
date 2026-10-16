@@ -66,6 +66,22 @@ test("extracts XHR headers and URLSearchParams prepared within the calling funct
   expect(JSON.stringify(request)).not.toContain("tenantId")
 })
 
+test("does not attribute headers or auth signals from a neighboring request", () => {
+  const source = [
+    'function loadBoth() {',
+    '  fetch("/api/private", { headers: { Authorization: privateToken } })',
+    '  fetch("/api/public")',
+    '}',
+  ].join("\n")
+  const requests = analyzeJavaScriptSource(source).requests
+  const privateRequest = requests.find((item) => item.path === "/api/private")!
+  const publicRequest = requests.find((item) => item.path === "/api/public")!
+  expect(privateRequest.headerNames).toContain("Authorization")
+  expect(privateRequest.authSignals).toContain("authorization-header")
+  expect(publicRequest.headerNames).not.toContain("Authorization")
+  expect(publicRequest.authSignals).not.toContain("authorization-header")
+})
+
 test("extracts XHR headers and query keys from a named URLSearchParams variable", () => {
   const source = [
     'function loadRecords() {',
