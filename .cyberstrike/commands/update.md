@@ -116,7 +116,7 @@ The run is complete only when **all selected sources have completed Phase A firs
 
 Use these headings in this order so the result is auditable:
 
-1. **Overall status** — complete, partial, blocked, or crawl-budget-capped; never use “complete” if any configured source or required queue work is unresolved.
+1. **Overall status** — complete, partial, or blocked; never use “complete” if any configured source or required queue work is unresolved. There is no crawl-budget-capped completion state: keep going until the accessible frontier is exhausted or a concrete blocker is recorded.
 2. **Before → after counters** — global queue and knowledge counters, including learned/rejected/completed/skipped/pending model-study counts.
 3. **Per-source ledger** — one row per exact configured source ID, with each pass's requested page budget and actual pages, candidates, queued_new, learned saves, rejected decisions, preflight skips, blocked_auth, error_count/examples, retry attempts, remaining queue states, and final status. Mark not-run sources explicitly. Do not mistake source-filtered queue statistics for source-filtered knowledge statistics.
 4. **Persisted lessons** — useful Knowledge IDs and source URLs returned by successful saves; distinguish saved-and-terminal-state-confirmed from saved-but-queue-transition-failed.
