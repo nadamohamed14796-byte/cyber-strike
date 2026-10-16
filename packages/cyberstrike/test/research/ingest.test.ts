@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test"
 import { eq } from "drizzle-orm"
 import { Database } from "../../src/storage/db"
 import { ResearchQueueTable } from "../../src/research/queue.sql"
-import { classifyResearchTopic, classifyResearchDocumentType, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedWithBudget, retryAuthenticatedResearch } from "../../src/research/ingest"
+import { classifyResearchTopic, classifyResearchDocumentType, extractResearchDetails, learnResearchQueue, looksLikeResearchAuthenticationWall, normalizeResearchUrl, redactResearchSecrets, retryAuthBlockedAcrossSources, retryAuthenticatedResearch } from "../../src/research/ingest"
 import { RESEARCH_SOURCES } from "../../src/research/sources"
 import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ReportKnowledgeEventTable, ReportKnowledgeTable } from "../../src/learning/report-knowledge.sql"
@@ -206,7 +206,7 @@ test("research URL normalization strips provider-specific signed and secret quer
 })
 
 
-test("learning queue floors non-integer item limits instead of exceeding the requested budget", async () => {
+test("learning queue drains all claimable work regardless of legacy limit arguments", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
     directory: dir.path,
@@ -236,61 +236,57 @@ test("learning queue floors non-integer item limits instead of exceeding the req
       }
 
       const result = await learnResearchQueue({ limit: 1.5, sourceID })
-      expect(result.claimed).toBe(1)
-      expect(ResearchQueue.stats(sourceID).queued).toBe(1)
+      expect(result.claimed).toBe(2)
+      expect(ResearchQueue.stats(sourceID).queued).toBe(0)
       await Instance.dispose()
     },
   })
 })
 
-test("authenticated research retries enforce one global budget across configured sources", () => {
+test("authenticated research retries visit every configured source with credentials", () => {
   const sources = [
     { id: "hackerone-hacktivity", hasCredentials: true },
     { id: "intigriti", hasCredentials: true },
     { id: "portswigger", hasCredentials: false },
   ]
-  const calls: Array<{ limit: number; sourceID: string; minAgeMs: number }> = []
-  const retry = (limit: number, sourceID: string, minAgeMs: number) => {
-    calls.push({ limit, sourceID, minAgeMs })
+  const calls: Array<{ sourceID: string; minAgeMs: number }> = []
+  const retry = (sourceID: string, minAgeMs: number) => {
+    calls.push({ sourceID, minAgeMs })
     return 1
   }
 
-  const total = retryAuthBlockedWithBudget(
+  const total = retryAuthBlockedAcrossSources(
     sources,
-    1,
     (source) => source.hasCredentials,
     retry,
     10 * 60_000,
   )
 
-  expect(total).toBe(1)
+  expect(total).toBe(2)
   expect(calls).toEqual([
-    { limit: 1, sourceID: "hackerone-hacktivity", minAgeMs: 10 * 60_000 },
+    { sourceID: "hackerone-hacktivity", minAgeMs: 10 * 60_000 },
+    { sourceID: "intigriti", minAgeMs: 10 * 60_000 },
   ])
 })
 
-test("authenticated research retry budget continues when an eligible source has nothing to retry", () => {
+test("authenticated research retries continue across empty and non-empty sources", () => {
   const sources = [
     { id: "source-empty", hasCredentials: true },
     { id: "source-with-work", hasCredentials: true },
   ]
-  const calls: Array<{ limit: number; sourceID: string }> = []
-  const total = retryAuthBlockedWithBudget(
+  const calls: string[] = []
+  const total = retryAuthBlockedAcrossSources(
     sources,
-    1,
     (source) => source.hasCredentials,
-    (limit, sourceID) => {
-      calls.push({ limit, sourceID })
+    (sourceID) => {
+      calls.push(sourceID)
       return sourceID === "source-with-work" ? 1 : 0
     },
     10 * 60_000,
   )
 
   expect(total).toBe(1)
-  expect(calls).toEqual([
-    { limit: 1, sourceID: "source-empty" },
-    { limit: 1, sourceID: "source-with-work" },
-  ])
+  expect(calls).toEqual(["source-empty", "source-with-work"])
 })
 test("research queue resumes authenticated work and learns cached report text without a second fetch", async () => {
   await using dir = await tmpdir({ git: true })
@@ -379,7 +375,7 @@ test("research queue resumes authenticated work and learns cached report text wi
           // A separate source without configured credentials must remain blocked.
           expect(ResearchQueue.find("portswigger", otherURL)?.status).toBe("blocked_auth")
 
-          // The requested limit is global across authenticated sources, not repeated per source.
+          // A legacy limit argument must not cap retry work across sources.
           process.env[intigritiCookieEnv] = "session=operator-provided-test-value"
           const budgetRows = [
             { sourceID: authSourceID, sourceURL: "https://hackerone.com/reports/budget-a-" + marker },
@@ -390,11 +386,11 @@ test("research queue resumes authenticated work and learns cached report text wi
           for (const row of budgetRows) {
             ResearchQueue.blockAuthentication({ ...row, reason: "HTTP 401" })
           }
-          expect(await retryAuthenticatedResearch({ limit: 1, retryImmediately: true })).toBe(1)
+          expect(await retryAuthenticatedResearch({ limit: 1, retryImmediately: true })).toBe(4)
           const retriedRows = budgetRows.filter((row) =>
             ResearchQueue.find(row.sourceID, row.sourceURL)?.status !== "blocked_auth",
           )
-          expect(retriedRows).toHaveLength(1)
+          expect(retriedRows).toHaveLength(4)
         } finally {
           if (originalCookie === undefined) delete process.env[cookieEnv]
           else process.env[cookieEnv] = originalCookie
