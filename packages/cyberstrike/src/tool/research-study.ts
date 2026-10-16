@@ -104,7 +104,6 @@ const ResearchStudyParameters = z.object({
   cycle_id: z.string().trim().min(8).max(100).optional().describe("Exact durable run ID returned by action=begin; pass it on every discover/next/read/save/complete call to prevent stale-cycle writes."),
   // Per-call discovery window only; /update must expand pages until exhaustion.
   pages: z.number().int().min(1).default(20),
-  depth: z.number().int().min(0).default(Number.MAX_SAFE_INTEGER),
   continue_after_save: z.boolean().default(false),
   /** Exact active lease and character offset for reading subsequent text chunks. */
   public_id: z.string().regex(/^RPT-\d{1,12}$/).optional(),
@@ -713,7 +712,7 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
       }
 
       const legacyBackfill = await backfillResearch(params.source, sessionIDs)
-      const results = await discoverResearch({ sourceID: params.source, pages: params.pages, depth: params.depth, agentLed: true, sessionIDs })
+      const results = await discoverResearch({ sourceID: params.source, pages: params.pages, agentLed: true, sessionIDs })
       const recorded = results.map((item) => {
         const queue = ResearchQueue.stats(item.source)
         const unresolvedAuth = queue.blocked_auth + queue.crawl_page_auth_blocked
