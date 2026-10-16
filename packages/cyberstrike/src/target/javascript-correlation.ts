@@ -487,6 +487,134 @@ export interface JavaScriptCorrelationGraph {
   notes: string[]
 }
 
+
+export type JavaScriptTesterCheckStatus = "planned" | "in_progress" | "completed" | "blocked" | "not_applicable"
+export type JavaScriptTesterCaseStatus = "planned" | "in_progress" | "completed" | "blocked" | "stale"
+
+export interface JavaScriptTesterCheck {
+  id: string
+  kind: string
+  title: string
+  status: JavaScriptTesterCheckStatus
+  result?: string
+  evidenceRequestIDs: string[]
+}
+export interface JavaScriptTesterCase {
+  id: string
+  candidateID: string
+  method: string | null
+  urlTemplate: string
+  host: string | null
+  path: string
+  sourceFile: string
+  sourceFunction: string | null
+  sourceLine: number
+  pathParameters: string[]
+  queryParameters: string[]
+  bodyParameters: string[]
+  headerNames: string[]
+  authSignals: string[]
+  cookieSignals: string[]
+  observedRequestIDs: string[]
+  status: JavaScriptTesterCaseStatus
+  stale: boolean
+  checks: JavaScriptTesterCheck[]
+}
+const SURVEY_CHECK_STATUSES = new Set<JavaScriptTesterCheckStatus>(["planned", "in_progress", "completed", "blocked", "not_applicable"])
+const SURVEY_CASE_STATUSES = new Set<JavaScriptTesterCaseStatus>(["planned", "in_progress", "completed", "blocked", "stale"])
+function surveyKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64) || "review"
+}
+function surveyRouteKey(host: string | null, path: string): string {
+  const normalized = path.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/"
+  const shape = normalized.split("/").map((part) => /^\{[^}]+\}$/.test(part) ? "{}" : part).join("/")
+  return (host?.toLowerCase() ?? "*") + shape
+}
+
+/** Generate a review plan only; it never sends a request or assumes a vulnerability. */
+export function createJavaScriptTesterCases(
+  requests: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[]; recommendedChecks: string[] }>,
+  endpoints: JavaScriptEndpointCandidate[],
+  previousCases: JavaScriptTesterCase[] = [],
+): JavaScriptTesterCase[] {
+  const previous = new Map(previousCases.filter((item) => item && typeof item.id === "string" && Array.isArray(item.checks)).map((item) => [item.id, item]))
+  const cases: JavaScriptTesterCase[] = []
+  const structuredRoutes = new Set<string>()
+  const buildCase = (input: {
+    candidateID: string; method: string | null; urlTemplate: string; host: string | null; path: string;
+    sourceFile: string; sourceFunction: string | null; sourceLine: number; pathParameters: string[];
+    queryParameters: string[]; bodyParameters: string[]; headerNames: string[]; authSignals: string[];
+    cookieSignals: string[]; observedRequestIDs: string[]; recommendedChecks: string[]
+  }): JavaScriptTesterCase => {
+    const id = "tester-case:" + createHash("sha256").update(input.sourceFile + "\0" + input.candidateID).digest("hex").slice(0, 20)
+    const old = previous.get(id)
+    const titles = [
+      "Capture or inspect the baseline request and response",
+      ...(input.pathParameters.length ? ["Vary one path parameter using controlled test data"] : []),
+      ...(input.queryParameters.length ? ["Compare omitted and altered query parameters one at a time"] : []),
+      ...(input.bodyParameters.length ? ["Compare body fields, requiredness, and accepted data types"] : []),
+      ...(input.headerNames.length ? ["Vary one non-secret header at a time and record response differences"] : ["Record relevant headers from a captured baseline"]),
+      "Compare authenticated and unauthenticated behavior using authorized test accounts",
+      "Compare session-cookie behavior one cookie at a time using authorized test sessions",
+      "Check authorization with objects owned by controlled test accounts",
+      "Review response fields for unintended sensitive-data exposure",
+      "Confirm server-side input validation; static source alone is not a finding",
+      ...input.recommendedChecks,
+    ]
+    const checks: JavaScriptTesterCheck[] = [...new Set(titles)].map((title) => {
+      const kind = surveyKey(title)
+      const checkID = "tester-check:" + createHash("sha256").update(id + "\0" + kind).digest("hex").slice(0, 16)
+      const oldCheck = old?.checks?.find((item) => item && item.id === checkID)
+      return {
+        id: checkID, kind, title,
+        status: oldCheck && SURVEY_CHECK_STATUSES.has(oldCheck.status) ? oldCheck.status : "planned",
+        ...(oldCheck?.result ? { result: oldCheck.result } : {}),
+        evidenceRequestIDs: [...new Set([...(oldCheck?.evidenceRequestIDs ?? []), ...input.observedRequestIDs])].slice(0, 100),
+      }
+    })
+    return {
+      id, candidateID: input.candidateID, method: input.method, urlTemplate: input.urlTemplate, host: input.host, path: input.path,
+      sourceFile: input.sourceFile, sourceFunction: input.sourceFunction, sourceLine: input.sourceLine,
+      pathParameters: [...new Set(input.pathParameters)], queryParameters: [...new Set(input.queryParameters)],
+      bodyParameters: [...new Set(input.bodyParameters)], headerNames: [...new Set(input.headerNames)],
+      authSignals: [...new Set(input.authSignals)], cookieSignals: [...new Set(input.cookieSignals)],
+      observedRequestIDs: [...new Set([...(old?.observedRequestIDs ?? []), ...input.observedRequestIDs])].slice(0, 100),
+      status: old && SURVEY_CASE_STATUSES.has(old.status) ? old.status : "planned", stale: false, checks,
+    }
+  }
+  for (const request of requests) {
+    structuredRoutes.add(surveyRouteKey(request.host, request.path))
+    cases.push(buildCase({
+      candidateID: request.id, method: request.method, urlTemplate: request.urlTemplate, host: request.host, path: request.path,
+      sourceFile: request.sourceFile, sourceFunction: request.sourceFunction, sourceLine: request.sourceLine,
+      pathParameters: request.pathParameters, queryParameters: request.queryParameters, bodyParameters: request.bodyParameters,
+      headerNames: request.headerNames, authSignals: request.authSignals, cookieSignals: request.cookieSignals,
+      observedRequestIDs: request.observedRequestIDs, recommendedChecks: request.recommendedChecks,
+    }))
+  }
+  // Literal-only routes remain visible, but are marked as lacking method/shape evidence.
+  for (const endpoint of endpoints) {
+    if (structuredRoutes.has(surveyRouteKey(endpoint.host, endpoint.path))) continue
+    for (const sourceFile of endpoint.sourceFiles.length ? endpoint.sourceFiles : ["(static route literal)"]) {
+      cases.push(buildCase({
+        candidateID: endpoint.id + ":" + sourceFile, method: null, urlTemplate: endpoint.literal,
+        host: endpoint.host, path: endpoint.path, sourceFile, sourceFunction: null, sourceLine: 0,
+        pathParameters: Array.from(endpoint.path.matchAll(/\{([^}]+)\}/g), (match) => match[1]!).slice(0, 80),
+        queryParameters: [], bodyParameters: [], headerNames: [], authSignals: [], cookieSignals: [],
+        observedRequestIDs: endpoint.observedRequestIDs,
+        recommendedChecks: ["Determine HTTP method and request shape from an authorized captured request"],
+      }))
+    }
+  }
+  const currentIDs = new Set(cases.map((item) => item.id))
+  for (const old of previous.values()) {
+    if (currentIDs.has(old.id)) continue
+    cases.push({...old, status: old.status === "completed" ? "completed" : "stale", stale: true,
+      checks: old.checks.map((item) => ({...item, evidenceRequestIDs: [...item.evidenceRequestIDs]}))})
+  }
+  return cases.sort((a, b) => a.sourceFile.localeCompare(b.sourceFile) || a.sourceLine - b.sourceLine || a.path.localeCompare(b.path))
+}
+
 /**
  * Correlates JavaScript asset observations with already-recorded target requests,
  * response metadata, web-function models, request observations and findings. It
@@ -498,6 +626,7 @@ export namespace JavaScriptCorrelation {
     workspacePath: string
     graphPath: string
     endpointPath: string
+    testerSurveyPath: string
     noteID: string
   }
 
@@ -573,16 +702,17 @@ export namespace JavaScriptCorrelation {
 
     const filenameHost = (explicitJS?.hostname ?? new URL(workspace.targetURL).hostname).replace(/[^a-z0-9.-]/gi, "-").slice(0, 50)
     const snapshotSelector = explicitJS ? explicitJS.origin + explicitJS.pathname : "all-assets"
-    const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, rootSessionID, snapshotSelector])).digest("hex").slice(0, 12)
+    const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, snapshotSelector])).digest("hex").slice(0, 12)
     const graphFilename = filenameHost + "-" + digest + ".json"
     const endpointFilename = graphFilename
+    const testerSurveyRelativePath = path.posix.join("testing", "tester-survey-" + digest + ".json")
     const analysisCache = new Map<string, JavaScriptSourceAnalysis>()
     const previousGraphPath = path.join(workspace.workspacePath, "javascript", graphFilename)
     try {
       const info = await fs.lstat(previousGraphPath)
       if (info.isFile() && !info.isSymbolicLink()) {
         const previous = JSON.parse(await fs.readFile(previousGraphPath, "utf-8")) as JavaScriptCorrelationGraph
-        if (previous.schemaVersion === 1 && previous.targetURL === workspace.targetURL && previous.sessionID === rootSessionID) {
+        if (previous.schemaVersion === 1 && previous.targetURL === workspace.targetURL) {
           for (const source of previous.sourceFiles ?? []) {
             if (source.sha256 && source.analysis) analysisCache.set(source.sha256, source.analysis)
           }
@@ -1060,6 +1190,34 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Response previews are length-limited and redacted heuristically; JavaScript secret-like values are redacted from persisted graph/notes and only their fingerprints are retained.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
 
+    const testerSurveyAbsolutePath = path.join(workspace.workspacePath, testerSurveyRelativePath)
+    let previousTesterCases: JavaScriptTesterCase[] = []
+    try {
+      const info = await fs.lstat(testerSurveyAbsolutePath)
+      if (info.isFile() && !info.isSymbolicLink()) {
+        const oldSurvey = JSON.parse(await fs.readFile(testerSurveyAbsolutePath, "utf-8"))
+        if (oldSurvey?.schemaVersion === 1 && oldSurvey.targetURL === workspace.targetURL && Array.isArray(oldSurvey.cases)) {
+          previousTesterCases = oldSurvey.cases as JavaScriptTesterCase[]
+        }
+      }
+    } catch {
+      // Missing or invalid prior survey only disables state reuse; fresh analysis still proceeds.
+    }
+    const testerCases = createJavaScriptTesterCases(graph.javascriptAnalysis.requestCandidates, graph.endpointCandidates, previousTesterCases)
+    const testerSurvey = {
+      schemaVersion: 1,
+      generatedAt: graph.createdAt,
+      targetURL: graph.targetURL,
+      sessionID: graph.sessionID,
+      sourceGraph: path.posix.join("javascript", graphFilename),
+      sourceEndpointInventory: path.posix.join("endpoints", endpointFilename),
+      cases: testerCases,
+      notes: [
+        "Review plan only; generating this artifact sends no HTTP requests.",
+        "Before replay, re-check the persisted scope and use captured baselines; change one input at a time.",
+        "Completed statuses and prior evidence links persist for stable case IDs; vanished cases remain as stale history.",
+      ],
+    }
     const urlList = graph.javascriptAssets.map((asset) => asset.url).join("\n")
     const content = [
       "# JavaScript Correlation Snapshot",
@@ -1082,6 +1240,8 @@ export namespace JavaScriptCorrelation {
       "- Request observations: " + graph.observations.length,
       "- Candidate findings: " + graph.findings.length,
       "- Recorded graph edges: " + graph.edges.length,
+      "- Tester survey cases: " + testerCases.length,
+      "- Tester survey artifact: " + testerSurveyRelativePath,
       "",
       "## Local JavaScript files",
       ...(graph.sourceFiles.length ? graph.sourceFiles.map((file) => "- " + file.relativePath + " — SHA-256 " + file.sha256 + " — " + file.bytes + " bytes — " + file.endpointLiterals.length + " static endpoint literal(s)") : ["No local .js/.mjs/.cjs source files found in the target workspace."]),
@@ -1115,9 +1275,9 @@ export namespace JavaScriptCorrelation {
     ].join("\n")
     const note = await TargetMemory.addNote(workspace.targetURL, {
       kind: "javascript",
-      title: "JavaScript correlation snapshot - " + rootSessionID + (explicitJS ? " - " + explicitJS.pathname : " - all assets"),
+      title: "JavaScript correlation snapshot" + (explicitJS ? " - " + explicitJS.pathname : " - all assets"),
       content,
-      source: "session:" + rootSessionID,
+      source: "javascript-correlation:" + workspace.id + ":" + snapshotSelector,
       sourceURL: explicitJS?.href,
       status: "observed",
       tags: ["javascript", "correlation", "request-response", "finding"],
@@ -1142,7 +1302,14 @@ export namespace JavaScriptCorrelation {
         note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
         endpoints: graph.endpointCandidates,
         javascriptAnalysis: graph.javascriptAnalysis,
+        testerSurvey: testerSurveyRelativePath,
       }, null, 2) + "\n",
+    )
+
+    const testerSurveyPath = await TargetMemory.writeWorkspaceFile(
+      workspace,
+      testerSurveyRelativePath,
+      JSON.stringify(testerSurvey, null, 2) + "\n",
     )
 
     // Create one stable, readable note per endpoint candidate so future request
@@ -1186,6 +1353,6 @@ export namespace JavaScriptCorrelation {
         upsertByIdentity: true,
       })
     }
-    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, noteID: note.note.id }
+    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, testerSurveyPath, noteID: note.note.id }
   }
 }

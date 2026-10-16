@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -219,6 +219,46 @@ test("persists deduplicated endpoint candidates and links only host-compatible c
   expect(profile?.observedRequestIDs).not.toContain("req-2")
 })
 
+
+test("generates an idempotent tester survey with request shape and resumable check progress", () => {
+  const candidate = {
+    id: "js-request:survey", sourceFunction: "loadUser", method: "GET",
+    urlTemplate: "https://app.example.com/api/users/{userId}", host: "app.example.com",
+    path: "/api/users/{userId}", pathParameters: ["userId"], queryParameters: ["include"],
+    bodyParameters: [], headerNames: ["Authorization", "X-Tenant-ID"],
+    authSignals: ["authorization-header"], cookieSignals: ["credentialed-request-may-send-cookies"],
+    authAssessment: "signals-present" as const, sourceLine: 42, confidence: "candidate" as const,
+    sourceFile: "javascript/app.js", observedRequestIDs: ["req-1"],
+    recommendedChecks: ["Manually verify backend validation"],
+  }
+  const first = createJavaScriptTesterCases([candidate], [], [])
+  expect(first).toHaveLength(1)
+  expect(first[0]?.pathParameters).toContain("userId")
+  expect(first[0]?.queryParameters).toContain("include")
+  expect(first[0]?.headerNames).toContain("Authorization")
+  expect(first[0]?.observedRequestIDs).toContain("req-1")
+  const progressed = {
+    ...first[0]!, status: "completed" as const,
+    checks: first[0]!.checks.map((check) => check.kind === "capture-or-inspect-the-baseline-request-and-response"
+      ? { ...check, status: "completed" as const, result: "Baseline stable" } : check),
+  }
+  const second = createJavaScriptTesterCases([candidate], [], [progressed])
+  expect(second[0]?.id).toBe(first[0]?.id)
+  expect(second[0]?.status).toBe("completed")
+  expect(second[0]?.checks.find((check) => check.kind === "capture-or-inspect-the-baseline-request-and-response")?.result).toBe("Baseline stable")
+})
+
+test("keeps literal-only endpoint candidates in the tester survey", () => {
+  const endpoint = {
+    id: "endpoint:literal", literal: "/api/admin/reports", host: null, origin: null,
+    path: "/api/admin/reports", sourceFiles: ["javascript/admin.js"],
+    observedRequestIDs: [], observedInTraffic: false, confidence: "candidate" as const,
+  }
+  const cases = createJavaScriptTesterCases([], [endpoint], [])
+  expect(cases).toHaveLength(1)
+  expect(cases[0]?.method).toBe(null)
+  expect(cases[0]?.checks.some((check) => check.title.includes("HTTP method"))).toBe(true)
+})
 
 test("strips response processor metadata before analyzing captured JavaScript lines", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
