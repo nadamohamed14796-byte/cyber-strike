@@ -73,7 +73,8 @@ export function unresolvedReconPrerequisites(
 ): ReconPhase[] {
   const earlier = RECON_PHASES.slice(0, RECON_PHASES.indexOf(phase))
   const unresolved = earlier.filter((item) =>
-    item === "scope_validation" || item === "workspace_setup"
+    item === "scope_validation" || item === "workspace_setup" ||
+    (phase === "vulnerability_testing" && item === "endpoint_inventory")
       ? phases[item].status !== "complete"
       : !terminal(phases[item].status),
   )
