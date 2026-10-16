@@ -202,6 +202,7 @@ export function isIndexLikeResearchUrl(url: string) {
     const path = parsed.pathname.toLowerCase().replace(/\/+$/, "") || "/"
     // Root landing pages are discovery seeds, not automatically learnable articles.
     if (path === "/") return true
+    if (parsed.hostname.toLowerCase() === "github.com" && /\/tree\/[^/]+(?:\/|$)/i.test(path)) return true
     if (/[?&](page|p|offset|start|pageindex)=\d+/i.test(parsed.search)) return true
     if (/\/page\/\d+\/?$/i.test(path)) return true
     if (/\/(all-labs|all-topics|all-courses|all-resources|latest|popular)(\/)?$/.test(path)) return true

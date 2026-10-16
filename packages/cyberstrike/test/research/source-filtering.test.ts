@@ -127,10 +127,12 @@ test("source exclusions apply even when a source has no include-term policy", ()
   ).toBe(true)
 })
 
-test("does not classify root landing pages or all-labs indexes as learnable articles", () => {
+test("does not classify root landing pages, GitHub tree listings, or all-labs indexes as learnable articles", () => {
   expect(isIndexLikeResearchUrl("https://trickster0.medium.com/")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/all-labs")).toBe(true)
   expect(isIndexLikeResearchUrl("https://portswigger.net/web-security/authentication")).toBe(false)
+  expect(isIndexLikeResearchUrl("https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports")).toBe(true)
+  expect(isIndexLikeResearchUrl("https://github.com/MyuriKanao/src-hunter-skill/blob/main/references/h1-reports/raw/reports/report.md")).toBe(false)
 })
 
 test("hyphenated vulnerability names pass curated source relevance filters", () => {

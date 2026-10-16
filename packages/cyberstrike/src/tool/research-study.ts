@@ -1098,6 +1098,9 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           model_study_version: RESEARCH_MODEL_STUDY_VERSION,
           study_method: "llm-assisted-agent-command-v1",
           excerpt: text.slice(0, 12000),
+          duplicate_content_sources: Array.isArray(claim.payload.duplicate_content_sources)
+            ? claim.payload.duplicate_content_sources.filter((value): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value))
+            : [],
           extracted,
         },
       })

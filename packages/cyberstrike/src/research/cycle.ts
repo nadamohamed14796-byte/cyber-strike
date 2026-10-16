@@ -39,10 +39,13 @@ function cleanError(value: string) {
 function summarizeSourceState(state: ResearchSourceCycleState | undefined) {
   if (!state) return null
   const { passes, ...totals } = state
+  const lastPass = passes?.at(-1)
   return {
     ...totals,
     passes_count: passes?.length ?? 0,
-    last_pass: passes?.at(-1) ?? null,
+    last_pass: lastPass
+      ? { ...lastPass, errors: (lastPass.errors ?? []).slice(0, 3).map((value) => value.slice(0, 240)) }
+      : null,
   }
 }
 
@@ -138,7 +141,7 @@ export namespace ResearchCycle {
         return { ok: false as const, reason: "page_window_out_of_sequence" as const, expected_page_window: previous.next_page_window }
       }
       if (terminal(previous.status)) {
-        return { ok: false as const, reason: "source_already_terminal" as const, source_state: previous }
+        return { ok: false as const, reason: "source_already_terminal" as const, source_state: summarizeSourceState(previous) }
       }
       const documentTypes = Object.fromEntries(
         Object.entries(input.documentTypes ?? {})
@@ -200,7 +203,12 @@ export namespace ResearchCycle {
         phase: updated.phase as ResearchCyclePhase,
         source_state: summarizeSourceState(nextSource),
         waiting_sources: updated.source_ids.filter((id) => !terminal(updated.source_states[id]?.status)),
-        cycle: summarizeCycleRow(updated),
+        cycle: {
+          cycle_id: updated.cycle_id,
+          phase: updated.phase,
+          source_count: updated.source_ids.length,
+          waiting_source_count: updated.source_ids.filter((id) => !terminal(updated.source_states[id]?.status)).length,
+        },
       }
     })
   }
