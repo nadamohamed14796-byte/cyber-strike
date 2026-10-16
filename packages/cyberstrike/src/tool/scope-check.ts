@@ -6,9 +6,9 @@ export { checkMatch } from "../target/scope-match"
 
 export const ScopeCheckTool = Tool.define("scope_check", {
   description:
-    "Validate that a target is in scope before testing. Supports exact domain match, wildcard domains (*.example.com), and IPv4 CIDR ranges (10.0.0.0/24). During target hunting, pass target_url to load the authoritative scope manifest from the existing CyberStrike target workspace; an unconfigured or missing manifest fails closed. Without target_url, supplied scope_items are informational caller-provided entries, not persisted authorization.",
+    "Validate a target against the persisted authorization scope before testing. Supports exact hosts, wildcard domain families (including the apex), IPv4 CIDRs, exact IPv6 literals, host:port entries, and explicit HTTP(S) URL scopes constrained by scheme, port, and exact path or /* path subtree. Scope-file imports preserve additional compact program-specific identifiers as raw evidence, but unsupported formats never authorize an HTTP target. During target hunting, pass target_url to load the authoritative scope manifest from the existing CyberStrike target workspace; an unconfigured or missing manifest fails closed. Without target_url, supplied scope_items are informational caller-provided entries, not persisted authorization.",
   parameters: z.object({
-    target: z.string().describe("The target to check (domain, IPv4 address, or HTTP(S) URL)"),
+    target: z.string().describe("The target to check (hostname, IP literal, host:port, or HTTP(S) URL)"),
     target_url: z.string().optional().describe("Existing CyberStrike target workspace URL; when supplied, its persisted scope manifest is authoritative and scope_items are ignored"),
     scope_items: z
       .array(z.string())
