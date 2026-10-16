@@ -12,18 +12,11 @@ import { SkillIndex } from "../skill/index-engine"
 // Phase-aware skill discovery is intentionally separate from loading: the agent must
 // use the skill tool to load the selected skill so normal per-agent permissions apply.
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
-  scope_analysis: ["attack-bb-methodology", "target-workspace-workflow", "scope", "attack surface"],
+  // Recon execution is defined centrally in methodology/recon.ts; do not load duplicate recon skills for these phases.
+  scope_analysis: [],
   mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
-  passive_recon: [
-    "recon-methodology", "wstg-recon-config", "wstg-info", "recon-subdomain-enumeration", "recon-email-security",
-    "recon-gitlab-public-recon", "recon-origin-ip-discovery", "recon-error-log-mining",
-    "recon-visual-recon", "target-workspace-workflow", "osint",
-  ],
-  active_recon: [
-    "attack-web-recon", "wstg-info", "wstg-conf-05", "wstg-conf-10", "wstg-apit-01", "recon-port-service-discovery", "recon-vhost-enumeration",
-    "recon-cms-detection", "recon-subdomain-enumeration", "recon-origin-ip-discovery",
-    "attack-subdomain-takeover", "recon-asn-infrastructure", "target-workspace-workflow",
-  ],
+  passive_recon: [],
+  active_recon: [],
   technology_profiling: [
     "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09", "wstg-recon-config",
     "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
@@ -85,6 +78,9 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
+  // Recon is a single canonical workflow in methodology/recon.ts, not a set of
+  // overlapping dynamically loaded skills. Other testing phases retain skill retrieval.
+  if (phaseId === "scope_analysis" || phaseId === "passive_recon" || phaseId === "active_recon") return []
   // Include methodology-defined required tags as first-class search terms. These are
   // the canonical phase taxonomy; hand-maintained queries are additional aliases.
   const configured = PHASE_SKILL_QUERIES[phaseId] ?? []
