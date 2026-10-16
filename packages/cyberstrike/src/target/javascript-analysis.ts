@@ -507,7 +507,10 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   const riskSignals = new Map<string, JavaScriptRiskSignal>()
   for (const rule of riskRules) for (const match of source.matchAll(rule.regex)) {
     const index = match.index ?? 0, line = lineNumber(lineStarts, index)
-    const functionName = [...functions].reverse().find((fn) => fn.line <= line)?.name ?? null
+    const containingFunction = functionRanges
+      .filter((range) => range.start <= index && index <= range.end)
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
+    const functionName = containingFunction?.name ?? null
     const id = "js-risk:" + createHash("sha256").update(rule.kind + ":" + line + ":" + (functionName ?? "")).digest("hex").slice(0, 16)
     riskSignals.set(id, { id, kind: rule.kind, line, functionName, confidence: "candidate" })
     if (riskSignals.size >= 300) break

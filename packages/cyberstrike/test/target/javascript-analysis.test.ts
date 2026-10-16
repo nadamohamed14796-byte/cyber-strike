@@ -321,3 +321,17 @@ test("retains exact secret candidate values and keeps them unverified", () => {
   });
   expect(result.secretCandidates[0]?.fingerprint).toMatch(/^[a-f0-9]{20}$/);
 });
+
+
+test("does not attribute top-level risk sinks to the previously closed function", () => {
+  const source = [
+    "function renderCard() {",
+    '  document.body.innerHTML = "<p>card</p>"',
+    "}",
+    'document.body.innerHTML = "<p>top-level</p>"',
+  ].join("\\n")
+  const signals = analyzeJavaScriptSource(source).riskSignals.filter((signal) => signal.kind === "dom-html-sink")
+  expect(signals).toHaveLength(2)
+  expect(signals.find((signal) => signal.functionName === "renderCard")).toBeDefined()
+  expect(signals.find((signal) => signal.functionName === null)).toBeDefined()
+})
