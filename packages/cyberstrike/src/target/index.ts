@@ -141,6 +141,8 @@ export interface NoteInput {
   tags?: string[]
   /** Update the existing note with the same provenance/title instead of creating snapshot duplicates. */
   upsertByIdentity?: boolean
+  /** Stable identity independent of the human-readable title; updates one note across revisions. */
+  identityKey?: string
 }
 
 export interface TargetNote {
@@ -1621,8 +1623,16 @@ export namespace TargetMemory {
     targetURL: string,
     input: NoteInput,
   ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
-    const rawContent = input.content?.trim()
-    if (!rawContent) throw new Error("Note content cannot be empty.")
+    const suppliedContent = input.content?.trim()
+    if (!suppliedContent) throw new Error("Note content cannot be empty.")
+    const identityKey = input.identityKey?.trim()
+    if (identityKey && !/^[a-zA-Z0-9:_-]{1,160}$/.test(identityKey)) {
+      throw new Error("Note identityKey must contain only letters, numbers, colon, underscore, or hyphen.")
+    }
+    const identityMarker = identityKey ? "<!-- cyberstrike-note-identity:" + identityKey + " -->" : ""
+    const rawContent = identityMarker && !suppliedContent.includes(identityMarker)
+      ? suppliedContent + "\n\n" + identityMarker
+      : suppliedContent
     const rawEvidence = input.evidence?.trim()
     const requestedStatus = input.status ?? "observed"
     if ((requestedStatus === "confirmed" || requestedStatus === "disproven") && !rawEvidence) {
@@ -1649,26 +1659,39 @@ export namespace TargetMemory {
       .digest("hex")
 
     if (input.upsertByIdentity) {
-      const existing = Database.use((db) =>
-        db.select().from(TargetNoteTable).where(and(
+      const existing = Database.use((db) => {
+        const base = db.select().from(TargetNoteTable).where(and(
           eq(TargetNoteTable.target_id, workspace.id),
           eq(TargetNoteTable.kind, kind),
-          title ? eq(TargetNoteTable.title, title) : isNull(TargetNoteTable.title),
           eq(TargetNoteTable.source, source),
-          sourceURL ? eq(TargetNoteTable.source_url, sourceURL) : isNull(TargetNoteTable.source_url),
-        )).orderBy(desc(TargetNoteTable.time_updated)).get(),
-      )
+        )).orderBy(desc(TargetNoteTable.time_updated)).all()
+        if (identityKey) {
+          const legacyIdentity = identityKey.startsWith("finding:") ? "Finding ID: " + identityKey.slice("finding:".length) : undefined
+          return base.find((row) =>
+            row.content.includes(identityMarker) ||
+            Boolean(legacyIdentity && row.content.includes(legacyIdentity)),
+          )
+        }
+        return base.find((row) =>
+          (title ? row.title === title : row.title === null) &&
+          (sourceURL ? row.source_url === sourceURL : row.source_url === null),
+        )
+      })
       if (existing) {
         const existingTags = (existing.tags as string[] | null) ?? []
         const nextStatus = input.status ?? existing.status
         const nextTags = input.tags === undefined ? existingTags : tags
         const changed =
+          existing.title !== title ||
+          existing.source_url !== (sourceURL ?? null) ||
           existing.content !== content ||
           existing.content_hash !== contentHash ||
           nextStatus !== existing.status ||
           JSON.stringify(nextTags) !== JSON.stringify(existingTags)
         const row = changed
           ? Database.use((db) => db.update(TargetNoteTable).set({
+              title,
+              source_url: sourceURL ?? null,
               content,
               content_hash: contentHash,
               status: nextStatus,
