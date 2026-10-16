@@ -73,6 +73,22 @@ test("redacts detected literal secrets from source-analysis metadata before pers
   expect(serialized).toContain("redacted from persisted correlation artifacts")
 })
 
+test("reuses analysis for the same JavaScript content hash", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const cache = new Map<string, any>()
+  const request = {
+    id: "req-cache-js",
+    url: "https://app.example.com/assets/app.js",
+    responseContentType: "application/javascript",
+    responseBody: 'function loadUser(id) { return fetch("/api/users/" + id) }',
+  }
+  const first = extractCapturedJavaScriptSources([request], cache)[0]
+  const second = extractCapturedJavaScriptSources([{ ...request, id: "req-cache-js-2" }], cache)[0]
+  expect(first?.sha256).toBe(second?.sha256)
+  expect(second?.analysis).toBe(first?.analysis)
+  expect(cache.has(first!.sha256)).toBe(true)
+})
+
 test("correlates security sink candidates from captured JavaScript without retaining source", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const sources = extractCapturedJavaScriptSources([{
