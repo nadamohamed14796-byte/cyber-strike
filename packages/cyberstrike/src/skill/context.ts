@@ -18,21 +18,28 @@ export namespace SkillContext {
 
   export async function load(name: string): Promise<string | undefined> {
     const id = key(name)
-    const catalog = Skill.state()
-    const cached = loaded.get(id)
-    if (cached?.catalog === catalog) return cached.content
-    if (cached) loaded.delete(id)
+    // Catalog refreshes can race the asynchronous skill lookup. Never cache or
+    // return content from a catalog that is no longer the active project catalog.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const catalog = Skill.state()
+      const cached = loaded.get(id)
+      if (cached?.catalog === catalog) return cached.content
+      if (cached) loaded.delete(id)
 
-    const skill = await Skill.get(name)
-    if (!skill) {
-      log.warn("skill not found for loading", { name })
-      return undefined
+      const skill = await Skill.get(name)
+      if (Skill.state() !== catalog) continue
+      if (!skill) {
+        log.warn("skill not found for loading", { name })
+        return undefined
+      }
+
+      const tokens = estimateTokens(skill.content)
+      loaded.set(id, { name, directory: Instance.directory, catalog, content: skill.content, tokens })
+      log.info("skill loaded into context", { name, tokens })
+      return skill.content
     }
 
-    const tokens = estimateTokens(skill.content)
-    loaded.set(id, { name, directory: Instance.directory, catalog, content: skill.content, tokens })
-    log.info("skill loaded into context", { name, tokens })
-    return skill.content
+    throw new Error(`Skill catalog changed repeatedly while loading "${name}". Retry the skill operation.`)
   }
 
   export function unload(name: string): boolean {
