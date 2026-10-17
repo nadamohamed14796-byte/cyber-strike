@@ -167,11 +167,21 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   if (allowed.includes("*") || /\{[^{}]+\}/.test(allowed)) {
     const labels = allowed.split(".")
     if (labels.some((label) => label.includes("*") || /^\{[^{}]+\}$/.test(label))) {
-      const escaped = allowed
-        .split(".")
+      const escaped = labels
         .map((label) => label === "*" || /^\{[^{}]+\}$/.test(label)
           ? "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
-          : label.replace(/[.*+?^$()|[\]\\]/g, "\\  // A bare domain is an exact entry, not an implicit wildcard. Programs that
+          : label.replace(/[.*+?^\x24()|[\]\\]/g, "\\$&"))
+        .join("\\.")
+      let pattern: RegExp
+      try { pattern = new RegExp("^" + escaped + "$", "i") }
+      catch { return { matches: false, reason: "invalid wildcard scope " + allowed } }
+      return pattern.test(hostname)
+        ? { matches: true, reason: "host matches wildcard pattern " + allowed }
+        : { matches: false, reason: "does not match wildcard pattern " + allowed }
+    }
+  }
+
+  // A bare domain is an exact entry, not an implicit wildcard. Programs that
 "))
         .join("\\.")
       let pattern: RegExp
