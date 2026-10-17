@@ -16,7 +16,7 @@ export function redactTargetNoteSecrets(value: string): string {
 }
 
 /** Sanitize values embedded into generated Markdown metadata as one line. */
-export function redactTargetNoteLine(value: string, maxLength: number): string {
+export function redactTargetNoteLine(value: string, maxLength = Number.MAX_SAFE_INTEGER): string {
   return redactTargetNoteSecrets(value)
     .replace(/[\r\n\t]+/g, " ")
     .replace(/\s{2,}/g, " ")
