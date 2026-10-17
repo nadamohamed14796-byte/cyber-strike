@@ -1272,14 +1272,71 @@ export const SessionRoutes = lazy(() =>
             })
 
           if (isDuplicate) {
-            recordObservation()
+            // Request analysis remains deduplicated, but each distinct JavaScript
+            // response version is retained and correlated. A changed deployment or
+            // cache-busted bundle must not disappear just because the request key is
+            // unchanged.
+            const javascriptCapture = Request.captureJavaScriptSource({
+              sessionID,
+              method: normalized.method,
+              normalizedPath: normalized.normalizedPath,
+              response: body.response,
+              keyHash: normalized.keyHash,
+              bodyHash: normalized.bodyHash,
+              queryHash: normalized.queryKeyHash,
+              opKeyHash: normalized.opKeyHash,
+              origin: normalized.origin,
+              scheme: normalized.scheme,
+              host: normalized.host,
+              port: normalized.port,
+              pageUrl: body.page_url,
+            })
+            recordObservation(javascriptCapture?.requestID)
+            if (javascriptCapture?.captured && normalized.origin) {
+              try {
+                const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
+                const scopeDecision = await TargetMemory.checkURLScope(observedURL)
+                if (scopeDecision.allowed && scopeDecision.workspace) {
+                  const correlation = await JavaScriptCorrelation.build({
+                    sessionID,
+                    targetURL: scopeDecision.workspace.targetURL,
+                  })
+                  log.info("JavaScript source version captured and correlated after request dedup", {
+                    sessionID,
+                    requestID: javascriptCapture.requestID,
+                    contentHash: javascriptCapture.contentHash,
+                    targetID: scopeDecision.workspace.id,
+                    sourceFiles: correlation.graph.sourceFiles.length,
+                    endpointCandidates: correlation.graph.endpointCandidates.length,
+                    graphPath: correlation.graphPath,
+                  })
+                } else {
+                  log.info("JavaScript source version captured but correlation skipped by persisted scope", {
+                    sessionID,
+                    requestID: javascriptCapture.requestID,
+                    reason: scopeDecision.reason,
+                  })
+                }
+              } catch (error) {
+                log.warn("automatic correlation of a changed JavaScript source version failed", {
+                  sessionID,
+                  requestID: javascriptCapture.requestID,
+                  error: error instanceof Error ? error.message : String(error),
+                })
+              }
+            }
             log.info("duplicate request skipped", {
               sessionID,
               method: normalized.method,
               path: normalized.normalizedPath,
+              javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
             })
             c.status(202)
-            return c.json({ sessionID, skipped: true })
+            return c.json({
+              sessionID,
+              skipped: true,
+              javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
+            })
           }
 
           const truncatedRawRequest = truncateRawRequest(body.text)
