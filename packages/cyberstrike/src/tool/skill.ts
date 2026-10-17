@@ -124,7 +124,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           return {
             title: "No skills on this page",
             output: "Offset " + offset + " is beyond the " + all.length + " available skills. Restart at offset=0 or use action=\"search\" with a focused query.",
-            metadata: { offset, next_offset: null, total: all.length } as { name?: string; dir?: string },
+            metadata: { offset, next_offset: null, total: all.length } as { name?: string; dir?: string; offset: number; next_offset: number | null; total: number },
           }
         }
         const nextOffset = offset + page.length
@@ -141,7 +141,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             ),
             ...(hasMore ? ["", "More skills remain. Repeat action=\"list\" with offset=" + nextOffset + " and limit=" + limit + ", or use action=\"search\" to narrow the catalog."] : []),
           ].join("\n"),
-          metadata: { offset, next_offset: hasMore ? nextOffset : null, total: all.length } as { name?: string; dir?: string },
+          metadata: { offset, next_offset: hasMore ? nextOffset : null, total: all.length } as { name?: string; dir?: string; offset: number; next_offset: number | null; total: number },
         }
       }
 
@@ -174,7 +174,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         } else if (params.query) {
           candidates = SkillIndex.search(params.query, Infinity)
         } else {
-          candidates = SkillIndex.all()
+          candidates = SkillIndex.all().sort((left, right) => left.name.localeCompare(right.name))
         }
         const permitted = candidates.filter((entry) => accessibleNames.has(entry.name))
         const totalCount = permitted.length
@@ -186,7 +186,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             output: totalCount === 0
               ? "No skills matched the search criteria."
               : "Offset " + offset + " is beyond the " + totalCount + " matching skills. Reset offset to 0 or refine the query.",
-            metadata: { offset, next_offset: null, total: totalCount } as { name?: string; dir?: string },
+            metadata: { offset, next_offset: null, total: totalCount } as { name?: string; dir?: string; offset: number; next_offset: number | null; total: number },
           }
 
         const nextOffset = offset + results.length
@@ -202,7 +202,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             ),
             ...(hasMore ? ["", "More results remain. Repeat the same search filters with offset=" + nextOffset + " and limit=" + limit + ", or refine the query."] : []),
           ].join("\n"),
-          metadata: { offset, next_offset: hasMore ? nextOffset : null, total: totalCount } as { name?: string; dir?: string },
+          metadata: { offset, next_offset: hasMore ? nextOffset : null, total: totalCount } as { name?: string; dir?: string; offset: number; next_offset: number | null; total: number },
         }
       }
 
