@@ -188,6 +188,18 @@ test("target artifact tool writes only inside an existing workspace and protects
       expect(copiedText).toContain("api.example.com")
       expect(copiedText).toContain("source.secret.token")
 
+      const symlinkPath = path.join(sourceTmp.path, "linked-scope.txt")
+      await fs.symlink(largeInput, symlinkPath)
+      const symlinkCopy = await artifact.execute({
+        target_url: "https://example.com",
+        area: "scope",
+        filename: "linked-targets.txt",
+        source_path: symlinkPath,
+        overwrite: false,
+      }, artifactCtx as never)
+      expect(symlinkCopy.metadata.saved).toBe(false)
+      expect(symlinkCopy.metadata.reason).toBe("unsafe_source_file")
+
       const duplicate = await artifact.execute({
         target_url: "https://example.com",
         area: "recon",
