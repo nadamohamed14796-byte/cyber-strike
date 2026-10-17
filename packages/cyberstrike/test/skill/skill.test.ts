@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test"
 import { Skill } from "../../src/skill"
+import { SkillContext } from "../../src/skill/context"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import path from "path"
@@ -390,3 +391,32 @@ description: A skill in the .cyberstrike/skills directory.
     },
   })
 })
+
+
+test("every skill in the full catalog can be loaded into context", async () => {
+  const repoRoot = path.resolve(import.meta.dir, "../../../..")
+  const previousTestHome = process.env.CYBERSTRIKE_TEST_HOME
+  delete process.env.CYBERSTRIKE_TEST_HOME
+  SkillContext.clear()
+
+  try {
+    await Instance.provide({
+      directory: repoRoot,
+      fn: async () => {
+        const skills = await Skill.all()
+        expect(skills.length).toBeGreaterThan(0)
+
+        for (const skill of skills) {
+          const loaded = await SkillContext.load(skill.name)
+          expect(loaded, `skill "${skill.name}" should load into context`).toBe(skill.content)
+          expect(SkillContext.isLoaded(skill.name), `skill "${skill.name}" should be marked loaded`).toBe(true)
+          expect(SkillContext.unload(skill.name), `skill "${skill.name}" should unload cleanly`).toBe(true)
+        }
+      },
+    })
+  } finally {
+    SkillContext.clear()
+    if (previousTestHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousTestHome
+  }
+}, 60000)
