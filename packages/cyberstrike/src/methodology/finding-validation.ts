@@ -86,6 +86,8 @@ export interface FindingValidationAssessment {
   output: string
   attemptCount: number
   attemptsRemaining: number
+  /** Distinct valid attempts in the durable execution ledger; caller-authored checks do not increment this. */
+  ledgerAttemptCount?: number
 }
 
 const CONTRADICTION_CHECKS = new Set([
@@ -321,6 +323,7 @@ export namespace FindingValidation {
     const ledgerAttempts = VerificationLedger.list({ sessionID: rootSessionID, hypothesisKey })
     const distinctValidLedgerAttempts = VerificationPolicy.uniqueAttempts(ledgerAttempts)
       .filter((attempt) => attempt.validConditions)
+    assessment.ledgerAttemptCount = distinctValidLedgerAttempts.length
 
     if (assessment.verdict === "false_positive") {
       const ledgerDisproved = distinctValidLedgerAttempts.length >= VerificationPolicy.MAX_ATTEMPTS &&
@@ -331,7 +334,6 @@ export namespace FindingValidation {
         const originalNextStep = assessment.nextStep
         assessment.verdict = "inconclusive"
         assessment.confidence = 45
-        assessment.attemptCount = distinctValidLedgerAttempts.length
         assessment.attemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
         assessment.summary = "Inconclusive: checklist evidence suggested a false-positive explanation, but the durable verification ledger lacks 20 distinct valid attempts and direct contradictory evidence for " + hypothesisKey + ". Self-reported attempts alone cannot classify a finding as false positive."
         assessment.nextStep = "Record distinct tests with verification_attempt using hypothesis_key=" + hypothesisKey + ". Keep the finding inconclusive until the durable ledger reaches 20 valid attempts and records an evidence-backed disproven outcome. Previous checklist assessment: " + originalSummary + " " + originalNextStep
@@ -469,7 +471,7 @@ export namespace FindingValidation {
           upsertByIdentity: true,
           identityKey: "finding:" + input.vulnerabilityID,
           ...(assessment.verdict === "confirmed" || assessment.verdict === "false_positive"
-            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; distinct evidence-backed attempts: " + assessment.attemptCount + "; summary: " + assessment.summary }
+            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; submitted distinct attempts: " + assessment.attemptCount + "; durable valid ledger attempts: " + (assessment.ledgerAttemptCount ?? 0) + "; summary: " + assessment.summary }
             : {}),
           status: assessment.verdict === "confirmed" ? "confirmed" : assessment.verdict === "false_positive" ? "disproven" : "unverified",
           tags: ["finding-validation", assessment.verdict, ...assessment.failedCheckIDs.map((id) => "failed:" + id)],
@@ -486,7 +488,8 @@ export namespace FindingValidation {
           sessionID: rootSessionID,
           verdict: assessment.verdict,
           confidence: assessment.confidence,
-          distinctAttempts: assessment.attemptCount,
+          submittedDistinctAttempts: assessment.attemptCount,
+          durableValidLedgerAttempts: assessment.ledgerAttemptCount ?? 0,
           failedCheckIDs: assessment.failedCheckIDs,
           unknownCheckIDs: assessment.unknownCheckIDs,
           targetNoteID: note.note.id,
