@@ -31,6 +31,8 @@ export interface ProcessedResponse {
   contentType: string
   originalSize: number
   content: string
+  /** Full JavaScript source for static analysis; excluded from the default LLM-facing preview. */
+  javascriptSource?: string
 }
 
 export function processResponse(input: ResponseInput): ProcessedResponse {
@@ -74,6 +76,7 @@ export function processResponse(input: ResponseInput): ProcessedResponse {
     contentType,
     originalSize,
     content,
+    ...(isJavaScript(contentType) ? { javascriptSource: input.body } : {}),
   }
 }
 
@@ -117,6 +120,11 @@ function isHtml(contentType: string): boolean {
 function isJson(contentType: string): boolean {
   const ct = contentType.toLowerCase()
   return ct.includes("application/json") || ct.includes("+json")
+}
+
+function isJavaScript(contentType: string): boolean {
+  const ct = contentType.toLowerCase()
+  return ct.includes("javascript") || ct.includes("ecmascript") || ct === "text/jscript"
 }
 
 function isText(contentType: string): boolean {
