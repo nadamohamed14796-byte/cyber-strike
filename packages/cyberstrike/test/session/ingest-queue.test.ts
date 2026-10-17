@@ -146,7 +146,10 @@ describe("IngestQueue.pause / resume", () => {
         order.push("ran")
       })
 
-      // Resolve the first wait, then pause again before its continuation runs.
+      // Let the queue enter waitIfPaused and create its first resume signal.
+      await Promise.resolve()
+
+      // Resolve that wait, then pause again before the continuation runs.
       // The queued task must observe the second pause rather than slipping through.
       IngestQueue.resume(sid)
       IngestQueue.pause(sid)
