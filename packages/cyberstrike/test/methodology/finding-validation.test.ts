@@ -58,7 +58,7 @@ test("validation output reports counts and the reason/evidence for all ten check
     identity_context: { status: "not_applicable", reason: "No identity boundary is claimed" },
   })
   const result = assessFindingChecks(checks)
-  expect(result.output).toContain("Check results: 8 passed, 1 failed, 1 unknown, 1 not applicable (10 total).")
+  expect(result.output).toContain("Check results: 7 passed, 1 failed, 1 unknown, 1 not applicable (10 total).")
   expect(result.output).toContain("#1 [FAIL]")
   expect(result.output).toContain("Reason: Replay did not reproduce the claim")
   expect(result.output).toContain("Evidence: Two controlled replays matched baseline")
