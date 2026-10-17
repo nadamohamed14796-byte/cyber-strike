@@ -88,6 +88,8 @@ export interface FindingValidationAssessment {
   attemptsRemaining: number
   /** Distinct valid attempts in the durable execution ledger; caller-authored checks do not increment this. */
   ledgerAttemptCount?: number
+  /** Remaining durable ledger attempts required for a terminal false-positive verdict. */
+  ledgerAttemptsRemaining?: number
 }
 
 const CONTRADICTION_CHECKS = new Set([
@@ -324,6 +326,7 @@ export namespace FindingValidation {
     const distinctValidLedgerAttempts = VerificationPolicy.uniqueAttempts(ledgerAttempts)
       .filter((attempt) => attempt.validConditions)
     assessment.ledgerAttemptCount = distinctValidLedgerAttempts.length
+    assessment.ledgerAttemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
 
     if (assessment.verdict === "false_positive") {
       const ledgerDisproved = distinctValidLedgerAttempts.length >= VerificationPolicy.MAX_ATTEMPTS &&
@@ -334,14 +337,13 @@ export namespace FindingValidation {
         const originalNextStep = assessment.nextStep
         assessment.verdict = "inconclusive"
         assessment.confidence = 45
-        assessment.attemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
         assessment.summary = "Inconclusive: checklist evidence suggested a false-positive explanation, but the durable verification ledger lacks 20 distinct valid attempts and direct contradictory evidence for " + hypothesisKey + ". Self-reported attempts alone cannot classify a finding as false positive."
         assessment.nextStep = "Record distinct tests with verification_attempt using hypothesis_key=" + hypothesisKey + ". Keep the finding inconclusive until the durable ledger reaches 20 valid attempts and records an evidence-backed disproven outcome. Previous checklist assessment: " + originalSummary + " " + originalNextStep
         assessment.output = assessment.output
           .replace("Final verdict: false_positive", "Final verdict: inconclusive")
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
-          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary
+          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary + "\\nDurable ledger progress: " + distinctValidLedgerAttempts.length + "/" + VerificationPolicy.MAX_ATTEMPTS + "; remaining ledger attempts: " + (assessment.ledgerAttemptsRemaining ?? 0) + ". Submitted checklist attempts do not satisfy this gate."
       }
     } else if (assessment.verdict === "confirmed") {
       const ledgerConfirmed = distinctValidLedgerAttempts.some((attempt) =>
@@ -360,7 +362,7 @@ export namespace FindingValidation {
           .replace("Final verdict: confirmed", "Final verdict: inconclusive")
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
-          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary
+          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary + "\\nDurable ledger progress: " + distinctValidLedgerAttempts.length + " valid attempts; a separate evidence-backed CONFIRMED ledger outcome is required. " + (assessment.ledgerAttemptsRemaining ?? 0) + " ledger attempts remain for false-positive evaluation.
       }
     }
 
@@ -470,7 +472,7 @@ export namespace FindingValidation {
           upsertByIdentity: true,
           identityKey: "finding:" + input.vulnerabilityID,
           ...(assessment.verdict === "confirmed" || assessment.verdict === "false_positive"
-            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; submitted distinct attempts: " + assessment.attemptCount + "; durable valid ledger attempts: " + (assessment.ledgerAttemptCount ?? 0) + "; summary: " + assessment.summary }
+            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; submitted distinct attempts: " + assessment.attemptCount + "; durable valid ledger attempts: " + (assessment.ledgerAttemptCount ?? 0) + "; durable attempts remaining: " + (assessment.ledgerAttemptsRemaining ?? VerificationPolicy.MAX_ATTEMPTS) + "; summary: " + assessment.summary }
             : {}),
           status: assessment.verdict === "confirmed" ? "confirmed" : assessment.verdict === "false_positive" ? "disproven" : "unverified",
           tags: ["finding-validation", assessment.verdict, ...assessment.failedCheckIDs.map((id) => "failed:" + id)],
@@ -489,6 +491,7 @@ export namespace FindingValidation {
           confidence: assessment.confidence,
           submittedDistinctAttempts: assessment.attemptCount,
           durableValidLedgerAttempts: assessment.ledgerAttemptCount ?? 0,
+          durableLedgerAttemptsRemaining: assessment.ledgerAttemptsRemaining ?? VerificationPolicy.MAX_ATTEMPTS,
           failedCheckIDs: assessment.failedCheckIDs,
           unknownCheckIDs: assessment.unknownCheckIDs,
           targetNoteID: note.note.id,
