@@ -1652,10 +1652,12 @@ export namespace TargetMemory {
 
     if (input.upsertByIdentity) {
       const existing = Database.use((db) => {
+        // A stable investigation identity must survive agent/model changes. When an identity
+        // key is supplied, search across provenance sources within this target and note kind;
+        // otherwise preserve the older title + source + URL deduplication behavior.
         const base = db.select().from(TargetNoteTable).where(and(
           eq(TargetNoteTable.target_id, workspace.id),
           eq(TargetNoteTable.kind, kind),
-          eq(TargetNoteTable.source, source),
         )).orderBy(desc(TargetNoteTable.time_updated)).all()
         if (identityKey) {
           const legacyIdentity = identityKey.startsWith("finding:") ? "Finding ID: " + identityKey.slice("finding:".length) : undefined
@@ -1665,6 +1667,7 @@ export namespace TargetMemory {
           )
         }
         return base.find((row) =>
+          row.source === source &&
           (title ? row.title === title : row.title === null) &&
           (sourceURL ? row.source_url === sourceURL : row.source_url === null),
         )
