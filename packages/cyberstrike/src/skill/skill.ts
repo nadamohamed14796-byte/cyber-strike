@@ -77,13 +77,16 @@ export namespace Skill {
       : path.join(path.resolve(import.meta.dir, "../../../.."), ".cyberstrike")
   }
 
-  // CYBERSTRIKE_TEST_HOME is process-wide, while Bun tests may initialize
-  // multiple Instance.directory values concurrently. Only suppress the builtin
-  // catalog for the instance that is actually the fixture home; otherwise one
-  // test can make unrelated repo/project instances lose every required skill.
-  function isCurrentTestHome(): boolean {
+  // CYBERSTRIKE_TEST_HOME is process-wide, while Bun tests may initialize many
+  // Instance.directory values concurrently. Use the fixture's per-directory marker
+  // first, so one test changing process.env cannot make another fixture load global
+  // built-in skills (or make a real repository instance lose its built-in catalog).
+  function isSkillCatalogIsolationContext(): boolean {
+    const directory = path.resolve(Instance.directory)
+    const basename = path.basename(directory)
+    if (basename.startsWith("cyberstrike-test-")) return true
     const testHome = process.env.CYBERSTRIKE_TEST_HOME
-    return Boolean(testHome && path.resolve(Instance.directory) === path.resolve(testHome))
+    return Boolean(testHome && directory === path.resolve(testHome))
   }
 
   export const state = Instance.state(async () => {
@@ -231,7 +234,7 @@ export namespace Skill {
     // Built-in skills: resolve .cyberstrike/ relative to this source file
     // so they're always found regardless of Instance.directory (web UI header).
     // Skip in test mode to preserve test isolation.
-    if (!isCurrentTestHome()) {
+    if (!isSkillCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
@@ -388,7 +391,7 @@ export namespace Skill {
     }
 
     // Built-in skills
-    if (!isCurrentTestHome()) {
+    if (!isSkillCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
