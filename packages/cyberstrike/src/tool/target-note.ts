@@ -8,11 +8,11 @@ const TargetNoteParameters = z.object({
     kind: z.enum(["manual", "asset", "endpoint", "javascript", "finding", "evidence", "research", "lesson"]).default("manual"),
     record_mode: z.enum(["current", "journal"]).default("current").describe("current updates the living summary of one investigation; journal appends a meaningful dated experiment/result without replacing earlier history. Use journal only for consequential steps, not every request."),
     title: z.string().min(1).max(180),
-    content: z.string().min(1).max(10000),
+    content: z.string().min(1),
     status: z.enum(["unverified", "observed", "confirmed", "disproven"]).optional().describe("Optional note status. Omit when updating an existing investigation to preserve its current status; new notes default to observed."),
-    evidence: z.string().max(5000).optional().describe("Concrete evidence required when status is confirmed or disproven"),
+    evidence: z.string().optional().describe("Concrete evidence required when status is confirmed or disproven"),
     source_url: z.string().url().optional(),
-    tags: z.array(z.string().min(1).max(48)).max(20).optional(),
+    tags: z.array(z.string().min(1)).optional(),
     upsert_by_identity: z.boolean().default(true).describe("For record_mode=current, update an existing investigation note instead of creating a duplicate. record_mode=journal always appends and ignores this setting."),
     identity_key: z.string().regex(/^[a-zA-Z0-9:._/-]{1,160}$/).optional().describe("Stable identity for a continuing investigation, such as endpoint:/api/me:authorization or finding:123. Reuse it when updating the same line of reasoning."),
   })
@@ -50,7 +50,7 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
         sourceURL: params.source_url,
         status: params.status as TargetNoteStatus,
         tags: [...(params.tags ?? []), ...(journalEntry ? ["journal"] : [])]
-          .map((tag) => tag.replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 48)),
+          .map((tag) => tag.replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ")),
         upsertByIdentity: journalEntry ? false : params.upsert_by_identity,
         identityKey: journalEntry ? undefined : params.identity_key,
       })
