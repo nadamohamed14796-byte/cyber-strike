@@ -313,6 +313,14 @@ export interface JavaScriptEndpointCandidate {
   host: string | null
   origin: string | null
   path: string
+  /** Null means static evidence did not establish the HTTP method. */
+  method?: string | null
+  pathParameters?: string[]
+  queryParameters?: string[]
+  bodyParameters?: string[]
+  headerNames?: string[]
+  authSignals?: string[]
+  cookieSignals?: string[]
   sourceFiles: string[]
   observedRequestIDs: string[]
   observedInTraffic: boolean
@@ -348,28 +356,89 @@ function normalizedTemplateShape(inputPath: string): string {
 export function mergeStructuredJavaScriptEndpoints(
   staticEndpoints: JavaScriptEndpointCandidate[],
   requests: Array<JavaScriptRequestCandidate & { sourceFile: string; observedRequestIDs: string[] }>,
+  capturedRequests: Array<{ id: string; method: string }> = [],
 ): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
-  const keyOf = (origin: string | null, route: string) => (origin?.toLowerCase() ?? "*") + normalizedTemplateShape(route)
-  for (const endpoint of staticEndpoints) {
-    const key = keyOf(endpoint.origin, endpoint.path)
-    const existing = byKey.get(key)
-    if (!existing) {
-      byKey.set(key, { ...endpoint, sourceFiles: [...endpoint.sourceFiles], observedRequestIDs: [...endpoint.observedRequestIDs] })
-      continue
+  const routeKeyOf = (origin: string | null, route: string) =>
+    (origin?.toLowerCase() ?? "*") + "\\0" + normalizedTemplateShape(route)
+  const normalizeMethod = (method?: string | null) => method?.trim().toUpperCase() || null
+  const keyOf = (origin: string | null, route: string, method?: string | null) =>
+    routeKeyOf(origin, route) + "\\0method:" + (normalizeMethod(method) ?? "*")
+  const capturedMethodByID = new Map(capturedRequests.map((request) => [request.id, normalizeMethod(request.method)]))
+  const requestVariants = new Map<string, Map<string | null, typeof requests>>()
+  const unique = (values: string[]) => [...new Set(values)]
+
+  for (const request of requests) {
+    const url = safeURL(request.urlTemplate)
+    const origin = request.origin ?? url?.origin ?? null
+    const method = normalizeMethod(request.method)
+    const routeKey = routeKeyOf(origin, request.path)
+    let byMethod = requestVariants.get(routeKey)
+    if (!byMethod) {
+      byMethod = new Map()
+      requestVariants.set(routeKey, byMethod)
     }
-    existing.sourceFiles = [...new Set([...existing.sourceFiles, ...endpoint.sourceFiles])]
-    existing.observedRequestIDs = [...new Set([...existing.observedRequestIDs, ...endpoint.observedRequestIDs])]
-    if (existing.observedRequestIDs.length) {
-      existing.observedInTraffic = true
-      existing.confidence = "observed"
+    const items = byMethod.get(method) ?? []
+    items.push(request)
+    byMethod.set(method, items)
+  }
+
+  function mergeStaticEndpoint(source: JavaScriptEndpointCandidate, method: string | null) {
+    const key = keyOf(source.origin, source.path, method)
+    let endpoint = byKey.get(key)
+    const sourceObservedIDs = method && capturedRequests.length
+      ? source.observedRequestIDs.filter((id) => capturedMethodByID.get(id) === method)
+      : source.observedRequestIDs
+    if (!endpoint) {
+      endpoint = {
+        ...source,
+        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+        method,
+        sourceFiles: [],
+        observedRequestIDs: [],
+        pathParameters: [],
+        queryParameters: [],
+        bodyParameters: [],
+        headerNames: [],
+        authSignals: [],
+        cookieSignals: [],
+        observedInTraffic: false,
+        confidence: "candidate",
+      }
+      byKey.set(key, endpoint)
+    }
+    endpoint.sourceFiles = unique([...endpoint.sourceFiles, ...source.sourceFiles])
+    endpoint.observedRequestIDs = unique([...endpoint.observedRequestIDs, ...sourceObservedIDs])
+    if (endpoint.observedRequestIDs.length) {
+      endpoint.observedInTraffic = true
+      endpoint.confidence = "observed"
     }
   }
+
+  // A generic route literal may correspond to more than one HTTP method. Once the
+  // source reveals those methods, materialize one stable endpoint per method rather
+  // than mixing GET/POST evidence and parameter sets into a single route record.
+  for (const source of staticEndpoints) {
+    const routeKey = routeKeyOf(source.origin, source.path)
+    const variants = requestVariants.get(routeKey)
+    if (normalizeMethod(source.method)) {
+      mergeStaticEndpoint(source, normalizeMethod(source.method))
+      continue
+    }
+    const methods = variants ? [...variants.keys()] : []
+    if (methods.some((method) => method !== null)) {
+      for (const method of methods) mergeStaticEndpoint(source, method)
+    } else {
+      mergeStaticEndpoint(source, null)
+    }
+  }
+
   for (const request of requests) {
     const url = safeURL(request.urlTemplate)
     const origin = request.origin ?? url?.origin ?? null
     const host = url?.host ?? request.host ?? null
-    const key = keyOf(origin, request.path)
+    const method = normalizeMethod(request.method)
+    const key = keyOf(origin, request.path, method)
     let endpoint = byKey.get(key)
     if (!endpoint) {
       endpoint = {
@@ -378,17 +447,28 @@ export function mergeStructuredJavaScriptEndpoints(
         host,
         origin,
         path: request.path,
+        method,
         sourceFiles: [],
         observedRequestIDs: [],
+        pathParameters: [],
+        queryParameters: [],
+        bodyParameters: [],
+        headerNames: [],
+        authSignals: [],
+        cookieSignals: [],
         observedInTraffic: false,
         confidence: "candidate",
       }
       byKey.set(key, endpoint)
     }
     if (!endpoint.sourceFiles.includes(request.sourceFile)) endpoint.sourceFiles.push(request.sourceFile)
-    for (const requestID of request.observedRequestIDs) {
-      if (!endpoint.observedRequestIDs.includes(requestID)) endpoint.observedRequestIDs.push(requestID)
-    }
+    endpoint.pathParameters = unique([...endpoint.pathParameters ?? [], ...request.pathParameters])
+    endpoint.queryParameters = unique([...endpoint.queryParameters ?? [], ...request.queryParameters])
+    endpoint.bodyParameters = unique([...endpoint.bodyParameters ?? [], ...request.bodyParameters])
+    endpoint.headerNames = unique([...endpoint.headerNames ?? [], ...request.headerNames])
+    endpoint.authSignals = unique([...endpoint.authSignals ?? [], ...request.authSignals])
+    endpoint.cookieSignals = unique([...endpoint.cookieSignals ?? [], ...request.cookieSignals])
+    endpoint.observedRequestIDs = unique([...endpoint.observedRequestIDs, ...request.observedRequestIDs])
     if (endpoint.observedRequestIDs.length) {
       endpoint.observedInTraffic = true
       endpoint.confidence = "observed"
