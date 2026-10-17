@@ -71,11 +71,13 @@ export function matchesCapturedJavaScriptAsset(input: {
   origin?: string | null
   pageURL?: string | null
   host?: string | null
+  scheme?: string | null
+  port?: number | null
   normalizedPath?: string | null
 }, target: string | URL): boolean {
   const targetURL = target instanceof URL ? target : safeURL(target)
   if (!targetURL) return false
-  const base = safeURL(input.origin) ?? safeURL(input.pageURL) ?? safeURL(input.host)
+  const base = observedRequestBaseURL(input)
   if (!base || !input.normalizedPath?.trim()) return false
   let observed: URL
   try {
@@ -1079,6 +1081,8 @@ export namespace JavaScriptCorrelation {
           origin: request.origin,
           pageURL: request.page_url,
           host: request.host,
+          scheme: request.scheme,
+          port: request.port,
           normalizedPath: request.normalized_path,
         }, explicitJS))
       : relevantRequests
