@@ -291,6 +291,7 @@ async function sendGoverned(
     total_timeout_ms?: number
     follow_redirects?: boolean
     signal?: AbortSignal
+    redirectScopeCheck?: (url: string) => Promise<boolean>
   },
 ): Promise<Send.Result> {
   const outbound = await Network.forUrl(origin)
@@ -306,6 +307,7 @@ async function sendGoverned(
         clientCertificate: outbound.clientCertificate,
         totalTimeoutMs: opts.total_timeout_ms,
         followRedirects: opts.follow_redirects,
+        redirectScopeCheck: opts.redirectScopeCheck,
         signal: opts.signal,
       }),
     msg.method,
@@ -607,11 +609,17 @@ export const HttpReplayTool = Tool.define("http_replay", {
       }
     }
 
+    const originalWorkspaceID = targetAuthorization.workspace?.id
     const sendOpts = {
       insecure_tls: params.insecure_tls,
       total_timeout_ms: params.total_timeout_ms,
       follow_redirects: params.follow_redirects,
       signal: ctx.abort,
+      redirectScopeCheck: async (url: string) => {
+        if (!originalWorkspaceID) return false
+        const redirectDecision = await TargetMemory.checkURLScope(url)
+        return redirectDecision.allowed && redirectDecision.workspace?.id === originalWorkspaceID
+      },
     }
 
     // ── Compare mode ──────────────────────────────────────────────────────
