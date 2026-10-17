@@ -49,28 +49,38 @@ export namespace IngestQueue {
     }
   }
 
-  function waitIfPaused(sessionID: string): Promise<void> {
-    const s = state()[sessionID]
-    if (!s || !s.paused) return Promise.resolve()
-    if (!s.resumeSignal) {
-      s.resumeSignal = new Promise<void>((resolve) => {
-        s.resumeResolve = resolve
-      })
-    }
-    return s.resumeSignal
+  function waitIfAnyPaused(sessionIDs: string[]): Promise<void> {
+    const paused = [...new Set(sessionIDs)]
+      .map((id) => ({ id, state: state()[id] }))
+      .filter((entry) => entry.state?.paused)
+    if (paused.length === 0) return Promise.resolve()
+    return Promise.race(
+      paused.map(({ id, state: s }) => {
+        if (!s!.resumeSignal) {
+          s!.resumeSignal = new Promise<void>((resolve) => {
+            s!.resumeResolve = resolve
+          })
+        }
+        return s!.resumeSignal
+      }),
+    )
   }
 
-  export function enqueue(sessionID: string, task: () => Promise<unknown>) {
+  export function enqueue(sessionID: string, task: () => Promise<unknown>, parentSessionID?: string) {
     const s = getOrInit(sessionID)
-    s.pending++
-    publish(sessionID)
+    const trackedIDs = [...new Set([sessionID, ...(parentSessionID ? [parentSessionID] : [])])]
+    for (const id of trackedIDs) {
+      const tracked = getOrInit(id)
+      tracked.pending++
+      publish(id)
+    }
 
     const next = s.chain
-      // Re-check after every resume wake-up. A pause can race with a resolved
-      // resume promise before the next .then(task) callback gets its turn.
+      // A child ingest inherits pause/resume from its owning parent session.
+      // Re-check after every wake-up because a pause can race with resume.
       .then(async () => {
-        while (state()[sessionID]?.paused) {
-          await waitIfPaused(sessionID)
+        while (trackedIDs.some((id) => state()[id]?.paused)) {
+          await waitIfAnyPaused(trackedIDs)
         }
         return task()
       })
@@ -79,10 +89,12 @@ export namespace IngestQueue {
         (err) => log.error("ingest prompt failed", { sessionID, error: err }),
       )
       .then(() => {
-        const cur = state()[sessionID]
-        if (cur) cur.pending = Math.max(0, cur.pending - 1)
-        publish(sessionID)
-        maybeCleanup(sessionID)
+        for (const id of trackedIDs) {
+          const cur = state()[id]
+          if (cur) cur.pending = Math.max(0, cur.pending - 1)
+          publish(id)
+          maybeCleanup(id)
+        }
       })
 
     s.chain = next
