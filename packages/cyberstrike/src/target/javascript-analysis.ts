@@ -469,7 +469,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       }
 
   const secrets = new Map<string, JavaScriptSecretCandidate>()
-  const secretPattern = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key)\b\s*[:=]\s*(['"\x60])([^'"\x60\r\n]{8,500})\2/gi
+  const secretPattern = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key)\b\s*[:=]\s*(['"\x60])([^'"\x60\r\n]{8,})\2/gi
   for (const match of source.matchAll(secretPattern)) {
     const rawValue = match[3] ?? ""
     if (!rawValue || /^(?:\$\{|\{\{|\$[A-Z_][A-Z0-9_]*|<[^>]+>)/i.test(rawValue.trim())) continue
