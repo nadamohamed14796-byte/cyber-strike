@@ -181,7 +181,12 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
   const confidence = verdict === "confirmed" ? 90 : verdict === "false_positive" ? 85 : 45
   const failedIDs = failed.map((check) => check.id)
   const unknownIDs = unknown.map((check) => check.id)
-  const formatFailed = failed.map((check) => "#" + check.number + " " + check.question + " — " + check.reason)
+  const passed = checks.filter((check) => check.status === "pass")
+  const notApplicable = checks.filter((check) => check.status === "not_applicable")
+  const formatCheck = (check: FindingValidationCheckRecord) =>
+    "#" + check.number + " [" + check.status.toUpperCase() + "] " + check.question +
+    (check.reason ? " — Reason: " + check.reason : "") +
+    (check.evidence ? " — Evidence: " + check.evidence : "")
   let summary: string
   let nextStep: string
 
@@ -205,9 +210,13 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
 
   const output = [
     "Verdict: " + verdict + " (rubric confidence label: " + confidence + "/100; not a statistical probability)",
+    "Check results: " + passed.length + " passed, " + failed.length + " failed, " + unknown.length + " unknown, " + notApplicable.length + " not applicable (10 total).",
     summary,
-    ...(formatFailed.length ? ["", "Failed checks:", ...formatFailed] : []),
-    ...(unknown.length ? ["", "Unknown checks:", ...unknown.map((check) => "#" + check.number + " " + check.question + (check.reason ? " — " + check.reason : ""))] : []),
+    "",
+    "All ten checks (status, reason, and evidence):",
+    ...checks.map(formatCheck),
+    "",
+    "Verification attempts: " + validAttempts.length + "/" + FINDING_VALIDATION_MIN_ATTEMPTS + " distinct valid evidence-backed attempts; " + Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " remaining before false-positive eligibility.",
     "",
     "Next step: " + nextStep,
   ].join("\n")
