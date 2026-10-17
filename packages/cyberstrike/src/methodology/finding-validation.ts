@@ -340,7 +340,7 @@ export namespace FindingValidation {
     if (assessment.verdict === "false_positive") {
       try {
         FalsePositiveKnowledge.record({
-          finding,
+          finding: { ...finding, id: input.vulnerabilityID },
           validationID,
           failedCheckIDs: assessment.failedCheckIDs,
           checks: assessment.checks,
