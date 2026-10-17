@@ -18,6 +18,13 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://notatt.com/", entries)).toEqual([])
   })
 
+  test("indexes typed HackerOne web assets and keeps non-web assets non-authorizing", () => {
+    expect(matchingScopeItems("https://example.com/", ["Wildcard: *.example.com"])).toEqual(["Wildcard: *.example.com"])
+    expect(matchingScopeItems("https://example.com/app1/users", ["URL: example.com/app1"])).toEqual(["URL: example.com/app1"])
+    expect(matchingScopeItems("https://example.com/", ["Source Code: https://github.com/acme/app"])).toEqual([])
+    expect(matchingScopeItems("https://example.com/", ["AWS Cloud Config: 123456789012"])).toEqual([])
+  })
+
   test("matches IPv6 CIDR ranges", () => {
     const entries = ["2001:db8::/32"]
     expect(matchingScopeItems("https://[2001:db8::1]/", entries)).toEqual(["2001:db8::/32"])
