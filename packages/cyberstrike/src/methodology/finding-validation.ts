@@ -335,6 +335,8 @@ export namespace FindingValidation {
       description,
     })
 
+    let falsePositiveMemorySaved = false
+    let falsePositiveMemoryRetracted = false
     if (assessment.verdict === "false_positive") {
       try {
         FalsePositiveKnowledge.record({
@@ -344,6 +346,7 @@ export namespace FindingValidation {
           checks: assessment.checks,
           summary: assessment.summary,
         })
+        falsePositiveMemorySaved = true
       } catch (error) {
         console.warn("[cyberstrike] false-positive lesson could not be saved:", error instanceof Error ? error.message : String(error))
       }
@@ -352,6 +355,7 @@ export namespace FindingValidation {
       // old global lesson so stale conclusions cannot mislead future target hunts.
       try {
         FalsePositiveKnowledge.reopenForFinding(input.vulnerabilityID)
+        falsePositiveMemoryRetracted = true
       } catch (error) {
         console.warn("[cyberstrike] superseded false-positive lesson could not be retracted:", error instanceof Error ? error.message : String(error))
       }
@@ -436,6 +440,12 @@ export namespace FindingValidation {
     return {
       ...assessment,
       output: assessment.output + strategyGuidance + (
+        falsePositiveMemorySaved
+          ? "\\n\\nSaved a sanitized false-positive lesson to the shared SQLite memory for future target hunts."
+          : falsePositiveMemoryRetracted
+            ? "\\n\\nRetracted the stale shared false-positive lesson because this finding was reopened by later evidence."
+            : ""
+      ) + (
         priorFalsePositiveLessons.length
           ? "\n\n## Similar historical false-positive cases (advisory only)\n" +
             priorFalsePositiveLessons.map((lesson, index) =>
@@ -452,6 +462,8 @@ export namespace FindingValidation {
       findingID: input.vulnerabilityID,
       targetNoteID,
       targetFilePath,
+      falsePositiveMemorySaved,
+      falsePositiveMemoryRetracted,
     }
   }
 
