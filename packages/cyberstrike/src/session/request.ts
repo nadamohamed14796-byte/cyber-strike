@@ -2,10 +2,40 @@ import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import z from "zod"
 import { Database, eq, and, isNull, asc } from "../storage/db"
-import { RequestTable } from "./session.sql"
+import { RequestJavaScriptCaptureTable, RequestTable } from "./session.sql"
 import { Identifier } from "../id/id"
 import { createHash } from "crypto"
 import { processResponse, type ResponseInput } from "./response-processor"
+
+function requestResponseURL(input: {
+  normalizedPath: string
+  origin?: string
+  scheme?: "http" | "https"
+  host?: string
+  port?: number
+}): string {
+  let responseURL = input.normalizedPath
+  const responseBase = input.origin ?? (
+    input.scheme && input.host
+      ? input.scheme + "://" + input.host + (input.port && !/(?:\]:\d+|:\d+)$/.test(input.host) ? ":" + input.port : "")
+      : undefined
+  )
+  if (responseBase) {
+    try { responseURL = new URL(input.normalizedPath, responseBase).href } catch {}
+  }
+  return responseURL
+}
+
+function canonicalSourceURL(value: string): string {
+  try {
+    const url = new URL(value)
+    url.search = ""
+    url.hash = ""
+    return url.origin + url.pathname
+  } catch {
+    return value.split(/[?#]/, 1)[0] || value
+  }
+}
 
 const Status = z.enum(["queued", "processing", "processed", "failed"])
 const Method = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
@@ -100,18 +130,7 @@ export namespace Request {
     const id = Identifier.ascending("request")
     const now = Date.now()
 
-    // Keep the ordinary LLM-facing preview bounded, while retaining complete JavaScript source
-    // in its separate database column for static analysis. Use the observed URL as a fallback
-    // for script servers that incorrectly label their MIME type.
-    let responseURL = input.normalizedPath
-    const responseBase = input.origin ?? (
-      input.scheme && input.host
-        ? input.scheme + "://" + input.host + (input.port && !/:(?:80|443)$/.test(input.host) ? ":" + input.port : "")
-        : undefined
-    )
-    if (responseBase) {
-      try { responseURL = new URL(input.normalizedPath, responseBase).href } catch {}
-    }
+    const responseURL = requestResponseURL(input)
     const processed = input.response ? processResponse({ ...input.response, url: responseURL }) : undefined
 
     // Atomic dedup guard (Faz 0): one row per (session, key_hash). If a concurrent
@@ -120,8 +139,8 @@ export namespace Request {
     // caller (returns undefined) so it skips the redundant LLM enqueue. key_hash NULL
     // (legacy / non-HTTP) never conflicts (NULLs are distinct), so behavior is
     // unchanged for those rows.
-    const inserted = Database.use((db) =>
-      db
+    const inserted = Database.transaction((db) => {
+      const created = db
         .insert(RequestTable)
         .values({
           id,
@@ -161,8 +180,32 @@ export namespace Request {
         })
         .onConflictDoNothing({ target: [RequestTable.session_id, RequestTable.key_hash] })
         .returning({ id: RequestTable.id })
-        .all(),
-    )
+        .all()
+      // A duplicate request shape is not enqueued to the LLM twice, but a new
+      // JavaScript content version must still be preserved against the existing row.
+      const linkedRequestID = created[0]?.id ?? (input.keyHash
+        ? db.select({ id: RequestTable.id }).from(RequestTable).where(and(
+            eq(RequestTable.session_id, input.sessionID),
+            eq(RequestTable.key_hash, input.keyHash),
+          )).get()?.id
+        : undefined)
+      if (processed?.javascriptSource && linkedRequestID) {
+        const sourceURL = canonicalSourceURL(responseURL)
+        const contentHash = createHash("sha256").update(processed.javascriptSource).digest("hex")
+        db.insert(RequestJavaScriptCaptureTable).values({
+          id: Identifier.ascending("request_javascript_capture"),
+          session_id: input.sessionID,
+          request_id: linkedRequestID,
+          source_url: sourceURL,
+          content_hash: contentHash,
+          source_content: processed.javascriptSource,
+          content_type: processed.contentType,
+          response_size: processed.originalSize,
+          time_created: now,
+        }).onConflictDoNothing().run()
+      }
+      return created
+    })
     // Race-duplicate: a concurrent ingest already owns this key_hash → caller skips.
     if (inserted.length === 0) return undefined
     const list = get(input.sessionID)
@@ -201,6 +244,64 @@ export namespace Request {
       processed_response: processed?.content,
       time: { created: now, updated: now },
     }
+  }
+
+  /**
+   * Save a JavaScript response version for an already-known request without enqueueing
+   * another request-analysis job. Used when ingest deduplicates a repeated request shape.
+   */
+  export function captureJavaScriptSource(input: {
+    sessionID: string
+    method: z.infer<typeof Method>
+    normalizedPath: string
+    response?: ResponseInput
+    keyHash?: string
+    queryHash?: string
+    bodyHash?: string
+    opKeyHash?: string
+    origin?: string
+    scheme?: "http" | "https"
+    host?: string
+    port?: number
+    pageUrl?: string
+  }): { requestID: string; captured: boolean; contentHash?: string } | undefined {
+    if (!input.response) return undefined
+    const responseURL = requestResponseURL(input)
+    const processed = processResponse({ ...input.response, url: responseURL })
+    if (!processed.javascriptSource) return undefined
+
+    const request = Database.use((db) => {
+      if (input.keyHash) {
+        const match = db.select({ id: RequestTable.id }).from(RequestTable).where(and(
+          eq(RequestTable.session_id, input.sessionID),
+          eq(RequestTable.key_hash, input.keyHash),
+        )).get()
+        if (match) return match
+      }
+      return db.select({ id: RequestTable.id }).from(RequestTable).where(and(
+        eq(RequestTable.session_id, input.sessionID),
+        eq(RequestTable.method, input.method),
+        eq(RequestTable.normalized_path, input.normalizedPath),
+        input.origin ? eq(RequestTable.origin, input.origin) : isNull(RequestTable.origin),
+      )).orderBy(asc(RequestTable.id)).get()
+    })
+    if (!request) return undefined
+
+    const contentHash = createHash("sha256").update(processed.javascriptSource).digest("hex")
+    const inserted = Database.transaction((db) =>
+      db.insert(RequestJavaScriptCaptureTable).values({
+        id: Identifier.ascending("request_javascript_capture"),
+        session_id: input.sessionID,
+        request_id: request.id,
+        source_url: canonicalSourceURL(responseURL),
+        content_hash: contentHash,
+        source_content: processed.javascriptSource!,
+        content_type: processed.contentType,
+        response_size: processed.originalSize,
+        time_created: Date.now(),
+      }).onConflictDoNothing().returning({ id: RequestJavaScriptCaptureTable.id }).all(),
+    )
+    return { requestID: request.id, captured: inserted.length > 0, contentHash }
   }
 
   export function get(sessionID: string): Info[] {
