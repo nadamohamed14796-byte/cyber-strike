@@ -27,6 +27,27 @@ describe("parseScopeFileContents", () => {
     expect(parseScopeFileContents("\uFEFFatt.com\napi.att.com")).toEqual(["att.com", "api.att.com"])
   })
 
+  test("parses HackerOne TSV exports into typed scope entries", () => {
+    expect(parseScopeFileContents([
+      "identifier\tasset_type\tasset_tags",
+      "*.example.com\tWildcard\t",
+      "example.com\tDomain\t",
+      "https://example.com/app1\tUrl\t",
+      "192.0.2.0/24\tCidr\t",
+      "com.example.mobile\tAndroidPlayStore\t",
+      "https://github.com/acme/app\tSourceCode\t",
+      "123456789012\tAwsCloudConfig\t",
+    ].join("\n"))).toEqual([
+      "Wildcard: *.example.com",
+      "Domain: example.com",
+      "URL: https://example.com/app1",
+      "CIDR: 192.0.2.0/24",
+      "Android Play Store: com.example.mobile",
+      "Source Code: https://github.com/acme/app",
+      "AWS Cloud Config: 123456789012",
+    ])
+  })
+
   test("preserves unfamiliar typed scope entries instead of aborting the entire import", () => {
     expect(parseScopeFileContents("att.com\nAndroid application: com.example.mobile\n")).toEqual([
       "att.com",
