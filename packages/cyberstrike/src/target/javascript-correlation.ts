@@ -5,7 +5,7 @@ import { and, desc, eq, inArray } from "../storage/db"
 import { Database } from "../storage/db"
 import { Instance } from "../project/instance"
 import { Session } from "../session"
-import { SessionTable, RequestTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
+import { SessionTable, RequestTable, RequestJavaScriptCaptureTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
 import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal } from "./javascript-analysis"
@@ -227,8 +227,12 @@ export interface JavaScriptSourceFile {
   captureTruncated?: boolean
   /** First request ID is retained for backward-compatible artifact references. */
   sourceRequestID?: string
-  /** All captured request IDs for this canonical URL/content version. */
+  /** All request IDs whose response contained this canonical URL/content version. */
   sourceRequestIDs?: string[]
+  /** First persistent JavaScript-capture row for this content version. */
+  sourceCaptureID?: string
+  /** Persistent capture-row IDs for this canonical URL/content version. */
+  sourceCaptureIDs?: string[]
   /** Static-analysis metadata; secret-like literal values must be redacted before persistence. */
   analysis?: JavaScriptSourceAnalysis
 }
@@ -270,6 +274,8 @@ function unwrapProcessedResponseBody(value: string): { body: string; truncated: 
 export function extractCapturedJavaScriptSources(
   requests: Array<{
     id: string
+    requestID?: string
+    captureID?: string
     url?: string | null
     origin?: string | null
     pageURL?: string | null
@@ -314,7 +320,11 @@ export function extractCapturedJavaScriptSources(
     const previousIndex = sourceIndexByURLAndHash.get(identity)
     if (previousIndex !== undefined) {
       const previous = output[previousIndex]!
-      previous.sourceRequestIDs = [...new Set([...(previous.sourceRequestIDs ?? [previous.sourceRequestID].filter((id): id is string => Boolean(id))), request.id])]
+      const requestID = request.requestID ?? request.id
+      previous.sourceRequestIDs = [...new Set([...(previous.sourceRequestIDs ?? [previous.sourceRequestID].filter((id): id is string => Boolean(id))), requestID])]
+      if (request.captureID) {
+        previous.sourceCaptureIDs = [...new Set([...(previous.sourceCaptureIDs ?? [previous.sourceCaptureID].filter((id): id is string => Boolean(id))), request.captureID])]
+      }
       continue
     }
     const basename = (url.pathname.split("/").filter(Boolean).pop() || "captured.js").replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
@@ -339,8 +349,9 @@ export function extractCapturedJavaScriptSources(
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
       sourceURL: canonicalSourceURL,
       captureTruncated: unwrapped.truncated,
-      sourceRequestID: request.id,
-      sourceRequestIDs: [request.id],
+      sourceRequestID: request.requestID ?? request.id,
+      sourceRequestIDs: [request.requestID ?? request.id],
+      ...(request.captureID ? { sourceCaptureID: request.captureID, sourceCaptureIDs: [request.captureID] } : {}),
       analysis,
     })
   }
