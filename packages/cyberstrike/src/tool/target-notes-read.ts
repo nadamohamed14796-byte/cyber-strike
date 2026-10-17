@@ -35,8 +35,8 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
       if (!workspace) {
         return { title: "Target notes unavailable", output: "No existing workspace matches this target. No data was read.", metadata: { found: false, reason: "workspace_missing" } }
       }
-      if (!TargetMemory.isObservedInSession(sessionID, workspace.targetURL)) {
-        return { title: "Target notes unavailable", output: "The target was not observed in this session tree. No notes were returned to prevent cross-target contamination.", metadata: { found: false, reason: "target_not_observed" } }
+      if (!TargetMemory.isObservedOrAncestorInSession(sessionID, workspace.targetURL)) {
+        return { title: "Target notes unavailable", output: "This workspace is neither observed in the session tree nor a registered ancestor of an observed workspace. No notes were returned to prevent cross-target contamination.", metadata: { found: false, reason: "target_not_observed_or_ancestor" } }
       }
       let notes = TargetMemory.allNotes(workspace.id)
       if (params.note_id) notes = notes.filter((note) => note.id === params.note_id)
