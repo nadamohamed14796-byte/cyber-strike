@@ -540,3 +540,15 @@ The branch list returned by GitHub contained `main`, `dev`, `feat/proxy-config`,
 - Source-level inspection confirms the current prompt assertions match the orchestrator and injection prompts, and confirms `http_replay` and `csrf_extract` pass persisted-scope checks for redirect destinations.
 - The latest inspected commit status API returned no status records. The GitHub workflow-run wrapper available here filters to pull-request-triggered runs and returned no runs for the main commit. Therefore no CI success or test execution is claimed.
 - Still required: run `bun turbo test`, `bun turbo typecheck`, and `bun turbo build` on the exact latest main SHA; then inspect the actual workflow results. These prompt-level safeguards do not replace the existing execution-boundary scope enforcement, and they do not prove model behavior end-to-end.
+
+
+### Follow-up — 2026-10-17: specialist prompts aligned with the evidence gate
+
+- Replaced the injection specialist's “every parameter” sweep and exploit/escalation instructions with a scope-first, hypothesis-specific workflow. Removed the later extraction/weaponization workflow and aligned false-positive handling with `validate_finding` (20 distinct valid attempts, ten checks, contradictory evidence).
+- Rewrote the IDOR prompt to prohibit guessed/sequential ID enumeration and require test-owned resources plus an explicit ownership boundary.
+- Rewrote the SSRF prompt to require a controlled, authorized canary and to prohibit default internal-network/metadata probes, alternate-protocol probing, and WAF/allowlist evasion.
+- Rewrote the mass-assignment prompt to prohibit privilege/financial field spraying and require a harmless reversible fixture; rewrote file-attacks guidance to prohibit webshells, sensitive-file reads, and destructive uploads.
+- Rewrote authn/authz prompts to require controlled identity comparisons and remove credential stuffing/brute-force recipes. Rewrote business-logic guidance to require reversible fixtures and prohibit real financial or destructive state changes.
+- Replaced broad web-application prompt recipes with evidence-based class selection and safe fixture requirements. Added regression assertions for orchestrator, injection, web-app, and specialist prompts.
+- Commits: IDOR `1a56855f4f1a0e4ca623fa40fbf0a1a96c02017f`; SSRF `f023218ec2e2052ffd86a840c9ef25b63bf7f938`; mass assignment `5d85e3cae5c5e78c0ddc52a944cc17b3eab5c53e`; file attacks `248fc7ddb4a3dcc3d39a59156911fe312799bbd2`; authn `d6f9976c334a69cb32c64d80b7d6bf663fe65ee0`; authz `2fda11b7985f2f2234df292ea1999a3661cec1bd`; business logic `d6a3513d044ac0bfdd199452c63408f109082e10`; regression test `852eb5aacd6b1bb368e1a5f13b795baf8c64ad2d`.
+- Verification remains source-level only. The commit-status API returned no status records; tests/typecheck/build have not been executed in this environment. Do not mark this checkpoint CI-green until exact-main workflows complete.
