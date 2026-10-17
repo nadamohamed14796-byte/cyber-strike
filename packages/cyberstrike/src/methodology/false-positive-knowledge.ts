@@ -107,7 +107,7 @@ export namespace FalsePositiveKnowledge {
       if (existing) {
         db.update(FalsePositiveKnowledgeTable).set({
           occurrences: existing.occurrences + 1,
-          confidence: Math.min(95, existing.confidence + 5),
+          confidence: Math.min(95, existing.confidence + (existing.source_finding_id === input.finding.id ? 0 : 5)),
           benign_explanation: benignExplanation,
           evidence_summary: evidenceSummary,
           source_validation_id: input.validationID,
