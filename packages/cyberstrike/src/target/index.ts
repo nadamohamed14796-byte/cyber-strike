@@ -2157,29 +2157,32 @@ export namespace TargetMemory {
       "Use scope_check with target_url set to the selected asset URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must pass persisted scope checks for every outbound URL.",
       "Keep endpoint/request/finding/evidence files inside the selected asset's workspace. Keep program summaries in the program/root workspace. Do not copy one asset's full notes or findings into a sibling's workspace.",
       "",
-      "## Registered program asset tree",
-      ...(hierarchyLines.length ? hierarchyLines : ["No authorized child assets are currently registered."]),
-      "",
-      "Expected artifact areas per workspace: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
-      "",
+      // The active asset's ranked memory is deliberately emitted before inventories:
+      // the final context-size guard must never spend the entire budget on an asset tree
+      // and silently discard the observations needed to resume the current investigation.
+      ...(primaryNotes.length ? ["## Selected asset memory (persistent notes)", "", ...primaryNotes.flatMap((note) => [
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
+        note.content.slice(0, 1100),
+        "",
+      ])] : []),
       ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 900),
+        note.content.slice(0, 550),
         "",
       ])] : []),
       ...(ancestorNotes.length ? ["## Intermediate ancestor memory", "", ...ancestorNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 900),
+        note.content.slice(0, 550),
         "",
       ])] : []),
-      ...(primaryNotes.length ? ["## Selected asset memory (persistent notes)", "", ...primaryNotes.flatMap((note) => [
-        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
-        "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 1800),
-        "",
-      ])] : []),
+      "",
+      "## Registered program asset tree",
+      ...(hierarchyLines.length ? hierarchyLines : ["No authorized child assets are currently registered."]),
+      "",
+      "Expected artifact areas per workspace: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
     ]
     return sections.join("\n").slice(0, 18_000)
   }
