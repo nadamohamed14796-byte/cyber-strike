@@ -4,6 +4,7 @@ import { FindingValidation } from "../../src/methodology/finding-validation"
 import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { Vulnerability } from "../../src/session/vulnerability"
+import { VerificationLedger } from "../../src/session/verification-ledger"
 import { Database } from "../../src/storage/db"
 import { IntelEntryTable } from "../../src/methodology/methodology.sql"
 import { TargetMemory } from "../../src/target"
@@ -38,6 +39,46 @@ function makeAttempts(count = 20) {
     evidence: "Observed controlled response comparison for variation " + (index + 1),
     validConditions: true,
   }))
+}
+
+function recordDisprovenLedger(sessionID: string, findingID: string, endpoint: string) {
+  for (let index = 0; index < 20; index++) {
+    VerificationLedger.record({
+      sessionID,
+      hypothesisKey: "finding:" + findingID,
+      asset: "https://ledger-test.example.test",
+      endpoint,
+      vulnerabilityClass: "authorization",
+      attempt: {
+        strategyID: "controlled-strategy-" + (index + 1),
+        variantKey: "controlled-variant-" + (index + 1),
+        rationale: "Test a distinct controlled condition for the same finding",
+        resultSummary: "Observed expected access-control behavior in a controlled comparison",
+        evidenceRef: "test-evidence://finding/" + findingID + "/" + (index + 1),
+        validConditions: true,
+      },
+      decisiveResult: index === 19 ? "disproven" : "none",
+    })
+  }
+}
+
+function recordConfirmedLedger(sessionID: string, findingID: string, endpoint: string) {
+  VerificationLedger.record({
+    sessionID,
+    hypothesisKey: "finding:" + findingID,
+    asset: "https://ledger-test.example.test",
+    endpoint,
+    vulnerabilityClass: "authorization",
+    attempt: {
+      strategyID: "confirmed-controlled-replay",
+      variantKey: "confirmed-evidence",
+      rationale: "Reproduce the security impact under valid conditions",
+      resultSummary: "Observed unauthorized access compared with the owner baseline",
+      evidenceRef: "test-evidence://finding/" + findingID + "/confirmed",
+      validConditions: true,
+    },
+    decisiveResult: "confirmed",
+  })
 }
 
 test("requires all ten unique checks", () => {
@@ -272,6 +313,7 @@ test("records validation history and removes false positives from confirmed find
       expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
       expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.candidate).toBe("medium")
 
+      recordDisprovenLedger(session.id, finding.id, finding.endpoint!)
       const result = await FindingValidation.record({
         sessionID: session.id,
         vulnerabilityID: finding.id,
@@ -441,6 +483,7 @@ test("accumulates 20 distinct attempts across separate validation calls before f
         ...attempt,
         variation: "second-batch-variation-" + (index + 1),
       }))
+      recordDisprovenLedger(session.id, finding.id, finding.endpoint!)
       const second = await FindingValidation.record({
         sessionID: session.id,
         vulnerabilityID: finding.id,
