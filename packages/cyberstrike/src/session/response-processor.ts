@@ -23,6 +23,8 @@ export interface ResponseInput {
   status: number
   headers: Record<string, string>
   body: string
+  /** Optional observed URL/path, used to recognize script responses with incorrect/missing MIME types. */
+  url?: string
 }
 
 export interface ProcessedResponse {
@@ -76,7 +78,7 @@ export function processResponse(input: ResponseInput): ProcessedResponse {
     contentType,
     originalSize,
     content,
-    ...(isJavaScript(contentType) ? { javascriptSource: input.body } : {}),
+    ...(isJavaScript(contentType, input.url) ? { javascriptSource: input.body } : {}),
   }
 }
 
@@ -122,9 +124,11 @@ function isJson(contentType: string): boolean {
   return ct.includes("application/json") || ct.includes("+json")
 }
 
-function isJavaScript(contentType: string): boolean {
+function isJavaScript(contentType: string, url?: string): boolean {
   const ct = contentType.toLowerCase()
-  return ct.includes("javascript") || ct.includes("ecmascript") || ct === "text/jscript"
+  const scriptMimeType = ct.includes("javascript") || ct.includes("ecmascript") || ct === "text/jscript"
+  const pathname = (url ?? "").split(/[?#]/, 1)[0] ?? ""
+  return scriptMimeType || /\.(?:m?js|cjs)$/i.test(pathname)
 }
 
 function isText(contentType: string): boolean {
