@@ -6,6 +6,8 @@ import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
+import { Database, eq } from "../../src/storage/db"
+import { TargetWorkspaceTable } from "../../src/target/target.sql"
 import { targetWorkspaceOwnerKey } from "../../src/target/project-key"
 
 describe("target memory normalization", () => {
@@ -634,6 +636,46 @@ test("serializes concurrent current-note updates without losing intermediate evi
       expect(persistedStates).toContain("Baseline: role and ownership")
       expect(persistedStates).toContain("Experiment A:")
       expect(persistedStates).toContain("Experiment B:")
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("notes access allows a registered ancestor of an observed asset but not an unrelated workspace", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const parentURL = "https://program.example.test"
+      const childURL = "https://api.program.example.test"
+      const siblingURL = "https://other-program.example.test"
+      const parent = await TargetMemory.ensure(parentURL)
+      const child = await TargetMemory.ensure(childURL)
+      const sibling = await TargetMemory.ensure(siblingURL)
+
+      // Simulate an already-established asset relationship. This function verifies
+      // the persisted parent chain rather than guessing by DNS suffix.
+      Database.use((db) => db.update(TargetWorkspaceTable)
+        .set({ parent_target_id: parent.id, asset_type: "hostname" })
+        .where(eq(TargetWorkspaceTable.id, child.id))
+        .run())
+
+      const session = await Session.create({ title: "ancestor-note-read-test" })
+      const request = Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/api/profile",
+        origin: childURL,
+        keyHash: "ancestor-note-read-test-key",
+      })
+      expect(request).toBeDefined()
+
+      expect(TargetMemory.isObservedOrAncestorInSession(session.id, childURL)).toBe(true)
+      expect(TargetMemory.isObservedOrAncestorInSession(session.id, parentURL)).toBe(true)
+      expect(TargetMemory.isObservedOrAncestorInSession(session.id, siblingURL)).toBe(false)
+
+      await Session.remove(session.id)
       await Instance.dispose()
     },
   })
