@@ -149,6 +149,41 @@ test("false positive requires multiple evidence-backed contradictions and explai
   expect(result.output).toContain("#3")
 })
 
+test("caller-authored attempts cannot set a false-positive status without the durable verification ledger", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      try {
+        const finding = Vulnerability.add({
+          sessionID: session.id,
+          data: {
+            severity: "medium",
+            title: "Unproven false-positive ledger gate",
+            description: "A candidate finding with caller-authored attempt claims.",
+            endpoint: "GET /api/private-record",
+          },
+        })
+        const result = await FindingValidation.record({
+          sessionID: session.id,
+          vulnerabilityID: finding.id,
+          checks: checklist({
+            reproducible: { status: "fail", reason: "Controlled replay did not reproduce the claim", evidence: "Observed response matched baseline" },
+            unexpected_behavior: { status: "fail", reason: "Behavior matched intended policy", evidence: "Owner and non-owner controls showed no difference" },
+          }),
+          attempts: makeAttempts(20),
+        })
+        expect(result.verdict).toBe("inconclusive")
+        expect(result.summary).toContain("durable verification ledger")
+        expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
+
 test("uncertainty register is shown before the final verdict and explains missing evidence", () => {
   const checks = checklist({
     security_impact: {
