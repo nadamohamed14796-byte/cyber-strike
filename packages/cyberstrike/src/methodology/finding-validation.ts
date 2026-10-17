@@ -361,7 +361,7 @@ export namespace FindingValidation {
           .replace("Final verdict: confirmed", "Final verdict: inconclusive")
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
-          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary + String.fromCharCode(10) + "Durable ledger progress:  + distinctValidLedgerAttempts.length + " valid attempts; a separate evidence-backed CONFIRMED ledger outcome is required. " + (assessment.ledgerAttemptsRemaining ?? 0) + " ledger attempts remain for false-positive evaluation.
+          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary + String.fromCharCode(10) + "Durable ledger progress: " + distinctValidLedgerAttempts.length + " valid attempts; a separate evidence-backed CONFIRMED ledger outcome is required. " + (assessment.ledgerAttemptsRemaining ?? 0) + " ledger attempts remain for false-positive evaluation."
       }
     }
 
