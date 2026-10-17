@@ -49,7 +49,8 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
         source: "agent:" + (ctx.agent || "cyberstrike").replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 100),
         sourceURL: params.source_url,
         status: params.status as TargetNoteStatus,
-        tags: params.tags?.map((tag) => tag.replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 48)),
+        tags: [...(params.tags ?? []), ...(journalEntry ? ["journal"] : [])]
+          .map((tag) => tag.replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 48)),
         upsertByIdentity: journalEntry ? false : params.upsert_by_identity,
         identityKey: journalEntry ? undefined : params.identity_key,
       })
