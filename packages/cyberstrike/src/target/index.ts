@@ -1630,9 +1630,10 @@ export namespace TargetMemory {
     )
   }
 
-  export function notes(targetID: string, limit = 100): TargetNote[] {
+  export function notes(targetID: string, limit?: number): TargetNote[] {
     if (!targetIsInCurrentProject(targetID)) return []
-    const boundedLimit = Math.max(1, Math.min(Number.isFinite(limit) ? Math.floor(limit) : 100, 500))
+    if (limit === undefined || !Number.isFinite(limit)) return allNotes(targetID)
+    const boundedLimit = Math.max(0, Math.floor(limit))
     return Database.use((db) =>
       db
         .select()
@@ -1666,7 +1667,6 @@ export namespace TargetMemory {
       throw new Error("Confirmed/disproven target notes require concrete evidence. Use observed or unverified when evidence is incomplete.")
     }
     const combinedContent = rawContent + (rawEvidence ? "\n\nEvidence: " + rawEvidence : "")
-    if (combinedContent.length > 100_000) throw new Error("Note content and evidence are too large (maximum 100,000 characters).")
     const content = combinedContent
     // This is a private, target-local evidence store. Preserve exact observed values so the
     // operator can reproduce and validate the finding; never mirror raw evidence into global research.
@@ -1679,7 +1679,7 @@ export namespace TargetMemory {
     const source = redactTargetNoteLine((input.source?.trim() || "manual"), 120) || "manual"
     const sourceURL = normalizedSourceURL(input.sourceURL ? redactTargetNoteSecrets(input.sourceURL) : undefined)
     const statusForInsert = input.status ?? "observed"
-    const tags = [...new Set((input.tags ?? []).map((tag) => redactTargetNoteLine(tag, 48)).filter(Boolean))].slice(0, 30)
+    const tags = [...new Set((input.tags ?? []).map((tag) => redactTargetNoteLine(tag).trim()).filter(Boolean))]
     // Provenance is part of note identity, so identical lessons from distinct sources do not erase attribution.
     const contentHash = createHash("sha256")
       .update([kind, title ?? "", source, sourceURL ?? "", content].join("\0"))
@@ -2066,7 +2066,7 @@ export namespace TargetMemory {
     }
     const programRoot = lineage[0] ?? selected
 
-    const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.min(Math.floor(maxNotes), 20)) : 8
+    const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.floor(maxNotes)) : 8
     // Fetch the full small target-local note set before ranking; applying LIMIT in SQL
     // first would discard older but still critical confirmed/disproven conclusions.
     const selectedAssetNotes = Database.use((db) =>
@@ -2082,7 +2082,7 @@ export namespace TargetMemory {
     const journalNotes = selectedAssetNotes
       .filter((note) => note.tags.includes("journal"))
       .sort((a, b) => b.timeCreated - a.timeCreated || b.id.localeCompare(a.id))
-      .slice(0, 4)
+      .slice(0, noteLimit)
     const journalIDs = new Set(journalNotes.map((note) => note.id))
     const primaryNotes = rankNotesForContext(
       selectedAssetNotes.filter((note) => !journalIDs.has(note.id)),
@@ -2099,7 +2099,7 @@ export namespace TargetMemory {
               .all()
               .map(mapNote),
           ),
-          Math.min(4, noteLimit),
+          noteLimit,
         )
     // Include useful memory from intermediate ancestors too. Without this, a nested
     // API asset could inherit only root notes and its own notes while missing the
@@ -2126,9 +2126,8 @@ export namespace TargetMemory {
     const hierarchyLines: string[] = []
     const treeVisited = new Set<string>()
     let listedAssets = 0
-    const maxListedAssets = 100
     const appendChildren = (parent: Workspace, depth: number) => {
-      if (depth >= 12 || listedAssets >= maxListedAssets || treeVisited.has(parent.id)) return
+      if (treeVisited.has(parent.id)) return
       treeVisited.add(parent.id)
       let items: Workspace[] = []
       try {
@@ -2138,7 +2137,6 @@ export namespace TargetMemory {
         return
       }
       for (const child of items) {
-        if (listedAssets >= maxListedAssets) break
         listedAssets++
         hierarchyLines.push(
           "  ".repeat(depth + 1) + "- [" + child.assetType + "] " + child.targetURL +
@@ -2148,7 +2146,6 @@ export namespace TargetMemory {
       }
     }
     appendChildren(programRoot, 0)
-    if (listedAssets >= maxListedAssets) hierarchyLines.push("- Asset inventory truncated at " + maxListedAssets + " entries.")
 
     // Bound the selected-note portion independently of maxNotes. Callers may request
     // up to 20 notes, so a fixed per-note excerpt could consume the whole context budget
@@ -2176,21 +2173,21 @@ export namespace TargetMemory {
       // the final context-size guard must never spend the entire budget on an asset tree
       // and silently discard the observations needed to resume the current investigation.
       ...(primaryNotes.length ? ["## Selected asset memory (current investigation notes)", "", ...primaryNotes.flatMap((note) => [
-        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)") + " — note_id: " + note.id,
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, primaryNoteContentLimit),
+        note.content.slice(0, primaryNoteContentLimit) + (note.content.length > primaryNoteContentLimit ? "\n[Note excerpt only; read the full note by note_id with target_notes_read.]" : ""),
         "",
       ])] : []),
       ...(journalNotes.length ? ["## Recent investigation journal (append-only history; newest first)", "", ...journalNotes.flatMap((note) => [
         "### " + (note.title ?? "(untitled)") + " [" + new Date(note.timeCreated).toISOString().replace("T", " ").slice(0, 19) + " UTC]",
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 700),
+        note.content.slice(0, 700) + (note.content.length > 700 ? "\n[Journal excerpt only; retrieve remaining content with target_notes_read.]" : ""),
         "",
       ])] : []),
       ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 550),
+        note.content.slice(0, 550) + (note.content.length > 550 ? "\n[Note excerpt only; read the full note by note_id with target_notes_read.]" : ""),
         "",
       ])] : []),
       ...(ancestorNotes.length ? ["## Intermediate ancestor memory", "", ...ancestorNotes.flatMap((note) => [
@@ -2205,6 +2202,9 @@ export namespace TargetMemory {
       "",
       "Expected artifact areas per workspace: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
     ]
-    return sections.join("\n").slice(0, 18_000)
+    const context = sections.join("\n")
+    const contextLimit = 18_000
+    if (context.length <= contextLimit) return context
+    return context.slice(0, contextLimit - 500) + "\n\n[PARTIAL TARGET CONTEXT: this is a preview, not the complete note or asset inventory. Do not infer that omitted notes/assets do not exist. Use target_notes_read to search and page through saved notes, open the selected workspace notes.md/artifacts for full details, and continue asset inventory from the workspace database.]
   }
 }
