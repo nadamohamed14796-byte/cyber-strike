@@ -253,6 +253,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       // Companion-file discovery is best-effort: filesystem/ripgrep failures must
       // not turn a successfully loaded SKILL.md into a failed skill invocation.
       // Cancellation remains fatal so aborted tool calls never report success.
+      let companionFileListComplete = true
       const files = await iife(async () => {
         const arr: string[] = []
         for await (const file of Ripgrep.files({
@@ -261,7 +262,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           hidden: true,
           signal: ctx.abort,
         })) {
-          if (file.includes("SKILL.md")) continue
+          if (path.basename(file) === "SKILL.md") continue
           arr.push(path.resolve(dir, file))
         }
         return arr
@@ -269,6 +270,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         .then((f) => f.map((file) => `<file>${file}</file>`).join("\n"))
         .catch((error) => {
           if (ctx.abort.aborted) throw error
+          companionFileListComplete = false
           return "<file-list-unavailable>Skill content loaded; companion-file listing failed.</file-list-unavailable>"
         })
 
@@ -310,7 +312,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           `Base directory for this skill: ${base}`,
           "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
-          "Companion-file listing is complete; use the paths above to read the references or scripts needed by this skill.",
+          companionFileListComplete
+            ? "Companion-file listing is complete; use the paths above to read the references or scripts needed by this skill."
+            : "Companion-file listing failed; only the SKILL.md content was loaded. Do not assume missing companion paths are absent.",
           "",
           "<skill_files>",
           files,
