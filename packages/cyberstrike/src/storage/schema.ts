@@ -23,6 +23,7 @@ export { ReportKnowledgeTable, ReportKnowledgeEventTable } from "../learning/rep
 export { ResearchQueueTable } from "../research/queue.sql"
 export { ResearchCycleDuplicateTable, ResearchCycleTable } from "../research/cycle.sql"
 export { FindingValidationTable } from "../methodology/finding-validation.sql"
+export { FalsePositiveKnowledgeTable } from "../methodology/false-positive-knowledge.sql"
 export {
   IntelEntryTable,
   VrtCheckTable,
