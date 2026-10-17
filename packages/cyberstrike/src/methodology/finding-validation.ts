@@ -234,11 +234,10 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     "Verification attempts: " + validAttempts.length + "/" + FINDING_VALIDATION_MIN_ATTEMPTS + " distinct valid evidence-backed attempts; " + Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " remaining before false-positive eligibility.",
     "",
     "Check results: " + passed.length + " passed, " + failed.length + " failed, " + unknown.length + " unknown, " + notApplicable.length + " not applicable (10 total).",
-    summary,
-    "",
     "Next step: " + nextStep,
     "",
     "Final verdict: " + verdict + " (rubric confidence label: " + confidence + "/100; not a statistical probability)",
+    summary
   ].join("\n")
 
   return {
