@@ -137,6 +137,9 @@ Use this skill.
           expect(result.output).toContain(`<skill_content name="tool-skill" verified="unverified">`)
           expect(result.output).toContain(`Base directory for this skill: ${pathToFileURL(dir).href}`)
           expect(result.output).toContain(`<file>${file}</file>`)
+          expect(result.output).toContain(path.resolve(dir, "reference", "part-0.md"))
+          expect(result.output).toContain(path.resolve(dir, "reference", "part-14.md"))
+          expect(result.output).not.toContain("file list is sampled")
         },
       })
     } finally {
