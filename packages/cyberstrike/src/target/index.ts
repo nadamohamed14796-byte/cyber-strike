@@ -2118,7 +2118,7 @@ export namespace TargetMemory {
               .all()
               .map(mapNote),
           ),
-          Math.min(4, noteLimit),
+          noteLimit,
         )
 
     // Walk the entire registered asset tree iteratively: no arbitrary asset-count or
@@ -2171,6 +2171,7 @@ export namespace TargetMemory {
       "Selected authorization manifest: " + path.join(selected.relativePath, "scope", "scope.json"),
       "Before any active request, verify the selected asset's saved scope against the official program policy. Every ancestor scope and exclusion also applies. If any manifest is missing, unconfigured, invalid, ambiguous, or excludes the URL, stop; never infer authorization from a target URL or discovery alone.",
       "Use scope_check with target_url set to the selected asset URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must pass persisted scope checks for every outbound URL.",
+      "Memory completeness: this is a prioritized context preview, not proof that omitted notes or assets do not exist. Use target_notes_read to search and page through saved notes before concluding that a prior observation or experiment is absent.",
       "Keep endpoint/request/finding/evidence files inside the selected asset's workspace. Keep program summaries in the program/root workspace. Do not copy one asset's full notes or findings into a sibling's workspace.",
       "",
       // The active asset's ranked memory is deliberately emitted before inventories:
@@ -2195,9 +2196,9 @@ export namespace TargetMemory {
         "",
       ])] : []),
       ...(ancestorNotes.length ? ["## Intermediate ancestor memory", "", ...ancestorNotes.flatMap((note) => [
-        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)") + " — note_id: " + note.id,
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 550),
+        note.content.slice(0, 550) + (note.content.length > 550 ? "\n[Note excerpt only; read the full note by note_id with target_notes_read.]" : ""),
         "",
       ])] : []),
       "",
