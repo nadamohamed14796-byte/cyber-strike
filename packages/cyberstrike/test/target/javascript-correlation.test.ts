@@ -339,3 +339,29 @@ test("extracts endpoints from already-captured JavaScript responses without reta
   expect(sources[0]?.relativePath).toContain("captured/app.example.com")
   expect(sources[0]?.sourceRequestID).toBe("req-js")
 })
+
+
+test("extracts more than 200 distinct static endpoint literals", () => {
+  const source = Array.from({ length: 251 }, (_, index) =>
+    'fetch("/api/v1/resource-' + index + '")',
+  ).join("\\n")
+  const endpoints = extractStaticJavaScriptEndpoints(source)
+  expect(endpoints).toHaveLength(251)
+  expect(endpoints).toContain("/api/v1/resource-250")
+})
+
+test("marks captures explicitly truncated by the response processor as partial", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const sources = extractCapturedJavaScriptSources([{
+    id: "truncated-js",
+    url: "https://app.example.com/assets/truncated.js",
+    responseContentType: "application/javascript",
+    responseBody: [
+      "[Status: 200, Type: application/javascript, Size: 1.2 MB]",
+      'fetch("/api/visible-route")',
+      "[TRUNCATED - showing first 100KB of 1.2 MB]",
+    ].join("\\n"),
+  }])
+  expect(sources[0]?.captureTruncated).toBe(true)
+  expect(sources[0]?.analysis?.notes.some((note) => note.startsWith("PARTIAL SOURCE:"))).toBe(true)
+})
