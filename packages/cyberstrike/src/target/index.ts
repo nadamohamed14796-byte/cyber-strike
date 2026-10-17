@@ -2329,7 +2329,7 @@ export namespace TargetMemory {
         "",
       ])] : []),
       ...(journalNotes.length ? ["## Recent investigation journal (append-only history; newest first)", "", ...journalNotes.flatMap((note) => [
-        "### " + (note.title ?? "(untitled)") + " [" + new Date(note.timeCreated).toISOString().replace("T", " ").slice(0, 19) + " UTC]",
+        "### " + (note.title ?? "(untitled)") + " [" + new Date(note.timeCreated).toISOString().replace("T", " ").slice(0, 19) + " UTC] — note_id: " + note.id,
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
         note.content.slice(0, 700) + (note.content.length > 700 ? "\n[Journal excerpt only; retrieve remaining content with target_notes_read.]" : ""),
         "",
