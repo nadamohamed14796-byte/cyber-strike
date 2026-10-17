@@ -2142,6 +2142,13 @@ export namespace TargetMemory {
     appendChildren(programRoot, 0)
     if (listedAssets >= maxListedAssets) hierarchyLines.push("- Asset inventory truncated at " + maxListedAssets + " entries.")
 
+    // Bound the selected-note portion independently of maxNotes. Callers may request
+    // up to 20 notes, so a fixed per-note excerpt could consume the whole context budget
+    // before parent memory and the asset inventory are emitted.
+    const primaryNoteContentLimit = Math.min(
+      1100,
+      Math.max(250, Math.floor(8500 / Math.max(1, primaryNotes.length))),
+    )
     const sections = [
       "## Target Workspace Context (project-scoped)",
       "",
@@ -2163,7 +2170,7 @@ export namespace TargetMemory {
       ...(primaryNotes.length ? ["## Selected asset memory (persistent notes)", "", ...primaryNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
-        note.content.slice(0, 1100),
+        note.content.slice(0, primaryNoteContentLimit),
         "",
       ])] : []),
       ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
