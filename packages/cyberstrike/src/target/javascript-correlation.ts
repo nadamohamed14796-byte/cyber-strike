@@ -169,9 +169,7 @@ export function extractStaticJavaScriptEndpoints(content: string): string[] {
     for (const match of content.matchAll(pattern)) {
       const normalized = normalizeEndpointLiteral(match[1])
       if (normalized) found.add(normalized)
-      if (found.size >= 200) break
     }
-    if (found.size >= 200) break
   }
   return [...found]
 }
@@ -236,9 +234,7 @@ export function extractCapturedJavaScriptSources(
 ): JavaScriptSourceFile[] {
   const output: JavaScriptSourceFile[] = []
   const seen = new Set<string>()
-  let totalBytes = 0
   for (const request of requests) {
-    if (output.length >= 250 || totalBytes >= 5 * 1024 * 1024) break
     let url = safeURL(request.url)
     const base = safeURL(request.origin) ?? safeURL(request.pageURL) ?? safeURL(request.host)
     if (!url && base && request.normalizedPath) {
@@ -260,11 +256,10 @@ export function extractCapturedJavaScriptSources(
       /\.cjs$/i.test(url.pathname)
     if (!isJavaScript) continue
     const bytes = Buffer.byteLength(body, "utf-8")
-    if (bytes < 1 || bytes > 1024 * 1024 || totalBytes + bytes > 5 * 1024 * 1024) continue
+    if (bytes < 1) continue
     const digest = createHash("sha256").update(body).digest("hex")
     if (seen.has(digest)) continue
     seen.add(digest)
-    totalBytes += bytes
     const basename = (url.pathname.split("/").filter(Boolean).pop() || "captured.js").replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
     let analysis = analysisCache?.get(digest)
     if (!analysis) {
@@ -372,7 +367,7 @@ export function mergeStructuredJavaScriptEndpoints(
       endpoint.confidence = "observed"
     }
   }
-  return [...byKey.values()].slice(0, 1000)
+  return [...byKey.values()]
 }
 
 export function correlateStaticJavaScriptEndpoints(
@@ -428,13 +423,12 @@ export function correlateStaticJavaScriptEndpoints(
       }
     }
   }
-  return [...candidates.values()].slice(0, 1000)
+  return [...candidates.values()]
 }
 
 /** Inventory only local JS source files; never follow symlinks or execute their contents. */
 async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
-  let totalBytes = 0
   async function visit(directory: string, depth: number): Promise<void> {
     if (depth > 4 || output.length >= 250 || totalBytes >= 5 * 1024 * 1024) return
     let entries
@@ -445,15 +439,14 @@ async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string
       throw error
     }
     for (const entry of entries) {
-      if (output.length >= 250 || totalBytes >= 5 * 1024 * 1024) break
-      const fullPath = path.join(directory, entry.name)
+        const fullPath = path.join(directory, entry.name)
       if (entry.isDirectory()) {
         await visit(fullPath, depth + 1)
         continue
       }
       if (!entry.isFile() || !/\.(?:m?js|cjs)$/i.test(entry.name)) continue
       const stat = await fs.stat(fullPath)
-      if (stat.size < 0 || stat.size > 1024 * 1024 || totalBytes + stat.size > 5 * 1024 * 1024) continue
+      if (stat.size < 0) continue
       const content = await fs.readFile(fullPath, "utf-8")
       totalBytes += Buffer.byteLength(content, "utf-8")
       const digest = createHash("sha256").update(content).digest("hex")
@@ -632,7 +625,7 @@ export function createJavaScriptTesterCases(
         id: checkID, kind, title,
         status: oldCheck && SURVEY_CHECK_STATUSES.has(oldCheck.status) ? oldCheck.status : "planned",
         ...(oldCheck?.result ? { result: oldCheck.result } : {}),
-        evidenceRequestIDs: [...new Set([...(oldCheck?.evidenceRequestIDs ?? []), ...input.observedRequestIDs])].slice(0, 100),
+        evidenceRequestIDs: [...new Set([...(oldCheck?.evidenceRequestIDs ?? []), ...input.observedRequestIDs]) ],
       }
     })
     return {
@@ -641,7 +634,7 @@ export function createJavaScriptTesterCases(
       pathParameters: [...new Set(input.pathParameters)], queryParameters: [...new Set(input.queryParameters)],
       bodyParameters: [...new Set(input.bodyParameters)], headerNames: [...new Set(input.headerNames)],
       authSignals: [...new Set(input.authSignals)], cookieSignals: [...new Set(input.cookieSignals)],
-      observedRequestIDs: [...new Set([...(old?.observedRequestIDs ?? []), ...input.observedRequestIDs])].slice(0, 100),
+      observedRequestIDs: [...new Set([...(old?.observedRequestIDs ?? []), ...input.observedRequestIDs]) ],
       status: old && SURVEY_CASE_STATUSES.has(old.status) ? old.status : "planned", stale: false, checks,
     }
   }
@@ -662,7 +655,7 @@ export function createJavaScriptTesterCases(
       cases.push(buildCase({
         candidateID: endpoint.id + ":" + sourceFile, method: null, urlTemplate: endpoint.literal,
         host: endpoint.host, path: endpoint.path, sourceFile, sourceFunction: null, sourceLine: 0,
-        pathParameters: Array.from(endpoint.path.matchAll(/\{([^}]+)\}/g), (match) => match[1]!).slice(0, 80),
+        pathParameters: Array.from(endpoint.path.matchAll(/\{([^}]+)\}/g), (match) => match[1]!),
         queryParameters: [], bodyParameters: [], headerNames: [], authSignals: [], cookieSignals: [],
         observedRequestIDs: endpoint.observedRequestIDs,
         recommendedChecks: ["Determine HTTP method and request shape from an authorized captured request"],
@@ -813,7 +806,6 @@ export namespace JavaScriptCorrelation {
         .from(IntelEntryTable)
         .where(inArray(IntelEntryTable.session_id, sessionIDs))
         .orderBy(desc(IntelEntryTable.time_updated))
-        .limit(1000)
         .all(),
     )
     const jsCandidates = intel
@@ -883,7 +875,6 @@ export namespace JavaScriptCorrelation {
       const decision = await scopeDecisionFor(item.url.href)
       if (!decision.allowed || !decision.workspace || !relatedTargetIDs.has(decision.workspace.id)) continue
       assets.push(item)
-      if (assets.length >= 150) break
     }
 
     const requests = Database.use((db) =>
@@ -892,7 +883,6 @@ export namespace JavaScriptCorrelation {
         .from(RequestTable)
         .where(inArray(RequestTable.session_id, sessionIDs))
         .orderBy(desc(RequestTable.time_updated))
-        .limit(2000)
         .all(),
     )
     const candidateRequests = requests.filter((request) => {
@@ -952,7 +942,7 @@ export namespace JavaScriptCorrelation {
     const mergedSourceFiles = [
       ...sourceFiles,
       ...capturedSources.filter((file) => !localSourceKeys.has(file.sha256)),
-    ].slice(0, 250)
+    ]
     // Keep exact secret-like values transient in memory only. Every copy that may be
     // serialized to JSON or target notes goes through this redaction boundary.
     const persistedSourceFiles = mergedSourceFiles.map(sanitizeJavaScriptSourceFileForPersistence)
@@ -965,7 +955,6 @@ export namespace JavaScriptCorrelation {
             .from(WebFunctionTable)
             .where(inArray(WebFunctionTable.request_id, requestIDs))
             .orderBy(desc(WebFunctionTable.time_updated))
-            .limit(1000)
             .all(),
         )
       : []
@@ -976,8 +965,7 @@ export namespace JavaScriptCorrelation {
             .from(RequestObservationTable)
             .where(and(inArray(RequestObservationTable.session_id, sessionIDs), inArray(RequestObservationTable.request_id, requestIDs)))
             .orderBy(desc(RequestObservationTable.time_updated))
-            .limit(2000)
-            .all(),
+                .all(),
         )
       : []
     const findingRows = Database.use((db) =>
@@ -986,7 +974,6 @@ export namespace JavaScriptCorrelation {
         .from(VulnerabilityTable)
         .where(inArray(VulnerabilityTable.session_id, sessionIDs))
         .orderBy(desc(VulnerabilityTable.time_updated))
-        .limit(500)
         .all(),
     )
     const findings: typeof findingRows = []
@@ -1034,7 +1021,7 @@ export namespace JavaScriptCorrelation {
       })),
       sourceFiles: persistedSourceFiles,
       javascriptAnalysis: {
-        functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
+        functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).map((item) => {
           const observedRequestIDs = relevantRequests.filter((request) => {
             const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
@@ -1061,11 +1048,11 @@ export namespace JavaScriptCorrelation {
             "Check authorization with accounts that own only their own test data",
             "Manually confirm server-side validation; static JavaScript alone is not proof",
           ]
-          return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs)].slice(0, 100), recommendedChecks }
-        })).slice(0, 1500),
-        secretCandidates: persistedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
-        roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 500),
-        riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))).slice(0, 1000),
+          return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs) ], recommendedChecks }
+        })),
+        secretCandidates: persistedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
+        roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
+        riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
       },
       endpointCandidates: [],
       evidence: relevantRequests
