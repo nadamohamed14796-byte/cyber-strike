@@ -552,3 +552,9 @@ The branch list returned by GitHub contained `main`, `dev`, `feat/proxy-config`,
 - Replaced broad web-application prompt recipes with evidence-based class selection and safe fixture requirements. Added regression assertions for orchestrator, injection, web-app, and specialist prompts.
 - Commits: IDOR `1a56855f4f1a0e4ca623fa40fbf0a1a96c02017f`; SSRF `f023218ec2e2052ffd86a840c9ef25b63bf7f938`; mass assignment `5d85e3cae5c5e78c0ddc52a944cc17b3eab5c53e`; file attacks `248fc7ddb4a3dcc3d39a59156911fe312799bbd2`; authn `d6f9976c334a69cb32c64d80b7d6bf663fe65ee0`; authz `2fda11b7985f2f2234df292ea1999a3661cec1bd`; business logic `d6a3513d044ac0bfdd199452c63408f109082e10`; regression test `852eb5aacd6b1bb368e1a5f13b795baf8c64ad2d`.
 - Verification remains source-level only. The commit-status API returned no status records; tests/typecheck/build have not been executed in this environment. Do not mark this checkpoint CI-green until exact-main workflows complete.
+
+
+### Skill-loading follow-up
+
+- Current `SkillIndex.ensureBuilt()` on main retries catalog rebuild up to five times when the skill catalog changes during indexing, then throws an explicit error if it cannot stabilize. The skill tool also throws if `SkillContext.load()` returns no content; it does not silently report a successful load. A regression test covers a missing/ambiguous skill load.
+- Source was inspected on the latest main tree. The race path still needs a dedicated deterministic concurrency test and the complete skill/agent tests must run in CI; no runtime pass is claimed.
