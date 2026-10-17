@@ -429,15 +429,15 @@ export namespace FindingValidation {
       ...assessment,
       output: assessment.output + strategyGuidance + (
         priorFalsePositiveLessons.length
-          ? "\\n\\n## Similar historical false-positive cases (advisory only)\\n" +
+          ? "\n\n## Similar historical false-positive cases (advisory only)\n" +
             priorFalsePositiveLessons.map((lesson, index) =>
               (index + 1) + ". " + lesson.titlePattern +
               " — similarity " + lesson.similarity + "%; seen " + lesson.occurrences + " time(s); " +
               "prior contradictory checks: " + lesson.failedCheckIDs.join(", ") + ". " +
               "Benign explanation: " + lesson.benignExplanation +
               " This is a comparison clue, NOT proof that the current finding is false positive."
-            ).join("\\n")
-          : "\\n\\nNo matching historical false-positive lesson was found in the shared database."
+            ).join("\n")
+          : "\n\nNo matching historical false-positive lesson was found in the shared database."
       ),
       strategyPlan,
       id: validationID,
