@@ -145,6 +145,14 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
         rawContent = bytes.toString("utf-8")
         sourceHash = createHash("sha256").update(bytes).digest("hex")
       } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code === "ELOOP" || code === "EISDIR") {
+          return {
+            title: "Target artifact not saved",
+            output: "Source input must be a regular file; symbolic links and non-file inputs are refused.",
+            metadata: { saved: false, reason: "unsafe_source_file", target_url: params.target_url, source_path: params.source_path } as TargetArtifactMetadata,
+          }
+        }
         return {
           title: "Target artifact not saved",
           output: "Could not read source file: " + (error instanceof Error ? error.message : String(error)),
