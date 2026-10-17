@@ -339,9 +339,16 @@ test("does not attribute top-level risk sinks to the previously closed function"
 
 test("extracts more than 300 JavaScript request candidates", () => {
   const source = Array.from({ length: 350 }, (_, index) =>
-    'fetch("/api/v1/resources/' + index + '")',
+    'fetch("/api/v1/resources/item-' + index + '")',
   ).join("\n")
   const result = analyzeJavaScriptSource(source)
   expect(result.requests).toHaveLength(350)
-  expect(result.requests.some((request) => request.path === "/api/v1/resources/349")).toBe(true)
+  expect(result.requests.some((request) => request.path === "/api/v1/resources/item-349")).toBe(true)
+})
+
+
+test("analyzes a route found after the former 1 MB source boundary", () => {
+  const source = " ".repeat(1_000_050) + 'fetch("/api/v1/after-size-cap")'
+  const result = analyzeJavaScriptSource(source)
+  expect(result.requests.some((request) => request.path === "/api/v1/after-size-cap")).toBe(true)
 })
