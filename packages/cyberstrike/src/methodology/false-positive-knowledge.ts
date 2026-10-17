@@ -62,6 +62,9 @@ function normalizeEndpoint(value?: string | null) {
 /** Store concise sanitized patterns, never raw HTTP requests, cookies, tokens, or PoCs. */
 function safeText(value: string, max = 1200) {
   return value
+    // Cookie headers contain multiple semicolon-delimited credentials; redact the whole
+    // header line instead of only its first value.
+    .replace(/\b(cookie|set-cookie)\s*[:=]\s*[^\r\n]*/gi, "$1=[REDACTED]")
     .replace(/\b(authorization|cookie|set-cookie|x-api-key|access_token|refresh_token|password|secret)\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi, "$1=[REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\b/g, "[JWT REDACTED]")
