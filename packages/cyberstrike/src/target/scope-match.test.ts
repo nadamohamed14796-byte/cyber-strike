@@ -11,7 +11,6 @@ describe("HackerOne typed scope assets", () => {
 
   test("supports HackerOne wildcard labels in any position", () => {
     expect(checkMatch("https://www.amazon.com/", "Wildcard: www.amazon.*").matches).toBe(true)
-    expect(checkMatch("https://www.amazon.com/", "Wildcard: www.amazon.*").matches).toBe(true)
     expect(checkMatch("https://tenant.example.com/", "Wildcard: {tenant}.example.com").matches).toBe(true)
     expect(checkMatch("https://a.b.example.com/", "Wildcard: {tenant}.example.com").matches).toBe(false)
     expect(checkMatch("https://notamazon.com/", "Wildcard: www.amazon.*").matches).toBe(false)
