@@ -102,7 +102,13 @@ async function loadVulnAgent(
   const skillBlocks: string[] = []
   for (let i = 0; i < skillNames.length; i++) {
     const skill = skills[i]
-    if (!skill) continue
+    // Never silently initialize a specialist without a skill explicitly declared
+    // as part of its methodology. A missing reference must be visible at startup.
+    if (!skill) {
+      throw new Error(
+        `Agent "${description.split("\n")[0].trim()}" references unavailable skill "${skillNames[i]}". Check the skill catalog and metadata aliases.`,
+      )
+    }
     const content = stripDefensiveSections(skill.content)
     if (content) skillBlocks.push(`<skill name="${skillNames[i]}">\n${content}\n</skill>`)
   }
