@@ -514,3 +514,29 @@ The branch list returned by GitHub contained `main`, `dev`, `feat/proxy-config`,
 - **GitHub Actions on that exact SHA:** [tests](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902765), [typecheck](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902735), [build](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902785), and [CodeQL](https://github.com/nadamohamed14796-byte/cyber-strike/actions/runs/38562902816) all completed with `success`. The separate issue-comment-triggered `review` and `cyberstrike` runs were `skipped`; they are not part of the four successful push workflows.
 - **PR #83 isolation finding:** inspection of its changed-file list confirms it modifies only `packages/cyberstrike/test/research/ingest.test.ts` and `packages/cyberstrike/test/research/research-study.test.ts`. It does not change `packages/cyberstrike/package.json` or `.github/workflows/test.yml`, so the PR description's claim that it serializes package tests is not implemented by the current diff. The `beforeEach` table cleanup is present on main but does not prove cross-file isolation. This was documented in [PR #83 discussion](https://github.com/nadamohamed14796-byte/cyber-strike/pull/83).
 - **Status boundary:** CI-green does not prove cross-file database isolation or a live `/update` run. Keep issue #39 open until the live research cycle and isolation strategy are demonstrated, and do not claim local test execution.
+
+
+## Current checkpoint — 2026-10-17: proxy dispatch, injection discipline, and redirect scope
+
+### Changes committed on main
+
+- **Proxy orchestrator prompt:** replaced endpoint-by-endpoint attack recipes that instructed blanket SQLi/XSS/SSTI, mass-assignment, arbitrary ID guessing, internal/metadata SSRF probes, and potentially destructive transaction testing with evidence-grounded dispatch rules. JWT/path-normalization routing cues now distinguish token analysis from automatic tampering and path confusion from SSRF. Regression assertions guard against reintroducing these old instructions.
+- **Injection specialist prompt:** removed the “probe every parameter” mandate, blanket payload sweep, WAF-evasion escalation, arbitrary exploit/extraction language, and the four-to-five-variation stop rule. The specialist now requires scope validation, a specific evidence-backed sink hypothesis, controlled replay and negative controls, actual attempt logging, the ten-check `validate_finding` rubric, and 20 distinct valid attempts plus contradictory evidence for a false-positive verdict.
+- **Injection methodology skill:** replaced the unsafe “test in every input” payload catalog and data-extraction/RCE recipes with a scoped, class-specific workflow and harmless proof principles. A regression test checks that blanket and destructive examples do not return.
+- **Replay redirect scope:** found that `BackendFetch` blocked cross-origin redirects but could still follow a same-origin redirect to a path excluded by a path-scoped target workspace. It now follows a redirect only when the caller provides a scope callback and that callback approves the exact destination. `http_replay` and `csrf_extract` check every followed redirect against the persisted scope and require it to resolve to the same workspace as the original URL. `csrf_extract` also checks the initial URL before sending any request.
+- **Regression coverage:** added tests for scope-rejected same-origin redirects, redirect refusal when no scope callback exists, proxy prompt dispatch constraints, injection specialist constraints, and the safer methodology skill.
+
+### Key commits
+
+- Proxy decision examples: `e6a8ae4bc5b9d08dcf4c6397dd1f42497ea379b1`
+- Specialist dispatch rules: `27a915c5ce15b347f84553fb9f2bdb5583a4b145`
+- Injection specialist workflow: `d63e234c6ee32e7ef84a280c357a1aefdcca8bde`
+- Safer injection skill: `ba459b2538fde25f6b80d6bc6623cb3d35daf65e`
+- Redirect scope callback and caller wiring: `9d6a8c5bc85f8e3efbc71c6fba2ec001f2d57aef`, `fbf5c69488fb1f77e28df69f7ee806a51484f1e6`, `836b83c3c0bf745d1aea86348b8e6e37c00897aa`
+- Redirect regression tests: `fb5c062069c096b3b0b5846fa05d758d66c3ab09`
+
+### Verification boundary
+
+- Source-level inspection confirms the current prompt assertions match the orchestrator and injection prompts, and confirms `http_replay` and `csrf_extract` pass persisted-scope checks for redirect destinations.
+- The latest inspected commit status API returned no status records. The GitHub workflow-run wrapper available here filters to pull-request-triggered runs and returned no runs for the main commit. Therefore no CI success or test execution is claimed.
+- Still required: run `bun turbo test`, `bun turbo typecheck`, and `bun turbo build` on the exact latest main SHA; then inspect the actual workflow results. These prompt-level safeguards do not replace the existing execution-boundary scope enforcement, and they do not prove model behavior end-to-end.
