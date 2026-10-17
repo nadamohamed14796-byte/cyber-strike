@@ -61,6 +61,34 @@ test("never persists JavaScript source in correlation response previews", () => 
   expect(jsonPreview).not.toContain("this-is-a-secret-value")
 })
 
+test("redacts sensitive JSON response preview values across key families and quoted whitespace", () => {
+  const secretValues = [
+    "two word password must be hidden",
+    "client secret must be hidden",
+    "private key must be hidden",
+    "csrf token must be hidden",
+    "generic secret must be hidden",
+    "refresh token must be hidden",
+    "cookie value must be hidden",
+  ]
+  const preview = safeCorrelationResponsePreview({
+    id: "request-sensitive-json",
+    normalizedPath: "/api/config",
+    responseContentType: "application/json",
+    processedResponse: JSON.stringify({
+      password: secretValues[0],
+      client_secret: secretValues[1],
+      private_key: secretValues[2],
+      csrf_token: secretValues[3],
+      secret: secretValues[4],
+      refresh_token: secretValues[5],
+      cookie: secretValues[6],
+    }),
+  })
+  expect(preview).toContain("[REDACTED]")
+  for (const secret of secretValues) expect(preview).not.toContain(secret)
+})
+
 test("redacts detected literal secrets from source-analysis metadata before persistence", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const secret = "private-api-key-value-must-not-be-persisted"
