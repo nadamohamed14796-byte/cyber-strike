@@ -2093,6 +2093,25 @@ export namespace TargetMemory {
           ),
           Math.min(4, noteLimit),
         )
+    // Include useful memory from intermediate ancestors too. Without this, a nested
+    // API asset could inherit only root notes and its own notes while missing the
+    // immediate service/application context that explains its trust boundary.
+    const intermediateIDs = lineage
+      .filter((item) => item.id !== programRoot.id && item.id !== selected.id)
+      .map((item) => item.id)
+    const ancestorNotes = intermediateIDs.length === 0
+      ? []
+      : rankNotesForContext(
+          Database.use((db) =>
+            db
+              .select()
+              .from(TargetNoteTable)
+              .where(inArray(TargetNoteTable.target_id, intermediateIDs))
+              .all()
+              .map(mapNote),
+          ),
+          Math.min(4, noteLimit),
+        )
 
     // Create a compact, cycle-safe inventory of the program's already-registered assets.
     // Listing an asset is not authorization; each request still goes through checkURLScope.
@@ -2144,6 +2163,12 @@ export namespace TargetMemory {
       "Expected artifact areas per workspace: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research.",
       "",
       ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
+        note.content.slice(0, 900),
+        "",
+      ])] : []),
+      ...(ancestorNotes.length ? ["## Intermediate ancestor memory", "", ...ancestorNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
         note.content.slice(0, 900),
