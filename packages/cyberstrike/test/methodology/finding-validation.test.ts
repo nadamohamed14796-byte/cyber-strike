@@ -73,7 +73,8 @@ test("confirmed validation keeps a finding pending explicit triage", async () =>
           vulnerabilityID: finding.id,
           checks: checklist({ identity_context: { status: "not_applicable", reason: "No identity boundary is claimed" } }),
         })
-        expect(result.verdict).toBe("confirmed")
+        expect(result.verdict).toBe("inconclusive")
+        expect(result.summary).toContain("durable verification ledger")
         expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
       } finally {
         await Session.remove(session.id)
