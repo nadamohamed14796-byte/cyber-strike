@@ -22,7 +22,7 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
   const hostPorts: string[] = []
   const typedEntries: string[] = []
   for (const item of items) {
-    if (/^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contract|source code|executable|hardware|ios|android|windows|aws account|azure account|other)[ \t]*:/i.test(item)) typedEntries.push(item)
+    if (/^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contract|source code|executable|hardware|ios|android|windows|aws account|azure account|aws cloud config|azure cloud config|other)[ \t]*:/i.test(item)) typedEntries.push(item)
     else if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
     else if (/^\d+(?:\.\d+){3}\/.+$/.test(item) || (item.includes("/") && item.includes(":"))) cidrs.push(item)
     else if (/^[^:/]+:\d{1,5}$/.test(item)) hostPorts.push(item)
