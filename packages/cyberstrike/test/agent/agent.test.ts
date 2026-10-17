@@ -273,6 +273,23 @@ test("specialized proxy tools stay limited to their intended tester agents", asy
   })
 })
 
+test("web application prompt requires evidence-led, non-destructive testing", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const webApp = await Agent.get("web-application")
+      expect(webApp).toBeDefined()
+      expect(webApp?.prompt).toContain("A parameter or free-text field alone is not sufficient")
+      expect(webApp?.prompt).toContain("Use tester-owned, reversible fixtures")
+      expect(webApp?.prompt).not.toContain("SQLi: all input vectors")
+      expect(webApp?.prompt).not.toContain("SSRF: internal URLs, cloud metadata")
+      expect(webApp?.prompt).not.toContain("Test login bypass, default creds, brute force lockout")
+      expect(webApp?.prompt).not.toContain("web shells, polyglot files")
+    },
+  })
+})
+
 test("explore agent denies edits", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
