@@ -1192,19 +1192,6 @@ export const SessionRoutes = lazy(() =>
           sessionID = session.id
         }
 
-        // Handle credential registration
-        let credentialID = body.credential_id
-        if (body.credential && !credentialID) {
-          const cred = WebCredential.add({
-            sessionID,
-            label: body.credential.label,
-            headers: body.credential.headers,
-            containerID: body.credential.container_id,
-          })
-          credentialID = cred.id
-          log.info("credential registered", { sessionID, credentialID, label: body.credential.label })
-        }
-
         const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
         const normalized = await runNormalize(body, sessionID, ingestDryRun)
 
@@ -1216,6 +1203,19 @@ export const SessionRoutes = lazy(() =>
           return c.json({
             error: "Captured HTTP request could not be normalized; it was not sent to the parent chat session.",
           })
+        }
+
+        // Handle credential registration
+        let credentialID = body.credential_id
+        if (body.credential && !credentialID) {
+          const cred = WebCredential.add({
+            sessionID,
+            label: body.credential.label,
+            headers: body.credential.headers,
+            containerID: body.credential.container_id,
+          })
+          credentialID = cred.id
+          log.info("credential registered", { sessionID, credentialID, label: body.credential.label })
         }
 
         // Passive discovery only: attach observed origins when a persisted scope authorizes them.
