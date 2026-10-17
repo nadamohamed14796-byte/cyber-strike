@@ -58,11 +58,25 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     description,
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
-      await SkillIndex.ensureBuilt()
+      // Keep the searchable index and accessible skill list on the same catalog snapshot.
+      // A refresh between awaits can otherwise resolve aliases against stale entries.
+      let catalog = Skill.state()
+      let skills = await Skill.all()
+      let stableCatalog = false
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await SkillIndex.ensureBuilt()
+        catalog = Skill.state()
+        skills = await Skill.all()
+        if (Skill.state() === catalog) {
+          stableCatalog = true
+          break
+        }
+      }
+      if (!stableCatalog) {
+        throw new Error("Skill catalog changed repeatedly while preparing the skill tool; retry the skill operation.")
+      }
 
       const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
-      const catalog = Skill.state()
-      const skills = await Skill.all()
       const agentInfo = await Agent.get(ctx.agent)
       const permissionFingerprint = JSON.stringify(agentInfo?.permission ?? null)
       const cached = accessibleCache.get(agentKey)
