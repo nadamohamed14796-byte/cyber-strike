@@ -56,15 +56,15 @@ function observedRequestBaseURL(input: {
   const pageURL = safeURL(input.pageURL)
   const host = input.host?.trim()
   if (host) {
-    if (/^https?:\\/\\//i.test(host)) return safeURL(host)
-    const hostAlreadyHasPort = /(?:\\]:\\d+|:\\d+)$/.test(host)
+    if (/^https?:\/\//i.test(host)) return safeURL(host)
+    const hostAlreadyHasPort = /(?:\]:\d+|:\d+)$/.test(host)
     const portPart = input.port && !hostAlreadyHasPort ? ":" + input.port : ""
     const scheme = input.scheme || pageURL?.protocol.replace(/:$/, "") || "https"
     const fromHost = safeURL(scheme + "://" + host + portPart)
     if (fromHost) return fromHost
   }
   return pageURL
-
+}
 
 /** Match a captured request to one explicit JavaScript asset by exact origin and path. */
 export function matchesCapturedJavaScriptAsset(input: {
