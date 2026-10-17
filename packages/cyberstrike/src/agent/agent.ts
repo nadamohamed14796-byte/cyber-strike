@@ -517,18 +517,19 @@ export namespace Agent {
         permission: PermissionNext.merge(
           defaults,
           PermissionNext.fromConfig({
-            // Pure orchestrator (Phase 1b, docs/proxy-pipeline-redesign): deny
-            // everything, then allow ONLY delegation + read. Findings, intel and
-            // architecture writes are the testers'/analyzer's job. This structurally
-            // removes the orchestrator overreach measured on opus (self add_intel /
-            // update_vrt_check / web_write) — the tools aren't even offered to the
-            // model. `task` MUST be allowed explicitly or delegation breaks.
+            // Pure orchestrator: deny active testing and finding/architecture writes,
+            // while allowing delegation, read-only context, and safe JavaScript correlation.
+            // These are the exact tools named by the orchestrator prompt; if omitted here,
+            // the model attempts calls that permission enforcement rejects.
+            // `task` MUST be allowed explicitly or delegation breaks.
             "*": "deny",
             task: "allow",
             question: "allow",
             skill: "allow",
             web_get_session_context: "allow",
             web_get_detail: "allow",
+            web_get_request_detail: "allow",
+            correlate_javascript: "allow",
             web_get_vulnerabilities: "allow",
             web_get_vuln_detail: "allow",
             triage_vulnerability: "allow",
