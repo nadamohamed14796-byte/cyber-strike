@@ -45,6 +45,49 @@ describe("tool.skill", () => {
     }
   })
 
+  test("list and search paginate large skill catalogs", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        for (const name of ["tool-skill-a", "tool-skill-b", "tool-skill-c"]) {
+          const skillDir = path.join(dir, ".cyberstrike", "skill", name)
+          await Bun.write(
+            path.join(skillDir, "SKILL.md"),
+            ["---", "name: " + name, "description: Pagination fixture skill.", "---", "", "# " + name, ""].join("\n"),
+          )
+        }
+      },
+    })
+
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
+
+          const firstListPage = await tool.execute({ action: "list", limit: 2, offset: 0 }, ctx)
+          expect(firstListPage.output).toContain("showing 1-2 of 3")
+          expect(firstListPage.output).toContain("More skills remain")
+          expect(firstListPage.output).not.toContain("tool-skill-c")
+
+          const secondListPage = await tool.execute({ action: "list", limit: 2, offset: 2 }, ctx)
+          expect(secondListPage.output).toContain("tool-skill-c")
+          expect(secondListPage.output).not.toContain("tool-skill-a")
+
+          const secondSearchPage = await tool.execute({ action: "search", query: "tool-skill", limit: 2, offset: 2 }, ctx)
+          expect(secondSearchPage.output).toContain("tool-skill-c")
+          expect(secondSearchPage.output).toContain("showing 3-3 of 3")
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("description shows skill count", async () => {
     await using tmp = await tmpdir({
       git: true,
