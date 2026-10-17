@@ -112,6 +112,8 @@ export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters,
           failed_checks: result.failedCheckIDs,
           unknown_checks: result.unknownCheckIDs,
           research_reference_feedback_recorded: researchFeedbackRecorded,
+          false_positive_memory_saved: result.falsePositiveMemorySaved,
+          false_positive_memory_retracted: result.falsePositiveMemoryRetracted,
         },
       }
     } catch (error) {
