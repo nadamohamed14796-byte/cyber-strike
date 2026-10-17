@@ -25,6 +25,8 @@ export namespace BackendFetch {
     rejectUnauthorized?: boolean
     /** Follow 3xx redirects instead of returning the redirect response. */
     followRedirects?: boolean
+    /** Authorize each exact redirect destination against the caller's persisted scope. */
+    redirectScopeCheck?: (url: string) => Promise<boolean>
     /** External cancellation (e.g. the chat turn's abort). */
     signal?: AbortSignal
     /** Target outbound proxy and TLS material resolved by Network.forUrl. */
@@ -158,12 +160,16 @@ export namespace BackendFetch {
         } catch {
           break
         }
-        // A cross-origin (including cross-port) redirect is returned as 3xx.
+        // Never follow a cross-origin redirect, even when enabled. Same-origin
+        // is not enough: target workspaces may be path-scoped or explicitly exclude
+        // a route. Only callers that provide a persisted-scope callback may follow.
         if (
           nextURL.origin !== base.origin ||
           (nextURL.protocol !== "http:" && nextURL.protocol !== "https:") ||
           nextURL.username ||
-          nextURL.password
+          nextURL.password ||
+          !opts.redirectScopeCheck ||
+          !(await opts.redirectScopeCheck(nextURL.href))
         ) {
           break
         }
