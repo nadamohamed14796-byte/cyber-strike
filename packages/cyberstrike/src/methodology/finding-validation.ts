@@ -205,9 +205,11 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
       (failed.length ? failed.map((check) => "#" + check.number).join(", ") : "none") +
       "; unknown checks: " + (unknown.length ? unknown.map((check) => "#" + check.number).join(", ") : "none") + ". " +
       (enoughDistinctAttempts ? "The minimum of 20 distinct valid evidence-backed attempts has been reached." : "False-positive classification is blocked: " + validAttempts.length + "/20 distinct valid evidence-backed attempts are recorded.")
-    nextStep = enoughDistinctAttempts
-      ? "Twenty distinct valid attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching valid attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
-      : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " more distinct, case-specific tests under valid preconditions. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, invalid preconditions, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
+    nextStep = unknown.length > 0
+      ? "Resolve the unknown checks before making a final verdict: " + unknown.map((check) => "#" + check.number + " " + check.id).join(", ") + ". Gather the missing evidence or record a justified not_applicable status where appropriate; 20 attempts do not override unanswered checklist questions."
+      : enoughDistinctAttempts
+        ? "Twenty distinct valid attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching valid attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
+        : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " more distinct, case-specific tests under valid preconditions. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, invalid preconditions, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
   }
 
   const output = [
