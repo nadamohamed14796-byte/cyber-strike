@@ -278,12 +278,21 @@ export namespace Request {
         )).get()
         if (match) return match
       }
-      return db.select({ id: RequestTable.id }).from(RequestTable).where(and(
+      const conditions = [
         eq(RequestTable.session_id, input.sessionID),
         eq(RequestTable.method, input.method),
         eq(RequestTable.normalized_path, input.normalizedPath),
         input.origin ? eq(RequestTable.origin, input.origin) : isNull(RequestTable.origin),
-      )).orderBy(asc(RequestTable.id)).get()
+      ]
+      if (input.opKeyHash) {
+        conditions.push(eq(RequestTable.op_key_hash, input.opKeyHash))
+      } else {
+        conditions.push(
+          input.bodyHash ? eq(RequestTable.body_hash, input.bodyHash) : isNull(RequestTable.body_hash),
+          input.queryHash ? eq(RequestTable.query_hash, input.queryHash) : isNull(RequestTable.query_hash),
+        )
+      }
+      return db.select({ id: RequestTable.id }).from(RequestTable).where(and(...conditions)).orderBy(asc(RequestTable.id)).get()
     })
     if (!request) return undefined
 
