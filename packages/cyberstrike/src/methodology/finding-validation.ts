@@ -315,15 +315,16 @@ export namespace FindingValidation {
     const allAttempts = [...accumulated.values()]
     const assessment = assessFindingChecks(input.checks, allAttempts)
 
-    // Caller-authored attempt descriptions alone must not trigger a global false-positive verdict.
-    // Require the durable execution ledger for this exact finding to prove the 20-attempt gate.
+    // Validation checklists and caller-authored attempts are claims, not execution proof.
+    // Bind both terminal verdicts to the durable ledger for this exact finding.
+    const hypothesisKey = "finding:" + input.vulnerabilityID
+    const ledgerAttempts = VerificationLedger.list({ sessionID: rootSessionID, hypothesisKey })
+    const distinctValidLedgerAttempts = VerificationPolicy.uniqueAttempts(ledgerAttempts)
+      .filter((attempt) => attempt.validConditions)
+
     if (assessment.verdict === "false_positive") {
-      const hypothesisKey = "finding:" + input.vulnerabilityID
-      const ledgerAttempts = VerificationLedger.list({ sessionID: rootSessionID, hypothesisKey })
-      const distinctValidLedgerAttempts = VerificationPolicy.uniqueAttempts(ledgerAttempts)
-        .filter((attempt) => attempt.validConditions)
       const ledgerDisproved = distinctValidLedgerAttempts.length >= VerificationPolicy.MAX_ATTEMPTS &&
-        ledgerAttempts.some((attempt) => attempt.outcome === "disproven" && Boolean(attempt.evidenceRef?.trim()))
+        ledgerAttempts.some((attempt) => attempt.outcome === "disproven" && attempt.validConditions && Boolean(attempt.evidenceRef?.trim()))
 
       if (!ledgerDisproved) {
         const originalSummary = assessment.summary
@@ -339,6 +340,26 @@ export namespace FindingValidation {
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
           + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary
+      }
+    } else if (assessment.verdict === "confirmed") {
+      const ledgerConfirmed = distinctValidLedgerAttempts.some((attempt) =>
+        attempt.outcome === "confirmed" && Boolean(attempt.evidenceRef?.trim()),
+      )
+
+      if (!ledgerConfirmed) {
+        const originalSummary = assessment.summary
+        const originalNextStep = assessment.nextStep
+        assessment.verdict = "inconclusive"
+        assessment.confidence = 45
+        assessment.attemptCount = distinctValidLedgerAttempts.length
+        assessment.attemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
+        assessment.summary = "Inconclusive: the ten-check checklist passed, but the durable verification ledger has no valid, evidence-backed CONFIRMED attempt for " + hypothesisKey + ". Checklist text alone cannot confirm a finding."
+        assessment.nextStep = "Use verification_attempt with hypothesis_key=" + hypothesisKey + " to record an executed in-scope test and direct evidence. Keep the finding pending until the ledger contains a valid CONFIRMED outcome with an evidence reference. Previous checklist assessment: " + originalSummary + " " + originalNextStep
+        assessment.output = assessment.output
+          .replace("Final verdict: confirmed", "Final verdict: inconclusive")
+          .replace(originalSummary, assessment.summary)
+          .replace(originalNextStep, assessment.nextStep)
+          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary
       }
     }
 
