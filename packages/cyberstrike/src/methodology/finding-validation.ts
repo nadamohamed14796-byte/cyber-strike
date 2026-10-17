@@ -353,7 +353,6 @@ export namespace FindingValidation {
         const originalNextStep = assessment.nextStep
         assessment.verdict = "inconclusive"
         assessment.confidence = 45
-        assessment.attemptCount = distinctValidLedgerAttempts.length
         assessment.attemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
         assessment.summary = "Inconclusive: the ten-check checklist passed, but the durable verification ledger has no valid, evidence-backed CONFIRMED attempt for " + hypothesisKey + ". Checklist text alone cannot confirm a finding."
         assessment.nextStep = "Use verification_attempt with hypothesis_key=" + hypothesisKey + " to record an executed in-scope test and direct evidence. Keep the finding pending until the ledger contains a valid CONFIRMED outcome with an evidence reference. Previous checklist assessment: " + originalSummary + " " + originalNextStep
