@@ -2213,55 +2213,55 @@ export namespace TargetMemory {
     )
     // Keep the living investigation notes and the append-only experiment history distinct.
     // The ranked summary set must not crowd out the recent journal when a session resumes.
-    const journalNotes = selectedAssetNotes
+    const allJournalNotes = selectedAssetNotes
       .filter((note) => note.tags.includes("journal"))
       .sort((a, b) => b.timeCreated - a.timeCreated || b.id.localeCompare(a.id))
-      .slice(0, noteLimit)
-    const journalIDs = new Set(journalNotes.map((note) => note.id))
-    const primaryNotes = rankNotesForContext(
-      selectedAssetNotes.filter((note) => !journalIDs.has(note.id)),
-      noteLimit,
-    )
-    const parentNotes = programRoot.id === selected.id
+    const journalNotes = allJournalNotes.slice(0, noteLimit)
+    const omittedJournalNoteCount = Math.max(0, allJournalNotes.length - journalNotes.length)
+    // A journal entry is never reclassified as a living summary just because it is older
+    // than the current prompt budget. Omitted history remains available to target_notes_read.
+    const currentAssetNotes = selectedAssetNotes.filter((note) => !note.tags.includes("journal"))
+    const primaryNotes = rankNotesForContext(currentAssetNotes, noteLimit)
+    const omittedPrimaryNoteCount = Math.max(0, currentAssetNotes.length - primaryNotes.length)
+    const parentNoteInventory = programRoot.id === selected.id
       ? []
-      : rankNotesForContext(
-          Database.use((db) =>
-            db
-              .select()
-              .from(TargetNoteTable)
-              .where(eq(TargetNoteTable.target_id, programRoot.id))
-              .all()
-              .map(mapNote),
-          ),
-          noteLimit,
+      : Database.use((db) =>
+          db
+            .select()
+            .from(TargetNoteTable)
+            .where(eq(TargetNoteTable.target_id, programRoot.id))
+            .all()
+            .map(mapNote),
         )
+    const parentNotes = rankNotesForContext(parentNoteInventory, noteLimit)
+    const omittedParentNoteCount = Math.max(0, parentNoteInventory.length - parentNotes.length)
     // Include useful memory from intermediate ancestors too. Without this, a nested
     // API asset could inherit only root notes and its own notes while missing the
     // immediate service/application context that explains its trust boundary.
     const intermediateIDs = lineage
       .filter((item) => item.id !== programRoot.id && item.id !== selected.id)
       .map((item) => item.id)
-    const ancestorNotes = intermediateIDs.length === 0
+    const ancestorNoteInventory = intermediateIDs.length === 0
       ? []
-      : rankNotesForContext(
-          Database.use((db) => {
-            // Keep every ancestor note while staying under SQLite's bind-parameter budget.
-            const notes: TargetNote[] = []
-            for (let offset = 0; offset < intermediateIDs.length; offset += 500) {
-              const ids = intermediateIDs.slice(offset, offset + 500)
-              notes.push(
-                ...db
-                  .select()
-                  .from(TargetNoteTable)
-                  .where(inArray(TargetNoteTable.target_id, ids))
-                  .all()
-                  .map(mapNote),
-              )
-            }
-            return notes
-          }),
-          noteLimit,
-        )
+      : Database.use((db) => {
+          // Keep every ancestor note while staying under SQLite's bind-parameter budget.
+          const notes: TargetNote[] = []
+          for (let offset = 0; offset < intermediateIDs.length; offset += 500) {
+            const ids = intermediateIDs.slice(offset, offset + 500)
+            notes.push(
+              ...db
+                .select()
+                .from(TargetNoteTable)
+                .where(inArray(TargetNoteTable.target_id, ids))
+                .all()
+                .map(mapNote),
+            )
+          }
+          return notes
+        })
+    const ancestorNotes = rankNotesForContext(ancestorNoteInventory, noteLimit)
+    const omittedAncestorNoteCount = Math.max(0, ancestorNoteInventory.length - ancestorNotes.length)
+    const omittedNoteCount = omittedPrimaryNoteCount + omittedJournalNoteCount + omittedParentNoteCount + omittedAncestorNoteCount
 
     // Walk the entire registered asset tree iteratively: no arbitrary asset-count or
     // nesting-depth truncation, and the visited set makes malformed cycles harmless.
@@ -2314,6 +2314,9 @@ export namespace TargetMemory {
       "Before any active request, verify the selected asset's saved scope against the official program policy. Every ancestor scope and exclusion also applies. If any manifest is missing, unconfigured, invalid, ambiguous, or excludes the URL, stop; never infer authorization from a target URL or discovery alone.",
       "Use scope_check with target_url set to the selected asset URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must pass persisted scope checks for every outbound URL.",
       "Memory completeness: this is a prioritized context preview, not proof that omitted notes or assets do not exist. Use target_notes_read to search and page through saved notes before concluding that a prior observation or experiment is absent.",
+      ...(omittedNoteCount > 0 ? [
+        "PARTIAL NOTE SELECTION: " + omittedPrimaryNoteCount + " current notes, " + omittedJournalNoteCount + " journal entries, " + omittedParentNoteCount + " program/root notes, and " + omittedAncestorNoteCount + " intermediate-ancestor notes were not included in this prompt. They remain saved. Use target_notes_read with target_url=" + selected.targetURL + ", and page through results until has_more_notes is false; set include_history=true to inspect archived revisions.",
+      ] : []),
       "Keep endpoint/request/finding/evidence files inside the selected asset's workspace. Keep program summaries in the program/root workspace. Do not copy one asset's full notes or findings into a sibling's workspace.",
       "",
       // The active asset's ranked memory is deliberately emitted before inventories:
@@ -2332,7 +2335,7 @@ export namespace TargetMemory {
         "",
       ])] : []),
       ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
-        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
+        "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)") + " — note_id: " + note.id,
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
         note.content.slice(0, 550) + (note.content.length > 550 ? "\n[Note excerpt only; read the full note by note_id with target_notes_read.]" : ""),
         "",
