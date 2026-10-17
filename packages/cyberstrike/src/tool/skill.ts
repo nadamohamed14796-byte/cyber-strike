@@ -240,8 +240,14 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
       const skill = await Skill.get(canonicalName)
       if (!skill) {
-        const available = accessibleSkills.map((s) => s.name).join(", ")
-        throw new Error(`Skill "${params.name}" not found or has an ambiguous metadata reference. Available: ${available || "none"}`)
+        const sample = accessibleSkills.slice(0, 12).map((entry) => entry.name)
+        const suffix = accessibleSkills.length > sample.length ? ", …" : ""
+        throw new Error(
+          `Skill "${params.name}" was not found or its metadata reference is ambiguous. ` +
+          `Accessible skills: ${accessibleSkills.length}. ` +
+          `Use skill(action="search", query="...") or paged skill(action="list") to find an exact name. ` +
+          (sample.length ? `Examples: ${sample.join(", ")}${suffix}` : "No skills are currently accessible."),
+        )
       }
       // Listing filters denied skills, but loading must enforce the same policy;
       // otherwise an agent could bypass the filter by naming a denied skill directly.
