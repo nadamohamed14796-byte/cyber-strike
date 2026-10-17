@@ -132,6 +132,7 @@ test("unresolved checklist questions block a false-positive verdict even after 2
   expect(result.verdict).toBe("inconclusive")
   expect(result.unknownCheckIDs).toContain("security_impact")
   expect(result.output).toContain("20/20 distinct valid evidence-backed attempts")
+  expect(result.nextStep).toContain("Resolve the unknown checks before making a final verdict")
 })
 
 test("false positive requires multiple evidence-backed contradictions and explains failed numbers", () => {
