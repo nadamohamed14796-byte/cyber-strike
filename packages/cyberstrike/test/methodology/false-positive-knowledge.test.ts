@@ -19,7 +19,7 @@ test("false-positive memory persists normalized lessons across targets and redac
       const checks = [
         { id: "reproducible", status: "fail", reason: "The behavior was not reproducible", evidence: "Controlled replays matched the expected response" },
         { id: "unexpected_behavior", status: "fail", reason: "The response matches intended policy", evidence: "Owner and non-owner controls showed the documented behavior" },
-        { id: "benign_behavior_ruled_out", status: "fail", reason: "Expected policy explains the response", evidence: "Authorization: Bearer secret-token-value" },
+        { id: "benign_behavior_ruled_out", status: "fail", reason: "Expected policy explains the response", evidence: "Authorization: Bearer secret-token-value\nCookie: session=secret-cookie; csrf=secret-csrf" },
       ]
       const record = {
         finding,
@@ -40,6 +40,8 @@ test("false-positive memory persists normalized lessons across targets and redac
       expect(matches[0]?.occurrences).toBe(2)
       expect(matches[0]?.endpointPattern).toBe("/api/users/{n}/profile")
       expect(matches[0]?.benignExplanation).not.toContain("secret-token-value")
+      expect(matches[0]?.benignExplanation).not.toContain("secret-cookie")
+      expect(matches[0]?.benignExplanation).not.toContain("secret-csrf")
       expect(matches[0]?.benignExplanation).toContain("[REDACTED]")
       const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).all())
       expect(rows).toHaveLength(1)
