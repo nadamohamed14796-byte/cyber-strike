@@ -1,10 +1,12 @@
 import z from "zod"
 import fs from "node:fs/promises"
+import { constants as fsConstants } from "node:fs"
 import path from "node:path"
 import { createHash } from "node:crypto"
 import { TargetMemory, type TargetAssetType } from "../target"
 import { parseScopeFileContents, resolveScopeFilePath } from "../target/scope-file"
 import { Tool } from "./tool"
+import { assertExternalDirectory } from "./external-directory"
 
 const Parameters = z.object({
   action: z.enum(["init", "configure_scope", "attach_asset", "show", "list", "record_summary"]),
@@ -69,7 +71,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     "Use show/list to retrieve canonical absolute paths. For a supplied scope-list file use action=configure_scope with scope_file_path; it imports exact entries, stores a copy under the root workspace scope directory, and records the count/source hash in notes.md. Use target_artifact for other target files and target_note for observations tied to evidence. Never invent an alternate output directory.",
   ].join("\n"),
   parameters: Parameters,
-  async execute(params) {
+  async execute(params, ctx) {
     if (params.action === "init") {
       const workspace = await TargetMemory.ensure(required(params.target_url, "target_url"))
       const scope = await TargetMemory.getScope(workspace.targetURL)
@@ -133,18 +135,39 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         }
 
         sourcePath = resolveScopeFilePath(params.scope_file_path)
+        // Scope import reads a local file; require the same filesystem permissions as ReadTool.
+        await assertExternalDirectory(ctx, sourcePath)
+        await ctx.ask({
+          permission: "read",
+          patterns: [sourcePath],
+          always: ["*"],
+          metadata: { purpose: "import target authorization scope file" },
+        })
         let bytes: Buffer
         try {
-          const info = await fs.lstat(sourcePath)
-          if (info.isSymbolicLink() || !info.isFile()) {
-            throw new Error("Scope file must be a regular file; symbolic links and non-file inputs are refused.")
-          }
-          if (info.size > 32 * 1024 * 1024) {
-            throw new Error("Scope file exceeds the 32 MB import limit.")
-          }
-          bytes = await fs.readFile(sourcePath)
-          if (bytes.byteLength > 32 * 1024 * 1024) {
-            throw new Error("Scope file grew beyond the 32 MB import limit while being read.")
+          const noFollow = process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0)
+          const handle = await fs.open(sourcePath, fsConstants.O_RDONLY | noFollow)
+          try {
+            const openedInfo = await handle.stat()
+            const pathInfo = await fs.lstat(sourcePath)
+            if (
+              !openedInfo.isFile() ||
+              pathInfo.isSymbolicLink() ||
+              !pathInfo.isFile() ||
+              pathInfo.dev !== openedInfo.dev ||
+              pathInfo.ino !== openedInfo.ino
+            ) {
+              throw new Error("Scope file must remain the same regular file during open; symbolic links and non-file inputs are refused.")
+            }
+            if (openedInfo.size > 32 * 1024 * 1024) {
+              throw new Error("Scope file exceeds the 32 MB import limit.")
+            }
+            bytes = await handle.readFile()
+            if (bytes.byteLength > 32 * 1024 * 1024) {
+              throw new Error("Scope file grew beyond the 32 MB import limit while being read.")
+            }
+          } finally {
+            await handle.close()
           }
         } catch (error) {
           throw new Error("Could not read scope file " + sourcePath + ": " + (error instanceof Error ? error.message : String(error)))
