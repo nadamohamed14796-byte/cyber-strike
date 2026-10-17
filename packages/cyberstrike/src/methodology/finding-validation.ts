@@ -154,7 +154,9 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
   const attemptBackedContradictions = contradictions.filter((check) => attemptContradictedCheckIDs.has(check.id))
   const attemptPrimaryContradiction = attemptBackedContradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
   const enoughDistinctAttempts = validAttempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
-  const falsePositive = enoughDistinctAttempts && contradictions.length >= 2 && hasPrimaryContradiction && attemptBackedContradictions.length >= 2 && attemptPrimaryContradiction
+  // A false-positive verdict must not skip unresolved checklist questions. All ten checks
+  // are required inputs, but UNKNOWN still means the assessment is incomplete and inconclusive.
+  const falsePositive = enoughDistinctAttempts && unknown.length === 0 && contradictions.length >= 2 && hasPrimaryContradiction && attemptBackedContradictions.length >= 2 && attemptPrimaryContradiction
 
   const requiredPasses = [
     "reproducible",
