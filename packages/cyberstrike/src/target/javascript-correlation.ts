@@ -1237,7 +1237,7 @@ export namespace JavaScriptCorrelation {
             observedRequestIDs: [...new Set(variant.matching.map((entry) => entry.request.id))],
             recommendedChecks,
           }))
-        }))
+        })),
         secretCandidates: persistedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
