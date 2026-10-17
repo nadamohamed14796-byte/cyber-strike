@@ -179,11 +179,13 @@ export namespace Methodology {
         const now = Date.now()
         if (existing) {
           const blockReason = phase.blockReason ?? null
+          const completedAt = phase.status === "completed" ? (existing.completed_at ?? now) : null
           const changed =
             existing.status !== phase.status ||
             existing.completion_evidence !== phase.evidence ||
             existing.deliverable_count !== phase.deliverableCount ||
-            (existing.block_reason ?? null) !== blockReason
+            (existing.block_reason ?? null) !== blockReason ||
+            existing.completed_at !== completedAt
           db.update(MethodologyPhaseTable)
             .set({
               status: phase.status,
@@ -191,7 +193,7 @@ export namespace Methodology {
               deliverable_count: phase.deliverableCount,
               block_reason: blockReason,
               started_at: phase.status !== "not_started" && !existing.started_at ? now : existing.started_at,
-              completed_at: phase.status === "completed" && !existing.completed_at ? now : existing.completed_at,
+              completed_at: completedAt,
               time_updated: changed ? now : existing.time_updated,
             })
             .where(eq(MethodologyPhaseTable.id, existing.id))
@@ -230,8 +232,8 @@ export namespace Methodology {
     // 1. methodology_ordering: Check if advanced phases are attempted before basics
     const completedIds = new Set(phases.filter((p) => p.status === "completed").map((p) => p.id))
     for (const phase of phases) {
-      // blockReason records unmet prerequisites even when deliverables make the
-      // phase appear completed. Flag any phase with actual work and unmet prerequisites.
+      // A phase with deliverables but unmet prerequisites remains blocked.
+      // Preserve the ordering violation so premature work stays visible to the agent.
       if (phase.blockReason && phase.deliverableCount > 0) {
         violations.push({
           gate: "methodology_ordering",
