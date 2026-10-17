@@ -347,6 +347,14 @@ export namespace FindingValidation {
       } catch (error) {
         console.warn("[cyberstrike] false-positive lesson could not be saved:", error instanceof Error ? error.message : String(error))
       }
+    } else if (finding.status === "false_positive") {
+      // A later inconclusive/confirmed assessment reopens this finding. Retract its
+      // old global lesson so stale conclusions cannot mislead future target hunts.
+      try {
+        FalsePositiveKnowledge.reopenForFinding(input.vulnerabilityID)
+      } catch (error) {
+        console.warn("[cyberstrike] superseded false-positive lesson could not be retracted:", error instanceof Error ? error.message : String(error))
+      }
     }
 
     // Prefer the explicit workspace attribution already stored on the finding. Older findings
