@@ -152,6 +152,9 @@ test("legacy WSTG SQLi/auth skills no longer prescribe extraction or brute-force
   const base = path.join(repoRoot, ".cyberstrike", "skill", "WEB", "OWASP_WSTG_4.2")
   const files = [
     ["wstg-inpv-05.1", ["SELECT banner FROM v$version", "UTL_HTTP.REQUEST", "Try to extract data"]],
+    ["wstg-inpv-05.2", ["LOAD_FILE('/etc/passwd')", "--dump", "--file-read=/etc/passwd"]],
+    ["wstg-inpv-05.3", ["EXEC master..xp_cmdshell", "OPENROWSET(", "ping attacker.com"]],
+    ["wstg-inpv-05.4", ["pg_read_file('/etc/passwd')", "COPY (SELECT 'test') TO"]],
     ["wstg-inpv-05.5", ["SELECT username,password FROM users", "UNION SELECT NULL FROM MSysObjects"]],
     ["wstg-auth-session", ["ffuf -u", "hashcat -a 0", "Default Credentials (Top 20)"]],
     ["wstg-authz-03", ['"role": "admin"', "Test sequential IDs"]],
