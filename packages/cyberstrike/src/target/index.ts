@@ -1825,7 +1825,7 @@ export namespace TargetMemory {
                 content_hash: revisionHash,
                 status: existing.status,
                 tags: previousTags,
-                time_created: existing.time_updated,
+                time_created: now,
               }).onConflictDoNothing().run()
               return db.update(TargetNoteTable).set({
                 title,
