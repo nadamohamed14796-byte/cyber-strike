@@ -1811,7 +1811,7 @@ export namespace TargetMemory {
                   existing.source_url ?? "",
                   existing.status,
                   JSON.stringify(previousTags),
-                ].join("\\0"))
+                ].join("\0"))
                 .digest("hex")
               db.insert(TargetNoteRevisionTable).values({
                 id: Identifier.ascending("target_note_revision"),
