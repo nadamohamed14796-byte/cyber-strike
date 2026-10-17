@@ -321,13 +321,23 @@ async function claimResearchBatch(params: { source?: string; sessionIDs?: readon
             { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "preflight-skip", model_study_decision: "skipped" },
           )
           const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
-          if (completed && legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
-            id: legacyKnowledgeID,
-            version: RESEARCH_MODEL_STUDY_VERSION,
-            decision: "skipped",
-            reason: "the source is no longer configured for safe fetching",
-          })
-          issues.push(claim.public_id + ": unknown source id")
+          const legacyMarkerSaved = completed && legacyKnowledgeID
+            ? ReportKnowledge.markModelStudyCompleted({
+                id: legacyKnowledgeID,
+                version: RESEARCH_MODEL_STUDY_VERSION,
+                decision: "skipped",
+                reason: "the source is no longer configured for safe fetching",
+              })
+            : !legacyKnowledgeID
+          issues.push(
+            claim.public_id + ": " + (
+              !completed
+                ? "lease lost while recording unknown source"
+                : !legacyMarkerSaved
+                  ? "unknown source id; legacy model-study marker persistence failed"
+                  : "unknown source id"
+            ),
+          )
           continue
         }
 
@@ -459,13 +469,23 @@ async function claimResearchBatch(params: { source?: string; sessionIDs?: readon
             { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "preflight-skip", model_study_decision: "skipped" },
           )
           const legacyKnowledgeID = typeof current.payload.legacy_knowledge_id === "string" ? current.payload.legacy_knowledge_id : undefined
-          if (completed && legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
-            id: legacyKnowledgeID,
-            version: RESEARCH_MODEL_STUDY_VERSION,
-            decision: "skipped",
-            reason: "source page is an index or does not contain enough article text",
-          })
-          issues.push(claim.public_id + ": insufficient article content")
+          const legacyMarkerSaved = completed && legacyKnowledgeID
+            ? ReportKnowledge.markModelStudyCompleted({
+                id: legacyKnowledgeID,
+                version: RESEARCH_MODEL_STUDY_VERSION,
+                decision: "skipped",
+                reason: "source page is an index or does not contain enough article text",
+              })
+            : !legacyKnowledgeID
+          issues.push(
+            claim.public_id + ": " + (
+              !completed
+                ? "lease lost while recording insufficient article content"
+                : !legacyMarkerSaved
+                  ? "insufficient article content; legacy model-study marker persistence failed"
+                  : "insufficient article content"
+            ),
+          )
           continue
         }
         const relevance = sourceRelevance(claim.source_url, title, text, source)
@@ -1045,14 +1065,21 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
           { model_study_version: RESEARCH_MODEL_STUDY_VERSION, model_study_method: "llm-assisted-agent-command-v1" },
         )
         const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
-        if (completed && legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
-          id: legacyKnowledgeID,
-          version: RESEARCH_MODEL_STUDY_VERSION,
-          decision: "rejected",
+        const legacyMarkerSaved = completed && legacyKnowledgeID
+          ? ReportKnowledge.markModelStudyCompleted({
+              id: legacyKnowledgeID,
+              version: RESEARCH_MODEL_STUDY_VERSION,
+              decision: "rejected",
+              reason,
+            })
+          : !legacyKnowledgeID
+        if (completed) rejected++
+        results.push({
+          public_id: note.public_id,
+          result: !completed ? "lease-lost" : legacyMarkerSaved ? "rejected" : "rejected-legacy-marker-failed",
+          legacy_marker_saved: legacyMarkerSaved,
           reason,
         })
-        if (completed) rejected++
-        results.push({ public_id: note.public_id, result: completed ? "rejected" : "lease-lost", reason })
         continue
       }
 
@@ -1313,15 +1340,18 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
         continue
       }
       const legacyKnowledgeID = typeof claim.payload.legacy_knowledge_id === "string" ? claim.payload.legacy_knowledge_id : undefined
-      if (legacyKnowledgeID) ReportKnowledge.markModelStudyCompleted({
-        id: legacyKnowledgeID,
-        version: RESEARCH_MODEL_STUDY_VERSION,
-        decision: "learned",
-      })
+      const legacyMarkerSaved = legacyKnowledgeID
+        ? ReportKnowledge.markModelStudyCompleted({
+            id: legacyKnowledgeID,
+            version: RESEARCH_MODEL_STUDY_VERSION,
+            decision: "learned",
+          })
+        : true
       saved++
       results.push({
         public_id: note.public_id,
-        result: "learned",
+        result: legacyMarkerSaved ? "learned" : "learned-legacy-marker-failed",
+        legacy_marker_saved: legacyMarkerSaved,
         knowledge_id: ingested.id,
         title: claim.title,
         vulnerability_class: vulnerabilityClass ?? null,
