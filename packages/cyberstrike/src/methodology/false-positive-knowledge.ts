@@ -153,8 +153,8 @@ export namespace FalsePositiveKnowledge {
       const overlap = [...words].filter((word) => rowWords.has(word)).length
       const titleScore = words.size ? overlap / words.size : 0
       const endpointScore = endpointPattern && row.endpoint_pattern === endpointPattern ? 0.35 : 0
-      const classScore = row.vulnerability_class === vulnerabilityClass ? 0.25 : 0
-      return { row, score: Math.min(1, titleScore * 0.4 + endpointScore + classScore) }
+      const classScore = vulnerabilityClass !== "other" && row.vulnerability_class === vulnerabilityClass ? 0.2 : 0
+      return { row, score: Math.min(1, titleScore * 0.45 + endpointScore + classScore) }
     })
       .filter((item) => item.score >= 0.25)
       .sort((a, b) => b.score - a.score || b.row.time_updated - a.row.time_updated)
