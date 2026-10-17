@@ -727,6 +727,41 @@ function mapNote(row: typeof TargetNoteTable.$inferSelect): TargetNote {
   }
 }
 
+/**
+ * Rank persistent notes for limited agent context. Preserve confirmed and disproven
+ * conclusions (including useful negative results) while still favoring recent updates.
+ * This is context selection only; it never changes the persisted note or its status.
+ */
+function rankNotesForContext(notes: TargetNote[], limit: number): TargetNote[] {
+  const now = Date.now()
+  const statusWeight: Record<string, number> = {
+    confirmed: 3,
+    disproven: 3,
+    observed: 2,
+    unverified: 1,
+  }
+  const kindWeight: Record<string, number> = {
+    finding: 3,
+    evidence: 3,
+    lesson: 2,
+    research: 2,
+    endpoint: 1,
+    javascript: 1,
+    manual: 0,
+    asset: 0,
+  }
+  return [...notes]
+    .sort((a, b) => {
+      const score = (note: TargetNote) => {
+        const ageDays = Math.max(0, (now - note.timeUpdated) / 86_400_000)
+        const recency = 2 / (1 + ageDays / 30)
+        return (statusWeight[note.status] ?? 0) * 2 + (kindWeight[note.kind] ?? 0) + recency
+      }
+      return score(b) - score(a) || b.timeUpdated - a.timeUpdated || a.id.localeCompare(b.id)
+    })
+    .slice(0, Math.max(0, limit))
+}
+
 export namespace TargetMemory {
   export function normalize(input: string): NormalizedTarget {
     return normalizeTarget(input)
@@ -2032,27 +2067,31 @@ export namespace TargetMemory {
     const programRoot = lineage[0] ?? selected
 
     const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.min(Math.floor(maxNotes), 20)) : 8
-    const primaryNotes = Database.use((db) =>
-      db
-        .select()
-        .from(TargetNoteTable)
-        .where(eq(TargetNoteTable.target_id, selected.id))
-        .orderBy(desc(TargetNoteTable.time_updated))
-        .limit(noteLimit)
-        .all()
-        .map(mapNote),
+    // Fetch the full small target-local note set before ranking; applying LIMIT in SQL
+    // first would discard older but still critical confirmed/disproven conclusions.
+    const primaryNotes = rankNotesForContext(
+      Database.use((db) =>
+        db
+          .select()
+          .from(TargetNoteTable)
+          .where(eq(TargetNoteTable.target_id, selected.id))
+          .all()
+          .map(mapNote),
+      ),
+      noteLimit,
     )
     const parentNotes = programRoot.id === selected.id
       ? []
-      : Database.use((db) =>
-          db
-            .select()
-            .from(TargetNoteTable)
-            .where(eq(TargetNoteTable.target_id, programRoot.id))
-            .orderBy(desc(TargetNoteTable.time_updated))
-            .limit(Math.min(4, noteLimit))
-            .all()
-            .map(mapNote),
+      : rankNotesForContext(
+          Database.use((db) =>
+            db
+              .select()
+              .from(TargetNoteTable)
+              .where(eq(TargetNoteTable.target_id, programRoot.id))
+              .all()
+              .map(mapNote),
+          ),
+          Math.min(4, noteLimit),
         )
 
     // Create a compact, cycle-safe inventory of the program's already-registered assets.
