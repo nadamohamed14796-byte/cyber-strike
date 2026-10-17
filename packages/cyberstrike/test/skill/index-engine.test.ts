@@ -134,6 +134,19 @@ Skill body for ${name}.
   }
 })
 
+test("injection methodology skill enforces scope, evidence, and non-destructive proof", async () => {
+  const repoRoot = path.resolve(import.meta.dir, "../../../..")
+  const skillPath = path.join(repoRoot, ".cyberstrike", "skill", "WEB", "OWASP_WSTG_4.2", "wstg-injection", "SKILL.md")
+  const content = await fs.readFile(skillPath, "utf8")
+  expect(content).toContain("persisted authorization scope")
+  expect(content).toContain("A parameter, free-text field, header, JSON body, or reflected value alone is not proof")
+  expect(content).toContain("20 distinct valid evidence-backed attempts")
+  expect(content).not.toContain("Detection Payloads (test in every input)")
+  expect(content).not.toContain("--dump")
+  expect(content).not.toContain("file:///etc/passwd")
+  expect(content).not.toContain("--os-shell")
+})
+
 test("full repository skill catalog has no unresolved chain or prerequisite references", async () => {
   const repoRoot = path.resolve(import.meta.dir, "../../../..")
   const previousTestHome = process.env.CYBERSTRIKE_TEST_HOME
