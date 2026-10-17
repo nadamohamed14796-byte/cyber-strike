@@ -10,7 +10,7 @@ import { matchingScopeItems } from "./scope-index"
 import { Instance } from "../project/instance"
 import { SessionTable, RequestTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
-import { TargetNoteTable, TargetWorkspaceTable, type TargetAssetType } from "./target.sql"
+import { TargetNoteRevisionTable, TargetNoteTable, TargetWorkspaceTable, type TargetAssetType } from "./target.sql"
 
 const TARGET_DIRECTORIES = [
   "scope",
@@ -158,6 +158,22 @@ export interface TargetNote {
   tags: string[]
   timeCreated: number
   timeUpdated: number
+}
+
+/** Archived immutable version of a current investigation note. */
+export interface TargetNoteRevision {
+  id: string
+  noteID: string
+  targetID: string
+  kind: string
+  title: string | null
+  content: string
+  source: string
+  sourceURL: string | null
+  contentHash: string
+  status: string
+  tags: string[]
+  timeCreated: number
 }
 
 function projectRoot(): string {
@@ -724,6 +740,23 @@ function mapNote(row: typeof TargetNoteTable.$inferSelect): TargetNote {
     tags: (row.tags as string[] | null) ?? [],
     timeCreated: row.time_created,
     timeUpdated: row.time_updated,
+  }
+}
+
+function mapNoteRevision(row: typeof TargetNoteRevisionTable.$inferSelect): TargetNoteRevision {
+  return {
+    id: row.id,
+    noteID: row.note_id,
+    targetID: row.target_id,
+    kind: row.kind,
+    title: row.title,
+    content: row.content,
+    source: row.source,
+    sourceURL: row.source_url,
+    contentHash: row.content_hash,
+    status: row.status,
+    tags: (row.tags as string[] | null) ?? [],
+    timeCreated: row.time_created,
   }
 }
 
@@ -1719,15 +1752,44 @@ export namespace TargetMemory {
           nextStatus !== existing.status ||
           JSON.stringify(nextTags) !== JSON.stringify(existingTags)
         const row = changed
-          ? Database.use((db) => db.update(TargetNoteTable).set({
-              title,
-              source_url: sourceURL ?? null,
-              content,
-              content_hash: contentHash,
-              status: nextStatus,
-              tags: nextTags,
-              time_updated: now,
-            }).where(eq(TargetNoteTable.id, existing.id)).returning().get() ?? existing)
+          ? Database.transaction((db) => {
+              // Keep the prior complete state before changing the living note. A unique
+              // revision fingerprint avoids duplicate archives if an update is retried.
+              const previousTags = (existing.tags as string[] | null) ?? []
+              const revisionHash = createHash("sha256")
+                .update([
+                  existing.content_hash,
+                  existing.title ?? "",
+                  existing.source,
+                  existing.source_url ?? "",
+                  existing.status,
+                  JSON.stringify(previousTags),
+                ].join("\\0"))
+                .digest("hex")
+              db.insert(TargetNoteRevisionTable).values({
+                id: Identifier.ascending("target_note_revision"),
+                note_id: existing.id,
+                target_id: existing.target_id,
+                kind: existing.kind,
+                title: existing.title,
+                content: existing.content,
+                source: existing.source,
+                source_url: existing.source_url,
+                content_hash: revisionHash,
+                status: existing.status,
+                tags: previousTags,
+                time_created: existing.time_updated,
+              }).onConflictDoNothing().run()
+              return db.update(TargetNoteTable).set({
+                title,
+                source_url: sourceURL ?? null,
+                content,
+                content_hash: contentHash,
+                status: nextStatus,
+                tags: nextTags,
+                time_updated: now,
+              }).where(eq(TargetNoteTable.id, existing.id)).returning().get() ?? existing
+            })
           : existing
         const note = mapNote(row)
         await syncTargetNotesMarkdown(workspace)
@@ -1867,6 +1929,30 @@ export namespace TargetMemory {
         .all()
         .map(mapNote),
     )
+  }
+
+  /** Read immutable revisions for a workspace, optionally narrowed to one current note. */
+  export function noteRevisions(
+    targetID: string,
+    noteID?: string,
+    offset = 0,
+    limit?: number,
+  ): TargetNoteRevision[] {
+    if (!targetIsInCurrentProject(targetID)) return []
+    const rows = Database.use((db) => {
+      const query = db.select().from(TargetNoteRevisionTable)
+        .where(and(
+          eq(TargetNoteRevisionTable.target_id, targetID),
+          ...(noteID ? [eq(TargetNoteRevisionTable.note_id, noteID)] : []),
+        ))
+        .orderBy(asc(TargetNoteRevisionTable.time_created), asc(TargetNoteRevisionTable.id))
+        .all()
+      return query.map(mapNoteRevision)
+    })
+    const start = Math.max(0, Math.floor(Number.isFinite(offset) ? offset : 0))
+    return limit === undefined || !Number.isFinite(limit)
+      ? rows.slice(start)
+      : rows.slice(start, start + Math.max(0, Math.floor(limit)))
   }
 
   /** Exact HTTP(S) origin plus path-prefix matching for session observations; never fetches or authorizes a target. */
