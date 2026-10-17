@@ -172,8 +172,11 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       // instructing itself to synthesize/send unobserved form submissions.
       expect(orchestrator?.prompt).toContain("pure orchestrator")
       expect(orchestrator?.prompt).toContain("never invent an endpoint, body")
+      expect(orchestrator?.prompt).toContain("Reflection alone proves none of these")
       expect(orchestrator?.prompt).not.toContain("synthesize and send it yourself")
       expect(orchestrator?.prompt).not.toContain("POST the form's action")
+      expect(orchestrator?.prompt).not.toContain("SQLi + XSS + SSTI on EVERY field")
+      expect(orchestrator?.prompt).not.toContain("The field is ALSO a SQLi sink")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
       expect(evalPerm(analyzer, "report_vulnerability")).toBe("deny")
