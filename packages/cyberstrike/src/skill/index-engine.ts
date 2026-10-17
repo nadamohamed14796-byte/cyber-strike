@@ -135,6 +135,12 @@ export namespace SkillIndex {
     const catalog = Skill.state()
     if (states.get(directory)?.catalog === catalog) return
     await rebuild()
+    if (Skill.state() !== catalog || states.get(directory)?.catalog !== catalog) {
+      await rebuild()
+      if (states.get(directory)?.catalog !== Skill.state()) {
+        throw new Error("Skill index could not stabilize because the skill catalog changed during rebuild.")
+      }
+    }
   }
 
   export async function rebuild() {
