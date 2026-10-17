@@ -494,6 +494,7 @@ export function correlateStaticJavaScriptEndpoints(
   sourceFiles: JavaScriptSourceFile[],
   requests: Array<{ id: string; method: string; host: string | null; url: string | null; normalizedPath: string; responseStatus: number | null }>,
   targetHost: string,
+  targetOrigin?: string,
 ): JavaScriptEndpointCandidate[] {
   const candidates = new Map<string, JavaScriptEndpointCandidate>()
   for (const file of sourceFiles) {
@@ -501,45 +502,61 @@ export function correlateStaticJavaScriptEndpoints(
       const endpointURL = safeURL(literal)
       const endpointPath = (endpointURL?.pathname ?? literal.split(/[?#]/, 1)[0]).replace(/\/{2,}/g, "/")
       if (!endpointPath.startsWith("/")) continue
-      const host = endpointURL?.hostname.toLowerCase() ?? null
-      const origin = endpointURL?.origin.toLowerCase() ?? null
-      const key = (origin ?? "*") + endpointPath
-      let candidate = candidates.get(key)
-      if (!candidate) {
-        candidate = {
-          id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
-          literal,
-          host,
-          origin,
-          path: endpointPath,
-          sourceFiles: [],
-          observedRequestIDs: [],
-          observedInTraffic: false,
-          confidence: "candidate",
-        }
-        candidates.set(key, candidate)
-      }
-      if (!candidate.sourceFiles.includes(file.relativePath)) candidate.sourceFiles.push(file.relativePath)
-
-      for (const request of requests) {
+      const explicitOrigin = endpointURL?.origin.toLowerCase() ?? null
+      const matchingRequests = requests.flatMap((request) => {
         const requestURL = safeURL(request.url) ?? safeURL(request.host)
-        const requestHost = requestURL?.hostname.toLowerCase()
-        if (!requestHost) continue
-        // Relative literals resolve against the application host; absolute literals
-        // must match their explicit host. Do not cross-correlate identical paths on a CDN.
-        if (host ? requestHost !== host : requestHost !== targetHost.toLowerCase()) continue
-        if (origin && requestURL?.origin.toLowerCase() !== origin) continue
+        if (!requestURL) return []
+        if (explicitOrigin && requestURL.origin.toLowerCase() !== explicitOrigin) return []
         const observedPath = request.normalizedPath.split(/[?#]/, 1)[0]
-        // Require an exact segment-count/template match. Prefix overlap such as
-        // /api/user -> /api/users/123 is not evidence that the endpoint was observed.
-        const matches = matchesEndpointPathTemplate(endpointPath, observedPath)
-        if (matches && !candidate.observedRequestIDs.includes(request.id)) {
-          candidate.observedRequestIDs.push(request.id)
+        return matchesEndpointPathTemplate(endpointPath, observedPath) ? [{ request, url: requestURL }] : []
+      })
+
+      // Relative routes are not bound to the JavaScript bundle's host: browsers
+      // resolve them against the document/API base. Use captured matching traffic to
+      // discover the actual origin(s); if none are observed, leave origin unknown.
+      const variants = new Map<string, { origin: string | null; host: string | null; matching: typeof matchingRequests }>()
+      if (explicitOrigin && endpointURL) {
+        variants.set(explicitOrigin, {
+          origin: explicitOrigin,
+          host: endpointURL.host.toLowerCase(),
+          matching: matchingRequests.filter((item) => item.url.origin.toLowerCase() === explicitOrigin),
+        })
+      } else if (matchingRequests.length) {
+        for (const item of matchingRequests) {
+          const origin = item.url.origin.toLowerCase()
+          const existing = variants.get(origin)
+          if (existing) existing.matching.push(item)
+          else variants.set(origin, { origin, host: item.url.host.toLowerCase(), matching: [item] })
         }
+      } else {
+        variants.set("*", { origin: null, host: null, matching: [] })
       }
-      if (candidate.observedRequestIDs.length) {
-        candidate.observedInTraffic = true
-        candidate.confidence = "observed"
+
+      for (const variant of variants.values()) {
+        const key = (variant.origin ?? "*") + "\\0" + normalizedTemplateShape(endpointPath)
+        let candidate = candidates.get(key)
+        if (!candidate) {
+          candidate = {
+            id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+            literal,
+            host: variant.host,
+            origin: variant.origin,
+            path: endpointPath,
+            sourceFiles: [],
+            observedRequestIDs: [],
+            observedInTraffic: false,
+            confidence: "candidate",
+          }
+          candidates.set(key, candidate)
+        }
+        if (!candidate.sourceFiles.includes(file.relativePath)) candidate.sourceFiles.push(file.relativePath)
+        for (const item of variant.matching) {
+          if (!candidate.observedRequestIDs.includes(item.request.id)) candidate.observedRequestIDs.push(item.request.id)
+        }
+        if (candidate.observedRequestIDs.length) {
+          candidate.observedInTraffic = true
+          candidate.confidence = "observed"
+        }
       }
     }
   }
@@ -1259,7 +1276,7 @@ export namespace JavaScriptCorrelation {
       }
     }
     graph.endpointCandidates = mergeStructuredJavaScriptEndpoints(
-      correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname),
+      correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname, targetURL.origin),
       graph.javascriptAnalysis.requestCandidates,
       graph.requests,
     )
