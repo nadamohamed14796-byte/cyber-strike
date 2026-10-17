@@ -118,6 +118,41 @@ test("upserts stable target-note identity instead of accumulating snapshot dupli
   })
 })
 
+
+test("upserts endpoint notes by stable path identity across title and source changes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://identity-path.example.test"
+      const first = await TargetMemory.addNote(targetURL, {
+        kind: "endpoint",
+        title: "GET profile endpoint",
+        content: "The endpoint returns a profile-shaped response.",
+        source: "session:first",
+        identityKey: "endpoint:/api/v1/profile.js:authorization",
+        upsertByIdentity: true,
+      })
+      const refreshed = await TargetMemory.addNote(targetURL, {
+        kind: "endpoint",
+        title: "Profile endpoint authorization check",
+        content: "Anonymous access returned 401; authenticated owner returned 200.",
+        source: "session:second",
+        identityKey: "endpoint:/api/v1/profile.js:authorization",
+        upsertByIdentity: true,
+      })
+      expect(first.created).toBe(true)
+      expect(refreshed.created).toBe(false)
+      expect(refreshed.updated).toBe(true)
+      expect(refreshed.note.id).toBe(first.note.id)
+      expect(TargetMemory.allNotes(first.workspace.id)).toHaveLength(1)
+      expect(refreshed.note.content).toContain("authenticated owner returned 200")
+      expect(refreshed.note.content).toContain("cyberstrike-note-identity:endpoint:/api/v1/profile.js:authorization")
+      await Instance.dispose()
+    },
+  })
+})
+
 test("target observation matching requires exact origin and scoped path", () => {
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/api/users")).toBe(true)
   expect(TargetMemory.targetObservationMatches("https://app.example.com/portal", "https://app.example.com/portal/")).toBe(true)
