@@ -5,6 +5,7 @@ import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { TargetArtifactTool } from "../../src/tool/target-artifact"
 import { TargetWorkspaceTool } from "../../src/tool/target-workspace"
+import { PermissionNext } from "../../src/permission/next"
 
 test("target workspace tool initializes, configures scope, and nests authorized child assets", async () => {
   await using tmp = await tmpdir()
@@ -123,6 +124,7 @@ test("scope-file import persists the source list, configured manifest, and notes
 
 test("target artifact tool writes only inside an existing workspace and protects reserved files", async () => {
   await using tmp = await tmpdir()
+  await using sourceTmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
     async fn() {
@@ -131,6 +133,18 @@ test("target artifact tool writes only inside an existing workspace and protects
       const artifact = await TargetArtifactTool.init()
       const init = await workspaces.execute({ action: "init", target_url: "https://example.com" }, {} as never)
       const workspace = init.metadata.workspace!
+      const permissionRequests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
+      const artifactCtx = {
+        sessionID: "test",
+        messageID: "",
+        agent: "cyberstrike",
+        abort: AbortSignal.any([]),
+        messages: [],
+        metadata: () => {},
+        ask: async (request: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
+          permissionRequests.push(request)
+        },
+      }
       const saved = await artifact.execute({
         target_url: "https://example.com",
         area: "recon",
@@ -143,7 +157,7 @@ test("target artifact tool writes only inside an existing workspace and protects
       const content = await fs.readFile(saved.metadata.path!, "utf-8")
       expect(content).toContain("api.example.com")
       expect(content).toContain("super.secret.token")
-      const largeInput = path.join(tmp.path, "large-scope.txt")
+      const largeInput = path.join(sourceTmp.path, "large-scope.txt")
       await fs.writeFile(largeInput, "api.example.com\n" + "x".repeat(2_100_000) + "\nAuthorization: Bearer source.secret.token\n")
       const copied = await artifact.execute({
         target_url: "https://example.com",
@@ -151,8 +165,10 @@ test("target artifact tool writes only inside an existing workspace and protects
         filename: "targets.txt",
         source_path: largeInput,
         overwrite: false,
-      }, {} as never)
+      }, artifactCtx as never)
       expect(copied.metadata.saved).toBe(true)
+      expect(permissionRequests.some((request) => request.permission === "external_directory")).toBe(true)
+      expect(permissionRequests.some((request) => request.permission === "read" && request.patterns.includes(largeInput))).toBe(true)
       expect(copied.metadata.source_sha256).toMatch(/^[a-f0-9]{64}$/)
       const copiedText = await fs.readFile(copied.metadata.path!, "utf-8")
       expect(copiedText.length).toBeGreaterThan(2_000_000)
