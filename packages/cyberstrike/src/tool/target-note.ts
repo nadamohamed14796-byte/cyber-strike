@@ -8,7 +8,7 @@ const TargetNoteParameters = z.object({
     kind: z.enum(["manual", "asset", "endpoint", "javascript", "finding", "evidence", "research", "lesson"]).default("manual"),
     title: z.string().min(1).max(180),
     content: z.string().min(1).max(10000),
-    status: z.enum(["unverified", "observed", "confirmed", "disproven"]).default("observed"),
+    status: z.enum(["unverified", "observed", "confirmed", "disproven"]).optional().describe("Optional note status. Omit when updating an existing investigation to preserve its current status; new notes default to observed."),
     evidence: z.string().max(5000).optional().describe("Concrete evidence required when status is confirmed or disproven"),
     source_url: z.string().url().optional(),
     tags: z.array(z.string().min(1).max(48)).max(20).optional(),
