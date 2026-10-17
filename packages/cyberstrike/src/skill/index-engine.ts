@@ -132,15 +132,16 @@ export namespace SkillIndex {
 
   export async function ensureBuilt() {
     const directory = Instance.directory
-    const catalog = Skill.state()
-    if (states.get(directory)?.catalog === catalog) return
-    await rebuild()
-    if (Skill.state() !== catalog || states.get(directory)?.catalog !== catalog) {
+    // Skill.state() may be invalidated while Skill.all() scans local and external
+    // catalogs. Retry against the newest snapshot instead of leaving callers with
+    // an empty/stale index after only one concurrent refresh.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const catalog = Skill.state()
+      if (states.get(directory)?.catalog === catalog) return
       await rebuild()
-      if (states.get(directory)?.catalog !== Skill.state()) {
-        throw new Error("Skill index could not stabilize because the skill catalog changed during rebuild.")
-      }
+      if (Skill.state() === catalog && states.get(directory)?.catalog === catalog) return
     }
+    throw new Error("Skill catalog changed repeatedly while building the skill index; retry the skill operation.")
   }
 
   export async function rebuild() {
