@@ -182,6 +182,44 @@ describe("IngestQueue.pause / resume", () => {
   })
 })
 
+describe("IngestQueue parent-child controls", () => {
+  test("parent pause gates child request queues without serializing siblings", async () => {
+    await withInstance(async () => {
+      const parent = "parent-ingest"
+      const childA = "child-ingest-a"
+      const childB = "child-ingest-b"
+      const unrelated = "unrelated-ingest"
+      const order: string[] = []
+
+      IngestQueue.pause(parent)
+      IngestQueue.enqueue(childA, async () => {
+        order.push("child-a")
+      }, parent)
+      IngestQueue.enqueue(childB, async () => {
+        order.push("child-b")
+      }, parent)
+      IngestQueue.enqueue(unrelated, async () => {
+        order.push("unrelated")
+      })
+
+      await new Promise((r) => setTimeout(r, 20))
+      expect(order).toEqual(["unrelated"])
+      expect(IngestQueue.pendingCount(parent)).toBe(2)
+      expect(IngestQueue.pendingCount(childA)).toBe(1)
+      expect(IngestQueue.pendingCount(childB)).toBe(1)
+
+      IngestQueue.resume(parent)
+      await new Promise((r) => setTimeout(r, 20))
+      expect(order).toContain("child-a")
+      expect(order).toContain("child-b")
+      expect(order).toHaveLength(3)
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+      expect(IngestQueue.pendingCount(childA)).toBe(0)
+      expect(IngestQueue.pendingCount(childB)).toBe(0)
+    })
+  })
+})
+
 describe("IngestQueue isolation", () => {
   test("two sessions are independent", async () => {
     await withInstance(async () => {
