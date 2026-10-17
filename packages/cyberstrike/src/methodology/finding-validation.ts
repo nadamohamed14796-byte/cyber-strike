@@ -347,7 +347,7 @@ export namespace FindingValidation {
             "Validation of " + finding.title + " reached a " + assessment.verdict.replaceAll("_", " ") + " verdict (confidence rubric " + assessment.confidence + "/100, not a statistical probability). " + assessment.summary,
             "Across the recorded history there are " + assessment.attemptCount + " distinct evidence-backed attempts; the validation record is " + validationID + ". " + (assessment.failedCheckIDs.length ? "The evidence currently contradicts these checks: " + assessment.failedCheckIDs.join(", ") + ". " : "") + (assessment.unknownCheckIDs.length ? "These questions remain unresolved: " + assessment.unknownCheckIDs.join(", ") + ". " : ""),
             "Next, " + assessment.nextStep + " The full check and attempt history is stored in SQLite; this note summarizes the decision without duplicating raw request/response evidence. Revisit the conclusion if later evidence changes the interpretation.",
-          ],
+          ].filter(Boolean).join("\n\n"),
           source: "finding-validation",
           upsertByIdentity: true,
           identityKey: "finding:" + input.vulnerabilityID,
