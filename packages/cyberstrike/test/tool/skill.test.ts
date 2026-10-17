@@ -100,6 +100,9 @@ Use this skill.
 `,
         )
         await Bun.write(path.join(skillDir, "scripts", "demo.txt"), "demo")
+        for (let index = 0; index < 15; index++) {
+          await Bun.write(path.join(skillDir, "reference", "part-" + index + ".md"), "reference " + index)
+        }
       },
     })
 
