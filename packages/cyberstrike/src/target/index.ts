@@ -454,16 +454,14 @@ function defaultTargetNotes(workspace: Workspace): string {
   return [
     "# Target Notes",
     "",
-    "> Research memory for manual hunting and future sessions. Notes are stored in SQLite and mirrored here so the reasoning remains readable outside the agent.",
+    "> Working memory for manual hunting and future sessions. Keep the notes natural and evidence-led; there is no required template. Add only conclusions, useful context, failed approaches, and open questions worth remembering.",
     "",
     "## Target",
     "",
     "- URL: " + workspace.targetURL,
     "- Hostname: " + workspace.hostname,
     "",
-    "## Research Notes",
-    "",
-    "Write naturally and only preserve information that will help someone understand the target or continue an investigation. There is no required note template: let each note's shape and length fit the evidence. Keep raw inventories and machine-readable outputs in their artifact files; use this page for useful observations, reasoning, hypotheses, failed approaches, decisions, and next steps. Distinguish what was observed from what is inferred, and revise stale conclusions when new evidence changes them.",
+    "## Working notes",
     "",
   ].join("\n")
 }
