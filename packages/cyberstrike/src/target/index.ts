@@ -2110,14 +2110,22 @@ export namespace TargetMemory {
     const ancestorNotes = intermediateIDs.length === 0
       ? []
       : rankNotesForContext(
-          Database.use((db) =>
-            db
-              .select()
-              .from(TargetNoteTable)
-              .where(inArray(TargetNoteTable.target_id, intermediateIDs))
-              .all()
-              .map(mapNote),
-          ),
+          Database.use((db) => {
+            // Keep every ancestor note while staying under SQLite's bind-parameter budget.
+            const notes: TargetNote[] = []
+            for (let offset = 0; offset < intermediateIDs.length; offset += 500) {
+              const ids = intermediateIDs.slice(offset, offset + 500)
+              notes.push(
+                ...db
+                  .select()
+                  .from(TargetNoteTable)
+                  .where(inArray(TargetNoteTable.target_id, ids))
+                  .all()
+                  .map(mapNote),
+              )
+            }
+            return notes
+          }),
           noteLimit,
         )
 
