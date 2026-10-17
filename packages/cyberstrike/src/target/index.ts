@@ -591,6 +591,52 @@ async function syncTargetNotesMarkdown(workspace: Workspace): Promise<void> {
     )
     const nextFile = rows.map(mapNote).reduce(applyTargetNoteToMarkdown, base)
     if (nextFile !== notesFile) await TargetMemory.writeWorkspaceFile(workspace, "notes.md", nextFile)
+
+    // Keep old versions available to manual testers without duplicating them in the active
+    // investigation notes. Rebuild this companion file from SQLite on every sync so retries
+    // are idempotent and interruptions cannot silently lose an earlier note revision.
+    const revisions = Database.use((db) =>
+      db.select()
+        .from(TargetNoteRevisionTable)
+        .where(eq(TargetNoteRevisionTable.target_id, workspace.id))
+        .orderBy(asc(TargetNoteRevisionTable.time_created), asc(TargetNoteRevisionTable.id))
+        .all()
+        .map(mapNoteRevision),
+    )
+    const historyPath = path.join(workspace.workspacePath, "notes-history.md")
+    await assertRegularFileOrMissing(historyPath)
+    let historyFile = ""
+    try {
+      historyFile = await fs.readFile(historyPath, "utf-8")
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+    const historyBase = [
+      "# Target Note History",
+      "",
+      "Immutable snapshots of earlier versions of current investigation notes. The latest living state is in notes.md. Archived revisions remain separate from the active note list so updates do not erase prior reasoning or create duplicate active notes.",
+      "",
+      "Total archived revisions: " + revisions.length,
+      "",
+    ].join("\\n")
+    const historySections = revisions.map((revision) => [
+      "## " + (revision.title ?? "(untitled)") + " — archived " + new Date(revision.timeCreated).toISOString(),
+      "",
+      "- Revision ID: " + revision.id,
+      "- Current note ID: " + revision.noteID,
+      "- Kind/status: " + revision.kind + "/" + revision.status,
+      "- Source: " + revision.source + (revision.sourceURL ? " — " + revision.sourceURL : ""),
+      "- Tags: " + (revision.tags.join(", ") || "(none)"),
+      "",
+      revision.content,
+      "",
+      "---",
+      "",
+    ].join("\\n")).join("\\n")
+    const nextHistoryFile = historyBase + historySections
+    if (nextHistoryFile !== historyFile) {
+      await TargetMemory.writeWorkspaceFile(workspace, "notes-history.md", nextHistoryFile)
+    }
   })
 }
 
