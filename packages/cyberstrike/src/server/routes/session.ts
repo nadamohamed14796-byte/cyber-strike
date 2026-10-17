@@ -1375,8 +1375,6 @@ export const SessionRoutes = lazy(() =>
           }
 
           // New endpoint shape: record the first observation, linked to the row.
-
-          // New endpoint shape: record the first observation, linked to the row.
           recordObservation(req.id)
 
           // Build the prompt as a thunk so the `## Observed Values` block reflects the
