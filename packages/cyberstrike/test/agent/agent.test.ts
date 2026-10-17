@@ -167,6 +167,8 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       }
 
       expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
+      expect(evalPerm(orchestrator, "web_get_request_detail")).toBe("allow")
+      expect(evalPerm(orchestrator, "correlate_javascript")).toBe("allow")
       expect(evalPerm(orchestrator, "triage_vulnerability")).toBe("allow")
       expect(evalPerm(orchestrator, "report_vulnerability")).toBe("deny")
       // The orchestrator must not contradict its pure-orchestration contract by
