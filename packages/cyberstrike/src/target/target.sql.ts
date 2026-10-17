@@ -61,3 +61,35 @@ export const TargetNoteTable = sqliteTable(
     index("target_note_target_time_idx").on(table.target_id, table.time_created),
   ],
 )
+
+/**
+ * Immutable snapshots of earlier versions of a living investigation note.
+ * They are separate from the current note list, so edits preserve evidence without
+ * creating duplicate visible notes or forcing a rigid note template.
+ */
+export const TargetNoteRevisionTable = sqliteTable(
+  "target_note_revision",
+  {
+    id: text().primaryKey(),
+    note_id: text()
+      .notNull()
+      .references(() => TargetNoteTable.id, { onDelete: "cascade" }),
+    target_id: text()
+      .notNull()
+      .references(() => TargetWorkspaceTable.id, { onDelete: "cascade" }),
+    kind: text().notNull(),
+    title: text(),
+    content: text().notNull(),
+    source: text().notNull(),
+    source_url: text(),
+    content_hash: text().notNull(),
+    status: text().notNull(),
+    tags: text({ mode: "json" }).$type<string[]>().notNull(),
+    time_created: integer().notNull(),
+  },
+  (table) => [
+    uniqueIndex("target_note_revision_dedup_idx").on(table.note_id, table.content_hash),
+    index("target_note_revision_note_time_idx").on(table.note_id, table.time_created),
+    index("target_note_revision_target_time_idx").on(table.target_id, table.time_created),
+  ],
+)
