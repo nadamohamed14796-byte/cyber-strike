@@ -435,3 +435,34 @@ describe("target workspace owner keys", () => {
       .toBe(targetWorkspaceOwnerKey("proj_example", "/tmp/repo-worktree"))
   })
 })
+
+
+test("persists long target notes, evidence, and every supplied tag", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const content = "Detailed investigation evidence. ".repeat(4_200)
+      const evidence = "Captured request/response comparison. ".repeat(450)
+      const tags = Array.from({ length: 35 }, (_, index) => "evidence-tag-" + index + "-" + "x".repeat(60))
+      const saved = await TargetMemory.addNote("https://long-notes.example.test", {
+        kind: "evidence",
+        title: "Long evidence note",
+        content,
+        evidence,
+        status: "confirmed",
+        tags,
+      })
+
+      expect(saved.note.content).toContain(content)
+      expect(saved.note.content).toContain(evidence)
+      expect(saved.note.tags).toHaveLength(35)
+      expect(saved.note.tags[34]).toBe(tags[34])
+      expect(TargetMemory.notes(saved.workspace.id)).toHaveLength(1)
+
+      const notesFile = await fs.readFile(path.join(saved.workspace.workspacePath, "notes.md"), "utf-8")
+      expect(notesFile).toContain(content)
+      await Instance.dispose()
+    },
+  })
+})
