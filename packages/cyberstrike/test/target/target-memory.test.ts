@@ -578,6 +578,7 @@ test("resumable target context reports note and journal entries omitted by promp
       expect(request).toBeDefined()
 
       const context = TargetMemory.contextForSession(session.id, 1)
+      if (context === null) throw new Error("Expected target memory context for an observed target")
       expect(context).toContain("PARTIAL NOTE SELECTION")
       expect(context).toContain("1 current notes, 1 journal entries")
       expect(context).toContain("Use target_notes_read")
