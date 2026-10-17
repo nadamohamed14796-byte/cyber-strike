@@ -90,6 +90,18 @@ test("scope-file import persists the source list, configured manifest, and notes
         const inputPath = path.join(tmp.path, "att.com.txt")
         const sourceContents = "# authorized program scope\natt.com\n*.att.com\napi.att.com\n"
         await fs.writeFile(inputPath, sourceContents, "utf-8")
+        const permissionRequests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
+        const scopeCtx = {
+          sessionID: "test",
+          messageID: "",
+          agent: "cyberstrike",
+          abort: AbortSignal.any([]),
+          messages: [],
+          metadata: () => {},
+          ask: async (request: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
+            permissionRequests.push(request)
+          },
+        }
 
         const imported = await tool.execute({
           action: "configure_scope",
@@ -97,9 +109,10 @@ test("scope-file import persists the source list, configured manifest, and notes
           scope_file_path: inputPath,
           authorization_source: "Authorized disclosure program",
           authorization_reference: "https://hackerone.com/example",
-        }, {} as never)
+        }, scopeCtx as never)
 
         expect(imported.metadata.saved).toBe(true)
+        expect(permissionRequests.some((request) => request.permission === "read" && request.patterns.includes(inputPath))).toBe(true)
         expect(imported.metadata.scope_configured).toBe(true)
         expect(imported.metadata.workspace).toBe(workspace)
         expect(imported.metadata.source_scope_entry_count).toBe(3)
