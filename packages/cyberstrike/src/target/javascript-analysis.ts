@@ -521,12 +521,11 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   return {
     functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
     notes: [
-      "Bounded static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
+      "Static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
       "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated.",
       "Static sink signals are triage candidates, can be false positives in comments/vendor code, and do not prove taint or exploitability.",
-      "Function attribution uses bounded lexical body spans; minified or complex TypeScript syntax may remain unattributed.",
-      ...(input.length > 1_000_000 ? ["Source was bounded to the first 1 MB for static analysis."] : []),
+      "Function attribution uses lexical body spans; minified or complex TypeScript syntax may remain unattributed.",
     ],
   }
 }
