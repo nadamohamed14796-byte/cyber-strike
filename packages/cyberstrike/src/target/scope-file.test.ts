@@ -76,6 +76,31 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
+  test("parses comma and semicolon HackerOne exports with display-name asset types", () => {
+    expect(parseScopeFileContents([
+      "identifier,asset_type,asset_tags",
+      '"www.amazon.*",Wildcard,',
+      '"com.example.mobile","Android: Play Store",',
+      '"com.example.ios","iOS: .ipa",',
+      '"router-01","Hardware/IoT",',
+      '"internal-system",Other,',
+    ].join("\n"))).toEqual([
+      "Wildcard: www.amazon.*",
+      "Android Play Store: com.example.mobile",
+      "iOS: .ipa: com.example.ios",
+      "Hardware: router-01",
+      "Other Asset: internal-system",
+    ])
+    expect(parseScopeFileContents([
+      "identifier;asset_type;asset_tags",
+      "*.example.com;Wildcard;",
+      "example.com;Domain;",
+    ].join("\n"))).toEqual([
+      "Wildcard: *.example.com",
+      "Domain: example.com",
+    ])
+  })
+
   test("preserves unfamiliar typed scope entries instead of aborting the entire import", () => {
     expect(parseScopeFileContents("att.com\nAndroid application: com.example.mobile\n")).toEqual([
       "att.com",
