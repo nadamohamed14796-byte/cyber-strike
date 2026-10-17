@@ -5,7 +5,43 @@ type ScopeMatch = { matches: boolean; reason: string }
 /** Check one target against a single scope expression; exported for deterministic contract tests. */
 export function checkMatch(target: string, scope: string): ScopeMatch {
   const value = target.trim().toLowerCase()
-  const allowed = scope.trim().toLowerCase()
+  let allowed = scope.trim().toLowerCase()
+
+  // HackerOne scope exports may include an asset type alongside its identifier.
+  // Only web-addressable types can authorize an HTTP target. Non-web assets are
+  // retained as scope evidence, but never authorize an unrelated HTTP request.
+  const typed = allowed.match(/^(domain|wildcard|url|cidr|ip address|api|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|other(?: asset)?)[ \\t]*:[ \\t]*(.+)$/i)
+  if (typed) {
+    const assetType = typed[1].replace(/\\s+/g, " ").trim().toLowerCase()
+    const identifier = typed[2].trim()
+    const webTypes = new Set(["domain", "wildcard", "url", "cidr", "ip address", "api", "ai model", "smart contract", "smart contracts"])
+    if (!webTypes.has(assetType)) {
+      return { matches: false, reason: `HackerOne asset type "${assetType}" is not an HTTP target scope; use its appropriate assessment workflow` }
+    }
+    if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
+    if (assetType === "wildcard") allowed = identifier.startsWith("*.") ? identifier : "*." + identifier
+    else if (assetType === "url" && !/^https?:\\/\\//i.test(identifier)) {
+      // HackerOne commonly exports URL identifiers without a scheme. Preserve
+      // their host/path restriction and accept either HTTP or HTTPS in that case.
+      let candidateURL: URL
+      let scopeURL: URL
+      try {
+        candidateURL = /^[a-z][a-z\\d+.-]*:\\/\\//i.test(value) ? new URL(value) : new URL("https://" + value)
+        scopeURL = new URL("https://" + identifier)
+      } catch {
+        return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
+      }
+      const scopePath = scopeURL.pathname.replace(/\\/+$/, "") || "/"
+      const targetPath = candidateURL.pathname.replace(/\\/+$/, "") || "/"
+      return candidateURL.hostname.toLowerCase() === scopeURL.hostname.toLowerCase() &&
+        candidateURL.port === scopeURL.port &&
+        (targetPath === scopePath || targetPath.startsWith(scopePath === "/" ? "/" : scopePath + "/"))
+        ? { matches: true, reason: "matches HackerOne URL asset host, port, and path" }
+        : { matches: false, reason: "target does not match HackerOne URL asset host, port, and path" }
+    } else {
+      allowed = identifier
+    }
+  }
 
   // Treat any IPv4-looking CIDR as a CIDR candidate, including malformed prefixes,
   // so invalid ranges fail closed rather than falling through to hostname matching.
