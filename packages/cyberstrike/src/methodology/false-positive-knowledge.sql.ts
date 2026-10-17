@@ -22,6 +22,7 @@ export const FalsePositiveKnowledgeTable = sqliteTable(
     confidence: integer().notNull().default(50),
     occurrences: integer().notNull().default(1),
     last_verdict: text().notNull().default("false_positive"),
+    active: integer().notNull().default(1),
     ...Timestamps,
   },
   (table) => [
