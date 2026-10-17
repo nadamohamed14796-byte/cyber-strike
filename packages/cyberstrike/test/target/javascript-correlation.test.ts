@@ -365,3 +365,63 @@ test("marks captures explicitly truncated by the response processor as partial",
   expect(sources[0]?.captureTruncated).toBe(true)
   expect(sources[0]?.analysis?.notes.some((note) => note.startsWith("PARTIAL SOURCE:"))).toBe(true)
 })
+
+
+test("keeps endpoint identity method-specific while merging parameter evidence for the same method", () => {
+  const endpoints = mergeStructuredJavaScriptEndpoints(
+    [{
+      id: "endpoint:static-users",
+      literal: "/api/users/{id}",
+      host: null,
+      origin: null,
+      path: "/api/users/{id}",
+      sourceFiles: ["javascript/routes.js"],
+      observedRequestIDs: ["req-get", "req-post"],
+      observedInTraffic: true,
+      confidence: "observed",
+    }],
+    [
+      {
+        id: "js-request:get-id", sourceFunction: "loadUser", method: "GET",
+        urlTemplate: "/api/users/{id}", host: null, origin: null, path: "/api/users/{id}",
+        pathParameters: ["id"], queryParameters: ["role"], bodyParameters: [], headerNames: ["Authorization"],
+        authSignals: ["authorization-header"], cookieSignals: [], authAssessment: "signals-present",
+        sourceLine: 12, confidence: "candidate", sourceFile: "javascript/users.js", observedRequestIDs: ["req-get"],
+      },
+      {
+        id: "js-request:get-expanded", sourceFunction: "loadUser", method: "GET",
+        urlTemplate: "/api/users/{userId}", host: null, origin: null, path: "/api/users/{userId}",
+        pathParameters: ["userId"], queryParameters: ["include"], bodyParameters: [], headerNames: [],
+        authSignals: [], cookieSignals: [], authAssessment: "no-static-auth-signal",
+        sourceLine: 39, confidence: "candidate", sourceFile: "javascript/users-expanded.js", observedRequestIDs: [],
+      },
+      {
+        id: "js-request:post-user", sourceFunction: "updateUser", method: "POST",
+        urlTemplate: "/api/users/{id}", host: null, origin: null, path: "/api/users/{id}",
+        pathParameters: ["id"], queryParameters: [], bodyParameters: ["role"], headerNames: ["X-CSRF-Token"],
+        authSignals: ["csrf-or-xsrf-signal"], cookieSignals: ["cookie-header-signal"], authAssessment: "signals-present",
+        sourceLine: 61, confidence: "candidate", sourceFile: "javascript/update-user.js", observedRequestIDs: ["req-post"],
+      },
+    ],
+    [
+      { id: "req-get", method: "GET" },
+      { id: "req-post", method: "POST" },
+    ],
+  )
+
+  expect(endpoints).toHaveLength(2)
+  const getEndpoint = endpoints.find((endpoint) => endpoint.method === "GET")
+  const postEndpoint = endpoints.find((endpoint) => endpoint.method === "POST")
+  expect(getEndpoint).toBeDefined()
+  expect(postEndpoint).toBeDefined()
+  expect(getEndpoint?.id).not.toBe(postEndpoint?.id)
+  expect(getEndpoint?.sourceFiles).toEqual(["javascript/routes.js", "javascript/users.js", "javascript/users-expanded.js"])
+  expect(getEndpoint?.pathParameters).toEqual(["id", "userId"])
+  expect(getEndpoint?.queryParameters).toEqual(["role", "include"])
+  expect(getEndpoint?.bodyParameters).toEqual([])
+  expect(getEndpoint?.observedRequestIDs).toEqual(["req-get"])
+  expect(postEndpoint?.sourceFiles).toContain("javascript/update-user.js")
+  expect(postEndpoint?.bodyParameters).toEqual(["role"])
+  expect(postEndpoint?.queryParameters).toEqual([])
+  expect(postEndpoint?.observedRequestIDs).toEqual(["req-post"])
+})
