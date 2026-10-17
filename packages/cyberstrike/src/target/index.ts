@@ -2052,49 +2052,129 @@ export namespace TargetMemory {
     }
   }
 
-  /** True only when this session tree has observed a URL matching an existing target workspace. */
-  export function isObservedInSession(sessionID: string, targetURL: string): boolean {
-    const normalized = normalizeTarget(targetURL)
-    const projectID = Instance.project.id
-    const rootSessionExists = Database.use((db) =>
-      db
-        .select({ id: SessionTable.id })
-        .from(SessionTable)
-        .where(and(eq(SessionTable.id, sessionID), eq(SessionTable.project_id, projectID)))
-        .get(),
-    )
-    if (!rootSessionExists) return false
-    const sessionIDs = new Set<string>([sessionID])
-    let frontier = [sessionID]
-    while (frontier.length > 0) {
-      const children = Database.use((db) =>
-        db.select({ id: SessionTable.id }).from(SessionTable)
-          .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, frontier)))
-          .all().map((row) => row.id).filter((id) => !sessionIDs.has(id)),
-      )
-      for (const child of children) sessionIDs.add(child)
-      frontier = children
-    }
-    const requests = Database.use((db) =>
-      db.select({ host: RequestTable.host, origin: RequestTable.origin, normalizedPath: RequestTable.normalized_path, pageURL: RequestTable.page_url })
-        .from(RequestTable).where(inArray(RequestTable.session_id, [...sessionIDs])).all(),
-    )
-    const assets = Database.use((db) =>
-      db.select({ asset: IntelEntryTable.asset }).from(IntelEntryTable)
-        .where(inArray(IntelEntryTable.session_id, [...sessionIDs])).all().map((row) => row.asset),
-    )
-    const observedURLs: string[] = []
-    for (const request of requests) {
-      if (request.pageURL) observedURLs.push(request.pageURL)
-      if (request.origin) observedURLs.push(request.origin)
-      if (request.host) observedURLs.push(request.host)
-      if (request.origin && request.normalizedPath) {
-        try { observedURLs.push(new URL(request.normalizedPath, request.origin).href) } catch {}
+  /** Collect observed request/asset URLs from a session tree without crossing project boundaries. */
+function sessionObservedURLs(sessionID: string): string[] | undefined {
+  const projectID = Instance.project.id
+  const rootSessionExists = Database.use((db) =>
+    db.select({ id: SessionTable.id }).from(SessionTable)
+      .where(and(eq(SessionTable.id, sessionID), eq(SessionTable.project_id, projectID))).get(),
+  )
+  if (!rootSessionExists) return undefined
+
+  const sessionIDs = new Set<string>([sessionID])
+  let frontier = [sessionID]
+  while (frontier.length > 0) {
+    const children = Database.use((db) => {
+      const discovered: string[] = []
+      for (let offset = 0; offset < frontier.length; offset += 500) {
+        const parentIDs = frontier.slice(offset, offset + 500)
+        discovered.push(
+          ...db.select({ id: SessionTable.id }).from(SessionTable)
+            .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, parentIDs)))
+            .all().map((row) => row.id),
+        )
       }
-    }
-    observedURLs.push(...assets.filter((asset): asset is string => typeof asset === "string" && asset.length > 0))
-    return observedURLs.some((observed) => targetObservationMatches(normalized.targetURL, observed))
+      return [...new Set(discovered)].filter((id) => !sessionIDs.has(id))
+    })
+    for (const child of children) sessionIDs.add(child)
+    frontier = children
   }
+  const orderedIDs = [...sessionIDs]
+  const requests = Database.use((db) => {
+    const rows: Array<{ host: string | null; origin: string | null; normalizedPath: string; pageURL: string | null }> = []
+    for (let offset = 0; offset < orderedIDs.length; offset += 500) {
+      const ids = orderedIDs.slice(offset, offset + 500)
+      rows.push(
+        ...db.select({
+          host: RequestTable.host,
+          origin: RequestTable.origin,
+          normalizedPath: RequestTable.normalized_path,
+          pageURL: RequestTable.page_url,
+        }).from(RequestTable).where(inArray(RequestTable.session_id, ids)).all(),
+      )
+    }
+    return rows
+  })
+  const assets = Database.use((db) => {
+    const rows: string[] = []
+    for (let offset = 0; offset < orderedIDs.length; offset += 500) {
+      const ids = orderedIDs.slice(offset, offset + 500)
+      rows.push(
+        ...db.select({ asset: IntelEntryTable.asset }).from(IntelEntryTable)
+          .where(inArray(IntelEntryTable.session_id, ids)).all().map((row) => row.asset),
+      )
+    }
+    return rows
+  })
+  const observedURLs: string[] = []
+  for (const request of requests) {
+    if (request.pageURL) observedURLs.push(request.pageURL)
+    if (request.origin) observedURLs.push(request.origin)
+    if (request.host) observedURLs.push(request.host)
+    if (request.origin && request.normalizedPath) {
+      try { observedURLs.push(new URL(request.normalizedPath, request.origin).href) } catch {}
+    }
+  }
+  observedURLs.push(...assets.filter((asset): asset is string => typeof asset === "string" && asset.length > 0))
+  return observedURLs
+}
+
+/** True when this session tree has observed a URL matching this existing target workspace. */
+export function isObservedInSession(sessionID: string, targetURL: string): boolean {
+  const observedURLs = sessionObservedURLs(sessionID)
+  if (!observedURLs) return false
+  const normalized = normalizeTarget(targetURL)
+  return observedURLs.some((observed) => targetObservationMatches(normalized.targetURL, observed))
+}
+
+/**
+ * Permit a notes read on an ancestor workspace only when the same session tree
+ * observed a registered descendant whose parent chain reaches that workspace.
+ * This allows resumable parent/ancestor memory without opening unrelated siblings.
+ */
+export function isObservedOrAncestorInSession(sessionID: string, targetURL: string): boolean {
+  const normalized = normalizeTarget(targetURL)
+  const projectID = Instance.project.id
+  const ownerKey = currentOwnerKey()
+  const targetRow = Database.use((db) =>
+    db.select().from(TargetWorkspaceTable).where(and(
+      eq(TargetWorkspaceTable.project_id, projectID),
+      eq(TargetWorkspaceTable.owner_key, ownerKey),
+      eq(TargetWorkspaceTable.target_key, normalized.targetKey),
+    )).get(),
+  )
+  if (!targetRow) return false
+
+  const observedURLs = sessionObservedURLs(sessionID)
+  if (!observedURLs) return false
+  if (observedURLs.some((observed) => targetObservationMatches(normalized.targetURL, observed))) return true
+
+  const workspaces = Database.use((db) =>
+    db.select().from(TargetWorkspaceTable).where(and(
+      eq(TargetWorkspaceTable.project_id, projectID),
+      eq(TargetWorkspaceTable.owner_key, ownerKey),
+    )).all(),
+  )
+  const byID = new Map(workspaces.map((workspace) => [workspace.id, workspace]))
+  const observedWorkspaceIDs = new Set(
+    workspaces
+      .filter((workspace) => observedURLs.some((observed) => targetObservationMatches(workspace.target_url, observed)))
+      .map((workspace) => workspace.id),
+  )
+  for (const observedID of observedWorkspaceIDs) {
+    let current = byID.get(observedID)
+    const visited = new Set<string>()
+    while (current?.parent_target_id) {
+      if (visited.has(current.id)) break
+      visited.add(current.id)
+      if (current.parent_target_id === targetRow.id) return true
+      const parent = byID.get(current.parent_target_id)
+      if (!parent || parent.project_id !== projectID || parent.owner_key !== ownerKey) break
+      current = parent
+    }
+  }
+  return false
+}
 
   /**
    * Retrieve notes for the most relevant known target seen in this session.
