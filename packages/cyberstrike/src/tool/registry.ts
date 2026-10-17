@@ -17,6 +17,7 @@ import { ReconCheckpointTool } from "./recon-checkpoint"
 import { ResearchKnowledgeTool } from "./research-knowledge"
 import { ResearchStudyTool } from "./research-study"
 import { TargetNoteTool } from "./target-note"
+import { TargetNotesReadTool } from "./target-notes-read"
 import { TargetWorkspaceTool } from "./target-workspace"
 import { TargetArtifactTool } from "./target-artifact"
 import { WebFetchTool } from "./webfetch"
@@ -177,6 +178,7 @@ export namespace ToolRegistry {
       ResearchKnowledgeTool,
       ResearchStudyTool,
       TargetNoteTool,
+      TargetNotesReadTool,
       TargetWorkspaceTool,
       TargetArtifactTool,
       // TodoReadTool,
