@@ -13,6 +13,7 @@ const HACKERONE_ASSET_TYPES: Record<string, string> = {
   domain: "Domain",
   executable: "Executable",
   hardware: "Hardware",
+  hardwareiot: "Hardware",
   iosappstore: "iOS: App Store",
   iosipa: "iOS: .ipa",
   iostestflight: "iOS: Testflight",
@@ -34,18 +35,38 @@ export function parseScopeFileContents(contents: string): string[] {
 
   // HackerOne asset exports are tab-separated and include identifier + asset_type.
   // Convert rows to typed expressions, retaining unsupported asset kinds as evidence.
-  const header = nonEmpty[0].line.split("\t").map((part) => part.trim().toLowerCase().replace(/[ _-]+/g, ""))
+  const delimiter = nonEmpty[0].line.includes("\\t") ? "\\t" : nonEmpty[0].line.includes(";") ? ";" : ","
+  const parseRow = (line: string): string[] => {
+    if (delimiter === "\\t") return line.split("\\t")
+    const fields: string[] = []
+    let field = ""
+    let quoted = false
+    for (let index = 0; index < line.length; index++) {
+      const char = line[index]!
+      if (char === '"') {
+        if (quoted && line[index + 1] === '"') { field += '"'; index++ }
+        else quoted = !quoted
+      } else if (char === delimiter && !quoted) {
+        fields.push(field.trim())
+        field = ""
+      } else field += char
+    }
+    fields.push(field.trim())
+    return fields
+  }
+  const normalizeTypeKey = (part: string) => part.toLowerCase().replace(/[^a-z0-9]+/g, "")
+  const header = parseRow(nonEmpty[0].line).map(normalizeTypeKey)
   const identifierColumn = header.indexOf("identifier")
   const typeColumn = header.indexOf("assettype")
   if (identifierColumn >= 0 && typeColumn >= 0) {
     const entries: string[] = []
     for (const row of nonEmpty.slice(1)) {
       if (row.line.length > 1000) throw new Error("Scope file entry at line " + (row.index + 1) + " exceeds the 1000-character entry limit.")
-      const columns = row.line.split("\t")
+      const columns = parseRow(row.line)
       const identifier = columns[identifierColumn]?.trim()
       const rawType = columns[typeColumn]?.trim()
       if (!identifier || !rawType) continue
-      const key = rawType.toLowerCase().replace(/[ _-]+/g, "")
+      const key = normalizeTypeKey(rawType)
       const type = HACKERONE_ASSET_TYPES[key] ?? rawType
       entries.push(type + ": " + identifier)
     }
