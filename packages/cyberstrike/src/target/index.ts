@@ -449,6 +449,25 @@ async function createIfMissing(filePath: string, content: string): Promise<void>
 
 const notesMarkdownQueues = new Map<string, Promise<void>>()
 
+const targetNoteWriteQueues = new Map<string, Promise<void>>()
+
+/** Serialize all note upserts for one normalized target before they read/merge the current row. */
+async function withTargetNoteWriteLock<T>(targetKey: string, task: () => Promise<T>): Promise<T> {
+  const previous = targetNoteWriteQueues.get(targetKey) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  targetNoteWriteQueues.set(targetKey, current)
+  await previous.catch(() => undefined)
+  try {
+    return await task()
+  } finally {
+    release()
+    if (targetNoteWriteQueues.get(targetKey) === current) targetNoteWriteQueues.delete(targetKey)
+  }
+}
+
 /** Serialize Markdown read/modify/write cycles so concurrent note additions cannot overwrite one another. */
 async function withNotesMarkdownLock<T>(notesPath: string, task: () => Promise<T>): Promise<T> {
   const previous = notesMarkdownQueues.get(notesPath) ?? Promise.resolve()
@@ -1727,6 +1746,14 @@ export namespace TargetMemory {
 
   /** Store a provenance-aware, idempotent note in SQLite and keep its generated notes.md metadata in sync. */
   export async function addNote(
+    targetURL: string,
+    input: NoteInput,
+  ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
+    const targetKey = normalizeTarget(targetURL).targetKey
+    return withTargetNoteWriteLock(targetKey, () => addNoteUnlocked(targetURL, input))
+  }
+
+  async function addNoteUnlocked(
     targetURL: string,
     input: NoteInput,
   ): Promise<{ workspace: Workspace; note: TargetNote; created: boolean; updated: boolean }> {
