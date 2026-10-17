@@ -175,14 +175,15 @@ Do not manufacture certainty to complete a schema. Keep unknown values absent or
 
 Report `reports_found`, `writeups_found`, `reports_and_writeups_found`, and `unique_documents_found` from the current cycle summary. Keep these per-run counts separate from lifetime queue totals. If the current cycle summary is unavailable, report the counts as unavailable; do not estimate them.
 
-Use these headings in this order so the result is auditable:
+Use these headings in this order so the result is auditable. Put uncertainty and disputed claims before the status/conclusion so the reader sees what remains unproven before the overall result:
 
-1. **Overall status** — complete, partial, or blocked; never use “complete” if any configured source or required queue work is unresolved. There is no crawl-budget-capped completion state: keep going until the accessible frontier is exhausted or a concrete blocker is recorded.
-2. **Before → after counters** — global queue and knowledge counters, including learned/rejected/completed/skipped/pending model-study counts.
-3. **Per-source ledger** — one row per exact configured source ID, with each pass's requested page budget and actual pages, candidates, queued_new, learned saves, rejected decisions, preflight skips, blocked_auth, error_count/examples, retry attempts, remaining queue states, and final status. Mark not-run sources explicitly. Do not mistake source-filtered queue statistics for source-filtered knowledge statistics.
-4. **Persisted lessons** — useful Knowledge IDs and source URLs returned by successful saves; distinguish saved-and-terminal-state-confirmed from saved-but-queue-transition-failed.
-5. **Skipped/rejected work** — preflight skips and model rejections in separate lists with IDs and reasons.
-6. **Outstanding blockers and resume point** — unresolved source errors/auth, queued/retry/studying/blocked_auth rows, stale leases, persistence failures, incomplete pagination, and the exact next safe action. If interrupted, say partial and identify what has and has not completed.
+1. **Uncertainty and disputed claims** — list every studied item whose claim, impact, reproduction, provenance, or applicability is not fully established. For each, include the public ID/title/source URL, what is supported by the actual source, what remains unverified, why it is uncertain, what evidence is missing, plausible alternatives/limitations, and the next safe verification step. Say “none identified” only after reviewing every saved item; otherwise say “not assessed/unavailable.” Never relabel uncertainty as rejection or false positive.
+2. **Overall status** — complete, partial, or blocked; never use “complete” if any configured source or required queue work is unresolved. There is no crawl-budget-capped completion state: keep going until the accessible frontier is exhausted or a concrete blocker is recorded.
+3. **Before → after counters** — global queue and knowledge counters, including learned/rejected/completed/skipped/pending model-study counts.
+4. **Per-source ledger** — one row per exact configured source ID, with each pass's requested page budget and actual pages, candidates, queued_new, learned saves, rejected decisions, preflight skips, blocked_auth, error_count/examples, retry attempts, remaining queue states, and final status. Mark not-run sources explicitly. Do not mistake source-filtered queue statistics for source-filtered knowledge statistics.
+5. **Persisted lessons** — useful Knowledge IDs and source URLs returned by successful saves; distinguish saved-and-terminal-state-confirmed from saved-but-queue-transition-failed.
+6. **Skipped/rejected work** — preflight skips and model rejections in separate lists with IDs and reasons. State explicitly that a model rejection is a document-ingestion decision, not a false-positive finding verdict.
+7. **Outstanding blockers and resume point** — unresolved source errors/auth, queued/retry/studying/blocked_auth rows, stale leases, persistence failures, incomplete pagination, and the exact next safe action. If interrupted, say partial and identify what has and has not completed.
 
 Never invent counts or infer missing results. Use “unknown/not returned” when the tool did not provide a value.
 
