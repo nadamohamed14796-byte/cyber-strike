@@ -156,7 +156,7 @@ test("legacy WSTG SQLi/auth skills no longer prescribe extraction or brute-force
     ["wstg-inpv-05.3", ["EXEC master..xp_cmdshell", "OPENROWSET(", "ping attacker.com"]],
     ["wstg-inpv-05.4", ["pg_read_file('/etc/passwd')", "COPY (SELECT 'test') TO"]],
     ["wstg-inpv-05.5", ["SELECT username,password FROM users", "UNION SELECT NULL FROM MSysObjects"]],
-    ["wstg-inpv-05.6", ['"auth_bypass": [', '"$where": "function(){return true}"', "password": {"$ne""]],
+    ["wstg-inpv-05.6", ['"auth_bypass": [', '"$where": "function(){return true}"', '"password": {"$ne"']],
     ["wstg-inpv-05.7", ["DROP TABLE users", "UNION SELECT password FROM users", "substring(password,1,1)"]],
     ["wstg-auth-session", ["ffuf -u", "hashcat -a 0", "Default Credentials (Top 20)"]],
     ["wstg-authz-03", ['"role": "admin"', "Test sequential IDs"]],
