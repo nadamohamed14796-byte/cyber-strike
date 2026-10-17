@@ -7,7 +7,7 @@ const TargetNoteParameters = z.object({
     target_url: z.string().min(1).describe("Exact existing target workspace URL, including a path when the workspace is path-scoped"),
     kind: z.enum(["manual", "asset", "endpoint", "javascript", "finding", "evidence", "research", "lesson"]).default("manual"),
     record_mode: z.enum(["current", "journal"]).default("current").describe("current updates the living summary of one investigation; journal appends a meaningful dated experiment/result without replacing earlier history. Use journal only for consequential steps, not every request."),
-    title: z.string().min(1).max(180),
+    title: z.string().min(1),
     content: z.string().min(1),
     status: z.enum(["unverified", "observed", "confirmed", "disproven"]).optional().describe("Optional note status. Omit when updating an existing investigation to preserve its current status; new notes default to observed."),
     evidence: z.string().optional().describe("Concrete evidence required when status is confirmed or disproven"),
