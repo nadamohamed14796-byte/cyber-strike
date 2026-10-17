@@ -147,6 +147,23 @@ test("injection methodology skill enforces scope, evidence, and non-destructive 
   expect(content).not.toContain("--os-shell")
 })
 
+test("legacy WSTG SQLi/auth skills no longer prescribe extraction or brute-force recipes", async () => {
+  const repoRoot = path.resolve(import.meta.dir, "../../../..")
+  const base = path.join(repoRoot, ".cyberstrike", "skill", "WEB", "OWASP_WSTG_4.2")
+  const files = [
+    ["wstg-inpv-05.1", ["SELECT banner FROM v$version", "UTL_HTTP", "Try to extract data"]],
+    ["wstg-inpv-05.5", ["SELECT username,password FROM users", "MSysObjects"]],
+    ["wstg-auth-session", ["ffuf -u", "hashcat -a 0", "Default Credentials (Top 20)"]],
+    ["wstg-authz-03", ['"role": "admin"', "Test sequential IDs"]],
+    ["wstg-authz-05.1", ["Test common/default client secrets", "Weak client secret found"]],
+  ] as const
+  for (const [folder, forbidden] of files) {
+    const content = await fs.readFile(path.join(base, folder, "SKILL.md"), "utf8")
+    expect(content).toContain("persisted scope")
+    for (const phrase of forbidden) expect(content).not.toContain(phrase)
+  }
+})
+
 test("full repository skill catalog has no unresolved chain or prerequisite references", async () => {
   const repoRoot = path.resolve(import.meta.dir, "../../../..")
   const previousTestHome = process.env.CYBERSTRIKE_TEST_HOME
