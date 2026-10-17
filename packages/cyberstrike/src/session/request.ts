@@ -100,8 +100,19 @@ export namespace Request {
     const id = Identifier.ascending("request")
     const now = Date.now()
 
-    // Process response if provided
-    const processed = input.response ? processResponse(input.response) : undefined
+    // Keep the ordinary LLM-facing preview bounded, while retaining complete JavaScript source
+    // in its separate database column for static analysis. Use the observed URL as a fallback
+    // for script servers that incorrectly label their MIME type.
+    let responseURL = input.normalizedPath
+    const responseBase = input.origin ?? (
+      input.scheme && input.host
+        ? input.scheme + "://" + input.host + (input.port && !/:(?:80|443)$/.test(input.host) ? ":" + input.port : "")
+        : undefined
+    )
+    if (responseBase) {
+      try { responseURL = new URL(input.normalizedPath, responseBase).href } catch {}
+    }
+    const processed = input.response ? processResponse({ ...input.response, url: responseURL }) : undefined
 
     // Atomic dedup guard (Faz 0): one row per (session, key_hash). If a concurrent
     // ingest already inserted this key_hash, ON CONFLICT DO NOTHING drops the second
