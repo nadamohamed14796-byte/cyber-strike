@@ -31,8 +31,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       } catch {
         return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
       }
-      const scopePath = scopeURL.pathname.replace(/\\/+$/, "") || "/"
-      const targetPath = candidateURL.pathname.replace(/\\/+$/, "") || "/"
+      const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
+      const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
       return candidateURL.hostname.toLowerCase() === scopeURL.hostname.toLowerCase() &&
         candidateURL.port === scopeURL.port &&
         (targetPath === scopePath || targetPath.startsWith(scopePath === "/" ? "/" : scopePath + "/"))
@@ -114,8 +114,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     if (!hostMatches) return { matches: false, reason: "hostname does not match explicit URL scope" }
     if (candidateURL.protocol !== scopeURL.protocol) return { matches: false, reason: "protocol does not match explicit URL scope" }
     if (candidateURL.port !== scopeURL.port) return { matches: false, reason: "port does not match explicit URL scope" }
-    const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
-    const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
+      const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
+      const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
     const pathWildcard = scopePath.endsWith("/*")
     const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
     const pathMatches = pathWildcard
