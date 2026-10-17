@@ -348,7 +348,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (fnSeen.has(key)) continue
     fnSeen.add(key)
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
-      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p)) )
+      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p)))
     functions.push({ name, line, parameters })
     functionOffsets.set(key, match.index ?? 0)
       }
@@ -362,7 +362,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (fnSeen.has(key)) continue
     fnSeen.add(key)
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
-      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p)) )
+      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p)))
     functions.push({ name, line, parameters })
     functionOffsets.set(key, match.index ?? 0)
       }
