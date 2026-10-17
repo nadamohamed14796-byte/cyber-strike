@@ -1489,13 +1489,23 @@ export namespace JavaScriptCorrelation {
         "- Cookie/session signals: " + ((endpoint.cookieSignals ?? []).join(", ") || "none statically identified"),
       ]
       const sourceCallLines = relatedCandidates.length
-        ? relatedCandidates.map((candidate) =>
-            "- " + candidate.sourceFile + ":" + candidate.sourceLine +
-            (candidate.sourceFunction ? " in " + candidate.sourceFunction : "") +
-            " — path=[" + candidate.pathParameters.join(", ") + "] query=[" + candidate.queryParameters.join(", ") +
-            "] body=[" + candidate.bodyParameters.join(", ") + "] headers=[" + candidate.headerNames.join(", ") +
-            "] auth=[" + candidate.authSignals.join(", ") + "] cookies=[" + candidate.cookieSignals.join(", ") + "]",
-          )
+        ? relatedCandidates.map((candidate) => {
+            const parameterEvidence = [
+              ...candidate.pathParameters.map((name) => name + " [path; type unknown unless independently inferred]"),
+              ...candidate.queryParameters.map((name) => name + " [query; type unknown unless independently inferred]"),
+              ...candidate.bodyParameters.map((name) => name + " [body; type unknown unless independently inferred]"),
+              ...candidate.headerNames.map((name) => name + " [header; value/type not captured by this static hint]"),
+            ]
+            return "- " + (candidate.method ?? "UNKNOWN") + " " + candidate.urlTemplate +
+              " — source: " + candidate.sourceFile + ":" + candidate.sourceLine +
+              (candidate.sourceFunction ? " in " + candidate.sourceFunction : "") +
+              " — parameters: [" + (parameterEvidence.join(", ") || "none statically identified") + "]" +
+              " — confidence: " + candidate.confidence +
+              " — auth assessment: " + candidate.authAssessment +
+              " — auth signals: [" + candidate.authSignals.join(", ") + "]" +
+              " — cookie/session signals: [" + candidate.cookieSignals.join(", ") + "]" +
+              " — captured request IDs: [" + (candidate.observedRequestIDs.join(", ") || "none") + "]"
+          })
         : ["- No structured request-call candidate associated with this method-specific route."]
       const endpointNoteContent = [
         "# Endpoint Evidence",
