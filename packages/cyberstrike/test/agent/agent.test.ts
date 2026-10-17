@@ -291,7 +291,7 @@ test("vulnerability specialists reject speculative and destructive test recipes"
       expect(idor?.prompt).not.toContain("common/predictable IDs")
       expect(ssrf?.prompt).toContain("controlled HTTPS canary")
       expect(ssrf?.prompt).not.toContain("ALWAYS test 169.254.169.254 first")
-      expect(ssrf?.prompt).not.toContain("DNS rebinding")
+      expect(ssrf?.prompt).toContain("Do not bypass a WAF or URL allowlist")
       expect(massAssignment?.prompt).toContain("harmless reversible properties")
       expect(massAssignment?.prompt).not.toContain('"role": "admin"')
       expect(massAssignment?.prompt).not.toContain('"balance": 999999')
