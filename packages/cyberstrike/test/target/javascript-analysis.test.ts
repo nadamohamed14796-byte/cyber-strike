@@ -335,3 +335,13 @@ test("does not attribute top-level risk sinks to the previously closed function"
   expect(signals.find((signal) => signal.functionName === "renderCard")).toBeDefined()
   expect(signals.find((signal) => signal.functionName === null)).toBeDefined()
 })
+
+
+test("extracts more than 300 JavaScript request candidates", () => {
+  const source = Array.from({ length: 350 }, (_, index) =>
+    'fetch("/api/v1/resources/' + index + '")',
+  ).join("\\n")
+  const result = analyzeJavaScriptSource(source)
+  expect(result.requests).toHaveLength(350)
+  expect(result.requests.some((request) => request.path === "/api/v1/resources/349")).toBe(true)
+})
