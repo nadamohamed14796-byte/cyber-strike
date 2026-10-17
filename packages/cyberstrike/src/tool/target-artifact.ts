@@ -1,9 +1,11 @@
 import path from "node:path"
 import fs from "node:fs/promises"
+import { constants as fsConstants } from "node:fs"
 import { createHash } from "node:crypto"
 import z from "zod"
 import { TargetMemory } from "../target"
 import { Tool } from "./tool"
+import { assertExternalDirectory } from "./external-directory"
 
 const AREAS = [
   "scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints",
@@ -47,7 +49,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, then verify the output file. Do not use the shell current directory or /root/targets implicitly.",
   ].join("\n"),
   parameters: Parameters,
-  async execute(params) {
+  async execute(params, ctx) {
     const workspace = await TargetMemory.get(params.target_url)
     if (!workspace) {
       return {
@@ -90,23 +92,56 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
           metadata: { saved: false, reason: "source_path_not_absolute", target_url: params.target_url } as TargetArtifactMetadata,
         }
       }
+      // Match the regular read tool's permission boundary. An absolute source_path
+      // is not implicit consent to copy arbitrary local files into target evidence.
+      await assertExternalDirectory(ctx, params.source_path)
+      await ctx.ask({
+        permission: "read",
+        patterns: [params.source_path],
+        always: ["*"],
+        metadata: { purpose: "copy source file into target artifact workspace" },
+      })
       try {
-        const info = await fs.lstat(params.source_path)
-        if (info.isSymbolicLink() || !info.isFile()) {
-          return {
-            title: "Target artifact not saved",
-            output: "Source input must be a regular file; symbolic links and non-file inputs are refused.",
-            metadata: { saved: false, reason: "unsafe_source_file", target_url: params.target_url, source_path: params.source_path } as TargetArtifactMetadata,
+        // Open the file once and read through that handle. O_NOFOLLOW prevents a
+        // symlink swap on supported platforms; inode/device comparison protects
+        // the fallback platforms against a path replacement after open.
+        const noFollow = process.platform === "win32" ? 0 : (fsConstants.O_NOFOLLOW ?? 0)
+        const handle = await fs.open(params.source_path, fsConstants.O_RDONLY | noFollow)
+        let bytes: Buffer
+        try {
+          const openedInfo = await handle.stat()
+          const pathInfo = await fs.lstat(params.source_path)
+          if (
+            !openedInfo.isFile() ||
+            pathInfo.isSymbolicLink() ||
+            !pathInfo.isFile() ||
+            pathInfo.dev !== openedInfo.dev ||
+            pathInfo.ino !== openedInfo.ino
+          ) {
+            return {
+              title: "Target artifact not saved",
+              output: "Source input must remain the same regular file during open; symbolic links and non-file inputs are refused.",
+              metadata: { saved: false, reason: "unsafe_source_file", target_url: params.target_url, source_path: params.source_path } as TargetArtifactMetadata,
+            }
           }
-        }
-        if (info.size > 32 * 1024 * 1024) {
-          return {
-            title: "Target artifact not saved",
-            output: "Source text file exceeds the 32 MB limit. Configure the producer to write to the exact target workspace path instead.",
-            metadata: { saved: false, reason: "source_file_too_large", target_url: params.target_url, source_path: params.source_path } as TargetArtifactMetadata,
+          if (openedInfo.size > 32 * 1024 * 1024) {
+            return {
+              title: "Target artifact not saved",
+              output: "Source text file exceeds the 32 MB limit. Configure the producer to write to the exact target workspace path instead.",
+              metadata: { saved: false, reason: "source_file_too_large", target_url: params.target_url, source_path: params.source_path } as TargetArtifactMetadata,
+            }
           }
+          bytes = await handle.readFile()
+          if (bytes.byteLength > 32 * 1024 * 1024) {
+            return {
+              title: "Target artifact not saved",
+              output: "Source text file grew beyond the 32 MB limit while being read. Configure the producer to write to the exact target workspace path instead.",
+              metadata: { saved: false, reason: "source_file_too_large", target_url: params.target_url, source_path: params.source_path } as TargetArtifactMetadata,
+            }
+          }
+        } finally {
+          await handle.close()
         }
-        const bytes = await fs.readFile(params.source_path)
         rawContent = bytes.toString("utf-8")
         sourceHash = createHash("sha256").update(bytes).digest("hex")
       } catch (error) {
