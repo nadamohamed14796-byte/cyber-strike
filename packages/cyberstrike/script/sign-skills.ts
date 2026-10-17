@@ -7,6 +7,7 @@
 // Reads private key from CYBERSTRIKE_SKILL_PRIVATE_KEY env var or .skill-signing-key file
 // The .skill-signing-key file is gitignored — NEVER commit it
 import path from "path"
+import { hashSkillContent } from "../src/skill/signature-format"
 
 const root = path.resolve(import.meta.dir, "../../..")
 const skillDir = path.join(root, ".cyberstrike", "skill")
@@ -24,14 +25,7 @@ async function generateKeyPair() {
 }
 
 async function signContent(content: string, privateKeyB64: string) {
-  const stripped = content
-    .replace(/^sha256:.*\n?/m, "")
-    .replace(/^signature:.*\n?/m, "")
-    .replace(/^signed_by:.*\n?/m, "")
-    .trim()
-  const hasher = new Bun.CryptoHasher("sha256")
-  hasher.update(stripped)
-  const hash = hasher.digest("hex")
+  const hash = hashSkillContent(content)
 
   const raw = Buffer.from(privateKeyB64, "base64")
   const key = await crypto.subtle.importKey("pkcs8", raw, { name: "Ed25519" }, false, ["sign"])

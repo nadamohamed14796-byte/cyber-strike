@@ -1,4 +1,5 @@
 import { Log } from "../util/log"
+import { hashSkillContent } from "./signature-format"
 
 export namespace SkillSigning {
   const log = Log.create({ service: "skill-signing" })
@@ -11,14 +12,7 @@ export namespace SkillSigning {
   export type VerificationStatus = "official" | "community" | "unverified" | "tampered"
 
   export async function computeHash(content: string): Promise<string> {
-    const stripped = content
-      .replace(/^sha256:.*\n?/m, "")
-      .replace(/^signature:.*\n?/m, "")
-      .replace(/^signed_by:.*\n?/m, "")
-      .trim()
-    const hasher = new Bun.CryptoHasher("sha256")
-    hasher.update(stripped)
-    return hasher.digest("hex")
+    return hashSkillContent(content)
   }
 
   export async function verify(skill: {
