@@ -137,6 +137,30 @@ describe("IngestQueue.pause / resume", () => {
     })
   })
 
+  test("a pause racing with resume still blocks a queued task", async () => {
+    await withInstance(async () => {
+      const sid = "p5"
+      const order: string[] = []
+      IngestQueue.pause(sid)
+      IngestQueue.enqueue(sid, async () => {
+        order.push("ran")
+      })
+
+      // Resolve the first wait, then pause again before its continuation runs.
+      // The queued task must observe the second pause rather than slipping through.
+      IngestQueue.resume(sid)
+      IngestQueue.pause(sid)
+      await new Promise((r) => setTimeout(r, 10))
+      expect(order).toEqual([])
+      expect(IngestQueue.pendingCount(sid)).toBe(1)
+
+      IngestQueue.resume(sid)
+      await new Promise((r) => setTimeout(r, 10))
+      expect(order).toEqual(["ran"])
+      expect(IngestQueue.pendingCount(sid)).toBe(0)
+    })
+  })
+
   test("enqueue while already paused waits at start", async () => {
     await withInstance(async () => {
       const sid = "p4"
