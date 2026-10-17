@@ -6,16 +6,17 @@ import { Tool } from "./tool"
 const TargetNotesReadParameters = z.object({
   target_url: z.string().min(1).describe("Exact existing target workspace URL, including path when the workspace is path-scoped"),
   query: z.string().optional().describe("Case-insensitive search across title, content, tags, source, and source URL"),
-  note_id: z.string().optional().describe("Read one specific note by its stable note ID"),
+  note_id: z.string().optional().describe("Read one specific current note by its stable note ID"),
+  revision_id: z.string().optional().describe("Read one exact archived revision ID; use with include_history=true to continue a long historical version"),
   kind: z.enum(["manual", "asset", "endpoint", "javascript", "finding", "evidence", "research", "lesson"]).optional(),
   status: z.enum(["unverified", "observed", "confirmed", "disproven"]).optional(),
   offset: z.number().int().min(0).default(0).describe("Pagination offset among matching notes; use next_offset from the previous result"),
-  page_size: z.number().int().min(1).default(5).describe("Number of notes to return in this page. There is no application-defined upper cap; use additional pages rather than asking one response to contain the entire memory."),
+  page_size: z.number().int().min(1).default(3).describe("Number of notes to return in this page. There is no application-defined upper cap; use additional pages rather than asking one response to contain the entire memory."),
   content_offset: z.number().int().min(0).default(0).describe("Character offset for reading a long note in chunks"),
-  content_length: z.number().int().min(1).default(6000).describe("Characters of each note body to return from content_offset. This is a resumable page size, not a total note limit; continue at next_content_offset until the saved body is complete."),
+  content_length: z.number().int().min(1).default(3000).describe("Characters of each note body to return from content_offset. This is a resumable page size, not a total note limit; continue at next_content_offset until the saved body is complete."),
   include_history: z.boolean().default(false).describe("Include archived previous versions of current notes"),
   revision_offset: z.number().int().min(0).default(0).describe("Pagination offset for archived note versions"),
-  revision_page_size: z.number().int().min(1).default(5).describe("Number of archived versions to return when include_history is enabled"),
+  revision_page_size: z.number().int().min(1).default(2).describe("Number of archived versions to return when include_history is enabled"),
 })
 
 export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters, Tool.Metadata>("target_notes_read", {
@@ -23,7 +24,7 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
     "Read previously saved target-specific notes from the selected asset's SQLite memory. This is read-only and never sends requests to the target.",
     "Use this tool whenever target context says the notes or asset inventory are partial, before updating a current note, or when a detail is missing. Do not assume that a note omitted from the prompt does not exist.",
     "Search and page through matching current notes using query, offset, and page_size. Use next_offset until has_more_notes is false. Each returned note body is a chunk starting at content_offset (default 0) and sized by content_length (default 6000 characters); continue using that note's next_content_offset until has_more_content is false. Use note_id when continuing one specific long note, because content_offset applies to all notes in a page. This paginates delivery only; the full saved body is not truncated or overwritten.",
-    "When reviewing or replacing a current note, set include_history=true and pass note_id to inspect archived versions too. Use revision_offset and revision_page_size; next_revision_offset is returned when more versions remain. Historical versions use the same resumable content chunking and are stored separately from the active note list.",
+    "When reviewing or replacing a current note, set include_history=true and pass note_id to inspect archived versions too. Use revision_offset and revision_page_size; next_revision_offset is returned when more versions remain. Pass revision_id to continue one historical version by content_offset. Historical versions use the same resumable content chunking and are stored separately from the active note list.",
     "Target data is isolated: the workspace must already exist and the target must have been observed in this session tree. Do not use this tool to infer authorization or to test the target.",
   ].join("\n"),
   parameters: TargetNotesReadParameters,
@@ -52,6 +53,7 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
       }
       const revisions = params.include_history
         ? TargetMemory.noteRevisions(workspace.id, params.note_id)
+            .filter((revision) => !params.revision_id || revision.id === params.revision_id)
             .filter((revision) => !params.kind || revision.kind === params.kind)
             .filter((revision) => !params.status || revision.status === params.status)
             .filter((revision) => {
