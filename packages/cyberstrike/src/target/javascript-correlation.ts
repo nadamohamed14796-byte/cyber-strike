@@ -10,6 +10,22 @@ import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
 import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal } from "./javascript-analysis"
 
+/**
+ * SQLite builds have a finite bind-parameter budget. Split IN lists into safe
+ * query batches, then combine and sort the complete result; this is not a result cap.
+ */
+const SQLITE_IN_BATCH_SIZE = 500
+function chunkForSQLiteIn<T>(values: readonly T[], size = SQLITE_IN_BATCH_SIZE): T[][] {
+  const output: T[][] = []
+  for (let offset = 0; offset < values.length; offset += size) {
+    output.push(values.slice(offset, offset + size))
+  }
+  return output
+}
+function newestFirst<T extends { time_updated: number }>(rows: T[]): T[] {
+  return rows.sort((a, b) => b.time_updated - a.time_updated)
+}
+
 function safeURL(input?: string | null): URL | undefined {
   if (!input?.trim()) return undefined
   try {
@@ -796,13 +812,14 @@ export namespace JavaScriptCorrelation {
     let frontier = [rootSessionID]
     while (frontier.length > 0) {
       const children = Database.use((db) =>
-        db
-          .select({ id: SessionTable.id })
-          .from(SessionTable)
-          .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, frontier)))
-          .all()
-          .map((row) => row.id)
-          .filter((id) => !sessionIDsSet.has(id)),
+        chunkForSQLiteIn(frontier).flatMap((parentIDs) =>
+          db
+            .select({ id: SessionTable.id })
+            .from(SessionTable)
+            .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, parentIDs)))
+            .all()
+            .map((row) => row.id),
+        ).filter((id) => !sessionIDsSet.has(id)),
       )
       for (const child of children) sessionIDsSet.add(child)
       frontier = children
@@ -810,12 +827,9 @@ export namespace JavaScriptCorrelation {
     const sessionIDs = [...sessionIDsSet]
 
     const intel = Database.use((db) =>
-      db
-        .select()
-        .from(IntelEntryTable)
-        .where(inArray(IntelEntryTable.session_id, sessionIDs))
-        .orderBy(desc(IntelEntryTable.time_updated))
-        .all(),
+      newestFirst(chunkForSQLiteIn(sessionIDs).flatMap((ids) =>
+        db.select().from(IntelEntryTable).where(inArray(IntelEntryTable.session_id, ids)).all(),
+      )),
     )
     const jsCandidates = intel
       .map((row) => ({
@@ -887,12 +901,9 @@ export namespace JavaScriptCorrelation {
     }
 
     const requests = Database.use((db) =>
-      db
-        .select()
-        .from(RequestTable)
-        .where(inArray(RequestTable.session_id, sessionIDs))
-        .orderBy(desc(RequestTable.time_updated))
-        .all(),
+      newestFirst(chunkForSQLiteIn(sessionIDs).flatMap((ids) =>
+        db.select().from(RequestTable).where(inArray(RequestTable.session_id, ids)).all(),
+      )),
     )
     const candidateRequests = requests.filter((request) => {
       const hostURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
@@ -959,31 +970,30 @@ export namespace JavaScriptCorrelation {
     const requestIDSet = new Set(requestIDs)
     const webFunctions = requestIDs.length
       ? Database.use((db) =>
-          db
-            .select()
-            .from(WebFunctionTable)
-            .where(inArray(WebFunctionTable.request_id, requestIDs))
-            .orderBy(desc(WebFunctionTable.time_updated))
-            .all(),
+          newestFirst(chunkForSQLiteIn(requestIDs).flatMap((ids) =>
+            db.select().from(WebFunctionTable).where(inArray(WebFunctionTable.request_id, ids)).all(),
+          )),
         )
       : []
     const observations = requestIDs.length
       ? Database.use((db) =>
-          db
-            .select()
-            .from(RequestObservationTable)
-            .where(and(inArray(RequestObservationTable.session_id, sessionIDs), inArray(RequestObservationTable.request_id, requestIDs)))
-            .orderBy(desc(RequestObservationTable.time_updated))
-                .all(),
+          newestFirst(
+            chunkForSQLiteIn(requestIDs)
+              .flatMap((ids) =>
+                db.select().from(RequestObservationTable)
+                  .where(inArray(RequestObservationTable.request_id, ids))
+                  .all(),
+              )
+              // request IDs were selected only after this session-tree and target-scope
+              // gate; retain the session check as a defense against inconsistent rows.
+              .filter((row) => sessionIDsSet.has(row.session_id)),
+          ),
         )
       : []
     const findingRows = Database.use((db) =>
-      db
-        .select()
-        .from(VulnerabilityTable)
-        .where(inArray(VulnerabilityTable.session_id, sessionIDs))
-        .orderBy(desc(VulnerabilityTable.time_updated))
-        .all(),
+      newestFirst(chunkForSQLiteIn(sessionIDs).flatMap((ids) =>
+        db.select().from(VulnerabilityTable).where(inArray(VulnerabilityTable.session_id, ids)).all(),
+      )),
     )
     const findings: typeof findingRows = []
     for (const finding of findingRows) {
