@@ -6,7 +6,7 @@ import { tmpdir } from "../fixture/fixture"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
 import { Database, eq } from "../../src/storage/db"
-import { RequestTable } from "../../src/session/session.sql"
+import { RequestJavaScriptCaptureTable, RequestTable } from "../../src/session/session.sql"
 
 function defer<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -335,5 +335,74 @@ describe("full JavaScript source persistence", () => {
       expect(stored?.source).toBe(source)
       await Session.remove(session.id)
     })
+  })
+})
+
+
+test("retains changed JavaScript response versions when request analysis is deduplicated", async () => {
+  await withInstance(async () => {
+    const session = await Session.create({ title: "javascript-capture-history-test" })
+    const common = {
+      sessionID: session.id,
+      method: "GET" as const,
+      normalizedPath: "/assets/app.js",
+      origin: "https://example.test",
+      host: "example.test",
+      scheme: "https" as const,
+      keyHash: "javascript-capture-history-test-key",
+    }
+    const firstBody = 'fetch("/api/profile"); /* version one */'
+    const secondBody = 'fetch("/api/profile"); fetch("/api/roles"); /* version two */'
+    const first = Request.add({
+      ...common,
+      response: {
+        status: 200,
+        headers: { "content-type": "application/javascript" },
+        body: firstBody,
+      },
+    })
+    expect(first).toBeDefined()
+
+    const second = Request.add({
+      ...common,
+      response: {
+        status: 200,
+        headers: { "content-type": "application/javascript" },
+        body: secondBody,
+      },
+    })
+    expect(second).toBeUndefined()
+
+    const rows = Database.use((db) =>
+      db.select()
+        .from(RequestJavaScriptCaptureTable)
+        .where(eq(RequestJavaScriptCaptureTable.session_id, session.id))
+        .all(),
+    )
+    expect(rows).toHaveLength(2)
+    expect(new Set(rows.map((row) => row.content_hash)).size).toBe(2)
+    expect(rows.map((row) => row.source_url)).toEqual([
+      "https://example.test/assets/app.js",
+      "https://example.test/assets/app.js",
+    ])
+    expect(rows.map((row) => row.source_content).sort()).toEqual([firstBody, secondBody].sort())
+
+    const repeatedBody = Request.add({
+      ...common,
+      response: {
+        status: 200,
+        headers: { "content-type": "application/javascript" },
+        body: secondBody,
+      },
+    })
+    expect(repeatedBody).toBeUndefined()
+    const afterRepeat = Database.use((db) =>
+      db.select({ id: RequestJavaScriptCaptureTable.id })
+        .from(RequestJavaScriptCaptureTable)
+        .where(eq(RequestJavaScriptCaptureTable.session_id, session.id))
+        .all(),
+    )
+    expect(afterRepeat).toHaveLength(2)
+    await Session.remove(session.id)
   })
 })
