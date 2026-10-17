@@ -77,6 +77,15 @@ export namespace Skill {
       : path.join(path.resolve(import.meta.dir, "../../../.."), ".cyberstrike")
   }
 
+  // CYBERSTRIKE_TEST_HOME is process-wide, while Bun tests may initialize
+  // multiple Instance.directory values concurrently. Only suppress the builtin
+  // catalog for the instance that is actually the fixture home; otherwise one
+  // test can make unrelated repo/project instances lose every required skill.
+  function isCurrentTestHome(): boolean {
+    const testHome = process.env.CYBERSTRIKE_TEST_HOME
+    return Boolean(testHome && path.resolve(Instance.directory) === path.resolve(testHome))
+  }
+
   export const state = Instance.state(async () => {
     const skills: Record<string, Info> = {}
     const dirs = new Set<string>()
@@ -222,7 +231,7 @@ export namespace Skill {
     // Built-in skills: resolve .cyberstrike/ relative to this source file
     // so they're always found regardless of Instance.directory (web UI header).
     // Skip in test mode to preserve test isolation.
-    if (!process.env.CYBERSTRIKE_TEST_HOME) {
+    if (!isCurrentTestHome()) {
       const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
@@ -379,7 +388,7 @@ export namespace Skill {
     }
 
     // Built-in skills
-    if (!process.env.CYBERSTRIKE_TEST_HOME) {
+    if (!isCurrentTestHome()) {
       const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
