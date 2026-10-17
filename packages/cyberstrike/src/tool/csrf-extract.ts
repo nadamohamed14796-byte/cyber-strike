@@ -16,14 +16,7 @@ function originFromRequest(req: Request.Info): string | undefined {
   return `${scheme}://${req.host}${port}`
 }
 
-export const CsrfExtractTool = Tool.define("csrf_extract", {
-  description: `Fetch a page and extract a CSRF token from the response. Replays a captured GET request, then extracts the token using one of: regex pattern matching on the body, a response header name, or a Set-Cookie name.
-
-Use this to:
-- Get a fresh CSRF token before sending a state-changing request
-- Verify CSRF token rotation (fetch twice, compare)
-- Extract anti-CSRF tokens from login/form pages before submitting a state-changing form`,
-  parameters: z.object({
+const CsrfExtractParameters = z.object({
     request_id: z.string().describe("Captured GET request that serves the page containing the CSRF token"),
     credential_id: z
       .string()
@@ -41,8 +34,9 @@ Use this to:
       .number()
       .optional()
       .default(1)
-      .describe("Regex capture group index (default 1, only used when extract_from=body)"),
-  }),
+      .describe("Regex capture group index (default 1, only used when extract_from=body)"),})
+
+export const CsrfExtractTool = Tool.define<typeof CsrfExtractParameters, Tool.Metadata>("csrf_extract", {
   async execute(params, ctx) {
     const sessionID = Session.root(ctx.sessionID)
 
