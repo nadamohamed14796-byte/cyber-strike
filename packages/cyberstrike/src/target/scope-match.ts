@@ -182,18 +182,6 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   }
 
   // A bare domain is an exact entry, not an implicit wildcard. Programs that
-"))
-        .join("\\.")
-      let pattern: RegExp
-      try { pattern = new RegExp("^" + escaped + "$", "i") }
-      catch { return { matches: false, reason: `invalid wildcard scope ${allowed}` } }
-      return pattern.test(hostname)
-        ? { matches: true, reason: `host matches wildcard pattern ${allowed}` }
-        : { matches: false, reason: `does not match wildcard pattern ${allowed}` }
-    }
-  }
-
-  // A bare domain is an exact entry, not an implicit wildcard. Programs that
   // include subdomains must express that permission with an explicit wildcard.
   if (hostname === scopeHost) return { matches: true, reason: "exact domain/IP match (ignoring protocol, port, and path)" }
   return { matches: false, reason: "no exact domain/IP match; add an explicit wildcard if subdomains are in scope" }
