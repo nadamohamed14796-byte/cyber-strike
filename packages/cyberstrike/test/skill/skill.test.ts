@@ -397,25 +397,28 @@ test("every skill in the full catalog can be loaded into context", async () => {
   const repoRoot = path.resolve(import.meta.dir, "../../../..")
   const previousTestHome = process.env.CYBERSTRIKE_TEST_HOME
   delete process.env.CYBERSTRIKE_TEST_HOME
-  SkillContext.clear()
 
   try {
     await Instance.provide({
       directory: repoRoot,
       fn: async () => {
-        const skills = await Skill.all()
-        expect(skills.length).toBeGreaterThan(0)
+        SkillContext.clear()
+        try {
+          const skills = await Skill.all()
+          expect(skills.length).toBeGreaterThan(0)
 
-        for (const skill of skills) {
-          const loaded = await SkillContext.load(skill.name)
-          expect(loaded, `skill "${skill.name}" should load into context`).toBe(skill.content)
-          expect(SkillContext.isLoaded(skill.name), `skill "${skill.name}" should be marked loaded`).toBe(true)
-          expect(SkillContext.unload(skill.name), `skill "${skill.name}" should unload cleanly`).toBe(true)
+          for (const skill of skills) {
+            const loaded = await SkillContext.load(skill.name)
+            expect(loaded, `skill "${skill.name}" should load into context`).toBe(skill.content)
+            expect(SkillContext.isLoaded(skill.name), `skill "${skill.name}" should be marked loaded`).toBe(true)
+            expect(SkillContext.unload(skill.name), `skill "${skill.name}" should unload cleanly`).toBe(true)
+          }
+        } finally {
+          SkillContext.clear()
         }
       },
     })
   } finally {
-    SkillContext.clear()
     if (previousTestHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
     else process.env.CYBERSTRIKE_TEST_HOME = previousTestHome
   }
