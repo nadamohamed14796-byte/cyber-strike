@@ -146,7 +146,7 @@ export function isJavaScriptAssetAllowed(input: {
 
 function normalizeEndpointLiteral(value: string): string | undefined {
   const trimmed = value.trim()
-  if (!trimmed || trimmed.length > 240) return undefined
+  if (!trimmed) return undefined
   const absolute = safeURL(trimmed)
   if (absolute) {
     const normalizedPath = normalizeJavaScriptEndpointPath(absolute.pathname).path
@@ -180,6 +180,8 @@ export interface JavaScriptSourceFile {
   sha256: string
   bytes: number
   endpointLiterals: string[]
+  /** True when upstream response capture marked this body as truncated. */
+  captureTruncated?: boolean
   /** Request identifier for the already-captured source response; raw JS is never copied to the graph. */
   sourceRequestID?: string
   /** Static-analysis metadata; secret-like literal values must be redacted before persistence. */
@@ -211,12 +213,13 @@ export function sanitizeJavaScriptSourceFileForPersistence(file: JavaScriptSourc
  * Extract route literals from already-captured JavaScript responses without
  * persisting or executing the response body. Bounds mirror local-file inventory.
  */
-function unwrapProcessedResponseBody(value: string): string {
+function unwrapProcessedResponseBody(value: string): { body: string; truncated: boolean } {
   const metadata = /^\[Status:\s*\d+,\s*Type:\s*[^,\]\r\n]+,\s*Size:\s*[^\]\r\n]+\]\r?\n/
-  if (!metadata.test(value)) return value
-  return value
-    .replace(metadata, "")
-    .replace(/\r?\n\[TRUNCATED - showing first 100KB of [^\]]+\]$/, "")
+  const truncated = /\r?\n\[TRUNCATED - showing first 100KB of [^\]]+\]$/.test(value)
+  return {
+    body: value.replace(metadata, "").replace(/\r?\n\[TRUNCATED - showing first 100KB of [^\]]+\]$/, ""),
+    truncated,
+  }
 }
 
 export function extractCapturedJavaScriptSources(
@@ -249,7 +252,8 @@ export function extractCapturedJavaScriptSources(
     if (!url || !storedBody) continue
     // RequestTable stores the response-processor's metadata prefix and truncation marker;
     // strip them so source line numbers and content hashes refer to the captured JS itself.
-    const body = unwrapProcessedResponseBody(storedBody)
+    const unwrapped = unwrapProcessedResponseBody(storedBody)
+    const body = unwrapped.body
     const isJavaScript =
       /(?:java|ecma)script|x-javascript/i.test(request.responseContentType ?? "") ||
       /\.m?js$/i.test(url.pathname) ||
@@ -264,6 +268,12 @@ export function extractCapturedJavaScriptSources(
     let analysis = analysisCache?.get(digest)
     if (!analysis) {
       analysis = analyzeJavaScriptSource(body)
+      if (unwrapped.truncated) {
+        analysis = {
+          ...analysis,
+          notes: [...analysis.notes, "PARTIAL SOURCE: captured response was explicitly truncated by the upstream response processor at 100KB; routes, parameters, functions, and sinks in the omitted tail were not analyzed. Retrieve the full response through the request-detail/capture pipeline before treating this inventory as complete."],
+        }
+      }
       analysisCache?.set(digest, analysis)
     }
     output.push({
@@ -272,6 +282,7 @@ export function extractCapturedJavaScriptSources(
       sha256: digest,
       bytes,
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
+      captureTruncated: unwrapped.truncated,
       sourceRequestID: request.id,
       analysis,
     })
