@@ -25,3 +25,15 @@ test("does not duplicate full-source storage for ordinary JSON responses", () =>
   expect(processed.content).toContain('"ok":true')
   expect(processed.javascriptSource).toBeUndefined()
 })
+
+
+test("recognizes JavaScript assets by URL when the response MIME type is wrong", () => {
+  const source = 'fetch("/api/mislabelled-source")'
+  const processed = processResponse({
+    status: 200,
+    headers: { "content-type": "text/plain" },
+    url: "https://app.example.test/assets/main.js?cache=1",
+    body: source,
+  })
+  expect(processed.javascriptSource).toBe(source)
+})
