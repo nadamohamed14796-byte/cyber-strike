@@ -43,15 +43,16 @@ function normalizeTitle(value: string) {
 
 function normalizeEndpoint(value?: string | null) {
   if (!value) return null
+  const candidate = value.trim().replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+/i, "")
   try {
-    const url = new URL(value)
+    const url = new URL(candidate)
     return url.pathname
       .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{uuid}")
       .replace(/\b\d{2,}\b/g, "{n}")
       .replace(/\/{2,}/g, "/")
       .slice(0, 300)
   } catch {
-    return value.split("?")[0]
+    return candidate.split("?")[0]
       .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "{uuid}")
       .replace(/\b\d{2,}\b/g, "{n}")
       .slice(0, 300)
