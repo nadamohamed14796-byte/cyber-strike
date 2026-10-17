@@ -144,6 +144,7 @@ export namespace Request {
           response_content_type: processed?.contentType ?? null,
           response_size: processed?.originalSize ?? null,
           processed_response: processed?.content ?? null,
+          javascript_source: processed?.javascriptSource ?? null,
           time_created: now,
           time_updated: now,
         })
