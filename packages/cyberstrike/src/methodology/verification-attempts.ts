@@ -77,7 +77,7 @@ export namespace VerificationAttempts {
     return `${attempt.strategyID.trim().toLowerCase()}::${attempt.variantKey.trim().toLowerCase()}`
   }
 
-  export function uniqueAttempts(attempts: Attempt[]): Attempt[] {
+  export function uniqueAttempts<T extends Attempt>(attempts: T[]): T[] {
     const seen = new Set<string>()
     return attempts.filter((attempt) => {
       const key = attemptKey(attempt)
