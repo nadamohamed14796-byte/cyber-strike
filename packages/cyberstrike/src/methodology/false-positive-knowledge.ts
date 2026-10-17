@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { and, desc, eq } from "../storage/db"
+import { and, desc, eq, isNull, or } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { FalsePositiveKnowledgeTable } from "./false-positive-knowledge.sql"
@@ -154,7 +154,7 @@ export namespace FalsePositiveKnowledge {
     const titlePattern = normalizeTitle(input.title)
     const endpointPattern = normalizeEndpoint(input.endpoint)
     const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable)
-      .where(and(eq(FalsePositiveKnowledgeTable.vulnerability_class, vulnerabilityClass), eq(FalsePositiveKnowledgeTable.active, 1)))
+      .where(and(eq(FalsePositiveKnowledgeTable.vulnerability_class, vulnerabilityClass), or(eq(FalsePositiveKnowledgeTable.active, 1), isNull(FalsePositiveKnowledgeTable.active))))
       .orderBy(desc(FalsePositiveKnowledgeTable.time_updated))
       .limit(100)
       .all())
