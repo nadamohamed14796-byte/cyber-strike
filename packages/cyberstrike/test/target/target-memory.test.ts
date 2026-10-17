@@ -510,6 +510,12 @@ test("archives prior full note revisions when one living investigation is update
       expect(revisions[0]?.content).toContain("role parameter has not been checked")
       expect(revisions[0]?.tags).toEqual(["authorization", "baseline"])
       expect(revisions[0]?.status).toBe("observed")
+
+      const historyFile = await fs.readFile(path.join(second.workspace.workspacePath, "notes-history.md"), "utf-8")
+      expect(historyFile).toContain("# Target Note History")
+      expect(historyFile).toContain("GET /api/profile exposed the user's own profile")
+      expect(historyFile).toContain("role parameter has not been checked")
+      expect(historyFile).toContain("Current note ID: " + second.note.id)
       await Instance.dispose()
     },
   })
