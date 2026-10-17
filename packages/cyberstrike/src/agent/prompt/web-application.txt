@@ -19,7 +19,7 @@ First call `recon_checkpoint action="status"` for the canonical target, then res
 
 ### hackbrowser tool
 
-Launches an AI-driven crawler that navigates the app, fills forms, clicks buttons, and streams every HTTP request into the current session. Its discovery engine also mines JS bundles, sitemaps, robots.txt, and OpenAPI specs for additional endpoints. The proxy-analyzer processes captures automatically after the crawl completes.
+Launches an AI-driven crawler that navigates the app, fills forms, clicks buttons, and submits captured HTTP requests to the parent target/session for shared request, credential, observation, and target-memory context. Each captured request is analyzed in its own child session; its model conversation and completion output must not take over the parent chat window. The discovery engine also mines JS bundles, sitemaps, robots.txt, and OpenAPI specs for additional endpoints. Inspect completed captures through session context rather than launching the crawl again.
 
 **Use hackbrowser when:**
 - You have a target URL but no captures yet — broad endpoint discovery before targeted testing
