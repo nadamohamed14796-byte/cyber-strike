@@ -1753,7 +1753,7 @@ export namespace TargetMemory {
     const workspace = await ensure(targetURL, { reconcileNotes: false })
     const kind = input.kind ?? "manual"
     const rawTitle = input.title?.trim()
-    const title = rawTitle ? redactTargetNoteLine(rawTitle, 180) || null : null
+    const title = rawTitle ? redactTargetNoteLine(rawTitle) || null : null
     const now = Date.now()
     const source = redactTargetNoteLine((input.source?.trim() || "manual"), 120) || "manual"
     const sourceURL = normalizedSourceURL(input.sourceURL ? redactTargetNoteSecrets(input.sourceURL) : undefined)
@@ -2352,7 +2352,7 @@ export namespace TargetMemory {
       "Use scope_check with target_url set to the selected asset URL. Active browser crawling, web_recon, http_replay, http_replay_raw, and inject_probe must pass persisted scope checks for every outbound URL.",
       "Memory completeness: this is a prioritized context preview, not proof that omitted notes or assets do not exist. Use target_notes_read to search and page through saved notes before concluding that a prior observation or experiment is absent.",
       ...(omittedNoteCount > 0 ? [
-        "PARTIAL NOTE SELECTION: " + omittedPrimaryNoteCount + " selected-asset current notes, " + omittedJournalNoteCount + " selected-asset journal entries, " + omittedParentNoteCount + " program/root current notes, " + omittedParentJournalCount + " program/root journal entries, " + omittedAncestorNoteCount + " intermediate-ancestor current notes, and " + omittedAncestorJournalCount + " intermediate-ancestor journal entries were not included in this prompt. They remain saved. Use target_notes_read with target_url=" + selected.targetURL + ", and page through results until has_more_notes is false; set include_history=true to inspect archived revisions.",
+        "PARTIAL NOTE SELECTION: " + omittedPrimaryNoteCount + " selected-asset current notes, " + omittedJournalNoteCount + " selected-asset journal entries, " + omittedParentNoteCount + " program/root current notes, " + omittedParentJournalCount + " program/root journal entries, " + omittedAncestorNoteCount + " intermediate-ancestor current notes, and " + omittedAncestorJournalCount + " intermediate-ancestor journal entries were not included in this prompt. They remain saved. Read each omitted workspace separately using target_notes_read with target_url values: " + [selected.targetURL, ...(programRoot.id === selected.id ? [] : [programRoot.targetURL]), ...lineage.filter((item) => item.id !== programRoot.id && item.id !== selected.id).map((item) => item.targetURL)].join(", ") + ". Page through results until has_more_notes is false; set include_history=true for current-note revisions.",
       ] : []),
       "Keep endpoint/request/finding/evidence files inside the selected asset's workspace. Keep program summaries in the program/root workspace. Do not copy one asset's full notes or findings into a sibling's workspace.",
       "",
