@@ -7,6 +7,7 @@ export {
   VulnerabilityTable,
   PermissionTable,
   RequestTable,
+  RequestJavaScriptCaptureTable,
   RequestObservationTable,
   WebCredentialTable,
   WebRoleTable,
