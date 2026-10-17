@@ -16,7 +16,7 @@ import { TargetMemory } from "../target"
 
 const DESCRIPTION = `Crawl a web application autonomously and capture HTTP requests with UI context.
 
-Use this when you have a target URL but no captured requests yet — hackbrowser will navigate the app, fill forms, click buttons, and stream every HTTP request into the current session for later vulnerability analysis. After captures arrive, the proxy-analyzer ingest pipeline analyzes them automatically.
+Use this when you have a target URL but no captured requests yet — hackbrowser will navigate the app, fill forms, click buttons, and submit captured HTTP requests for later vulnerability analysis. Captures share the parent target/session's request and observation context, while each request is analyzed in an independent child session so its model conversation does not take over the parent chat. After captures arrive, the proxy-analyzer ingest pipeline analyzes them automatically.
 
 This tool runs ASYNCHRONOUSLY: it returns immediately after starting the background crawl. Captures stream into the session over the next 30s–2min. Do NOT call this tool again to "wait" for results — use web_get_session_context to inspect captured endpoints when you actually need them. The hackbrowser status (running / completed / failed) appears in the TUI sidebar.
 
