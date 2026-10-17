@@ -13,7 +13,7 @@ const TargetNoteParameters = z.object({
     source_url: z.string().url().optional(),
     tags: z.array(z.string().min(1).max(48)).max(20).optional(),
     upsert_by_identity: z.boolean().default(true).describe("Update an existing note with the same kind/title/source instead of creating another copy; normally keep enabled."),
-    identity_key: z.string().regex(/^[a-zA-Z0-9:_-]{1,160}$/).optional().describe("Stable identity for a continuing investigation, such as endpoint:/api/me:authorization or finding:123. Reuse it when updating the same line of reasoning."),
+    identity_key: z.string().regex(/^[a-zA-Z0-9:._/-]{1,160}$/).optional().describe("Stable identity for a continuing investigation, such as endpoint:/api/me:authorization or finding:123. Reuse it when updating the same line of reasoning."),
   })
 
 export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Metadata>("target_note", {
