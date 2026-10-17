@@ -386,187 +386,42 @@ This is efficient and allows comprehensive testing.
 
 Check `web_get_session_context` for pending re-tests (`retest_queue`). If there are high-priority items, the system will feed them as new requests.
 
-## Decision-Making Examples
+## Evidence-Grounded Dispatch Examples
 
-### Example 1: POST /api/users (Registration)
-```
-Request Analysis:
-- POST with body (email, password, name)
-- No IDs visible
-- No credentials needed (public endpoint)
-- Session: No credentials yet (first request)
+These examples describe decision logic, not mandatory test lists. A request method, endpoint name, parameter name, or business domain alone does not prove a vulnerability class. Before active testing, apply the required persisted scope gate and verify that the selected specialist has a safe, authorized test path. Prefer passive analysis and existing captured evidence first.
 
-Agent Selection:
-✅ proxy-analyzer (extract User object)
-✅ proxy-tester-injection (test SQLi in email/name, XSS in name)
-✅ proxy-tester-authn (test weak password policy, user enumeration)
-✅ proxy-tester-mass-assignment (test injecting role, is_admin fields)
-❌ proxy-tester-idor (no IDs to manipulate yet)
-❌ proxy-tester-authz (no auth required)
-❌ proxy-tester-ssrf (no URL parameters)
-❌ proxy-tester-file-attacks (no file upload)
-❌ proxy-tester-business-logic (not transactional)
-```
+### Registration or profile update
 
-### Example 2: GET /api/orders/573 (Single Credential)
-```
-Request Analysis:
-- GET with numeric ID in path
-- Session: 1 credential, Order object known
-- No second credential available
+- Dispatch the analyzer to identify observed fields, response behavior, and any grounded schema or client-side constraints.
+- Consider authentication/authorization testing only when the request or session context exposes an actual identity or permission boundary.
+- Consider mass-assignment testing only when there is evidence of server-side object binding or writable properties whose authorization is unclear; use a tester-owned account and harmless reversible fields.
+- Consider injection only when captured behavior, a reviewed sink, or a discriminating response supports a specific injection hypothesis. A field named `name`, `email`, or `description` is not sufficient evidence.
+- If no request was captured for the form submission, do not invent its endpoint, method, body, or result. Record the missing evidence and ask for a captured submission or use a specialist's approved, evidence-grounded replay workflow.
 
-Agent Selection:
-✅ proxy-analyzer (extract order details)
-✅ proxy-tester-idor (test ID manipulation: 572, 574, 1, 0, -1, common IDs like 100, 1000)
-✅ proxy-tester-authz (test without credential, test guest access if role hierarchy known)
-✅ proxy-tester-injection (test ID for SQL Injection or others)
-❌ proxy-tester-mass-assignment (GET request)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-ssrf (no URL parameters)
-❌ proxy-tester-file-attacks (no file operations)
-❌ proxy-tester-business-logic (read-only GET)
+### Object lookup or read endpoint
 
-Note: Even with single credential, IDOR testing is valuable via ID manipulation!
-```
+- Consider IDOR/BOLA only when an object identifier and an authorization boundary are evidenced. Compare access to a tester-owned object with a different tester-owned account/fixture where authorized; do not enumerate arbitrary user IDs or access unrelated people's data.
+- Consider authentication checks only when the endpoint's access requirements are relevant and can be compared safely.
+- Consider injection only when observed input handling suggests a plausible sink; an identifier parameter by itself is not proof of SQL injection.
+- A 200, 403, or 404 alone is not proof of a vulnerability. Preserve baseline/control results and the response semantics.
 
-### Example 3: POST /api/checkout (Financial Transaction)
-```
-Request Analysis:
-- POST with body {"cart_id": 456, "payment_method": "credit_card", "total": 99.99}
-- Contains price field (total)
-- Session: 2 credentials, Order/Payment objects, transactional function
+### Checkout, transfer, or multi-step workflow
 
-Agent Selection:
-✅ proxy-analyzer
-✅ proxy-tester-business-logic (test negative total, zero, overflow, price manipulation)
-✅ proxy-tester-idor (test cart_id manipulation - access other users' carts)
-✅ proxy-tester-mass-assignment (test injecting discount, admin_override fields)
-✅ proxy-tester-injection (test SQLi/XSS in payment-related fields)
-✅ proxy-tester-authz (test with different credentials, test guest checkout)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-ssrf (no URL parameters)
-❌ proxy-tester-file-attacks (no file operations)
-```
+- Consider business-logic testing when captured requests or application evidence establish a state transition, invariant, price/quantity boundary, payment state, or multi-step dependency.
+- Consider race testing only when the observed operation is stateful and concurrency can be tested with owned fixtures without causing real financial or irreversible effects.
+- Consider IDOR/authz or mass assignment only when concrete object ownership or writable server-controlled fields are identified. Never assume that names such as `amount`, `owner_id`, `status`, or `cart_id` are exploitable.
+- Do not trigger real payments, transfers, destructive actions, or other effects against production data. If a safe test fixture or reversible path is unavailable, stop and mark the hypothesis blocked/inconclusive.
 
-### Example 4: GET /api/download?file=report.pdf
-```
-Request Analysis:
-- GET with file parameter
-- Potential path traversal risk
-- Session: 1 credential
+### File upload or download
 
-Agent Selection:
-✅ proxy-analyzer
-✅ proxy-tester-file-attacks (test path traversal: ../../etc/passwd)
-✅ proxy-tester-authz (test accessing other users' files)
-✅ proxy-tester-injection (test if filename reflected: XSS potential, SQL Injection — NOT LFI/path traversal, that is file-attacks' lane)
-❌ proxy-tester-idor (file parameter is string, not numeric ID)
-❌ proxy-tester-mass-assignment (GET request)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-ssrf (file path, not URL)
-❌ proxy-tester-business-logic (simple file download)
-```
+- Route path traversal and file handling to the file-attacks specialist when the captured path, upload behavior, or storage semantics make those hypotheses relevant.
+- Consider stored/reflected XSS only when a filename or file-derived value is shown to reach a browser-rendered context; consider XXE only when a supported parser and relevant XML-bearing format are evidenced.
+- Consider authorization testing only when the storage object, folder, or ownership boundary is established. Do not assume every upload supports server-side execution or that every filename is an injection sink.
+- Use benign test files and tester-owned storage. Avoid destructive payloads, sensitive-file reads, or actions that could affect other users.
 
-### Example 5: POST /api/import?url=https://example.com/data.json
-```
-Request Analysis:
-- POST with URL parameter
-- External resource fetching
-- Session: 1 credential, admin role
+### Dispatch decision for every request
 
-Agent Selection:
-✅ proxy-analyzer
-✅ proxy-tester-ssrf (CRITICAL - test 169.254.169.254, localhost, internal IPs)
-✅ proxy-tester-injection (test if URL content processed - XXE, SSTI)
-✅ proxy-tester-authz (test if regular users can import)
-❌ proxy-tester-idor (no object IDs)
-❌ proxy-tester-mass-assignment (not applicable)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-file-attacks (URL-based, not file upload)
-❌ proxy-tester-business-logic (not transactional)
-
-Note: SSRF is CRITICAL priority due to URL parameter!
-```
-
-### Example 6: POST /graphql (GraphQL API)
-```
-Request Analysis:
-- POST /graphql with body {"query": "query { user(id: 101) { id email creditCard } }"}
-- Authorization: Bearer eyJ... (JWT token)
-- Session: 1 credential, schema not yet introspected
-
-Agent Selection:
-✅ proxy-analyzer (extract User object from response, record schema discoveries)
-✅ proxy-tester-idor (BOLA on user(id) — try sequential IDs, swap with other credential's IDs, test admin IDs)
-✅ proxy-tester-authn (CRITICAL: JWT analysis — alg confusion, claim manipulation, kid injection, weak secret)
-✅ proxy-tester-injection (introspection: __schema query, batch queries, deep nesting DoS, field aliasing)
-✅ proxy-tester-authz (replay query as different roles, test query without auth)
-❌ proxy-tester-mass-assignment (read-only query — N/A; would apply to mutation)
-❌ proxy-tester-ssrf (no URL params)
-❌ proxy-tester-file-attacks (no file ops)
-❌ proxy-tester-business-logic (read-only query)
-
-Note: GraphQL endpoints are HIGH-VALUE — single endpoint exposes many objects via resolvers. For mutations, also dispatch mass-assignment.
-```
-
-### Example 7: POST /api/transfer (Race-Prone Financial Operation)
-```
-Request Analysis:
-- POST /api/transfer with body {"from_account": 100, "to_account": 200, "amount": 50.00}
-- Authorization: Bearer ... (user with account_id=100)
-- Session: User account_id=100 known, balance object discovered
-
-Agent Selection:
-✅ proxy-analyzer
-✅ proxy-tester-business-logic (CRITICAL: race condition — concurrent transfer requests can double-spend; also negative amounts, integer overflow, currency confusion)
-✅ proxy-tester-idor (test from_account=200 with our token — initiate transfer FROM another user's account)
-✅ proxy-tester-mass-assignment (try injecting fee=0, balance_override=999999, skip_limit=true)
-✅ proxy-tester-authz (test as guest, test other users' from_account values)
-✅ proxy-tester-injection (test SQLi in account_id, amount fields)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-ssrf (no URL params)
-❌ proxy-tester-file-attacks (no file ops)
-
-Note: For ANY race-prone operation, business-logic must run with concurrent request testing.
-```
-
-### Example 8: POST /api/checkout/step3 (Multi-Step Workflow)
-```
-Request Analysis:
-- POST /api/checkout/step3 with body {"shipping_address": "..."}
-- Header: X-Step: 3
-- Session: Cart object known, order in progress
-
-Agent Selection:
-✅ proxy-analyzer
-✅ proxy-tester-business-logic (CRITICAL: workflow bypass — POST to /step5 directly without /step4; test skipping payment step; reverse navigation; replay completed step)
-✅ proxy-tester-mass-assignment (try injecting price, status="paid", payment_complete=true, total=0)
-✅ proxy-tester-authz (test other users' active carts via cart_id swap)
-✅ proxy-tester-injection (test address fields for SQLi/XSS)
-❌ proxy-tester-idor (no clear ID to manipulate; cart_id covered by authz)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-ssrf (no URL params)
-❌ proxy-tester-file-attacks (no file ops)
-```
-
-### Example 9: POST /api/upload (File Upload)
-```
-Request Analysis:
-- POST /api/upload with Content-Type: multipart/form-data
-- Body: file field (binary) + filename="profile.jpg" + folder="avatars"
-- Session: Authenticated user, Profile object known
-
-Agent Selection:
-✅ proxy-analyzer
-✅ proxy-tester-file-attacks (CRITICAL: upload .php/.jsp/.asp; polyglot files; SVG with XSS; oversized files; XXE in DOCX/XLSX/SVG; double extension .jpg.php; null byte; magic-byte spoofing)
-✅ proxy-tester-injection (test filename for XSS and SQLi only — path traversal/LFI is proxy-tester-file-attacks' lane, do not route it here)
-✅ proxy-tester-mass-assignment (try injecting file_type, owner_id, is_executable, public=true)
-✅ proxy-tester-authz (test uploading to other users' folders by manipulating folder param)
-❌ proxy-tester-idor (no resource ID being read)
-❌ proxy-tester-authn (not auth endpoint)
-❌ proxy-tester-ssrf (no URL params, but file content could trigger SSRF — covered by file-attacks XXE testing)
-❌ proxy-tester-business-logic (simple upload, not transactional)
-```
+For each candidate specialist, state the observed signal, the specific hypothesis it supports, the safe control or distinguishing evidence needed, and any missing precondition. Dispatch only when the hypothesis is relevant and the approved tool path can enforce scope. Otherwise retain it as a candidate or unknown; never dispatch every specialist to satisfy a fixed checklist. Findings require reproduced security impact and evidence, not merely an unusual response or a test being attempted.
 
 ## Important Rules
 
