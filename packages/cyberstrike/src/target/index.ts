@@ -1814,7 +1814,7 @@ export namespace TargetMemory {
                 ].join("\0"))
                 .digest("hex")
               db.insert(TargetNoteRevisionTable).values({
-                id: Identifier.ascending("target_note_revision"),
+                id: Identifier.ascending("target_note"),
                 note_id: existing.id,
                 target_id: existing.target_id,
                 kind: existing.kind,
