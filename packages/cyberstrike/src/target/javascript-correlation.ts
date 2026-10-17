@@ -1087,7 +1087,57 @@ export namespace JavaScriptCorrelation {
     }
     // Analyze bodies that were already captured as JavaScript, but never save the
     // source body to disk or the graph. The graph retains only hashes and route literals.
-    const sourceRequests = explicitJS
+    const relevantRequestIDs = relevantRequests.map((request) => request.id)
+    const relevantRequestByID = new Map(relevantRequests.map((request) => [request.id, request]))
+    // Versioned captures are queried only through request rows that already passed
+    // session-tree and persisted-scope checks. This preserves source history without
+    // allowing a capture row to bypass the target boundary.
+    const sourceCaptureRows = relevantRequestIDs.length
+      ? Database.use((db) =>
+          chunkForSQLiteIn(relevantRequestIDs).flatMap((ids) =>
+            db.select().from(RequestJavaScriptCaptureTable)
+              .where(inArray(RequestJavaScriptCaptureTable.request_id, ids))
+              .all(),
+          ),
+        )
+      : []
+    const versionedSourceInputs = sourceCaptureRows.flatMap((capture) => {
+      const request = relevantRequestByID.get(capture.request_id)
+      if (!request) return []
+      if (explicitJS) {
+        const capturedURL = safeURL(capture.source_url)
+        if (capturedURL) {
+          if (capturedURL.origin !== explicitJS.origin || capturedURL.pathname !== explicitJS.pathname) return []
+        } else if (!matchesCapturedJavaScriptAsset({
+          origin: request.origin,
+          pageURL: request.page_url,
+          host: request.host,
+          scheme: request.scheme,
+          port: request.port,
+          normalizedPath: request.normalized_path,
+        }, explicitJS)) {
+          return []
+        }
+      }
+      return [{
+        id: capture.id,
+        requestID: capture.request_id,
+        captureID: capture.id,
+        url: capture.source_url,
+        origin: request.origin,
+        pageURL: request.page_url,
+        host: request.host,
+        scheme: request.scheme,
+        port: request.port,
+        normalizedPath: request.normalized_path,
+        responseContentType: capture.content_type ?? request.response_content_type,
+        responseBody: capture.source_content,
+      }]
+    })
+    // Older installations have only the RequestTable snapshot; include it even when
+    // newer version rows exist so migration-era first captures are not lost. Content
+    // URL/hash dedup merges identical rows and analyzes their bytes only once.
+    const legacySourceRequests = explicitJS
       ? relevantRequests.filter((request) => matchesCapturedJavaScriptAsset({
           origin: request.origin,
           pageURL: request.page_url,
@@ -1097,19 +1147,21 @@ export namespace JavaScriptCorrelation {
           normalizedPath: request.normalized_path,
         }, explicitJS))
       : relevantRequests
+    const legacySourceInputs = legacySourceRequests.map((request) => ({
+      id: request.id,
+      requestID: request.id,
+      url: (request.origin ?? "") + request.normalized_path,
+      origin: request.origin,
+      pageURL: request.page_url,
+      host: request.host,
+      scheme: request.scheme,
+      port: request.port,
+      normalizedPath: request.normalized_path,
+      responseContentType: request.response_content_type,
+      responseBody: request.javascript_source ?? request.processed_response,
+    }))
     const capturedSources = extractCapturedJavaScriptSources(
-      sourceRequests.map((request) => ({
-        id: request.id,
-        url: (request.origin ?? "") + request.normalized_path,
-        origin: request.origin,
-        pageURL: request.page_url,
-        host: request.host,
-        scheme: request.scheme,
-        port: request.port,
-        normalizedPath: request.normalized_path,
-        responseContentType: request.response_content_type,
-        responseBody: request.javascript_source ?? request.processed_response,
-      })),
+      [...versionedSourceInputs, ...legacySourceInputs],
       analysisCache,
     )
     // Keep every distinct source location/URL for provenance. analysisCache is keyed by
