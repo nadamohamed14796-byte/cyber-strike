@@ -1618,7 +1618,7 @@ export namespace TargetMemory {
     const suppliedContent = input.content?.trim()
     if (!suppliedContent) throw new Error("Note content cannot be empty.")
     const identityKey = input.identityKey?.trim()
-    if (identityKey && !/^[a-zA-Z0-9:_-]{1,160}$/.test(identityKey)) {
+    if (identityKey && !/^[a-zA-Z0-9:._/-]{1,160}$/.test(identityKey)) {
       throw new Error("Note identityKey must contain only letters, numbers, colon, underscore, or hyphen.")
     }
     const identityMarker = identityKey ? "<!-- cyberstrike-note-identity:" + identityKey + " -->" : ""
