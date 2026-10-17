@@ -25,6 +25,12 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://example.com/", ["AWS Cloud Config: 123456789012"])).toEqual([])
   })
 
+  test("indexes positional wildcard patterns", () => {
+    expect(matchingScopeItems("https://www.amazon.com/", ["www.amazon.*"])).toEqual(["www.amazon.*"])
+    expect(matchingScopeItems("https://tenant.example.com/", ["{tenant}.example.com"])).toEqual(["{tenant}.example.com"])
+    expect(matchingScopeItems("https://a.b.example.com/", ["{tenant}.example.com"])).toEqual([])
+  })
+
   test("matches IPv6 CIDR ranges", () => {
     const entries = ["2001:db8::/32"]
     expect(matchingScopeItems("https://[2001:db8::1]/", entries)).toEqual(["2001:db8::/32"])
