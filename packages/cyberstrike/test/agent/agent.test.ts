@@ -50,6 +50,25 @@ EMBEDDED_SKILL_ALIAS_REGRESSION_MARKER
   }
 })
 
+test("agent initialization fails loudly when a required embedded skill is missing", async () => {
+  await using tmp = await tmpdir({ git: true })
+  const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+  process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await expect(Agent.get("proxy-tester-idor")).rejects.toThrow(
+          /references unavailable skill "wstg-authz-04"/,
+        )
+      },
+    })
+  } finally {
+    if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+  }
+})
+
 test("every built-in agent skill reference resolves to a loadable skill", async () => {
   const repoRoot = path.resolve(import.meta.dir, "../../../..")
   const previousHome = process.env.CYBERSTRIKE_TEST_HOME
