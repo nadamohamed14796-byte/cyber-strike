@@ -16,6 +16,8 @@ export function looksLikeHTTPRequest(rawText: string, hasHTTPMetadata = false): 
   // Still classify common damaged/truncated captures as HTTP when the first
   // line resembles "GET /path" and following lines contain HTTP headers.
   const partialRequestLine = /^[A-Z][A-Z0-9!#$%&'*+.^_`|~-]{0,31}\s+\S+$/i
+  const requestTargetLine = /^[A-Z][A-Z0-9!#$%&'*+.^_`|~-]{0,31}\s+(?:\/\S*|\*|https?:\/\/\S+)$/i
   const headerLine = /^(?:host|user-agent|accept|content-type|content-length|authorization|cookie|origin|referer|connection|transfer-encoding)\s*:/i
-  return partialRequestLine.test(requestLine) && lines.slice(1).some((line) => headerLine.test(line.trim()))
+  return requestTargetLine.test(requestLine) ||
+    (partialRequestLine.test(requestLine) && lines.slice(1).some((line) => headerLine.test(line.trim())))
 }
