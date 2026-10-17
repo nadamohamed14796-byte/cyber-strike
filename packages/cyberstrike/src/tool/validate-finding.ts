@@ -93,7 +93,7 @@ export const ValidateFindingTool = Tool.define<typeof ValidateFindingParameters,
         })) researchFeedbackRecorded++
       }
       return {
-        title: "Finding validation: " + result.verdict,
+        title: "Finding validation report (uncertainty review first)",
         output: result.output + (
           result.targetNoteID
             ? "\nTarget-specific validation note saved: " + result.targetNoteID + (result.targetFilePath ? "\nTarget validation file: " + result.targetFilePath : "")
