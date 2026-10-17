@@ -273,6 +273,43 @@ test("specialized proxy tools stay limited to their intended tester agents", asy
   })
 })
 
+test("vulnerability specialists reject speculative and destructive test recipes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const idor = await Agent.get("proxy-tester-idor")
+      const ssrf = await Agent.get("proxy-tester-ssrf")
+      const massAssignment = await Agent.get("proxy-tester-mass-assignment")
+      const businessLogic = await Agent.get("proxy-tester-business-logic")
+      const fileAttacks = await Agent.get("proxy-tester-file-attacks")
+      const authn = await Agent.get("proxy-tester-authn")
+      const authz = await Agent.get("proxy-tester-authz")
+
+      expect(idor?.prompt).toContain("Never guess/enumerate sequential")
+      expect(idor?.prompt).not.toContain("Test sequential IDs")
+      expect(idor?.prompt).not.toContain("common/predictable IDs")
+      expect(ssrf?.prompt).toContain("controlled HTTPS canary")
+      expect(ssrf?.prompt).not.toContain("ALWAYS test 169.254.169.254 first")
+      expect(ssrf?.prompt).not.toContain("DNS rebinding")
+      expect(massAssignment?.prompt).toContain("harmless reversible properties")
+      expect(massAssignment?.prompt).not.toContain('"role": "admin"')
+      expect(massAssignment?.prompt).not.toContain('"balance": 999999')
+      expect(businessLogic?.prompt).toContain("Do not trigger real payments/refunds/transfers")
+      expect(businessLogic?.prompt).not.toContain('"price": -99.99')
+      expect(businessLogic?.prompt).not.toContain("rotate X-Forwarded-For")
+      expect(fileAttacks?.prompt).toContain("Never upload a webshell")
+      expect(fileAttacks?.prompt).not.toContain("../../etc/passwd")
+      expect(fileAttacks?.prompt).not.toContain("file:///etc/passwd")
+      expect(authn?.prompt).toContain("Never perform credential stuffing")
+      expect(authn?.prompt).not.toContain("key brute-force")
+      expect(authn?.prompt).not.toContain('values: ["1", "2", "3", "999"]')
+      expect(authz?.prompt).toContain("Use only explicitly authorized test identities")
+      expect(authz?.prompt).not.toContain("Bearer admin")
+    },
+  })
+})
+
 test("web application prompt requires evidence-led, non-destructive testing", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
