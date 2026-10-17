@@ -1,19 +1,61 @@
 import path from "node:path"
 
-/** Parse a plain-text scope list without inferring authorization or broadening entries. */
+const HACKERONE_ASSET_TYPES: Record<string, string> = {
+  aimodel: "AI Model",
+  androidapk: "Android: .apk",
+  androidplaystore: "Android Play Store",
+  api: "API",
+  awscloudconfig: "AWS Cloud Config",
+  azurecloudconfig: "Azure Cloud Config",
+  cidr: "CIDR",
+  domain: "Domain",
+  executable: "Executable",
+  hardware: "Hardware",
+  iosappstore: "iOS: App Store",
+  iosipa: "iOS: .ipa",
+  iostestflight: "iOS: Testflight",
+  ipaddress: "IP Address",
+  otherasset: "Other Asset",
+  smartcontract: "Smart Contract",
+  sourcecode: "Source Code",
+  url: "URL",
+  wildcard: "Wildcard",
+  windowsmicrosoftstore: "Windows: Microsoft Store",
+}
+
+/** Parse plain-text lists and HackerOne tabular exports without broadening authorization. */
 export function parseScopeFileContents(contents: string): string[] {
-  const entries: string[] = []
-  for (const [index, rawLine] of contents.replace(/^\uFEFF/, "").split(/\r?\n/).entries()) {
-    const value = rawLine.trim()
-    if (!value || value.startsWith("#") || value.startsWith("//")) continue
-    if (value.length > 1000) {
-      throw new Error("Scope file entry at line " + (index + 1) + " exceeds the 1000-character entry limit.")
+  const lines = contents.replace(/^\uFEFF/, "").split(/\r?\n/)
+  const nonEmpty = lines.map((line, index) => ({ line: line.trim(), index }))
+    .filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//"))
+  if (nonEmpty.length === 0) throw new Error("Scope file contains no usable entries.")
+
+  // HackerOne asset exports are tab-separated and include identifier + asset_type.
+  // Convert rows to typed expressions, retaining unsupported asset kinds as evidence.
+  const header = nonEmpty[0].line.split("\t").map((part) => part.trim().toLowerCase().replace(/[ _-]+/g, ""))
+  const identifierColumn = header.indexOf("identifier")
+  const typeColumn = header.indexOf("assettype")
+  if (identifierColumn >= 0 && typeColumn >= 0) {
+    const entries: string[] = []
+    for (const row of nonEmpty.slice(1)) {
+      if (row.line.length > 1000) throw new Error("Scope file entry at line " + (row.index + 1) + " exceeds the 1000-character entry limit.")
+      const columns = row.line.split("\t")
+      const identifier = columns[identifierColumn]?.trim()
+      const rawType = columns[typeColumn]?.trim()
+      if (!identifier || !rawType) continue
+      const key = rawType.toLowerCase().replace(/[ _-]+/g, "")
+      const type = HACKERONE_ASSET_TYPES[key] ?? rawType
+      entries.push(type + ": " + identifier)
     }
-    // Preserve unfamiliar typed/structured entries as raw evidence. The scope
-    // matcher only authorizes syntaxes it can interpret; opaque entries fail closed.
-    entries.push(value)
+    if (entries.length === 0) throw new Error("HackerOne scope export contains no usable asset rows.")
+    return entries
   }
-  if (entries.length === 0) throw new Error("Scope file contains no usable entries.")
+
+  const entries: string[] = []
+  for (const row of nonEmpty) {
+    if (row.line.length > 1000) throw new Error("Scope file entry at line " + (row.index + 1) + " exceeds the 1000-character entry limit.")
+    entries.push(row.line)
+  }
   return entries
 }
 
