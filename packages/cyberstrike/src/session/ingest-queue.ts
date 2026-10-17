@@ -66,8 +66,14 @@ export namespace IngestQueue {
     publish(sessionID)
 
     const next = s.chain
-      .then(() => waitIfPaused(sessionID))
-      .then(task)
+      // Re-check after every resume wake-up. A pause can race with a resolved
+      // resume promise before the next .then(task) callback gets its turn.
+      .then(async () => {
+        while (state()[sessionID]?.paused) {
+          await waitIfPaused(sessionID)
+        }
+        return task()
+      })
       .then(
         () => {},
         (err) => log.error("ingest prompt failed", { sessionID, error: err }),
