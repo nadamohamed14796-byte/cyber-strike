@@ -1377,7 +1377,10 @@ export const SessionRoutes = lazy(() =>
             log.info("prompt preview:\n" + buildPrompt())
             Request.updateStatus({ id: req.id, status: "processed" })
           } else {
-            const agentName = body.agent ?? "proxy-agent"
+            // Captured HTTP traffic always enters through the proxy orchestrator subagent.
+            // Do not let an ingest payload redirect a browser request into the primary chat
+            // agent or an unrelated specialist; plain-text ingest retains its explicit agent option.
+            const agentName = "proxy-agent"
             const source = `${normalized.method} ${normalized.normalizedPath}`
             // Give every captured request its own child session. The old queue was keyed
             // by the shared parent session, so one slow extension request blocked every
