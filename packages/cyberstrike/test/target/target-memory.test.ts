@@ -589,3 +589,52 @@ test("resumable target context reports note and journal entries omitted by promp
     },
   })
 })
+
+
+test("serializes concurrent current-note updates without losing intermediate evidence", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://concurrent-notes.example.test"
+      const baseline = await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Concurrent authorization investigation",
+        content: "Baseline: role and ownership have not been compared.",
+        source: "agent:concurrency-test",
+        identityKey: "endpoint:/api/profile:authorization-concurrency",
+        upsertByIdentity: true,
+        status: "observed",
+      })
+      const writes = await Promise.all([
+        TargetMemory.addNote(targetURL, {
+          kind: "manual",
+          title: "Concurrent authorization investigation",
+          content: "Experiment A: role=admin was compared under the same owner account.",
+          source: "agent:concurrency-test",
+          identityKey: "endpoint:/api/profile:authorization-concurrency",
+          upsertByIdentity: true,
+          status: "observed",
+        }),
+        TargetMemory.addNote(targetURL, {
+          kind: "manual",
+          title: "Concurrent authorization investigation",
+          content: "Experiment B: a second controlled account was used to compare ownership.",
+          source: "agent:concurrency-test",
+          identityKey: "endpoint:/api/profile:authorization-concurrency",
+          upsertByIdentity: true,
+          status: "observed",
+        }),
+      ])
+      expect(writes.every((result) => result.note.id === baseline.note.id)).toBe(true)
+      const revisions = TargetMemory.noteRevisions(baseline.workspace.id, baseline.note.id)
+      const current = TargetMemory.allNotes(baseline.workspace.id).find((note) => note.id === baseline.note.id)
+      const persistedStates = [...revisions.map((revision) => revision.content), current?.content ?? ""].join("\\n")
+      expect(revisions).toHaveLength(2)
+      expect(persistedStates).toContain("Baseline: role and ownership")
+      expect(persistedStates).toContain("Experiment A:")
+      expect(persistedStates).toContain("Experiment B:")
+      await Instance.dispose()
+    },
+  })
+})
