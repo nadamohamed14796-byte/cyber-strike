@@ -92,7 +92,7 @@ test("classifies as confirmed only when all required checks pass", () => {
   expect(assessFindingChecks(checks).verdict).toBe("confirmed")
 })
 
-test("confirmed validation keeps a finding pending explicit triage", async () => {
+test("checklist-only confirmation remains inconclusive and finding pending explicit triage", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
     directory: dir.path,
@@ -116,6 +116,37 @@ test("confirmed validation keeps a finding pending explicit triage", async () =>
         })
         expect(result.verdict).toBe("inconclusive")
         expect(result.summary).toContain("durable verification ledger")
+        expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
+
+test("durable confirmed evidence permits confirmation but never auto-approves the finding", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      try {
+        const finding = Vulnerability.add({
+          sessionID: session.id,
+          data: {
+            severity: "medium",
+            title: "Evidence-backed candidate",
+            description: "A candidate with durable execution evidence.",
+            endpoint: "GET /api/private-record",
+          },
+        })
+        recordConfirmedLedger(session.id, finding.id, finding.endpoint!)
+        const result = await FindingValidation.record({
+          sessionID: session.id,
+          vulnerabilityID: finding.id,
+          checks: checklist({ identity_context: { status: "not_applicable", reason: "No identity boundary is claimed" } }),
+        })
+        expect(result.verdict).toBe("confirmed")
         expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
       } finally {
         await Session.remove(session.id)
