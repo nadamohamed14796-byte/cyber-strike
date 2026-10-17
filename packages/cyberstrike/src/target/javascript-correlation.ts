@@ -1496,8 +1496,12 @@ export namespace JavaScriptCorrelation {
               ...candidate.bodyParameters.map((name) => name + " [body; type unknown unless independently inferred]"),
               ...candidate.headerNames.map((name) => name + " [header; value/type not captured by this static hint]"),
             ]
+            const sourceRecord = graph.sourceFiles.find((file) => file.relativePath === candidate.sourceFile)
+            const sourceReference = sourceRecord?.sourceRequestID
+              ? "captured JS response request " + sourceRecord.sourceRequestID + " (full body remains in request storage, not in the graph file)"
+              : "workspace file " + candidate.sourceFile
             return "- " + (candidate.method ?? "UNKNOWN") + " " + candidate.urlTemplate +
-              " — source: " + candidate.sourceFile + ":" + candidate.sourceLine +
+              " — source: " + sourceReference + ":" + candidate.sourceLine +
               (candidate.sourceFunction ? " in " + candidate.sourceFunction : "") +
               " — parameters: [" + (parameterEvidence.join(", ") || "none statically identified") + "]" +
               " — confidence: " + candidate.confidence +
