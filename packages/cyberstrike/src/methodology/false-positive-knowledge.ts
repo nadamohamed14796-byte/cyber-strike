@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { desc, eq } from "../storage/db"
+import { and, desc, eq } from "../storage/db"
 import { Database } from "../storage/db"
 import { Identifier } from "../id/id"
 import { FalsePositiveKnowledgeTable } from "./false-positive-knowledge.sql"
@@ -113,6 +113,7 @@ export namespace FalsePositiveKnowledge {
           source_validation_id: input.validationID,
           source_finding_id: input.finding.id,
           last_verdict: "false_positive",
+          active: 1,
           time_updated: now,
         }).where(eq(FalsePositiveKnowledgeTable.id, existing.id)).run()
       } else {
@@ -130,11 +131,21 @@ export namespace FalsePositiveKnowledge {
           confidence: 50,
           occurrences: 1,
           last_verdict: "false_positive",
+          active: 1,
           time_created: now,
           time_updated: now,
         }).run()
       }
     })
+  }
+
+  /** Deactivate a lesson when later evidence reopens its source finding. */
+  export function reopenForFinding(findingID: string) {
+    Database.use((db) => db.update(FalsePositiveKnowledgeTable).set({
+      active: 0,
+      last_verdict: "reopened",
+      time_updated: Date.now(),
+    }).where(eq(FalsePositiveKnowledgeTable.source_finding_id, findingID)).run())
   }
 
   /** Return advisory matches only. A historical false positive never auto-rejects a new finding. */
@@ -143,7 +154,7 @@ export namespace FalsePositiveKnowledge {
     const titlePattern = normalizeTitle(input.title)
     const endpointPattern = normalizeEndpoint(input.endpoint)
     const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable)
-      .where(eq(FalsePositiveKnowledgeTable.vulnerability_class, vulnerabilityClass))
+      .where(and(eq(FalsePositiveKnowledgeTable.vulnerability_class, vulnerabilityClass), eq(FalsePositiveKnowledgeTable.active, 1)))
       .orderBy(desc(FalsePositiveKnowledgeTable.time_updated))
       .limit(100)
       .all())
