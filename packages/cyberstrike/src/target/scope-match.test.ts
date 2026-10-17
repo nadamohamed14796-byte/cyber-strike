@@ -24,6 +24,8 @@ describe("HackerOne typed scope assets", () => {
     expect(checkMatch("https://192.0.2.17/", "IP Address: 192.0.2.17").matches).toBe(true)
     expect(checkMatch("https://192.0.2.17/", "CIDR: 192.0.2.0/24").matches).toBe(true)
     expect(checkMatch("https://192.0.3.17/", "CIDR: 192.0.2.0/24").matches).toBe(false)
+    expect(checkMatch("https://[2001:db8::1]/", "IP Address: 2001:db8::1").matches).toBe(true)
+    expect(checkMatch("https://[2001:db8::2]/", "IP Address: 2001:db8::1").matches).toBe(false)
   })
 
   test("URL assets retain host and path boundaries", () => {
