@@ -10,9 +10,9 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // HackerOne scope exports may include an asset type alongside its identifier.
   // Only web-addressable types can authorize an HTTP target. Non-web assets are
   // retained as scope evidence, but never authorize an unrelated HTTP request.
-  const typed = allowed.match(/^(domain|wildcard|url|cidr|ip address|api|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \\t]*:[ \\t]*(.+)$/i)
+  const typed = allowed.match(/^(domain|wildcard|url|cidr|ip address|api|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
   if (typed) {
-    const assetType = typed[1].replace(/\\s+/g, " ").trim().toLowerCase()
+    const assetType = typed[1].replace(/\s+/g, " ").trim().toLowerCase()
     const identifier = typed[2].trim()
     const webTypes = new Set(["domain", "wildcard", "url", "cidr", "ip address", "api", "ai model", "smart contract", "smart contracts"])
     if (!webTypes.has(assetType)) {
@@ -20,13 +20,13 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     }
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
     if (assetType === "wildcard") allowed = identifier.startsWith("*.") ? identifier : "*." + identifier
-    else if (assetType === "url" && !/^https?:\\/\\//i.test(identifier)) {
+    else if (assetType === "url" && !/^https?:\/\//i.test(identifier)) {
       // HackerOne commonly exports URL identifiers without a scheme. Preserve
       // their host/path restriction and accept either HTTP or HTTPS in that case.
       let candidateURL: URL
       let scopeURL: URL
       try {
-        candidateURL = /^[a-z][a-z\\d+.-]*:\\/\\//i.test(value) ? new URL(value) : new URL("https://" + value)
+        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL("https://" + value)
         scopeURL = new URL("https://" + identifier)
       } catch {
         return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
@@ -96,8 +96,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     let candidateURL: URL
     let scopeURL: URL
     try {
-      candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL(`https://${value}`)
-      scopeURL = new URL(allowed)
+        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL("https://" + value)
+        scopeURL = new URL("https://" + identifier)
     } catch {
       return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
     }
