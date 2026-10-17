@@ -268,13 +268,13 @@ export function extractCapturedJavaScriptSources(
     let analysis = analysisCache?.get(digest)
     if (!analysis) {
       analysis = analyzeJavaScriptSource(body)
-      if (unwrapped.truncated) {
-        analysis = {
-          ...analysis,
-          notes: [...analysis.notes, "PARTIAL SOURCE: captured response was explicitly truncated by the upstream response processor at 100KB; routes, parameters, functions, and sinks in the omitted tail were not analyzed. Retrieve the full response through the request-detail/capture pipeline before treating this inventory as complete."],
-        }
-      }
       analysisCache?.set(digest, analysis)
+    }
+    if (unwrapped.truncated && !analysis.notes.some((note) => note.startsWith("PARTIAL SOURCE:"))) {
+      analysis = {
+        ...analysis,
+        notes: [...analysis.notes, "PARTIAL SOURCE: captured response was explicitly truncated by the upstream response processor at 100KB; routes, parameters, functions, and sinks in the omitted tail were not analyzed. Retrieve the full response through the request-detail/capture pipeline before treating this inventory as complete."],
+      }
     }
     output.push({
       relativePath: "captured/" + url.hostname.toLowerCase() + "/" + basename + "-" + digest.slice(0, 8),
@@ -943,7 +943,7 @@ export namespace JavaScriptCorrelation {
         host: request.host,
         normalizedPath: request.normalized_path,
         responseContentType: request.response_content_type,
-        responseBody: request.processed_response,
+        responseBody: request.javascript_source ?? request.processed_response,
       })),
       analysisCache,
     )
