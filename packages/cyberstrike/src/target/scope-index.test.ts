@@ -25,6 +25,21 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://example.com/", ["AWS Cloud Config: 123456789012"])).toEqual([])
   })
 
+  test("indexes every non-web HackerOne type without authorizing HTTP targets", () => {
+    const nonWeb = [
+      "Android Play Store: com.example.mobile",
+      "Android: .apk: com.example.mobile",
+      "Hardware/IoT: router-01",
+      "Other Asset: internal-system",
+      "iOS: App Store: com.example.ios",
+      "iOS: Testflight: com.example.ios.beta",
+      "Windows: Microsoft Store: 9WZDNCRFHVJL",
+    ]
+    for (const item of nonWeb) {
+      expect(matchingScopeItems("https://example.com/", [item])).toEqual([])
+    }
+  })
+
   test("indexes positional wildcard patterns", () => {
     expect(matchingScopeItems("https://www.amazon.com/", ["www.amazon.*"])).toEqual(["www.amazon.*"])
     expect(matchingScopeItems("https://tenant.example.com/", ["{tenant}.example.com"])).toEqual(["{tenant}.example.com"])
