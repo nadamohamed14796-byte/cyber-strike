@@ -163,8 +163,8 @@ function normalizeEndpointLiteral(value: string): string | undefined {
 
 export function extractStaticJavaScriptEndpoints(content: string): string[] {
   const found = new Set<string>()
-  const callArgument = /(?:fetch|axios\.(?:get|post|put|patch|delete)|\.open)\s*\(\s*["'\`]([^"'\`]{1,240})["'\`]/gi
-  const routeString = /["'\`]((?:https?:\/\/)[^"'\`\s]{1,240}|\/(?:api|graphql|rest|rpc|v\d+|auth|admin|users|account|orders|cart|checkout|upload|download|search|profile)(?:\/[^"'\`\s]{0,160})?)["'\`]/gi
+  const callArgument = /(?:fetch|axios\.(?:get|post|put|patch|delete)|\.open)\s*\(\s*["'\`]([^"'\`]+)["'\`]/gi
+  const routeString = /["'\`]((?:https?:\/\/)[^"'\`\s]+|\/(?:api|graphql|rest|rpc|v\d+|auth|admin|users|account|orders|cart|checkout|upload|download|search|profile)(?:\/[^"'\`\s]*)?)["'\`]/gi
   for (const pattern of [callArgument, routeString]) {
     for (const match of content.matchAll(pattern)) {
       const normalized = normalizeEndpointLiteral(match[1])
