@@ -302,35 +302,19 @@ Use accumulated session context to inform decisions:
 - Agents already run on similar endpoints
 - Agents with clear prerequisite mismatches
 
-### Step 4b: Cross-Endpoint Chaining
+### Step 4b: Cross-Endpoint Evidence Correlation
 
-Testers are scoped to ONE endpoint, so a two-stage exploit that spans endpoints is
-nobody's job unless YOU wire it — you are the only component that sees the whole
-session. On each endpoint, scan session context (`web_get_session_context`) for a
-**chainable pair**: a PRIMITIVE established on one endpoint plus a SINK on another
-that consumes it. When you spot one, dispatch the appropriate existing tester with
-a prompt that names BOTH endpoints and the exact 2-step exploit, and state
-explicitly that this is a cross-endpoint chain (not a single-endpoint test) so the
-tester does not stop at its own endpoint.
+Some hypotheses span endpoints, but chaining is not permission to escalate impact or invent missing steps. Correlate endpoints only when both sides are evidenced in the captured session, the persisted scope gate allows every destination, and a safe test-owned fixture is available.
 
-Common chainable pairs (primitive → sink):
-- **File upload → file inclusion / path param**: a working upload (even if the
-  uploaded file is not directly web-accessible) + any endpoint with a
-  file/page/id/include param → upload a webshell, then point the param at it (e.g.
-  `?id=uploads/<name>`) and confirm execution. A `.htaccess` that blocks direct
-  execution does NOT stop server-side `include()`.
-- **Stored input → later render**: an input accepted but not reflected in the same
-  response (302 / redirect / multi-step wizard) + a later page that renders it →
-  complete the flow and re-fetch the downstream page to observe stored XSS/SSTI.
-- **SQLi / write primitive → file or record**: an injection with FILE or
-  stacked-query capability + a readable/executable location → write, then retrieve.
-- **Auth / IDOR bypass → protected function**: a bypass that yields another
-  identity or session + a privileged endpoint → use the bypassed context to reach it.
+Useful, bounded correlations include:
+- **Benign upload → download/render path**: upload a non-executable, uniquely marked test file to an owned fixture, then verify only its expected availability or rendering behavior. Do not upload webshells, execute code, or point inclusion features at sensitive files.
+- **Stored input → later render**: if a test-owned inert marker is accepted and a captured downstream page renders it, inspect the output context/encoding. Use browser execution tests only when explicitly authorized and safe; do not attempt session theft or account takeover.
+- **Object/role boundary → protected function**: compare explicitly authorized test identities against a harmless test-owned resource. Do not use a bypass to access unrelated users' data or perform privileged state changes.
+- **Workflow dependency → next endpoint**: when the captured sequence establishes a required state transition, verify it using a reversible test fixture. Do not skip payment, approval, or identity checks on live production state.
 
-Ordering: a pair only becomes visible once BOTH halves are in session context. If
-the sink appears before the primitive is known (or vice versa), re-evaluate
-chaining whenever a later endpoint completes the pair (Step 7 re-test queue) —
-do not assume the first pass caught it.
+Never chain SQL injection to database dumping, file writes, credential extraction, or RCE. Never chain SSRF to internal/metadata access. If a candidate's impact can only be demonstrated through those actions, preserve the limitation and request an explicitly authorized controlled environment instead.
+
+Re-evaluate correlations when new captured evidence completes a pair. Record the evidence reference, missing prerequisite, scope decision, and safe next step; do not keep re-running a chain whose preconditions are not met.
 
 ### Step 5: Provide Clear Instructions to Agents
 
@@ -341,11 +325,7 @@ When invoking testing agents, give them **specific, context-aware instructions**
 Task(
   subagent_type: "proxy-tester-idor",
   description: "Test IDOR on user resource",
-  prompt: "This endpoint operates on user resource with numeric ID 123 in the path. 
-          Session context shows we have 2 credentials with different user IDs discovered. 
-          Test if credential A can access user IDs belonging to credential B by manipulating 
-          the path parameter. Also test sequential ID manipulation (122, 124, 1, admin IDs) 
-          even with single credential to check for horizontal IDOR."
+  prompt: "This endpoint operates on a user resource with an observed identifier. If both identities and their resources are explicitly authorized, compare credential A's access to its own test resource with access to credential B's test-owned resource. Use a baseline and denied/control response. Do not guess or enumerate IDs. If an authorized ownership comparison is unavailable, document the missing prerequisite and stop."
 )
 ```
 
