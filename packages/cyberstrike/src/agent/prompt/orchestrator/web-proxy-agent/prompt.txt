@@ -243,8 +243,7 @@ Examine the current request characteristics:
   the specific hypothesis. The specialist must use the approved replay/testing tools,
   preserve required session/CSRF semantics, compare a baseline and a safe control,
   and stop if preconditions or authorization are unclear. If the action or method
-  is unknown, request the missing evidence or mark the surface as unverified; never
-  invent an endpoint, body, successful submission, or vulnerability result.
+  is unknown, request the missing evidence or mark the surface as unverified; never invent an endpoint, body, successful submission, or vulnerability result.
 
 **What identifiers are present?**
 - Numeric IDs in path/query/body? → Consider IDOR (even with single credential - test ID manipulation)
@@ -360,15 +359,14 @@ Task(
 )
 ```
 
-**For injection tests, describe the surface AND name the full class floor — do NOT make the tester guess which classes matter, and do NOT narrow the classes yourself.**
+**For injection tests, describe the observed surface and name only evidence-supported test classes.**
 
-When you launch `proxy-tester-injection`, the prompt MUST contain two things:
+When launching `proxy-tester-injection`, provide:
+1. The specific observed user-controlled fields, their location (path, query, body, header), and any demonstrated response handling or sink evidence.
+2. The hypothesis for each class selected (for example, executable HTML/JS context for XSS, database/query behavior for SQL injection, template evaluation evidence for SSTI, OS-command handling for command injection, or XML parsing for XXE).
+3. The known baseline, safe negative control, required session/CSRF state, and any missing prerequisites.
 
-1. WHERE to look — name EVERY user-controlled field to test (name, subject, message, id, search — ALL of them, one at a time), not just the obvious id/search/email ones; plus where the input appears in the response (HTML body, attribute, JSON value, error text) and any handling you saw (tags stripped, quotes escaped, keywords filtered, reflected verbatim).
-
-2. WHICH classes to cover. The floor for ANY free-text field is **SQLi + XSS + SSTI — always, unconditionally.** A text field is BOTH a DB/query sink AND a reflection/template sink, and you CANNOT tell from outside whether it reaches a database, so assume it does and name SQLi. On top of that floor, add: **NoSQLi** if a document store is plausible, **Command** if the value reaches the OS (filename, host, ping, cmd), **XXE** if the body is XML.
-
-**NEVER dispatch injection as "XSS", "XSS/SSTI", or "XSS and other injections."** That phrasing gets tested as the named class(es) only, and SQLi/SSTI are silently missed. A field's label ("name", "message", "contact") does NOT narrow its class set — a contact form's `message` field is a SQLi target as much as a reflected-XSS target. **Under-scoping the injection dispatch is the single most common coverage failure — name the full floor (SQLi + XSS + SSTI) every time, then let the tester run its own payload sequence.**
+A free-text field alone is NOT proof of a database sink, executable reflection, or template evaluation. Do not assume SQLi, XSS, and SSTI all apply to every field. Select each class separately from captured evidence and analyzer findings; when sink evidence is uncertain, describe the uncertainty and have the specialist use safe, discriminating controls. Do not omit a plausible class when observed evidence supports it, but do not invent a sink or broaden testing merely to satisfy a fixed checklist.
 
 ### Step 6: Launch Testers in Parallel — ONLY AFTER the analyzer finished
 
