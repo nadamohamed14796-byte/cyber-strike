@@ -127,6 +127,16 @@ export namespace Database {
         }
       }
 
+      if (entry.name === "20261017190000_request-javascript-source" && tableExists(sqlite, "request")) {
+        if (tableColumns(sqlite, "request").has("javascript_source")) {
+          const addJavaScriptSource = /ALTER TABLE request ADD COLUMN javascript_source TEXT;/i
+          if (!addJavaScriptSource.test(sql)) {
+            throw new Error("The request JavaScript source migration no longer matches its compatibility guard.")
+          }
+          sql = sql.replace(addJavaScriptSource, "SELECT 1;")
+        }
+      }
+
       if (entry.name === "20261013020000_vulnerability-target-workspace-id" && tableExists(sqlite, "vulnerability")) {
         if (tableColumns(sqlite, "vulnerability").has("target_id")) {
           sql = sql.replace(
