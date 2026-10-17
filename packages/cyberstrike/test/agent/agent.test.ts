@@ -30,6 +30,19 @@ description: Skill available through a directory alias.
 EMBEDDED_SKILL_ALIAS_REGRESSION_MARKER
 `,
       )
+      const apiSkillDir = path.join(dir, ".cyberstrike", "skill", "wstg-apit-02")
+      await Bun.write(
+        path.join(apiSkillDir, "SKILL.md"),
+        `---
+name: API authorization review
+description: API authorization review fixture.
+---
+
+# API authorization
+
+EMBEDDED_API_SKILL_REGRESSION_MARKER
+`,
+      )
     },
   })
 
