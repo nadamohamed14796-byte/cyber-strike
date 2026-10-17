@@ -4,6 +4,8 @@ import path from "node:path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
+import { Session } from "../../src/session"
+import { Request } from "../../src/session/request"
 import { targetWorkspaceOwnerKey } from "../../src/target/project-key"
 
 describe("target memory normalization", () => {
@@ -516,6 +518,72 @@ test("archives prior full note revisions when one living investigation is update
       expect(historyFile).toContain("GET /api/profile exposed the user's own profile")
       expect(historyFile).toContain("role parameter has not been checked")
       expect(historyFile).toContain("Current note ID: " + second.note.id)
+      await Instance.dispose()
+    },
+  })
+})
+
+
+test("resumable target context reports note and journal entries omitted by prompt ranking", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://context-notes.example.test"
+      await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Current hypothesis A",
+        content: "First current investigation conclusion.",
+        source: "agent:context-test",
+        identityKey: "context-current-a",
+        upsertByIdentity: true,
+        status: "observed",
+      })
+      await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Current hypothesis B",
+        content: "Second current investigation conclusion.",
+        source: "agent:context-test",
+        identityKey: "context-current-b",
+        upsertByIdentity: true,
+        status: "observed",
+      })
+      await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Journal experiment A",
+        content: "First archived experiment.",
+        source: "agent:context-test",
+        upsertByIdentity: false,
+        status: "observed",
+        tags: ["journal"],
+      })
+      await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Journal experiment B",
+        content: "Second archived experiment.",
+        source: "agent:context-test",
+        upsertByIdentity: false,
+        status: "observed",
+        tags: ["journal"],
+      })
+
+      const session = await Session.create({ title: "target-context-note-paging-test" })
+      const request = Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/api/profile",
+        origin: targetURL,
+        keyHash: "target-context-note-paging-test-key",
+      })
+      expect(request).toBeDefined()
+
+      const context = TargetMemory.contextForSession(session.id, 1)
+      expect(context).toContain("PARTIAL NOTE SELECTION")
+      expect(context).toContain("1 current notes, 1 journal entries")
+      expect(context).toContain("Use target_notes_read")
+      expect(context).not.toContain("First archived experiment.")
+      expect(context).not.toContain("Second archived experiment.")
+      await Session.remove(session.id)
       await Instance.dispose()
     },
   })
