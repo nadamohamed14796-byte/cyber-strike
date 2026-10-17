@@ -125,7 +125,10 @@ const systemRanges: Array<[string, number]> = [
   ["172.16.0.0", 12],
   ["192.0.0.0", 24],
   ["192.0.2.0", 24],
+  ["192.31.196.0", 24],
+  ["192.52.193.0", 24],
   ["192.88.99.0", 24],
+  ["192.175.48.0", 24],
   ["192.168.0.0", 16],
   ["198.18.0.0", 15],
   ["198.51.100.0", 24],
@@ -140,6 +143,38 @@ function ipv4Number(value: string): number | undefined {
   const octets = parts.map(Number)
   if (octets.some((octet) => octet < 0 || octet > 255)) return undefined
   return (((octets[0] * 256 + octets[1]) * 256 + octets[2]) * 256 + octets[3])
+}
+
+function ipv6Number(value: string): bigint | undefined {
+  let address = value.toLowerCase().split("%")[0] ?? ""
+  // Expand an embedded IPv4 tail into its two hexadecimal groups.
+  if (address.includes(".")) {
+    const separator = address.lastIndexOf(":")
+    if (separator < 0) return undefined
+    const ipv4 = ipv4Number(address.slice(separator + 1))
+    if (ipv4 === undefined) return undefined
+    const high = Math.floor(ipv4 / 65_536).toString(16)
+    const low = (ipv4 % 65_536).toString(16)
+    address = address.slice(0, separator + 1) + high + ":" + low
+  }
+
+  const sections = address.split("::")
+  if (sections.length > 2) return undefined
+  const left = sections[0] ? sections[0].split(":") : []
+  const right = sections.length === 2 && sections[1] ? sections[1].split(":") : []
+  const missing = 8 - left.length - right.length
+  if ((sections.length === 1 && missing !== 0) || (sections.length === 2 && missing < 1)) return undefined
+  const groups = [...left, ...Array(missing).fill("0"), ...right]
+  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/i.test(group))) return undefined
+  return groups.reduce((result, group) => (result << 16n) | BigInt(Number.parseInt(group, 16)), 0n)
+}
+
+function ipv6InRange(address: string, base: string, prefix: number): boolean {
+  const value = ipv6Number(address)
+  const network = ipv6Number(base)
+  if (value === undefined || network === undefined || prefix < 0 || prefix > 128) return false
+  const shift = BigInt(128 - prefix)
+  return (value >> shift) === (network >> shift)
 }
 
 /** Public unicast addresses only; reject reserved, local, documentation and transition ranges. */
@@ -172,15 +207,16 @@ export function isPublicResearchAddress(address: string): boolean {
     return false
   }
 
-  // Only currently allocated global-unicast 2000::/3 is eligible.
-  const first = Number.parseInt(normalized.split(":")[0] || "0", 16)
-  if (!Number.isFinite(first) || first < 0x2000 || first > 0x3fff) return false
-  // Special-purpose, documentation, 6to4 and transition addresses are denied.
+  // Only currently allocated global-unicast 2000::/3 is eligible. Parse the full
+  // address so expanded IPv6 spellings cannot bypass the special-purpose deny list.
+  if (ipv6Number(normalized) === undefined || !ipv6InRange(normalized, "2000::", 3)) return false
+
+  // Deny IANA special-purpose allocations, documentation space, and 6to4.
   if (
-    normalized.startsWith("2001:db8:") ||
-    normalized === "2001:db8" ||
-    normalized.startsWith("2001:0:") ||
-    normalized.startsWith("2002:")
+    ipv6InRange(normalized, "2001::", 23) ||
+    ipv6InRange(normalized, "2001:db8::", 32) ||
+    ipv6InRange(normalized, "2002::", 16) ||
+    ipv6InRange(normalized, "3fff::", 20)
   ) return false
   return true
 }
