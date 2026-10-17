@@ -122,6 +122,18 @@ test("invalid-precondition attempts do not count toward false-positive classific
   expect(result.output).toContain("0/20 distinct valid evidence-backed attempts")
 })
 
+test("unresolved checklist questions block a false-positive verdict even after 20 attempts", () => {
+  const checks = checklist({
+    reproducible: { status: "fail", reason: "Controlled replay did not reproduce the claim", evidence: "Twenty distinct valid attempts matched the expected baseline" },
+    unexpected_behavior: { status: "fail", reason: "Observed behavior matched intended behavior", evidence: "Controlled comparisons showed no claimed behavior" },
+    security_impact: { status: "unknown", reason: "Impact check remains untested", evidence: "" },
+  })
+  const result = assessFindingChecks(checks, makeAttempts(20))
+  expect(result.verdict).toBe("inconclusive")
+  expect(result.unknownCheckIDs).toContain("security_impact")
+  expect(result.output).toContain("20/20 distinct valid evidence-backed attempts")
+})
+
 test("false positive requires multiple evidence-backed contradictions and explains failed numbers", () => {
   const checks = checklist({
     reproducible: { status: "fail", reason: "Repeated controlled attempts did not reproduce the claim", evidence: "Three replays returned the expected owner-bound record" },
