@@ -6,6 +6,7 @@ import { WebCredential, COMMON_AUTH_HEADERS } from "../session/web/web-credentia
 import { HttpMessage } from "../replay/message"
 import { Mutate } from "../replay/mutate"
 import { BackendFetch } from "../replay/backend-fetch"
+import { TargetMemory } from "../target"
 
 function originFromRequest(req: Request.Info): string | undefined {
   if (req.origin) return req.origin.replace(/\/+$/, "")
@@ -91,10 +92,36 @@ Use this to:
       }
     }
 
+    let authorizationURL: URL
+    try {
+      authorizationURL = new URL(msg.target, origin)
+    } catch {
+      return {
+        title: "csrf_extract: invalid target",
+        output: "Cannot resolve the captured request target to a valid URL; no request was sent.",
+        metadata: { extracted: false, scopeDenied: true },
+      }
+    }
+    const authorization = await TargetMemory.checkURLScope(authorizationURL.href)
+    if (!authorization.allowed || !authorization.workspace) {
+      return {
+        title: "csrf_extract: refused (target scope)",
+        output: [
+          `Refusing URL "${authorizationURL.href}": ${authorization.reason}.`,
+          "No request was sent. A configured target workspace and persisted authorization scope are required.",
+        ].join("\\n"),
+        metadata: { extracted: false, scopeDenied: true, reason: authorization.reason },
+      }
+    }
+    const originalWorkspaceID = authorization.workspace.id
     const result = await BackendFetch.send(msg, {
       origin,
       totalTimeoutMs: 15000,
       followRedirects: true,
+      redirectScopeCheck: async (url: string) => {
+        const decision = await TargetMemory.checkURLScope(url)
+        return decision.allowed && decision.workspace?.id === originalWorkspaceID
+      },
       signal: ctx.abort,
     })
 
