@@ -1,6 +1,6 @@
 import z from "zod"
 import { Session } from "../session"
-import { TargetMemory, type TargetNoteKind, type TargetNoteStatus } from "../target"
+import { TargetMemory } from "../target"
 import { Tool } from "./tool"
 
 const TargetNotesReadParameters = z.object({
