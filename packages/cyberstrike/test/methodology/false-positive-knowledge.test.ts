@@ -44,6 +44,18 @@ test("false-positive memory persists normalized lessons across targets and redac
       const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).all())
       expect(rows).toHaveLength(1)
       expect(rows[0]?.source_validation_id).toBe("validation-source-2")
+      expect(rows[0]?.active).toBe(1)
+
+      // A later contradictory assessment must retract stale global advice.
+      FalsePositiveKnowledge.reopenForFinding("finding-source-1")
+      expect(FalsePositiveKnowledge.similar({
+        title: "IDOR: user can read another account's private profile",
+        description: "Possible broken access control",
+        endpoint: "GET /api/users/98765/profile",
+      })).toHaveLength(0)
+      const reopened = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).all())
+      expect(reopened[0]?.active).toBe(0)
+      expect(reopened[0]?.last_verdict).toBe("reopened")
     },
   })
 })
