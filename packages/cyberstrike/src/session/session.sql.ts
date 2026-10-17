@@ -191,6 +191,42 @@ export const RequestTable = sqliteTable(
   ],
 )
 
+/**
+ * Every distinct JavaScript response body observed for a request identity.
+ * RequestTable intentionally deduplicates request shapes for LLM work; this
+ * append-only capture table preserves changed script versions without creating
+ * duplicate request-analysis jobs.
+ */
+export const RequestJavaScriptCaptureTable = sqliteTable(
+  "request_javascript_capture",
+  {
+    id: text().primaryKey(),
+    session_id: text()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    request_id: text()
+      .notNull()
+      .references(() => RequestTable.id, { onDelete: "cascade" }),
+    source_url: text().notNull(),
+    content_hash: text().notNull(),
+    source_content: text().notNull(),
+    content_type: text(),
+    response_size: integer(),
+    time_created: integer().notNull(),
+  },
+  (table) => [
+    uniqueIndex("request_javascript_capture_dedup_idx").on(
+      table.session_id,
+      table.request_id,
+      table.source_url,
+      table.content_hash,
+    ),
+    index("request_javascript_capture_session_idx").on(table.session_id),
+    index("request_javascript_capture_request_idx").on(table.request_id),
+    index("request_javascript_capture_url_idx").on(table.session_id, table.source_url),
+  ],
+)
+
 // ============================================================================
 // Web Proxy Agent Tables - For advanced endpoint analysis and testing
 // ============================================================================
