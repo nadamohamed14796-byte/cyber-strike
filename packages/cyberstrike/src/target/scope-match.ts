@@ -97,7 +97,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     let scopeURL: URL
     try {
         candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL("https://" + value)
-        scopeURL = new URL("https://" + identifier)
+        scopeURL = new URL(allowed)
     } catch {
       return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
     }
@@ -159,8 +159,6 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     return { matches: false, reason: `does not match wildcard ${allowed}` }
   }
 
-  const scopeHost = parseHostname(allowed)
-  if (!scopeHost) return { matches: false, reason: "scope item is not a valid domain, IP address, or HTTP(S) URL" }
   // HackerOne also documents wildcard labels outside the leading "*." form,
   // e.g. "www.example.*" and "{tenant}.example.com". These match one DNS label
   // per token; only the leading "*.domain" form intentionally includes the apex.
@@ -181,6 +179,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     }
   }
 
+  const scopeHost = parseHostname(allowed)
+  if (!scopeHost) return { matches: false, reason: "scope item is not a valid domain, IP address, or HTTP(S) URL" }
   // A bare domain is an exact entry, not an implicit wildcard. Programs that
   // include subdomains must express that permission with an explicit wildcard.
   if (hostname === scopeHost) return { matches: true, reason: "exact domain/IP match (ignoring protocol, port, and path)" }
