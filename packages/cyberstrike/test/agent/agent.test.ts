@@ -172,6 +172,9 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       // instructing itself to synthesize/send unobserved form submissions.
       expect(orchestrator?.prompt).toContain("pure orchestrator")
       expect(orchestrator?.prompt).toContain("never invent an endpoint, body")
+      expect(orchestrator?.prompt).toContain("call `scope_check`")
+      expect(orchestrator?.prompt).toContain("captured request is evidence that the browser observed traffic, NOT proof")
+      expect(orchestrator?.prompt).toContain("Every specialist must still rely on its own execution-boundary scope enforcement")
       expect(orchestrator?.prompt).toContain("Reflection alone proves none of these")
       expect(orchestrator?.prompt).not.toContain("synthesize and send it yourself")
       expect(orchestrator?.prompt).not.toContain("POST the form's action")
