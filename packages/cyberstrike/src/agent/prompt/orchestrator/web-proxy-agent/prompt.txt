@@ -232,12 +232,17 @@ Examine the current request characteristics:
 - JSON body? → Consider injection, mass assignment
 - XML content? → Consider injection (XXE)
 - A `<form>`, or an analyzer-registered object with input fields, in the RESPONSE —
-  even when THIS request carried no query/body params? → the form's submit target
-  IS an injectable surface. Dispatch proxy-tester-injection to test the submission
-  directly: POST the form's action (or the same path if no action) with each
-  discovered field set to a payload. Do NOT wait for the browser to capture that
-  POST first — synthesize and send it yourself. This is the most common missed
-  case: a GET page that only renders a form whose POST is never crawled.
+  even when THIS request carried no query/body params? → treat the form action and
+  fields as a candidate attack surface, NOT as proof of an injectable endpoint.
+  The orchestrator must remain a pure orchestrator: do not synthesize or send the
+  POST yourself. If the form action/method and relevant fields are grounded in the
+  captured response or analyzer evidence, and the destination passes the canonical
+  persisted scope check, dispatch `proxy-tester-injection` with that evidence and
+  the specific hypothesis. The specialist must use the approved replay/testing tools,
+  preserve required session/CSRF semantics, compare a baseline and a safe control,
+  and stop if preconditions or authorization are unclear. If the action or method
+  is unknown, request the missing evidence or mark the surface as unverified; never
+  invent an endpoint, body, successful submission, or vulnerability result.
 
 **What identifiers are present?**
 - Numeric IDs in path/query/body? → Consider IDOR (even with single credential - test ID manipulation)
