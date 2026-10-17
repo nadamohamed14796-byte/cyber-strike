@@ -2404,6 +2404,6 @@ export namespace TargetMemory {
     const context = sections.join("\n")
     const contextLimit = 18_000
     if (context.length <= contextLimit) return context
-    return context.slice(0, contextLimit - 500) + "\n\n[PARTIAL TARGET CONTEXT: this is a preview, not the complete note or asset inventory. Do not infer that omitted notes/assets do not exist. Use target_notes_read to search and page through saved notes, open the selected workspace notes.md/artifacts for full details, and continue asset inventory from the workspace database.]
+    return context.slice(0, contextLimit - 500) + "\n\n[PARTIAL TARGET CONTEXT: this is a preview, not the complete note or asset inventory. Do not infer that omitted notes/assets do not exist. Use target_notes_read to search and page through saved notes, open the selected workspace notes.md/artifacts for full details, and continue asset inventory from the workspace database.]"
   }
 }
