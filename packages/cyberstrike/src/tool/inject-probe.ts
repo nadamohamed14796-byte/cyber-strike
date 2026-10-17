@@ -21,20 +21,16 @@ import { TargetMemory } from "../target"
 // enumeration weak models skip); the AGENT crafts the real exploit and confirms.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const description = `Fire a battery of probes at ONE parameter-bearing request and return RAW OBSERVATIONS.
+const description = `Run a bounded evidence-gathering probe against a previously captured, in-scope HTTP request. This tool returns observations, not vulnerability verdicts.
 
-This tool does NOT find or confirm vulnerabilities and does NOT run a JS engine or a shell — it only reports what the server echoed back. Every observation is a LEAD you must verify yourself, never a verdict. After reading it: craft and send the actual exploit to confirm, and separately cover every class listed under coverage.not_tested (this tool does not test them).
+Before calling it, inspect the captured request/response and select a specific injection hypothesis, class, and exact input point. A parameter, header, cookie, JSON field, or reflected value alone is not evidence of a vulnerable sink. Do not run every class against every input point or use this tool as a substitute for analyzing the request.
 
-vuln_type:
-- "xss"  — reflected tag-survival (which HTML tags reflect un-encoded past a filter).
-- "ssti" — server-side template evaluation: fires a fixed arithmetic expression in several engine
-           syntaxes and reports which (if any) the server EVALUATED (product present, literal absent).
-- "cmd"  — OS command injection: fires benign READ-ONLY probes (id/ver) behind shell separators and
-           reports which (if any) produced command output in the response. Read-only DETECTION ONLY —
-           it never sends network/file/write commands.
+- `xss`: observes whether selected markers or tag/handler strings are reflected and how they are encoded. Reflection is not proof of browser execution.
+- `ssti`: uses fixed arithmetic markers to look for evidence of server-side template evaluation; compare against a literal baseline.
+- `cmd`: uses fixed read-only detection markers; a response difference alone is not proof of command execution.
+- `sqli`, `nosql`, `ldap`, `xpath`, `lfi`: reports limited error/behavior signals, not confirmed injection.
 
-Query-string and form-urlencoded parameters only. You choose WHERE (request_id/target/target_param);
-the tool chooses the payloads (you cannot supply a command or template expression).`
+The tool checks persisted target scope before sending. If scope is missing or denied, no probes are sent. Prefer explicit `points` when multiple inputs exist; automatic enumeration is not a reason to test every field. Use the smallest relevant class/input set, preserve a baseline and safe negative control, and follow up only when a meaningful lead needs discrimination. Do not copy a reflected payload into an exploit attempt automatically. Never extract data, access unrelated users' resources, read local files, contact internal/metadata services, or trigger destructive/financial effects. Record actual observations and keep unresolved cases inconclusive.`
 
 // Tag battery — one benign marker per tag so we can detect survival + encoding
 // without executing anything. The agent weaponizes a surviving tag afterwards.
@@ -1655,7 +1651,7 @@ export const InjectProbeTool = Tool.define("inject_probe", {
       .array(z.enum(["xss", "ssti", "cmd", "sqli", "nosql", "ldap", "xpath", "lfi"]))
       .min(1)
       .describe(
-        "Injection classes to probe — YOU pick the set that fits THIS endpoint (don't run every class everywhere; e.g. no xpath on a plain REST/JSON API). xss/ssti/cmd return execution-facts; sqli/nosql/ldap/xpath return error-signature (sqli also a safe AND-based boolean-differential) facts. The tool never exploits — it hands you leads.",
+        "Only classes supported by the observed sink/parser context or a concrete signal. Do not pass every class by default. Output is evidence for follow-up, not a finding or authorization to exploit.",
       ),
     points: z
       .array(
@@ -1669,7 +1665,7 @@ export const InjectProbeTool = Tool.define("inject_probe", {
         }),
       )
       .optional()
-      .describe("WHERE to inject — YOU choose the points. Omit to auto-enumerate query + form-urlencoded params."),
+      .describe("WHERE to inject — select exact evidence-supported input points. If omitted, query/form fields may be enumerated; when several exist, prefer explicit points rather than testing every field."),
     target_param: z
       .string()
       .optional()
