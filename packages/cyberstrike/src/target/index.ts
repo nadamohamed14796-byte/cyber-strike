@@ -1746,6 +1746,7 @@ export namespace TargetMemory {
         const nextTags = input.tags === undefined ? existingTags : tags
         const changed =
           existing.title !== title ||
+          existing.source !== source ||
           existing.source_url !== (sourceURL ?? null) ||
           existing.content !== content ||
           existing.content_hash !== contentHash ||
@@ -1782,6 +1783,7 @@ export namespace TargetMemory {
               }).onConflictDoNothing().run()
               return db.update(TargetNoteTable).set({
                 title,
+                source,
                 source_url: sourceURL ?? null,
                 content,
                 content_hash: contentHash,
