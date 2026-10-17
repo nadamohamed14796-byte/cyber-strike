@@ -425,3 +425,17 @@ test("keeps endpoint identity method-specific while merging parameter evidence f
   expect(postEndpoint?.queryParameters).toEqual([])
   expect(postEndpoint?.observedRequestIDs).toEqual(["req-post"])
 })
+
+
+test("extracts more than 250 distinct captured JavaScript assets", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const requests = Array.from({ length: 251 }, (_, index) => ({
+    id: "captured-js-" + index,
+    url: "https://app.example.com/assets/chunk-" + index + ".js",
+    responseContentType: "application/javascript",
+    responseBody: 'fetch("/api/chunk-' + index + '")',
+  }))
+  const sources = extractCapturedJavaScriptSources(requests)
+  expect(sources).toHaveLength(251)
+  expect(sources.some((source) => source.basename === "chunk-250.js")).toBe(true)
+})
