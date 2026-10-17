@@ -2069,15 +2069,23 @@ export namespace TargetMemory {
     const noteLimit = Number.isFinite(maxNotes) ? Math.max(0, Math.min(Math.floor(maxNotes), 20)) : 8
     // Fetch the full small target-local note set before ranking; applying LIMIT in SQL
     // first would discard older but still critical confirmed/disproven conclusions.
+    const selectedAssetNotes = Database.use((db) =>
+      db
+        .select()
+        .from(TargetNoteTable)
+        .where(eq(TargetNoteTable.target_id, selected.id))
+        .all()
+        .map(mapNote),
+    )
+    // Keep the living investigation notes and the append-only experiment history distinct.
+    // The ranked summary set must not crowd out the recent journal when a session resumes.
+    const journalNotes = selectedAssetNotes
+      .filter((note) => note.tags.includes("journal"))
+      .sort((a, b) => b.timeCreated - a.timeCreated || b.id.localeCompare(a.id))
+      .slice(0, 4)
+    const journalIDs = new Set(journalNotes.map((note) => note.id))
     const primaryNotes = rankNotesForContext(
-      Database.use((db) =>
-        db
-          .select()
-          .from(TargetNoteTable)
-          .where(eq(TargetNoteTable.target_id, selected.id))
-          .all()
-          .map(mapNote),
-      ),
+      selectedAssetNotes.filter((note) => !journalIDs.has(note.id)),
       noteLimit,
     )
     const parentNotes = programRoot.id === selected.id
@@ -2167,10 +2175,16 @@ export namespace TargetMemory {
       // The active asset's ranked memory is deliberately emitted before inventories:
       // the final context-size guard must never spend the entire budget on an asset tree
       // and silently discard the observations needed to resume the current investigation.
-      ...(primaryNotes.length ? ["## Selected asset memory (persistent notes)", "", ...primaryNotes.flatMap((note) => [
+      ...(primaryNotes.length ? ["## Selected asset memory (current investigation notes)", "", ...primaryNotes.flatMap((note) => [
         "### [" + note.status + "/" + note.kind + "] " + (note.title ?? "(untitled)"),
         "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
         note.content.slice(0, primaryNoteContentLimit),
+        "",
+      ])] : []),
+      ...(journalNotes.length ? ["## Recent investigation journal (append-only history; newest first)", "", ...journalNotes.flatMap((note) => [
+        "### " + (note.title ?? "(untitled)") + " [" + note.timeCreated + "]",
+        "Source: " + note.source + (note.sourceURL ? " — " + note.sourceURL : ""),
+        note.content.slice(0, 700),
         "",
       ])] : []),
       ...(parentNotes.length ? ["## Program/root memory (summary notes)", "", ...parentNotes.flatMap((note) => [
