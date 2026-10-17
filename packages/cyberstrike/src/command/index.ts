@@ -88,11 +88,11 @@ export namespace Command {
         source: "command",
         template: [
           "Run CyberStrike /recon as an end-to-end, resumable reconnaissance workflow. Optional arguments: $ARGUMENTS may contain the root program URL and/or an official scope file path.",
-          "Start with the one canonical parent target workspace. Use target_workspace(action=\\"init\\") or show/list an existing workspace; never create alternate roots for each subdomain. Workspace creation does not grant authorization. Review the official policy first, configure the saved include/exclude scope, and require scope_check against the persisted manifest before any active request. If authorization is absent, ambiguous, or excluded, stay passive and mark active work blocked.",
+          "Start with the one canonical parent target workspace. Use target_workspace(action=\"init\") or show/list an existing workspace; never create alternate roots for each subdomain. Workspace creation does not grant authorization. Review the official policy first, configure the saved include/exclude scope, and require scope_check against the persisted manifest before any active request. If authorization is absent, ambiguous, or excluded, stay passive and mark active work blocked.",
           "Create or resume a durable checkpoint/run manifest under the canonical workspace. Save each stage output to its designated artifact directory, read existing manifests before starting expensive work, and continue in batches until the actual frontier is exhausted or a concrete blocker is recorded. Deduplicate by stable identity/version; do not use arbitrary endpoint, target, file, or total-work caps. Verify artifact paths and counts before marking any phase complete.",
           RECON_METHODOLOGY_PROMPT,
           "At the end, report COMPLETE/PARTIAL/BLOCKED with evidence-backed counts, saved artifact paths, scope limitations, sources that failed or were unavailable, unresolved hypotheses, negative results, and the exact next resumable action. Never present a candidate or scanner signal as a confirmed vulnerability without reproducible behavior and meaningful impact evidence.",
-        ].join("\\n\\n"),
+        ].join("\n\n"),
         hints: hints("$ARGUMENTS"),
       },
       [Default.UPDATE]: {
