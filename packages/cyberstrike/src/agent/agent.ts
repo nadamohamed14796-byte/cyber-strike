@@ -690,6 +690,7 @@ export namespace Agent {
             web_get_vulnerabilities: "allow",
             // Public research is global, read-only context; expose it to every specialist.
             research_knowledge: "allow",
+            false_positive_memory: "allow",
             target_note: "allow",
             validate_finding: "allow",
             correlate_javascript: "allow",
