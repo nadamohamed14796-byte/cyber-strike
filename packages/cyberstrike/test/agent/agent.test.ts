@@ -245,6 +245,13 @@ test("specialized proxy tools stay limited to their intended tester agents", asy
       const idor = await Agent.get("proxy-tester-idor")
 
       expect(evalPerm(injection, "inject_probe")).toBe("allow")
+      expect(injection?.prompt).toContain("Evidence-Grounded First Move")
+      expect(injection?.prompt).toContain("scope_check")
+      expect(injection?.prompt).toContain("A request containing a parameter is not by itself an injection hypothesis")
+      expect(injection?.prompt).toContain("20 distinct valid evidence-backed attempts")
+      expect(injection?.prompt).not.toContain("On ANY request carrying a parameter")
+      expect(injection?.prompt).not.toContain("test your class")
+      expect(injection?.prompt).not.toContain("a couple of probes settle it")
       expect(evalPerm(fileAttacks, "inject_probe")).toBe("allow")
       expect(evalPerm(idor, "inject_probe")).toBe("deny")
       expect(evalPerm(llm, "llmhook")).toBe("allow")
