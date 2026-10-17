@@ -94,6 +94,19 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       : { matches: false, reason: `IPv6 address is outside CIDR ${allowed}` }
   }
 
+  // HackerOne IP Address assets can be IPv6 literals without URL brackets.
+  // Normalize both sides to 128-bit values for exact equality, never hostname suffix matching.
+  if (allowed.includes(":") && !allowed.includes("/") && !allowed.includes("://")) {
+    const scopeAddress = ipv6ToBigInt(allowed)
+    if (scopeAddress !== null) {
+      const targetHost = parseHostname(value)
+      const targetAddress = targetHost ? ipv6ToBigInt(targetHost) : null
+      return targetAddress !== null && targetAddress === scopeAddress
+        ? { matches: true, reason: "IPv6 address exactly matches scope item " + allowed }
+        : { matches: false, reason: "target does not match IPv6 address scope item " + allowed }
+    }
+  }
+
   // Explicit URL scope entries can constrain scheme, port, and path. They must
   // never be reduced to a hostname because that would silently broaden permission.
   if (/^https?:\/\//i.test(allowed)) {
