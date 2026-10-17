@@ -1650,8 +1650,11 @@ export namespace JavaScriptCorrelation {
             ]
             const sourceRecord = graph.sourceFiles.find((file) => file.relativePath === candidate.sourceFile)
             const sourceRequestIDs = sourceRecord?.sourceRequestIDs ?? (sourceRecord?.sourceRequestID ? [sourceRecord.sourceRequestID] : [])
+            const sourceCaptureIDs = sourceRecord?.sourceCaptureIDs ?? (sourceRecord?.sourceCaptureID ? [sourceRecord.sourceCaptureID] : [])
             const sourceReference = sourceRequestIDs.length
-              ? "captured JS response " + (sourceRecord?.sourceURL ?? "(URL unavailable)") + " via request IDs " + sourceRequestIDs.join(", ") + " (full body remains in request storage, not in the graph file)"
+              ? "captured JS response " + (sourceRecord?.sourceURL ?? "(URL unavailable)") +
+                (sourceCaptureIDs.length ? " (source capture version IDs: " + sourceCaptureIDs.join(", ") + ")" : "") +
+                " via request IDs " + sourceRequestIDs.join(", ") + " (full body remains in request storage, not in the graph file)"
               : "workspace file " + candidate.sourceFile
             return "- " + (candidate.method ?? "UNKNOWN") + " " + candidate.urlTemplate +
               " — source: " + sourceReference + ":" + candidate.sourceLine +
