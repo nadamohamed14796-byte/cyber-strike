@@ -12,6 +12,7 @@ CREATE TABLE `false_positive_knowledge` (
   `confidence` integer DEFAULT 50 NOT NULL,
   `occurrences` integer DEFAULT 1 NOT NULL,
   `last_verdict` text DEFAULT 'false_positive' NOT NULL,
+  `active` integer DEFAULT 1 NOT NULL,
   `time_created` integer NOT NULL,
   `time_updated` integer NOT NULL
 );
