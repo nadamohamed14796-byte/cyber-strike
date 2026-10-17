@@ -94,15 +94,15 @@ export function normalizeJavaScriptEndpointPath(inputPath: string): { path: stri
     }
     return segment
   }).join("/")
-  return { path, pathParameters: cleanUnique(pathParameters).slice(0, 80) }
+  return { path, pathParameters: cleanUnique(pathParameters) }
 }
 const fieldNames = (value: string) => cleanUnique(
   Array.from(value.matchAll(/(?:^|[,{\n])\s*["']?([A-Za-z_$][\w$-]{0,99})["']?\s*:/g), (m) => m[1]!),
-).slice(0, 100)
+ )
 
 
 /** Match a brace-delimited object while ignoring strings and comments. */
-function matchingObjectBrace(source: string, open: number, maxLength = 10000): number {
+function matchingObjectBrace(source: string, open: number, maxLength = source.length): number {
   let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false
   const limit = Math.min(source.length, open + maxLength)
   for (let i = open; i < limit; i++) {
@@ -122,11 +122,11 @@ function matchingObjectBrace(source: string, open: number, maxLength = 10000): n
 function objectPropertyNames(value: string): string[] {
   const names = new Set(fieldNames(value))
   for (const part of splitTopLevelArguments(value)) {
-    const match = part.trim().match(/^(?:["']([^"']{1,100})["']|([A-Za-z_$][\w$-]{0,99}))\s*(?:\??:|$)/)
+    const match = part.trim().match(/^(?:["']([^"']+)["']|([A-Za-z_$][\w$-]{0,99}))\s*(?:\??:|$)/)
     const name = match?.[1] ?? match?.[2]
     if (name && /^[A-Za-z_$][\w$-]{0,99}$/.test(name)) names.add(name)
   }
-  return [...names].slice(0, 100)
+  return [...names]
 }
 
 function objectBindingFields(source: string, name: string, beforeIndex: number): string[] {
@@ -160,7 +160,7 @@ function configObjectFields(text: string, property: string, source: string, befo
   if (reference?.[1]) for (const key of objectBindingFields(source, reference[1], beforeIndex)) fields.add(key)
   const shorthand = new RegExp("(?:^|[,{])\\s*" + property + "\\s*(?=,|})").test(text)
   if (shorthand) for (const key of objectBindingFields(source, property, beforeIndex)) fields.add(key)
-  return [...fields].slice(0, 100)
+  return [...fields]
 }
 
 function urlSearchParamsVariables(text: string): string[] {
@@ -186,7 +186,7 @@ function staticFunctionRanges(source: string, functions: JavaScriptFunctionCandi
   for (const fn of functions) {
     const offset = offsets.get(fn.line + ":" + fn.name)
     if (offset === undefined) continue
-    const view = source.slice(offset, Math.min(source.length, offset + 10000))
+    const view = source.slice(offset)
     const arrowRel = view.indexOf("=>")
     const parenRel = view.indexOf("(")
     if (arrowRel >= 0 && (parenRel < 0 || arrowRel < view.indexOf("{") || view.indexOf("{") < 0)) {
@@ -210,7 +210,7 @@ function staticFunctionRanges(source: string, functions: JavaScriptFunctionCandi
     const closeParen = findCallEnd(source, openParen, 10000)
     if (closeParen < 0) continue
     const openBrace = source.indexOf("{", closeParen + 1)
-    if (openBrace < 0 || openBrace - closeParen > 3000) continue
+    if (openBrace < 0) continue
     const semicolon = source.indexOf(";", closeParen + 1)
     const arrow = source.indexOf("=>", closeParen + 1)
     if ((semicolon >= 0 && semicolon < openBrace) || (arrow >= 0 && arrow < openBrace)) continue
@@ -222,11 +222,11 @@ function staticFunctionRanges(source: string, functions: JavaScriptFunctionCandi
 
 function normalizeEndpoint(value: string) {
   const input = value.trim()
-  if (!input || input.length > 2048 || /^(?:data|javascript|file|blob):/i.test(input)) return undefined
+  if (!input || /^(?:data|javascript|file|blob):/i.test(input)) return undefined
   const noFragment = input.split("#", 1)[0]!
   const rawQuery = noFragment.includes("?") ? noFragment.slice(noFragment.indexOf("?") + 1) : ""
   const queryParameters = cleanUnique(rawQuery.split("&").map((part) => part.split("=", 1)[0] ?? "")
-    .filter((name) => /^[A-Za-z0-9_.~[\]-]{1,100}$/.test(name))).slice(0, 80)
+    .filter((name) => /^[A-Za-z0-9_.~[\]-]+$/.test(name)))
   const rawPath = noFragment.split("?", 1)[0]!
   const dynamic = [
     ...Array.from(rawPath.matchAll(/\$\{\s*([A-Za-z_$][\w$]*)[^}]*\}/g), (m) => m[1]!),
@@ -250,7 +250,7 @@ function normalizeEndpoint(value: string) {
   path = path.replace(/\/{2,}/g, "/")
   const normalizedPath = normalizeJavaScriptEndpointPath(path)
   path = normalizedPath.path
-  const pathParameters = cleanUnique([...dynamic, ...normalizedPath.pathParameters]).slice(0, 80)
+  const pathParameters = cleanUnique([...dynamic, ...normalizedPath.pathParameters])
   return { host, origin, path, urlTemplate: (origin ?? (host ? "https://" + host : "")) + path, pathParameters, queryParameters }
 }
 
@@ -258,14 +258,14 @@ function addConcatenatedPathParameters(
   endpoint: NonNullable<ReturnType<typeof normalizeEndpoint>>,
   expression: string,
 ): NonNullable<ReturnType<typeof normalizeEndpoint>> {
-  const first = expression.match(/(['"\x60])([^'"\x60]{1,2048})\1/)
+  const first = expression.match(/(['"\x60])([^'"\x60]+)\1/)
   if (!first || first.index === undefined) return endpoint
   // A concatenation after ? or # belongs to query/fragment data, not the route path.
   if (first[2]!.includes("?") || first[2]!.includes("#")) return endpoint
   let path = endpoint.path
   let rest = expression.slice(first.index + first[0].length)
   const pathParameters = [...endpoint.pathParameters]
-  for (let i = 0; i < 12; i++) {
+  for (;;) {
     const dynamic = rest.match(/^\s*\+\s*(?:(?:encodeURIComponent|String|Number)\s*\(\s*)?([A-Za-z_$][\w$]*)(?:\s*\))?/)
     if (!dynamic) break
     const name = dynamic[1]!
@@ -274,7 +274,7 @@ function addConcatenatedPathParameters(
     path += "{" + name + "}"
     pathParameters.push(name)
     rest = rest.slice(dynamic[0].length)
-    const staticPart = rest.match(/^\s*\+\s*(['"\x60])([^'"\x60]{0,500})\1/)
+    const staticPart = rest.match(/^\s*\+\s*(['"\x60])([^'"\x60]*)\1/)
     if (!staticPart) break
     const suffix = staticPart[2] ?? ""
     if (suffix.includes("?") || suffix.includes("#")) break
@@ -286,11 +286,11 @@ function addConcatenatedPathParameters(
     ...endpoint,
     path,
     urlTemplate: (endpoint.origin ?? (endpoint.host ? "https://" + endpoint.host : "")) + path,
-    pathParameters: cleanUnique(pathParameters).slice(0, 80),
+    pathParameters: cleanUnique(pathParameters),
   }
 }
 
-function findCallEnd(source: string, start: number, maxLength = 7000): number {
+function findCallEnd(source: string, start: number, maxLength = source.length): number {
   let depth = 0, quote = "", escaped = false, lineComment = false, blockComment = false
   const limit = Math.min(source.length, start + maxLength)
   for (let i = start; i < limit; i++) {
@@ -330,7 +330,7 @@ function splitTopLevelArguments(value: string): string[] {
  * private target workspace can record reproducible evidence. Results remain candidates until verified.
  */
 export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis {
-  const source = input.slice(0, 1_000_000)
+  const source = input
   const lineStarts = [0]
   for (let i = 0; i < source.length; i++) if (source.charCodeAt(i) === 10) lineStarts.push(i + 1)
   const functions: JavaScriptFunctionCandidate[] = []
@@ -348,11 +348,10 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (fnSeen.has(key)) continue
     fnSeen.add(key)
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
-      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p))).slice(0, 40)
+      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p)) )
     functions.push({ name, line, parameters })
     functionOffsets.set(key, match.index ?? 0)
-    if (functions.length >= 300) break
-  }
+      }
   // Capture class/object shorthand methods and accessors as well as declarations and arrows.
   const reservedMethodNames = new Set(["if", "for", "while", "switch", "catch", "with", "function", "return", "throw", "new", "else", "try", "do"])
   const methodPattern = /(?:^|[;{}]\s*|\n\s*)(?:static\s+|async\s+|public\s+|private\s+|protected\s+|get\s+|set\s+)*([A-Za-z_$][\w$]*)\s*\(([^()]*)\)\s*\{/gm
@@ -363,17 +362,16 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (fnSeen.has(key)) continue
     fnSeen.add(key)
     const parameters = cleanUnique((match[2] ?? "").split(",").map((p) => (p.trim().replace(/^\.\.\./, "").split("=")[0] ?? "").trim())
-      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p))).slice(0, 40)
+      .filter((p) => /^[A-Za-z_$][\w$]*$/.test(p)) )
     functions.push({ name, line, parameters })
     functionOffsets.set(key, match.index ?? 0)
-    if (functions.length >= 300) break
-  }
+      }
   functions.sort((a, b) => a.line - b.line)
   const functionRanges = staticFunctionRanges(source, functions, functionOffsets)
 
   const requests: JavaScriptRequestCandidate[] = []
   const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
-  const requestCallSpans = [...source.matchAll(callPattern)].slice(0, 600).map((call) => {
+  const requestCallSpans = [...source.matchAll(callPattern)].map((call) => {
     const start = call.index ?? 0
     const open = start + call[0].lastIndexOf("(")
     const end = findCallEnd(source, open, 7000)
@@ -383,7 +381,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const index = match.index ?? 0, callee = (match[1] ?? "").toLowerCase()
     const open = index + match[0].lastIndexOf("(")
     const close = findCallEnd(source, open)
-    if (close < 0 || close - open > 7000) continue
+    if (close < 0) continue
     const args = splitTopLevelArguments(source.slice(open + 1, close))
     const isXHR = callee.endsWith(".open")
     const methodSuffix = /\.(get|post|put|patch|delete|head|options)$/i.exec(callee)?.[1]?.toUpperCase() ?? null
@@ -391,8 +389,8 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const requestConfig = callee.endsWith(".request") && (args[0] ?? "").trim().startsWith("{")
     const urlExpression = isXHR ? args[1] ?? "" : args[0] ?? ""
     const literalMatch = requestConfig
-      ? (args[0] ?? "").match(/\burl\s*:\s*["'\x60]([^"'\x60]{1,2048})["'\x60]/)
-      : urlExpression.match(/['"\x60]([^'"\x60]{1,2048})['"\x60]/)
+      ? (args[0] ?? "").match(/\burl\s*:\s*["'\x60]([^"'\x60]+)["'\x60]/)
+      : urlExpression.match(/['"\x60]([^'"\x60]+)['"\x60]/)
     if (!literalMatch) continue
     const normalizedEndpoint = normalizeEndpoint(literalMatch[1]!)
     if (!normalizedEndpoint) continue
@@ -415,9 +413,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const method = (axiosMethod ?? methodOption?.[1] ?? (isXHR ? args[0]?.match(/["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)?.[1] : inferredFetchMethod) ?? "").toUpperCase() || null
     const headers = [
       ...configObjectFields(optionText, "headers", source, index),
-      ...Array.from(optionText.matchAll(/\[\s*\[\s*["']([^"']{1,120})["']/g), (m) => m[1]!),
-      ...Array.from(requestContext.matchAll(/(?:headers|requestHeaders)\s*\.\s*(?:set|append)\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
-      ...Array.from(requestContext.matchAll(/\.setRequestHeader\s*\(\s*["']([^"']{1,120})["']/gi), (m) => m[1]!),
+      ...Array.from(optionText.matchAll(/\[\s*\[\s*["']([^"']+)["']/g), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/(?:headers|requestHeaders)\s*\.\s*(?:set|append)\s*\(\s*["']([^"']+)["']/gi), (m) => m[1]!),
+      ...Array.from(requestContext.matchAll(/\.setRequestHeader\s*\(\s*["']([^"']+)["']/gi), (m) => m[1]!),
       ...Array.from(requestContext.matchAll(/\b(Authorization|Cookie|Set-Cookie|X-CSRF-Token|X-XSRF-Token|X-API-Key)\b/gi), (m) => m[1]!),
     ]
     const bodyArgs = requestConfig ? "" : isBodyMethod ? args[1] ?? "" : isFetch ? options : ""
@@ -426,8 +424,8 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const bodySource = options + "\n" + bodyArgs + (requestConfig ? "\n" + (args[0] ?? "") : "")
     const bodyParams = [
       ...objectPropertyNames(directObject),
-      ...Array.from(bodySource.matchAll(/\b(?:body|data)\s*:\s*\{([\s\S]{0,2500}?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
-      ...Array.from(bodySource.matchAll(/JSON\.stringify\s*\(\s*\{([\s\S]{0,2500}?)\}\s*\)/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+      ...Array.from(bodySource.matchAll(/\b(?:body|data)\s*:\s*\{([\s\S]*?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+      ...Array.from(bodySource.matchAll(/JSON\.stringify\s*\(\s*\{([\s\S]*?)\}\s*\)/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
       ...bodyVariableNames(bodySource).flatMap((name) => objectBindingFields(source, name, index)),
       ...(isBodyMethod && !requestConfig && /^[A-Za-z_$][\w$]*$/.test((args[1] ?? "").trim())
         ? objectBindingFields(source, (args[1] ?? "").trim(), index) : []),
@@ -448,13 +446,13 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     endpoint.queryParameters.push(
       ...configObjectFields(optionText, "params", source, index),
       ...configObjectFields(optionText, "searchParams", source, index),
-      ...Array.from(all.matchAll(/new\s+URLSearchParams\s*\(\s*\{([\s\S]{0,2500}?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
+      ...Array.from(all.matchAll(/new\s+URLSearchParams\s*\(\s*\{([\s\S]*?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
       ...urlSearchParamsVariables(requestContext).flatMap((name) =>
-        Array.from(requestContext.matchAll(new RegExp("\\b" + name + "\\s*\\.\\s*(?:set|append|get)\\s*\\(\\s*[\"']([^\"']{1,100})[\"']", "gi")), (m) => m[1]!),
+        Array.from(requestContext.matchAll(new RegExp("\\b" + name + "\\s*\\.\\s*(?:set|append|get)\\s*\\(\\s*[\"']([^\"']+)[\"']", "gi")), (m) => m[1]!),
       ),
     )
     if (/\b(?:searchParams|URLSearchParams)\b/i.test(all)) {
-      for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']{1,100})["']/gi)) endpoint.queryParameters.push(m[1]!)
+      for (const m of all.matchAll(/(?:searchParams|URLSearchParams)(?:\.set|\.append|\.get)?\s*\(\s*["']([^"']+)["']/gi)) endpoint.queryParameters.push(m[1]!)
     }
     const line = lineNumber(lineStarts, index)
     const sourceFunction = currentFunctionRange?.name ?? null
@@ -462,14 +460,13 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       id: "js-request:" + createHash("sha256").update(JSON.stringify([line, endpoint.urlTemplate, method, cleanUnique(endpoint.pathParameters), cleanUnique(endpoint.queryParameters), cleanUnique(bodyParams), cleanUnique(headers)])).digest("hex").slice(0, 16),
       sourceFunction, method, urlTemplate: endpoint.urlTemplate, host: endpoint.host, origin: endpoint.origin, path: endpoint.path,
       pathParameters: endpoint.pathParameters, queryParameters: cleanUnique(endpoint.queryParameters),
-      bodyParameters: cleanUnique(bodyParams).slice(0, 100), headerNames: cleanUnique(headers).slice(0, 100),
+      bodyParameters: cleanUnique(bodyParams), headerNames: cleanUnique(headers),
       authSignals: cleanUnique(authSignals), cookieSignals: cleanUnique(cookieSignals),
       authAssessment: authSignals.length || cookieSignals.length ? "signals-present" : "no-static-auth-signal",
       sourceLine: line, confidence: "candidate",
     }
     if (!requests.some((existing) => existing.id === item.id)) requests.push(item)
-    if (requests.length >= 300) break
-  }
+      }
 
   const secrets = new Map<string, JavaScriptSecretCandidate>()
   const secretPattern = /\b(api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret[_-]?key|password|passwd|private[_-]?key)\b\s*[:=]\s*(['"\x60])([^'"\x60\r\n]{8,500})\2/gi
@@ -481,8 +478,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       value: rawValue, fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
     }
     secrets.set(item.kind + ":" + item.fingerprint, item)
-    if (secrets.size >= 100) break
-  }
+      }
 
   const roles = new Map<string, JavaScriptRoleHint>()
   const rolePattern = /\b(isAdmin|is_admin|adminOnly|requireAdmin|hasRole|checkPermission|hasPermission|featureFlag|feature_flag|debugMode|debug_mode|internalOnly|superuser|impersonate|impersonation|role|permission)\b/gi
@@ -497,9 +493,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     { kind: "string-timer-execution", regex: /\b(?:setTimeout|setInterval)\s*\(\s*["'`]/gi },
     { kind: "navigation-or-redirect-sink", regex: /\b(?:window\.)?location(?:\.href)?\s*(?:=|\.assign\s*\(|\.replace\s*\()/gi },
     { kind: "cross-window-message", regex: /\bpostMessage\s*\(/gi },
-    { kind: "wildcard-postmessage-origin", regex: /\bpostMessage\s*\([^,]{1,1000},\s*["']\*["']\s*\)/gi },
+    { kind: "wildcard-postmessage-origin", regex: /\bpostMessage\s*\([^,]+,\s*["']\*["']\s*\)/gi },
     { kind: "message-event-handler", regex: /\baddEventListener\s*\(\s*["']message["']/gi },
-    { kind: "client-side-token-storage", regex: /\b(?:localStorage|sessionStorage)\.setItem\s*\(\s*["'][^"']{1,120}(?:token|auth|session|secret|key)[^"']*["']/gi },
+    { kind: "client-side-token-storage", regex: /\b(?:localStorage|sessionStorage)\.setItem\s*\(\s*["'][^"']+(?:token|auth|session|secret|key)[^"']*["']/gi },
     { kind: "document-cookie-write", regex: /\bdocument\.cookie\s*=/gi },
     { kind: "dynamic-regexp", regex: /\bnew\s+RegExp\s*\(\s*[A-Za-z_$]/gi },
     { kind: "prototype-mutation", regex: /\b(?:__proto__|prototype)\s*(?:\[|\.)/gi },
@@ -513,8 +509,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const functionName = containingFunction?.name ?? null
     const id = "js-risk:" + createHash("sha256").update(rule.kind + ":" + line + ":" + (functionName ?? "")).digest("hex").slice(0, 16)
     riskSignals.set(id, { id, kind: rule.kind, line, functionName, confidence: "candidate" })
-    if (riskSignals.size >= 300) break
-  }
+      }
   for (const match of source.matchAll(rolePattern)) {
     const value = match[1]!, lower = value.toLowerCase()
     const kind = /admin|superuser/.test(lower) ? "admin-role-hint" : /role|permission/.test(lower) ? "authorization-hint"
@@ -522,8 +517,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       : /impersonat/.test(lower) ? "impersonation-hint" : "internal-feature-hint"
     const item = { kind, value, line: lineNumber(lineStarts, match.index ?? 0) }
     roles.set(kind + ":" + value + ":" + item.line, item)
-    if (roles.size >= 100) break
-  }
+      }
   return {
     functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
     notes: [
