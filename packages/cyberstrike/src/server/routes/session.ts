@@ -1582,7 +1582,7 @@ export const SessionRoutes = lazy(() =>
               } finally {
                 Request.updateStatus({ id: req.id, status: finalStatus })
               }
-            })
+            }, sessionID)
           }
         } else {
           // Non-HTTP request (plain text message)
