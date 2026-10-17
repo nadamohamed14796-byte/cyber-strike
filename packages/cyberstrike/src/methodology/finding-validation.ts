@@ -348,7 +348,9 @@ export namespace FindingValidation {
             "Across the recorded history there are " + assessment.attemptCount + " distinct evidence-backed attempts; the validation record is " + validationID + ". " + (assessment.failedCheckIDs.length ? "The evidence currently contradicts these checks: " + assessment.failedCheckIDs.join(", ") + ". " : "") + (assessment.unknownCheckIDs.length ? "These questions remain unresolved: " + assessment.unknownCheckIDs.join(", ") + ". " : ""),
             "Next, " + assessment.nextStep + " The full check and attempt history is stored in SQLite; this note summarizes the decision without duplicating raw request/response evidence. Revisit the conclusion if later evidence changes the interpretation.",
           ],
-          source: "finding-validation:" + validationID,
+          source: "finding-validation",
+          upsertByIdentity: true,
+          identityKey: "finding:" + input.vulnerabilityID,
           ...(assessment.verdict === "confirmed" || assessment.verdict === "false_positive"
             ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; distinct evidence-backed attempts: " + assessment.attemptCount + "; summary: " + assessment.summary }
             : {}),
