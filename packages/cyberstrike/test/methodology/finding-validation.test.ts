@@ -51,6 +51,18 @@ test("classifies as confirmed only when all required checks pass", () => {
   expect(assessFindingChecks(checks).verdict).toBe("confirmed")
 })
 
+test("a missing security header without demonstrated impact cannot be confirmed", () => {
+  const checks = checklist({
+    security_impact: {
+      status: "unknown",
+      reason: "Only the missing header was observed; no exploitable browser behavior or sensitive action was demonstrated.",
+      evidence: "",
+    },
+  })
+  expect(assessFindingChecks(checks).verdict).toBe("inconclusive")
+  expect(assessFindingChecks(checks).unknownCheckIDs).toContain("security_impact")
+})
+
 test("invalid-precondition attempts do not count toward false-positive classification", () => {
   const checks = checklist({
     reproducible: { status: "fail", reason: "Controlled replay did not reproduce the claim", evidence: "Three replays returned the expected owner-bound record" },
