@@ -43,6 +43,29 @@ function safeURL(input?: string | null): URL | undefined {
   }
 }
 
+/** Resolve the actual request origin without mistaking the page that triggered it for the request host. */
+function observedRequestBaseURL(input: {
+  origin?: string | null
+  scheme?: string | null
+  host?: string | null
+  port?: number | null
+  pageURL?: string | null
+}): URL | undefined {
+  const explicitOrigin = safeURL(input.origin)
+  if (explicitOrigin) return explicitOrigin
+  const pageURL = safeURL(input.pageURL)
+  const host = input.host?.trim()
+  if (host) {
+    if (/^https?:\\/\\//i.test(host)) return safeURL(host)
+    const hostAlreadyHasPort = /(?:\\]:\\d+|:\\d+)$/.test(host)
+    const portPart = input.port && !hostAlreadyHasPort ? ":" + input.port : ""
+    const scheme = input.scheme || pageURL?.protocol.replace(/:$/, "") || "https"
+    const fromHost = safeURL(scheme + "://" + host + portPart)
+    if (fromHost) return fromHost
+  }
+  return pageURL
+
+
 /** Match a captured request to one explicit JavaScript asset by exact origin and path. */
 export function matchesCapturedJavaScriptAsset(input: {
   origin?: string | null
@@ -249,6 +272,8 @@ export function extractCapturedJavaScriptSources(
     origin?: string | null
     pageURL?: string | null
     host?: string | null
+    scheme?: string | null
+    port?: number | null
     normalizedPath?: string | null
     responseContentType?: string | null
     responseBody?: string | null
@@ -259,7 +284,7 @@ export function extractCapturedJavaScriptSources(
   const sourceIndexByURLAndHash = new Map<string, number>()
   for (const request of requests) {
     let url = safeURL(request.url)
-    const base = safeURL(request.origin) ?? safeURL(request.pageURL) ?? safeURL(request.host)
+    const base = observedRequestBaseURL(request)
     if (!url && base && request.normalizedPath) {
       try {
         url = new URL(request.normalizedPath, base)
@@ -1064,6 +1089,8 @@ export namespace JavaScriptCorrelation {
         origin: request.origin,
         pageURL: request.page_url,
         host: request.host,
+        scheme: request.scheme,
+        port: request.port,
         normalizedPath: request.normalized_path,
         responseContentType: request.response_content_type,
         responseBody: request.javascript_source ?? request.processed_response,
@@ -1129,7 +1156,7 @@ export namespace JavaScriptCorrelation {
       const endpointPath = (pathEndpointURL?.pathname ?? endpointValue).split(/[?#]/, 1)[0]!
       const matchesAttributedRequest = relevantRequests.some((request) => {
         if (requestTargetWorkspaceIDs.get(request.id) !== finding.target_id) return false
-        const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+        const requestURL = observedRequestBaseURL(request)
         if (pathEndpointURL && requestURL?.origin !== pathEndpointURL.origin) return false
         return matchesEndpointPathTemplate(endpointPath, request.normalized_path)
       })
@@ -1157,7 +1184,7 @@ export namespace JavaScriptCorrelation {
           const explicitOrigin = item.origin ?? itemURL?.origin ?? null
           const explicitHost = item.host ?? itemURL?.host ?? null
           const matchingRequests = relevantRequests.flatMap((request) => {
-            const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+            const requestURL = observedRequestBaseURL(request)
             if (!requestURL) return []
             if (explicitOrigin && requestURL.origin.toLowerCase() !== explicitOrigin.toLowerCase()) return []
             if (explicitHost && requestURL.host.toLowerCase() !== explicitHost.toLowerCase()) return []
@@ -1231,7 +1258,7 @@ export namespace JavaScriptCorrelation {
       requests: relevantRequests.map((request) => {
         // Older captures may have host/page_url but no normalized origin. Build
         // a URL only from an observed base; never invent a host for path-only rows.
-        const base = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+        const base = observedRequestBaseURL(request)
         let observedURL: string | null = null
         if (base) {
           try {
