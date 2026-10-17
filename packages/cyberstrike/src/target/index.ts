@@ -2042,7 +2042,7 @@ export namespace TargetMemory {
         .select()
         .from(TargetNoteTable)
         .where(eq(TargetNoteTable.target_id, selected.id))
-        .orderBy(desc(TargetNoteTable.time_created))
+        .orderBy(desc(TargetNoteTable.time_updated))
         .limit(noteLimit)
         .all()
         .map(mapNote),
@@ -2054,7 +2054,7 @@ export namespace TargetMemory {
             .select()
             .from(TargetNoteTable)
             .where(eq(TargetNoteTable.target_id, programRoot.id))
-            .orderBy(desc(TargetNoteTable.time_created))
+            .orderBy(desc(TargetNoteTable.time_updated))
             .limit(Math.min(4, noteLimit))
             .all()
             .map(mapNote),
