@@ -344,16 +344,10 @@ export namespace FindingValidation {
           kind: "finding",
           title: "Finding validation — " + finding.title,
           content: [
-            "Finding ID: " + input.vulnerabilityID,
-            "Validation ID: " + validationID,
-            "Verdict: " + assessment.verdict,
-            "Distinct evidence-backed attempts: " + assessment.attemptCount + "/" + FINDING_VALIDATION_MIN_ATTEMPTS,
-            assessment.summary,
-            assessment.nextStep,
-            "Failed checks: " + (assessment.failedCheckIDs.length ? assessment.failedCheckIDs.join(", ") : "none"),
-            "Unknown checks: " + (assessment.unknownCheckIDs.length ? assessment.unknownCheckIDs.join(", ") : "none"),
-            "Check history is stored in the SQLite finding_validation table. This note intentionally excludes raw request/response evidence.",
-          ].join("\n"),
+            "Validation of " + finding.title + " reached a " + assessment.verdict.replaceAll("_", " ") + " verdict (confidence rubric " + assessment.confidence + "/100, not a statistical probability). " + assessment.summary,
+            "Across the recorded history there are " + assessment.attemptCount + " distinct evidence-backed attempts; the validation record is " + validationID + ". " + (assessment.failedCheckIDs.length ? "The evidence currently contradicts these checks: " + assessment.failedCheckIDs.join(", ") + ". " : "") + (assessment.unknownCheckIDs.length ? "These questions remain unresolved: " + assessment.unknownCheckIDs.join(", ") + ". " : ""),
+            "Next, " + assessment.nextStep + " The full check and attempt history is stored in SQLite; this note summarizes the decision without duplicating raw request/response evidence. Revisit the conclusion if later evidence changes the interpretation.",
+          ],
           source: "finding-validation:" + validationID,
           ...(assessment.verdict === "confirmed" || assessment.verdict === "false_positive"
             ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; distinct evidence-backed attempts: " + assessment.attemptCount + "; summary: " + assessment.summary }
