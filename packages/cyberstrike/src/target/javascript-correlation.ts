@@ -303,8 +303,9 @@ export function extractCapturedJavaScriptSources(
       }
     }
     sourceIndexByURLAndHash.set(identity, output.length)
+    const sourceURLKey = createHash("sha256").update(canonicalSourceURL).digest("hex").slice(0, 8)
     output.push({
-      relativePath: "captured/" + url.hostname.toLowerCase() + "/" + basename + "-" + digest.slice(0, 8),
+      relativePath: "captured/" + url.hostname.toLowerCase() + "/" + sourceURLKey + "/" + basename + "-" + digest.slice(0, 8),
       basename,
       sha256: digest,
       bytes,
