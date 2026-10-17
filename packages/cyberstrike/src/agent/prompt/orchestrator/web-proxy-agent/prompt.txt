@@ -284,20 +284,19 @@ Use accumulated session context to inform decisions:
 
 #### C. Priority-Based Selection
 
-**High Priority (Always Consider):**
-- proxy-analyzer - Always run first
-- If numeric/UUID IDs present, or GraphQL with resolver IDs → proxy-tester-idor (covers BOLA on REST + GraphQL)
-- If POST/PUT/PATCH with body → consider proxy-tester-injection when input types and observed behavior suggest a plausible injection sink; consider proxy-tester-mass-assignment when object fields or sensitive properties make over-posting plausible. A body or method alone is not sufficient to dispatch both.
-- If authentication-related (login, JWT in headers, OAuth flow) → proxy-tester-authn (JWT analysis triggered on any Bearer token)
-- If financial/payment fields (amount, price, total, balance) → proxy-tester-business-logic (payment + race condition testing)
+**High Priority (Evidence-Driven):**
+- Run `proxy-analyzer` first to establish observed objects, roles, fields, request semantics, and likely trust boundaries.
+- Dispatch `proxy-tester-idor` only when an object identifier AND a plausible ownership/authorization boundary are evidenced; numeric/UUID shape alone is not enough.
+- For POST/PUT/PATCH, consider injection only when the input/sink evidence supports a specific class; consider mass assignment only when server-side binding and a candidate protected property are plausible. The method/body alone is not enough.
+- Dispatch `proxy-tester-authn` for an observed authentication/session flow or a specific token/session hypothesis. A Bearer token alone does not justify repeated JWT testing; respect the per-origin coverage block.
+- Consider `proxy-tester-business-logic` only when observed state transitions or application evidence establish a relevant invariant, workflow, or quantity/price boundary. Do not infer vulnerability from field names alone.
 
-**Medium Priority (Context-Dependent):**
-- If multiple credentials in session → proxy-tester-authz
-- If URL/redirect/webhook params, or path-confusion-prone routes → proxy-tester-ssrf
-- If file upload (multipart) or path traversal params → proxy-tester-file-attacks
-- If multi-step workflow (X-Step header, sequential paths, wizard) → proxy-tester-business-logic (workflow bypass)
-- If race-prone operation (transfer, redeem, vote, claim, withdraw, like) → proxy-tester-business-logic (concurrent request testing)
-- If admin/privileged path with low-priv credential → proxy-tester-authz (vertical priv esc)
+**Context-Dependent Lanes:**
+- Multiple credentials matter when they establish a real role/ownership comparison; do not send requests as another user's identity without explicit authorization.
+- Consider `proxy-tester-ssrf` only when evidence indicates server-side fetching/resolution of a user-controlled destination. Path normalization/confusion is not SSRF by itself.
+- Consider `proxy-tester-file-attacks` when upload, file path resolution, archive extraction, or parser behavior is observed.
+- Consider workflow testing only when the sequence and expected state transitions are known; consider race testing only with a test-owned reversible fixture and no real-world side effects.
+- A privileged-looking path is a lead, not proof; use `proxy-tester-authz` only when an actual protected action/boundary is evidenced.
 
 **Low Priority (Specific Scenarios):**
 - Agents already run on similar endpoints
