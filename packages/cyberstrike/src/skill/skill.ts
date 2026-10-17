@@ -69,6 +69,14 @@ export namespace Skill {
   const CYBERSTRIKE_SKILL_GLOB = new Bun.Glob("{skill,skills}/**/SKILL.md")
   const SKILL_GLOB = new Bun.Glob("**/SKILL.md")
 
+  // Keep full catalog loading and permission initialization on the same built-in
+  // root. Compiled distributions may inject a catalog path outside import.meta.dir.
+  function builtinSkillDirectory(): string {
+    return typeof CYBERSTRIKE_SKILL_CATALOG_DIR === "string" && CYBERSTRIKE_SKILL_CATALOG_DIR.length > 0
+      ? CYBERSTRIKE_SKILL_CATALOG_DIR
+      : path.join(path.resolve(import.meta.dir, "../../../.."), ".cyberstrike")
+  }
+
   export const state = Instance.state(async () => {
     const skills: Record<string, Info> = {}
     const dirs = new Set<string>()
@@ -215,10 +223,7 @@ export namespace Skill {
     // so they're always found regardless of Instance.directory (web UI header).
     // Skip in test mode to preserve test isolation.
     if (!process.env.CYBERSTRIKE_TEST_HOME) {
-      const builtinDir =
-        typeof CYBERSTRIKE_SKILL_CATALOG_DIR === "string" && CYBERSTRIKE_SKILL_CATALOG_DIR.length > 0
-          ? CYBERSTRIKE_SKILL_CATALOG_DIR
-          : path.join(path.resolve(import.meta.dir, "../../../.."), ".cyberstrike")
+      const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,
@@ -375,8 +380,7 @@ export namespace Skill {
 
     // Built-in skills
     if (!process.env.CYBERSTRIKE_TEST_HOME) {
-      const builtinRoot = path.resolve(import.meta.dir, "../../../..")
-      const builtinDir = path.join(builtinRoot, ".cyberstrike")
+      const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,
