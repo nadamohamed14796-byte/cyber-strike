@@ -207,7 +207,7 @@ function staticFunctionRanges(source: string, functions: JavaScriptFunctionCandi
     }
     if (parenRel < 0) continue
     const openParen = offset + parenRel
-    const closeParen = findCallEnd(source, openParen, 10000)
+    const closeParen = findCallEnd(source, openParen)
     if (closeParen < 0) continue
     const openBrace = source.indexOf("{", closeParen + 1)
     if (openBrace < 0) continue
@@ -374,7 +374,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   const requestCallSpans = [...source.matchAll(callPattern)].map((call) => {
     const start = call.index ?? 0
     const open = start + call[0].lastIndexOf("(")
-    const end = findCallEnd(source, open, 7000)
+    const end = findCallEnd(source, open)
     return { start, end: end >= 0 ? end + 1 : start + call[0].length }
   }).sort((a, b) => a.start - b.start)
   for (const match of source.matchAll(callPattern)) {
@@ -399,8 +399,8 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
     const previousSpan = [...requestCallSpans].reverse().find((span) => span.end <= index)
     const nextSpan = requestCallSpans.find((span) => span.start > index)
-    const lowerBound = Math.max(currentFunctionRange?.start ?? 0, index - 1500, previousSpan?.end ?? 0)
-    const upperBound = Math.min(currentFunctionRange?.end ?? source.length - 1, close + 1800, nextSpan?.start ?? source.length)
+    const lowerBound = Math.max(currentFunctionRange?.start ?? 0, previousSpan?.end ?? 0)
+    const upperBound = Math.min(currentFunctionRange?.end ?? source.length - 1, nextSpan?.start ?? source.length)
     const requestContext = source.slice(lowerBound, Math.max(close + 1, upperBound))
     const isFetch = callee === "fetch"
     const isBodyMethod = /\.(?:post|put|patch)$/i.test(callee)
