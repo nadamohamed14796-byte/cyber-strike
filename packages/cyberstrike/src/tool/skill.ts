@@ -250,7 +250,6 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       const dir = path.dirname(skill.location)
       const base = pathToFileURL(dir).href
 
-      const limit = 10
       // Companion-file discovery is best-effort: filesystem/ripgrep failures must
       // not turn a successfully loaded SKILL.md into a failed skill invocation.
       // Cancellation remains fatal so aborted tool calls never report success.
@@ -264,7 +263,6 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         })) {
           if (file.includes("SKILL.md")) continue
           arr.push(path.resolve(dir, file))
-          if (arr.length >= limit) break
         }
         return arr
       })
@@ -312,7 +310,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "",
           `Base directory for this skill: ${base}`,
           "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
-          "Note: file list is sampled.",
+          "Companion-file listing is complete; use the paths above to read the references or scripts needed by this skill.",
           "",
           "<skill_files>",
           files,
