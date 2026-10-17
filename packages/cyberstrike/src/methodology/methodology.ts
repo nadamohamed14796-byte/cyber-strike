@@ -52,10 +52,12 @@ export namespace Methodology {
       const result = validateDeliverables(def, entries)
       const prereqCheck = checkPrerequisites(def, applicablePhases, entries)
 
-      const status: Phase.Status = result.completed
-        ? "completed"
-        : !prereqCheck.canStart
-          ? "blocked"
+      // Prerequisites outrank deliverable presence. Premature work remains recorded,
+      // but cannot make a downstream phase appear completed.
+      const status: Phase.Status = !prereqCheck.canStart
+        ? "blocked"
+        : result.completed
+          ? "completed"
           : result.deliverableCount > 0
             ? "in_progress"
             : "not_started"
@@ -129,24 +131,42 @@ export namespace Methodology {
     def: Phase.Definition,
     applicablePhases: Phase.Definition[],
     entries: Array<typeof IntelEntryTable.$inferSelect>,
+    visiting = new Set<Phase.Id>(),
   ): { canStart: boolean; reason?: string } {
+    if (visiting.has(def.id)) {
+      return { canStart: false, reason: "prerequisite cycle detected at " + def.id }
+    }
     if (def.prerequisites.length === 0) return { canStart: true }
 
+    const nextVisiting = new Set(visiting)
+    nextVisiting.add(def.id)
     const applicableIds = new Set(applicablePhases.map((p) => p.id))
     const missing: string[] = []
 
     for (const prereq of def.prerequisites) {
-      if (!applicableIds.has(prereq)) continue // skip prereqs not in scope
       const prereqDef = Phase.get(prereq)
-      if (!prereqDef) continue
+      if (!prereqDef) {
+        missing.push(prereq + " (unknown prerequisite)")
+        continue
+      }
+      if (!applicableIds.has(prereq)) continue // skip valid prerequisites outside this scope
+
       const result = validateDeliverables(prereqDef, entries)
-      if (!result.completed) missing.push(prereq)
+      if (!result.completed) {
+        missing.push(prereq)
+        continue
+      }
+
+      // Deliverables alone must not unlock a prerequisite whose own ancestors are incomplete.
+      const ancestorCheck = checkPrerequisites(prereqDef, applicablePhases, entries, nextVisiting)
+      if (!ancestorCheck.canStart) {
+        missing.push(prereq + " (blocked: " + (ancestorCheck.reason ?? "ancestor prerequisite incomplete") + ")")
+      }
     }
 
-    if (missing.length > 0) return { canStart: false, reason: `Prerequisites incomplete: ${missing.join(", ")}` }
+    if (missing.length > 0) return { canStart: false, reason: "Prerequisites incomplete: " + missing.join(", ") }
     return { canStart: true }
   }
-
   function persistPhases(sessionID: string, phases: PhaseState[]) {
     Database.use((db) => {
       for (const phase of phases) {
@@ -158,14 +178,21 @@ export namespace Methodology {
 
         const now = Date.now()
         if (existing) {
+          const blockReason = phase.blockReason ?? null
+          const changed =
+            existing.status !== phase.status ||
+            existing.completion_evidence !== phase.evidence ||
+            existing.deliverable_count !== phase.deliverableCount ||
+            (existing.block_reason ?? null) !== blockReason
           db.update(MethodologyPhaseTable)
             .set({
               status: phase.status,
               completion_evidence: phase.evidence,
               deliverable_count: phase.deliverableCount,
-              block_reason: phase.blockReason ?? null,
+              block_reason: blockReason,
               started_at: phase.status !== "not_started" && !existing.started_at ? now : existing.started_at,
               completed_at: phase.status === "completed" && !existing.completed_at ? now : existing.completed_at,
+              time_updated: changed ? now : existing.time_updated,
             })
             .where(eq(MethodologyPhaseTable.id, existing.id))
             .run()
