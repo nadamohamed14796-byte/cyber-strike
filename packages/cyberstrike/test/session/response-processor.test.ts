@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import { processResponse } from "../../src/session/response-processor"
 
 test("keeps full JavaScript source while preserving the existing bounded prompt preview", () => {
-  const source = 'fetch("/api/full-source");\\n' + "x".repeat(110 * 1024)
+  const source = 'fetch("/api/full-source");\n' + "x".repeat(110 * 1024)
   const processed = processResponse({
     status: 200,
     headers: { "content-type": "application/javascript; charset=utf-8" },
