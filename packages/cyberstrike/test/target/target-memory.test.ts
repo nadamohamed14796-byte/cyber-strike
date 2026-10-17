@@ -466,3 +466,51 @@ test("persists long target notes, evidence, and every supplied tag", async () =>
     },
   })
 })
+
+
+test("archives prior full note revisions when one living investigation is updated", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://note-revisions.example.test"
+      const first = await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Authorization investigation",
+        content: "GET /api/profile exposed the user's own profile. The role parameter has not been checked.",
+        source: "agent:revision-test",
+        identityKey: "endpoint:/api/profile:authorization",
+        upsertByIdentity: true,
+        status: "observed",
+        tags: ["authorization", "baseline"],
+      })
+      const second = await TargetMemory.addNote(targetURL, {
+        kind: "manual",
+        title: "Authorization investigation",
+        content: "GET /api/profile remains the same endpoint. Added role=admin and role=member comparisons; no cross-user impact was observed.",
+        source: "agent:revision-test",
+        identityKey: "endpoint:/api/profile:authorization",
+        upsertByIdentity: true,
+        status: "observed",
+        tags: ["authorization", "baseline", "negative-result"],
+      })
+
+      expect(second.created).toBe(false)
+      expect(second.updated).toBe(true)
+      expect(second.note.id).toBe(first.note.id)
+      expect(second.note.content).toContain("role=admin")
+      expect(second.note.content).not.toContain("has not been checked")
+
+      const active = TargetMemory.allNotes(second.workspace.id)
+      expect(active.filter((note) => note.id === first.note.id)).toHaveLength(1)
+      expect(active).toHaveLength(1)
+
+      const revisions = TargetMemory.noteRevisions(second.workspace.id, second.note.id)
+      expect(revisions).toHaveLength(1)
+      expect(revisions[0]?.content).toContain("role parameter has not been checked")
+      expect(revisions[0]?.tags).toEqual(["authorization", "baseline"])
+      expect(revisions[0]?.status).toBe("observed")
+      await Instance.dispose()
+    },
+  })
+})
