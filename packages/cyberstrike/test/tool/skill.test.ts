@@ -88,6 +88,45 @@ describe("tool.skill", () => {
     }
   })
 
+  test("missing skill errors guide discovery without dumping the full catalog", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        for (let index = 0; index < 20; index++) {
+          const name = "catalog-skill-" + String(index).padStart(2, "0")
+          const skillDir = path.join(dir, ".cyberstrike", "skill", name)
+          await Bun.write(
+            path.join(skillDir, "SKILL.md"),
+            ["---", "name: " + name, "description: Catalog fixture skill.", "---", "", "# " + name, ""].join("\n"),
+          )
+        }
+      },
+    })
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
+          await expect(tool.execute({ action: "load", name: "does-not-exist" }, ctx)).rejects.toThrow(
+            'Use skill(action="search", query="...") or paged skill(action="list")',
+          )
+          try {
+            await tool.execute({ action: "load", name: "does-not-exist" }, ctx)
+            throw new Error("Expected missing skill to fail")
+          } catch (error) {
+            expect(String(error)).not.toContain("catalog-skill-19")
+          }
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("description shows skill count", async () => {
     await using tmp = await tmpdir({
       git: true,
