@@ -11,6 +11,7 @@ import { ReportVulnerabilityTool } from "./vulnerability"
 import { VerificationAttemptTool } from "./verification-attempt"
 import { TriageVulnerabilityTool } from "./triage-vulnerability"
 import { ValidateFindingTool } from "./validate-finding"
+import { FalsePositiveMemoryTool } from "./false-positive-memory"
 import { CorrelateJavaScriptTool } from "./correlate-javascript"
 import { ReconCheckpointTool } from "./recon-checkpoint"
 import { ResearchKnowledgeTool } from "./research-knowledge"
@@ -170,6 +171,7 @@ export namespace ToolRegistry {
       VerificationAttemptTool,
       TriageVulnerabilityTool,
       ValidateFindingTool,
+      FalsePositiveMemoryTool,
       CorrelateJavaScriptTool,
       ReconCheckpointTool,
       ResearchKnowledgeTool,
