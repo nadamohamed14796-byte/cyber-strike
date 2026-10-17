@@ -13,7 +13,7 @@ const TargetNoteParameters = z.object({
     evidence: z.string().max(5000).optional().describe("Concrete evidence required when status is confirmed or disproven"),
     source_url: z.string().url().optional(),
     tags: z.array(z.string().min(1).max(48)).max(20).optional(),
-    upsert_by_identity: z.boolean().default(true).describe("Update an existing note with the same kind/title/source instead of creating another copy; normally keep enabled."),
+    upsert_by_identity: z.boolean().default(true).describe("For record_mode=current, update an existing investigation note instead of creating a duplicate. record_mode=journal always appends and ignores this setting."),
     identity_key: z.string().regex(/^[a-zA-Z0-9:._/-]{1,160}$/).optional().describe("Stable identity for a continuing investigation, such as endpoint:/api/me:authorization or finding:123. Reuse it when updating the same line of reasoning."),
   })
 
@@ -61,6 +61,7 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
         output: [
           "Target: " + saved.workspace.targetURL,
           "Note ID: " + saved.note.id,
+          "Record mode: " + (journalEntry ? "journal (append-only)" : "current investigation note"),
           "Status: " + saved.note.status,
           "Workspace: " + saved.workspace.workspacePath,
           "Notes file: " + saved.workspace.workspacePath + "/notes.md",
