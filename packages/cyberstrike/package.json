@@ -30,7 +30,7 @@
   ],
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "test": "bun test --timeout 30000",
+    "test": "bun run script/test-isolated.ts",
     "build": "bun run script/build.ts",
     "dev": "bun run --conditions=browser ./src/index.ts",
     "clean": "rm -rf node_modules dist",
