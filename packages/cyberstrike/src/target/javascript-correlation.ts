@@ -1069,11 +1069,10 @@ export namespace JavaScriptCorrelation {
       })),
       analysisCache,
     )
-    const localSourceKeys = new Set(sourceFiles.map((file) => file.sha256))
-    const mergedSourceFiles = [
-      ...sourceFiles,
-      ...capturedSources.filter((file) => !localSourceKeys.has(file.sha256)),
-    ]
+    // Keep every distinct source location/URL for provenance. analysisCache is keyed by
+    // content hash, so identical bytes are analyzed once but may produce multiple origin-aware
+    // source records; this matters when the same bundle is served from different hosts.
+    const mergedSourceFiles = [...sourceFiles, ...capturedSources]
     // Keep exact secret-like values transient in memory only. Every copy that may be
     // serialized to JSON or target notes goes through this redaction boundary.
     const persistedSourceFiles = mergedSourceFiles.map(sanitizeJavaScriptSourceFileForPersistence)
@@ -1152,34 +1151,61 @@ export namespace JavaScriptCorrelation {
       sourceFiles: persistedSourceFiles,
       javascriptAnalysis: {
         functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
-        requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).map((item) => {
-          const observedRequestIDs = relevantRequests.filter((request) => {
+        requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).flatMap((item) => {
+          const itemURL = safeURL(item.urlTemplate)
+          const explicitOrigin = item.origin ?? itemURL?.origin ?? null
+          const explicitHost = item.host ?? itemURL?.host ?? null
+          const matchingRequests = relevantRequests.flatMap((request) => {
             const requestURL = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
-            if (!requestURL) return false
-            if (item.host && requestURL.host.toLowerCase() !== item.host.toLowerCase()) return false
-            if (!item.host && requestURL.hostname !== targetURL.hostname && !assets.some((asset) => asset.url.hostname === requestURL.hostname)) return false
-            if (item.method && request.method.toUpperCase() !== item.method) return false
-            const expectedSegments = item.path.split("/").filter(Boolean)
-            const actualSegments = request.normalized_path.split(/[?#]/, 1)[0]!.split("/").filter(Boolean)
-            // A route template must match the exact segment count. Prefix matching would
-            // incorrectly attach /api/users/{id} to /api/users/123/admin or /settings.
-            return expectedSegments.length === actualSegments.length && expectedSegments.every((segment, index) =>
-              (segment.startsWith("{") && segment.endsWith("}")) ? Boolean(actualSegments[index]) : segment === actualSegments[index],
-            )
-          }).map((request) => request.id)
+            if (!requestURL) return []
+            if (explicitOrigin && requestURL.origin.toLowerCase() !== explicitOrigin.toLowerCase()) return []
+            if (explicitHost && requestURL.host.toLowerCase() !== explicitHost.toLowerCase()) return []
+            if (item.method && request.method.toUpperCase() !== item.method.toUpperCase()) return []
+            return matchesEndpointPathTemplate(item.path, request.normalized_path) ? [{ request, url: requestURL }] : []
+          })
+          const variants = new Map<string, { origin: string | null; host: string | null; matching: typeof matchingRequests }>()
+          if (explicitOrigin) {
+            variants.set(explicitOrigin.toLowerCase(), {
+              origin: explicitOrigin.toLowerCase(),
+              host: explicitHost?.toLowerCase() ?? safeURL(explicitOrigin)?.host.toLowerCase() ?? null,
+              matching: matchingRequests.filter((entry) => entry.url.origin.toLowerCase() === explicitOrigin.toLowerCase()),
+            })
+          } else if (matchingRequests.length) {
+            // Relative routes may be used against several authorized origins (for example,
+            // a shared bundle used by both app.example and api.example). Keep those endpoint
+            // identities separate rather than guessing from where the JS file was hosted.
+            for (const entry of matchingRequests) {
+              const origin = entry.url.origin.toLowerCase()
+              const existing = variants.get(origin)
+              if (existing) existing.matching.push(entry)
+              else variants.set(origin, { origin, host: entry.url.host.toLowerCase(), matching: [entry] })
+            }
+          } else {
+            variants.set("*", { origin: null, host: explicitHost?.toLowerCase() ?? null, matching: [] })
+          }
           const recommendedChecks = [
             "Baseline replay and response capture",
             ...(item.pathParameters.length ? ["Compare path parameter type/boundary values using controlled test data"] : []),
             ...(item.queryParameters.length ? ["Compare omitted and altered query parameters"] : []),
             ...(item.bodyParameters.length ? ["Compare required/optional body fields and expected types"] : []),
-            ...(file.sourceRequestID ? ["Inspect the original captured JavaScript response via request-detail tooling using request ID " + file.sourceRequestID] : []),
+            ...((file.sourceRequestIDs?.length ?? (file.sourceRequestID ? 1 : 0)) > 0
+              ? ["Inspect the original captured JavaScript response(s) via request-detail tooling using request ID(s) " + (file.sourceRequestIDs ?? [file.sourceRequestID]).filter(Boolean).join(", ")]
+              : []),
             ...(file.analysis?.riskSignals?.some((signal) => signal.functionName === item.sourceFunction) ? ["Manually review static sink candidates in the associated function and confirm source-to-sink data flow"] : []),
             ...(item.authSignals.length || item.cookieSignals.length ? ["Compare authenticated and unauthenticated/session-cookie behavior using controlled accounts"] : ["Determine authentication requirements from captured requests and controlled account tests"]),
             "Check authorization with accounts that own only their own test data",
             "Manually confirm server-side validation; static JavaScript alone is not proof",
           ]
-          return { ...item, sourceFile: file.relativePath, observedRequestIDs: [...new Set(observedRequestIDs) ], recommendedChecks }
-        })),
+          return [...variants.values()].map((variant) => ({
+            ...item,
+            host: variant.host,
+            origin: variant.origin,
+            urlTemplate: variant.origin ? variant.origin + item.path : item.urlTemplate,
+            sourceFile: file.relativePath,
+            observedRequestIDs: [...new Set(variant.matching.map((entry) => entry.request.id))],
+            recommendedChecks,
+          }))
+        }))
         secretCandidates: persistedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
