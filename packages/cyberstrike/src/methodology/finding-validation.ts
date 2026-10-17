@@ -310,11 +310,9 @@ export namespace FindingValidation {
       id: input.vulnerabilityID,
       ...(assessment.verdict === "false_positive"
         ? { status: "false_positive" as const, candidate: null }
-        : assessment.verdict === "confirmed"
-          ? { status: "approved" as const, candidate: null }
-          : finding.status === "false_positive"
-            ? { status: "new" as const, candidate: finding.severity }
-            : {}),
+        : finding.status === "false_positive"
+          ? { status: "new" as const, candidate: finding.severity }
+          : {}),
       description,
     })
 
