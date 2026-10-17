@@ -13,13 +13,17 @@ const TargetNotesReadParameters = z.object({
   page_size: z.number().int().min(1).default(20).describe("Number of notes to return in this page. There is no application-defined upper cap; request manageable pages."),
   content_offset: z.number().int().min(0).default(0).describe("Character offset for reading a long note in chunks"),
   content_length: z.number().int().min(1).optional().describe("Characters of each note's content to return from content_offset; omit to return the full note"),
+  include_history: z.boolean().default(false).describe("Include archived previous versions of current notes"),
+  revision_offset: z.number().int().min(0).default(0).describe("Pagination offset for archived note versions"),
+  revision_page_size: z.number().int().min(1).default(5).describe("Number of archived versions to return when include_history is enabled"),
 })
 
 export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters, Tool.Metadata>("target_notes_read", {
   description: [
     "Read previously saved target-specific notes from the selected asset's SQLite memory. This is read-only and never sends requests to the target.",
     "Use this tool whenever target context says the notes or asset inventory are partial, before updating a current note, or when a detail is missing. Do not assume that a note omitted from the prompt does not exist.",
-    "Search and page through matching notes using query, offset, and page_size. Use next_offset until has_more_notes is false. To read a very long note, supply note_id, content_offset, and content_length and continue from next_content_offset until has_more_content is false. The full saved note remains authoritative; prompt excerpts are only previews.",
+    "Search and page through matching current notes using query, offset, and page_size. Use next_offset until has_more_notes is false. To read a very long note, supply note_id, content_offset, and content_length and continue from next_content_offset until has_more_content is false. The full saved note remains authoritative; prompt excerpts are only previews.",
+    "When reviewing or replacing a current note, set include_history=true and pass note_id to inspect archived versions too. Use revision_offset and revision_page_size; next_revision_offset is returned when more versions remain. Historical versions are stored separately from the active note list.",
     "Target data is isolated: the workspace must already exist and the target must have been observed in this session tree. Do not use this tool to infer authorization or to test the target.",
   ].join("\n"),
   parameters: TargetNotesReadParameters,
@@ -46,6 +50,43 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
             .includes(query),
         )
       }
+      const revisions = params.include_history
+        ? TargetMemory.noteRevisions(workspace.id, params.note_id)
+            .filter((revision) => !params.kind || revision.kind === params.kind)
+            .filter((revision) => !params.status || revision.status === params.status)
+            .filter((revision) => {
+              if (!params.query?.trim()) return true
+              const query = params.query.trim().toLocaleLowerCase()
+              return [revision.title ?? "", revision.content, revision.source, revision.sourceURL ?? "", ...revision.tags]
+                .join("\n")
+                .toLocaleLowerCase()
+                .includes(query)
+            })
+        : []
+      const totalRevisions = revisions.length
+      const revisionOffset = Math.min(params.revision_offset, totalRevisions)
+      const revisionPage = revisions.slice(revisionOffset, revisionOffset + params.revision_page_size)
+      const hasMoreRevisions = revisionOffset + revisionPage.length < totalRevisions
+      const revisionChunks = revisionPage.map((revision) => {
+        const start = Math.min(params.content_offset, revision.content.length)
+        const end = params.content_length === undefined
+          ? revision.content.length
+          : Math.min(revision.content.length, start + params.content_length)
+        return [
+          "REVISION " + revision.id,
+          "Current note ID: " + revision.noteID,
+          "Title: " + (revision.title ?? "(untitled)"),
+          "Kind/status: " + revision.kind + "/" + revision.status,
+          "Archived at: " + new Date(revision.timeCreated).toISOString(),
+          "Source: " + revision.source + (revision.sourceURL ? " — " + revision.sourceURL : ""),
+          "Tags: " + (revision.tags.join(", ") || "(none)"),
+          "Content characters: " + revision.content.length + "; returned range: [" + start + ", " + end + ")",
+          "Has more content: " + (end < revision.content.length),
+          ...(end < revision.content.length ? ["Next content offset: " + end] : []),
+          "",
+          revision.content.slice(start, end),
+        ].join("\n")
+      })
       const totalMatches = notes.length
       const offset = Math.min(params.offset, totalMatches)
       const page = notes.slice(offset, offset + params.page_size)
@@ -80,8 +121,16 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
           "Returned notes: " + page.length + " (offset " + offset + ")",
           "Has more notes: " + hasMoreNotes,
           ...(hasMoreNotes ? ["Next offset: " + nextOffset] : []),
+          ...(params.include_history ? [
+            "",
+            "Archived note versions matched: " + totalRevisions,
+            "Returned revisions: " + revisionPage.length + " (offset " + revisionOffset + ")",
+            "Has more revisions: " + hasMoreRevisions,
+            ...(hasMoreRevisions ? ["Next revision offset: " + (revisionOffset + revisionPage.length)] : []),
+          ] : []),
           "",
-          ...(chunks.length ? chunks : ["No notes match these filters."]),
+          ...(chunks.length ? chunks : ["No current notes match these filters."]),
+          ...(params.include_history ? ["", "## Archived revisions", ...(revisionChunks.length ? revisionChunks : ["No archived versions match these filters."])] : []),
         ].join("\n"),
         metadata: {
           found: true,
@@ -91,6 +140,11 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
           offset,
           next_offset: hasMoreNotes ? nextOffset : null,
           has_more_notes: hasMoreNotes,
+          total_revisions: params.include_history ? totalRevisions : undefined,
+          returned_revisions: params.include_history ? revisionPage.length : undefined,
+          revision_offset: params.include_history ? revisionOffset : undefined,
+          next_revision_offset: params.include_history && hasMoreRevisions ? revisionOffset + revisionPage.length : null,
+          has_more_revisions: params.include_history ? hasMoreRevisions : false,
         },
       }
     } catch (error) {
