@@ -575,7 +575,7 @@ async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string
 }
 
 export interface JavaScriptCorrelationGraph {
-  schemaVersion: 1
+  schemaVersion: 2
   createdAt: string
   targetURL: string
   sessionID: string
@@ -873,7 +873,7 @@ export namespace JavaScriptCorrelation {
       const info = await fs.lstat(previousGraphPath)
       if (info.isFile() && !info.isSymbolicLink()) {
         const previous = JSON.parse(await fs.readFile(previousGraphPath, "utf-8")) as JavaScriptCorrelationGraph
-        if (previous.schemaVersion === 1 && previous.targetURL === workspace.targetURL) {
+        if (previous.schemaVersion === 2 && previous.targetURL === workspace.targetURL) {
           for (const source of previous.sourceFiles ?? []) {
             if (source.sha256 && source.analysis) analysisCache.set(source.sha256, source.analysis)
           }
@@ -1106,7 +1106,7 @@ export namespace JavaScriptCorrelation {
     }
 
     const graph: JavaScriptCorrelationGraph = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       createdAt: new Date().toISOString(),
       targetURL: normalizedTarget.targetURL,
       sessionID: rootSessionID,
@@ -1448,7 +1448,7 @@ export namespace JavaScriptCorrelation {
       workspace,
       path.posix.join("endpoints", endpointFilename),
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         generatedAt: graph.createdAt,
         targetURL: graph.targetURL,
         sessionID: graph.sessionID,
