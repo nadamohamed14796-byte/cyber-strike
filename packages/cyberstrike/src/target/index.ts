@@ -2090,40 +2090,62 @@ export namespace TargetMemory {
 
     // Include child-agent sessions without scanning every session in the project.
     while (frontier.length > 0) {
-      const children = Database.use((db) =>
-        db
-          .select({ id: SessionTable.id })
-          .from(SessionTable)
-          .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, frontier)))
-          .all()
-          .map((row) => row.id)
-          .filter((id) => !relatedSessionIDs.has(id)),
-      )
+      const children = Database.use((db) => {
+        const discovered: string[] = []
+        // SQLite bind parameters are finite; query in small batches without imposing
+        // a maximum number of child sessions or dropping any IDs.
+        for (let offset = 0; offset < frontier.length; offset += 500) {
+          const parentIDs = frontier.slice(offset, offset + 500)
+          discovered.push(
+            ...db
+              .select({ id: SessionTable.id })
+              .from(SessionTable)
+              .where(and(eq(SessionTable.project_id, projectID), inArray(SessionTable.parent_id, parentIDs)))
+              .all()
+              .map((row) => row.id),
+          )
+        }
+        return [...new Set(discovered)].filter((id) => !relatedSessionIDs.has(id))
+      })
       for (const child of children) relatedSessionIDs.add(child)
       frontier = children
     }
 
     const sessionIDs = [...relatedSessionIDs]
-    const requests = Database.use((db) =>
-      db
-        .select({
-          host: RequestTable.host,
-          origin: RequestTable.origin,
-          normalizedPath: RequestTable.normalized_path,
-          pageURL: RequestTable.page_url,
-        })
-        .from(RequestTable)
-        .where(inArray(RequestTable.session_id, sessionIDs))
-        .all(),
-    )
-    const intelAssets = Database.use((db) =>
-      db
-        .select({ asset: IntelEntryTable.asset })
-        .from(IntelEntryTable)
-        .where(inArray(IntelEntryTable.session_id, sessionIDs))
-        .all()
-        .map((row) => row.asset),
-    )
+    const requests = Database.use((db) => {
+      const rows: Array<{ host: string | null; origin: string | null; normalizedPath: string; pageURL: string | null }> = []
+      for (let offset = 0; offset < sessionIDs.length; offset += 500) {
+        const ids = sessionIDs.slice(offset, offset + 500)
+        rows.push(
+          ...db
+            .select({
+              host: RequestTable.host,
+              origin: RequestTable.origin,
+              normalizedPath: RequestTable.normalized_path,
+              pageURL: RequestTable.page_url,
+            })
+            .from(RequestTable)
+            .where(inArray(RequestTable.session_id, ids))
+            .all(),
+        )
+      }
+      return rows
+    })
+    const intelAssets = Database.use((db) => {
+      const rows: string[] = []
+      for (let offset = 0; offset < sessionIDs.length; offset += 500) {
+        const ids = sessionIDs.slice(offset, offset + 500)
+        rows.push(
+          ...db
+            .select({ asset: IntelEntryTable.asset })
+            .from(IntelEntryTable)
+            .where(inArray(IntelEntryTable.session_id, ids))
+            .all()
+            .map((row) => row.asset),
+        )
+      }
+      return rows
+    })
     const workspaces = Database.use((db) =>
       db
         .select()
