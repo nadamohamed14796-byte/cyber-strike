@@ -69,7 +69,7 @@ construct, not rely on the safety net.
 - **Boolean-based:** `' AND 1=1 --` vs `' AND 1=2 --` (compare responses)
 - **Time-based:** `' AND SLEEP(2) --` (use 2 seconds, NOT 30 — avoid DoS)
 - **Error-based:** `'` (single quote to trigger an error message)
-- **UNION read:** `' UNION SELECT user(),version() --` (info disclosure only)
+- **UNION syntax check (only when a database sink is evidenced):** `' UNION SELECT NULL --` against a test-owned fixture; never select real account, schema, or credential data
 - **sqlmap safe defaults:** `--batch --technique=BEU --level=1 --risk=1`
   (boolean, error, union — read-only; explicitly excludes stacked/RCE)
 
