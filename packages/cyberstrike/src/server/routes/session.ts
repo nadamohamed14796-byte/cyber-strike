@@ -19,6 +19,7 @@ import { CoverageNote } from "../../session/coverage-note"
 import { Normalize } from "../../session/normalize"
 import { IngestSummary } from "../../session/ingest-summary"
 import { IngestQueue } from "../../session/ingest-queue"
+import { looksLikeHTTPRequest } from "../../session/ingest-detection"
 import { WebCredential } from "../../session/web/web-credential"
 import { WebRole } from "../../session/web/web-role"
 import { WebObject } from "../../session/web/web-object"
@@ -1206,6 +1207,16 @@ export const SessionRoutes = lazy(() =>
 
         const ingestDryRun = process.env.CYBERSTRIKE_INGEST_DRY_RUN === "true"
         const normalized = await runNormalize(body, sessionID, ingestDryRun)
+
+        // Never route a malformed extension capture into the ordinary parent-chat
+        // branch. That fallback writes into the active text window and can hijack
+        // the user's conversation when request normalization fails.
+        if (!normalized && looksLikeHTTPRequest(body.text, Boolean(body.scheme || body.response))) {
+          c.status(400)
+          return c.json({
+            error: "Captured HTTP request could not be normalized; it was not sent to the parent chat session.",
+          })
+        }
 
         // Passive discovery only: attach observed origins when a persisted scope authorizes them.
         // This branch never probes the host and must not block request ingestion on hierarchy errors.
