@@ -2055,7 +2055,7 @@ export namespace TargetMemory {
     const lineage: Workspace[] = [selected]
     const lineageIDs = new Set<string>([selected.id])
     let parentTargetID = selected.parentTargetID
-    while (parentTargetID && lineage.length < 16) {
+    while (parentTargetID) {
       if (lineageIDs.has(parentTargetID)) break
       const parentRow = workspaces.find((row) => row.id === parentTargetID)
       if (!parentRow || parentRow.project_id !== projectID || parentRow.owner_key !== ownerKey) break
@@ -2121,31 +2121,35 @@ export namespace TargetMemory {
           Math.min(4, noteLimit),
         )
 
-    // Create a compact, cycle-safe inventory of the program's already-registered assets.
-    // Listing an asset is not authorization; each request still goes through checkURLScope.
+    // Walk the entire registered asset tree iteratively: no arbitrary asset-count or
+    // nesting-depth truncation, and the visited set makes malformed cycles harmless.
     const hierarchyLines: string[] = []
     const treeVisited = new Set<string>()
-    let listedAssets = 0
-    const appendChildren = (parent: Workspace, depth: number) => {
-      if (treeVisited.has(parent.id)) return
-      treeVisited.add(parent.id)
+    const pendingAssets: Array<{ workspace: Workspace; depth: number; root: boolean }> = [
+      { workspace: programRoot, depth: 0, root: true },
+    ]
+    while (pendingAssets.length) {
+      const current = pendingAssets.pop()!
+      if (treeVisited.has(current.workspace.id)) continue
+      treeVisited.add(current.workspace.id)
+      if (!current.root) {
+        hierarchyLines.push(
+          "  ".repeat(current.depth) + "- [" + current.workspace.assetType + "] " + current.workspace.targetURL +
+          " | workspace: " + path.relative(programRoot.workspacePath, current.workspace.workspacePath).split(path.sep).join("/"),
+        )
+      }
       let items: Workspace[] = []
       try {
-        items = children(parent.id)
+        items = children(current.workspace.id)
       } catch {
-        hierarchyLines.push("  ".repeat(depth + 1) + "[asset inventory unavailable for this node]")
-        return
+        hierarchyLines.push("  ".repeat(current.depth + 1) + "[asset inventory unavailable for this node]")
+        continue
       }
-      for (const child of items) {
-        listedAssets++
-        hierarchyLines.push(
-          "  ".repeat(depth + 1) + "- [" + child.assetType + "] " + child.targetURL +
-          " | workspace: " + path.relative(programRoot.workspacePath, child.workspacePath).split(path.sep).join("/"),
-        )
-        appendChildren(child, depth + 1)
+      // Reverse push preserves the existing child order during depth-first traversal.
+      for (let index = items.length - 1; index >= 0; index--) {
+        pendingAssets.push({ workspace: items[index]!, depth: current.depth + 1, root: false })
       }
     }
-    appendChildren(programRoot, 0)
 
     // Bound the selected-note portion independently of maxNotes. Callers may request
     // up to 20 notes, so a fixed per-note excerpt could consume the whole context budget
