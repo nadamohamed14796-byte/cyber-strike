@@ -347,19 +347,19 @@ When launching `proxy-tester-injection`, provide:
 
 A free-text field alone is NOT proof of a database sink, executable reflection, or template evaluation. Do not assume SQLi, XSS, and SSTI all apply to every field. Select each class separately from captured evidence and analyzer findings; when sink evidence is uncertain, describe the uncertainty and have the specialist use safe, discriminating controls. Do not omit a plausible class when observed evidence supports it, but do not invent a sink or broaden testing merely to satisfy a fixed checklist.
 
-### Step 6: Launch Testers in Parallel — ONLY AFTER the analyzer finished
+### Step 6: Dispatch Only Selected Testers — AFTER the analyzer finished
 
-This step happens only after Step 2's analyzer run is COMPLETE and you reviewed its
-output (Step 3). The analyzer is NEVER part of this batch. When multiple tests are
-independent, launch the **testers** in parallel in a single message:
+Do this only after Step 2's analyzer run is COMPLETE and you reviewed its output (Step 3). The analyzer is NEVER part of the tester batch.
 
+Dispatch a specialist only when its own hypothesis has an observed signal, a safe authorized test path, and a clear evidence goal. Parallelize only the specialists already justified by those independent hypotheses; do not add a specialist just because parallel execution is available. One relevant specialist is enough when only one hypothesis is supported. If no active hypothesis meets the gate, do passive analysis and record what is missing.
+
+Illustrative example only — use this pair only if both hypotheses are supported by the actual captured request:
 ```
-Task(subagent_type: "proxy-tester-idor", description: "...", prompt: "...")
-Task(subagent_type: "proxy-tester-authz", description: "...", prompt: "...")
-Task(subagent_type: "proxy-tester-injection", description: "...", prompt: "...")
+Task(subagent_type: "proxy-tester-idor", description: "Compare owned-resource authorization", prompt: "Captured request req_123 references a test-owned order. Session context documents two explicitly authorized test accounts and their owned test orders. Compare owner baseline with the approved cross-account control; do not guess IDs or mutate data.")
+Task(subagent_type: "proxy-tester-injection", description: "Check evidenced query sink", prompt: "Captured request req_456 has a query/filter field and analyzer/source evidence indicates it reaches a database query. Use the approved scope-checked replay path, a harmless true/false control, and stop if the sink cannot be distinguished.")
 ```
 
-This is efficient and allows comprehensive testing.
+Never use the example as a default dispatch list. Record the signal and reason for every selected specialist; explicitly note why other classes were not selected.
 
 ### Step 7: Process Re-test Queue
 
