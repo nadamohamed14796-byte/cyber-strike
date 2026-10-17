@@ -213,7 +213,7 @@ Use this table to quickly classify the endpoint and identify which testers to pr
 | **Path-confusion-prone** | Routes with overlapping prefixes, `/api/v1/users/../admin` | ssrf, authz (path normalization bypass) |
 | **Admin / privileged** | Path contains `/admin`, `/manage`, `/internal`, `/system` | authz (vertical priv esc) |
 | **Search / filter** | Param like `q=`, `search=`, `filter=`, `where=` | injection (SQLi via filter, NoSQL operators) |
-| **Form / free-text input** | Any `<form>` in the response, or any param/body field carrying free text (name, subject, message, comment, contact) | injection — dispatch it and name the full floor **SQLi + XSS + SSTI on EVERY field** (a text field is both a DB/query sink and a reflection/template sink; do not skip it just because THIS request had no params — test the form's submit target) |
+| **Form / free-text input** | A captured form or a free-text field | Consider injection only when the field, sink, and safe test path are grounded. Select SQLi, XSS, or SSTI tests separately from evidence; a text field alone does not prove database use, reflection, or template evaluation. If the form submission is not captured, route the observed action/method/fields to the appropriate specialist and mark unknown details unverified. |
 | **WebSocket / SSE** | `Upgrade: websocket` or `Accept: text/event-stream` | injection (message injection), authn (origin/auth check) |
 | **LLM / chat endpoint** | Body has `messages[]`/`prompt`/`input` feeding a model, path like `/chat`, `/completions`, `/v1/chat/completions`, `/generate`, or response is model-generated text | llm (prompt injection, jailbreak, system-prompt leak, output handling) — dispatch `proxy-tester-llm`; also injection if the same body has classic injectable params |
 
@@ -258,7 +258,7 @@ Examine the current request characteristics:
 - File operations? → Consider file-attacks
 
 **What's in the response?**
-- User input reflected? → injection: XSS **AND SSTI** (reflected input is a server-side template-evaluation sink as often as an XSS sink — name SSTI distinctly). The field is ALSO a SQLi sink — reflection does not rule out a database write/query behind it.
+- User input reflected? → consider XSS when the response context indicates executable reflection. Consider SSTI only when evidence suggests server-side template evaluation, and SQLi only when the input plausibly reaches a database/query sink. Reflection alone proves none of these; use context-specific controls and report only reproduced behavior.
 - JWT tokens? → Consider authn (JWT analysis)
 - Error messages? → Consider injection (SQL / parser errors)
 
@@ -286,7 +286,7 @@ Use accumulated session context to inform decisions:
 **High Priority (Always Consider):**
 - proxy-analyzer - Always run first
 - If numeric/UUID IDs present, or GraphQL with resolver IDs → proxy-tester-idor (covers BOLA on REST + GraphQL)
-- If POST/PUT/PATCH with body → proxy-tester-injection, proxy-tester-mass-assignment
+- If POST/PUT/PATCH with body → consider proxy-tester-injection when input types and observed behavior suggest a plausible injection sink; consider proxy-tester-mass-assignment when object fields or sensitive properties make over-posting plausible. A body or method alone is not sufficient to dispatch both.
 - If authentication-related (login, JWT in headers, OAuth flow) → proxy-tester-authn (JWT analysis triggered on any Bearer token)
 - If financial/payment fields (amount, price, total, balance) → proxy-tester-business-logic (payment + race condition testing)
 
