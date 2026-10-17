@@ -196,10 +196,14 @@ export interface JavaScriptSourceFile {
   sha256: string
   bytes: number
   endpointLiterals: string[]
+  /** Canonical source URL without query/fragment; provides the correct origin for relative routes. */
+  sourceURL?: string
   /** True when upstream response capture marked this body as truncated. */
   captureTruncated?: boolean
-  /** Request identifier for the already-captured source response; raw JS is never copied to the graph. */
+  /** First request ID is retained for backward-compatible artifact references. */
   sourceRequestID?: string
+  /** All captured request IDs for this canonical URL/content version. */
+  sourceRequestIDs?: string[]
   /** Static-analysis metadata; secret-like literal values must be redacted before persistence. */
   analysis?: JavaScriptSourceAnalysis
 }
@@ -252,7 +256,7 @@ export function extractCapturedJavaScriptSources(
   analysisCache?: Map<string, JavaScriptSourceAnalysis>,
 ): JavaScriptSourceFile[] {
   const output: JavaScriptSourceFile[] = []
-  const seen = new Set<string>()
+  const sourceIndexByURLAndHash = new Map<string, number>()
   for (const request of requests) {
     let url = safeURL(request.url)
     const base = safeURL(request.origin) ?? safeURL(request.pageURL) ?? safeURL(request.host)
@@ -278,8 +282,14 @@ export function extractCapturedJavaScriptSources(
     const bytes = Buffer.byteLength(body, "utf-8")
     if (bytes < 1) continue
     const digest = createHash("sha256").update(body).digest("hex")
-    if (seen.has(digest)) continue
-    seen.add(digest)
+    const canonicalSourceURL = url.origin + url.pathname
+    const identity = canonicalSourceURL + "\\0" + digest
+    const previousIndex = sourceIndexByURLAndHash.get(identity)
+    if (previousIndex !== undefined) {
+      const previous = output[previousIndex]!
+      previous.sourceRequestIDs = [...new Set([...(previous.sourceRequestIDs ?? [previous.sourceRequestID].filter((id): id is string => Boolean(id))), request.id])]
+      continue
+    }
     const basename = (url.pathname.split("/").filter(Boolean).pop() || "captured.js").replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
     let analysis = analysisCache?.get(digest)
     if (!analysis) {
@@ -292,14 +302,17 @@ export function extractCapturedJavaScriptSources(
         notes: [...analysis.notes, "PARTIAL SOURCE: captured response was explicitly truncated by the upstream response processor at 100KB; routes, parameters, functions, and sinks in the omitted tail were not analyzed. Retrieve the full response through the request-detail/capture pipeline before treating this inventory as complete."],
       }
     }
+    sourceIndexByURLAndHash.set(identity, output.length)
     output.push({
       relativePath: "captured/" + url.hostname.toLowerCase() + "/" + basename + "-" + digest.slice(0, 8),
       basename,
       sha256: digest,
       bytes,
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
+      sourceURL: canonicalSourceURL,
       captureTruncated: unwrapped.truncated,
       sourceRequestID: request.id,
+      sourceRequestIDs: [request.id],
       analysis,
     })
   }
@@ -534,7 +547,7 @@ export function correlateStaticJavaScriptEndpoints(
 }
 
 /** Inventory only local JS source files; never follow symlinks or execute their contents. */
-async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>): Promise<JavaScriptSourceFile[]> {
+async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>, sourceBaseURL?: string): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
   const pendingDirectories = [root]
   while (pendingDirectories.length) {
@@ -567,6 +580,7 @@ async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string
         sha256: digest,
         bytes: Buffer.byteLength(content, "utf-8"),
         endpointLiterals: extractStaticJavaScriptEndpoints(content),
+        sourceURL: sourceBaseURL ? safeURL(sourceBaseURL)?.origin : undefined,
         analysis,
       })
     }
@@ -885,7 +899,7 @@ export namespace JavaScriptCorrelation {
 
     // An explicit asset URL must narrow source analysis, and must have been observed
     // and pass the same persisted scope/hierarchy gate as captured traffic.
-    const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"), analysisCache)
+    const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"), analysisCache, normalizedTarget.targetURL)
 
     const projectID = Instance.project.id
     const sessionIDsSet = new Set<string>([rootSessionID])
