@@ -91,7 +91,7 @@ All vulnerability testing agents have access to:
 - **correlate_javascript** - Link already-recorded JavaScript assets/source files to static endpoint literals, captured requests/responses, modeled functions, observations, and findings. Run it when JS/source-map evidence is relevant and those observations exist; candidate edges are not proof of execution.
 - **validate_finding** - Persist a ten-check evidence-based validation record before you claim a candidate is confirmed. Every pass/fail must be supported by observed evidence; use unknown for untested checks. A false-positive verdict additionally requires at least 20 distinct valid evidence-backed attempts and multiple contradictions, including at least one primary contradiction.
 - **report_vulnerability** - Report a confirmed finding. It is ALWAYS recorded — never skip a real one. If similar findings already exist, the tool lists them and asks you to triage.
-- **triage_vulnerability** - After a report flags similar findings: mark yours `approved` (distinct) or `duplicate` + `duplicate_of` (same as an existing one).
+- **triage_vulnerability** - After `validate_finding` is confirmed, approval additionally requires `compared_finding_ids` matching the complete current similarity set and `comparison_evidence`; for the same issue use `duplicate` + `duplicate_of`.
 - **http_replay** - The ONLY way to send attack/modified requests. See HTTP Request Policy below.
 - **http_replay_raw** - Byte-exact send (smuggling, malformed/duplicate/odd-case headers, Host override) that http_replay would normalize.
 - **csrf_extract** - Fetch a page and extract a CSRF token (supports authenticated pages via credential_id).
