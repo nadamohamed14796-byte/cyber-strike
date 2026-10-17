@@ -167,6 +167,12 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(evalPerm(orchestrator, "research_knowledge")).toBe("allow")
       expect(evalPerm(orchestrator, "triage_vulnerability")).toBe("allow")
       expect(evalPerm(orchestrator, "report_vulnerability")).toBe("deny")
+      // The orchestrator must not contradict its pure-orchestration contract by
+      // instructing itself to synthesize/send unobserved form submissions.
+      expect(orchestrator?.prompt).toContain("pure orchestrator")
+      expect(orchestrator?.prompt).toContain("never invent an endpoint, body")
+      expect(orchestrator?.prompt).not.toContain("synthesize and send it yourself")
+      expect(orchestrator?.prompt).not.toContain("POST the form's action")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
       expect(evalPerm(analyzer, "report_vulnerability")).toBe("deny")
