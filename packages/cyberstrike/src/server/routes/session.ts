@@ -1398,13 +1398,21 @@ export const SessionRoutes = lazy(() =>
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
-                await SessionPrompt.prompt({
+                const agentResult = await SessionPrompt.prompt({
                   sessionID: childSessionID,
                   agent: agentName,
                   model: body.model,
                   excludeHistory: true,
                   parts: [{ type: "text", text: promptText }],
                 })
+                // SessionPrompt.prompt can resolve with an assistant message carrying
+                // an error, stuck-abort, or step-cap marker instead of throwing.
+                // Do not turn those incomplete runs into a successful ingest status.
+                const agentInfo = agentResult.info
+                const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
+                const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
+                const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
+                const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
                 const model = body.model ?? (await SessionPrompt.lastModel(childSessionID))
                 await IngestSummary.write({
                   // Keep completion chatter in the request child session, not the active parent transcript.
@@ -1550,7 +1558,24 @@ export const SessionRoutes = lazy(() =>
                     })
                   }
                 }
-                finalStatus = "processed"
+                if (agentIncomplete) {
+                  log.warn("captured request analysis did not complete cleanly", {
+                    sessionID,
+                    childSessionID,
+                    requestID: req.id,
+                    agent: agentName,
+                    errorName:
+                      agentError && typeof agentError === "object" && "name" in agentError
+                        ? String(agentError.name)
+                        : agentError
+                          ? "error"
+                          : undefined,
+                    stuckAborted: agentStuck,
+                    stepCapped: agentCapped,
+                  })
+                } else {
+                  finalStatus = "processed"
+                }
               } finally {
                 Request.updateStatus({ id: req.id, status: finalStatus })
               }
