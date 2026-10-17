@@ -5,6 +5,8 @@ import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
+import { Database, eq } from "../../src/storage/db"
+import { RequestTable } from "../../src/session/session.sql"
 
 function defer<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -298,6 +300,39 @@ describe("Request processing outcome persistence", () => {
       expect(Request.get(session.id).find((item) => item.id === request.id)?.status).toBe("failed")
       expect(Request.get(session.id).find((item) => item.id === request.id)?.status).not.toBe("processed")
 
+      await Session.remove(session.id)
+    })
+  })
+})
+
+
+describe("full JavaScript source persistence", () => {
+  test("stores complete .js response while keeping the normal request preview capped", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "javascript-source-persistence-test" })
+      const source = 'fetch("/api/full-endpoint");\\n' + "x".repeat(110 * 1024)
+      const request = Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/assets/application.js",
+        origin: "https://example.test",
+        keyHash: "javascript-source-persistence-test-key",
+        response: {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+          body: source,
+        },
+      })
+      expect(request).toBeDefined()
+      if (!request) throw new Error("JavaScript request fixture was not inserted")
+      expect(request.processed_response).toContain("[TRUNCATED - showing first 100KB")
+      const stored = Database.use((db) =>
+        db.select({ source: RequestTable.javascript_source })
+          .from(RequestTable)
+          .where(eq(RequestTable.id, request.id))
+          .get(),
+      )
+      expect(stored?.source).toBe(source)
       await Session.remove(session.id)
     })
   })
