@@ -18,7 +18,7 @@ export {
 } from "../session/session.sql"
 export { SessionShareTable } from "../share/share.sql"
 export { ProjectTable } from "../project/project.sql"
-export { TargetWorkspaceTable, TargetNoteTable } from "../target/target.sql"
+export { TargetWorkspaceTable, TargetNoteTable, TargetNoteRevisionTable } from "../target/target.sql"
 export { ReportKnowledgeTable, ReportKnowledgeEventTable } from "../learning/report-knowledge.sql"
 export { ResearchQueueTable } from "../research/queue.sql"
 export { ResearchCycleDuplicateTable, ResearchCycleTable } from "../research/cycle.sql"
