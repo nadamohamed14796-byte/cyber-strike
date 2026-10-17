@@ -10,7 +10,7 @@ export function stripSkillSigningMetadata(content: string): string {
   if (!frontmatter) return content.trim()
 
   const [matched, opening, metadata, closing] = frontmatter
-  const cleanMetadata = metadata.replace(/^(?:sha256|signature|signed_by):[^\r\n]*(?:\r?\n|$)/gm, "")
+  const cleanMetadata = metadata.replace(/(?:^|\r?\n)(?:sha256|signature|signed_by):[^\r\n]*/g, "")
   const start = frontmatter.index
   const end = start + matched.length
   return (content.slice(0, start) + opening + cleanMetadata + closing + content.slice(end)).trim()
