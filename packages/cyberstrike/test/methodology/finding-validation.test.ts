@@ -413,6 +413,7 @@ test("persists validation summaries into notes for the uniquely observed target 
           status: "approved",
         },
       })
+      recordDisprovenLedger(session.id, finding.id, finding.endpoint!)
       const result = await FindingValidation.record({
         sessionID: session.id,
         vulnerabilityID: finding.id,
