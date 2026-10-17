@@ -97,7 +97,7 @@ export function normalizeJavaScriptEndpointPath(inputPath: string): { path: stri
   return { path, pathParameters: cleanUnique(pathParameters) }
 }
 const fieldNames = (value: string) => cleanUnique(
-  Array.from(value.matchAll(/(?:^|[,{\n])\s*["']?([A-Za-z_$][\w$-]{0,99})["']?\s*:/g), (m) => m[1]!),
+  Array.from(value.matchAll(/(?:^|[,{\n])\s*["']?([A-Za-z_$][\w$-]*)["']?\s*:/g), (m) => m[1]!),
  )
 
 
@@ -122,9 +122,9 @@ function matchingObjectBrace(source: string, open: number, maxLength = source.le
 function objectPropertyNames(value: string): string[] {
   const names = new Set(fieldNames(value))
   for (const part of splitTopLevelArguments(value)) {
-    const match = part.trim().match(/^(?:["']([^"']+)["']|([A-Za-z_$][\w$-]{0,99}))\s*(?:\??:|$)/)
+    const match = part.trim().match(/^(?:["']([^"']+)["']|([A-Za-z_$][\w$-]*))\s*(?:\??:|$)/)
     const name = match?.[1] ?? match?.[2]
-    if (name && /^[A-Za-z_$][\w$-]{0,99}$/.test(name)) names.add(name)
+    if (name && /^[A-Za-z_$][\w$-]*$/.test(name)) names.add(name)
   }
   return [...names]
 }
@@ -406,7 +406,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const isBodyMethod = /\.(?:post|put|patch)$/i.test(callee)
     const options = isXHR ? "" : requestConfig ? args[0] ?? "" : callee.endsWith(".request") ? args.slice(1).join(",")
       : isFetch ? args.slice(1).join(",") : /\.(?:get|head|options|delete)$/i.test(callee) ? args.slice(1).join(",") : args.slice(2).join(",")
-    const optionText = options + "\n" + source.slice(index, Math.min(close + 1, index + 7000))
+    const optionText = options + "\n" + source.slice(index, close + 1)
     const methodOption = optionText.match(/\bmethod\s*:\s*["'](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE)["']/i)
     const hasDynamicMethodOption = isFetch && /\bmethod\b/i.test(optionText) && !methodOption
     const inferredFetchMethod = isFetch && !hasDynamicMethodOption ? "GET" : undefined
