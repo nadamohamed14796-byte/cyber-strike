@@ -19,7 +19,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       return { matches: false, reason: `HackerOne asset type "${assetType}" is not an HTTP target scope; use its appropriate assessment workflow` }
     }
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
-    if (assetType === "wildcard") allowed = identifier.startsWith("*.") ? identifier : "*." + identifier
+    if (assetType === "wildcard") allowed = identifier.includes("*") || /\{[^{}]+\}/.test(identifier) ? identifier : "*." + identifier
     else if (assetType === "url" && !/^https?:\/\//i.test(identifier)) {
       // HackerOne commonly exports URL identifiers without a scheme. Preserve
       // their host/path restriction and accept either HTTP or HTTPS in that case.
