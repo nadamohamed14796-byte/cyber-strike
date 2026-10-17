@@ -213,17 +213,32 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
         : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " more distinct, case-specific tests under valid preconditions. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, invalid preconditions, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
   }
 
+  const uncertaintyRegister = unknown.length
+    ? unknown.map((check) =>
+        "#" + check.number + " [" + check.id + "] — " +
+        (check.reason?.trim() || "Why unresolved: the required evidence has not been recorded.") +
+        (check.evidence?.trim() ? " Existing evidence: " + check.evidence : " Missing evidence: no sufficient observation was supplied.") +
+        " Next: collect the missing in-scope evidence or record a justified not_applicable status if the check truly does not apply."
+      )
+    : ["No checks are marked unknown. This does not replace review of the evidence and failed checks below."]
   const output = [
-    "Verdict: " + verdict + " (rubric confidence label: " + confidence + "/100; not a statistical probability)",
-    "Check results: " + passed.length + " passed, " + failed.length + " failed, " + unknown.length + " unknown, " + notApplicable.length + " not applicable (10 total).",
-    summary,
+    "Uncertainty / missing-evidence register (review before verdict):",
+    ...uncertaintyRegister,
+    "",
+    "Contradictory / failed checks (each requires evidence):",
+    ...(failed.length ? failed.map(formatCheck) : ["No checks are marked failed."]),
     "",
     "All ten checks (status, reason, and evidence):",
     ...checks.map(formatCheck),
     "",
     "Verification attempts: " + validAttempts.length + "/" + FINDING_VALIDATION_MIN_ATTEMPTS + " distinct valid evidence-backed attempts; " + Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " remaining before false-positive eligibility.",
     "",
+    "Check results: " + passed.length + " passed, " + failed.length + " failed, " + unknown.length + " unknown, " + notApplicable.length + " not applicable (10 total).",
+    summary,
+    "",
     "Next step: " + nextStep,
+    "",
+    "Final verdict: " + verdict + " (rubric confidence label: " + confidence + "/100; not a statistical probability)",
   ].join("\n")
 
   return {
