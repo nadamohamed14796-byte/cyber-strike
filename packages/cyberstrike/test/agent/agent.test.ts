@@ -219,7 +219,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
       expect(orchestrator?.prompt).not.toContain("tests internal IP ranges, localhost, cloud metadata")
       expect(orchestrator?.prompt).not.toContain("path traversal (../../etc/passwd)")
       expect(orchestrator?.prompt).toContain("A URL-like parameter alone is insufficient")
-      expect(orchestrator?.prompt).toContain("do not trigger real payments, transfers, destructive actions")
+      expect(orchestrator?.prompt).toContain("Do not trigger real payments, transfers, destructive actions")
       expect(evalPerm(analyzer, "research_knowledge")).toBe("allow")
       expect(evalPerm(analyzer, "correlate_javascript")).toBe("allow")
       expect(evalPerm(analyzer, "report_vulnerability")).toBe("deny")
