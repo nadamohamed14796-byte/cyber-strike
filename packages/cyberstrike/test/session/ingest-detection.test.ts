@@ -9,6 +9,11 @@ test("recognizes a truncated HTTP request with recognizable headers", () => {
   expect(looksLikeHTTPRequest("POST /api/users\nHost: app.example.test\nContent-Type: application/json")).toBe(true)
 })
 
+test("recognizes a truncated request line even when headers were lost", () => {
+  expect(looksLikeHTTPRequest("GET /api/users")).toBe(true)
+  expect(looksLikeHTTPRequest("GET https://app.example.test/api/users")).toBe(true)
+})
+
 test("treats explicit HTTP capture metadata as HTTP even if the raw request is malformed", () => {
   expect(looksLikeHTTPRequest("not a request", true)).toBe(true)
 })
