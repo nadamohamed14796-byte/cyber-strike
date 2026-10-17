@@ -4,6 +4,8 @@ import { Identifier } from "../id/id"
 import { Session } from "../session"
 import { Vulnerability } from "../session/vulnerability"
 import { TargetMemory } from "../target"
+import { VerificationLedger } from "../session/verification-ledger"
+import { VerificationAttempts as VerificationPolicy } from "./verification-attempts"
 import { FalsePositiveKnowledge } from "./false-positive-knowledge"
 import {
   FindingValidationTable,
@@ -312,6 +314,34 @@ export namespace FindingValidation {
     }
     const allAttempts = [...accumulated.values()]
     const assessment = assessFindingChecks(input.checks, allAttempts)
+
+    // Caller-authored attempt descriptions alone must not trigger a global false-positive verdict.
+    // Require the durable execution ledger for this exact finding to prove the 20-attempt gate.
+    if (assessment.verdict === "false_positive") {
+      const hypothesisKey = "finding:" + input.vulnerabilityID
+      const ledgerAttempts = VerificationLedger.list({ sessionID: rootSessionID, hypothesisKey })
+      const distinctValidLedgerAttempts = VerificationPolicy.uniqueAttempts(ledgerAttempts)
+        .filter((attempt) => attempt.validConditions)
+      const ledgerDisproved = distinctValidLedgerAttempts.length >= VerificationPolicy.MAX_ATTEMPTS &&
+        ledgerAttempts.some((attempt) => attempt.outcome === "disproven" && Boolean(attempt.evidenceRef?.trim()))
+
+      if (!ledgerDisproved) {
+        const originalSummary = assessment.summary
+        const originalNextStep = assessment.nextStep
+        assessment.verdict = "inconclusive"
+        assessment.confidence = 45
+        assessment.attemptCount = distinctValidLedgerAttempts.length
+        assessment.attemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
+        assessment.summary = "Inconclusive: checklist evidence suggested a false-positive explanation, but the durable verification ledger lacks 20 distinct valid attempts and direct contradictory evidence for " + hypothesisKey + ". Self-reported attempts alone cannot classify a finding as false positive."
+        assessment.nextStep = "Record distinct tests with verification_attempt using hypothesis_key=" + hypothesisKey + ". Keep the finding inconclusive until the durable ledger reaches 20 valid attempts and records an evidence-backed disproven outcome. Previous checklist assessment: " + originalSummary + " " + originalNextStep
+        assessment.output = assessment.output
+          .replace("Final verdict: false_positive", "Final verdict: inconclusive")
+          .replace(originalSummary, assessment.summary)
+          .replace(originalNextStep, assessment.nextStep)
+          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary
+      }
+    }
+
     const validationID = Identifier.ascending("finding_validation")
     const now = Date.now()
     Database.transaction((db) =>
