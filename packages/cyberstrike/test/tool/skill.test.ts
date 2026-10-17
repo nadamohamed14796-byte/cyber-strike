@@ -21,6 +21,30 @@ const baseCtx: Omit<Tool.Context, "ask"> = {
 }
 
 describe("tool.skill", () => {
+  test("missing skill load fails explicitly instead of reporting a successful load", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          await expect(
+            tool.execute(
+              { action: "load", name: "skill-that-does-not-exist" },
+              { ...baseCtx, ask: async () => {} },
+            ),
+          ).rejects.toThrow(/not found or has an ambiguous metadata reference/)
+          expect(SkillContext.isLoaded("skill-that-does-not-exist")).toBe(false)
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("description shows skill count", async () => {
     await using tmp = await tmpdir({
       git: true,
