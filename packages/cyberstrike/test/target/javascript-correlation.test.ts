@@ -344,7 +344,7 @@ test("extracts endpoints from already-captured JavaScript responses without reta
 test("extracts more than 200 distinct static endpoint literals", () => {
   const source = Array.from({ length: 251 }, (_, index) =>
     'fetch("/api/v1/resource-' + index + '")',
-  ).join("\\n")
+  ).join("\n")
   const endpoints = extractStaticJavaScriptEndpoints(source)
   expect(endpoints).toHaveLength(251)
   expect(endpoints).toContain("/api/v1/resource-250")
@@ -360,7 +360,7 @@ test("marks captures explicitly truncated by the response processor as partial",
       "[Status: 200, Type: application/javascript, Size: 1.2 MB]",
       'fetch("/api/visible-route")',
       "[TRUNCATED - showing first 100KB of 1.2 MB]",
-    ].join("\\n"),
+    ].join("\n"),
   }])
   expect(sources[0]?.captureTruncated).toBe(true)
   expect(sources[0]?.analysis?.notes.some((note) => note.startsWith("PARTIAL SOURCE:"))).toBe(true)
