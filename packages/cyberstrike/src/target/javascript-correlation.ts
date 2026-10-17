@@ -429,26 +429,25 @@ export function correlateStaticJavaScriptEndpoints(
 /** Inventory only local JS source files; never follow symlinks or execute their contents. */
 async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
-  async function visit(directory: string, depth: number): Promise<void> {
-    if (depth > 4 || output.length >= 250 || totalBytes >= 5 * 1024 * 1024) return
+  const pendingDirectories = [root]
+  while (pendingDirectories.length) {
+    const directory = pendingDirectories.pop()!
     let entries
     try {
       entries = await fs.readdir(directory, { withFileTypes: true })
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue
       throw error
     }
     for (const entry of entries) {
-        const fullPath = path.join(directory, entry.name)
+      const fullPath = path.join(directory, entry.name)
+      // Dirent checks intentionally avoid following symlinks outside the workspace.
       if (entry.isDirectory()) {
-        await visit(fullPath, depth + 1)
+        pendingDirectories.push(fullPath)
         continue
       }
       if (!entry.isFile() || !/\.(?:m?js|cjs)$/i.test(entry.name)) continue
-      const stat = await fs.stat(fullPath)
-      if (stat.size < 0) continue
       const content = await fs.readFile(fullPath, "utf-8")
-      totalBytes += Buffer.byteLength(content, "utf-8")
       const digest = createHash("sha256").update(content).digest("hex")
       let analysis = analysisCache?.get(digest)
       if (!analysis) {
@@ -465,7 +464,6 @@ async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string
       })
     }
   }
-  await visit(root, 0)
   return output
 }
 
