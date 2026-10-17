@@ -441,9 +441,9 @@ export namespace FindingValidation {
       ...assessment,
       output: assessment.output + strategyGuidance + (
         falsePositiveMemorySaved
-          ? "\\n\\nSaved a sanitized false-positive lesson to the shared SQLite memory for future target hunts."
+          ? "\n\nSaved a sanitized false-positive lesson to the shared SQLite memory for future target hunts."
           : falsePositiveMemoryRetracted
-            ? "\\n\\nRetracted the stale shared false-positive lesson because this finding was reopened by later evidence."
+            ? "\n\nRetracted the stale shared false-positive lesson because this finding was reopened by later evidence."
             : ""
       ) + (
         priorFalsePositiveLessons.length
