@@ -51,6 +51,37 @@ test("classifies as confirmed only when all required checks pass", () => {
   expect(assessFindingChecks(checks).verdict).toBe("confirmed")
 })
 
+test("confirmed validation keeps a finding pending explicit triage", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const session = await Session.create({})
+      try {
+        const finding = Vulnerability.add({
+          sessionID: session.id,
+          data: {
+            severity: "medium",
+            title: "Confirmed but untriaged candidate",
+            description: "Controlled evidence supports this finding.",
+            endpoint: "GET /api/private-record",
+          },
+        })
+        expect(finding.status).toBe("new")
+        const result = await FindingValidation.record({
+          sessionID: session.id,
+          vulnerabilityID: finding.id,
+          checks: checklist({ identity_context: { status: "not_applicable", reason: "No identity boundary is claimed" } }),
+        })
+        expect(result.verdict).toBe("confirmed")
+        expect(Vulnerability.get(session.id).find((row) => row.id === finding.id)?.status).toBe("new")
+      } finally {
+        await Session.remove(session.id)
+      }
+    },
+  })
+})
+
 test("validation output reports counts and the reason/evidence for all ten checks", () => {
   const checks = checklist({
     reproducible: { status: "fail", reason: "Replay did not reproduce the claim", evidence: "Two controlled replays matched baseline" },
