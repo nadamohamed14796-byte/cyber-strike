@@ -51,6 +51,21 @@ test("classifies as confirmed only when all required checks pass", () => {
   expect(assessFindingChecks(checks).verdict).toBe("confirmed")
 })
 
+test("validation output reports counts and the reason/evidence for all ten checks", () => {
+  const checks = checklist({
+    reproducible: { status: "fail", reason: "Replay did not reproduce the claim", evidence: "Two controlled replays matched baseline" },
+    request_path: { status: "unknown", reason: "No route-level evidence collected", evidence: "" },
+    identity_context: { status: "not_applicable", reason: "No identity boundary is claimed" },
+  })
+  const result = assessFindingChecks(checks)
+  expect(result.output).toContain("Check results: 8 passed, 1 failed, 1 unknown, 1 not applicable (10 total).")
+  expect(result.output).toContain("#1 [FAIL]")
+  expect(result.output).toContain("Reason: Replay did not reproduce the claim")
+  expect(result.output).toContain("Evidence: Two controlled replays matched baseline")
+  expect(result.output).toContain("#2 [UNKNOWN]")
+  expect(result.output).toContain("#10 [PASS]")
+})
+
 test("a missing security header without demonstrated impact cannot be confirmed", () => {
   const checks = checklist({
     security_impact: {
