@@ -1472,6 +1472,31 @@ export namespace JavaScriptCorrelation {
       const requestLines = relatedRequests.length
         ? relatedRequests.map((request) => "- " + request.id + ": " + request.method + " " + (request.url ?? request.normalizedPath) + " — status " + (request.responseStatus ?? "unknown"))
         : ["- No matching captured request yet."]
+      const endpointOrigin = endpoint.origin?.toLowerCase() ?? "*"
+      const relatedCandidates = graph.javascriptAnalysis.requestCandidates.filter((candidate) => {
+        const candidateURL = safeURL(candidate.urlTemplate)
+        const candidateOrigin = (candidate.origin ?? candidateURL?.origin ?? null)?.toLowerCase() ?? "*"
+        return candidateOrigin === endpointOrigin &&
+          normalizedTemplateShape(candidate.path) === normalizedTemplateShape(endpoint.path) &&
+          (endpoint.method ? candidate.method?.toUpperCase() === endpoint.method : !candidate.method)
+      })
+      const parameterLines = [
+        "- Path parameters: " + ((endpoint.pathParameters ?? []).join(", ") || "none statically identified"),
+        "- Query parameters: " + ((endpoint.queryParameters ?? []).join(", ") || "none statically identified"),
+        "- Body parameters: " + ((endpoint.bodyParameters ?? []).join(", ") || "none statically identified"),
+        "- Header names: " + ((endpoint.headerNames ?? []).join(", ") || "none statically identified"),
+        "- Authentication signals: " + ((endpoint.authSignals ?? []).join(", ") || "none statically identified"),
+        "- Cookie/session signals: " + ((endpoint.cookieSignals ?? []).join(", ") || "none statically identified"),
+      ]
+      const sourceCallLines = relatedCandidates.length
+        ? relatedCandidates.map((candidate) =>
+            "- " + candidate.sourceFile + ":" + candidate.sourceLine +
+            (candidate.sourceFunction ? " in " + candidate.sourceFunction : "") +
+            " — path=[" + candidate.pathParameters.join(", ") + "] query=[" + candidate.queryParameters.join(", ") +
+            "] body=[" + candidate.bodyParameters.join(", ") + "] headers=[" + candidate.headerNames.join(", ") +
+            "] auth=[" + candidate.authSignals.join(", ") + "] cookies=[" + candidate.cookieSignals.join(", ") + "]",
+          )
+        : ["- No structured request-call candidate associated with this method-specific route."]
       const endpointNoteContent = [
         "# Endpoint Evidence",
         "",
@@ -1479,13 +1504,20 @@ export namespace JavaScriptCorrelation {
         "- Target: " + workspace.targetURL,
         "- Origin: " + (endpoint.origin ?? "(relative or same-origin route)"),
         "- Host: " + (endpoint.host ?? "(relative or same-origin route)"),
+        "- Method: " + (endpoint.method ?? "not statically known"),
         "- Path/template: " + endpoint.path,
         "- Observation status: " + (endpoint.observedInTraffic ? "path overlap observed in captured traffic" : "static JavaScript candidate; not yet observed in captured traffic"),
         "- Confidence: " + endpoint.confidence,
         "- Source JavaScript files: " + (endpoint.sourceFiles.length ? endpoint.sourceFiles.join(", ") : "none recorded"),
         "- Related captured request IDs: " + (endpoint.observedRequestIDs.length ? endpoint.observedRequestIDs.join(", ") : "none"),
         "",
-        "## Related request evidence",
+        "## Merged parameter inventory (kept separate by location)",
+        ...parameterLines,
+        "",
+        "## Request-call provenance",
+        ...sourceCallLines,
+        "",
+        "## Related captured request evidence",
         ...requestLines,
         "",
         "## Artifact links",
@@ -1497,7 +1529,7 @@ export namespace JavaScriptCorrelation {
       ].join("\n")
       await TargetMemory.addNote(workspace.targetURL, {
         kind: "endpoint",
-        title: ("Endpoint " + (endpoint.host ?? "relative") + endpoint.path).slice(0, 180),
+        title: ("Endpoint " + (endpoint.method ? endpoint.method + " " : "") + (endpoint.host ?? "relative") + endpoint.path).slice(0, 180),
         content: endpointNoteContent,
         source: "javascript-correlation:" + endpoint.id,
         sourceURL: endpoint.origin ? endpoint.origin + endpoint.path : undefined,
