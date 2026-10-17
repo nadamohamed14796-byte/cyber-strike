@@ -343,7 +343,7 @@ export namespace FindingValidation {
           .replace("Final verdict: false_positive", "Final verdict: inconclusive")
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
-          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary + "\\nDurable ledger progress: " + distinctValidLedgerAttempts.length + "/" + VerificationPolicy.MAX_ATTEMPTS + "; remaining ledger attempts: " + (assessment.ledgerAttemptsRemaining ?? 0) + ". Submitted checklist attempts do not satisfy this gate."
+          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary + String.fromCharCode(10) + "Durable ledger progress: " + distinctValidLedgerAttempts.length + "/" + VerificationPolicy.MAX_ATTEMPTS + "; remaining ledger attempts: " + (assessment.ledgerAttemptsRemaining ?? 0) + ". Submitted checklist attempts do not satisfy this gate."
       }
     } else if (assessment.verdict === "confirmed") {
       const ledgerConfirmed = distinctValidLedgerAttempts.some((attempt) =>
@@ -355,14 +355,13 @@ export namespace FindingValidation {
         const originalNextStep = assessment.nextStep
         assessment.verdict = "inconclusive"
         assessment.confidence = 45
-        assessment.attemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
         assessment.summary = "Inconclusive: the ten-check checklist passed, but the durable verification ledger has no valid, evidence-backed CONFIRMED attempt for " + hypothesisKey + ". Checklist text alone cannot confirm a finding."
         assessment.nextStep = "Use verification_attempt with hypothesis_key=" + hypothesisKey + " to record an executed in-scope test and direct evidence. Keep the finding pending until the ledger contains a valid CONFIRMED outcome with an evidence reference. Previous checklist assessment: " + originalSummary + " " + originalNextStep
         assessment.output = assessment.output
           .replace("Final verdict: confirmed", "Final verdict: inconclusive")
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
-          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary + "\\nDurable ledger progress: " + distinctValidLedgerAttempts.length + " valid attempts; a separate evidence-backed CONFIRMED ledger outcome is required. " + (assessment.ledgerAttemptsRemaining ?? 0) + " ledger attempts remain for false-positive evaluation.
+          + String.fromCharCode(10, 10) + "Confirmation guard: " + assessment.summary + String.fromCharCode(10) + "Durable ledger progress:  + distinctValidLedgerAttempts.length + " valid attempts; a separate evidence-backed CONFIRMED ledger outcome is required. " + (assessment.ledgerAttemptsRemaining ?? 0) + " ledger attempts remain for false-positive evaluation.
       }
     }
 
