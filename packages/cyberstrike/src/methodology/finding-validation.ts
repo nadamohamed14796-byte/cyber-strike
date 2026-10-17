@@ -4,6 +4,7 @@ import { Identifier } from "../id/id"
 import { Session } from "../session"
 import { Vulnerability } from "../session/vulnerability"
 import { TargetMemory } from "../target"
+import { FalsePositiveKnowledge } from "./false-positive-knowledge"
 import {
   FindingValidationTable,
   type FindingValidationCheckRecord,
@@ -252,6 +253,20 @@ export namespace FindingValidation {
       throw new Error("Finding " + input.vulnerabilityID + " was not found in the current session. No validation record was saved.")
     }
 
+    // Global false-positive memory is advisory context only; never use similarity to
+    // automatically classify or suppress a new finding.
+    let priorFalsePositiveLessons: ReturnType<typeof FalsePositiveKnowledge.similar> = []
+    try {
+      priorFalsePositiveLessons = FalsePositiveKnowledge.similar({
+        title: finding.title,
+        description: finding.description,
+        endpoint: finding.endpoint,
+        limit: 5,
+      })
+    } catch (error) {
+      console.warn("[cyberstrike] false-positive memory lookup failed:", error instanceof Error ? error.message : String(error))
+    }
+
     const priorAttempts = Database.use((db) =>
       db
         .select({ attempts: FindingValidationTable.attempts })
@@ -319,6 +334,20 @@ export namespace FindingValidation {
           : {}),
       description,
     })
+
+    if (assessment.verdict === "false_positive") {
+      try {
+        FalsePositiveKnowledge.record({
+          finding,
+          validationID,
+          failedCheckIDs: assessment.failedCheckIDs,
+          checks: assessment.checks,
+          summary: assessment.summary,
+        })
+      } catch (error) {
+        console.warn("[cyberstrike] false-positive lesson could not be saved:", error instanceof Error ? error.message : String(error))
+      }
+    }
 
     // Prefer the explicit workspace attribution already stored on the finding. Older findings
     // without target_id can still use unambiguous session observations as a conservative fallback.
@@ -398,7 +427,18 @@ export namespace FindingValidation {
       : ""
     return {
       ...assessment,
-      output: assessment.output + strategyGuidance,
+      output: assessment.output + strategyGuidance + (
+        priorFalsePositiveLessons.length
+          ? "\\n\\n## Similar historical false-positive cases (advisory only)\\n" +
+            priorFalsePositiveLessons.map((lesson, index) =>
+              (index + 1) + ". " + lesson.titlePattern +
+              " — similarity " + lesson.similarity + "%; seen " + lesson.occurrences + " time(s); " +
+              "prior contradictory checks: " + lesson.failedCheckIDs.join(", ") + ". " +
+              "Benign explanation: " + lesson.benignExplanation +
+              " This is a comparison clue, NOT proof that the current finding is false positive."
+            ).join("\\n")
+          : "\\n\\nNo matching historical false-positive lesson was found in the shared database."
+      ),
       strategyPlan,
       id: validationID,
       findingID: input.vulnerabilityID,
