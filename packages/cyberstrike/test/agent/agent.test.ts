@@ -67,6 +67,30 @@ test("every built-in agent skill reference resolves to a loadable skill", async 
             expect(resolved, `agent "${agent.name}" references unresolved skill "${reference}"`).toBeDefined()
           }
         }
+
+        // These are injected directly by loadVulnAgent(), not stored in agent.skills.
+        // Check the rendered prompt so a stale/missing alias cannot silently remove
+        // baseline methodology while the dynamic SkillTool still works.
+        const embeddedReferences: Record<string, string[]> = {
+          "proxy-tester-idor": ["wstg-authz-04", "wstg-apit-02"],
+          "proxy-tester-authz": ["wstg-authz-02", "wstg-authz-03", "wstg-authz-01"],
+          "proxy-tester-mass-assignment": ["wstg-inpv-20", "wstg-busl-02"],
+          "proxy-tester-injection": ["wstg-injection", "wstg-inpv-05", "wstg-inpv-12", "wstg-inpv-18"],
+          "proxy-tester-authn": ["wstg-auth-session", "wstg-athn-04", "wstg-athn-09", "wstg-athn-11", "wstg-sess-10"],
+          "proxy-tester-business-logic": ["wstg-logic-client-api", "wstg-busl-04", "wstg-busl-10"],
+          "proxy-tester-ssrf": ["wstg-inpv-19", "wstg-conf-13"],
+          "proxy-tester-file-attacks": ["wstg-inpv-11.1", "wstg-inpv-11", "wstg-busl-08", "wstg-busl-09"],
+          "proxy-tester-llm": ["llm-security"],
+        }
+        for (const [agentName, references] of Object.entries(embeddedReferences)) {
+          const agent = await Agent.get(agentName)
+          expect(agent, `missing vulnerability agent "${agentName}"`).toBeDefined()
+          for (const reference of references) {
+            expect(agent?.prompt, `"${agentName}" prompt is missing embedded skill "${reference}"`).toContain(
+              `<skill name="${reference}">`,
+            )
+          }
+        }
       },
     })
   } finally {
