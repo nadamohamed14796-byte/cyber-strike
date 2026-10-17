@@ -158,6 +158,7 @@ test("proxy vulnerability agents can retrieve shared global research and validat
         const tester = testers[i]
         expect(tester, testerNames[i]).toBeDefined()
         expect(evalPerm(tester, "research_knowledge"), testerNames[i]).toBe("allow")
+        expect(evalPerm(tester, "false_positive_memory"), testerNames[i]).toBe("allow")
         expect(evalPerm(tester, "validate_finding"), testerNames[i]).toBe("allow")
         expect(evalPerm(tester, "correlate_javascript"), testerNames[i]).toBe("allow")
         expect(evalPerm(tester, "report_vulnerability"), testerNames[i]).toBe("allow")
