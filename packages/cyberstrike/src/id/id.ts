@@ -34,6 +34,7 @@ export namespace Identifier {
     report_knowledge: "rkn",
     report_knowledge_event: "rke",
     finding_validation: "fvl",
+    false_positive_knowledge: "fpk",
   } as const
 
   export function schema(prefix: keyof typeof prefixes) {
