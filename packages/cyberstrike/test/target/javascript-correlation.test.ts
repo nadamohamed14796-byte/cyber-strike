@@ -439,3 +439,49 @@ test("extracts more than 250 distinct captured JavaScript assets", async () => {
   expect(sources).toHaveLength(251)
   expect(sources.some((source) => source.basename === "chunk-250.js")).toBe(true)
 })
+
+
+test("deduplicates analysis by content while preserving each canonical JavaScript source URL", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const body = 'fetch("/api/profile")'
+  const cache = new Map<string, any>()
+  const sources = extractCapturedJavaScriptSources([
+    { id: "req-app", url: "https://app.example.com/assets/shared.js", responseContentType: "application/javascript", responseBody: body },
+    { id: "req-api", url: "https://api.example.com/assets/shared.js", responseContentType: "application/javascript", responseBody: body },
+    { id: "req-app-2", url: "https://app.example.com/assets/shared.js?cache=refresh", responseContentType: "application/javascript", responseBody: body },
+  ], cache)
+
+  expect(sources).toHaveLength(2)
+  const appSource = sources.find((source) => source.sourceURL === "https://app.example.com/assets/shared.js")
+  const apiSource = sources.find((source) => source.sourceURL === "https://api.example.com/assets/shared.js")
+  expect(appSource?.sha256).toBe(apiSource?.sha256)
+  expect(appSource?.sourceRequestIDs).toEqual(["req-app", "req-app-2"])
+  expect(apiSource?.sourceRequestIDs).toEqual(["req-api"])
+  expect(appSource?.relativePath).not.toBe(apiSource?.relativePath)
+  expect(appSource?.analysis).toBe(apiSource?.analysis)
+  expect(cache.size).toBe(1)
+})
+
+test("resolves relative static endpoint candidates to each observed request origin", () => {
+  const endpoints = correlateStaticJavaScriptEndpoints(
+    [{
+      relativePath: "captured/app/shared.js",
+      basename: "shared.js",
+      sha256: "same-content",
+      bytes: 10,
+      sourceURL: "https://cdn.example.com/assets/shared.js",
+      endpointLiterals: ["/api/profile"],
+    }],
+    [
+      { id: "req-app-profile", method: "GET", host: "app.example.com", url: "https://app.example.com/api/profile", normalizedPath: "/api/profile", responseStatus: 200 },
+      { id: "req-api-profile", method: "GET", host: "api.example.com", url: "https://api.example.com/api/profile", normalizedPath: "/api/profile", responseStatus: 200 },
+    ],
+    "app.example.com",
+    "https://app.example.com",
+  )
+
+  expect(endpoints).toHaveLength(2)
+  expect(endpoints.map((endpoint) => endpoint.origin).sort()).toEqual(["https://api.example.com", "https://app.example.com"])
+  expect(endpoints.find((endpoint) => endpoint.origin === "https://app.example.com")?.observedRequestIDs).toEqual(["req-app-profile"])
+  expect(endpoints.find((endpoint) => endpoint.origin === "https://api.example.com")?.observedRequestIDs).toEqual(["req-api-profile"])
+})
