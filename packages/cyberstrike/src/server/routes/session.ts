@@ -1106,7 +1106,7 @@ export const SessionRoutes = lazy(() =>
       describeRoute({
         summary: "Ingest message",
         description:
-          "Send a message as if from user input (e.g. from another port or service). Creates a new session if sessionID is missing or invalid. AI response streams into the same session and appears in TUI chat.",
+          "Accept captured HTTP requests or plain-text messages from another port or service. HTTP captures are analyzed in independent child sessions so they do not take over the parent chat window; plain-text messages are processed in the supplied session. Creates a session if sessionID is missing or invalid.",
         operationId: "session.ingest",
         responses: {
           202: {
