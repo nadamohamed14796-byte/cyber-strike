@@ -41,7 +41,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     cwe: z.string().optional().describe("CWE ID filter (for search action)"),
     category: z.string().optional().describe("Category filter (for search action)"),
     loaded: z.boolean().optional().describe("For list action: only show currently loaded skills"),
-    limit: z.number().int().min(1).max(100).default(50).describe("Maximum number of skills to return per page (1-100)"),
+    limit: z.number().int().min(1).max(50).default(25).describe("Maximum number of skills to return per page (1-50)"),
     offset: z.number().int().min(0).default(0).describe("Zero-based result offset for list/search pagination"),
     findings: z
       .array(
@@ -117,7 +117,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           }
         }
         const all = [...accessibleSkills].sort((left, right) => left.name.localeCompare(right.name))
-        const limit = Math.min(100, Math.max(1, params.limit ?? 50))
+        const limit = Math.min(50, Math.max(1, params.limit ?? 25))
         const offset = Math.max(0, params.offset ?? 0)
         const page = all.slice(offset, offset + limit)
         if (page.length === 0) {
@@ -159,7 +159,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       }
 
       if (params.action === "search") {
-        const limit = Math.min(100, Math.max(1, params.limit ?? 50))
+        const limit = Math.min(50, Math.max(1, params.limit ?? 25))
         const offset = Math.max(0, params.offset ?? 0)
         const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
         let candidates: SkillIndex.Entry[] = []
