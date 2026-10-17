@@ -25,12 +25,12 @@ const description = `Run a bounded evidence-gathering probe against a previously
 
 Before calling it, inspect the captured request/response and select a specific injection hypothesis, class, and exact input point. A parameter, header, cookie, JSON field, or reflected value alone is not evidence of a vulnerable sink. Do not run every class against every input point or use this tool as a substitute for analyzing the request.
 
-- `xss`: observes whether selected markers or tag/handler strings are reflected and how they are encoded. Reflection is not proof of browser execution.
-- `ssti`: uses fixed arithmetic markers to look for evidence of server-side template evaluation; compare against a literal baseline.
-- `cmd`: uses fixed read-only detection markers; a response difference alone is not proof of command execution.
-- `sqli`, `nosql`, `ldap`, `xpath`, `lfi`: reports limited error/behavior signals, not confirmed injection.
+- \`xss\`: observes whether selected markers or tag/handler strings are reflected and how they are encoded. Reflection is not proof of browser execution.
+- \`ssti\`: uses fixed arithmetic markers to look for evidence of server-side template evaluation; compare against a literal baseline.
+- \`cmd\`: uses fixed read-only detection markers; a response difference alone is not proof of command execution.
+- \`sqli\`, \`nosql\`, \`ldap\`, \`xpath\`, \`lfi\`: reports limited error/behavior signals, not confirmed injection.
 
-The tool checks persisted target scope before sending. If scope is missing or denied, no probes are sent. Prefer explicit `points` when multiple inputs exist; automatic enumeration is not a reason to test every field. Use the smallest relevant class/input set, preserve a baseline and safe negative control, and follow up only when a meaningful lead needs discrimination. Do not copy a reflected payload into an exploit attempt automatically. Never extract data, access unrelated users' resources, read local files, contact internal/metadata services, or trigger destructive/financial effects. Record actual observations and keep unresolved cases inconclusive.`
+The tool checks persisted target scope before sending. If scope is missing or denied, no probes are sent. Prefer explicit \`points\` when multiple inputs exist; automatic enumeration is not a reason to test every field. Use the smallest relevant class/input set, preserve a baseline and safe negative control, and follow up only when a meaningful lead needs discrimination. Do not copy a reflected payload into an exploit attempt automatically. Never extract data, access unrelated users' resources, read local files, contact internal/metadata services, or trigger destructive/financial effects. Record actual observations and keep unresolved cases inconclusive.`
 
 // Tag battery — one benign marker per tag so we can detect survival + encoding
 // without executing anything. The agent weaponizes a surviving tag afterwards.
