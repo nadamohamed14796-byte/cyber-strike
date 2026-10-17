@@ -160,6 +160,45 @@ DYNAMIC_SKILL_ALIAS_REGRESSION_MARKER
     }
   })
 
+  test("unload resolves the same directory aliases accepted by load", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillDir = path.join(dir, ".cyberstrike", "skill", "wstg-authz-04")
+        await Bun.write(
+          path.join(skillDir, "SKILL.md"),
+          `---
+name: readable-authorization-guide
+description: Skill available through a directory alias.
+---
+
+# Authorization methodology
+`,
+        )
+      },
+    })
+
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
+          await tool.execute({ action: "load", name: "wstg-authz-04" }, ctx)
+          expect(SkillContext.isLoaded("readable-authorization-guide")).toBe(true)
+          const result = await tool.execute({ action: "unload", name: "wstg-authz-04" }, ctx)
+          expect(result.title).toBe("Unloaded: readable-authorization-guide")
+          expect(SkillContext.isLoaded("readable-authorization-guide")).toBe(false)
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("skill caches refresh after an instance is disposed and recreated at the same path", async () => {
     await using tmp = await tmpdir({
       git: true,

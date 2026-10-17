@@ -119,12 +119,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (params.action === "unload") {
         if (!params.name) throw new Error("Skill name required for unload action")
-        const removed = SkillContext.unload(params.name)
+        const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
+        const removed = SkillContext.unload(canonicalName)
         return {
-          title: removed ? `Unloaded: ${params.name}` : `Not loaded: ${params.name}`,
+          title: removed ? `Unloaded: ${canonicalName}` : `Not loaded: ${canonicalName}`,
           output: removed
-            ? `Skill "${params.name}" removed from context. Active tokens: ${SkillContext.tokenCount()}`
-            : `Skill "${params.name}" was not in context.`,
+            ? `Skill "${canonicalName}" removed from context. Active tokens: ${SkillContext.tokenCount()}`
+            : `Skill "${canonicalName}" was not in context.`,
           metadata: {} as { name?: string; dir?: string },
         }
       }
