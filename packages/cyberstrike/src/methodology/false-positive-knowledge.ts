@@ -61,7 +61,7 @@ function normalizeEndpoint(value?: string | null) {
 /** Store concise sanitized patterns, never raw HTTP requests, cookies, tokens, or PoCs. */
 function safeText(value: string, max = 1200) {
   return value
-    .replace(/\b(authorization|cookie|set-cookie|x-api-key|access_token|refresh_token|password|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=[REDACTED]")
+    .replace(/\b(authorization|cookie|set-cookie|x-api-key|access_token|refresh_token|password|secret)\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/gi, "$1=[REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}\b/g, "[JWT REDACTED]")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
