@@ -149,6 +149,23 @@ test("false positive requires multiple evidence-backed contradictions and explai
   expect(result.output).toContain("#3")
 })
 
+test("uncertainty register is shown before the final verdict and explains missing evidence", () => {
+  const checks = checklist({
+    security_impact: {
+      status: "unknown",
+      reason: "Impact has not been demonstrated in a controlled test.",
+      evidence: "",
+    },
+  })
+  const result = assessFindingChecks(checks)
+  expect(result.verdict).toBe("inconclusive")
+  expect(result.output).toContain("Uncertainty / missing-evidence register (review before verdict):")
+  expect(result.output).toContain("#4 [security_impact]")
+  expect(result.output).toContain("Impact has not been demonstrated in a controlled test.")
+  expect(result.output).toContain("Missing evidence: no sufficient observation was supplied.")
+  expect(result.output.indexOf("Uncertainty / missing-evidence register")).toBeLessThan(result.output.indexOf("Final verdict:"))
+  expect(result.output).toContain("Final verdict: inconclusive")
+})
 test("missing failure evidence is rejected and unknown checks remain inconclusive", () => {
   const invalid = checklist({
     reproducible: { status: "fail", reason: "Could not reproduce", evidence: "" },
