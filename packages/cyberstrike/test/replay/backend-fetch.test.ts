@@ -8,6 +8,7 @@ let crossServer: ReturnType<typeof Bun.serve>
 let origin: string
 let crossOrigin: string
 let crossOriginHits = 0
+let restrictedPathHits = 0
 
 // Echo server: reflects method, path, and raw body so we can assert exactly what
 // landed on the wire. /slow delays; /big streams a large body.
@@ -31,6 +32,13 @@ beforeAll(() => {
       }
       if (url.pathname === "/redirect-cross") {
         return new Response(null, { status: 302, headers: { location: `${crossOrigin}/secret` } })
+      }
+      if (url.pathname === "/redirect-path") {
+        return new Response(null, { status: 302, headers: { location: "/restricted" } })
+      }
+      if (url.pathname === "/restricted") {
+        restrictedPathHits++
+        return new Response("restricted path reached")
       }
       if (url.pathname === "/slow") {
         await Bun.sleep(300)
@@ -105,15 +113,37 @@ describe("BackendFetch.send", () => {
   })
 
 
-  test("follows same-origin redirects when explicitly enabled", async () => {
+  test("follows same-origin redirects only when caller authorizes the exact destination", async () => {
     const r = await BackendFetch.send(reqLine("GET /redirect-same HTTP/1.1"), {
       origin,
       followRedirects: true,
+      redirectScopeCheck: async (url) => url === `${origin}/hello`,
     })
     expect(r.error).toBeUndefined()
     expect(r.response?.status).toBe(200)
     const echoed = JSON.parse(new TextDecoder().decode(r.response!.body))
     expect(echoed.path).toBe("/hello")
+  })
+
+  test("does not follow a same-origin redirect when persisted scope rejects its path", async () => {
+    restrictedPathHits = 0
+    const r = await BackendFetch.send(reqLine("GET /redirect-path HTTP/1.1"), {
+      origin,
+      followRedirects: true,
+      redirectScopeCheck: async () => false,
+    })
+    expect(r.error).toBeUndefined()
+    expect(r.response?.status).toBe(302)
+    expect(restrictedPathHits).toBe(0)
+  })
+
+  test("does not follow redirects when no scope callback is supplied", async () => {
+    const r = await BackendFetch.send(reqLine("GET /redirect-same HTTP/1.1"), {
+      origin,
+      followRedirects: true,
+    })
+    expect(r.error).toBeUndefined()
+    expect(r.response?.status).toBe(302)
   })
 
   test("does not follow a redirect to a different origin even when enabled", async () => {
