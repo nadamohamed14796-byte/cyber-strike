@@ -31,6 +31,10 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       } catch {
         return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
       }
+      if ((candidateURL.protocol !== "http:" && candidateURL.protocol !== "https:") ||
+          candidateURL.username || candidateURL.password || scopeURL.username || scopeURL.password) {
+        return { matches: false, reason: "HackerOne URL asset and target must be credential-free HTTP(S) URLs" }
+      }
       const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
       const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
       return candidateURL.hostname.toLowerCase() === scopeURL.hostname.toLowerCase() &&
