@@ -462,12 +462,12 @@ export function mergeStructuredJavaScriptEndpoints(
       byKey.set(key, endpoint)
     }
     if (!endpoint.sourceFiles.includes(request.sourceFile)) endpoint.sourceFiles.push(request.sourceFile)
-    endpoint.pathParameters = unique([...endpoint.pathParameters ?? [], ...request.pathParameters])
-    endpoint.queryParameters = unique([...endpoint.queryParameters ?? [], ...request.queryParameters])
-    endpoint.bodyParameters = unique([...endpoint.bodyParameters ?? [], ...request.bodyParameters])
-    endpoint.headerNames = unique([...endpoint.headerNames ?? [], ...request.headerNames])
-    endpoint.authSignals = unique([...endpoint.authSignals ?? [], ...request.authSignals])
-    endpoint.cookieSignals = unique([...endpoint.cookieSignals ?? [], ...request.cookieSignals])
+    endpoint.pathParameters = unique([...(endpoint.pathParameters ?? []), ...request.pathParameters])
+    endpoint.queryParameters = unique([...(endpoint.queryParameters ?? []), ...request.queryParameters])
+    endpoint.bodyParameters = unique([...(endpoint.bodyParameters ?? []), ...request.bodyParameters])
+    endpoint.headerNames = unique([...(endpoint.headerNames ?? []), ...request.headerNames])
+    endpoint.authSignals = unique([...(endpoint.authSignals ?? []), ...request.authSignals])
+    endpoint.cookieSignals = unique([...(endpoint.cookieSignals ?? []), ...request.cookieSignals])
     endpoint.observedRequestIDs = unique([...endpoint.observedRequestIDs, ...request.observedRequestIDs])
     if (endpoint.observedRequestIDs.length) {
       endpoint.observedInTraffic = true
@@ -1247,6 +1247,7 @@ export namespace JavaScriptCorrelation {
     graph.endpointCandidates = mergeStructuredJavaScriptEndpoints(
       correlateStaticJavaScriptEndpoints(graph.sourceFiles, graph.requests, targetURL.hostname),
       graph.javascriptAnalysis.requestCandidates,
+      graph.requests,
     )
     for (const endpoint of graph.endpointCandidates) {
       for (const sourceFile of endpoint.sourceFiles) {
