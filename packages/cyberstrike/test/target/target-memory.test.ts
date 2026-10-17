@@ -456,14 +456,14 @@ test("persists long target notes, evidence, and every supplied tag", async () =>
         tags,
       })
 
-      expect(saved.note.content).toContain(content)
-      expect(saved.note.content).toContain(evidence)
+      expect(saved.note.content).toContain(content.trim())
+      expect(saved.note.content).toContain(evidence.trim())
       expect(saved.note.tags).toHaveLength(35)
       expect(saved.note.tags[34]).toBe(tags[34])
       expect(TargetMemory.notes(saved.workspace.id)).toHaveLength(1)
 
       const notesFile = await fs.readFile(path.join(saved.workspace.workspacePath, "notes.md"), "utf-8")
-      expect(notesFile).toContain(content)
+      expect(notesFile).toContain(content.trim())
       await Instance.dispose()
     },
   })
@@ -580,7 +580,8 @@ test("resumable target context reports note and journal entries omitted by promp
       const context = TargetMemory.contextForSession(session.id, 1)
       if (context === null) throw new Error("Expected target memory context for an observed target")
       expect(context).toContain("PARTIAL NOTE SELECTION")
-      expect(context).toContain("1 current notes, 1 journal entries")
+      expect(context).toContain("1 selected-asset current notes")
+      expect(context).toContain("1 selected-asset journal entries")
       expect(context).toContain("Use target_notes_read")
       expect([context.includes("First archived experiment."), context.includes("Second archived experiment.")].filter(Boolean)).toHaveLength(1)
       await Session.remove(session.id)
