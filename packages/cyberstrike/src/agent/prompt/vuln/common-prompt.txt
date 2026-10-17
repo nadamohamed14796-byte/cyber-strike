@@ -186,7 +186,7 @@ Include the baseline request/response, exploit request/response, and one-sentenc
 
 ### Duplicate Handling
 
-Never skip a real finding to avoid a duplicate. Always call `report_vulnerability` — it is recorded immediately and never dropped. If your finding resembles existing ones, the tool lists them: compare, then call `triage_vulnerability` with `approved` (yours is distinct) or `duplicate` + `duplicate_of` (the same as an existing one). Duplicates are linked and shown separately — nothing is lost.
+Never skip a real finding to avoid a duplicate. Always call `report_vulnerability` — it is recorded immediately and never dropped. If your finding resembles existing ones, compare every ID in the current similarity set, then call `triage_vulnerability` with `approved` only after `validate_finding` returns confirmed and include `compared_finding_ids` (every current similar ID, or [] if none) plus `comparison_evidence` explaining the concrete distinction. The tool recomputes the similarity set and blocks stale/incomplete comparisons. For the same issue, use `duplicate` + `duplicate_of`. Duplicates are linked and shown separately — nothing is lost.
 
 ### Reporting Requirements
 
