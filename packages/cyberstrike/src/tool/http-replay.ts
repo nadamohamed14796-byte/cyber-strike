@@ -217,7 +217,7 @@ function curlTemplate(msg: HttpMessage.Request, origin: string): string {
 
 function summarize(result: ReplayResponse.Result, marker?: string): Record<string, unknown> {
   if (result.error) {
-    return { sent: true, error: result.error, timing: result.timing, attempts: (result as Send.Result).attempts }
+    return { sent: true, error: { ...result.error, message: redactSensitiveText(result.error.message) }, timing: result.timing, attempts: (result as Send.Result).attempts }
   }
   const res = result.response!
   const bodyText = new TextDecoder("latin1").decode(res.body)
@@ -700,14 +700,17 @@ export const HttpReplayTool = Tool.define("http_replay", {
       const results = await Batch.run(
         sweep.values,
         async (value) => {
+          const sensitiveMutation = /(?:authorization|cookie|token|secret|password|api[-_]?key|session|csrf|credential)/i.test(sweep.mutation.name ?? "")
+            || /\\bBearer\\s+|\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b/i.test(value)
+            || /(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|session(?:id)?|authorization)\\s*[:=]/i.test(value)
+          const safeValue = sensitiveMutation ? "[REDACTED]" : redactSensitiveText(value)
           try {
             const mut = { ...sweep.mutation, value } as Apply.Mutation
             const varMsg = Apply.mutations(sharedMsg, [mut])
             const result = await sendGoverned(varMsg, origin, sendOpts)
-            const sensitiveMutation = /(?:authorization|cookie|token|secret|password|api[-_]?key|session|csrf|credential)/i.test(sweep.mutation.name ?? "")
-            return { value: sensitiveMutation ? "[REDACTED]" : redactSensitiveText(value), ...summarize(result, params.marker) }
+            return { value: safeValue, ...summarize(result, params.marker) }
           } catch (e) {
-            return { value, error: e instanceof Error ? e.message : String(e) }
+            return { value: safeValue, error: redactSensitiveText(e instanceof Error ? e.message : String(e)) }
           }
         },
         { concurrency: 3 },
