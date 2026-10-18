@@ -19,7 +19,7 @@ const RecordAction = z.object({
   variant_key: z.string().min(1).describe("Meaningful context/input variant; identical strategy+variant retries do not count."),
   rationale: z.string().min(1).describe("Why this is the next most informative test based on previous results."),
   result_summary: z.string().min(1).describe("What actually happened; never write a guessed result."),
-  evidence_ref: z.string().optional().describe("Reference to stored request/response, artifact, or reproducible evidence."),
+  evidence_ref: z.string().optional().describe("Reference to stored request/response, artifact, or reproducible evidence. Required when valid_conditions=true; otherwise the attempt cannot count toward the 20-attempt gate."),
   valid_conditions: z.boolean().describe("True only when prerequisites, identity/session, scope, and test setup were valid."),
   decisive_result: z.enum(["none", "confirmed", "disproven"]).optional().default("none"),
   blocked_reason: z.string().optional(),
@@ -42,7 +42,7 @@ type VerificationAttemptMetadata = {
 
 export const VerificationAttemptTool = Tool.define<typeof Parameters, VerificationAttemptMetadata>("verification_attempt", {
   description:
-    "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. Up to 20 distinct strategy_id + variant_key combinations per hypothesis; only attempts with valid_conditions=true count toward the false-positive budget, and duplicate retries do not consume it. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, WAF response, or exhausted budget alone NEVER proves false positive. Confirmation may stop early with decisive evidence_ref. A DISPROVEN/false-positive outcome requires 20 distinct valid attempts plus direct contradictory evidence_ref; earlier disproof signals remain INCONCLUSIVE. If unresolved at 20, status is INCONCLUSIVE/NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
+    "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. Up to 20 distinct strategy_id + variant_key combinations per hypothesis; only attempts with valid_conditions=true AND a durable evidence_ref count toward the false-positive budget; missing evidence references are rejected for valid attempts, and duplicate retries do not consume the budget. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, WAF response, or exhausted budget alone NEVER proves false positive. Confirmation may stop early with decisive evidence_ref. A DISPROVEN/false-positive outcome requires 20 distinct valid attempts plus direct contradictory evidence_ref; earlier disproof signals remain INCONCLUSIVE. If unresolved at 20, status is INCONCLUSIVE/NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
   parameters: Parameters,
   async execute(params, ctx) {
     const sessionID = Session.root(ctx.sessionID)
