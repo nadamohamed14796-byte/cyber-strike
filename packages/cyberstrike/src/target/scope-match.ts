@@ -28,8 +28,9 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       let candidateURL: URL
       let scopeURL: URL
       try {
-        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL("https://" + value)
-        scopeURL = new URL("https://" + identifier)
+        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
+        const urlIdentifier = rawScope.replace(/^[^:]+:[ \t]*/, "").trim()
+        scopeURL = new URL("https://" + urlIdentifier)
       } catch {
         return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
       }
@@ -115,8 +116,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     let candidateURL: URL
     let scopeURL: URL
     try {
-        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? new URL(value) : new URL("https://" + value)
-        scopeURL = new URL(allowed)
+        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
+        scopeURL = new URL(rawScope)
     } catch {
       return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
     }
