@@ -88,8 +88,8 @@ describe("Methodology phase skill routing", () => {
   })
 
 
-  test("recon phases route to security agents, not the codebase-only explore agent", () => {
-    for (const phaseId of ["passive_recon", "active_recon"] as const) {
+  test("scope and recon phases route to security agents, not the codebase-only explore agent", () => {
+    for (const phaseId of ["scope_analysis", "passive_recon", "active_recon"] as const) {
       const agents = Phase.get(phaseId)?.agents ?? []
       expect(agents).toContain("cyberstrike")
       expect(agents).toContain("web-application")
