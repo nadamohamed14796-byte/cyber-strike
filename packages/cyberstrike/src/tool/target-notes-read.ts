@@ -31,13 +31,13 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
   parameters: TargetNotesReadParameters,
   async execute(params: z.input<typeof TargetNotesReadParameters>, ctx) {
     const options = {
-      offset: options.offset ?? 0,
-      page_size: options.page_size ?? 3,
-      content_offset: options.content_offset ?? 0,
-      content_length: options.content_length ?? 3000,
-      include_history: options.include_history ?? false,
-      revision_offset: options.revision_offset ?? 0,
-      revision_page_size: options.revision_page_size ?? 2,
+      offset: params.offset ?? 0,
+      page_size: params.page_size ?? 3,
+      content_offset: params.content_offset ?? 0,
+      content_length: params.content_length ?? 3000,
+      include_history: params.include_history ?? false,
+      revision_offset: params.revision_offset ?? 0,
+      revision_page_size: params.revision_page_size ?? 2,
     }
     try {
       const sessionID = Session.root(ctx.sessionID)
