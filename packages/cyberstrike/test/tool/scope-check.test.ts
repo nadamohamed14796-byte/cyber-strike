@@ -20,6 +20,8 @@ describe("scope_check IPv4 CIDR matching", () => {
     expect(checkMatch("https://example.com/API/users", "https://example.com/API/*").matches).toBe(true)
     expect(checkMatch("https://example.com/api/users", "url: example.com/API/*").matches).toBe(false)
     expect(checkMatch("https://example.com/API/users", "url: example.com/API/*").matches).toBe(true)
+    expect(checkMatch("https://example.com/API/users/1", "url: example.com/API/*").matches).toBe(true)
+    expect(checkMatch("https://example.com/APIx/users", "url: example.com/API/*").matches).toBe(false)
     expect(checkMatch("http://example.com/api/users", "https://example.com/api/*").matches).toBe(false)
     expect(checkMatch("https://example.com:8443/api/users", "https://example.com/api/*").matches).toBe(false)
     expect(checkMatch("https://example.com/api/users", "https://example.com:8443/api/*").matches).toBe(false)
