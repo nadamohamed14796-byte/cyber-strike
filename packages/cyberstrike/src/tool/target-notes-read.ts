@@ -30,6 +30,15 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
   ].join("\n"),
   parameters: TargetNotesReadParameters,
   async execute(params: z.input<typeof TargetNotesReadParameters>, ctx) {
+    const options = {
+      offset: options.offset ?? 0,
+      page_size: options.page_size ?? 3,
+      content_offset: options.content_offset ?? 0,
+      content_length: options.content_length ?? 3000,
+      include_history: options.include_history ?? false,
+      revision_offset: options.revision_offset ?? 0,
+      revision_page_size: options.revision_page_size ?? 2,
+    }
     try {
       const sessionID = Session.root(ctx.sessionID)
       const workspace = await TargetMemory.get(params.target_url)
@@ -52,7 +61,7 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
             .includes(query),
         )
       }
-      const revisions = params.include_history
+      const revisions = options.include_history
         ? TargetMemory.noteRevisions(workspace.id, params.note_id)
             .filter((revision) => !params.revision_id || revision.id === params.revision_id)
             .filter((revision) => !params.kind || revision.kind === params.kind)
@@ -67,14 +76,14 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
             })
         : []
       const totalRevisions = revisions.length
-      const revisionOffset = Math.min(params.revision_offset, totalRevisions)
-      const revisionPage = revisions.slice(revisionOffset, revisionOffset + params.revision_page_size)
+      const revisionOffset = Math.min(options.revision_offset, totalRevisions)
+      const revisionPage = revisions.slice(revisionOffset, revisionOffset + options.revision_page_size)
       const hasMoreRevisions = revisionOffset + revisionPage.length < totalRevisions
       const revisionChunks = revisionPage.map((revision) => {
-        const start = Math.min(params.content_offset, revision.content.length)
-        const end = params.content_length === undefined
+        const start = Math.min(options.content_offset, revision.content.length)
+        const end = options.content_length === undefined
           ? revision.content.length
-          : Math.min(revision.content.length, start + params.content_length)
+          : Math.min(revision.content.length, start + options.content_length)
         return [
           "REVISION " + revision.id,
           "Current note ID: " + revision.noteID,
@@ -91,13 +100,13 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
         ].join("\n")
       })
       const totalMatches = notes.length
-      const offset = Math.min(params.offset, totalMatches)
-      const page = notes.slice(offset, offset + params.page_size)
+      const offset = Math.min(options.offset, totalMatches)
+      const page = notes.slice(offset, offset + options.page_size)
       const chunks = page.map((note) => {
-        const start = Math.min(params.content_offset, note.content.length)
-        const end = params.content_length === undefined
+        const start = Math.min(options.content_offset, note.content.length)
+        const end = options.content_length === undefined
           ? note.content.length
-          : Math.min(note.content.length, start + params.content_length)
+          : Math.min(note.content.length, start + options.content_length)
         return [
           "NOTE " + note.id,
           "Title: " + (note.title ?? "(untitled)"),
@@ -124,7 +133,7 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
           "Returned notes: " + page.length + " (offset " + offset + ")",
           "has_more_notes: " + hasMoreNotes,
           ...(hasMoreNotes ? ["next_offset: " + nextOffset] : []),
-          ...(params.include_history ? [
+          ...(options.include_history ? [
             "",
             "Archived note versions matched: " + totalRevisions,
             "Returned revisions: " + revisionPage.length + " (offset " + revisionOffset + ")",
@@ -133,7 +142,7 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
           ] : []),
           "",
           ...(chunks.length ? chunks : ["No current notes match these filters."]),
-          ...(params.include_history ? ["", "## Archived revisions", ...(revisionChunks.length ? revisionChunks : ["No archived versions match these filters."])] : []),
+          ...(options.include_history ? ["", "## Archived revisions", ...(revisionChunks.length ? revisionChunks : ["No archived versions match these filters."])] : []),
         ].join("\n"),
         metadata: {
           found: true,
@@ -143,11 +152,11 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
           offset,
           next_offset: hasMoreNotes ? nextOffset : null,
           has_more_notes: hasMoreNotes,
-          total_revisions: params.include_history ? totalRevisions : undefined,
-          returned_revisions: params.include_history ? revisionPage.length : undefined,
-          revision_offset: params.include_history ? revisionOffset : undefined,
-          next_revision_offset: params.include_history && hasMoreRevisions ? revisionOffset + revisionPage.length : null,
-          has_more_revisions: params.include_history ? hasMoreRevisions : false,
+          total_revisions: options.include_history ? totalRevisions : undefined,
+          returned_revisions: options.include_history ? revisionPage.length : undefined,
+          revision_offset: options.include_history ? revisionOffset : undefined,
+          next_revision_offset: options.include_history && hasMoreRevisions ? revisionOffset + revisionPage.length : null,
+          has_more_revisions: options.include_history ? hasMoreRevisions : false,
         },
       }
     } catch (error) {
