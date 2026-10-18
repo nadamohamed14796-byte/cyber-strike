@@ -4,7 +4,6 @@ import { RequestTable, WebCredentialTable } from "../session/session.sql"
 import { lookup } from "node:dns/promises"
 import { isIP } from "node:net"
 
-const MAX_DOCUMENT_BYTES = 1_500_000
 const MAX_REDIRECTS = 5
 const REQUEST_TIMEOUT_MS = 20_000
 const MAX_TOTAL_FETCH_MS = 120_000
@@ -254,7 +253,7 @@ function hostAllowed(url: URL, source: ResearchSource) {
   )
 }
 
-async function readBoundedText(body: ReadableStream<Uint8Array> | null) {
+async function readResearchText(body: ReadableStream<Uint8Array> | null) {
   if (!body) return ""
 
   const reader = body.getReader()
@@ -265,10 +264,6 @@ async function readBoundedText(body: ReadableStream<Uint8Array> | null) {
       const next = await reader.read()
       if (next.done) break
       size += next.value.byteLength
-      if (size > MAX_DOCUMENT_BYTES) {
-        await reader.cancel().catch(() => undefined)
-        throw new NonRetryableResearchError("research document too large")
-      }
       chunks.push(next.value)
     }
   } finally {
@@ -289,8 +284,8 @@ async function readBoundedText(body: ReadableStream<Uint8Array> | null) {
  *
  * Redirects are followed manually so a trusted source cannot redirect the
  * crawler to an unrelated host, a plaintext endpoint, or a local service.
- * Response bodies are size-limited while streaming, before they can consume
- * unbounded memory.
+ * The complete response body is read; discovery/study pagination applies to
+ * the corpus and tool output, not an arbitrary per-document byte ceiling.
  */
 export async function fetchResearchText(url: string, source: ResearchSource, resolveHost: ResearchLookup = defaultResearchLookup, sessionIDs: readonly string[] = []) {
   const initial = new URL(url)
@@ -372,13 +367,7 @@ export async function fetchResearchText(url: string, source: ResearchSource, res
             await response.body?.cancel().catch(() => undefined)
             throw new NonRetryableResearchError("unsupported content type: " + contentType)
           }
-          const length = Number(response.headers.get("content-length") ?? 0)
-          if (length > MAX_DOCUMENT_BYTES) {
-            await response.body?.cancel().catch(() => undefined)
-            throw new NonRetryableResearchError("research document too large")
-          }
-
-          return await readBoundedText(response.body)
+          return await readResearchText(response.body)
         } finally {
           clearTimeout(timer)
         }
