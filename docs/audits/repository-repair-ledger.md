@@ -627,3 +627,19 @@ Commits:
 
 - Run the new safe-fetch tests and the full package test/typecheck/build against the latest `main` commit; no CI status or workflow run is currently exposed for these direct-to-main commits.
 - Continue the runtime wiring audit of skill selection/loading, JavaScript analysis and endpoint/parameter retention, note-history persistence, and finding/false-positive evidence gates. No completion claim is made for these areas merely because the related source files were inspected.
+## Follow-up checkpoint — 2026-10-18 06:30 UTC: structured skill invocation
+
+### Prompt/runtime contract correction
+
+- Updated `packages/cyberstrike/src/agent/prompt/cyberstrike.txt`, `web-application.txt`, `mobile-application.txt`, `cloud-security.txt`, and `internal-network.txt` to use the actual `skill` tool schema (`action`, `tech` array, `cwe`, `category`, exact `name`) instead of shell-style examples such as `skill search --tech ...` and unsupported `--tag` syntax.
+- The CyberStrike and web-application prompts now state that a skill is loaded only when the tool returns `<skill_content>`, that search results are not proof of a successful load, and that a failed load must be retried through exact-name search or recorded as unavailable rather than treated as applied guidance.
+- Re-fetched the five prompt files from GitHub after edits; a source scan found no remaining shell-style `skill search --tech` / `--tag` examples in those prompt files.
+
+Relevant commits:
+- [5e8d0bf](https://github.com/nadamohamed14796-byte/cyber-strike/commit/5e8d0bfd2d9d02e0ed2c37eaa436bdf50101360a), [5d73b7f](https://github.com/nadamohamed14796-byte/cyber-strike/commit/5d73b7f2d2032619581ea1d0b25d62e25e0b7edc), [c9f11a9](https://github.com/nadamohamed14796-byte/cyber-strike/commit/c9f11a9790faf2c9949224423159eec301864a1b)
+- [fd76af9](https://github.com/nadamohamed14796-byte/cyber-strike/commit/fd76af9719d5d7ef04918fcbcfa80898c2ac8904), [c652290](https://github.com/nadamohamed14796-byte/cyber-strike/commit/c652290d39d05e641b68f8a7aa813bbbe310161e), [2e4d563](https://github.com/nadamohamed14796-byte/cyber-strike/commit/2e4d563aaa7e36101091223d0cb0fefb81ac89ab), [c5a8d01](https://github.com/nadamohamed14796-byte/cyber-strike/commit/c5a8d01fda1cbecf82ed3f2e1f27d0048c5fbcb8)
+
+### Verification boundary
+
+- This corrects prompt examples and tool-call guidance only; it does not prove the model will always select the right skill or that skill registry/index/permission loading succeeds at runtime. Regression tests, package typecheck/build, and end-to-end specialist dispatch remain unexecuted here.
+- The research destination allowlist correction and tests are also committed (see the 2026-10-18 03:45 UTC checkpoint); neither those tests nor the broader suite has been run in this environment.
