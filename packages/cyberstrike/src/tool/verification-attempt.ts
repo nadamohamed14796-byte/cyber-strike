@@ -53,12 +53,12 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
       const last = attempts[attempts.length - 1]
       const outcome = last?.outcome ?? "inconclusive"
       const lines = attempts.map((a, i) =>
-        `${i + 1}. [${a.strategyID} / ${a.variantKey}] valid=${a.validConditions} — why: ${a.rationale} — result: ${a.resultSummary}${a.evidenceRef ? ` (evidence: ${a.evidenceRef})` : ""}`,
+        `${i + 1}. [${redactTargetNoteSecrets(a.strategyID)} / ${redactTargetNoteSecrets(a.variantKey)}] valid=${a.validConditions} — why: ${redactTargetNoteSecrets(a.rationale)} — result: ${redactTargetNoteSecrets(a.resultSummary)}${a.evidenceRef ? ` (evidence: ${redactTargetNoteSecrets(a.evidenceRef)})` : ""}`,
       )
       return {
         title: `Verification: ${attemptsUsed}/${Policy.MAX_ATTEMPTS} valid attempts — ${outcome.toUpperCase()}`,
         output: attempts.length
-          ? `Hypothesis: ${params.hypothesis_key}\nOutcome: ${outcome}\nValid attempts used: ${attemptsUsed}/${Policy.MAX_ATTEMPTS}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}${attemptsUsed >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nValid-attempt budget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
+          ? `Hypothesis: ${redactTargetNoteSecrets(params.hypothesis_key)}\nOutcome: ${outcome}\nValid attempts used: ${attemptsUsed}/${Policy.MAX_ATTEMPTS}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}${attemptsUsed >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nValid-attempt budget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
           : `No verification attempts recorded for hypothesis ${params.hypothesis_key}.`,
         metadata: {
           hypothesisKey: params.hypothesis_key,
@@ -99,7 +99,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
     return {
       title: `Verification ${d.attemptsUsed}/${Policy.MAX_ATTEMPTS}: ${status}`,
       output: [
-        `Hypothesis: ${params.hypothesis_key}`,
+        `Hypothesis: ${redactTargetNoteSecrets(params.hypothesis_key)}`,
         `Outcome: ${status}`,
         `Attempts used: ${d.attemptsUsed}/${Policy.MAX_ATTEMPTS}`,
         `Remaining: ${d.remainingAttempts}`,
