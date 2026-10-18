@@ -6,6 +6,7 @@ const attempt = (strategyID: string, variantKey: string, validConditions = true)
   variantKey,
   rationale: "Test a distinct hypothesis path",
   resultSummary: "No decisive signal observed",
+  evidenceRef: validConditions ? "evidence://observed/" + strategyID + "/" + variantKey : undefined,
   validConditions,
 })
 
@@ -34,6 +35,18 @@ describe("VerificationAttempts", () => {
       strategyID: "idor.owner-check",
       variantKey: "account-b",
     })).toBe(true)
+  })
+
+  test("valid conditions without a durable evidence reference do not consume the budget", () => {
+    const attempts = Array.from({ length: 20 }, (_, i) => ({
+      ...attempt("unreferenced-" + i, "v1"),
+      evidenceRef: undefined,
+    }))
+    const result = VA.decide({ attempts })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.attemptsUsed).toBe(0)
+    expect(result.remainingAttempts).toBe(20)
+    expect(VA.canRunAttempt(attempts, { strategyID: "new-evidence-backed", variantKey: "v1" })).toBe(true)
   })
 
   test("budget exhaustion is inconclusive, never automatic false positive", () => {
