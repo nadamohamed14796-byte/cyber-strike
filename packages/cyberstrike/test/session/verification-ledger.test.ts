@@ -30,7 +30,7 @@ describe("VerificationLedger terminal outcomes", () => {
           asset: "https://example.test",
           endpoint: "/api/profile",
           vulnerabilityClass: "idor",
-          attempt: attempt("valid-but-unreferenced", undefined, true),
+          attempt: attempt("valid-but-unreferenced", "", true),
         })).toThrow(/valid verification attempt requires evidence_ref/i)
         expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: "missing-evidence-hypothesis" })).toHaveLength(0)
         await Instance.dispose()
