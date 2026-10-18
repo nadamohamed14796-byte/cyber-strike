@@ -18,6 +18,60 @@ function attempt(strategyID: string, evidenceRef: string | undefined = undefined
 }
 
 describe("VerificationLedger terminal outcomes", () => {
+  test("a valid attempt cannot be recorded without a durable evidence reference", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.createNext({ directory: tmp.path, title: "verification-ledger-missing-evidence-test" })
+        expect(() => VerificationLedger.record({
+          sessionID: session.id,
+          hypothesisKey: "missing-evidence-hypothesis",
+          asset: "https://example.test",
+          endpoint: "/api/profile",
+          vulnerabilityClass: "idor",
+          attempt: attempt("valid-but-unreferenced", undefined, true),
+        })).toThrow(/valid verification attempt requires evidence_ref/i)
+        expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: "missing-evidence-hypothesis" })).toHaveLength(0)
+        await Instance.dispose()
+      },
+    })
+  })
+
+  test("legacy rows without evidence references do not count as valid attempts", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const session = await Session.createNext({ directory: tmp.path, title: "verification-ledger-legacy-evidence-test" })
+        const common = {
+          sessionID: session.id,
+          hypothesisKey: "legacy-missing-evidence",
+          asset: "https://example.test",
+          endpoint: "/api/profile",
+          vulnerabilityClass: "idor",
+        }
+        VerificationLedger.record({
+          ...common,
+          attempt: attempt("legacy-without-evidence", undefined, false),
+        })
+        Database.use((db) => db.update(VerificationAttemptTable).set({
+          valid_conditions: 1,
+          evidence_ref: null,
+        }).where(and(
+          eq(VerificationAttemptTable.session_id, session.id),
+          eq(VerificationAttemptTable.hypothesis_key, common.hypothesisKey),
+        )).run())
+        const [legacy] = VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
+        expect(legacy?.validConditions).toBe(false)
+        expect(VerificationLedger.record({
+          ...common,
+          attempt: attempt("new-evidence-backed-attempt", "evidence://new-attempt"),
+        }).decision.attemptsUsed).toBe(1)
+        await Instance.dispose()
+      },
+    })
+  })
   test("invalid attempts do not exhaust the budget before valid attempts can run", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
