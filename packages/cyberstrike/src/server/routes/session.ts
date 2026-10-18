@@ -1479,9 +1479,9 @@ export const SessionRoutes = lazy(() =>
                   after: IngestSummary.snapshot(sessionID),
                 })
 
-                // Persist a compact target-local evidence note for every captured request,
-                // not only JavaScript responses. The full request remains in SQLite; notes
-                // contain stable IDs, parameter names and response metadata, never raw secrets.
+                // Persist a target-local evidence artifact for every captured request.
+                // This private artifact preserves the exact captured request for reproduction;
+                // shared/exported evidence must be separately redacted before leaving the workspace.
                 if (normalized.origin) {
                   try {
                     const observedURL = new URL(normalized.normalizedPath, normalized.origin)
@@ -1501,7 +1501,7 @@ export const SessionRoutes = lazy(() =>
                             origin: observedURL.origin,
                             path: observedURL.pathname,
                             queryParameterNames: queryNames,
-                            redactedRawRequest: redactTargetNoteSecrets(truncatedRawRequest),
+                            rawRequest: truncatedRawRequest,
                           },
                           response: {
                             status: req.response_status ?? null,
@@ -1514,7 +1514,7 @@ export const SessionRoutes = lazy(() =>
                               processedResponse: req.processed_response,
                             }),
                           },
-                          evidencePolicy: "Redacted workspace copy for navigation; the canonical captured request remains in SQLite for request-detail/replay tooling.",
+                          evidencePolicy: "Private target-local original preserving exact request values for authorized reproduction. Create a separate redacted copy before sharing, reporting publicly, or sending to an external service.",
                         }, null, 2) + "\n")
                       } catch (error) {
                         log.warn("request artifact persistence failed", {
