@@ -152,17 +152,16 @@ export namespace FalsePositiveKnowledge {
   }
 
   /** Return advisory matches only. A historical false positive never auto-rejects a new finding. */
-  export function similar(input: { title: string; description: string; endpoint?: string | null; limit?: number }) {
+  export function similar(input: { title: string; description: string; endpoint?: string | null; offset?: number; pageSize?: number }) {
     const vulnerabilityClass = classify([input.title, input.description].join(" "))
     const titlePattern = normalizeTitle(input.title)
     const endpointPattern = normalizeEndpoint(input.endpoint)
     const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable)
       .where(and(eq(FalsePositiveKnowledgeTable.vulnerability_class, vulnerabilityClass), or(eq(FalsePositiveKnowledgeTable.active, 1), isNull(FalsePositiveKnowledgeTable.active))))
       .orderBy(desc(FalsePositiveKnowledgeTable.time_updated))
-      .limit(100)
       .all())
     const words = new Set(titlePattern.split(" ").filter((word) => word.length >= 4 && !["with", "from", "that", "when", "this", "into"].includes(word)))
-    return rows.map((row) => {
+    const ranked = rows.map((row) => {
       const rowWords = new Set(row.title_pattern.split(" ").filter((word) => word.length >= 4))
       const overlap = [...words].filter((word) => rowWords.has(word)).length
       const titleScore = words.size ? overlap / words.size : 0
@@ -172,7 +171,6 @@ export namespace FalsePositiveKnowledge {
     })
       .filter((item) => item.score >= 0.25)
       .sort((a, b) => b.score - a.score || b.row.time_updated - a.row.time_updated)
-      .slice(0, Math.max(1, Math.min(input.limit ?? 5, 10)))
       .map(({ row, score }) => ({
         id: row.id,
         vulnerabilityClass: row.vulnerability_class,
@@ -185,5 +183,15 @@ export namespace FalsePositiveKnowledge {
         occurrences: row.occurrences,
         similarity: Math.round(score * 100),
       }))
+    const offset = Math.max(0, Math.trunc(input.offset ?? 0))
+    const pageSize = Math.max(1, Math.trunc(input.pageSize ?? 10))
+    const matches = ranked.slice(offset, offset + pageSize)
+    return {
+      matches,
+      total: ranked.length,
+      offset,
+      nextOffset: offset + matches.length < ranked.length ? offset + matches.length : null,
+      hasMore: offset + matches.length < ranked.length,
+    }
   }
 }
