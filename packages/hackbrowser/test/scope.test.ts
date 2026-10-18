@@ -16,12 +16,13 @@ describe("hackbrowser network scope", () => {
     expect(matches("EXAMPLE.COM.")).toBe(true)
   })
 
-  test("a wildcard matches subdomains but not the apex", () => {
+  test("a wildcard includes the apex and subdomains but rejects lookalikes", () => {
     const matches = makeMatcher(["*.example.com"])
-    expect(matches("example.com")).toBe(false)
+    expect(matches("example.com")).toBe(true)
     expect(matches("api.example.com")).toBe(true)
     expect(matches("deep.api.example.com")).toBe(true)
     expect(matches("notexample.com")).toBe(false)
+    expect(matches("example.com.attacker.test")).toBe(false)
   })
 
   test("explicit entries combine with OR semantics and empty scope fails closed", () => {
