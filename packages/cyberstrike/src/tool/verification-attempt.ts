@@ -3,6 +3,11 @@ import { Tool } from "./tool"
 import { Session } from "../session"
 import { VerificationLedger } from "../session/verification-ledger"
 import { VerificationAttempts as Policy } from "../methodology/verification-attempts"
+import { redactTargetNoteSecrets } from "../target/redact"
+
+function safeLedgerText(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : redactTargetNoteSecrets(value)
+}
 
 const RecordAction = z.object({
   action: z.literal("record"),
@@ -69,20 +74,22 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
 
     const result = VerificationLedger.record({
       sessionID,
-      hypothesisKey: params.hypothesis_key,
-      asset: params.asset,
-      endpoint: params.endpoint,
-      vulnerabilityClass: params.vulnerability_class,
+      hypothesisKey: redactTargetNoteSecrets(params.hypothesis_key),
+      asset: redactTargetNoteSecrets(params.asset),
+      endpoint: safeLedgerText(params.endpoint),
+      vulnerabilityClass: redactTargetNoteSecrets(params.vulnerability_class),
       attempt: {
-        strategyID: params.strategy_id,
-        variantKey: params.variant_key,
-        rationale: params.rationale,
-        resultSummary: params.blocked_reason ? `${params.result_summary} [Blocked: ${params.blocked_reason}]` : params.result_summary,
-        evidenceRef: params.evidence_ref,
+        strategyID: redactTargetNoteSecrets(params.strategy_id),
+        variantKey: redactTargetNoteSecrets(params.variant_key),
+        rationale: redactTargetNoteSecrets(params.rationale),
+        resultSummary: redactTargetNoteSecrets(params.blocked_reason
+          ? `${params.result_summary} [Blocked: ${params.blocked_reason}]`
+          : params.result_summary),
+        evidenceRef: safeLedgerText(params.evidence_ref),
         validConditions: params.valid_conditions,
       },
       decisiveResult: params.decisive_result,
-      blockedReason: params.blocked_reason,
+      blockedReason: safeLedgerText(params.blocked_reason),
     })
     const d = result.decision
     const status = d.outcome.toUpperCase()
