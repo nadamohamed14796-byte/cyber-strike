@@ -142,6 +142,11 @@ export namespace FalsePositiveKnowledge {
     })
   }
 
+  /** Return all matching lessons for internal callers that need the complete evidence set. */
+  export function similar(input: { title: string; description: string; endpoint?: string | null; limit?: number }) {
+    return similarPage({ ...input, offset: 0, pageSize: input.limit ?? Number.MAX_SAFE_INTEGER }).matches
+  }
+
   /** Deactivate a lesson when later evidence reopens its source finding. */
   export function reopenForFinding(findingID: string) {
     Database.use((db) => db.update(FalsePositiveKnowledgeTable).set({
@@ -152,7 +157,7 @@ export namespace FalsePositiveKnowledge {
   }
 
   /** Return advisory matches only. A historical false positive never auto-rejects a new finding. */
-  export function similar(input: { title: string; description: string; endpoint?: string | null; offset?: number; pageSize?: number }) {
+  export function similarPage(input: { title: string; description: string; endpoint?: string | null; offset?: number; pageSize?: number }) {
     const vulnerabilityClass = classify([input.title, input.description].join(" "))
     const titlePattern = normalizeTitle(input.title)
     const endpointPattern = normalizeEndpoint(input.endpoint)
