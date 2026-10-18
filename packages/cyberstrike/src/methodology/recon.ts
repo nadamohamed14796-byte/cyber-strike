@@ -1,9 +1,9 @@
 /**
  * Canonical reconnaissance methodology.
  *
- * Recon knowledge lives here so the orchestrator does not repeatedly load overlapping
- * recon skills. This is the workflow contract; tool gates and the persisted checkpoint
- * manifest enforce the ordering independently of model instructions.
+ * Recon workflow ordering lives here. Phase-specific and asset-specific skills add deeper,
+ * conditional procedures without replacing the workflow contract. Tool gates and the
+ * persisted checkpoint manifest enforce ordering independently of model instructions.
  */
 export const RECON_METHODOLOGY_PROMPT = String.raw`
 CANONICAL RECONNAISSANCE METHODOLOGY — FOLLOW AS ONE CONNECTED WORKFLOW
