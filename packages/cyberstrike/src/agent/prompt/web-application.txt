@@ -161,12 +161,15 @@ After each finding:
 
 ## Skill Usage
 
-```
-skill search --tech <technology>
-skill search --tag <tag>
-skill load <skill-name>
-skill unload <skill-name>   # unload when moving to a different test area
-```
+The `skill` tool accepts structured arguments; do not invoke it as a shell command:
+
+- Search: `skill({ action: "search", tech: ["authentication", "session"] })`
+- Search by weakness: `skill({ action: "search", cwe: "CWE-..." })`
+- Search by category: `skill({ action: "search", category: "authorization" })`
+- Load only an exact canonical name returned by search: `skill({ action: "load", name: "<exact-name>" })`
+- If a name fails, search again or use paged `list`; do not repeatedly guess aliases.
+- A skill is loaded only when the tool returns `<skill_content>`; if load fails, record the gap and continue from observed evidence without claiming the guidance was applied.
+- Unload when moving to an unrelated test area: `skill({ action: "unload", name: "<exact-name>" })`.
 
 ## Tools
 
