@@ -903,11 +903,11 @@ export namespace ReportKnowledge {
       limit?: number
     } = {},
   ) {
-    const limit = boundedLimit(input.limit, 20, 0, 100)
+    const limit = input.limit === undefined
+      ? Number.MAX_SAFE_INTEGER
+      : Math.max(0, Math.trunc(Number.isFinite(input.limit) ? input.limit : Number.MAX_SAFE_INTEGER))
     if (limit === 0) return []
     try {
-      const requestedLimit = input.limit ?? 20
-      const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(Math.trunc(requestedLimit), 100)) : 20
       return Database.use((db) => {
         const conditions = []
         if (input.vulnerabilityClass)
@@ -920,9 +920,8 @@ export namespace ReportKnowledge {
           conditions.push(isNull(ReportKnowledgeTable.session_id))
           conditions.push(or(isNull(ReportKnowledgeTable.target_pattern), eq(ReportKnowledgeTable.target_pattern, ""))!)
           conditions.push(notInArray(ReportKnowledgeTable.status, ["rejected", "disproven", "duplicate"]))
-          // Filter rejected/skipped legacy study decisions in SQL before the
-          // 500-row candidate cap; post-ranking filtering could let old rejected
-          // rows starve valid references from automatic hunting recommendations.
+          // Filter rejected/skipped legacy study decisions in SQL before ranking;
+          // never cap the candidate pool because later matching rows may be relevant.
           conditions.push(sql`coalesce(json_extract(${ReportKnowledgeTable.metadata}, '$.model_study_decision'), '') NOT IN ('rejected', 'skipped')`)
         }
 
@@ -957,7 +956,6 @@ export namespace ReportKnowledge {
         const query = db.select().from(ReportKnowledgeTable)
         const rows = (conditions.length ? query.where(and(...conditions)) : query)
           .orderBy(desc(ReportKnowledgeTable.time_updated))
-          .limit(tokens.length || signals.length ? 500 : limit)
           .all()
 
         return rows
