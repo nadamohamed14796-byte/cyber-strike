@@ -240,19 +240,21 @@ export interface JavaScriptSourceFile {
 const RAW_SECRET_PERSISTENCE_NOTE =
   "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated."
 
-/** Remove literal secret-like values before analysis metadata is written to graph JSON or target notes. */
+/**
+ * Preserve exact secret-like candidate values in the private target-local correlation
+ * artifact so the operator can inspect the literal and its source location. This is
+ * not a finding verdict: static matches remain candidates until independently verified.
+ * Do not copy this graph into global research, shared reports, or outbound payloads.
+ */
 export function sanitizeJavaScriptSourceFileForPersistence(file: JavaScriptSourceFile): JavaScriptSourceFile {
   if (!file.analysis) return file
   return {
     ...file,
     analysis: {
       ...file.analysis,
-      secretCandidates: file.analysis.secretCandidates.map((candidate) => ({
-        ...candidate,
-        value: "[REDACTED]",
-      })),
+      secretCandidates: file.analysis.secretCandidates.map((candidate) => ({ ...candidate })),
       notes: file.analysis.notes.map((note) => note === RAW_SECRET_PERSISTENCE_NOTE
-        ? "Secret-like candidate values are redacted from persisted correlation artifacts; fingerprints are leads only and do not prove validity."
+        ? "Exact candidate values are stored in this private target-local artifact with source location; a static match remains unverified until independently validated. Do not export raw values."
         : note),
     },
   }
