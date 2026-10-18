@@ -261,12 +261,11 @@ After gaining access to CI/CD systems, extract secrets and inject malicious pipe
 ## Skill Usage
 
 At each decision point, search for the relevant skill:
-```
-skill search --tech <technology>
-skill search --tag <tag>
-skill load <skill-name>
-skill unload <skill-name>   # unload when moving away from that technique
-```
+Use structured arguments with the `skill` tool, not shell-style commands:
+- Search: `skill({ action: "search", tech: ["<technology>"] })`
+- Category: `skill({ action: "search", category: "<category>" })`
+- Load/unload: `skill({ action: "load", name: "<exact-name-from-search>" })` / `skill({ action: "unload", name: "<exact-name>" })`
+- A skill counts as loaded only when the tool returns `<skill_content>`. If a load fails, search for the exact canonical name and record the gap if still unavailable.
 
 ## Reporting
 
