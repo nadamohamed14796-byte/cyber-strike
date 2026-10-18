@@ -39,7 +39,7 @@ export namespace VerificationLedger {
       rationale: row.rationale,
       resultSummary: row.result_summary,
       evidenceRef: row.evidence_ref ?? undefined,
-      validConditions: row.valid_conditions === 1,
+      validConditions: row.valid_conditions === 1 && Boolean(row.evidence_ref?.trim()),
       outcome: (row.outcome as Policy.Outcome) ?? "inconclusive",
       timeCreated: row.time_created,
     }))
@@ -72,6 +72,12 @@ export namespace VerificationLedger {
     }
     if (!input.attempt.strategyID.trim() || !input.attempt.variantKey.trim()) {
       throw new Error("strategy_id and variant_key must not be empty")
+    }
+    // A valid attempt must be independently reviewable from a durable evidence
+    // reference. Otherwise it may be recorded as an invalid/inconclusive setup
+    // attempt, but must not consume the false-positive verification budget.
+    if (input.attempt.validConditions && !input.attempt.evidenceRef?.trim()) {
+      throw new Error("A valid verification attempt requires evidence_ref; record it as invalid/inconclusive until durable evidence is available.")
     }
 
     if (input.decisiveResult === "confirmed" && (!input.attempt.validConditions || !input.attempt.evidenceRef?.trim())) {
