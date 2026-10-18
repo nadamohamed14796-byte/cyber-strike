@@ -42,7 +42,7 @@ const Parameters = z.object({
   summary: z.string().max(4000).optional(),
   reason: z.string().max(2000).optional(),
   counts: z.record(z.string(), z.number().finite().nonnegative()).optional(),
-  artifacts: z.array(z.string().min(1).max(1000)).max(100).optional(),
+  artifacts: z.array(z.string().min(1)).optional(),
 })
 
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
