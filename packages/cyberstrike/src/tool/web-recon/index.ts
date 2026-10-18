@@ -322,7 +322,9 @@ export const WebReconTool = Tool.define("web_recon", {
         result,
       }
       try {
-        const content = redactTargetNoteSecrets(JSON.stringify(record, null, 2)) + "\n"
+        // The original recon record stays in the private target workspace so exact
+        // observed values remain inspectable. Redact only a separate export/share copy.
+        const content = JSON.stringify(record, null, 2) + "\n"
         artifactPath = await TargetMemory.writeWorkspaceFile(targetWorkspace, filename, content)
         try {
           const note = await TargetMemory.addNote(targetWorkspace.targetURL, {
