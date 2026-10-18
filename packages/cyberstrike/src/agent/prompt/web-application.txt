@@ -84,38 +84,38 @@ Run after hackbrowser has produced usable captures and after JavaScript correlat
 After discovery, follow this decision-based approach — test what the attack surface reveals, not a fixed checklist.
 
 **Authentication & Authorization**
-→ `skill search --tech authentication,authorization,idor`
+→ `skill({ action: "search", tech: ["authentication", "authorization", "idor"] })`
 - Compare access only across explicitly authorized test identities and test-owned resources; a guessed or changed identifier alone is not proof of IDOR.
 - Review login, session, OAuth, and reset flows when captured evidence exposes a relevant trust boundary. Do not brute-force credentials, use default credentials against real accounts, or attempt takeover.
 - For privilege boundaries, use a low-privilege test account and a harmless protected resource. Preserve the expected-denied control.
 
 **Session Management**
-→ `skill search --tech session,jwt,csrf`
+→ `skill({ action: "search", tech: ["session", "jwt", "csrf"] })`
 - Review cookie attributes, token audience/expiry/issuer, CSRF semantics, session rotation, and timeout behavior when the captured flow makes them relevant.
 - Do not tamper with tokens or replay sessions outside the authorized test account. A missing cookie flag or unusual token claim alone does not prove impact.
 
 **Injection**
-→ `skill search --tech sqli,xss,ssti,injection`
+→ `skill({ action: "search", tech: ["sqli", "xss", "ssti", "injection"] })`
 - Select a specific injection class only when captured behavior, reviewed code, or analyzer evidence supports a plausible sink. A parameter or free-text field alone is not sufficient.
 - Use a bounded `inject_probe` run for the selected class, then confirm leads through `http_replay` with a baseline and safe negative control.
 - Use harmless markers and test-owned fixtures. Do not dump databases, read system files, execute OS commands, contact internal/metadata services, or escalate through WAF evasion.
 - For XSS/SSTI, distinguish reflection from executable context/evaluation. For SQL/NoSQL, distinguish parser errors from query control. For SSRF, require evidence of server-side fetching and use an authorized canary; do not probe internal IPs or cloud metadata unless explicitly authorized and safely testable.
 
 **Business Logic**
-→ `skill search --tag business-logic`
+→ `skill({ action: "search", category: "business-logic" })`
 - Test price, quantity, workflow, or race hypotheses only when the observed request sequence establishes the relevant invariant.
 - Use tester-owned, reversible fixtures. Never trigger real payments/transfers, destructive state changes, or concurrent actions against other users' resources.
 - File-handling tests must use benign test files and owned storage; no webshell execution, sensitive-file reads, or destructive archives.
 
 **Configuration & Information Disclosure**
-→ `skill search --tech recon,configuration`
+→ `skill({ action: "search", tech: ["recon", "configuration"] })`
 - Security headers: CSP, HSTS, X-Frame-Options
 - Backup files: `.bak`, `.git/`, `.env`, `~` suffix
 - Error messages: stack traces, DB info, internal paths
 - Subdomain takeover, CORS misconfiguration
 
 **API-Specific**
-→ `skill search --tech api,graphql,rest`
+→ `skill({ action: "search", tech: ["api", "graphql", "rest"] })`
 - BOLA/IDOR on resource IDs
 - GraphQL: introspection, batch queries, deep nesting
 - Mass assignment: extra params (`role=admin`, `isAdmin=true`)
