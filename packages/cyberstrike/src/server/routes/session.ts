@@ -1341,6 +1341,35 @@ export const SessionRoutes = lazy(() =>
               javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
             })
           }
+          const truncatedRawRequest = truncateRawRequest(body.text)
+          const req = Request.add({
+            sessionID,
+            method: normalized.method,
+            normalizedPath: normalized.normalizedPath,
+            credentialID,
+            rawRequest: truncatedRawRequest,
+            bodyHash: normalized.bodyHash,
+            queryHash: normalized.queryKeyHash,
+            response: body.response,
+            triggerElement: body.trigger_element,
+            elementRoles: body.element_roles,
+            uiContext: body.ui_context as Record<string, unknown> | undefined,
+            pageUrl: body.page_url,
+            pageVisitedBy: body.page_visited_by,
+            scheme: normalized.scheme,
+            host: normalized.host,
+            port: normalized.port,
+            origin: normalized.origin,
+            site: normalized.site,
+            canonicalPath: normalized.canonicalPath,
+            templateID: normalized.templateID,
+            normSource: normalized.normSource,
+            protocol: normalized.protocol,
+            operation: normalized.operation,
+            opKeyHash: normalized.opKeyHash,
+            keyHash: normalized.keyHash,
+          })
+
           // Race-duplicate: a concurrent ingest won the atomic key_hash upsert
           // between our exists() check and this insert. Treat exactly like a
           // duplicate — no row was created, so skip the LLM enqueue, but still
