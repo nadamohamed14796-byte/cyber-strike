@@ -13,6 +13,7 @@ export namespace Identifier {
     tool: "tool",
     vulnerability: "vul",
     request: "req",
+    request_javascript_capture: "rjc",
     request_observation: "rob",
     coverage_note: "cov",
     web_credential: "wcr",
