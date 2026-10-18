@@ -130,8 +130,8 @@ function redact(value?: string | null, max = 320): string | null {
   if (!value) return null
   return value
     // Redact complete quoted values (including whitespace and escaped quotes) before generic assignments.
-    .replace(/(["']?(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)["']?\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,\s;}]+)/gi, "$1[REDACTED]")
-    .replace(/\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|private[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
+    .replace(/(["']?(?:authorization|proxy-authorization|x-auth-token|x-access-token|x-csrf-token|cookie|set-cookie|x-api-key|api[_-]?(?:key|secret)|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|jwt|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)["']?\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,\s;}]+)/gi, "$1[REDACTED]")
+    .replace(/\b(authorization|proxy-authorization|x-auth-token|x-access-token|x-csrf-token|cookie|set-cookie|x-api-key|api[_-]?(?:key|secret)|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|jwt|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
