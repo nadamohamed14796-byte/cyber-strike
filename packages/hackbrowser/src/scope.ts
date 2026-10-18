@@ -6,7 +6,7 @@
 //
 // Explicit scope patterns follow least-privilege matching:
 //   - bare host: exact host only
-//   - *.example.com: subdomains only, not example.com itself
+//   - *.example.com: example.com itself and all subdomains on label boundaries
 // When no scope is supplied, default to the exact starting hostname. A target URL
 // does not imply authorization for sibling subdomains or the whole registrable domain.
 // ============================================================
@@ -38,7 +38,7 @@ export function deriveScope(targetUrl: string): string {
 
 /**
  * Build a matcher from one or more scope patterns (OR semantics).
- * A bare host matches exactly; a wildcard matches subdomains only.
+ * A bare host matches exactly; an explicit wildcard includes its apex and subdomains.
  * Empty input rejects every host.
  */
 export function makeMatcher(scopes: readonly string[]): ScopeMatcher {
@@ -50,7 +50,7 @@ export function makeMatcher(scopes: readonly string[]): ScopeMatcher {
   return (host: string) => {
     const normalizedHost = host.toLowerCase().replace(/\.+$/, "")
     return patterns.some(({ host: base, wildcard }) =>
-      wildcard ? normalizedHost.endsWith("." + base) : normalizedHost === base,
+      wildcard ? normalizedHost === base || normalizedHost.endsWith("." + base) : normalizedHost === base,
     )
   }
 }
