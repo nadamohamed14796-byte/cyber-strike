@@ -97,7 +97,7 @@ test("redacts sensitive JSON response preview values across key families and quo
   expect(preview).not.toContain("multi word credential must be hidden")
 })
 
-test("redacts detected literal secrets from source-analysis metadata before persistence", async () => {
+test("preserves exact literal secret candidates and source location in private target-local correlation artifacts", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const secret = "private-api-key-value-must-not-be-persisted"
   const [source] = extractCapturedJavaScriptSources([{
@@ -111,11 +111,12 @@ test("redacts detected literal secrets from source-analysis metadata before pers
 
   const persisted = sanitizeJavaScriptSourceFileForPersistence(source!)
   const serialized = JSON.stringify(persisted)
-  expect(serialized).not.toContain(secret)
-  expect(persisted.analysis?.secretCandidates[0]?.value).toBe("[REDACTED]")
+  expect(serialized).toContain(secret)
+  expect(persisted.analysis?.secretCandidates[0]?.value).toBe(secret)
+  expect(persisted.analysis?.secretCandidates[0]?.line).toBe(source?.analysis?.secretCandidates[0]?.line)
   expect(persisted.analysis?.secretCandidates[0]?.fingerprint).toBe(source?.analysis?.secretCandidates[0]?.fingerprint)
-  expect(serialized).not.toContain("Exact candidate values are available")
-  expect(serialized).toContain("redacted from persisted correlation artifacts")
+  expect(serialized).toContain("Exact candidate values are stored in this private target-local artifact")
+  expect(serialized).toContain("Do not export raw values")
 })
 
 test("reuses analysis for the same JavaScript content hash", async () => {
