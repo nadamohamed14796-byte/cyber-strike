@@ -100,6 +100,67 @@ describe("Validation — Evidence Quality", () => {
 })
 
 describe("Validation — Triager Checks", () => {
+  test("uses label-boundary scope matching and rejects hostname lookalikes", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "endpoint",
+            severity: "high",
+            title: "GET /private",
+            detail: "Scope matcher regression",
+            asset: "https://example.com.attacker.test/private",
+            source: "test",
+            confidenceLevel: "high",
+            tags: [],
+            status: "exploited",
+          },
+        })
+
+        const results = Validation.runTriagerChecks(session.id, ["example.com"])
+        expect(results).toHaveLength(1)
+        expect(results[0].checks.inScope).toBe(false)
+        expect(results[0].violations.some((violation) => violation.field === "asset" && violation.severity === "blocking")).toBe(true)
+
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("includes the apex and subdomains for an explicit wildcard family", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        for (const asset of ["https://example.com/", "https://api.example.com/"]) {
+          Intel.add({
+            sessionID: session.id,
+            data: {
+              type: "endpoint",
+              severity: "high",
+              title: "GET /",
+              detail: "Wildcard family matcher regression",
+              asset,
+              source: "test",
+              confidenceLevel: "high",
+              tags: [],
+              status: "exploited",
+            },
+          })
+        }
+
+        const results = Validation.runTriagerChecks(session.id, ["*.example.com"])
+        expect(results).toHaveLength(2)
+        expect(results.every((result) => result.checks.inScope)).toBe(true)
+
+        await Session.remove(session.id)
+      },
+    })
+  })
+
   test("runs triager checks without error", async () => {
     await Instance.provide({
       directory: projectRoot,
