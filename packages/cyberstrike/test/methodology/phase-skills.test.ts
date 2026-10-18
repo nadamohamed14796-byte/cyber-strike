@@ -7,19 +7,18 @@ describe("Methodology phase skill routing", () => {
   test("every defined phase has a phase-specific skill discovery plan", () => {
     for (const phase of Phase.ALL) {
       const queries = skillQueriesForPhase(phase.id)
-      if (["scope_analysis", "passive_recon", "active_recon"].includes(phase.id)) {
-        expect(queries).toEqual([])
-        continue
-      }
       expect(queries.length).toBeGreaterThan(0)
       for (const requiredTag of phase.requiredTags) expect(queries).toContain(requiredTag)
     }
   })
 
   test("recon, authorization, reporting, and mobile phases prioritize relevant skill families", () => {
-    expect(skillQueriesForPhase("scope_analysis")).toEqual([])
-    expect(skillQueriesForPhase("passive_recon")).toEqual([])
-    expect(skillQueriesForPhase("active_recon")).toEqual([])
+    expect(skillQueriesForPhase("scope_analysis")).toContain("target-workspace-workflow")
+    expect(skillQueriesForPhase("scope_analysis")).toContain("attack-bb-methodology")
+    expect(skillQueriesForPhase("passive_recon")).toContain("recon-subdomain-enumeration")
+    expect(skillQueriesForPhase("passive_recon")).toContain("recon-asn-infrastructure")
+    expect(skillQueriesForPhase("active_recon")).toContain("recon-port-service-discovery")
+    expect(skillQueriesForPhase("active_recon")).toContain("attack-web-recon")
     expect(skillQueriesForPhase("authorization_testing")).toContain("attack-idor-automation")
     expect(skillQueriesForPhase("input_validation")).toContain("attack-ssrf")
     expect(skillQueriesForPhase("input_validation")).toContain("attack-sqli")
@@ -98,7 +97,7 @@ describe("Methodology phase skill routing", () => {
     }
   })
 
-  test("recon phases are served by the canonical methodology instead of duplicate skill retrieval", () => {
+  test("recon phases rank their base and specialized skills without dropping skill retrieval", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
       name,
       description: "Reconnaissance enumeration and discovery",
@@ -115,7 +114,10 @@ describe("Methodology phase skill routing", () => {
       "recon-email-security", "recon-gitlab-public-recon", "recon-error-log-mining",
       "recon-visual-recon", "recon-asn-infrastructure", "attack-web-recon",
     ].map(makeSkill))
-    expect(ranked).toEqual([])
+    const names = ranked.map((skill) => skill.name)
+    expect(names).toContain("recon-methodology")
+    expect(names).toContain("recon-subdomain-enumeration")
+    expect(names).toContain("recon-port-service-discovery")
   })
 
   test("phase ranking uses required tags and metadata rather than only display-name phrases", () => {
@@ -197,7 +199,7 @@ describe("Methodology phase skill routing", () => {
     expect(ranked[0]?.name).toBe("z-react-framework-check")
   })
 
-  test("recon phases do not dynamically rank skills when the canonical methodology owns the workflow", () => {
+  test("recon skill ranking preserves the canonical workflow while surfacing applicable procedures", () => {
     const makeSkill = (name: string, description: string, tags: string[] = []): SkillIndex.Entry => ({
       name,
       description,
@@ -215,7 +217,9 @@ describe("Methodology phase skill routing", () => {
       makeSkill("http-fingerprint", "HTTP technology fingerprinting", ["technology", "framework"]),
     ], 2)
 
-    expect(ranked).toEqual([])
+    const names = ranked.map((skill) => skill.name)
+    expect(names).toContain("recon-port-service-discovery")
+    expect(names).not.toContain("generic-web-testing")
   })
 
   test("scope detection distinguishes mobile artifacts from domain names", () => {
