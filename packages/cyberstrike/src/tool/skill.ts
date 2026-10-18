@@ -208,13 +208,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (params.action === "chain") {
         if (!params.findings?.length) throw new Error("Findings required for chain analysis")
-        const summary = KillChain.summary(params.findings)
+        const summary = KillChain.summary(params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })))
         return { title: "Kill Chain Analysis", output: summary, metadata: {} as { name?: string; dir?: string } }
       }
 
       if (params.action === "suggest") {
         if (!params.findings?.length) throw new Error("Findings required for suggestions")
-        const suggestions = SkillContext.suggest(params.findings)
+        const suggestions = SkillContext.suggest(params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })))
         if (suggestions.length === 0)
           return {
             title: "No suggestions",
