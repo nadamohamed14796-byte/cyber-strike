@@ -30,7 +30,9 @@ describe("hackbrowser network scope", () => {
     expect(matches("app.example.com")).toBe(true)
     expect(matches("api.example.com")).toBe(false)
     expect(matches("api.example.net")).toBe(true)
-    expect(matches("example.net")).toBe(false)
+    // Explicit wildcard scope includes the apex as well as subdomains.
+    expect(matches("example.net")).toBe(true)
+    expect(matches("example.net.attacker.test")).toBe(false)
     expect(makeMatcher([])("example.com")).toBe(false)
   })
 
