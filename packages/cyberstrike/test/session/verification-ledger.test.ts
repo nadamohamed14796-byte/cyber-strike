@@ -6,13 +6,13 @@ import { Session } from "../../src/session"
 import { VerificationLedger } from "../../src/session/verification-ledger"
 import { tmpdir } from "../fixture/fixture"
 
-function attempt(strategyID: string, evidenceRef?: string, validConditions = true) {
+function attempt(strategyID: string, evidenceRef: string | undefined = undefined, validConditions = true) {
   return {
     strategyID,
     variantKey: "controlled-valid-session",
     rationale: "Verify one specific hypothesis with a distinct strategy",
     resultSummary: "Observed a controlled response",
-    evidenceRef,
+    evidenceRef: evidenceRef ?? (validConditions ? "evidence://observed/" + strategyID : undefined),
     validConditions,
   }
 }
@@ -42,7 +42,7 @@ describe("VerificationLedger terminal outcomes", () => {
         for (let i = 0; i < 20; i++) {
           const result = VerificationLedger.record({
             ...common,
-            attempt: attempt("valid-strategy-" + i, i === 19 ? "evidence://direct-disproof" : undefined),
+            attempt: attempt("valid-strategy-" + i, i === 19 ? "evidence://direct-disproof" : "evidence://observed-" + i),
             ...(i === 19 ? { decisiveResult: "disproven" as const } : {}),
           })
           expect(result.decision.attemptsUsed).toBe(i + 1)
@@ -90,7 +90,7 @@ describe("VerificationLedger terminal outcomes", () => {
 
         const resumed = VerificationLedger.record({
           ...common,
-          attempt: attempt("new-valid-check"),
+          attempt: attempt("new-valid-check", "evidence://new-valid-check"),
         })
         expect(resumed.decision.outcome).toBe("inconclusive")
         expect(resumed.decision.attemptsUsed).toBe(2)
