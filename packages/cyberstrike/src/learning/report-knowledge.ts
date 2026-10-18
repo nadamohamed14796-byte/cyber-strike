@@ -673,11 +673,6 @@ export namespace ReportKnowledge {
     }
   }
 
-  function boundedLimit(value: number | undefined, fallback: number, minimum: number, maximum: number) {
-    const candidate = value === undefined || !Number.isFinite(value) ? fallback : value
-    return Math.max(minimum, Math.min(Math.floor(candidate), maximum))
-  }
-
   const QUERY_STOP_WORDS = new Set([
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "into", "is", "it",
     "of", "on", "or", "that", "the", "then", "this", "to", "using", "was", "were", "with",
