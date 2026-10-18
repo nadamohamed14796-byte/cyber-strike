@@ -28,9 +28,9 @@ Prefer test accounts and synthetic marker values. Do not bulk-download records w
 
 ## 3. Secrets and personal data
 
-Before saving, sharing, committing, or attaching evidence, redact session cookies, bearer/refresh tokens, API keys, passwords, private keys, email addresses, phone numbers, addresses, government identifiers, payment details, and unrelated user records.
+Keep two explicit copies when needed: a private target-local original for authorized reproduction, and a separately redacted copy for sharing, committing, attaching to public reports, or sending to external services. Do not silently redact the private local original when its exact value is material to the operator's investigation.
 
-Use stable placeholders such as [REDACTED_ACCESS_TOKEN]. Keep original artifacts only in a restricted local location when retention is authorized and necessary. Never put live credentials in skill files, Git history, issue comments, public reports, or command examples.
+Use stable placeholders such as [REDACTED_ACCESS_TOKEN]. Keep original artifacts only in a restricted local location when retention is authorized and necessary. For detected secret-like strings, record the exact value, source file/URL, line or location, and confidence as a candidate; never describe a static match as a verified credential or vulnerability. Never put live credentials in skill files, Git history, issue comments, public reports, or command examples.
 
 ## 4. Reproducibility
 
