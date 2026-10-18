@@ -380,7 +380,6 @@ async function claimResearchBatch(params: { source?: string; sessionIDs?: readon
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             const authRequired = /authentication required|login wall|HTTP\s+(?:401|403)/i.test(message)
-            const documentTooLarge = /research document too large/i.test(message)
             const terminalFetchFailure = isNonRetryableResearchError(error) || /unknown research source id|research source URL failed normalization|outside the configured HTTPS source hosts/i.test(message)
             const handled = authRequired
               ? ResearchQueue.blockAuthentication({
@@ -391,18 +390,7 @@ async function claimResearchBatch(params: { source?: string; sessionIDs?: readon
                   payload: { source_name: source.name, source_kind: source.kind, crawl_depth: claim.payload.crawl_depth },
                   claim: { sequence: claim.sequence, leaseOwner: claim.lease_owner },
                 })?.status === "blocked_auth"
-              : documentTooLarge
-                ? Boolean(ResearchQueue.complete(
-                    claim.sequence,
-                    claim.lease_owner,
-                    "blocked_size",
-                    message,
-                    {
-                      study_blocked_reason: "safe-fetch-document-size-limit",
-                      study_blocked_detail: message,
-                    },
-                  ))
-                : terminalFetchFailure
+              : terminalFetchFailure
                   ? Boolean(ResearchQueue.complete(
                       claim.sequence,
                       claim.lease_owner,
@@ -419,11 +407,9 @@ async function claimResearchBatch(params: { source?: string; sessionIDs?: readon
               continue
             }
             issues.push(claim.public_id + ": " + (
-              documentTooLarge
-                ? "blocked_size (safe-fetch document-size ceiling): " + message
-                : terminalFetchFailure && !authRequired
-                  ? "blocked_fetch (non-retryable safe-fetch error): " + message
-                  : message
+              terminalFetchFailure && !authRequired
+                ? "blocked_fetch (non-retryable safe-fetch error): " + message
+                : message
             ))
             // Do not immediately reclaim the same failed row repeatedly in this batch.
             break
@@ -629,7 +615,7 @@ export async function queueLegacyKnowledgeForModelStudy(sourceFilter?: string) {
 
       const rawStoredExcerpt = typeof metadata.excerpt === "string" ? metadata.excerpt : ""
       // Do not introduce another silent per-document cap while migrating legacy
-      // knowledge. The safe study fetcher enforces the resource byte ceiling; any
+      // knowledge. The safe study fetcher reads the complete resource body; any
       // mismatch between stored content and the reported length triggers a refetch.
       const storedExcerpt = rawStoredExcerpt ? redactResearchSecrets(rawStoredExcerpt) : ""
       const hasCachedExcerpt = storedExcerpt.trim().length >= 250
