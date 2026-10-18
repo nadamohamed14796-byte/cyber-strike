@@ -87,19 +87,23 @@ export namespace VerificationAttempts {
     })
   }
 
+  /** Only valid attempts with durable evidence can consume the verification budget. */
+  export function isEvidenceBackedValidAttempt(attempt: Attempt): boolean {
+    return attempt.validConditions && Boolean(attempt.evidenceRef?.trim())
+  }
+
   export function canRunAttempt(attempts: Attempt[], next: Pick<Attempt, "strategyID" | "variantKey">): boolean {
     const unique = uniqueAttempts(attempts)
-    const validAttemptCount = unique.filter((attempt) => attempt.validConditions).length
+    const validAttemptCount = unique.filter(isEvidenceBackedValidAttempt).length
     return validAttemptCount < MAX_ATTEMPTS && Boolean(next.strategyID.trim() && next.variantKey.trim()) &&
       !unique.some((attempt) => attemptKey(attempt) === attemptKey(next))
   }
 
   export function decide(input: DecisionInput): Decision {
     const attempts = uniqueAttempts(input.attempts)
-    // Only attempts executed under valid preconditions count toward the 20-attempt
-    // false-positive gate. Invalid setup, wrong identity, or out-of-scope attempts
-    // must not consume the verification budget.
-    const attemptsUsed = attempts.filter((attempt) => attempt.validConditions).length
+    // Only attempts with valid preconditions AND durable evidence count toward
+    // the 20-attempt false-positive gate. Missing evidence is not a valid observation.
+    const attemptsUsed = attempts.filter(isEvidenceBackedValidAttempt).length
     const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
     // Hard stops (scope, safety, or unavailable target) always win over verdicts.
@@ -109,11 +113,11 @@ export namespace VerificationAttempts {
 
     const hasDecisiveEvidence = Boolean(input.decisiveEvidenceRef?.trim())
 
-    if (input.decisiveConfirmation && hasDecisiveEvidence && attempts[attempts.length - 1]?.validConditions) {
+    if (input.decisiveConfirmation && hasDecisiveEvidence && attempts[attempts.length - 1] && isEvidenceBackedValidAttempt(attempts[attempts.length - 1]!)) {
       return { outcome: "confirmed", attemptsUsed, remainingAttempts, canContinue: false, reason: "Decisive evidence supports the vulnerability hypothesis." }
     }
 
-    const hasValidDisproof = input.decisiveDisproof && hasDecisiveEvidence && attempts[attempts.length - 1]?.validConditions
+    const hasValidDisproof = input.decisiveDisproof && hasDecisiveEvidence && attempts[attempts.length - 1] && isEvidenceBackedValidAttempt(attempts[attempts.length - 1]!)
     if (hasValidDisproof && attemptsUsed >= MAX_ATTEMPTS) {
       return { outcome: "disproven", attemptsUsed, remainingAttempts, canContinue: false, reason: "Direct evidence contradicts the hypothesis after 20 distinct valid verification attempts." }
     }
