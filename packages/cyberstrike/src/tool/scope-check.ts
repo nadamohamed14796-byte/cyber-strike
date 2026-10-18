@@ -16,7 +16,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       .describe("Caller-provided scope entries for standalone checks only; use target_url for the persisted target scope"),
   }),
   async execute(params): Promise<{ title: string; output: string; metadata: Tool.Metadata }> {
-    const target = params.target.toLowerCase().trim()
+    const target = params.target.trim()
     let scopeItems = params.scope_items ?? []
     let excludedItems: string[] = []
     let scopeSource = "caller-provided (not persisted authorization)"
@@ -79,13 +79,13 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     let excluded = false
 
     for (const scope of scopeItems) {
-      const s = scope.toLowerCase().trim()
+      const s = scope.trim()
       const match = checkMatch(target, s)
       results.push({ scope: s, ...match })
       if (match.matches) included = true
     }
     for (const scope of excludedItems) {
-      const s = scope.toLowerCase().trim()
+      const s = scope.trim()
       const match = checkMatch(target, s)
       results.push({ scope: s, ...match, excluded: true })
       if (match.matches) excluded = true
