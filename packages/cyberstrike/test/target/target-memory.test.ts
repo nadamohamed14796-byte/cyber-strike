@@ -657,7 +657,7 @@ test("notes access allows a registered ancestor of an observed asset but not an 
       // Simulate an already-established asset relationship. This function verifies
       // the persisted parent chain rather than guessing by DNS suffix.
       Database.use((db) => db.update(TargetWorkspaceTable)
-        .set({ parent_target_id: parent.id, asset_type: "hostname" })
+        .set({ parent_target_id: parent.id, asset_type: "subdomain" })
         .where(eq(TargetWorkspaceTable.id, child.id))
         .run())
 
