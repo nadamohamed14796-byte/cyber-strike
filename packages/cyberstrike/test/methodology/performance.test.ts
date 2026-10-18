@@ -260,7 +260,7 @@ describe("AgentPerformance — getAgentMeta", () => {
 })
 
 describe("AgentPerformance — selectAgentsForPhase", () => {
-  test("returns explore as primary for scope_analysis", async () => {
+  test("returns a security-capable agent as primary for scope_analysis", async () => {
     await Instance.provide({
       directory: projectRoot,
       fn: async () => {
@@ -268,9 +268,9 @@ describe("AgentPerformance — selectAgentsForPhase", () => {
 
         const agents = AgentPerformance.selectAgentsForPhase(session.id, "scope_analysis")
         expect(agents.length).toBeGreaterThan(0)
-        expect(agents[0].name).toBe("explore")
+        expect(agents[0].name).toBe("web-application")
         expect(agents[0].role).toBe("primary")
-        expect(agents[0].codename).toBe("GHOST")
+        expect(agents[0].codename).toBe("STRIKER")
 
         await Session.remove(session.id)
       },
