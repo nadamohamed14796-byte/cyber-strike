@@ -30,7 +30,7 @@ export namespace Tool {
       description: string
       parameters: Parameters
       execute(
-        args: z.infer<Parameters>,
+        args: z.input<Parameters>,
         ctx: Context,
       ): Promise<{
         title: string
@@ -55,8 +55,9 @@ export namespace Tool {
         const toolInfo = init instanceof Function ? await init(initCtx) : init
         const execute = toolInfo.execute
         toolInfo.execute = async (args, ctx) => {
+          let parsedArgs: z.output<Parameters>
           try {
-            toolInfo.parameters.parse(args)
+            parsedArgs = toolInfo.parameters.parse(args)
           } catch (error) {
             if (error instanceof z.ZodError && toolInfo.formatValidationError) {
               throw new Error(toolInfo.formatValidationError(error), { cause: error })
@@ -66,7 +67,7 @@ export namespace Tool {
               { cause: error },
             )
           }
-          const result = await execute(args, ctx)
+          const result = await execute(parsedArgs, ctx)
           // skip truncation for tools that handle it themselves
           if (result.metadata.truncated !== undefined) {
             return result
