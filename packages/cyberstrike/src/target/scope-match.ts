@@ -25,13 +25,13 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     if (assetType === "wildcard") allowed = identifier.includes("*") || /\{[^{}]+\}/.test(identifier) ? identifier : "*." + identifier
     else if (assetType === "url" && !/^https?:\/\//i.test(identifier)) {
       // HackerOne commonly exports URL identifiers without a scheme. Preserve
-      // their host/path restriction and accept either HTTP or HTTPS in that case.
+      // host/path boundaries, accept HTTP or HTTPS, and support terminal /*
+      // path wildcards without admitting sibling paths such as /APIx.
       let candidateURL: URL
       let scopeURL: URL
       try {
         candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
-        const urlIdentifier = rawScope.replace(/^[^:]+:\s*/, "").trim()
-        scopeURL = new URL("https://" + urlIdentifier)
+        scopeURL = new URL("https://" + identifier)
       } catch {
         return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
       }
@@ -39,11 +39,19 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
           candidateURL.username || candidateURL.password || scopeURL.username || scopeURL.password) {
         return { matches: false, reason: "HackerOne URL asset and target must be credential-free HTTP(S) URLs" }
       }
+      const scopeHost = scopeURL.hostname.toLowerCase().replace(/\.$/, "")
+      const targetHost = candidateURL.hostname.toLowerCase().replace(/\.$/, "")
+      if (targetHost !== scopeHost || candidateURL.port !== scopeURL.port) {
+        return { matches: false, reason: "target does not match HackerOne URL asset host and port" }
+      }
       const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
       const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
-      return candidateURL.hostname.toLowerCase() === scopeURL.hostname.toLowerCase() &&
-        candidateURL.port === scopeURL.port &&
-        (targetPath === scopePath || targetPath.startsWith(scopePath === "/" ? "/" : scopePath + "/"))
+      const pathWildcard = scopePath.endsWith("/*")
+      const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
+      const pathMatches = pathWildcard
+        ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
+        : targetPath === pathPrefix
+      return pathMatches
         ? { matches: true, reason: "matches HackerOne URL asset host, port, and path" }
         : { matches: false, reason: "target does not match HackerOne URL asset host, port, and path" }
     } else {
