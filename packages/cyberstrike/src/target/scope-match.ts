@@ -4,8 +4,10 @@ type ScopeMatch = { matches: boolean; reason: string }
 
 /** Check one target against a single scope expression; exported for deterministic contract tests. */
 export function checkMatch(target: string, scope: string): ScopeMatch {
-  const value = target.trim().toLowerCase()
-  let allowed = scope.trim().toLowerCase()
+  const rawTarget = target.trim()
+  const value = rawTarget.toLowerCase()
+  const rawScope = scope.trim()
+  let allowed = rawScope.toLowerCase()
 
   // HackerOne scope exports may include an asset type alongside its identifier.
   // Only web-addressable types can authorize an HTTP target. Non-web assets are
