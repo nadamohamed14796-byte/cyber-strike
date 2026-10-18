@@ -295,6 +295,9 @@ test("rejects private, local, link-local, reserved and documentation IP literals
     expect(isPublicResearchAddress(address)).toBe(false)
   }
   expect(isPublicResearchAddress("93.184.216.34")).toBe(true)
+  expect(isPublicResearchAddress("192.0.0.9")).toBe(true)
+  expect(isPublicResearchAddress("192.0.0.10")).toBe(true)
+  expect(isPublicResearchAddress("192.0.0.8")).toBe(false)
   // These special-purpose AS112 anycast ranges are globally reachable; do not treat them as private/reserved.
   expect(isPublicResearchAddress("192.31.196.1")).toBe(true)
   expect(isPublicResearchAddress("192.52.193.1")).toBe(true)
