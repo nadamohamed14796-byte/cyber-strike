@@ -527,7 +527,7 @@ test("local enrichment selects only legacy shared excerpts and marks records cur
       expect(scoped).not.toBeNull()
       if (!legacy) throw new Error("legacy record was not persisted")
 
-      const candidates = ReportKnowledge.externalRecordsForEnrichment(100)
+      const candidates = ReportKnowledge.externalRecordsForEnrichment()
       expect(candidates.some((row) => row.id === legacy.id)).toBe(true)
       expect(candidates.some((row) => row.id === scoped?.id)).toBe(false)
       const row = candidates.find((candidate) => candidate.id === legacy.id)
@@ -557,7 +557,7 @@ test("local enrichment selects only legacy shared excerpts and marks records cur
       expect(enriched?.vulnerability_class).toBe("idor")
       expect(enriched?.severity).toBe("high")
       expect(enriched?.status).toBe("observed")
-      expect(ReportKnowledge.externalRecordsForEnrichment(100).some((candidate) => candidate.id === legacy.id)).toBe(false)
+      expect(ReportKnowledge.externalRecordsForEnrichment().some((candidate) => candidate.id === legacy.id)).toBe(false)
       await Instance.dispose()
     },
   })
