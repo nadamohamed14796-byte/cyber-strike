@@ -14,14 +14,14 @@ Before any intrusive action:
 → Enumerate public exposure
 → `aws s3 ls s3://<bucket> --no-sign-request` — unauthenticated bucket access
 → `nmap -sV <public_ip_range>` — exposed services
-→ Skills: `skill search --tech recon,cloud`
+→ Skills: `skill({ action: "search", tech: ["recon", "cloud"] })`
 
 **IAM user / service account credentials:**
 → Confirm identity, enumerate permissions, find escalation paths
 → `aws sts get-caller-identity`
 → `aws iam list-attached-user-policies --user-name <user> && aws iam list-user-policies --user-name <user>`
 → `pacu` (AWS) / `ScoutSuite` / `Prowler` — automated enumeration and config audit
-→ Skills: `skill search --tech iam,privilege-escalation,cloud`
+→ Skills: `skill({ action: "search", tech: ["iam", "privilege-escalation", "cloud"] })`
 
 **Shell on a cloud VM / container:**
 → Check IMDS for credentials, enumerate attached roles
@@ -29,12 +29,12 @@ Before any intrusive action:
 → `curl -H "Metadata:true" "http://169.254.169.254/metadata/instance?api-version=2021-02-01"` — Azure
 → `curl -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token` — GCP
 → Check env vars, mounted secrets, service account token files
-→ Skills: `skill search --tech imds,container`
+→ Skills: `skill({ action: "search", tech: ["imds", "container"] })`
 
 **Admin / Owner access obtained:**
 → Complete objectives, dump secrets, document attack path
 → `aws secretsmanager list-secrets` / `az keyvault secret list` / `gcloud secrets list`
-→ Skills: `skill search --tech persistence,cloud`
+→ Skills: `skill({ action: "search", tech: ["persistence", "cloud"] })`
 
 ## Decision Loop
 
@@ -84,7 +84,7 @@ gcloud iam service-accounts list --format='table(email,disabled)'
 | AttachPolicy | `iam:AttachUserPolicy` or `iam:AttachRolePolicy` | Attach AdministratorAccess |
 | AssumeRole | `sts:AssumeRole` without ExternalId | Confused deputy on cross-account roles |
 
-Skills: `skill search --tech aws,iam,privilege-escalation`
+Skills: `skill({ action: "search", tech: ["aws", "iam", "privilege-escalation"] })`
 
 ### Public Storage Exposure
 
@@ -110,7 +110,7 @@ az storage account list --query '[].{Name:name,PublicAccess:allowBlobPublicAcces
 gsutil iam get gs://<BUCKET> | grep -E '(allUsers|allAuthenticatedUsers)'
 ```
 
-Skills: `skill search --tech s3,storage,public-access`
+Skills: `skill({ action: "search", tech: ["s3", "storage", "public-access"] })`
 
 ### Network Exposure
 
@@ -137,7 +137,7 @@ gcloud compute firewall-rules list --filter="sourceRanges=('0.0.0.0/0')" \
   --format='table(name,direction,allowed[].map().firewall_rule().list())'
 ```
 
-Skills: `skill search --tech network,vpc,firewall`
+Skills: `skill({ action: "search", tech: ["network", "vpc", "firewall"] })`
 
 ### Kubernetes / Container
 
@@ -158,7 +158,7 @@ kubectl get pods --all-namespaces -o json | jq '.items[] | select(.spec.volumes[
 kube-bench run --targets=master,node
 ```
 
-Skills: `skill search --tech kubernetes,container,rbac`
+Skills: `skill({ action: "search", tech: ["kubernetes", "container", "rbac"] })`
 
 ### Secrets & Credentials in Code
 
@@ -169,7 +169,7 @@ checkov -d /path/to/terraform          # IaC misconfigs
 trivy config /path/to/terraform        # IaC secrets
 ```
 
-Skills: `skill search --tech secrets,iac,devsecops`
+Skills: `skill({ action: "search", tech: ["secrets", "iac", "devsecops"] })`
 
 ### Logging & Monitoring Gaps
 
@@ -178,7 +178,7 @@ Skills: `skill search --tech secrets,iac,devsecops`
 **Azure:** `az security pricing list` — check Defender plans
 **GCP:** `gcloud logging sinks list` — check audit log export
 
-Skills: `skill search --tech logging,monitoring,detection`
+Skills: `skill({ action: "search", tech: ["logging", "monitoring", "detection"] })`
 
 ### AWS Post-Exploitation (after compromising IAM credentials)
 
@@ -191,7 +191,7 @@ When AWS credentials are compromised during assessment, use awshook for advanced
 - **Evasion (13):** `awshook cloudtrail_blind --action stop` — stop/modify/delete CloudTrail, `awshook guardduty_evade` — suspend/suppress GuardDuty, `awshook config_disable` — stop AWS Config, `awshook vpc_flow_disable` — delete VPC Flow Logs, `awshook access_analyzer_suppress` — archive Access Analyzer findings, `awshook security_hub_suppress` — suppress Security Hub, `awshook waf_bypass` — enumerate WAF rules/ACLs, `awshook dns_firewall_disable` — DNS Firewall removal, `awshook cloudwatch_tamper` — delete/reduce CloudWatch logs, `awshook macie_disable` — disable Macie, `awshook inspector_disable` — disable Inspector, `awshook s3_logging_disable` — disable S3 access logging, `awshook cloudtrail_selector_tamper` — surgical event selector modification
 - **Exfil (16):** `awshook s3_dump` — sensitive file discovery/download, `awshook ec2_snapshot` — EBS snapshot with cross-account share, `awshook rds_dump` — RDS snapshot/share/restore, `awshook dynamodb_dump` — DynamoDB scan with secret detection, `awshook ebs_direct_read` — block-level snapshot read, `awshook s3_exfil` — bucket policy for external access, `awshook data_stage` — compress/stage to attacker S3, `awshook codecommit_dump` — CodeCommit repo dump, `awshook ecr_dump` — ECR repos/images/vulns, `awshook athena_query` — query S3 data lakes via Athena, `awshook secrets_bulk_export` — bulk Secrets Manager + SSM export, `awshook backup_vault_enum` — Backup vaults/recovery points, `awshook cloudwatch_logs_dump` — export CloudWatch logs to S3, `awshook sns_sqs_siphon` — intercept SNS/SQS messages, `awshook kinesis_tap` — tap Kinesis data streams, `awshook cleanup_aws` — ALWAYS run to restore and clean artifacts
 
-Skills: `skill search --tech aws,iam,postexploit`
+Skills: `skill({ action: "search", tech: ["aws", "iam", "postexploit"] })`
 
 ### Azure Post-Exploitation (after compromising Azure credentials)
 
@@ -209,7 +209,7 @@ When Azure/Entra ID credentials are compromised, use azurehook for tenant compro
 - **M365 (4):** `azurehook exchange_abuse` — Exchange mailbox/rule abuse, `azurehook sharepoint_enum`, `azurehook teams_enum`, `azurehook onedrive_access`
 - `azurehook cleanup_azure` — ALWAYS run to restore and clean artifacts
 
-Skills: `skill search --tech azure,entraid,postexploit`
+Skills: `skill({ action: "search", tech: ["azure", "entraid", "postexploit"] })`
 
 ### GCP Post-Exploitation (after compromising GCP credentials)
 
@@ -222,7 +222,7 @@ When GCP credentials or service accounts are compromised, use gcphook for projec
 - **Evasion (3):** `gcphook audit_log_tamper`, `gcphook vpc_flow_tamper`, `gcphook vpc_firewall_modify`
 - `gcphook cleanup_gcp` — ALWAYS run to restore and clean artifacts
 
-Skills: `skill search --tech gcp,cloud,postexploit`
+Skills: `skill({ action: "search", tech: ["gcp", "cloud", "postexploit"] })`
 
 ### Kubernetes Post-Exploitation (after compromising pod or kubeconfig)
 
@@ -233,7 +233,7 @@ When Kubernetes access is obtained, use kubehook for cluster compromise. 20 prog
 - **Persist:** `kubehook k8s_backdoor --type daemonset --image IMG` — DaemonSet/CronJob backdoor, `kubehook k8s_pv_dump` — PV/PVC data extraction
 - `kubehook cleanup_k8s` — ALWAYS run to remove created resources
 
-Skills: `skill search --tech kubernetes,container,postexploit`
+Skills: `skill({ action: "search", tech: ["kubernetes", "container", "postexploit"] })`
 
 ## Skill Usage
 
