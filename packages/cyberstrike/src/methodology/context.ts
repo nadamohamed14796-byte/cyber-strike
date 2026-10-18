@@ -12,11 +12,23 @@ import { SkillIndex } from "../skill/index-engine"
 // Phase-aware skill discovery is intentionally separate from loading: the agent must
 // use the skill tool to load the selected skill so normal per-agent permissions apply.
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
-  // Recon execution is defined centrally in methodology/recon.ts; do not load duplicate recon skills for these phases.
-  scope_analysis: [],
+  // The canonical recon workflow owns phase ordering. Skills provide detailed, conditional sub-workflows.
+  scope_analysis: [
+    "target-workspace-workflow", "attack-bb-methodology", "recon-methodology",
+    "scope analysis", "scope validation", "wildcard scope", "program policy",
+  ],
   mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
-  passive_recon: [],
-  active_recon: [],
+  passive_recon: [
+    "recon-methodology", "recon-subdomain-enumeration", "recon-asn-infrastructure",
+    "recon-origin-ip-discovery", "recon-email-security", "recon-gitlab-public-recon",
+    "recon-visual-recon", "passive reconnaissance", "OSINT", "certificate transparency",
+  ],
+  active_recon: [
+    "recon-methodology", "recon-subdomain-enumeration", "recon-port-service-discovery",
+    "recon-vhost-enumeration", "recon-cms-detection", "recon-origin-ip-discovery",
+    "recon-asn-infrastructure", "recon-visual-recon", "attack-web-recon",
+    "endpoint enumeration", "parameter discovery", "JavaScript analysis",
+  ],
   technology_profiling: [
     "technology profiling", "technology fingerprinting", "framework detection", "wstg-info-08", "wstg-info-09", "wstg-recon-config",
     "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
@@ -78,11 +90,8 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
-  // Recon is a single canonical workflow in methodology/recon.ts, not a set of
-  // overlapping dynamically loaded skills. Other testing phases retain skill retrieval.
-  if (phaseId === "scope_analysis" || phaseId === "passive_recon" || phaseId === "active_recon") return []
-  // Include methodology-defined required tags as first-class search terms. These are
-  // the canonical phase taxonomy; hand-maintained queries are additional aliases.
+  // Include methodology-defined required tags as first-class search terms. The
+  // canonical recon workflow owns ordering; relevant skills add detailed procedures.
   const configured = PHASE_SKILL_QUERIES[phaseId] ?? []
   const requiredTags = Phase.get(phaseId)?.requiredTags ?? []
   return [...new Set([...requiredTags, ...configured])]
@@ -102,7 +111,6 @@ export function rankSkillsForPhase(
   limit = 10,
   observedTechStack: string[] = [],
 ): Array<{ name: string; description: string; query: string; score: number }> {
-  if (phaseId === "scope_analysis" || phaseId === "passive_recon" || phaseId === "active_recon") return []
   const queries = skillQueriesForPhase(phaseId)
   const observedTechnologies = observedTechStack.map(normalizeSkillText).filter(Boolean)
   const phase = Phase.get(phaseId)
@@ -177,14 +185,14 @@ export function rankSkillsForPhase(
 }
 
 async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): Promise<string> {
-  if (phaseId === "scope_analysis" || phaseId === "passive_recon" || phaseId === "active_recon") {
-    return [
-      "## Canonical Recon Methodology",
-      "Follow the single ordered workflow injected from methodology/recon.ts. Do not search for or load overlapping recon-specific skills; the canonical methodology already consolidates scope validation, asset/subdomain discovery, service profiling, URL and parameter collection, JavaScript analysis, endpoint inventory, browser-extension correlation, and checkpoint/resume rules.",
-      "Use recon_checkpoint and the persisted scope gate as execution controls. Record outputs and provenance in the target workspace before advancing phases.",
-    ].join("\n")
-  }
+  const isReconPhase = ["scope_analysis", "passive_recon", "active_recon"].includes(phaseId)
   const lines = [
+    ...(isReconPhase ? [
+      "## Canonical Recon Workflow",
+      "Follow methodology/recon.ts for ordered phases, checkpoint gates, persistence, and completion criteria. It owns workflow order; it does not replace detailed skills. Search and load recon-methodology plus specialized sub-workflow skills that materially apply to the current asset/evidence (for example subdomain/DNS, services/ports, virtual hosts, CMS, JS/API discovery, or cloud leads). Do not load unrelated skills or repeat a procedure when the canonical workflow and a loaded skill already cover it.",
+      "Use recon_checkpoint and the persisted scope gate as execution controls. Record outputs and provenance in the target workspace before advancing phases.",
+      "",
+    ] : []),
     "## Required Skill Preflight",
     "Before doing phase work, use the `skill` tool action=`search` to discover relevant skills for each distinct task, then action=`load` with the exact skill name. Wait for each tool result and verify the skill content was returned before claiming it is loaded.",
     "The candidate list below is a ranked shortlist, not the complete catalog. Search again for every applicable subtask, observed technology/framework, protocol, and vulnerability class; load all skills that materially apply to the current evidence, not unrelated skills from the whole catalog.",
