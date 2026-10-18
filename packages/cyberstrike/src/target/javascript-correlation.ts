@@ -233,7 +233,7 @@ export interface JavaScriptSourceFile {
   sourceCaptureID?: string
   /** Persistent capture-row IDs for this canonical URL/content version. */
   sourceCaptureIDs?: string[]
-  /** Static-analysis metadata; secret-like literal values must be redacted before persistence. */
+  /** Static-analysis metadata. Exact secret-like candidates may be retained in private target-local artifacts; redact separate exports. */
   analysis?: JavaScriptSourceAnalysis
 }
 
@@ -1170,8 +1170,8 @@ export namespace JavaScriptCorrelation {
     // content hash, so identical bytes are analyzed once but may produce multiple origin-aware
     // source records; this matters when the same bundle is served from different hosts.
     const mergedSourceFiles = [...sourceFiles, ...capturedSources]
-    // Keep exact secret-like values transient in memory only. Every copy that may be
-    // serialized to JSON or target notes goes through this redaction boundary.
+    // Preserve exact candidate values in private target-local graph/note artifacts for manual verification.
+    // Any export or outbound payload must use a separately redacted copy.
     const persistedSourceFiles = mergedSourceFiles.map(sanitizeJavaScriptSourceFileForPersistence)
     const requestIDs = relevantRequests.map((request) => request.id)
     const requestIDSet = new Set(requestIDs)
@@ -1494,7 +1494,7 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Static endpoint candidates are saved separately under endpoints/; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
-    graph.notes.push("Response previews are length-limited and redacted heuristically; JavaScript secret-like values are redacted from persisted graph/notes and only their fingerprints are retained.")
+    graph.notes.push("Response previews are length-limited and redacted heuristically; private target-local JavaScript artifacts retain exact secret-like candidate values with source locations for manual verification. Create a separate redacted copy before sharing or sending data externally.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
 
     const testerSurveyAbsolutePath = path.join(workspace.workspacePath, testerSurveyRelativePath)
