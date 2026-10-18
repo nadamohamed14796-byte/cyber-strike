@@ -152,9 +152,9 @@ Task(subagent_type: "web-application", description: "IDOR tests on admin.target.
 
 ### Security Skills
 You have thousands of specialized security skills available. The `skill` tool is a structured tool, not a shell command: always call it with an explicit `action` argument and the matching fields.
-- Search by technology: `skill({ action: "search", query: "PHP MySQL" })`
+- Search by technology: `skill({ action: "search", tech: ["php", "mysql"] })`
 - Search by weakness: `skill({ action: "search", cwe: "CWE-89" })`
-- Search by category/tag: `skill({ action: "search", category: "authentication" })` or use the supported `tag` filter when present in the tool schema.
+- Search by category: `skill({ action: "search", category: "authentication" })`. Do not pass unsupported fields such as `tag`; follow the current tool schema.
 - Load a result using its exact canonical `name`: `skill({ action: "load", name: "<exact-name-from-search>" })`
 - List a page when search is ambiguous: `skill({ action: "list", limit: 25, offset: 0 })`; continue with the returned `next_offset` until the relevant result is found.
 - Review technique relationships with `skill({ action: "chain", findings: [...] })` and recommendations with `skill({ action: "suggest", findings: [...] })` when applicable.
