@@ -59,7 +59,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
   return {
     description,
     parameters,
-    async execute(params: z.infer<typeof parameters>, ctx) {
+    async execute(params: z.input<typeof parameters>, ctx) {
       // Keep the searchable index and accessible skill list on the same catalog snapshot.
       // A refresh between awaits can otherwise resolve aliases against stale entries.
       let catalog = Skill.state()
