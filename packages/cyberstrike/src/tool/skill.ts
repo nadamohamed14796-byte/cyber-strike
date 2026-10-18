@@ -41,7 +41,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     cwe: z.string().optional().describe("CWE ID filter (for search action)"),
     category: z.string().optional().describe("Category filter (for search action)"),
     loaded: z.boolean().optional().describe("For list action: only show currently loaded skills"),
-    limit: z.number().int().min(1).max(50).default(25).describe("Maximum number of skills to return per page (1-50)"),
+    limit: z.number().int().min(1).default(25).describe("Number of skills to return in this page; no application-defined maximum, continue through pages until exhausted"),
     offset: z.number().int().min(0).default(0).describe("Zero-based result offset for list/search pagination"),
     findings: z
       .array(
@@ -65,17 +65,11 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       let catalog = Skill.state()
       let skills = await Skill.all()
       let stableCatalog = false
-      for (let attempt = 0; attempt < 5; attempt++) {
+      while (!stableCatalog) {
         await SkillIndex.ensureBuilt()
         catalog = Skill.state()
         skills = await Skill.all()
-        if (Skill.state() === catalog) {
-          stableCatalog = true
-          break
-        }
-      }
-      if (!stableCatalog) {
-        throw new Error("Skill catalog changed repeatedly while preparing the skill tool; retry the skill operation.")
+        if (Skill.state() === catalog) stableCatalog = true
       }
 
       const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
@@ -117,7 +111,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           }
         }
         const all = [...accessibleSkills].sort((left, right) => left.name.localeCompare(right.name))
-        const limit = Math.min(50, Math.max(1, params.limit ?? 25))
+        const limit = Math.max(1, params.limit ?? 25)
         const offset = Math.max(0, params.offset ?? 0)
         const page = all.slice(offset, offset + limit)
         if (page.length === 0) {
