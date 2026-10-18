@@ -1,4 +1,5 @@
 import { Intel } from "./intel"
+import { checkMatch } from "../target/scope-match"
 import { Methodology } from "./methodology"
 
 // ============================================================
@@ -336,16 +337,8 @@ export namespace Validation {
   // --- Helpers ---
 
   function matchesScope(asset: string, scopeItems: string[]): boolean {
-    const normalized = asset.toLowerCase().trim()
-    for (const scope of scopeItems) {
-      const s = scope.toLowerCase().trim()
-      if (s === normalized) return true
-      if (s.startsWith("*.")) {
-        const domain = s.slice(2)
-        if (normalized === domain || normalized.endsWith("." + domain)) return true
-      }
-      if (normalized.includes(s) || s.includes(normalized)) return true
-    }
-    return false
+    // Reuse the authoritative host/path/IP matcher. Substring checks here can
+    // incorrectly accept example.com.attacker.test when the scope is example.com.
+    return scopeItems.some((scope) => checkMatch(asset, scope).matches)
   }
 }
