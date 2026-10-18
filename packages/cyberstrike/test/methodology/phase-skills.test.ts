@@ -12,7 +12,7 @@ describe("Methodology phase skill routing", () => {
     }
   })
 
-  test("recon, authorization, reporting, and mobile phases prioritize relevant skill families", () => {
+  test("scope/recon, authorization, reporting, and mobile phases prioritize relevant skill families", () => {
     expect(skillQueriesForPhase("scope_analysis")).toContain("target-workspace-workflow")
     expect(skillQueriesForPhase("scope_analysis")).toContain("attack-bb-methodology")
     expect(skillQueriesForPhase("passive_recon")).toContain("recon-subdomain-enumeration")
