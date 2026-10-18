@@ -21,7 +21,7 @@ export const FalsePositiveMemoryTool = Tool.define<typeof Parameters, Tool.Metad
   parameters: Parameters,
   async execute(params) {
     try {
-      const page = FalsePositiveKnowledge.similar({
+      const page = FalsePositiveKnowledge.similarPage({
         title: params.title,
         description: params.description,
         endpoint: params.endpoint,
