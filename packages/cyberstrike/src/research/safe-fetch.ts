@@ -180,6 +180,9 @@ export function isPublicResearchAddress(address: string): boolean {
   if (family === 4) {
     const value = ipv4Number(address)
     if (value === undefined) return false
+    // IANA marks 192.0.0.9 and 192.0.0.10 as globally reachable exceptions
+    // inside 192.0.0.0/24; the rest of this special-purpose block remains denied.
+    if (value === ipv4Number("192.0.0.9") || value === ipv4Number("192.0.0.10")) return true
     return !systemRanges.some(([baseText, prefix]) => {
       const base = ipv4Number(baseText)!
       const width = 2 ** (32 - prefix)
