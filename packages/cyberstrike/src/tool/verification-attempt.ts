@@ -46,8 +46,9 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
   parameters: Parameters,
   async execute(params, ctx) {
     const sessionID = Session.root(ctx.sessionID)
+    const hypothesisKey = redactTargetNoteSecrets(params.hypothesis_key)
     if (params.action === "status") {
-      const attempts = VerificationLedger.list({ sessionID, hypothesisKey: params.hypothesis_key })
+      const attempts = VerificationLedger.list({ sessionID, hypothesisKey })
       const uniqueAttempts = Policy.uniqueAttempts(attempts)
       const attemptsUsed = uniqueAttempts.filter((attempt) => attempt.validConditions).length
       const last = attempts[attempts.length - 1]
@@ -58,10 +59,10 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
       return {
         title: `Verification: ${attemptsUsed}/${Policy.MAX_ATTEMPTS} valid attempts — ${outcome.toUpperCase()}`,
         output: attempts.length
-          ? `Hypothesis: ${redactTargetNoteSecrets(params.hypothesis_key)}\nOutcome: ${outcome}\nValid attempts used: ${attemptsUsed}/${Policy.MAX_ATTEMPTS}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}${attemptsUsed >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nValid-attempt budget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
-          : `No verification attempts recorded for hypothesis ${params.hypothesis_key}.`,
+          ? `Hypothesis: ${hypothesisKey}\nOutcome: ${outcome}\nValid attempts used: ${attemptsUsed}/${Policy.MAX_ATTEMPTS}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}${attemptsUsed >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nValid-attempt budget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
+          : `No verification attempts recorded for hypothesis ${hypothesisKey}.`,
         metadata: {
-          hypothesisKey: params.hypothesis_key,
+          hypothesisKey,
           attemptsUsed,
           maxAttempts: Policy.MAX_ATTEMPTS,
           outcome,
@@ -74,7 +75,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
 
     const result = VerificationLedger.record({
       sessionID,
-      hypothesisKey: redactTargetNoteSecrets(params.hypothesis_key),
+      hypothesisKey,
       asset: redactTargetNoteSecrets(params.asset),
       endpoint: safeLedgerText(params.endpoint),
       vulnerabilityClass: redactTargetNoteSecrets(params.vulnerability_class),
@@ -99,7 +100,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
     return {
       title: `Verification ${d.attemptsUsed}/${Policy.MAX_ATTEMPTS}: ${status}`,
       output: [
-        `Hypothesis: ${redactTargetNoteSecrets(params.hypothesis_key)}`,
+        `Hypothesis: ${hypothesisKey}`,
         `Outcome: ${status}`,
         `Attempts used: ${d.attemptsUsed}/${Policy.MAX_ATTEMPTS}`,
         `Remaining: ${d.remainingAttempts}`,
