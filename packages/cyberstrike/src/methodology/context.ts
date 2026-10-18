@@ -159,10 +159,17 @@ export function rankSkillsForPhase(
         score += 35
       }
     }
-    // A single generic token (for example "tech" from "tech-profile") is not enough
-    // to select an otherwise unrelated skill. Require either multiple token matches
-    // or a substantive exact/tag/description/technology signal.
-    if (score >= 6) ranked.push({ entry, score, query: matchedQuery })
+    // Token overlap alone is weak evidence: generic skills often share words like
+    // "web", "testing", or "recon" without containing the actual procedure.
+    // Keep broad token-only matches out of the shortlist unless several distinct
+    // tokens align; strong name/tag/category/technology matches still rank normally.
+    const hasSubstantiveMatch = queries.some((query) => {
+      const normalizedQuery = normalizeSkillText(query)
+      return name === normalizedQuery || name.startsWith(normalizedQuery) || name.includes(normalizedQuery) ||
+        tags.includes(normalizedQuery) || tags.some((tag) => tag === normalizedQuery) ||
+        category === normalizedQuery || tech.includes(normalizedQuery) || description.includes(normalizedQuery)
+    })
+    if (hasSubstantiveMatch || matchedTokens.length >= 3) ranked.push({ entry, score, query: matchedQuery })
   }
 
   ranked.sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
