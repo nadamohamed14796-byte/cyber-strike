@@ -237,12 +237,11 @@ Skills: `skill search --tech kubernetes,container,postexploit`
 
 ## Skill Usage
 
-```
-skill search --tech <technology>
-skill search --tag <tag>
-skill load <skill-name>
-skill unload <skill-name>
-```
+Use structured arguments with the `skill` tool, not shell-style commands:
+- Search: `skill({ action: "search", tech: ["<technology>"] })`
+- Category: `skill({ action: "search", category: "<category>" })`
+- Load/unload: `skill({ action: "load", name: "<exact-name-from-search>" })` / `skill({ action: "unload", name: "<exact-name>" })`
+- A skill counts as loaded only when the tool returns `<skill_content>`. If a load fails, search for the exact canonical name and record the gap if still unavailable.
 
 ## Tools
 
