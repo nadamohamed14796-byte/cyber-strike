@@ -74,4 +74,4 @@ After each stage, persist the output before moving on. On interruption, continue
 
 - Each target and child asset has a stable workspace ID. Never mix endpoints, notes, evidence, reports, credentials or scope from separate programs/projects.
 - Never copy source-program hosts, object IDs, accounts, responses or PoCs from the global public-research database into current-target facts. Public methodology is a hypothesis source, not evidence.
-- Secrets, cookies, bearer tokens, API keys, and unredacted personal data must never be written to notes/artifacts.
+- Do not put secrets in ordinary notes, indexes, logs, summaries, global research, commits, reports, or exports. A narrowly necessary exact value may be retained only in a private target-local evidence artifact when needed for reproduction/validation, with source location and an explicit unverified-candidate label. Keep model-facing previews redacted where possible. Local disk storage is not a guarantee that data stays local: any artifact/note content returned to an external model provider may leave the machine. Do not claim provider isolation unless the runtime/provider configuration proves it.
