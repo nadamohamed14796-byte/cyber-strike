@@ -34,7 +34,6 @@ import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { TargetMemory } from "../../target"
 import { JavaScriptCorrelation, safeCorrelationResponsePreview } from "../../target/javascript-correlation"
-import { redactTargetNoteSecrets } from "../../target/redact"
 
 const log = Log.create({ service: "server" })
 
