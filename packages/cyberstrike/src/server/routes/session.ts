@@ -1362,7 +1362,7 @@ export const SessionRoutes = lazy(() =>
             origin: normalized.origin,
             site: normalized.site,
             canonicalPath: normalized.canonicalPath,
-            templateID: normalized.templateID,
+            templateID: normalized.templateId,
             normSource: normalized.normSource,
             protocol: normalized.protocol,
             operation: normalized.operation,
