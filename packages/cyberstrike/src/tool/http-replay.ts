@@ -181,6 +181,9 @@ function redactSensitiveText(value: string): string {
 }
 
 function redactRequestForOutput(msg: HttpMessage.Request): HttpMessage.Request {
+  // Query strings can carry credentials too. Sanitize only the agent-facing copy;
+  // the original request remains unchanged for the actual send and local evidence.
+  const target = redactSensitiveText(msg.target)
   const headers = msg.headers.map((header) => ({
     ...header,
     value: SECRET_HEADER.test(header.name) ? "[REDACTED]" : redactSensitiveText(header.value),
@@ -205,7 +208,7 @@ function redactRequestForOutput(msg: HttpMessage.Request): HttpMessage.Request {
     const contentLength = headers.find((header) => header.name.toLowerCase() === "content-length")
     if (contentLength) contentLength.value = String(body.length)
   }
-  return { ...msg, headers, body }
+  return { ...msg, target, headers, body }
 }
 
 function curlTemplate(msg: HttpMessage.Request, origin: string): string {
@@ -701,7 +704,8 @@ export const HttpReplayTool = Tool.define("http_replay", {
             const mut = { ...sweep.mutation, value } as Apply.Mutation
             const varMsg = Apply.mutations(sharedMsg, [mut])
             const result = await sendGoverned(varMsg, origin, sendOpts)
-            return { value, ...summarize(result, params.marker) }
+            const sensitiveMutation = /(?:authorization|cookie|token|secret|password|api[-_]?key|session|csrf|credential)/i.test(sweep.mutation.name ?? "")
+            return { value: sensitiveMutation ? "[REDACTED]" : redactSensitiveText(value), ...summarize(result, params.marker) }
           } catch (e) {
             return { value, error: e instanceof Error ? e.message : String(e) }
           }
@@ -760,7 +764,7 @@ export const HttpReplayTool = Tool.define("http_replay", {
       manualReview: Boolean(params.mutations?.length || params.unauthenticated || params.credential || result.error),
     })
     const output = {
-      target: { method: msg.method, origin, request_target: msg.target },
+      target: { method: msg.method, origin, request_target: redactSensitiveText(msg.target) },
       ...summarize(result, params.marker),
       curl: curlTemplate(msg, origin),
       observation_note_saved: noteSaved,
