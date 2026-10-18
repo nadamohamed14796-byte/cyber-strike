@@ -45,7 +45,7 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
       const journalEntry = params.record_mode === "journal"
       const saved = await TargetMemory.addNote(workspace.targetURL, {
         kind: params.kind as TargetNoteKind,
-        title: params.title.trim().replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 180),
+        title: params.title.trim().replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ") ,
         content: params.content.trim(),
         evidence: params.evidence?.trim(),
         source: "agent:" + (ctx.agent || "cyberstrike").replaceAll("\r", " ").replaceAll("\n", " ").replaceAll("\t", " ").slice(0, 100),
