@@ -47,6 +47,13 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
   async execute(params, ctx) {
     const sessionID = Session.root(ctx.sessionID)
     const hypothesisKey = redactTargetNoteSecrets(params.hypothesis_key)
+    if (params.action === "record" && params.valid_conditions && !params.evidence_ref?.trim()) {
+      return {
+        title: "Verification attempt rejected: evidence reference required",
+        output: "No attempt was recorded. valid_conditions=true requires evidence_ref pointing to a stored request/response, artifact, or reproducible observation. If evidence is not available, record valid_conditions=false and keep the hypothesis inconclusive until evidence is preserved.",
+        metadata: { hypothesisKey, attemptsUsed: 0, maxAttempts: Policy.MAX_ATTEMPTS, outcome: "inconclusive", canContinue: true },
+      }
+    }
     if (params.action === "status") {
       const attempts = VerificationLedger.list({ sessionID, hypothesisKey })
       const uniqueAttempts = Policy.uniqueAttempts(attempts)
