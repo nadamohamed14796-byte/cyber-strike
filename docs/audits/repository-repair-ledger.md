@@ -610,3 +610,20 @@ The branch list returned by GitHub contained `main`, `dev`, `feat/proxy-config`,
 - The research destination filter still blocks `192.31.196.0/24`, `192.52.193.0/24`, and `192.175.48.0/24`. The [IANA IPv4 Special-Purpose registry](https://www.iana.org/assignments/iana-ipv4-special-registry) labels these allocations globally reachable; they are special-purpose service/anycast ranges, so this is a conservative deny policy and may overblock a research source hosted there. It must not be described as evidence those ranges are private or unroutable. No correction to those entries landed in this checkpoint.
 - `/recon` and the code fixes are committed to `main`; the local installed binary has not been rebuilt or smoke-tested here. A user installation must update/rebuild before runtime behavior can be confirmed.
 - Divergent branches and open PRs were not merged, force-pushed, or deleted. The pre-existing branch-only `cookies.txt` warning remains an owner review item; its contents were not opened or copied.
+
+## Follow-up checkpoint — 2026-10-18 03:45 UTC: research destination classification
+
+### Correction committed to `main`
+
+- Removed `192.31.196.0/24`, `192.52.193.0/24`, and `192.175.48.0/24` from the broad IPv4 deny list. These are globally reachable special-purpose AS112 anycast ranges; their special-purpose status alone does not make them private or unroutable.
+- Preserved the broader conservative deny for `192.0.0.0/24`, but added the IANA globally reachable exceptions `192.0.0.9` and `192.0.0.10`; neighboring `192.0.0.8` remains denied. Regression assertions cover both sides of the policy.
+- Source and tests were fetched back from GitHub after the updates. This is source-level verification only; the test suite, typecheck, build, and runtime fetch behavior have not been executed in this environment.
+
+Commits:
+- [a63baff](https://github.com/nadamohamed14796-byte/cyber-strike/commit/a63baff00e5343d024fd3b76cc8d1fa6a8a9fab6) and [b497543](https://github.com/nadamohamed14796-byte/cyber-strike/commit/b4975435b44c1d788ebaafa91f11d974b13ae5ec): remove false-positive AS112 blocks and test the public ranges.
+- [f5cfdb7](https://github.com/nadamohamed14796-byte/cyber-strike/commit/f5cfdb73d9a8b8db1a14abb6b7aaa987e8ff2389) and [81671af](https://github.com/nadamohamed14796-byte/cyber-strike/commit/81671afe4d7f60aeb32f299fc230ad2516554ccf): preserve globally reachable IETF IPv4 exceptions and test nearby denied addresses.
+
+### Still required
+
+- Run the new safe-fetch tests and the full package test/typecheck/build against the latest `main` commit; no CI status or workflow run is currently exposed for these direct-to-main commits.
+- Continue the runtime wiring audit of skill selection/loading, JavaScript analysis and endpoint/parameter retention, note-history persistence, and finding/false-positive evidence gates. No completion claim is made for these areas merely because the related source files were inspected.
