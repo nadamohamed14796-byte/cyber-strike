@@ -276,9 +276,6 @@ test("rejects private, local, link-local, reserved and documentation IP literals
     "172.16.2.3",
     "192.168.1.2",
     "192.0.2.5",
-    "192.31.196.1",
-    "192.52.193.1",
-    "192.175.48.1",
     "198.18.1.2",
     "203.0.113.9",
     "224.0.0.1",
@@ -298,6 +295,10 @@ test("rejects private, local, link-local, reserved and documentation IP literals
     expect(isPublicResearchAddress(address)).toBe(false)
   }
   expect(isPublicResearchAddress("93.184.216.34")).toBe(true)
+  // These special-purpose AS112 anycast ranges are globally reachable; do not treat them as private/reserved.
+  expect(isPublicResearchAddress("192.31.196.1")).toBe(true)
+  expect(isPublicResearchAddress("192.52.193.1")).toBe(true)
+  expect(isPublicResearchAddress("192.175.48.1")).toBe(true)
   expect(isPublicResearchAddress("2606:4700:4700::1111")).toBe(true)
 })
 
