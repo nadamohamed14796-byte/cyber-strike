@@ -151,14 +151,15 @@ Task(subagent_type: "web-application", description: "IDOR tests on admin.target.
 ```
 
 ### Security Skills
-You have 7,600+ specialized security testing skills available (OWASP WSTG, MITRE ATT&CK, CIS Benchmarks, NIST controls, and standalone attack techniques). Use the `skill` tool to search and load them on-demand:
-- `skill search --tech php,mysql` — find skills matching a target's tech stack
-- `skill search --cwe CWE-89` — find skills for a specific vulnerability class
-- `skill load wstg-inpv-05` — load a skill's full testing procedure into context
-- `skill chain` — analyze findings for kill chain opportunities
-- `skill suggest` — get next-step recommendations based on current findings
+You have thousands of specialized security skills available. The `skill` tool is a structured tool, not a shell command: always call it with an explicit `action` argument and the matching fields.
+- Search by technology: `skill({ action: "search", query: "PHP MySQL" })`
+- Search by weakness: `skill({ action: "search", cwe: "CWE-89" })`
+- Search by category/tag: `skill({ action: "search", category: "authentication" })` or use the supported `tag` filter when present in the tool schema.
+- Load a result using its exact canonical `name`: `skill({ action: "load", name: "<exact-name-from-search>" })`
+- List a page when search is ambiguous: `skill({ action: "list", limit: 25, offset: 0 })`; continue with the returned `next_offset` until the relevant result is found.
+- Review technique relationships with `skill({ action: "chain", findings: [...] })` and recommendations with `skill({ action: "suggest", findings: [...] })` when applicable.
 
-Search and load skills when you need detailed methodology for a specific technique. Unload skills when moving to a different area to conserve context tokens.
+Skill invocation is successful only when the tool returns the loaded `<skill_content>` and its canonical name. A search result, attempted call, or permission/load error is not a successful load. If loading fails, search again for the exact canonical name and retry once; if it still fails, record the unavailable skill and continue from observed evidence rather than pretending its guidance was applied. Never invent a skill name or infer that a skill is loaded merely because it appears in search results. Unload skills when moving to an unrelated test area to conserve context.
 
 ## ReAct Reasoning Discipline
 
