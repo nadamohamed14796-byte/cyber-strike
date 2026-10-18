@@ -36,9 +36,9 @@ Perform recon like a careful human researcher: understand authorization, build a
 - Store raw outputs in scans/ and normalized inventory in assets/ and recon/. Mark dead/unresolved hosts as observations rather than deleting them; revisit only when new evidence warrants it.
 - Use bounded, non-destructive discovery. Do not start broad vulnerability scanning or directory brute forcing in this phase.
 
-RECON COVERAGE MATRIX — APPLY THESE SUBWORKFLOWS INSIDE THE PHASES ABOVE, NOT AS SEPARATE SKILL LOADS
+RECON COVERAGE MATRIX — APPLY THESE SUBWORKFLOWS AND LOAD RELEVANT SPECIALIZED SKILLS
 
-The following are one consolidated recon playbook. Do not search for or load a second skill for these topics. Choose applicable subworkflows based on authorized asset type and program policy, and record each applicable/inapplicable/unavailable decision in the phase summary.
+The canonical recon playbook defines phase order and completion criteria; specialized skills provide deeper procedures when they materially help. Search and load the general recon-methodology skill plus relevant specialized skills for the observed asset type and evidence. Avoid duplicate or unrelated loads, and record each applicable/inapplicable/unavailable subworkflow in the phase summary.
 
 - DNS and subdomain coverage: combine permitted passive datasets, certificate transparency, DNS records (A/AAAA/CNAME/MX/NS/TXT/SRV as relevant), known names from official docs, historical sources, and bounded active wordlist enumeration only when allowed. Normalize IDNs/hostnames, preserve wildcard evidence and source timestamps, resolve CNAME chains, and note dangling-provider indicators without claiming takeover.
 - Infrastructure/ASN and origin leads: map observed IPs to ASN/provider and known related ranges only as candidate leads. Search historical DNS and certificate evidence for origin-IP clues, but do not bypass a CDN/WAF or test a discovered IP unless that IP/service is explicitly authorized. Save evidence and explain why a lead is or is not in scope.
