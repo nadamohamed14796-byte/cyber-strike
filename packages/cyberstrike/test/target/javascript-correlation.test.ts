@@ -83,10 +83,18 @@ test("redacts sensitive JSON response preview values across key families and quo
       secret: secretValues[4],
       refresh_token: secretValues[5],
       cookie: secretValues[6],
+      secretKey: "secret-key-value-must-be-hidden",
+      token: "generic-token-value-must-be-hidden",
+      "x-auth-token": "auth-header-token-must-be-hidden",
+      authorization: "Bearer multi word credential must be hidden",
     }),
   })
   expect(preview).toContain("[REDACTED]")
   for (const secret of secretValues) expect(preview).not.toContain(secret)
+  expect(preview).not.toContain("secret-key-value-must-be-hidden")
+  expect(preview).not.toContain("generic-token-value-must-be-hidden")
+  expect(preview).not.toContain("auth-header-token-must-be-hidden")
+  expect(preview).not.toContain("multi word credential must be hidden")
 })
 
 test("redacts detected literal secrets from source-analysis metadata before persistence", async () => {
