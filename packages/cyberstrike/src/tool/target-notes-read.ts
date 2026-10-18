@@ -29,7 +29,7 @@ export const TargetNotesReadTool = Tool.define<typeof TargetNotesReadParameters,
     "The workspace must already exist and the target must have been observed in this session tree. Do not use this tool to infer authorization or to test the target.",
   ].join("\n"),
   parameters: TargetNotesReadParameters,
-  async execute(params, ctx) {
+  async execute(params: z.input<typeof TargetNotesReadParameters>, ctx) {
     try {
       const sessionID = Session.root(ctx.sessionID)
       const workspace = await TargetMemory.get(params.target_url)
