@@ -7,6 +7,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   const rawTarget = target.trim()
   const value = rawTarget.toLowerCase()
   const rawScope = scope.trim()
+  let rawAllowed = rawScope
   let allowed = rawScope.toLowerCase()
 
   // HackerOne scope exports may include an asset type alongside its identifier.
@@ -46,6 +47,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
         ? { matches: true, reason: "matches HackerOne URL asset host, port, and path" }
         : { matches: false, reason: "target does not match HackerOne URL asset host, port, and path" }
     } else {
+      rawAllowed = rawScope.replace(/^[^:]+:[ \\t]*/, "").trim()
       allowed = identifier
     }
   }
@@ -117,7 +119,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     let scopeURL: URL
     try {
         candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
-        scopeURL = new URL(rawScope)
+        scopeURL = new URL(rawAllowed)
     } catch {
       return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
     }
