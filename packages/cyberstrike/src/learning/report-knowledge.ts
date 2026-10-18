@@ -1064,14 +1064,12 @@ export namespace ReportKnowledge {
     // Runtime recommendations are reusable public references only. Local findings and
     // triage lessons can contain target-specific details, so they remain available to
     // explicit search but are never mixed into cross-target hunting context.
-    const limit = boundedLimit(input.limit, 8, 1, 50)
     const rows = search({
       query: input.signal,
       vulnerabilityClass: input.vulnerabilityClass,
       cweID: input.cweID,
       sourceKind: "external_report",
       publicReferencesOnly: true,
-      limit: Math.min(limit * 3, 100),
     })
     return (
       rows
@@ -1099,7 +1097,6 @@ export namespace ReportKnowledge {
         })
         // search() already ranks by query relevance, then confidence/usefulness.
         // Do not replace that ordering with a confidence-only sort.
-        .slice(0, limit)
     )
   }
 }
