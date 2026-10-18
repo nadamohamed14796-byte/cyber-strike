@@ -42,7 +42,7 @@ The root is \`.cyberstrike/targets/<stable-slug>/\` inside the active CyberStrik
 - \`scope/\`: saved authorization manifest and input scope snapshots (never replace \`scope/scope.json\` through the generic artifact tool).
 - \`assets/\`: child-workspace registry; child workspaces are nested here.
 - \`recon/\`, \`urls/\`, \`endpoints/\`, \`javascript/\`: reconnaissance inventory, live assets, URL/API endpoints, JS analysis.
-- \`requests/\`: request/response references and correlation metadata; redact secrets.
+- \`requests/\`: request/response references and correlation metadata. Keep ordinary indexes, summaries, and model-facing previews redacted. If an exact secret-like value is essential to reproduce or validate a finding, preserve it only in a clearly labeled private target-local evidence artifact with its source/location and candidate status; never place it in shared summaries, reports, commits, global research, or external exports.
 - \`testing/\`: hypotheses, test matrices, verification outcomes, and negative results.
 - \`findings/\`, \`evidence/\`, \`reports/\`: finding references, redacted evidence indexes, and report drafts.
 - \`scans/\`, \`runs/\`, \`logs/\`, \`sessions/\`: resumability, tool manifests, output logs, and safe session references.
