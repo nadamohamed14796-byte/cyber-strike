@@ -170,7 +170,7 @@ function buildFromTarget(t: {
 }
 
 const BODY_PREVIEW = 4096
-const SECRET_HEADER = /^(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|x-auth-token|x-access-token|x-session-token|x-csrf-token)$/i
+const SECRET_HEADER = /(?:authorization|proxy-authorization|cookie|set-cookie|api[-_]?key|token|secret|password|session|csrf|credential)/i
 
 function redactSensitiveText(value: string): string {
   return value
@@ -328,8 +328,8 @@ function buildDiff(baseline: ReplayResponse.Result, exploit: ReplayResponse.Resu
   if (!bs || !ex) {
     return {
       comparable: false,
-      baseline_error: baseline.error?.message ?? null,
-      exploit_error: exploit.error?.message ?? null,
+      baseline_error: baseline.error ? redactSensitiveText(baseline.error.message) : null,
+      exploit_error: exploit.error ? redactSensitiveText(exploit.error.message) : null,
     }
   }
 
