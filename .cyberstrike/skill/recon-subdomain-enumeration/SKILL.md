@@ -141,3 +141,26 @@ Replace both example hosts with the actual authorized program and child. Never a
 
 ### Discovery provenance and wildcard handling
 Keep each candidate with source, timestamp, DNS answers/CNAME chain, wildcard-DNS check, HTTP fingerprint, ownership evidence, and explicit scope decision. Deduplicate normalized hostnames while preserving their discovery sources; never discard method, port, or auth context when later joining URL inventories. Correlate passive findings with current DNS and a second independent ownership signal before active probing. A historical hostname, third-party CNAME, wildcard response, or cert-transparency entry is a lead—not proof of live ownership or permission. Delta newly observed hosts against earlier runs, and route confirmed HTTP hosts to web recon while keeping cloud/CDN/shared-hosting ambiguity passive until resolved.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use passive asset sources first, then subfinder for domain discovery and dnsx for resolving records. Amass is an optional alternative when its broader graph/source coverage is needed; httpx can validate a curated set of discovered web endpoints.
+
+### Installation and setup
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — official installers/usage for subfinder, dnsx, httpx, and related tools.
+- [OWASP Amass](https://github.com/owasp-amass/amass) — official source/release instructions.
+- Use the program's approved host input and any request/rate constraints; do not install random wordlists or script bundles from untrusted repositories.
+A discovered hostname is a lead, not automatically an authorized target. Preserve passive-only results separately from active HTTP confirmation.
+
+### Primary resources
+- [OWASP WSTG — Information Gathering](https://owasp.org/www-project-web-security-testing-guide/) — recon methodology.
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — tool behavior and output.
+- [OWASP DNS Security Cheat Sheet](https://cheatsheetseries.owasp.org/) — relevant DNS hygiene context.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize any HTTP URLs discovered; it sends no DNS or HTTP requests.
+
+### Result handling
+Record source, observation time, record type, resolver, confidence, live status, and next phase. Deduplicate assets without discarding alternate discovery sources.
