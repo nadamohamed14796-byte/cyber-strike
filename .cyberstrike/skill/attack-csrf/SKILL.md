@@ -111,9 +111,9 @@ State the exact mutation reached, the privilege level required to exploit it, an
 - Stop before credential changes, MFA removal, payments, or irreversible actions.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary attempt ceiling)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+Continue testing materially distinct hypotheses while they remain plausible and new evidence can resolve the question; do not impose a fixed attempt ceiling. Stop when direct evidence resolves the hypothesis, no meaningful branch remains, a prerequisite is genuinely unavailable, or program/safety rules require it. Cosmetic retries do not count as new strategies.
 
 Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
 
@@ -143,3 +143,7 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [uphiago — hunt-csrf](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-csrf)
 - [Claude-BugHunter — hunt-csrf](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-csrf)
 - [OWASP CSRF Prevention Cheat Sheet](https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.md)
+
+
+## Enrichment: browser-triggered state change
+Use only a controlled account and a disposable object. Compare the normal same-site state-changing request with a controlled cross-origin browser attempt, then re-read the object's state and capture the actual server decision. Record whether cookies are sent, which SameSite policy applies, token validation, and Origin/Referer behavior. A missing token is not sufficient if another server-side control rejects the request. Chain to session management or clickjacking only when the respective condition is shown independently.
