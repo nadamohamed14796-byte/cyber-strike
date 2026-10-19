@@ -97,6 +97,51 @@ test("target workspace tool initializes, configures scope, and nests authorized 
   })
 })
 
+test("user-confirmed exact scope can be extended with another exact asset without asking for a policy URL", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const init = await tool.execute({
+          action: "init",
+          target_url: "https://app.example.test",
+        }, {} as never)
+
+        const initial = await tool.execute({
+          action: "configure_scope",
+          target_url: "https://app.example.test",
+          include: ["app.example.test"],
+          user_confirmed_scope: true,
+        }, {} as never)
+        expect(initial.metadata.saved).toBe(true)
+        expect(initial.metadata.scope_configured).toBe(true)
+
+        const added = await tool.execute({
+          action: "configure_scope",
+          target_url: "https://app.example.test",
+          include: ["api.example.test"],
+          merge_existing: true,
+        }, {} as never)
+        expect(added.metadata.saved).toBe(true)
+        expect(added.metadata.scope_configured).toBe(true)
+
+        const scope = await TargetMemory.getScope("https://app.example.test")
+        expect(scope?.scopeItems).toEqual(["app.example.test", "api.example.test"])
+        expect(scope?.authorizationReference).toBeNull()
+        expect(scope?.authorizationSource).toContain("User-confirmed in conversation")
+
+        const notes = await fs.readFile(path.join(init.metadata.workspace!, "notes.md"), "utf-8")
+        expect(notes).toContain("User-confirmed in-scope asset: app.example.test")
+        expect(notes).toContain("User-confirmed in-scope asset: api.example.test")
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
+
 test("scope-file import persists the source list, configured manifest, and notes in the canonical workspace", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
