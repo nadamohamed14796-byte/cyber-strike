@@ -104,9 +104,18 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
 
       if (params.action === "begin") {
         if (phase !== "scope_validation" && phase !== "workspace_setup") {
-          const scopeDecision = await TargetMemory.checkURLScope(workspace.targetURL)
-          if (!scopeDecision.allowed || scopeDecision.workspace?.id !== workspace.id) {
-            return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the canonical target workspace does not pass its current persisted scope gate: " + scopeDecision.reason, metadata: { saved: false, reason: "persisted_scope_rejected", scope_reason: scopeDecision.reason } }
+          // The root workspace can represent a bug-bounty program/policy container,
+          // not an in-scope hostname (for example, a program that authorizes unrelated
+          // domains). Validate that its saved authorization manifest is configured;
+          // individual candidate URLs must still pass checkURLScope before active use.
+          let rootScope
+          try {
+            rootScope = await TargetMemory.getScope(workspace.targetURL)
+          } catch (error) {
+            return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the root authorization manifest could not be loaded: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "persisted_scope_invalid" } }
+          }
+          if (!rootScope || rootScope.status !== "configured" || rootScope.scopeItems.length === 0) {
+            return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the canonical program workspace has no configured, non-empty authorization scope. Configure and review the official scope before continuing.", metadata: { saved: false, reason: "persisted_scope_unconfigured" } }
           }
         }
         const unresolved = unresolvedReconPrerequisites(phase, run.phases)
@@ -130,9 +139,19 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
         }
         if (status === "complete" && phase === "scope_validation") {
-          const decision = await TargetMemory.checkURLScope(workspace.targetURL)
-          if (!decision.allowed || decision.workspace?.id !== workspace.id) {
-            return { title: "Scope validation rejected", output: "Cannot mark scope_validation complete: the persisted scope gate did not authorize the canonical target URL. " + decision.reason, metadata: { saved: false, reason: "scope_validation_failed", scope_reason: decision.reason } }
+          // Scope validation proves the official policy is saved on the canonical
+          // program workspace. The root URL itself need not be in scope: the program
+          // may authorize unrelated domains. Recon and testing tools must separately
+          // authorize each concrete candidate URL against this manifest.
+          let scope
+          try {
+            scope = await TargetMemory.getScope(workspace.targetURL)
+          } catch (error) {
+            return { title: "Scope validation rejected", output: "Cannot complete scope_validation because the saved authorization manifest is invalid: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_manifest_invalid" } }
+          }
+          if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0 ||
+            !scope.authorizationSource?.trim() || !scope.authorizationReference?.startsWith("https://")) {
+            return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the canonical program workspace must have a configured, non-empty scope manifest with authorization source and HTTPS policy reference. The root workspace URL itself does not have to be in scope.", metadata: { saved: false, reason: "scope_manifest_unconfigured" } }
           }
         }
         if (status === "complete" && phase === "workspace_setup") {
