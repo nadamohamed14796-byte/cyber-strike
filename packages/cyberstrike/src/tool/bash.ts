@@ -17,7 +17,7 @@ import { Shell } from "@/shell/shell"
 import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
-import { TargetMemory, type TargetScope } from "../target"
+import { TargetMemory, type TargetScope, type Workspace } from "../target"
 import { reconPhaseGate, type ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
@@ -118,8 +118,10 @@ function hostnameMatchesScopeRule(ruleInput: string, hostname: string): boolean 
  * Katana cannot call CyberStrike's scope matcher before every HTTP request, so
  * a narrower manifest must use a scope-aware request/crawl path instead.
  */
-export function katanaScopeBlockReason(args: string[], targetURL: string, scope: TargetScope | null): string | undefined {
-  if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
+export function katanaScopeBlockReason(args: string[], targetURL: string, scopeInput: TargetScope | TargetScope[] | null): string | undefined {
+  const scopes = (Array.isArray(scopeInput) ? scopeInput : scopeInput ? [scopeInput] : [])
+    .filter((scope) => scope.status === "configured" && scope.scopeItems.length > 0)
+  if (scopes.length === 0) {
     return "Katana requires a configured, non-empty persisted scope manifest."
   }
 
@@ -152,43 +154,54 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scope:
     return "Katana target must be an absolute HTTP(S) URL."
   }
   const hostname = target.hostname.toLowerCase().replace(/\.$/, "")
-  const broadInclude = scope.scopeItems.some((item) => hostnameMatchesScopeRule(item, hostname))
-  if (!broadInclude) {
-    return "Katana requires an exact-host or wildcard-domain scope entry covering " + hostname + "; URL/path/port-only scope entries need per-request scope enforcement."
-  }
 
-  // A path/protocol/port exclusion for this host cannot be enforced by -fs fqdn.
-  for (const item of scope.excludedItems) {
-    const raw = item.trim().replace(/^(?:url)[ \t]*:[ \t]*/i, "")
-    if (/^https?:\/\//i.test(raw)) {
-      let excluded: URL
-      try { excluded = new URL(raw.replace("*.", "scope-wildcard.")) } catch { continue }
-      const excludedHost = excluded.hostname.toLowerCase().replace(/\.$/, "")
-      const wildcard = excludedHost.startsWith("scope-wildcard.")
-      const wildcardBase = wildcard ? excludedHost.slice("scope-wildcard.".length) : ""
-      const authority = raw.match(/^https?:\/\/([^/]+)/i)?.[1] ?? ""
-      const explicitPort = /:\d+$/.test(authority)
-      const hostMatches = excludedHost === hostname ||
-        (wildcard && (hostname === wildcardBase || hostname.endsWith("." + wildcardBase)))
-      if (hostMatches && (excluded.pathname !== "/" || excluded.port || explicitPort || excluded.protocol !== target.protocol)) {
-        return "Katana cannot enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+  // Every configured scope in the asset's ancestry is authoritative. FQDN is
+  // insufficient for URL/path/port-only inclusions or any narrower exclusions.
+  for (const scope of scopes) {
+    const broadInclude = scope.scopeItems.some((item) => hostnameMatchesScopeRule(item, hostname))
+    if (!broadInclude) {
+      return "Katana requires an exact-host or wildcard-domain scope entry covering " + hostname + " in every applicable scope layer; URL/path/port-only scope needs per-request scope enforcement."
+    }
+
+    for (const item of scope.excludedItems) {
+      const raw = item.trim().replace(/^(?:url)[ \t]*:[ \t]*/i, "")
+      if (/^https?:\/\//i.test(raw)) {
+        let excluded: URL
+        try { excluded = new URL(raw.replace("*.", "scope-wildcard.")) } catch { continue }
+        const excludedHost = excluded.hostname.toLowerCase().replace(/\.$/, "")
+        const wildcard = excludedHost.startsWith("scope-wildcard.")
+        const wildcardBase = wildcard ? excludedHost.slice("scope-wildcard.".length) : ""
+        const authority = raw.match(/^https?:\/\/([^/]+)/i)?.[1] ?? ""
+        const explicitPort = /:\d+$/.test(authority)
+        const hostMatches = excludedHost === hostname ||
+          (wildcard && (hostname === wildcardBase || hostname.endsWith("." + wildcardBase)))
+        if (hostMatches && (excluded.pathname !== "/" || excluded.port || explicitPort || excluded.protocol !== target.protocol)) {
+          return "Katana cannot enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+        }
+        continue
       }
-      continue
-    }
 
-    const hostPort = raw.match(/^([^:/]+):(\d{1,5})$/)
-    if (hostPort && hostPort[1]!.toLowerCase().replace(/\.$/, "") === hostname) {
-      return "Katana cannot enforce the saved port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
-    }
+      const hostPort = raw.match(/^([^:/]+):(\d{1,5})$/)
+      if (hostPort && hostPort[1]!.toLowerCase().replace(/\.$/, "") === hostname) {
+        return "Katana cannot enforce the saved port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+      }
 
-    let exclusion = raw.replace(/^(?:domain|wildcard)[ \t]*:[ \t]*/i, "")
-    if (exclusion.startsWith("*.")) {
-      const suffix = exclusion.slice(2).replace(/\.$/, "")
-      if (hostname === suffix || hostname.endsWith("." + suffix)) {
+      let exclusion = raw
+      const typed = exclusion.match(/^(domain|wildcard)[ \t]*:[ \t]*(.+)$/i)
+      if (typed) {
+        exclusion = typed[2]!.trim()
+        if (typed[1]!.toLowerCase() === "wildcard" && !exclusion.includes("*") && !/\{[^{}]+\}/.test(exclusion)) {
+          exclusion = "*." + exclusion
+        }
+      }
+      if (exclusion.startsWith("*.")) {
+        const suffix = exclusion.slice(2).replace(/\.$/, "")
+        if (hostname === suffix || hostname.endsWith("." + suffix)) {
+          return "Katana cannot safely merge the saved host exclusion '" + item + "' into a single-host crawl."
+        }
+      } else if (exclusion.toLowerCase().replace(/\.$/, "") === hostname) {
         return "Katana cannot safely merge the saved host exclusion '" + item + "' into a single-host crawl."
       }
-    } else if (exclusion.toLowerCase().replace(/\.$/, "") === hostname) {
-      return "Katana cannot safely merge the saved host exclusion '" + item + "' into a single-host crawl."
     }
   }
   return undefined
@@ -286,6 +299,30 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   if (!targets.length) {
     throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s). Target-list/file mode is blocked until each target can be checked against persisted scope and phase checkpoints.")
   }
+  const workspaceScopes = new Map<string, Promise<TargetScope[]>>()
+  const scopesForWorkspace = (start: Workspace): Promise<TargetScope[]> => {
+    const cached = workspaceScopes.get(start.id)
+    if (cached) return cached
+    const pending = (async () => {
+      const allWorkspaces = new Map(TargetMemory.list().map((item) => [item.id, item]))
+      const scopes: TargetScope[] = []
+      const visited = new Set<string>()
+      let current: Workspace | undefined = start
+      while (current) {
+        if (visited.has(current.id)) throw new Error("target workspace ancestry contains a cycle")
+        visited.add(current.id)
+        const currentScope = await TargetMemory.getScope(current.targetURL)
+        if (currentScope?.status === "configured") scopes.push(currentScope)
+        if (!current.parentTargetID) break
+        current = allWorkspaces.get(current.parentTargetID)
+        if (!current) throw new Error("parent target workspace is missing; refusing to weaken inherited scope")
+      }
+      return scopes
+    })()
+    workspaceScopes.set(start.id, pending)
+    return pending
+  }
+
   for (const target of targets) {
     let url: string
     try {
@@ -313,8 +350,13 @@ async function assertScannerReconGate(command: string[], commandText: string): P
         throw new Error("Recon execution gate blocked " + scanner + " for " + scopedURL + ": persisted scope rejected the target/port (" + decision.reason + "). No scanner command was started.")
       }
       if (scanner === "katana") {
-        const scope = await TargetMemory.getScope(scopedURL)
-        const reason = katanaScopeBlockReason(args, scopedURL, scope)
+        let scopes: TargetScope[]
+        try {
+          scopes = await scopesForWorkspace(decision.workspace)
+        } catch (error) {
+          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": unable to verify all inherited scope layers (" + (error instanceof Error ? error.message : String(error)) + "). No crawler command was started.")
+        }
+        const reason = katanaScopeBlockReason(args, scopedURL, scopes)
         if (reason) {
           throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, and -d 3. No crawler command was started.")
         }
