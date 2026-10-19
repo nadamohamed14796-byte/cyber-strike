@@ -400,3 +400,29 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+
+### Recommended tools
+- Python requests/httpx libraries — controlled repeatable request comparisons
+- jq — inspect structured API responses
+- http_response_diff.py — compare baseline and controlled-account results
+- A local JSONL matrix generator for test-owned accounts and objects
+
+### Official resources
+- https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
+- https://portswigger.net/web-security/access-control
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
+
+### Helper script and output contract
+Generate a matrix of tester-owned identities, roles, object owners, and read-only operations. Use http_response_diff.py, record controls and redacted response fingerprints, and verify server-side authorization rather than relying on status code alone.
+
+Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
+
+### Handoff
+Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
