@@ -81,10 +81,12 @@ For a candidate advisory, record product branch, version, patch level, reachable
 
 ## Tools
 
-- **curl:** bounded SOAP/HTTP response checks.
-- **Zimbra release notes/security advisories:** confirm patch levels and feature prerequisites.
-- **XML/SOAP parser:** inspect synthetic protocol responses offline.
-- **Source/config review or isolated lab:** validate proxy/upload handlers safely.
+- `curl`: bounded SOAP/HTTP response checks with explicit timeouts.
+- XML/SOAP parser: inspect synthetic protocol responses offline.
+- Vendor release notes/security advisories: confirm patch levels and feature prerequisites.
+- Source/config review or isolated lab: validate handlers without production state changes.
+
+Verify `curl --version`. Official docs: https://curl.se/docs/, https://wiki.zimbra.com/wiki/Security_Center, https://www.zimbra.com/downloads/.
 
 ## Zimbra Surface and CVE Matrix
 
@@ -166,26 +168,3 @@ grep -iE '^(HTTP/|content-type:|location:|server:|www-authenticate:)' zimbra.hea
 Do not save SOAP bodies containing mailbox, user, or authentication data. If protocol structure must be inspected, use a synthetic lab fixture and retain only the fields needed to establish the behavior.
 
 Record product_build_sources, vendor_advisory, affected_range, fixed_build, handler_path, auth_requirement, proxy_path, validation_environment, callback_evidence_if_permitted, and cleanup_status. Keep production exploitability unconfirmed when only version/build evidence is available.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use curl/Burp for low-impact version/route verification and Nuclei only for a relevant, reviewed detection template after program rules permit the request pattern. Match exact Zimbra product/version and advisory before interpreting a signal.
-
-### Installation and setup
-- On Kali/Debian, install curl with sudo apt update && sudo apt install curl.
-- [Nuclei documentation](https://docs.projectdiscovery.io/tools/nuclei/overview) — official installation and usage.
-- [Nuclei templates](https://github.com/projectdiscovery/nuclei-templates) — inspect the template source and request count before use.
-Do not run public exploit scripts, authenticated destructive routes, or high-volume template sets simply to check whether an instance is vulnerable. Prefer a lab replica for exploitability confirmation.
-
-### Primary resources
-- [Broadcom support and security advisories](https://support.broadcom.com/) — product version and advisory context.
-- [Nuclei documentation](https://docs.projectdiscovery.io/tools/nuclei/overview) — scanner behavior.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — web verification.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare captured responses offline.
-
-### Result handling
-Record version evidence, advisory affected ranges, route/auth context, safe reproducible response, and the gap between version match and confirmed impact. Avoid saving mailboxes, private messages, or credentials.
