@@ -89,7 +89,6 @@ For a suspected issue, capture a single benign handshake or read-only response a
 - Avoid high-rate full-range scans unless explicitly allowed; broad scanning is not a substitute for targeted validation.
 - Do not infer that all addresses within a hosting provider's ASN belong to the target.
 
-
 ## Signal Confidence, Attempt Budget, and Handoff
 
 Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
@@ -108,7 +107,6 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 4. Identify services with safe protocol handshakes or read-only banners; account for proxies, NAT, firewall filtering, rate limits, and shared-provider infrastructure before attributing a service.
 5. Stop on instability, rate-limit signals, unexpected sensitive data, or an out-of-scope address. Return a deduplicated service inventory with confidence and a narrow application-specific handoff.
 
-
 ### Deduplication and stop rules
 
 Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
@@ -123,13 +121,10 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - [Nmap Reference Guide](https://nmap.org/book/man.html)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Service fingerprint and owner gate
 For each host/port, record the exact resolver result, scope basis, service-detection confidence, banner source, protocol/TLS details, and whether the service is owned by the target or a shared provider. Start with low-impact connection checks and conservative timeouts; increase depth only when allowed and a clear hypothesis exists. Distinguish an open socket from an exposed administration function or vulnerable version. Validate protocol identity using service-specific evidence and vendor release notes; account for proxies and backports. Avoid exploit modules or broad UDP/TCP expansion by default. Route confirmed web interfaces to web recon, management planes to the relevant product specialist, and internal-only services to the program's explicit network-testing rules.
-
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
