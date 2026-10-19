@@ -63,3 +63,29 @@ Prefer private endpoints, narrow ingress allowlists, TLS, managed identity or st
 - https://www.mongodb.com/docs/manual/security/
 - https://www.postgresql.org/docs/current/client-authentication.html
 - https://www.elastic.co/guide/en/elasticsearch/reference/current/secure-cluster.html
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify official install docs, version, license, platform compatibility, and operational impact before use.
+
+### Recommended tools
+- nmap service detection with narrow approved ports
+- nrich/fingerprintx where supported for service metadata
+- Native database clients only for unauthenticated handshake or explicitly provisioned test accounts
+- Python/jq for inventory parsing
+
+### Resources
+- https://nmap.org/book/man.html
+- https://github.com/projectdiscovery/fingerprintx
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids, not a substitute for reviewing source, release provenance, and supported behavior.
+
+### Helper-script contract
+Record protocol handshake, auth-required state, TLS, source IP context, and intended exposure. Do not attempt credential guessing or enumerate database contents; a reachable port/banner alone is not a finding.
+
+Preserve native evidence; normalize to a separate file. Keep source, timestamp, tool/version, error state, confidence, and redaction. Use explicit paths, machine-readable output, and local test fixtures. Never silently treat missing data as a pass.
+
+### Handoff
+Return actual commands/tool versions, input/output paths, records checked, failures, confidence, limitations, and next skill. A detected service or misconfiguration is a lead until impact is confirmed.
