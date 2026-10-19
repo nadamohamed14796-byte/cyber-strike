@@ -107,7 +107,6 @@ Verify `curl --version`, the selected Python client, and `openssl version`. Offi
 - A 401/403 route is often the intended protection; don't label it vulnerable.
 - No spraying, credential stuffing, relay, coercion, mailbox access, or high-rate lockout testing in this skill.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. Never override program rules or production-safety constraints.
@@ -121,7 +120,6 @@ Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, o
 3. Prioritize safe configuration signals such as exposed management interfaces, transport/TLS configuration, and unintended information disclosure; correlate with vendor advisories rather than testing an exploit solely because a banner matches.
 4. Validate any suspected mailbox access or administrative capability with a synthetic test message/resource only. Do not access employee mailboxes, harvest tokens, or alter tenant settings.
 5. Capture evidence and build recommendations around supported versions, patch state, and least-privilege exposure; stop on sensitive mailbox content or a possible service-stability issue.
-
 
 ### Verdict gates
 
@@ -143,12 +141,10 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [Microsoft Exchange Server documentation](https://learn.microsoft.com/en-us/exchange/)
 - [Microsoft Security Update Guide](https://msrc.microsoft.com/update-guide)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Product/version confidence and exposure boundary
 Distinguish Exchange on-premises, Exchange Online, OWA, Autodiscover, hybrid identity, reverse-proxy, and unrelated endpoints by corroborating multiple version/product-specific signals. Public banners, an NTLM challenge, or a reachable OWA route do not establish a vulnerable build or exploitability. Match the exact product/build to current vendor advisories and consider backports and mitigations; use read-only evidence for external bug bounty work and validate exploit behavior only in an isolated lab or under explicit rules. Chain to identity/federation review only when the affected authentication boundary is observed, and to information disclosure only when a sensitive response is directly demonstrated.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
