@@ -64,7 +64,16 @@ EMBEDDED_API_SKILL_REGRESSION_MARKER
 })
 
 test("agent initialization fails loudly when a required embedded skill is missing", async () => {
-  await using tmp = await tmpdir({ git: true })
+  await using tmp = await tmpdir({
+    git: true,
+    init: async (dir) => {
+      const skillDir = path.join(dir, ".cyberstrike", "skill", "unrelated-test-skill")
+      await Bun.write(
+        path.join(skillDir, "SKILL.md"),
+        "---\nname: unrelated-test-skill\ndescription: Keeps the isolated catalog non-empty.\n---\n\n# Test fixture\n",
+      )
+    },
+  })
   const previousHome = process.env.CYBERSTRIKE_TEST_HOME
   process.env.CYBERSTRIKE_TEST_HOME = tmp.path
   try {
