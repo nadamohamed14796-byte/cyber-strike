@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, reconScannerInvocationKey } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, reconScannerInvocationKey, scannerLaunchedByWrapper } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -46,6 +46,21 @@ describe("Scanner shell-wrapper detection", () => {
     expect(await findWrappedScanner("sudo bash -lc 'katana -u https://example.com'")).toBe("katana")
     expect(await findWrappedScanner("printf '%s' 'katana -u https://example.com'")).toBeUndefined()
     expect(await findWrappedScanner("grep katana notes.txt")).toBeUndefined()
+  })
+})
+
+describe("Indirect scanner wrapper policy", () => {
+  test("blocks actual xargs/parallel/find execution wrappers, not scanner names in search arguments", async () => {
+    expect(await scannerLaunchedByWrapper(["xargs", "-I{}", "katana", "-u", "https://example.com"], 0)).toBe("katana")
+    expect(await scannerLaunchedByWrapper(["parallel", "-j", "2", "katana", "-u", "https://example.com"], 0)).toBe("katana")
+    expect(await scannerLaunchedByWrapper(["find", "/tmp", "-exec", "katana", "-u", "https://example.com", ";"], 0)).toBe("katana")
+    expect(await scannerLaunchedByWrapper(["find", "/tmp", "-exec", "sh", "-c", "katana -u https://example.com", ";"], 0)).toBe("katana")
+    expect(await scannerLaunchedByWrapper(["xargs", "grep", "katana", "notes.txt"], 0)).toBeUndefined()
+  })
+
+  test("parses env split-string as a command but ignores quoted text in ordinary arguments", async () => {
+    expect(await scannerLaunchedByWrapper(["env", "-S", "katana -u https://example.com"], 0)).toBe("katana")
+    expect(await scannerLaunchedByWrapper(["env", "-S", "grep katana notes.txt"], 0)).toBeUndefined()
   })
 })
 
