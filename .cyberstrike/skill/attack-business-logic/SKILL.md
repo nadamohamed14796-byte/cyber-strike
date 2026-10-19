@@ -99,7 +99,7 @@ Use a lab or disposable item with a small agreed request budget. Do not issue hi
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
 
@@ -133,3 +133,16 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [uphiago — hunt-business-logic](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-business-logic)
 - [Claude-BugHunter — hunt-business-logic](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-business-logic)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
+
+
+## Hands-on field pattern: state transition and invariant checks
+Map the workflow before testing: current state → allowed actor → expected transition → invariant that must remain true. Use an owned disposable record or staging fixture; avoid real payments, refunds, transfers, invitations, or destructive actions.
+
+```text
+Fixture: TEST_ORDER_001 (owned by controlled account A)
+Baseline: GET /api/orders/TEST_ORDER_001 -> status=Pending, owner=A
+Probe: replay the observed transition request as the same authorized actor; change one workflow variable only
+Verify: read the controlled object again and compare persisted state, audit event, and downstream side effects
+```
+
+The strongest chain is input/state inconsistency → missing server-side invariant → unauthorized or duplicate transition → measurable business consequence. Chain into attack-race-condition, attack-rate-limit-bypass, attack-bfla, or attack-idor-automation only when the relevant concurrency, abuse-control, function, or object signal is observed.
