@@ -64,10 +64,13 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
 
-  test("requires a unique output path inside the canonical workspace urls folder", () => {
+  test("requires a unique direct output path inside the canonical workspace urls folder", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/outside.txt"], "https://example.com", baseScope, workspacePath)).toContain("inside")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
+    const nestedOutput = path.join(workspacePath, "urls", "nested", "katana.jsonl")
+    const nestedArgs = safeArgs.map((arg) => arg === safeOutput ? nestedOutput : arg)
+    expect(katanaScopeBlockReason(nestedArgs, "https://example.com", baseScope, workspacePath)).toContain("direct child")
   })
 
   test("rejects a crawler command without explicit URL inputs", () => {
