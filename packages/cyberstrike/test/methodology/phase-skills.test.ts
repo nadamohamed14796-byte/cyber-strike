@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import path from "path"
 import { Phase } from "../../src/methodology/phase"
 import { PHASE_REQUIRED_SKILLS, rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
 import { Skill } from "../../src/skill"
+import { Instance } from "../../src/project/instance"
 import type { SkillIndex } from "../../src/skill/index-engine"
 import { RECON_METHODOLOGY_PROMPT, RECON_SPECIALIZED_COVERAGE_PROMPT } from "../../src/methodology/recon"
 
@@ -18,13 +20,18 @@ describe("Recon prompt specialization", () => {
 
 describe("Phase-critical skill pinning", () => {
   test("every pinned phase-critical skill exists in the actual runtime catalog", async () => {
-    const catalog = await Skill.all()
-    const available = new Set(catalog.map((skill) => skill.name.trim().toLowerCase()))
-    for (const [phaseID, required] of Object.entries(PHASE_REQUIRED_SKILLS) as Array<[Phase.Id, string[]]>) {
-      for (const name of required) {
-        expect(available.has(name.toLowerCase()), phaseID + " requires loadable skill " + name).toBe(true)
-      }
-    }
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const catalog = await Skill.all()
+        const available = new Set(catalog.map((skill) => skill.name.trim().toLowerCase()))
+        for (const [phaseID, required] of Object.entries(PHASE_REQUIRED_SKILLS) as Array<[Phase.Id, string[]]>) {
+          for (const name of required) {
+            expect(available.has(name.toLowerCase()), phaseID + " requires loadable skill " + name).toBe(true)
+          }
+        }
+      },
+    })
   })
 
   test("phase-critical skills remain present even when the optional shortlist limit is one", () => {
