@@ -241,15 +241,15 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           throw new Error(`Permission denied: skill "${canonicalName}" is not accessible to agent "${ctx.agent ?? "unknown"}".`)
         }
         const headings = skill.content
-          .split(/\\r?\\n/)
+          .split(/\r?\n/)
           .filter((line) => /^\\s{0,3}#{1,4}\\s+/.test(line))
           .map((line) => line.trim())
           .slice(0, 40)
         const intro = skill.content
-          .split(/\\r?\\n/)
+          .split(/\r?\n/)
           .filter((line) => line.trim() && !/^\\s*---\\s*$/.test(line) && !/^\\s*(name|description|metadata|license|version):/.test(line))
           .slice(0, 8)
-          .join("\\n")
+          .join("\n")
           .slice(0, 700)
         return {
           title: `Skill outline: ${skill.name}`,
@@ -267,7 +267,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             ...(headings.length ? headings : ["(No Markdown headings found)"]),
             "",
             "Load this skill by exact canonical name only if its detailed procedures are needed.",
-          ].join("\\n").slice(0, 2_400),
+          ].join("\n").slice(0, 2_400),
           metadata: { name: skill.name, dir: path.dirname(skill.location), outline: true },
         }
       }
