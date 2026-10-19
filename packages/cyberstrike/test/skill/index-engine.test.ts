@@ -228,7 +228,7 @@ test("community tool selection skill is discovered, searchable, retrievable, and
         expect(skill?.content).toContain("COMMUNITY_TOOL_MAP.md")
         expect(skill?.content).toContain("tool_preflight.py")
 
-        const indexed = SkillIndex.search("community tool selection", Infinity)
+        const indexed = SkillIndex.search("community-tool-selection", Infinity)
         expect(indexed.some((entry) => entry.name === "community-tool-selection")).toBe(true)
 
         const loaded = await SkillContext.load("community-tool-selection")
