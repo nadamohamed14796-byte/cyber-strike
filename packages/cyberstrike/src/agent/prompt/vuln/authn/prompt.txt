@@ -47,7 +47,7 @@ Use `http_replay` with the captured request:
 - Confirm the effect is attributable to the tested condition and not caching, expired sessions, stale state, WAF behavior, or tool artifacts.
 - Record exact request IDs, credential labels (not values), baseline/control, actual response, precondition validity, and remaining uncertainty.
 
-Use `verification_attempt` for each meaningful executed test. Duplicate variants, planned tests, and invalid scope/identity/setup do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts plus the `validate_finding` ten-check rubric and matching contradictory evidence. If safety or prerequisites prevent that, keep `INCONCLUSIVE / NEEDS REVIEW`.
+Use `verification_attempt` for each meaningful executed test. Duplicate variants, planned tests, and invalid scope/identity/setup do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires the `validate_finding` ten-check rubric and matching direct contradictory evidence under valid preconditions; no fixed attempt count applies. If safety or prerequisites prevent that, keep `INCONCLUSIVE / NEEDS REVIEW`.
 
 ### 4. Record coverage and report
 
