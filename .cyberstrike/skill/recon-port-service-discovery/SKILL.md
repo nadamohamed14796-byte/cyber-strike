@@ -128,28 +128,30 @@ For each host/port, record the exact resolver result, scope basis, service-detec
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+Use only command-line tools that produce inspectable output. Port/service checks are active network activity: confirm the target and allowed port ranges before running them, respect program rate limits, and stop if instability appears.
 
-### Recommended tools
-- naabu — approved TCP port inventory
-- nmap — targeted service/version detection when allowed
-- tlsx — TLS certificate and handshake metadata
-- httpx — HTTP metadata for confirmed web services
-- jq/Python — normalize port and service records
+### Tools and purpose
+- `naabu` — TCP port inventory for authorized hosts; preserve raw output and scanner errors.
+- `nmap` — targeted service/version detection for explicitly permitted hosts and ports; avoid intrusive scripts unless separately authorized.
+- `tlsx` — TLS certificate and handshake metadata for discovered services.
+- `httpx` — HTTP/TLS metadata for confirmed web services, not a vulnerability verdict.
+- `jq` and Python — normalize JSON output while retaining source, timestamp, tool version, and errors.
 
-### Official resources
+### Install and verify
+- ProjectDiscovery tools: use the official installation/release instructions at https://github.com/projectdiscovery/naabu, https://github.com/projectdiscovery/tlsx, and https://github.com/projectdiscovery/httpx. Verify each with its documented `-version` or `-h` option before use.
+- Nmap: install from https://nmap.org/download.html and verify with `nmap --version`.
+- Verify JSON processing with `jq --version`. If a tool is absent or unsupported on the current OS, record the gap and use a compatible alternative; do not claim the phase completed.
+- Keep scanner concurrency/rate settings aligned with the program rules and observed target stability. Do not use scanning to evade rate limits or expand beyond the approved asset set.
+
+### Resources
 - https://github.com/projectdiscovery/naabu
 - https://nmap.org/book/man.html
 - https://github.com/projectdiscovery/tlsx
 - https://github.com/projectdiscovery/httpx
-- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://owasp.org/www-project-web-security-testing-guide/
 
-Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
-
-### Helper script and output contract
-Normalize scanner JSON into host/port/protocol/state/service/timestamp/tool-version fields. Keep scanner errors separate from closed ports; never treat a banner alone as a vulnerability.
-
-Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
+### Output contract and helper guidance
+Normalize results into host, port, protocol, state, service, timestamp, tool/version, input artifact, and error fields. Keep scanner errors distinct from closed ports; a banner alone is not a vulnerability. Preserve native output and write normalized data separately. Do not silently overwrite source evidence. If no purpose-built helper fits, use a small local parser with JSON/JSONL output and fixtures rather than adding an unrelated dependency.
 
 ### Handoff
-Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
+Return command/tool and version, input/output artifact references, observed host/port counts, failures, limitations, confidence, and the next skill. Empty output or an unavailable tool is an explicit status, not proof that the phase completed.
