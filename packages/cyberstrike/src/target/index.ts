@@ -1542,7 +1542,7 @@ export namespace TargetMemory {
   /** Configure a scope only with explicit authorization provenance and at least one allowed item. */
   export async function configureScope(
     input: string,
-    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference?: string | null; userConfirmed?: boolean; userConfirmedExactEntries?: string[] },
+    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference?: string | null; userConfirmed?: boolean; userConfirmedExactEntries?: string[]; userConfirmedScopeList?: boolean },
   ): Promise<{ workspace: Workspace; scope: TargetScope; associatedAssets: Workspace[] }> {
     const include = [...new Set((options.include ?? []).map(normalizeScopeItem))]
     const exclude = [...new Set((options.exclude ?? []).map(normalizeScopeItem))]
@@ -1561,15 +1561,21 @@ export namespace TargetMemory {
     }
     const userConfirmedExactEntries = [...new Set((options.userConfirmedExactEntries ?? []).map(normalizeScopeItem))]
     if (userConfirmedWithoutReference) {
-      const confirmedEntries = userConfirmedExactEntries.length
-        ? userConfirmedExactEntries
-        : include.length === 1 ? include : []
-      if (
-        confirmedEntries.length === 0 ||
-        confirmedEntries.some((entry) => !include.includes(entry) || !isExactUserConfirmedScopeItem(entry)) ||
-        include.some((entry) => !isExactUserConfirmedScopeItem(entry))
-      ) {
-        throw new Error("User-confirmed scope without an external policy reference must contain exactly one exact hostname, host:port, IP, or HTTP(S) URL for initial setup; when extending a saved manifest, every newly confirmed entry must be exact and explicitly listed. Wildcards, CIDRs, and typed resource categories require an explicit policy import.")
+      if (options.userConfirmedScopeList === true) {
+        // An explicitly confirmed complete list may contain the scope patterns
+        // supplied by the operator. Never infer sibling assets from one entry.
+        if (!include.length) throw new Error("A user-confirmed complete scope list must contain at least one entry.")
+      } else {
+        const confirmedEntries = userConfirmedExactEntries.length
+          ? userConfirmedExactEntries
+          : include.length === 1 ? include : []
+        if (
+          confirmedEntries.length === 0 ||
+          confirmedEntries.some((entry) => !include.includes(entry) || !isExactUserConfirmedScopeItem(entry)) ||
+          include.some((entry) => !isExactUserConfirmedScopeItem(entry))
+        ) {
+          throw new Error("User-confirmed single-asset scope requires an exact hostname, host:port, IP, or HTTP(S) URL. Wildcards, CIDRs, and complete lists require explicit list confirmation or a policy import.")
+        }
       }
     }
     const excludeSet = new Set(exclude)
