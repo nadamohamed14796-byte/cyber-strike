@@ -166,3 +166,43 @@ Record cookie names, attributes, expiry, issuer/audience, token type, and a loca
 - Token remains in browser storage but is rejected server-side → not session takeover; document storage exposure separately only if an actual access path exists.
 
 Add transition_event, session_fingerprint, issued_at, expires_at, principal_before_after, permission_before_after, revocation_expected, old_session_request_result, fresh_session_control, and cleanup_verified to the private evidence record.
+
+
+## Reproducible session-transition ledger
+
+Use one record per transition and keep secret values out of the record. The fingerprint should be a keyed local digest or a one-way digest generated locally; never store the raw identifier.
+
+```json
+{
+  "test_run": "session-lifecycle-<local-id>",
+  "principal": "tester-owned-account-A",
+  "transition": "logout",
+  "session_fingerprint_before": "<redacted-local-fingerprint>",
+  "session_fingerprint_after": "<redacted-local-fingerprint>",
+  "expected_revocation": true,
+  "old_session_protected_request": {
+    "status": 401,
+    "protected_synthetic_marker_present": false
+  },
+  "fresh_session_control": {
+    "status": 200,
+    "protected_synthetic_marker_present": true
+  },
+  "server_state_confirmed": false,
+  "cleanup_verified": true,
+  "raw_tokens_persisted": false
+}
+```
+
+Replace example values with observations; do not treat this example as an expected result for every application. A 401/200 pair is useful only if both requests hit the same intended resource and the marker proves the protected operation.
+
+### Extra edge cases worth checking
+
+- Concurrent logout/revocation and refresh on two tester-owned sessions.
+- Password reset or MFA change followed by use of an older refresh token.
+- Cookie Domain and Path behavior across a sibling app, including whether the sibling is actually trusted.
+- Session expiry vs refresh-token expiry; verify the server-side contract, not the browser display.
+- Reauthentication/step-up requirements for sensitive actions after a long-lived session.
+- Remembered-device state and recovery flows, only with test accounts and synthetic factors.
+
+Keep each edge case as a separate hypothesis with a baseline and a negative control. If the application intentionally preserves other sessions, assess the documented revoke-one/revoke-all behavior rather than assuming every session must be invalidated.
