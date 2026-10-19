@@ -212,3 +212,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer to compare a normal authorized request with a single changed header, path normalization, method, or auth context. Param Miner can support candidate discovery when its probes are allowed; curl helps reproduce a minimal case from the terminal.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install and proxy configuration.
+- Param Miner is available via Burp's official BApp Store; review extension details first.
+- Kali/Debian: sudo apt update && sudo apt install curl.
+Start from an observed in-scope request and test one variant at a time; do not use proxy rotation, distributed sources, or automated evasion to bypass program limits.
+
+### Primary resources
+- [PortSwigger access control](https://portswigger.net/web-security/access-control) — authorization semantics.
+- [PortSwigger path traversal](https://portswigger.net/web-security/file-path-traversal) — normalization context when relevant.
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — policy design.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted responses offline.
+
+### Result handling
+Require a specific protected resource or action becoming accessible to the wrong controlled principal. Record status/body/state differential and alternative explanations; status code changes alone are not proof.
