@@ -70,7 +70,7 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   dalfox: "vulnerability_testing",
   wpscan: "vulnerability_testing",
 }
-function scannerExecutableIndex(command: string[]): number {
+function commandExecutableIndex(command: string[]): number {
   const optionWithValue: Record<string, Set<string>> = {
     sudo: new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-R", "--chroot", "-r", "--role", "-t", "--type", "-T", "--command-timeout", "-U", "--other-user"]),
     env: new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]),
@@ -86,8 +86,7 @@ function scannerExecutableIndex(command: string[]): number {
   while (index < command.length) {
     const token = stripOuterShellQuotes(command[index]!)
     const executable = path.basename(token).toLowerCase()
-    if (SCANNER_PHASES[executable] !== undefined) return index
-    if (!launchers.has(executable)) return -1
+    if (!launchers.has(executable)) return index
     index++
 
     const needsValue = optionWithValue[executable] ?? new Set<string>()
@@ -111,9 +110,7 @@ function scannerExecutableIndex(command: string[]): number {
         if (needsValue.has(arg)) index++
       }
       // timeout's first positional argument is its duration, not the executable.
-      if (index < command.length && SCANNER_PHASES[path.basename(stripOuterShellQuotes(command[index]!)).toLowerCase()] === undefined) {
-        index++
-      }
+      if (index < command.length) index++
       continue
     }
 
@@ -126,6 +123,13 @@ function scannerExecutableIndex(command: string[]): number {
     }
   }
   return -1
+}
+
+function scannerExecutableIndex(command: string[]): number {
+  const executableIndex = commandExecutableIndex(command)
+  if (executableIndex < 0) return -1
+  const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
+  return SCANNER_PHASES[executable] === undefined ? -1 : executableIndex
 }
 
 const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-file", "-out"])
@@ -382,14 +386,15 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
-    // Only inspect shell-wrapper payloads for nested scanner commands. Searching the
-    // entire command text causes false positives for ordinary file searches such as
-    // find / -iname "*gau*" and for comments/URLs containing tool names.
-    const executable = path.basename(command[0] ?? "").toLowerCase()
+    // Inspect only payloads of an actual shell executable, including simple
+    // launcher-prefixed forms such as "sudo bash -lc ...". Never search arbitrary
+    // arguments of commands like grep/find for scanner names.
+    const executableIndex = commandExecutableIndex(command)
+    const executable = executableIndex >= 0 ? path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase() : ""
     const shellWrappers = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish"])
     if (shellWrappers.has(executable)) {
-      const commandFlag = command.findIndex((value) => value === "-c" || value === "-lc" || value === "-ec")
-      const payload = commandFlag >= 0 ? command[commandFlag + 1] ?? "" : ""
+      const commandFlag = command.findIndex((value, index) => index > executableIndex && ["-c", "-lc", "-ec"].includes(stripOuterShellQuotes(value)))
+      const payload = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
       const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) =>
         new RegExp("^\\s*(?:(?:env|sudo)\\s+)*(?:[^\\s;&|]+/)*" + name + "(?:\\s|$)", "i").test(payload.trim()),
       )
