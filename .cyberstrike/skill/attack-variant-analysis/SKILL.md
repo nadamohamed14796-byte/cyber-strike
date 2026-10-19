@@ -1,0 +1,72 @@
+---
+name: attack-variant-analysis
+description: "Turn a verified security root cause into a deduplicated, evidence-led search for sibling defects across authorized source code and routes."
+category: "source-code-review"
+version: "1.0.0"
+tags: [variant-analysis, source-review, codeql, semgrep, root-cause, regression]
+tech_stack: [javascript, typescript, python, java, go, php, csharp]
+prerequisites: ["A concrete known root cause or a well-supported code pattern", "Authorized source tree or approved code-search access"]
+chains_with: [attack-bb-methodology, attack-triage-validation, attack-report-writing, attack-evidence-hygiene]
+---
+
+# Root-Cause Variant Analysis
+
+## Goal
+Use one verified defect to find structurally similar code paths that may share the same root cause. A text match is only a candidate; every sibling requires independent reachability and impact review.
+
+## Workflow
+1. **Write the root-cause statement:** identify source, transformation, sink/control, violated invariant, affected framework/version, and exact evidence. Do not start from a vague vulnerability label.
+2. **Extract a reusable pattern:** list semantic features that matter (data source, missing guard, unsafe merge, route registration, object lookup, serialization boundary) separately from incidental names/formatting.
+3. **Map the code family:** identify shared helpers, framework conventions, copied handlers, alternate API versions, batch paths, background jobs, and transport variants.
+4. **Search broadly, triage narrowly:** use code search, AST-aware rules, CodeQL, or Semgrep where available. Search is discovery only; inspect surrounding call sites, wrappers, tests, and effective middleware.
+5. **Rank candidates by evidence:** reachable input, same trust boundary, missing control, real sink, test coverage, and whether a compensating control exists. Do not rank solely by number of matches.
+6. **Validate each candidate independently:** state the expected invariant, use the least-impact controlled fixture, and preserve a positive/negative control. Never assume the first finding proves every sibling vulnerable.
+7. **Deduplicate and hand off:** group candidates by root cause but retain distinct impact and route evidence. Create regression tests that cover the original defect and confirmed sibling paths.
+
+## Pattern worksheet
+- Original finding/evidence reference
+- Source → transformation → sink/control
+- Required preconditions and attacker-controlled fields
+- Framework/runtime/library version evidence
+- Semantic pattern and exclusions
+- Candidate file/function/route and reachability
+- Existing guard/validation/compensating control
+- Safe reproduction and independent controls
+- Result: confirmed, disproven, inconclusive, blocked, or not run
+- Regression test and remediation owner
+
+## Search helper
+For an authorized local checkout, start with narrow semantic terms and file types. Replace the example tokens with the exact source/control identified in the original finding.
+
+```bash
+rg -n --glob '*.{js,ts,tsx,py,java,go,php,cs}' 'KNOWN_SOURCE|KNOWN_SINK|MISSING_GUARD_PATTERN' .
+```
+
+Then refine to AST/data-flow rules when available. Do not treat a regex match, similar function name, or shared dependency as confirmation.
+
+## Candidate decision matrix
+
+| Signal | Next review | Confirmation bar |
+|---|---|---|
+| Same helper called by multiple routes | Trace caller-specific authorization and input shape | One sibling has a distinct verified control failure |
+| Same unsafe API in multiple files | Follow data flow and wrapper semantics | Attacker-controlled input reaches the sink unsafely |
+| Missing decorator/guard in source | Trace global/inherited middleware and router setup | Effective server-side policy is absent on that route |
+| Similar old API version | Compare runtime policy and handler implementation | Version drift causes a specific security invariant failure |
+| Test exists but does not cover boundary | Add a focused regression test | Test gap alone is not a vulnerability |
+| Match exists only in dead/unreachable code | Confirm build/runtime reachability | If unreachable, document as not confirmed |
+
+## False-positive controls
+- Shared helper is safe when called with validated arguments or behind a guard.
+- Framework-wide middleware or resource policy supplies the control.
+- Candidate code is dead, test-only, generated, or not deployed.
+- Similar code has a different trust boundary or business contract.
+- One root cause creates many routes but a single canonical finding better represents the impact.
+
+## Output and chaining
+Return the root-cause pattern, candidate inventory, deduplication key, evidence per candidate, excluded matches with reason, confirmed sibling count, blocked/inconclusive count, regression tests, and next action. Route authorization defects to BOLA/BFLA/property authorization; source-to-sink injection to the matching injection skill; dependency-wide issues to supply-chain/variant review.
+
+## References
+- https://codeql.github.com/docs/
+- https://semgrep.dev/docs/writing-rules/overview/
+- https://github.com/trailofbits/skills/tree/main/plugins/variant-analysis
+- https://owasp.org/www-project-web-security-testing-guide/
