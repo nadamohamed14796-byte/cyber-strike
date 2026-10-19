@@ -73,3 +73,26 @@ Return `xml_surface`, `parser_evidence`, `doctype_behavior`, `external_resolutio
 
 ### XML parser behavior and external resolution boundary
 Identify accepted content types, parser configuration, DTD/entity behavior, and whether XML is handled by the application, gateway, or a downstream service. Establish a normal XML fixture and use a local lab callback or synthetic file controlled by the tester only when the program explicitly permits external-resolution testing. Do not attempt to read operating-system files, cloud metadata, internal endpoints, or environment secrets from production. A parser error that mentions DOCTYPE is not confirmation; verify whether external resolution occurred and what controlled result reached the response/log. Route non-XML serialized formats to deserialization review and outbound URL fetch behavior to SSRF only if a distinct source-to-request path is shown.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater with harmless XML and a controlled callback/OAST service only when permitted. Begin with a local vulnerable lab; do not test filesystem reads or internal-network access as proof on production.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- [PortSwigger Collaborator](https://portswigger.net/burp/documentation/desktop/tools/collaborator) — built into supported Burp workflows.
+- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) is an alternative; official Go installation instructions are in the repository README.
+Use only a benign unique DNS/HTTP callback and understand any external provider's retention/privacy. Do not attempt to read OS files, cloud metadata, or sensitive internal URLs unless the exact action is explicitly in scope.
+
+### Primary resources
+- [PortSwigger XXE](https://portswigger.net/web-security/xxe) — controlled methodology and labs.
+- [OWASP XXE Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html) — parser hardening.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — evidence requirements.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved XML/API responses offline; it does not execute parser tests.
+
+### Result handling
+Separate entity expansion, external network interaction, and file access as distinct claims. Stop at minimum safe proof and preserve a sanitized request/response plus callback timestamp.
