@@ -2,7 +2,7 @@ import { test, expect } from "bun:test"
 import path from "path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
-import { Agent } from "../../src/agent/agent"
+import { Agent, assertEmbeddedSkillAvailable } from "../../src/agent/agent"
 import { Skill } from "../../src/skill"
 import { SkillIndex } from "../../src/skill/index-engine"
 import { PermissionNext } from "../../src/permission/next"
@@ -63,32 +63,12 @@ EMBEDDED_API_SKILL_REGRESSION_MARKER
   }
 })
 
-test("agent initialization fails loudly when a required embedded skill is missing", async () => {
-  await using tmp = await tmpdir({
-    git: true,
-    init: async (dir) => {
-      const skillDir = path.join(dir, ".cyberstrike", "skill", "unrelated-test-skill")
-      await Bun.write(
-        path.join(skillDir, "SKILL.md"),
-        "---\nname: unrelated-test-skill\ndescription: Keeps the isolated catalog non-empty.\n---\n\n# Test fixture\n",
-      )
-    },
-  })
-  const previousHome = process.env.CYBERSTRIKE_TEST_HOME
-  process.env.CYBERSTRIKE_TEST_HOME = tmp.path
-  try {
-    await Instance.provide({
-      directory: tmp.path,
-      fn: async () => {
-        await expect(Agent.get("proxy-tester-idor")).rejects.toThrow(
-          /references unavailable skill "wstg-authz-04"/,
-        )
-      },
-    })
-  } finally {
-    if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
-    else process.env.CYBERSTRIKE_TEST_HOME = previousHome
-  }
+test("embedded skill validation fails loudly when a required skill is missing", () => {
+  expect(() => assertEmbeddedSkillAvailable(
+    "IDOR tester",
+    "wstg-authz-04",
+    undefined,
+  )).toThrow(/references unavailable skill "wstg-authz-04"/)
 })
 
 test("every built-in agent skill reference resolves to a loadable skill", async () => {
