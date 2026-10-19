@@ -98,9 +98,20 @@ function scannerTargets(command: string[], commandText: string): string[] {
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = command.findIndex((value) => SCANNER_PHASES[path.basename(value).toLowerCase()] !== undefined)
   if (scannerIndex < 0) {
-    const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) => new RegExp("\\b" + name + "\\b", "i").test(commandText))
-    if (wrappedScanner) {
-      throw new Error("Recon execution gate blocked an indirect/wrapped " + wrappedScanner + " invocation. Run the scanner as a direct command so target scope and phase prerequisites can be checked.")
+    // Only inspect shell-wrapper payloads for nested scanner commands. Searching the
+    // entire command text causes false positives for ordinary file searches such as
+    // find / -iname "*gau*" and for comments/URLs containing tool names.
+    const executable = path.basename(command[0] ?? "").toLowerCase()
+    const shellWrappers = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish"])
+    if (shellWrappers.has(executable)) {
+      const commandFlag = command.findIndex((value) => value === "-c" || value === "-lc" || value === "-ec")
+      const payload = commandFlag >= 0 ? command[commandFlag + 1] ?? "" : ""
+      const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) =>
+        new RegExp("^\\s*(?:(?:env|sudo)\\s+)*(?:[^\\s;&|]+/)*" + name + "(?:\\s|$)", "i").test(payload.trim()),
+      )
+      if (wrappedScanner) {
+        throw new Error("Recon execution gate blocked an indirect/wrapped " + wrappedScanner + " invocation. Run the scanner as a direct command so target scope and phase prerequisites can be checked.")
+      }
     }
     return
   }
