@@ -9,6 +9,8 @@ Each file was read from the current main branch before editing. Successful edits
 - `bug-bounty-evidence-workflow/SKILL.md`: evidence-led workflow, statuses, deduplication, triage, and reporting.
 - `attack-variant-analysis/SKILL.md`: root-cause-led sibling search with independent proof gates.
 - `attack-test-corpus-governance/SKILL.md`: corpus provenance, licensing, context, deduplication, and safe handling.
+- `attack-variant-analysis/SKILL.md`: root-cause-led sibling search with independent proof gates.
+- `attack-test-corpus-governance/SKILL.md`: corpus provenance, licensing, context, deduplication, and safe handling.
 
 These are unsigned community/local skills. The loader's signing code classifies files without a hash as unverified; do not label them official or signed.
 
@@ -40,3 +42,7 @@ Continue the loop through every direct custom skill and the framework/vendor ski
 
 ## Additional ceiling-wording cleanup
 Read-back checks confirmed the fixed wording was removed from attack-information-disclosure, attack-dom-xss, attack-exchange-owa, attack-ntlm-info, recon-asn-infrastructure, attack-django, attack-deserialization, and attack-flask-werkzeug. attack-wordpress was inspected but its write was blocked; no change is claimed there. This wording cleanup does not alter the separate runtime attempt policy.
+
+
+## New-skill structural read-back
+The five new skill files were fetched again from main. All five have frontmatter name matching the directory and a non-empty description; every declared chains_with target resolves to a local SKILL.md path. The loader source scans nested SKILL.md files and labels unsigned files as unverified rather than official. This is structural evidence, not a runtime invocation test.
