@@ -48,12 +48,10 @@ Save an endpoint/parameter inventory with asset, file hash, source, method, rout
 - Client-side hiding is mistaken for server-side authorization.
 - A sink appears in code but is unreachable from attacker-controlled input.
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### High-signal JS-to-request correlation
 For every extracted route, retain bundle URL/hash, line/offset, first-party confidence, method/parameter template, auth/tenant hints, sink/source pair, and whether an actual browser request corroborates it. Search results and token-like strings remain metadata, never copy a value into a request. Prioritize admin/tenant flows, export/import, billing, file transfer, URL-fetch inputs, account recovery, and versioned APIs. A route string without traffic or docs may be dead code; a client-side role check does not establish server authorization. Chain to IDOR/property authorization only after correlating a real request and controlled fixture, to SSRF only on a confirmed server fetch path, and to DOM XSS only after reachability from an untrusted source is shown.
-
 
 ## Repeatable inventory script (local assets only)
 
@@ -120,7 +118,6 @@ Use one normalized record per method + route template + content type + parameter
 
 Never store full cookie/token values or large minified lines. When a candidate appears important, use an already-captured, authorized normal-request artifact or a request supplied by the user; sanitize it before passing it to the specialist skill. Browser UI is not an agent dependency.
 
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 ### Agent-usable CLI tools
@@ -129,12 +126,15 @@ Never store full cookie/token values or large minified lines. When a candidate a
 - `LinkFinder` or `xnLinkFinder`: optional endpoint extraction corroboration; deduplicate results against the existing inventory.
 - `node`: parse or analyze local bundles with a purpose-built script; never execute unknown bundles with network/file permissions.
 - Existing helper `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript`: build a local endpoint candidate inventory.
+
 ### Installation and verification
 Install Node.js from https://nodejs.org/en/download/ and use each tool's official upstream instructions. Verify `node --version`, `rg --version`, and the selected extractor's `--help`. Treat third-party scripts as untrusted until reviewed; if unavailable, use the repository helper and static text search.
+
 ### Resources
 - https://developer.mozilla.org/en-US/docs/Web/JavaScript
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/0x240x23elu/JSluice
 - https://github.com/GerbenJavado/LinkFinder
+
 ### Output contract
 Store file path, source URL, content hash, discovered route/method/parameter hints, auth/session clues, line or offset, and confidence. Deduplicate candidates without discarding distinct parameters. Never copy token values, secrets, or whole minified lines into shared notes.
