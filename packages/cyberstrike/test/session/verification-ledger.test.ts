@@ -91,7 +91,7 @@ describe("VerificationLedger terminal outcomes", () => {
             attempt: attempt("invalid-setup-" + i, undefined, false),
           })
           expect(result.decision.attemptsUsed).toBe(0)
-          expect(result.decision.remainingAttempts).toBe(20)
+          expect(result.decision.remainingAttempts).toBeUndefined()
         }
         for (let i = 0; i < 20; i++) {
           const result = VerificationLedger.record({
@@ -187,7 +187,7 @@ describe("VerificationLedger terminal outcomes", () => {
     })
   })
 
-  test("a disproven hypothesis becomes terminal only after 20 valid distinct attempts", async () => {
+  test("a disproven hypothesis becomes terminal with decisive evidence, without a minimum count", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -200,21 +200,13 @@ describe("VerificationLedger terminal outcomes", () => {
           endpoint: "/api/profile",
           vulnerabilityClass: "idor",
         }
-        for (let i = 0; i < 19; i++) {
-          const result = VerificationLedger.record({
-            ...common,
-            attempt: attempt("idor.control-" + i),
-          })
-          expect(result.decision.outcome).toBe("inconclusive")
-        }
-
         const final = VerificationLedger.record({
           ...common,
-          attempt: attempt("idor.control-19", "evidence://direct-disproof"),
+          attempt: attempt("idor.control", "evidence://direct-disproof"),
           decisiveResult: "disproven",
         })
         expect(final.decision.outcome).toBe("disproven")
-        expect(final.decision.attemptsUsed).toBe(20)
+        expect(final.decision.attemptsUsed).toBe(1)
         expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
           .every((item) => item.outcome === "disproven")).toBe(true)
 
@@ -226,7 +218,7 @@ describe("VerificationLedger terminal outcomes", () => {
       },
     })
   })
-  test("a duplicate invalid retry cannot downgrade valid evidence or reopen the budget", async () => {
+  test("a duplicate invalid retry cannot downgrade valid evidence and further distinct checks remain allowed", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -252,16 +244,18 @@ describe("VerificationLedger terminal outcomes", () => {
         expect(duplicate.duplicate).toBe(true)
         expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
           .find((item) => item.strategyID === "valid-strategy-0")?.validConditions).toBe(true)
-        expect(() => VerificationLedger.record({
+        const extra = VerificationLedger.record({
           ...common,
-          attempt: attempt("valid-strategy-20", "evidence://late-valid"),
-        })).toThrow(/20-valid-distinct-attempt budget is exhausted/i)
+          attempt: attempt("valid-strategy-extra", "evidence://extra-valid"),
+        })
+        expect(extra.decision.attemptsUsed).toBe(21)
+        expect(extra.decision.canContinue).toBe(true)
         await Instance.dispose()
       },
     })
   })
 
-  test("an invalid attempt cannot be upgraded into a 21st valid attempt", async () => {
+  test("an invalid attempt can be upgraded after many distinct checks without a fixed ceiling", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -284,10 +278,12 @@ describe("VerificationLedger terminal outcomes", () => {
           ...common,
           attempt: attempt("invalid-candidate", undefined, false),
         })
-        expect(() => VerificationLedger.record({
+        const upgraded = VerificationLedger.record({
           ...common,
           attempt: attempt("invalid-candidate", "evidence://late-valid", true),
-        })).toThrow(/20-valid-distinct-attempt budget is exhausted/i)
+        })
+        expect(upgraded.decision.attemptsUsed).toBe(21)
+        expect(upgraded.decision.canContinue).toBe(true)
         await Instance.dispose()
       },
     })
