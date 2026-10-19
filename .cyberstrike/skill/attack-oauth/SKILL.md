@@ -171,3 +171,25 @@ Treat one login attempt as a correlated transaction across browser session, auth
 5. Revoke test tokens and clear disposable registrations or sessions; note anything that could not be cleaned up.
 
 Do not create a chain merely because two weaknesses coexist. Every child finding needs its own protocol invariant, observable terminal effect, and evidence reference.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Proxy/Repeater/Comparer, browser DevTools with separate controlled test profiles, and the JWT Editor extension only when token claim/signature inspection is relevant. Capture each authorization flow's baseline and expected redirect/token handling.
+
+### Installation and setup
+- [Burp Community/Professional](https://portswigger.net/burp) — install from PortSwigger and configure the browser through the official setup guide.
+- JWT Editor can be enabled through Burp's official BApp Store; verify its listing and permissions before enabling it.
+- Use a provider's own sandbox or your application’s local identity-provider fixture. Do not paste live access/refresh tokens into public decoders or external services.
+
+### Primary resources
+- [RFC 9700 OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700/) — current security requirements for OAuth 2.0.
+- [PortSwigger OAuth authentication](https://portswigger.net/web-security/oauth) — controlled testing methodology.
+- [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html) — identity-layer semantics.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized flow artifacts offline; it does not validate tokens or prove authorization.
+
+### Result handling
+Use test accounts and test clients; preserve state/nonce/PKCE context and redact tokens, authorization codes, and callback query values from saved artifacts.
