@@ -103,3 +103,7 @@ grep -iE '^(access-control-allow-origin|access-control-allow-credentials|vary):'
 ```
 
 Then verify in a local browser whether the untrusted origin can actually read the protected response under the intended credential mode. Do not count wildcard Access-Control-Allow-Origin alone as impact. Chain to attack-idor-automation only if the readable data is improperly scoped, to attack-security-headers for broader browser policy review, or to attack-csrf if a separate state-changing request is implicated.
+
+
+## Enrichment: browser proof
+Start with a harmless origin marker on a read-only in-scope endpoint, then inspect Access-Control-Allow-Origin, Access-Control-Allow-Credentials, and Vary. Confirm in a local browser whether an origin you control can read the protected response while using a controlled test account. Do not send the response body to an external collector. A wildcard or reflected origin alone is not impact without browser-enforced access to sensitive data. Link to object-authorization checks only when the returned data is private to another identity or tenant.
