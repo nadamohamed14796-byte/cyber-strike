@@ -57,6 +57,10 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(safeArgs, "https://example.com", baseScope)).toBeUndefined()
   })
 
+  test("rejects a crawler command without explicit URL inputs", () => {
+    expect(katanaScopeBlockReason(["-fs", "fqdn", "-rl", "5"], "https://example.com", baseScope)).toContain("explicit '-u")
+  })
+
   test("rejects broad default scope and requires an explicit FQDN field scope", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-rl", "5"], "https://example.com", baseScope)).toContain("-fs fqdn")
   })
