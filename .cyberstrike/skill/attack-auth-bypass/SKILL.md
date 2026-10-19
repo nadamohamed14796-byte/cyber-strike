@@ -176,3 +176,29 @@ Capture the same read-only endpoint under anonymous, invalid/expired, least-priv
 ### Chain rules
 
 Do not chain based on a shared word such as “auth.” The observed boundary determines the next skill: session issue → session management; factor bypass → MFA; wrong token issuer/audience → JWT/OAuth; object boundary → BOLA; function privilege → BFLA. A single symptom may reveal several hypotheses, but each reportable finding needs its own evidence and impact.
+
+
+## Identity-resolution trace and regression set
+
+For source review, trace the request from credential extraction through verifier, principal resolution, middleware/guard, authorization policy, and protected handler. Mark each layer as observed in code, approved logs, or only inferred. A route that lacks a visible decorator may still be protected by router-level middleware; inspect the full registration path before calling it a gap.
+
+### Source-review checklist
+
+- Locate route registration and determine inherited/global middleware, not just route-local annotations.
+- Follow the credential from its actual transport (cookie, bearer token, signed request, or documented mechanism) to the verifier.
+- Confirm the verifier's issuer, audience, expiry, signature/key selection, and revocation behavior where relevant.
+- Follow the resolved subject/tenant/assurance level into the authorization decision and final handler.
+- Check error paths and fallback behavior: authentication failure must not create a partial session or default to a privileged principal.
+- Review tests for anonymous, invalid, expired, revoked, low-role, and cross-tenant controlled fixtures.
+
+### Regression cases to hand off
+
+- Anonymous request to a protected synthetic resource is denied.
+- Invalid, expired, revoked, wrong-issuer, and wrong-audience test credentials are rejected when those cases apply.
+- Valid low-role account authenticates but cannot invoke a restricted function.
+- Valid identity cannot access a second tester-owned fixture belonging to another role or tenant.
+- Recovery and federated callback state is bound to the initiating controlled session.
+- Authentication failure does not create a partial session, trusted-device state, or elevated assurance claim.
+- Legacy and versioned routes enforce the same intended policy, or documented differences are preserved.
+
+For each regression, record route registration, effective middleware chain, expected principal, actual principal, authorization decision, fixture, negative control, and test result. Do not turn a source-search match or missing string into a confirmed finding.
