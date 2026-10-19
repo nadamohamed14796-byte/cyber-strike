@@ -704,6 +704,12 @@ test("user-confirmed scope without a policy URL must be exactly one asset, not a
         authorizationSource: "User-confirmed in conversation",
         userConfirmed: true,
       })).rejects.toThrow(/exactly one exact hostname/i)
+
+      await expect(TargetMemory.configureScope("https://program-root.example.test", {
+        include: ["https://app.example.net/*"],
+        authorizationSource: "User-confirmed in conversation",
+        userConfirmed: true,
+      })).rejects.toThrow(/exactly one exact hostname/i)
     },
   })
 })

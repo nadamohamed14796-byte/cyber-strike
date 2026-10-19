@@ -72,7 +72,8 @@ function confirmedScopeCandidate(input: string): URL | undefined {
   const value = input.trim()
   if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return undefined
   if (/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return undefined
-  if (!/^https?:\/\//i.test(value) && /[\\/*{}]/.test(value)) return undefined
+  if (/[*{}\\]/.test(value)) return undefined
+  if (!/^https?:\/\//i.test(value) && value.includes("/")) return undefined
   let candidateValue = value
   if (!/^https?:\/\//i.test(value)) {
     const rawIPv6 = (value.startsWith("[") || value.split(":").length >= 3)

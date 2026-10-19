@@ -189,7 +189,8 @@ function currentOwnerKey(): string {
 function isExactUserConfirmedScopeItem(input: string): boolean {
   const value = input.trim()
   if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
-  if (/[\\/*{}]/.test(value) && !/^https?:\/\//i.test(value)) return false
+  if (/[*{}\\]/.test(value)) return false
+  if (!/^https?:\/\//i.test(value) && value.includes("/")) return false
   if (!/^https?:\/\//i.test(value) && value.includes("/")) return false
   let candidateValue = value
   if (!/^https?:\/\//i.test(value)) {
