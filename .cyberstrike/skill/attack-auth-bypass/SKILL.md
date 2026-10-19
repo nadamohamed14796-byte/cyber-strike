@@ -102,7 +102,7 @@ Review credential validation, session creation, callback state/nonce, token issu
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
 
@@ -136,3 +136,16 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [uphiago — hunt-auth-bypass](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-auth-bypass)
 - [Claude-BugHunter — hunt-auth-bypass](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-auth-bypass)
 - [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
+
+
+## Hands-on field pattern: prove the boundary
+Record a clean anonymous baseline and a valid controlled-account baseline for the same endpoint. Repeat with the minimally required role difference; don't conflate routing quirks, a login-page shell, or error text with a bypass.
+
+```bash
+curl -sS -D anon.headers -o anon.body "$TARGET_URL"
+curl -sS -D user.headers -o user.body -H "Cookie: $TEST_SESSION" "$TARGET_URL"
+# Inspect only sanitized files; TEST_SESSION must belong to a controlled account.
+diff -u <(sed -E 's/(Set-Cookie:).*/\\1 [REDACTED]/I' anon.headers) <(sed -E 's/(Set-Cookie:).*/\\1 [REDACTED]/I' user.headers) || true
+```
+
+Explain the failed control explicitly: authentication, function authorization, object authorization, or session binding. Chain to `attack-401-403-bypass`, `attack-bfla`, `attack-idor-automation`, or `attack-session` based on that proven boundary.
