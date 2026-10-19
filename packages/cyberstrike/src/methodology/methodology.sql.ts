@@ -198,8 +198,8 @@ export const ValidationViolationTable = sqliteTable(
 )
 
 /**
- * Durable adaptive verification ledger. A hypothesis can have up to 20 distinct
- * strategy/variant attempts; unresolved hypotheses remain inconclusive.
+ * Durable adaptive verification ledger. A hypothesis can have any number of materially distinct
+ * strategy/variant attempts; duplicates are deduplicated and unresolved hypotheses remain inconclusive.
  */
 export const VerificationAttemptTable = sqliteTable(
   "verification_attempt",
