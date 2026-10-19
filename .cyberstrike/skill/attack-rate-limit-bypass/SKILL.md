@@ -68,3 +68,26 @@ Return `endpoint`, `action_type`, `test_account`, `request_budget`, `limit_key_h
 
 ### Rate-control semantics and business consequence
 Determine the key the control appears to count (account, session, client, source IP, route, action, or time window) using a small approved set of test-owned identities in staging/sandbox. Record reset window, retry semantics, response headers, server-side outcome, and a normal/blocked control. Do not rotate proxies, evade detection, brute force credentials, or generate load on a production service. A missing 429 is not proof if downstream action is still protected. Assess a realistic consequence such as one-use challenge replay only with vendor test fixtures; route login/MFA outcomes to auth skills and paid/limited business operations to workflow review.
+
+
+## Rate-control evidence matrix
+
+| Protected action | Control to record | Safe evidence |
+|---|---|---|
+| Login / MFA | Test account, challenge lifecycle, lockout/reset behavior | Provider test account only; no credential guessing or spraying |
+| Password reset / invitation | Per-account and per-resource limits | Test-owned destination and synthetic workflow |
+| Search / export | Per-identity, tenant, route, and cost unit | Small read-only samples plus documented policy |
+| Coupon / one-time benefit | Replay/idempotency vs rate limit | Disposable non-monetary fixture; persisted redemption state |
+| API quota | Authenticated principal, API key/client, tenant | Two controlled identities and response/quota telemetry |
+| Proxy-derived identity | Trusted edge configuration and origin behavior | Configuration/log review; no spoofed-header bypass attempts on production |
+
+### What to record per observation
+
+Store action_id, policy_source, identity_key_hypothesis, window_start/end, configured_threshold_if_known, request_sequence_ref, server_decision, quota_state, downstream_action_state, edge_or_origin_attribution, stop_reason, and cleanup. Do not infer the configured threshold from a few requests if the limit was not reached.
+
+### Chain routing
+
+- Limit failure enables repeated OTP/password attempts → authentication/MFA review, but do not perform credential guessing.
+- Duplicate one-time operation succeeds because state transition is not atomic → business-logic/race review with a disposable fixture.
+- Only expensive query cost is unbounded → API resource-consumption review.
+- A limit is absent but the action is harmless/public and no meaningful abuse path is demonstrated → document the control observation without claiming high severity.
