@@ -33,7 +33,7 @@ const Parameters = z.discriminatedUnion("action", [RecordAction, StatusAction])
 type VerificationAttemptMetadata = {
   hypothesisKey: string
   attemptsUsed: number
-  maxAttempts: number
+  maxAttempts?: number
   outcome: Policy.Outcome
   remainingAttempts?: number
   canContinue?: boolean
@@ -42,7 +42,7 @@ type VerificationAttemptMetadata = {
 
 export const VerificationAttemptTool = Tool.define<typeof Parameters, VerificationAttemptMetadata>("verification_attempt", {
   description:
-    "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. Up to 20 distinct strategy_id + variant_key combinations per hypothesis; only attempts with valid_conditions=true AND a durable evidence_ref count toward the false-positive budget; missing evidence references are rejected for valid attempts, and duplicate retries do not consume the budget. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, WAF response, or exhausted budget alone NEVER proves false positive. Confirmation may stop early with decisive evidence_ref. A DISPROVEN/false-positive outcome requires 20 distinct valid attempts plus direct contradictory evidence_ref; earlier disproof signals remain INCONCLUSIVE. If unresolved at 20, status is INCONCLUSIVE/NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
+    "Mandatory durable ledger for adaptive vulnerability verification. Call action=record after EVERY meaningful verification attempt and before deciding a plausible candidate is a false positive. Reuse hypothesis_key for the same hypothesis. There is no arbitrary fixed hypothesis-count ceiling; exact strategy_id + variant_key retries are deduplicated. Only attempts with valid_conditions=true AND a durable evidence_ref are evidence-backed; missing evidence references are rejected for valid attempts, and duplicate retries do not consume the budget. Choose each next attempt based on previous evidence and vulnerability class. A failed HTTP request, 401/403/404/429, timeout, WAF response, or exhausted budget alone NEVER proves false positive. Confirmation may stop early with decisive evidence_ref. A DISPROVEN outcome requires valid conditions and direct contradictory evidence_ref, not a minimum number of attempts. If unresolved, status remains INCONCLUSIVE / NEEDS REVIEW. action=status retrieves the durable ledger after restart.",
   parameters: Parameters,
   async execute(params, ctx) {
     const sessionID = Session.root(ctx.sessionID)
@@ -51,7 +51,7 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
       return {
         title: "Verification attempt rejected: evidence reference required",
         output: "No attempt was recorded. valid_conditions=true requires evidence_ref pointing to a stored request/response, artifact, or reproducible observation. If evidence is not available, record valid_conditions=false and keep the hypothesis inconclusive until evidence is preserved.",
-        metadata: { hypothesisKey, attemptsUsed: 0, maxAttempts: Policy.MAX_ATTEMPTS, outcome: "inconclusive", canContinue: true },
+        metadata: { hypothesisKey, attemptsUsed: 0,  outcome: "inconclusive", canContinue: true },
       }
     }
     if (params.action === "status") {
@@ -64,17 +64,17 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
         `${i + 1}. [${redactTargetNoteSecrets(a.strategyID)} / ${redactTargetNoteSecrets(a.variantKey)}] valid=${a.validConditions} — why: ${redactTargetNoteSecrets(a.rationale)} — result: ${redactTargetNoteSecrets(a.resultSummary)}${a.evidenceRef ? ` (evidence: ${redactTargetNoteSecrets(a.evidenceRef)})` : ""}`,
       )
       return {
-        title: `Verification: ${attemptsUsed}/${Policy.MAX_ATTEMPTS} valid attempts — ${outcome.toUpperCase()}`,
+        title: `Verification: ${attemptsUsed} evidence-backed attempts — ${outcome.toUpperCase()}`,
         output: attempts.length
-          ? `Hypothesis: ${hypothesisKey}\nOutcome: ${outcome}\nValid attempts used: ${attemptsUsed}/${Policy.MAX_ATTEMPTS}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}${attemptsUsed >= Policy.MAX_ATTEMPTS && outcome === "inconclusive" ? "\nValid-attempt budget exhausted: preserve as INCONCLUSIVE / NEEDS REVIEW; not a false positive." : ""}`
+          ? `Hypothesis: ${hypothesisKey}\nOutcome: ${outcome}\nValid evidence-backed attempts: ${attemptsUsed}\nRecorded distinct attempts: ${uniqueAttempts.length}\n${lines.join("\n")}`
           : `No verification attempts recorded for hypothesis ${hypothesisKey}.`,
         metadata: {
           hypothesisKey,
           attemptsUsed,
-          maxAttempts: Policy.MAX_ATTEMPTS,
+          
           outcome,
-          remainingAttempts: Math.max(0, Policy.MAX_ATTEMPTS - attemptsUsed),
-          canContinue: outcome === "inconclusive" && attemptsUsed < Policy.MAX_ATTEMPTS,
+          
+          canContinue: outcome === "inconclusive",
           duplicate: false,
         },
       }
@@ -105,12 +105,12 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
       d.outcome === "inconclusive" ? "Stop testing; preserve as NEEDS REVIEW, never false positive based on attempt count." :
       "Decisive evidence recorded; stop this hypothesis and preserve the evidence."
     return {
-      title: `Verification ${d.attemptsUsed}/${Policy.MAX_ATTEMPTS}: ${status}`,
+      title: `Verification (${d.attemptsUsed} evidence-backed attempts): ${status}`,
       output: [
         `Hypothesis: ${hypothesisKey}`,
         `Outcome: ${status}`,
-        `Attempts used: ${d.attemptsUsed}/${Policy.MAX_ATTEMPTS}`,
-        `Remaining: ${d.remainingAttempts}`,
+        `Evidence-backed attempts recorded: ${d.attemptsUsed}`,
+        `No fixed hypothesis-count ceiling; duplicate strategy/variant pairs are deduplicated.`,
         `Duplicate attempt: ${result.duplicate ? "yes — not counted again" : "no"}`,
         `Reason: ${d.reason}`,
         next,
@@ -118,8 +118,8 @@ export const VerificationAttemptTool = Tool.define<typeof Parameters, Verificati
       metadata: {
         hypothesisKey: params.hypothesis_key,
         attemptsUsed: d.attemptsUsed,
-        maxAttempts: Policy.MAX_ATTEMPTS,
-        remainingAttempts: d.remainingAttempts,
+        
+        
         outcome: d.outcome,
         canContinue: d.canContinue,
         duplicate: result.duplicate,
