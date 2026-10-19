@@ -102,7 +102,7 @@ describe("VerificationAttempts", () => {
     expect(result.attemptsUsed).toBe(19)
     expect(result.remainingAttempts).toBe(1)
     expect(result.canContinue).toBe(true)
-    expect(result.reason).toContain("requires 20 distinct valid verification attempts")
+    expect(result.reason).toContain("hypothesis remains unresolved")
   })
 
   test("direct disproof evidence can resolve only after 20 distinct valid attempts", () => {
