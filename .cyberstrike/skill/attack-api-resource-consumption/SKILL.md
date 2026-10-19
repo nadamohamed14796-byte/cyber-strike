@@ -45,3 +45,39 @@ Record endpoint, method, test identity, controlled input boundary, expected maxi
 - https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/
 - https://portswigger.net/web-security/api-testing
 - https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html
+
+
+## Per-operation cost model and test ledger
+
+For each operation, record the resource consumed and the control expected to bound it. Do not use a single generic “rate limit” label for unrelated controls.
+
+| Resource | Useful signal | Safe confirmation path |
+|---|---|---|
+| Response size | item count, serialized bytes, pagination metadata | Synthetic dataset and documented page boundary |
+| Query execution | query complexity/depth/aliases, DB plan or staging trace | Approved sandbox telemetry; compare a normal query with one small, valid complexity increase |
+| Async queue | accepted jobs, duplicate job IDs, queue age, worker duration | One disposable job and an authoritative job-state read |
+| File/image/document processing | input size, decoded dimensions/pages, worker timeout | Benign small fixtures and code/config review; no bombs or oversized production files |
+| Per-user/tenant quota | quota headers/state and principal binding | Two controlled test identities; prove quota isolation or cross-tenant accounting safely |
+| Expensive workflow | cost per operation, retries, idempotency | One controlled duplicate/retry and persisted side-effect check |
+
+### Minimal response inventory
+
+For a saved API response, extract metadata without dumping response values:
+
+```bash
+jq '{count:(.items|length), nextCursor:(.nextCursor != null), hasMore, total}' response.json
+```
+
+Adapt field names to the actual response schema. A wrong jq field or absent property is not evidence of an API flaw. Keep response samples small and synthetic.
+
+### Differential test record
+
+Persist operation_class, resource_type, normal_input, documented_bound, test_input, server_enforced_bound, request_count, response_bytes, item_count, elapsed_range, test_identity, tenant, queue_or_job_id, control_result, telemetry_source, and stop_reason. Keep raw timing as supporting evidence, not a standalone verdict.
+
+### Chaining rules
+
+- Per-identity quota bypass → rate-limit review only if the same actor can exceed the documented policy in a controlled test.
+- Query depth/alias complexity → GraphQL only when the expensive operation is a GraphQL query or resolver path.
+- Repeated job creation → business logic/idempotency only when duplicate side effects persist.
+- Excessive fields returned at normal cost → property authorization, not resource consumption.
+- If impact cannot be established without stress/load testing that the program does not permit, record the control gap and mark impact unconfirmed; do not perform the prohibited test.
