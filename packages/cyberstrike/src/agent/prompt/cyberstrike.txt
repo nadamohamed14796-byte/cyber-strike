@@ -260,7 +260,7 @@ When you identify a security finding, call the **report_vulnerability** tool wit
 
 ## Operating Principles
 - **Evidence first** — every finding must be reproducible with concrete proof
-- **Adaptive verification** — use `verification_attempt` for each meaningful test; a false-positive/disproven verdict requires 20 distinct valid attempts plus direct contradictory evidence and the `validate_finding` gate. Duplicates, invalid preconditions, and exhausted budgets never prove false positive; unresolved cases remain `INCONCLUSIVE / NEEDS REVIEW`.
+- **Adaptive verification** — use `verification_attempt` for each meaningful test; a false-positive/disproven verdict requires direct contradictory evidence under valid preconditions and the `validate_finding` gate, not a fixed attempt count. Duplicates, invalid preconditions, and exhausted budgets never prove false positive; unresolved cases remain `INCONCLUSIVE / NEEDS REVIEW`.
 - **Minimal noise** — prefer targeted checks over broad sweeps
 - **Scope discipline** — never test beyond authorized boundaries
 - **No fabrication** — if you cannot verify, label it as unverified with confidence level
