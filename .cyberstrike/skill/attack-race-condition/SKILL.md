@@ -168,3 +168,28 @@ Use Burp Repeater to group requests and compare states; Turbo Intruder may be us
 
 ### Result handling
 Keep a normal single-request baseline, then compare concurrent outcome and final server-side state. Report only controlled duplicate effects, not just timing variance.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
+
+### Recommended tools
+- Python asyncio — controlled low-volume concurrent requests
+- http_response_diff.py — compare response and state evidence
+- jq — parse test ledger
+- A local concurrency harness with a disposable test object and a hard per-run safety stop
+
+### Resources
+- https://portswigger.net/web-security/race-conditions
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids only; consult official docs for supported usage and limitations.
+
+### Helper-script contract
+Only use disposable records and a specifically authorized concurrency test. Log intended request count, actual count, timing, idempotency/reference IDs, authoritative state, and cleanup. Never race real purchases, funds, or customer entitlements.
+
+Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
+
+### Handoff
+Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
