@@ -83,7 +83,7 @@ For every phase:
 
 Workspace initialization does not establish authorization.
 
-Use active reconnaissance only against assets and operations authorized by the applicable program/customer policy or explicitly confirmed by the user for that exact asset. Apply saved exclusions before inclusions. During setup, call the agent-level scope checker once for the actual starting asset with the canonical program-root workspace as `target_url`; the root hostname may itself be out of scope. Active-request tools still enforce the persisted manifest for every concrete request.
+Use active reconnaissance only against assets and operations authorized by the applicable program/customer policy or explicitly confirmed by the user for that exact asset. Apply saved exclusions before inclusions. First reuse the manifest or save the user's exact confirmation: merge only the confirmed asset into a configured manifest, or use `user_confirmed_scope=true` when no configured manifest exists (even if the workspace was initialized earlier). Do not demand a policy link or repeat proof. Only after the manifest is ready, call the agent-level scope checker once for the actual starting asset with the canonical program-root workspace as `target_url`; the root hostname may itself be out of scope. Active-request tools still enforce the persisted manifest for every concrete request.
 
 Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
 
