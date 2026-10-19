@@ -266,13 +266,15 @@ If the user supplies a scope file:
 
 1. Inspect the file safely without executing its contents.
 2. Identify its format, source, integrity, and include/exclude rules.
-3. Compare its contents against the official policy.
-4. Resolve any conflicts conservatively.
+3. If a verified official policy reference is available, compare the supplied entries against it. If the user explicitly confirms the complete list as the authorized scope and no policy reference is available, record that provenance without inventing a reference or asking for per-entry confirmation.
+4. Resolve known conflicts conservatively; preserve unsupported entries as evidence and do not treat them as authorizing HTTP requests.
 5. Import it using the registered `target_workspace` scope-configuration operation.
 
 Use the actual registered schema. If it matches the following interface, provide the canonical target, absolute scope-file path, verified authorization source, official HTTPS reference, and any additional verified exclusions:
 
-`target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
+Policy-backed import: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
+
+User-confirmed complete list without a verified policy URL: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", user_confirmed_scope_list=true)`. The same flag applies to a complete explicit `include=[...]` list when no file is provided.
 
 Do not paste a large scope file into the model context unnecessarily.
 
