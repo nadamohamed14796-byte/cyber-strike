@@ -33,7 +33,6 @@ export type FindingValidationCheckID = (typeof FINDING_VALIDATION_CHECKS)[number
 
 export interface FindingValidationAttemptInput extends FindingValidationAttemptRecord {}
 
-export const FINDING_VALIDATION_MIN_ATTEMPTS = 20
 
 export function recommendValidationStrategies(context: string): FindingValidationAttemptStrategy[] {
   const value = context.toLowerCase()
@@ -85,10 +84,10 @@ export interface FindingValidationAssessment {
   nextStep: string
   output: string
   attemptCount: number
-  attemptsRemaining: number
+  attemptsRemaining?: number
   /** Distinct valid attempts in the durable execution ledger; caller-authored checks do not increment this. */
   ledgerAttemptCount?: number
-  /** Remaining durable ledger attempts required for a terminal false-positive verdict. */
+  /** Evidence-backed ledger attempt count for auditability; no fixed minimum applies. */
   ledgerAttemptsRemaining?: number
 }
 
@@ -160,7 +159,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
   const attemptContradictedCheckIDs = new Set(attemptContradictions.map((attempt) => attempt.checkID))
   const attemptBackedContradictions = contradictions.filter((check) => attemptContradictedCheckIDs.has(check.id))
   const attemptPrimaryContradiction = attemptBackedContradictions.some((check) => PRIMARY_CONTRADICTION_CHECKS.has(check.id))
-  const enoughDistinctAttempts = validAttempts.length >= FINDING_VALIDATION_MIN_ATTEMPTS
+  const enoughDistinctAttempts = validAttempts.some((attempt) => attempt.validConditions && Boolean(attempt.evidence?.trim()))
   // A false-positive verdict must not skip unresolved checklist questions. All ten checks
   // are required inputs, but UNKNOWN still means the assessment is incomplete and inconclusive.
   const falsePositive = enoughDistinctAttempts && unknown.length === 0 && contradictions.length >= 2 && hasPrimaryContradiction && attemptBackedContradictions.length >= 2 && attemptPrimaryContradiction
@@ -211,12 +210,12 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     summary = "Inconclusive: evidence does not justify classifying this finding as confirmed or false positive. Failed checks: " +
       (failed.length ? failed.map((check) => "#" + check.number).join(", ") : "none") +
       "; unknown checks: " + (unknown.length ? unknown.map((check) => "#" + check.number).join(", ") : "none") + ". " +
-      (enoughDistinctAttempts ? "The minimum of 20 distinct valid evidence-backed attempts has been reached." : "False-positive classification is blocked: " + validAttempts.length + "/20 distinct valid evidence-backed attempts are recorded.")
+      (enoughDistinctAttempts ? "Evidence-backed validation attempts are recorded; the verdict depends on the checks and contradictory evidence, not a fixed attempt count." : "False-positive classification is blocked because no valid evidence-backed attempt is recorded.")
     nextStep = unknown.length > 0
-      ? "Resolve the unknown checks before making a final verdict: " + unknown.map((check) => "#" + check.number + " " + check.id).join(", ") + ". Gather the missing evidence or record a justified not_applicable status where appropriate; 20 attempts do not override unanswered checklist questions."
+      ? "Resolve the unknown checks before making a final verdict: " + unknown.map((check) => "#" + check.number + " " + check.id).join(", ") + ". Gather the missing evidence or record a justified not_applicable status where appropriate; attempt counts do not override unanswered checklist questions."
       : enoughDistinctAttempts
-        ? "Twenty distinct valid attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching valid attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
-        : "Perform " + (FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " more distinct, case-specific tests under valid preconditions. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Do not count repeated identical requests, planned-but-unexecuted tests, invalid preconditions, or results without observed evidence. Stop if scope, safety, or authorization is unclear."
+        ? "Evidence-backed attempts are recorded, but a false-positive verdict still requires at least two failed contradiction checks backed by matching valid attempt outcomes, including one primary check. Reconcile the check evidence with the attempt log; keep the result inconclusive if they do not agree."
+        : "Record the next materially distinct, case-specific test only when it can change the conclusion. Choose strategies based on the vulnerability hypothesis; compare identities, controls, state, methods, endpoints, timing, and benign explanations only when relevant. Deduplicate repeated requests, do not count planned-but-unexecuted tests, and require observed evidence under valid preconditions. Stop if scope, safety, or authorization is unclear."
   }
 
   const uncertaintyRegister = unknown.length
@@ -237,7 +236,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     "All ten checks (status, reason, and evidence):",
     ...checks.map(formatCheck),
     "",
-    "Verification attempts: " + validAttempts.length + "/" + FINDING_VALIDATION_MIN_ATTEMPTS + " distinct valid evidence-backed attempts; " + Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length) + " remaining before false-positive eligibility.",
+    "Evidence-backed validation attempts recorded: " + validAttempts.filter((attempt) => attempt.validConditions && Boolean(attempt.evidence?.trim())).length + ". No fixed attempt-count threshold applies.",
     "",
     "Check results: " + passed.length + " passed, " + failed.length + " failed, " + unknown.length + " unknown, " + notApplicable.length + " not applicable (10 total).",
     "Next step: " + nextStep,
@@ -256,7 +255,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     nextStep,
     output,
     attemptCount: validAttempts.length,
-    attemptsRemaining: Math.max(0, FINDING_VALIDATION_MIN_ATTEMPTS - validAttempts.length),
+    
   }
 }
 
@@ -326,24 +325,23 @@ export namespace FindingValidation {
     const distinctValidLedgerAttempts = VerificationPolicy.uniqueAttempts(ledgerAttempts)
       .filter((attempt) => attempt.validConditions)
     assessment.ledgerAttemptCount = distinctValidLedgerAttempts.length
-    assessment.ledgerAttemptsRemaining = Math.max(0, VerificationPolicy.MAX_ATTEMPTS - distinctValidLedgerAttempts.length)
+    assessment.ledgerAttemptsRemaining = undefined
 
     if (assessment.verdict === "false_positive") {
-      const ledgerDisproved = distinctValidLedgerAttempts.length >= VerificationPolicy.MAX_ATTEMPTS &&
-        ledgerAttempts.some((attempt) => attempt.outcome === "disproven" && attempt.validConditions && Boolean(attempt.evidenceRef?.trim()))
+      const ledgerDisproved = ledgerAttempts.some((attempt) => attempt.outcome === "disproven" && attempt.validConditions && Boolean(attempt.evidenceRef?.trim()))
 
       if (!ledgerDisproved) {
         const originalSummary = assessment.summary
         const originalNextStep = assessment.nextStep
         assessment.verdict = "inconclusive"
         assessment.confidence = 45
-        assessment.summary = "Inconclusive: checklist evidence suggested a false-positive explanation, but the durable verification ledger lacks 20 distinct valid attempts and direct contradictory evidence for " + hypothesisKey + ". Self-reported attempts alone cannot classify a finding as false positive."
-        assessment.nextStep = "Record distinct tests with verification_attempt using hypothesis_key=" + hypothesisKey + ". Keep the finding inconclusive until the durable ledger reaches 20 valid attempts and records an evidence-backed disproven outcome. Previous checklist assessment: " + originalSummary + " " + originalNextStep
+        assessment.summary = "Inconclusive: checklist evidence suggested a false-positive explanation, but the durable verification ledger lacks a direct contradictory DISPROVEN outcome for " + hypothesisKey + ". Self-reported attempts alone cannot classify a finding as false positive."
+        assessment.nextStep = "Record distinct tests with verification_attempt using hypothesis_key=" + hypothesisKey + ". Keep the finding inconclusive until the durable ledger records an evidence-backed disproven outcome. Previous checklist assessment: " + originalSummary + " " + originalNextStep
         assessment.output = assessment.output
           .replace("Final verdict: false_positive", "Final verdict: inconclusive")
           .replace(originalSummary, assessment.summary)
           .replace(originalNextStep, assessment.nextStep)
-          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary + String.fromCharCode(10) + "Durable ledger progress: " + distinctValidLedgerAttempts.length + "/" + VerificationPolicy.MAX_ATTEMPTS + "; remaining ledger attempts: " + (assessment.ledgerAttemptsRemaining ?? 0) + ". Submitted checklist attempts do not satisfy this gate."
+          + String.fromCharCode(10, 10) + "False-positive guard: " + assessment.summary + String.fromCharCode(10) + "Durable ledger evidence-backed attempts: " + distinctValidLedgerAttempts.length + ". Submitted checklist attempts do not replace direct ledger evidence."
       }
     } else if (assessment.verdict === "confirmed") {
       const ledgerConfirmed = distinctValidLedgerAttempts.some((attempt) =>
@@ -471,7 +469,7 @@ export namespace FindingValidation {
           upsertByIdentity: true,
           identityKey: "finding:" + input.vulnerabilityID,
           ...(assessment.verdict === "confirmed" || assessment.verdict === "false_positive"
-            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; submitted distinct attempts: " + assessment.attemptCount + "; durable valid ledger attempts: " + (assessment.ledgerAttemptCount ?? 0) + "; durable attempts remaining: " + (assessment.ledgerAttemptsRemaining ?? VerificationPolicy.MAX_ATTEMPTS) + "; summary: " + assessment.summary }
+            ? { evidence: "SQLite finding-validation record " + validationID + "; verdict: " + assessment.verdict + "; submitted distinct attempts: " + assessment.attemptCount + "; durable valid ledger attempts: " + (assessment.ledgerAttemptCount ?? 0) + "; durable attempts remaining: " + (assessment.ledgerAttemptsRemaining ?? 0) + "; summary: " + assessment.summary }
             : {}),
           status: assessment.verdict === "confirmed" ? "confirmed" : assessment.verdict === "false_positive" ? "disproven" : "unverified",
           tags: ["finding-validation", assessment.verdict, ...assessment.failedCheckIDs.map((id) => "failed:" + id)],
@@ -490,7 +488,7 @@ export namespace FindingValidation {
           confidence: assessment.confidence,
           submittedDistinctAttempts: assessment.attemptCount,
           durableValidLedgerAttempts: assessment.ledgerAttemptCount ?? 0,
-          durableLedgerAttemptsRemaining: assessment.ledgerAttemptsRemaining ?? VerificationPolicy.MAX_ATTEMPTS,
+          durableLedgerAttemptsRemaining: assessment.ledgerAttemptsRemaining,
           failedCheckIDs: assessment.failedCheckIDs,
           unknownCheckIDs: assessment.unknownCheckIDs,
           targetNoteID: note.note.id,
