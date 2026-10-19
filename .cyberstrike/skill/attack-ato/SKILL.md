@@ -158,3 +158,29 @@ Impact requires a demonstrated unauthorized account/session transition, not mere
 
 ### Identity-chain validation
 Map the whole state transition—registration or recovery start, token issuance, verification, credential/factor change, session creation, and post-authentication principal. Use two tester-owned accounts with separate controlled inboxes and record which identity each token is bound to. A reset email arriving, a token parsing, or a page rendering does not prove takeover. Prove the terminal state only by authenticating into the disposable test account and checking a harmless identity endpoint; then revoke sessions and restore factors. Chain to MFA, reset, OAuth/OIDC, or session review only when the observed defect crosses that specific boundary. Treat an isolated weak recovery control as its own finding unless the account-control consequence is reproduced.
+
+
+## Identity lifecycle evidence matrix
+
+Track the identity, factor set, and active sessions before and after every event. The invariant is that an identity transition remains bound to the intended test principal.
+
+| Transition | Controlled test | Evidence to preserve |
+|---|---|---|
+| Email/phone change | Use the documented reauthentication and confirmation steps on a test account | Old/new verified contact state, notification, active sessions, effective principal |
+| Password reset | Use a fresh test-account token and assess purpose, expiry, single-use and account binding | Token fingerprint only, account binding, before/after state, session invalidation |
+| OAuth/OIDC linking | Link a provider identity owned by the tester to a test account | Issuer, subject, tenant, linking principal, final account identifier |
+| Invitation acceptance | Create a test invitation for a known role/tenant | Invited role, accepting principal, resulting membership and tenant |
+| MFA enrollment/removal | Change a factor on a test account and verify documented step-up/revocation behavior | Assurance before/after, factor inventory, old-session behavior |
+| Recovery fallback | Use the product's documented recovery path with test factors | Whether the required proof is preserved and the same principal remains bound |
+| Account merge/deletion | Use disposable tenant fixtures and non-production data only | Ownership/membership state and whether old sessions/links remain valid |
+
+### Evidence ledger
+
+Record entry_point, precondition, test_identity_A, test_identity_B, token_purpose, token_account_binding, token_reuse_result, principal_before, principal_after, factor_state_before_after, session_state_before_after, notifications_sent, terminal_effect, negative_control, and cleanup_verified. Use pseudonymous test labels, never raw tokens or recovery codes.
+
+### Reporting discipline
+
+- Separate a prerequisite defect from a demonstrated account-control consequence; label unproven consequences clearly.
+- If a result requires user interaction, prior compromise, an already-authorized account, or a specific provider configuration, state that precondition prominently.
+- Do not claim full takeover if only a low-risk profile field or a linking prompt changed.
+- Preserve a clean control flow and a regression test proving the expected account/issuer/tenant binding.
