@@ -104,3 +104,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater and application telemetry to check per-user/resource limits safely. A load-testing tool is usually unnecessary for a bug bounty proof; if required, k6 is for an explicitly approved staging/lab capacity test, not for stress-testing public production systems.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- [k6 installation](https://grafana.com/docs/k6/latest/set-up/install-k6/) — official installer and supported environments.
+- jq on Kali/Debian: sudo apt update && sudo apt install jq.
+Do not run load tests, large batches, or resource-exhaustion payloads against a live target unless the written program rules explicitly authorize them. Prefer a minimal test of a disposable resource and stop on service degradation or rate limiting.
+
+### Primary resources
+- [OWASP API Security Top 10 — API4](https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/) — risk and controls.
+- [Grafana k6 docs](https://grafana.com/docs/k6/latest/) — test design and thresholds.
+- [OWASP Denial of Service Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html) — defensive context.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
+
+### Result handling
+Record the documented limit, safe request count/spacing, resource ownership, observed control behavior, and stop condition. Don't claim unbounded impact from a single slow response.
