@@ -223,6 +223,16 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       const userConfirmedScopeList = params.user_confirmed_scope_list === true
       let inheritedUserConfirmedScopeList = false
 
+      // A full replacement of include entries does not implicitly erase prior exclusions.
+      // Passing exclude: [] is the explicit way to remove all saved exclusions.
+      if (!params.merge_existing && params.exclude === undefined && (params.scope_file_path || userConfirmedScopeList)) {
+        const existingWorkspace = await TargetMemory.get(targetURL)
+        const existingScope = existingWorkspace ? await TargetMemory.getScope(existingWorkspace.targetURL) : undefined
+        if (existingScope?.status === "configured") {
+          excludeEntries = [...existingScope.excludedItems]
+        }
+      }
+
       if (params.merge_existing) {
         if (params.scope_file_path) {
           throw new Error("merge_existing cannot be combined with scope_file_path. Add individual entries without re-importing the full scope file.")
