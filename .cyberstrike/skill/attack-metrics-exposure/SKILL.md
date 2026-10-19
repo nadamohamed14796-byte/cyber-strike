@@ -83,3 +83,28 @@ Kali/Debian: `sudo apt update && sudo apt install curl jq`. Get Prometheus/`prom
 
 ### Result handling
 Record the metric names and exposure context without copying secrets or personal data; distinguish public operational metadata from genuinely sensitive data.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
+
+### Recommended tools
+- curl — single read-only metadata request
+- jq — parse metrics exposition/JSON
+- rg — locate high-signal metric names in saved output
+- Python — redact labels and summarize cardinality locally
+
+### Resources
+- https://prometheus.io/docs/prometheus/latest/querying/api/
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; verify project maintenance, license, and supported behavior from official sources.
+
+### Helper-script contract
+Capture only minimal sanitized metrics metadata. Check whether sensitive labels, environment names, or internal topology are exposed without enumerating large metric sets or collecting customer-specific labels.
+
+Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+
+### Handoff
+Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
