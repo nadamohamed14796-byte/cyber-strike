@@ -194,3 +194,29 @@ These tools are optional additions, not a claim that they already exist on the t
 - Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
 - Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
 - If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-invokable CLI tools and local libraries only; browser UI, extensions, and interactive intercepting proxies are not required dependencies. Verify official installation docs, version, license, platform support, and impact before use.
+
+### Recommended tools
+- Python requests/httpx — controlled identity/session comparisons
+- jq — parse structured responses
+- http_response_diff.py — compare baseline and test variants
+- Local JSONL matrix for account, role, token lifecycle, and operation
+
+### Resources
+- https://portswigger.net/web-security/access-control
+- https://owasp.org/API-Security/
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; confirm tool maintenance and CLI behavior from official sources.
+
+### Helper-script contract
+Use tester-owned accounts and synthetic resources. Change one trust dimension at a time and preserve baseline/control, auth context, result, and redacted evidence. Never retain live bearer tokens or modify real user data.
+
+Preserve raw evidence and normalize a separate copy. Record source, timestamp, tool/version, auth context, errors, confidence, redaction state, and artifact references. Use explicit paths, structured output, and local fixtures.
+
+### Handoff
+Report actual commands and versions, input/output paths, control results, failures, confidence, limitations, and next skill. Missing tools and blocked tests are explicit.
