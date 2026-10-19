@@ -113,3 +113,25 @@ Before finalizing, label each sentence internally as OBSERVED, INFERRED, or RECO
 ### Regression handoff
 
 Provide a compact test case with setup, expected result, actual pre-fix result, post-fix expected result, and cleanup. Avoid using live credentials in sample requests; replace them with placeholders and redact cookies, tokens, personal fields, and sensitive response bodies. Do not attach an entire HAR when a minimal sanitized request pair proves the issue.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use a Markdown editor, sanitized Burp request/response exports, a redaction review, and FIRST's CVSS calculator when severity scoring is relevant. Keep the report reproducible and concise.
+
+### Installation and setup
+- CVSS calculator is web-based and requires no install: https://www.first.org/cvss/calculator/4.0 .
+- jq is optional for local JSON artifacts; on Kali/Debian: `sudo apt update && sudo apt install jq`.
+- Use Git or local backups only for sanitized report sources. Never commit raw requests, cookies, reset links, API keys, or private user data.
+
+### Primary resources
+- [HackerOne report writing guidance](https://docs.hackerone.com/en/articles/8475116-best-practices-for-submitting-reports) — actionable report structure.
+- [FIRST CVSS v4.0 resources](https://www.first.org/cvss/) — scoring specification and attribution.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — reproducibility and evidence framing.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` checks required evidence metadata and obvious secret-like values; it does not certify a report's correctness.
+
+### Result handling
+Write observed facts separately from assumptions; include test account/role, prerequisite, exact steps, expected/actual result, measurable impact, and remediation. Include the CVSS vector and reasoning when scoring, and mark untested impact as unknown.
