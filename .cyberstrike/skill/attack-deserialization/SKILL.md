@@ -186,3 +186,28 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record input format, parser/library/version, controlled marker, observable state/behavior, and plausible mitigation. Parser errors or a suspicious serialized field alone are not proof of code execution.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
+
+### Recommended tools
+- A local deserialization fixture matching the identified format
+- Semgrep — source-level unsafe deserialization patterns where source is available
+- Python/Java/.NET ecosystem-native parsers for static metadata only
+- curl/Python requests — minimal safe acceptance/rejection checks
+
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://portswigger.net/web-security/deserialization
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use the upstream community list only to discover candidates. Confirm tool maintenance, provenance, dependencies, and supported usage from official sources.
+
+### Helper-script contract
+Prefer static analysis and local lab fixtures. Record format, library/version evidence, parser boundary, and safe rejection behavior. Do not deploy gadget chains or execute commands against production targets.
+
+Helpers must accept explicit paths, preserve native evidence, write normalized output separately, redact sensitive values, record timestamps and tool versions, handle malformed inputs, and include local fixtures.
+
+### Handoff
+Return the tool/version, command, input/output artifact references, control result, failures, confidence, and limitations. A candidate signal is not a confirmed finding.
