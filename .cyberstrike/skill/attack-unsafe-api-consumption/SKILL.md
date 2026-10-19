@@ -79,3 +79,26 @@ Persist integration_name, provider_identity, tenant_binding, signature_policy, s
 ## Regression handoff
 
 Add tests for invalid signature, replay, wrong tenant/provider, unknown field, wrong type, missing required field, malformed downstream response, disallowed redirect, and retry after partial failure. Keep tests synthetic and verify authoritative state rather than the HTTP acknowledgement alone.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer to trace how the application consumes third-party API data, jq/schema validators for local response samples, and an authorized mock/staging upstream to reproduce trust-boundary issues. Never assume a partner API response is safe because it is syntactically valid JSON.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official installation.
+- jq on Kali/Debian: `sudo apt update && sudo apt install jq`.
+- For an owned service, use its existing OpenAPI/JSON Schema validator or the official library for its language; pin dependencies and test using sanitized synthetic fixtures.
+Do not alter third-party services, replay other users' webhooks, or inject real downstream actions during a production test.
+
+### Primary resources
+- [OWASP API Security Top 10 — API10: Unsafe Consumption of APIs](https://owasp.org/API-Security/editions/2023/en/0xa10-unsafe-consumption-of-apis/) — risk description.
+- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) — validation boundaries.
+- [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) — if upstream URLs are controllable.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares two already-collected sanitized responses offline.
+
+### Result handling
+Trace the untrusted upstream field to the security-sensitive sink, record the downstream effect using synthetic data, and keep partner keys and customer payloads out of evidence.
