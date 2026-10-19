@@ -163,3 +163,26 @@ rg -n --glob '*.{java,kt,yml,yaml,properties}' \
 ### Evidence fields
 
 Record application_port_vs_management_port, context_path, active_profile_source, filter_chain_order, matched_route, method_security, actuator_exposure_config, principal, data_classification, random_path_control, and cleanup_status. Do not fetch secret-bearing endpoints to fill unknown fields; use source/config evidence or mark the fact unverified.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp for HTTP behavior, Maven or Gradle for dependency/configuration analysis on an authorized source checkout, and Semgrep for targeted static checks when the source is available.
+
+### Installation and setup
+- [Spring Security documentation](https://spring.io/projects/spring-security) — version-specific integration.
+- [Maven installation](https://maven.apache.org/install.html) or [Gradle installation](https://gradle.org/install/) — follow the project's existing wrapper when available rather than replacing build versions.
+- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — optional source review.
+Run dependency checks on a disposable copy and preserve lock/build files. A default actuator path or static rule match is a lead; verify actual exposure/access control.
+
+### Primary resources
+- [Spring Boot security](https://docs.spring.io/spring-boot/reference/web/spring-security.html) — official behavior/configuration.
+- [Spring Actuator reference](https://docs.spring.io/spring-boot/reference/actuator/index.html) — management endpoints.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box evidence.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized responses saved locally.
+
+### Result handling
+Record exact app/version, route, authentication context, and the sensitive operation/data actually exposed. Redact actuator environment/config output before storing evidence.
