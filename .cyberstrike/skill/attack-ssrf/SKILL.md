@@ -120,24 +120,29 @@ Stop if the test reveals a real secret, internal response, or unexpected third-p
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Repeater and a controlled callback/OAST service to confirm server-side outbound requests. Interactsh can help correlate DNS/HTTP callbacks when the program permits use of an external service; no callback does not necessarily disprove SSRF.
+### Agent-usable tools and purpose
+- `curl` — send a captured, authorized baseline request and inspect status/headers/redirects; do not invent routes or replay secrets.
+- Python `httpx` or `requests` — run reproducible, low-volume request variations from a saved, redacted request template.
+- ProjectDiscovery `interactsh-client` — correlate a unique DNS/HTTP callback only when an external OAST service is allowed by the program and its privacy rules.
+- `jq` and `rg` — parse local JSON results and search source/configuration artifacts already collected within scope.
+- Existing local helper: `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved response samples; it does not issue network requests.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official installation.
-- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) documents the client install. With Go 1.20+, the documented command is `go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest`; install Go from https://go.dev/dl/ if needed.
-Use only a unique callback URL and benign test value. Do not probe internal address ranges, cloud metadata endpoints, or retrieve internal files unless the target's written scope explicitly authorizes the exact test. Consider the privacy implications of a third-party OAST provider.
+### Installation and verification
+- Prefer packages from the official OS repository or each project's official installation guide; verify versions before using any tool.
+- Interactsh official installation: https://github.com/projectdiscovery/interactsh. If Go is already installed, the documented client install is `go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest`; verify with `interactsh-client -h`. Install Go only from https://go.dev/dl/ if needed.
+- Verify request tools with `curl --version`, `python3 -c "import httpx; print(httpx.__version__)"`, or `python3 -c "import requests; print(requests.__version__)"`, depending on the chosen client.
+- If a dependency is missing, record it and use a safe available alternative; never imply a test ran when it did not.
 
 ### Primary resources
-- [PortSwigger SSRF](https://portswigger.net/web-security/ssrf) — lab-first methodology.
-- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) — callback workflow and options.
-- [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) — remediation.
+- [PortSwigger SSRF](https://portswigger.net/web-security/ssrf) — methodology and lab exercises.
+- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) — client usage and callback behavior.
+- [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) — defenses.
+- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test planning.
 
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares local responses; it does not probe URLs or internal resources.
+Use only a unique callback URL and benign test value. Do not probe internal address ranges, cloud metadata endpoints, or retrieve internal files unless the target's written scope explicitly authorizes that exact test. Consider the privacy implications of a third-party OAST provider.
 
-### Result handling
-Correlate the callback with a unique request ID/time, demonstrate that the server—not the tester's browser—made the request, and stop at the minimum proof needed.
+### Evidence and fallback
+Correlate callbacks with a unique non-sensitive run marker and timestamp. Callback absence is inconclusive. A callback proves outbound interaction only—not internal-network access, data exfiltration, or credential access. Preserve redacted request/response artifacts and callback metadata; stop on real secrets or unexpected sensitive data.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
