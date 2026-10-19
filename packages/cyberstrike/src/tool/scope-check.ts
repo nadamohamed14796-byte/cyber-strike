@@ -1,8 +1,47 @@
 import z from "zod"
 import { Tool } from "./tool"
 import { TargetMemory } from "../target"
-import { checkMatch } from "../target/scope-match"
+import { matchingScopeItems } from "../target/scope-index"
 export { checkMatch } from "../target/scope-match"
+
+const MAX_SCOPE_MATCHES_IN_OUTPUT = 8
+
+function toScopeURL(input: string, defaultProtocol = "https:"): URL | undefined {
+  const value = input.trim()
+  if (!value) return undefined
+  try {
+    let url: URL
+    const lower = value.toLowerCase()
+    if (lower.startsWith("http://") || lower.startsWith("https://")) {
+      url = new URL(value)
+    } else {
+      if (value.includes("://")) return undefined
+      let authority = value
+      while (authority.startsWith("/")) authority = authority.slice(1)
+      const delimiterPositions = [authority.indexOf("/"), authority.indexOf("?"), authority.indexOf("#")].filter((i) => i >= 0)
+      const hostEnd = delimiterPositions.length ? Math.min(...delimiterPositions) : authority.length
+      const hostPart = authority.slice(0, hostEnd)
+      if (!hostPart) return undefined
+      if (!hostPart.startsWith("[") && hostPart.split(":").length > 2) {
+        authority = "[" + hostPart + "]" + authority.slice(hostPart.length)
+      }
+      url = new URL(defaultProtocol + "//" + authority)
+    }
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return undefined
+    return url
+  } catch {
+    return undefined
+  }
+}
+
+function previewMatches(items: string[]): string {
+  if (!items.length) return "(none)"
+  const preview = items.slice(0, MAX_SCOPE_MATCHES_IN_OUTPUT).join(", ")
+  return preview + (items.length > MAX_SCOPE_MATCHES_IN_OUTPUT
+    ? " (+" + (items.length - MAX_SCOPE_MATCHES_IN_OUTPUT) + " more)"
+    : "")
+}
+
 
 export const ScopeCheckTool = Tool.define("scope_check", {
   description:
@@ -22,6 +61,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
     let scopeSource = "caller-provided (not persisted authorization)"
     let scopeConfigured = false
     let authoritativeDecision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>> | undefined
+    let candidateURL: URL | undefined
 
     if (params.target_url) {
       let workspace
@@ -61,10 +101,9 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       scopeConfigured = true
       scopeSource = persisted.authorizationSource ?? "persisted manifest (source missing)"
       try {
-        const candidateURL = /^https?:\/\//i.test(target)
-          ? target
-          : new URL(workspace.targetURL).protocol + "//" + target.replace(/^\/+/, "")
-        authoritativeDecision = await TargetMemory.checkURLScope(candidateURL)
+        candidateURL = toScopeURL(target, new URL(workspace.targetURL).protocol)
+        if (!candidateURL) throw new Error("Target must be a hostname, host:port, IP literal, or HTTP(S) URL.")
+        authoritativeDecision = await TargetMemory.checkURLScope(candidateURL.href)
       } catch (error) {
         return {
           title: "Target scope decision failed closed",
@@ -74,67 +113,83 @@ export const ScopeCheckTool = Tool.define("scope_check", {
       }
     }
 
-    const results: Array<{ scope: string; matches: boolean; reason: string; excluded?: boolean }> = []
-    let included = false
-    let excluded = false
+    if (!candidateURL) candidateURL = toScopeURL(target)
+    if (!candidateURL) {
+      return {
+        title: "Invalid scope target",
+        output: "Target must be a hostname, host:port, IP literal, or HTTP(S) URL. No scope decision was made.",
+        metadata: { target, inScope: false, scopeConfigured, invalidTarget: true },
+      }
+    }
 
-    for (const scope of scopeItems) {
-      const s = scope.trim()
-      const match = checkMatch(target, s)
-      results.push({ scope: s, ...match })
-      if (match.matches) included = true
-    }
-    for (const scope of excludedItems) {
-      const s = scope.trim()
-      const match = checkMatch(target, s)
-      results.push({ scope: s, ...match, excluded: true })
-      if (match.matches) excluded = true
-    }
-    if (authoritativeDecision) {
-      if (!authoritativeDecision.allowed) included = false
-      if (authoritativeDecision.excludeMatches.length > 0) excluded = true
-    }
+    // Reuse indexed scope results. Do not iterate over or emit every entry in a large manifest.
+    const includeMatches = authoritativeDecision
+      ? authoritativeDecision.includeMatches
+      : matchingScopeItems(candidateURL, scopeItems)
+    const excludeMatches = authoritativeDecision
+      ? authoritativeDecision.excludeMatches
+      : matchingScopeItems(candidateURL, excludedItems)
+    const included = includeMatches.length > 0
+    const excluded = excludeMatches.length > 0
     const inScope = included && !excluded && (authoritativeDecision?.allowed ?? true)
-
     const informationalOnly = !params.target_url
+    const allMatched = [
+      ...includeMatches.map((scope) => ({ scope, matches: true, reason: "matches target", excluded: false })),
+      ...excludeMatches.map((scope) => ({ scope, matches: true, reason: "explicit exclusion matches target", excluded: true })),
+    ]
+    const displayedMatches = allMatched.slice(0, MAX_SCOPE_MATCHES_IN_OUTPUT)
     const output = [
-      `Target: ${target}`,
+      "Target: " + target,
       informationalOnly
-        ? `Matches supplied scope entries: ${inScope ? "YES" : "NO"}`
-        : `In scope: ${inScope ? "YES" : "NO"}`,
-      `Scope source: ${scopeSource}`,
-      `Persisted authorization manifest: ${scopeConfigured ? "configured" : "not used"}`,
+        ? "Matches supplied scope entries: " + (included && !excluded ? "YES" : "NO")
+        : "In scope: " + (inScope ? "YES" : "NO"),
+      "Scope source: " + scopeSource,
+      "Persisted authorization manifest: " + (scopeConfigured ? "configured" : "not used"),
+      "Scope inventory size: " + scopeItems.length + " include entries; " + excludedItems.length + " exclusions",
+      "Matching inclusions (" + includeMatches.length + "): " + previewMatches(includeMatches),
+      "Matching exclusions (" + excludeMatches.length + "): " + previewMatches(excludeMatches),
       ...(informationalOnly
         ? ["Authorization: NOT VERIFIED — caller-provided scope entries are informational only. Do not treat a match as permission to test."]
         : []),
-      ...(authoritativeDecision ? ["Authoritative active-scope decision: " + authoritativeDecision.reason] : []),
+      ...(authoritativeDecision
+        ? ["Authoritative active-scope decision: " + authoritativeDecision.reason]
+        : []),
       "",
-      "Scope check details:",
-      ...(results.length ? results.map((r) => `  ${r.matches ? (r.excluded ? "[EXCLUDED]" : "[MATCH]") : "[NO]"} ${r.scope} — ${r.reason}`) : ["  (no scope entries supplied)"]),
+      "Matching scope details (non-matching manifest entries omitted):",
+      ...(displayedMatches.length
+        ? displayedMatches.map((item) => "  " + (item.excluded ? "[EXCLUDED]" : "[MATCH]") + " " + item.scope + " — " + item.reason)
+        : ["  (no scope entries match this target)"]),
     ]
 
     if (!inScope) {
       output.push("")
       output.push(excluded
         ? "WARNING: Target matches an explicit exclusion. Exclusions override all include entries."
-        : "WARNING: Target is NOT in scope. Do NOT perform active testing on this target.")
+        : informationalOnly
+          ? "WARNING: No supplied scope entry matches this target; the match is informational only."
+          : "WARNING: Target is NOT in scope. Do NOT perform active testing on this target.")
     }
 
+    const matchesSuppliedScope = included && !excluded && (authoritativeDecision?.allowed ?? true)
     return {
       title: informationalOnly
-        ? (inScope ? `Informational scope match: ${target} (authorization unverified)` : `No informational scope match: ${target}`)
-        : inScope ? `In scope: ${target}` : `OUT OF SCOPE: ${target}`,
+        ? (included && !excluded ? "Informational scope match: " + target + " (authorization unverified)" : "No informational scope match: " + target)
+        : inScope ? "In scope: " + target : "OUT OF SCOPE: " + target,
       output: output.join("\n"),
       metadata: {
         target,
         inScope: scopeConfigured && inScope,
-        matchesSuppliedScope: inScope,
+        matchesSuppliedScope,
         authorizationVerified: scopeConfigured && Boolean(authoritativeDecision?.allowed),
         scopeMatchOnly: informationalOnly,
         scopeConfigured,
         scopeSource,
         excluded,
-        results,
+        include_match_count: includeMatches.length,
+        exclude_match_count: excludeMatches.length,
+        include_match_preview: includeMatches.slice(0, MAX_SCOPE_MATCHES_IN_OUTPUT),
+        exclude_match_preview: excludeMatches.slice(0, MAX_SCOPE_MATCHES_IN_OUTPUT),
+        results: displayedMatches,
       },
     }
   },
