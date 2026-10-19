@@ -9,8 +9,6 @@ Each file was read from the current main branch before editing. Successful edits
 - `bug-bounty-evidence-workflow/SKILL.md`: evidence-led workflow, statuses, deduplication, triage, and reporting.
 - `attack-variant-analysis/SKILL.md`: root-cause-led sibling search with independent proof gates.
 - `attack-test-corpus-governance/SKILL.md`: corpus provenance, licensing, context, deduplication, and safe handling.
-- `attack-variant-analysis/SKILL.md`: root-cause-led sibling search with independent proof gates.
-- `attack-test-corpus-governance/SKILL.md`: corpus provenance, licensing, context, deduplication, and safe handling.
 
 These are unsigned community/local skills. The loader's signing code classifies files without a hash as unverified; do not label them official or signed.
 
