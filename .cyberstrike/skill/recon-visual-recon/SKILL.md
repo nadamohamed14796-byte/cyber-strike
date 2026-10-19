@@ -139,3 +139,26 @@ Return normalized asset, scope/provenance, capture conditions, confidence, dupli
 
 ### Visual clusters as testable hypotheses
 Capture consistent screenshots at the same viewport and auth context, then cluster only as a navigation aid—not as proof that two apps share code or ownership. Retain URL, screenshot hash/path, title, favicon/theme fingerprint, response status, and comparison rationale. Convert each visual anomaly into one question (different tenant, admin console, old version, hidden workflow, unexpected login state) and verify with normal HTTP evidence. Avoid screenshotting personal information and redact account names/IDs. Route admin-specific paths to BFLA, tenant/object references to IDOR, and visually different auth flows to the authentication specialist only after the request behavior corroborates the visual clue.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use browser screenshots for manual high-signal assets and an optional headless screenshot utility such as gowitness to compare unauthenticated pages at scale. Capture only the public/in-scope page state required for assessment.
+
+### Installation and setup
+- [gowitness project](https://github.com/sensepost/gowitness) — official release and setup instructions.
+- [ProjectDiscovery httpx](https://docs.projectdiscovery.io/tools/httpx/overview) — response/title/technology metadata and supported screenshot options.
+- [Browser DevTools](https://developer.chrome.com/docs/devtools/) — manual inspection.
+Use an approved URL list, modest concurrency, and unauthenticated public pages by default. Screenshots may capture personal information, account data, or private messages; review/redact before persistence and avoid storing full page contents.
+
+### Primary resources
+- [Chrome DevTools](https://developer.chrome.com/docs/devtools/) — browser investigation.
+- [gowitness](https://github.com/sensepost/gowitness) — supported screenshot behavior.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — visual clues as leads, not proof.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate screenshot target lists before running capture tools.
+
+### Result handling
+Keep asset URL, capture time, tool/version, redaction review, and specific observation. Do not treat a visual clue as a confirmed finding without a reproducible security test.
