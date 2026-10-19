@@ -70,10 +70,12 @@ Check RFC filter escaping separately from DN escaping, allowlisted attributes, s
 
 ## Tools
 
-- **Burp Suite:** compare directory-backed requests.
-- **ldapsearch:** use only against owned lab/test directory and scoped base DN.
-- **Source review:** locate filter/DN concatenation and escaping.
-- **Directory audit logs:** corroborate only the test identity's query.
+- `ldapsearch`: query only an owned lab/test directory and an explicitly scoped base DN.
+- `rg`: inspect authorized source for filter/DN concatenation and escaping.
+- `curl` or Python `httpx`: validate only the web application's observed, authorized request boundary.
+- Directory audit logs: corroborate the test identity's query without exposing unrelated entries.
+
+Verify `ldapsearch -VV` and the selected request client. Official docs: https://www.openldap.org/software/man.cgi?query=ldapsearch, https://curl.se/docs/, https://www.python-httpx.org/.
 
 ## LDAP Context and Evidence Matrix
 
@@ -156,24 +158,14 @@ Inspect whether the implementation uses context-specific filter/DN escaping, all
 Record query_context, input_field, escaping_function, synthetic_entry, baseline_match, candidate_match, effective_principal, authorization_effect, error_redacted, and cleanup_status. Chain to authentication bypass only if a controlled test identity is accepted incorrectly; parser errors alone stay a lead.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and their role
-For web application testing, start with Burp and normal login flows. For an authorized directory lab, `ldapsearch`/OpenLDAP client utilities and Apache Directory Studio help inspect LDAP queries and directory objects.
+Use `ldapsearch` only against an owned lab/test directory and explicitly scoped base DN. Inspect source for safe filter/DN handling before live validation. If no safe test directory exists, perform source/configuration review and record the live test as not run.
 
-### Install or enable when missing
-Kali/Debian: `sudo apt update && sudo apt install ldap-utils`; Apache Directory Studio downloads: https://directory.apache.org/studio/ . Connect only to an authorized lab/directory, and verify host/port/TLS before querying.
-These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+### Resources
+- https://www.openldap.org/software/man.cgi?query=ldapsearch
+- https://cheatsheetseries.owasp.org/cheatsheets/LDAP_Injection_Prevention_Cheat_Sheet.html
+- https://owasp.org/www-project-web-security-testing-guide/
 
-### Primary resources
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — login and identity controls.
-- [OpenLDAP documentation](https://www.openldap.org/doc/) — directory protocol/configuration.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — web authentication labs.
-
-### Small reusable helper
-`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` — checks local evidence metadata; it makes no LDAP connection.
-
-### Runtime and evidence notes
-- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
-- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
-- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
+### Evidence
+Preserve the test identity, scoped base DN, query shape, result classification, and log correlation. Do not enumerate unrelated directory entries or retain private directory data.
