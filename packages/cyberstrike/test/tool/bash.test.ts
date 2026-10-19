@@ -51,15 +51,23 @@ describe("Katana scope policy", () => {
     authorizationReference: null,
     configuredAt: "2026-01-01T00:00:00.000Z",
   }
-  const safeArgs = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3"]
+  const workspacePath = "/tmp/example-workspace"
+  const safeOutput = path.join(workspacePath, "scans", "katana-urls-run-1.txt")
+  const safeArgs = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", safeOutput]
 
   test("allows a bounded exact-host crawl when the saved scope is host-wide", () => {
-    expect(katanaScopeBlockReason(safeArgs, "https://example.com", baseScope)).toBeUndefined()
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
 
   test("accepts ordinary single- or double-quoted shell URL and numeric arguments", () => {
-    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"']
-    expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope)).toBeUndefined()
+    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-o", "'/tmp/example-workspace/scans/katana-urls-run-1.txt'"]
+    expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope, workspacePath)).toBeUndefined()
+  })
+
+  test("requires a unique output path inside the canonical workspace scans folder", () => {
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/tmp/outside.txt"], "https://example.com", baseScope, workspacePath)).toContain("inside")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
 
   test("rejects a crawler command without explicit URL inputs", () => {
@@ -67,19 +75,19 @@ describe("Katana scope policy", () => {
   })
 
   test("rejects broad default scope and requires an explicit FQDN field scope", () => {
-    expect(katanaScopeBlockReason(["-u", "https://example.com", "-rl", "5"], "https://example.com", baseScope)).toContain("-fs fqdn")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-rl", "5", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-fs fqdn")
   })
 
   test("rejects unbounded rate limits and scope-broadening flags", () => {
-    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150"], "https://example.com", baseScope)).toContain("-rl 5")
-    expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope)).toContain("scope overrides")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
+    expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope, workspacePath)).toContain("scope overrides")
   })
 
   test("rejects URL-only and path-excluded scope because FQDN filtering cannot enforce those boundaries", () => {
     const urlOnlyScope = { ...baseScope, scopeItems: ["https://example.com/app"] }
-    expect(katanaScopeBlockReason(safeArgs, "https://example.com/app", urlOnlyScope)).toContain("URL/path/port-only")
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com/app", urlOnlyScope, workspacePath)).toContain("URL/path/port-only")
     const pathExcludedScope = { ...baseScope, excludedItems: ["https://example.com/admin"] }
-    expect(katanaScopeBlockReason(safeArgs, "https://example.com", pathExcludedScope)).toContain("path/protocol/port exclusion")
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", pathExcludedScope, workspacePath)).toContain("path/protocol/port exclusion")
   })
 
   test("preserves exclusions from ancestor workspace scopes", () => {
@@ -87,26 +95,26 @@ describe("Katana scope policy", () => {
       ...baseScope,
       excludedItems: ["https://example.com/private"],
     }
-    expect(katanaScopeBlockReason(safeArgs, "https://example.com", [baseScope, inheritedExclusion])).toContain("path/protocol/port exclusion")
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", [baseScope, inheritedExclusion], workspacePath)).toContain("path/protocol/port exclusion")
   })
 
   test("rejects exact-host URL and scheme-less path exclusions, including wildcard URL exclusions", () => {
     const exactURLExclusion = { ...baseScope, excludedItems: ["https://example.com/"] }
-    expect(katanaScopeBlockReason(safeArgs, "https://example.com", exactURLExclusion)).toContain("URL/path/protocol/port exclusion")
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", exactURLExclusion, workspacePath)).toContain("URL/path/protocol/port exclusion")
     const schemeLessURLExclusion = { ...baseScope, excludedItems: ["url: example.com/private"] }
-    expect(katanaScopeBlockReason(safeArgs, "https://example.com", schemeLessURLExclusion)).toContain("URL/path exclusion")
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", schemeLessURLExclusion, workspacePath)).toContain("URL/path exclusion")
     const wildcardURLExclusion = { ...baseScope, scopeItems: ["*.example.com"], excludedItems: ["https://*.example.com/"] }
-    expect(katanaScopeBlockReason(safeArgs, "https://api.example.com", wildcardURLExclusion)).toContain("URL/path/protocol/port exclusion")
+    expect(katanaScopeBlockReason(safeArgs, "https://api.example.com", wildcardURLExclusion, workspacePath)).toContain("URL/path/protocol/port exclusion")
   })
 
   test("interprets typed wildcard scope entries as domain families", () => {
     const typedWildcard = { ...baseScope, scopeItems: ["wildcard: example.com"] }
-    expect(katanaScopeBlockReason(["-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5"], "https://api.example.com", typedWildcard)).toBeUndefined()
+    expect(katanaScopeBlockReason(["-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-o", safeOutput], "https://api.example.com", typedWildcard, workspacePath)).toBeUndefined()
   })
 
   test("recognizes wildcard authorization but still rejects a scoped port exclusion", () => {
     const wildcardScope = { ...baseScope, scopeItems: ["*.example.com"], excludedItems: ["api.example.com:8443"] }
-    expect(katanaScopeBlockReason(safeArgs, "https://api.example.com", wildcardScope)).toContain("port exclusion")
+    expect(katanaScopeBlockReason(safeArgs, "https://api.example.com", wildcardScope, workspacePath)).toContain("port exclusion")
   })
 })
 
