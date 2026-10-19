@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -521,4 +521,46 @@ test("resolves relative static endpoint candidates to each observed request orig
   expect(endpoints.map((endpoint) => endpoint.origin).sort()).toEqual(["https://api.example.com", "https://app.example.com"])
   expect(endpoints.find((endpoint) => endpoint.origin === "https://app.example.com")?.observedRequestIDs).toEqual(["req-app-profile"])
   expect(endpoints.find((endpoint) => endpoint.origin === "https://api.example.com")?.observedRequestIDs).toEqual(["req-api-profile"])
+})
+
+
+test("merges static parameter variants into one canonical endpoint and unions their evidence", () => {
+  const makeCandidate = (input: {
+    sourceFile: string
+    queryParameters: string[]
+    bodyParameters: string[]
+    headerNames: string[]
+    authSignals: string[]
+    cookieSignals: string[]
+  }): JavaScriptEndpointCandidate => ({
+    id: input.sourceFile,
+    literal: "/api/items",
+    host: "api.example.com",
+    origin: "https://api.example.com",
+    path: "/api/items",
+    method: "GET",
+    pathParameters: [],
+    queryParameters: input.queryParameters,
+    bodyParameters: input.bodyParameters,
+    headerNames: input.headerNames,
+    authSignals: input.authSignals,
+    cookieSignals: input.cookieSignals,
+    sourceFiles: [input.sourceFile],
+    observedRequestIDs: [],
+    observedInTraffic: false,
+    confidence: "candidate",
+  })
+
+  const endpoints = mergeStructuredJavaScriptEndpoints([
+    makeCandidate({ sourceFile: "bundle-a.js", queryParameters: ["page"], bodyParameters: ["filter"], headerNames: ["x-tenant"], authSignals: ["bearer"], cookieSignals: ["session"] }),
+    makeCandidate({ sourceFile: "bundle-b.js", queryParameters: ["sort"], bodyParameters: ["category"], headerNames: ["x-trace"], authSignals: ["api-key"], cookieSignals: ["preference"] }),
+  ], [])
+
+  expect(endpoints).toHaveLength(1)
+  expect(endpoints[0]?.queryParameters).toEqual(["page", "sort"])
+  expect(endpoints[0]?.bodyParameters).toEqual(["filter", "category"])
+  expect(endpoints[0]?.headerNames).toEqual(["x-tenant", "x-trace"])
+  expect(endpoints[0]?.authSignals).toEqual(["bearer", "api-key"])
+  expect(endpoints[0]?.cookieSignals).toEqual(["session", "preference"])
+  expect(endpoints[0]?.sourceFiles).toEqual(["bundle-a.js", "bundle-b.js"])
 })
