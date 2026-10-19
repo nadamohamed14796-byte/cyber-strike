@@ -114,7 +114,7 @@ Compare anonymous, owner, and lower-role behavior for a synthetic record. For wr
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and equivalent requests. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -151,3 +151,34 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Next.js trust-boundary map
 Map App Router/Pages Router route handlers, server actions, middleware, API routes, server components, cache/revalidation behavior, and any image/URL fetch feature that is actually present. Compare anonymous, low-role, and authorized test identities against one harmless controlled record. Verify server-side authorization at each entry point; hiding a client component or gating middleware alone does not prove that downstream handlers enforce policy. Distinguish cached public content from personalized responses and verify invalidation semantics with synthetic markers. Route object and field access defects to IDOR/property authorization, host/path normalization to 401/403 analysis, and image-optimizer fetching to SSRF only after confirming an actual backend request.
+
+
+## Source inventory: actions, routes, middleware, and serialization
+
+Use this on an authorized local source tree. Search results identify review candidates; confirm route reachability and effective guards in surrounding code.
+
+```bash
+rg -n --glob '*.{js,jsx,ts,tsx}' \
+  'use server|export async function|export const (GET|POST|PUT|PATCH|DELETE)|middleware|matcher|revalidate|unstable_cache|fetchCache|NEXT_PUBLIC_|server-only|dangerouslySetInnerHTML' app pages src .
+```
+
+### Runtime verification matrix
+
+| Surface | Evidence to collect | False-positive check |
+|---|---|---|
+| Server Action | Action function, auth check, object lookup, state effect | Action ID discovery alone is not authorization bypass |
+| Route Handler | Method, route template, auth and object policy | Middleware exclusion may be intentional if handler enforces auth |
+| RSC serialization | Exact serialized field and requesting identity | UI props may be intended public data |
+| Cache/revalidation | Cache key, headers, user context, second test account | Browser cache or stale UI is not shared-cache leakage |
+| Public env/build output | Variable name and actual bundled content | Public identifiers are not secrets |
+| Image/remote fetch | Actual server-side request and allowed destination | Browser fetch or URL reflection is not SSRF |
+
+### Chain rules
+
+- Server action permits a low role to invoke an admin-only function → BFLA.
+- Action or handler accepts another user's object ID → BOLA/IDOR.
+- User-specific RSC/page data crosses a shared cache → cache-deception review after clean cross-account replay.
+- Image optimizer or preview performs a server-side fetch → SSRF review only after controlled callback or approved telemetry confirms fetch.
+- Secret-like build output → source-leak review; never use the secret to prove impact.
+
+Record router_mode, framework_version_source, route_or_action, middleware_chain, auth_principal, object_fixture, serialized_field_paths, cache_context, negative_control, server_state, and cleanup_status.
