@@ -227,50 +227,18 @@ This compares local artifacts offline and heuristically redacts common secrets b
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/Comparer and browser DevTools to compare authenticated and unauthenticated controls; two test identities help separate login/session failures from authorization failures.
-
-### Installation and setup
-- [Burp Suite Community](https://portswigger.net/burp/communitydownload) — official installer.
-- [OWASP ZAP](https://www.zaproxy.org/) — optional second opinion for passive observations.
-- Firefox profiles can isolate sessions: https://www.mozilla.org/firefox/new/ .
-Avoid brute forcing credentials, disabling MFA, or testing another user's account. Start from an observed request and only mutate one property on an authorized target.
-
-### Primary resources
-- [PortSwigger authentication](https://portswigger.net/web-security/authentication) — lab methodology.
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — expected controls.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — differentiate identity and permission.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
-
-### Result handling
-Record the principal, normal login path, exact failed control, response/state differential, and safe recovery/cleanup. Redact credentials, cookies, reset links, and OTPs.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Agent-invokable CLI tools and local libraries only. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version, official documentation, license, and target-specific impact before use.
-
-### Recommended tools
-- curl/Python requests — baseline and controlled identity comparisons
-- jq — parse response fields and status
-- http_response_diff.py — compare control/variant responses
-- A local role/route matrix generated from API docs
-
+### Agent-usable CLI tools
+- Python `httpx` or `curl`: replay a captured request with a controlled authentication-state difference.
+- `jq`: compare structured response bodies and principal/role fields after redaction.
+- `rg`: inspect collected source/configuration for middleware, route guards, and authorization checks.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved redacted responses offline.
+### Install and verify
+Verify `curl --version`, the selected Python client, and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. Use a local fixture/source review when the dependencies are missing.
 ### Resources
-- https://portswigger.net/web-security/access-control
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://owasp.org/API-Security/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Use community lists to discover candidates, then verify their current maintenance and CLI behavior from official sources.
-
-### Helper-script contract
-Test one trust boundary at a time with tester-owned accounts and harmless resources. Preserve baseline, changed identity/claim, result, and evidence; do not equate a 200 response with an authorization bypass.
-
-Keep raw evidence separate from normalized results. Record source, timestamp, tool/version, auth context, control result, errors, confidence, and redaction. Helpers should use explicit input/output paths, structured output, and local fixtures.
-
-### Handoff
-Report commands actually run, tool versions, input/output artifact paths, control/variant outcomes, failures, confidence, limitations, and next skill. Missing tools and blocked tests must be explicit.
+- https://portswigger.net/web-security/authentication
+- https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+### Proof and limits
+Use only test identities you control. Verify the actual protected action/resource and the effective principal; redirects, status codes, and UI differences alone are not proof. Redact cookies and tokens.
