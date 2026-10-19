@@ -2,6 +2,7 @@ import z from "zod"
 import { spawn } from "child_process"
 import { Tool } from "./tool"
 import path from "path"
+import fs from "node:fs/promises"
 import DESCRIPTION from "./bash.txt"
 import { Log } from "../util/log"
 import { Instance } from "../project/instance"
@@ -128,7 +129,7 @@ function hostnameMatchesScopeRule(ruleInput: string, hostname: string): boolean 
  * Katana cannot call CyberStrike's scope matcher before every HTTP request, so
  * a narrower manifest must use a scope-aware request/crawl path instead.
  */
-export function katanaScopeBlockReason(args: string[], targetURL: string, scopeInput: TargetScope | TargetScope[] | null): string | undefined {
+export function katanaScopeBlockReason(args: string[], targetURL: string, scopeInput: TargetScope | TargetScope[] | null, workspacePath?: string): string | undefined {
   const scopes = (Array.isArray(scopeInput) ? scopeInput : scopeInput ? [scopeInput] : [])
     .filter((scope) => scope.status === "configured" && scope.scopeItems.length > 0)
   if (scopes.length === 0) {
@@ -234,6 +235,25 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
       }
     }
   }
+
+  const outputFlagIndex = normalizedArgs.findIndex((arg) => ["-o", "-output"].includes(arg))
+  if (outputFlagIndex < 0 || !args[outputFlagIndex + 1]) {
+    return "Save Katana's raw results with '-o <absolute path under this target workspace/scans/>'; stdout-only crawling cannot complete the URL-collection artifact."
+  }
+  if (!workspacePath) {
+    return "Katana output cannot be validated because the canonical target workspace path is unavailable."
+  }
+  const outputArg = stripOuterShellQuotes(args[outputFlagIndex + 1]!)
+  if (!path.isAbsolute(outputArg)) {
+    return "Katana output path must be absolute and remain inside this target workspace's scans/ directory."
+  }
+  const scansRoot = path.resolve(workspacePath, "scans")
+  const outputPath = path.resolve(outputArg)
+  const relativeOutput = path.relative(scansRoot, outputPath)
+  if (!relativeOutput || relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) {
+    return "Katana output path must name a file inside " + scansRoot + "; do not write outside the target workspace."
+  }
+
   return undefined
 }
 
@@ -386,9 +406,19 @@ async function assertScannerReconGate(command: string[], commandText: string): P
         } catch (error) {
           throw new Error("Recon execution gate blocked katana for " + scopedURL + ": unable to verify all inherited scope layers (" + (error instanceof Error ? error.message : String(error)) + "). No crawler command was started.")
         }
-        const reason = katanaScopeBlockReason(args, scopedURL, scopes)
+        const reason = katanaScopeBlockReason(args, scopedURL, scopes, decision.workspace.workspacePath)
         if (reason) {
-          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, and -d 3. No crawler command was started.")
+          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, -d 3, and a unique absolute -o path under that workspace's scans/ directory. No crawler command was started.")
+        }
+        const outputFlagIndex = args.findIndex((arg) => ["-o", "-output"].includes(stripOuterShellQuotes(arg).toLowerCase()))
+        const outputPath = path.resolve(stripOuterShellQuotes(args[outputFlagIndex + 1]!))
+        try {
+          await fs.lstat(outputPath)
+          throw new Error("output file already exists")
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw new Error("Recon execution gate blocked katana because its output path already exists or cannot be checked: " + outputPath + ". Choose a new run-specific path. No crawler command was started.")
+          }
         }
       }
       const gate = await reconPhaseGate(decision.workspace, phase)
