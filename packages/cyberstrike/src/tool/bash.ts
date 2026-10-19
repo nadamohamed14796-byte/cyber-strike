@@ -168,7 +168,7 @@ export function reconScannerInvocationKey(command: string[]): string | undefined
   return JSON.stringify([command.slice(0, scannerIndex).map(stripOuterShellQuotes), executable, ...normalizedArgs])
 }
 
-function scannerTargets(command: string[], commandText: string): string[] {
+export function scannerTargets(command: string[], commandText: string): string[] {
   const candidates = new Set<string>()
   for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>\x60]+/gi)) {
     const value = match[0].replace(/[),;]+$/, "")
