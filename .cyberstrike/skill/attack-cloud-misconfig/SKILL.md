@@ -160,3 +160,7 @@ gcloud auth list --filter=status:ACTIVE --format='value(account)'
 ```
 
 Run only the provider-specific query supported by the actual toolchain and approved asset list. Never infer permission from a public bucket/endpoint, a provider fingerprint, or a secret-like string. A reportable chain needs target ownership → reachable misconfiguration → protected resource/action actually exposed. Route confirmed storage/IAM/runtime findings to attack-minio-s3, aws-postexploit, azure-postexploit, gcp-postexploit, or k8s-assessment as applicable.
+
+
+## Enrichment: evidence chain for a cloud finding
+Separate four facts: the resource belongs to the authorized target, it is reachable, its access policy is weaker than intended, and a controlled test demonstrates the resulting exposure or action. A provider fingerprint, public DNS name, or secret-like string is only a lead. Prefer read-only configuration inspection and synthetic test objects; do not use found credentials or enumerate unrelated tenant resources. Chain a confirmed storage finding to the matching provider skill, an identity-policy weakness to IAM analysis, and a customer-facing exposure to triage/reporting.
