@@ -98,7 +98,7 @@ Inspect timeout/provider-error branches in code or staging. Do not intentionally
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
 
@@ -131,3 +131,15 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 
 - [Claude-BugHunter — hunt-captcha-bypass](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-captcha-bypass)
 - [OWASP Credential Stuffing Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Credential_Stuffing_Prevention_Cheat_Sheet.html)
+
+
+## Safe validation pattern
+Use a staging instance or an explicitly authorized test account and a normal first-party client flow. Capture baseline attempts with valid and invalid challenge state, then determine server-side enforcement without automating large submission volumes or trying to evade service controls.
+
+```text
+Record: action, test account, challenge provider, challenge token age, server decision, retry-after/lockout behavior
+Compare: normal flow vs missing/expired/replayed test token; keep other request fields identical
+Verify: server-side action did not occur when challenge validation should fail
+```
+
+Do not use proxy rotation or solve/bypass services against a live program. Impact is a demonstrated abuse-sensitive action available without an enforced control, not merely a client-side challenge disappearing. Chain to attack-rate-limit-bypass only when the program permits abuse-control validation and there is a separately observed enforcement weakness.
