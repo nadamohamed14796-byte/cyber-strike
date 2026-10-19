@@ -142,3 +142,32 @@ These tools are optional additions, not a claim that they already exist on the t
 - Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
 - Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
 - If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+
+### Recommended tools
+- jsluice — URL/path and secret-pattern candidates from local JS
+- xnLinkFinder — endpoint and parameter candidates
+- retire.js — vulnerable JavaScript dependency checks
+- gitleaks — local repository secret-pattern scanning
+- rg/jq/Python — route correlation and redaction
+
+### Official resources
+- https://github.com/BishopFox/jsluice
+- https://github.com/xnl-h4ck3r/xnLinkFinder
+- https://github.com/RetireJS/retire.js
+- https://github.com/gitleaks/gitleaks
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
+
+### Helper script and output contract
+Use js_endpoint_inventory.py; preserve bundle URL/hash, line/offset, route template, method/parameter clues, auth hints, and live-request correlation. Never print or submit candidate secret values.
+
+Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
+
+### Handoff
+Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
