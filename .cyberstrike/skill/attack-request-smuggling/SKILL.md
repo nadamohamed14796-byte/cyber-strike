@@ -106,12 +106,14 @@ This section lists command-line tools and local scripts the agent can invoke. Br
 
 ### Recommended tools
 - A dedicated request-smuggling CLI scanner only after its request behavior is reviewed
-- curl — establish ordinary HTTP baseline
+- `curl --http1.1 --max-time 10 -sS -D headers.txt -o /dev/null https://IN-SCOPE-HOST/KNOWN-PATH` — establish a bounded baseline for a known authorized path; replace placeholders with observed values.
+- `python3 -c "import socket; print('socket module available')"` — verify the standard-library socket primitive before using a local test harness.
 - Python socket/http client in a lab fixture for parser-differential tests
 - Local timing/log correlation tools
 
 ### Resources
 - https://portswigger.net/web-security/request-smuggling
+- https://curl.se/docs/ and https://docs.python.org/3/library/socket.html
 - https://github.com/vavkamil/awesome-bugbounty-tools
 - https://github.com/vavkamil/awesome-bugbounty-tools
 
