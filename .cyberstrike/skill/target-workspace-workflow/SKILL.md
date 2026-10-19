@@ -88,24 +88,20 @@ Each run checkpoint should record workspace ID, target/scope provenance, phase r
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Git for change provenance, ripgrep/fd for local asset discovery, jq for structured metadata, and the CyberStrike local URL/evidence helpers. Add specialist scanners only when a phase needs them; avoid one giant toolchain for every target.
+### Agent-usable tools and purpose
+- Python standard library — create/check workspace paths, JSONL manifests, and artifact inventories without extra dependencies.
+- `jq` and `rg` — inspect manifests and search local artifacts.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py --help` — inspect the actual evidence-manifest validator interface before use.
+- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool names...>` — verify selected local command availability/version without target traffic.
+- `sha256sum` or Python `hashlib` — record stable artifact hashes without altering source evidence.
 
-### Installation and setup
-On Kali/Debian: sudo apt update && sudo apt install git ripgrep fd-find jq. Confirm the binary name for fd varies by distribution (Debian may expose fdfind). Bun/Python should follow their official install pages when a script needs them: https://bun.sh/docs/installation and https://www.python.org/downloads/.
-Keep a single target root and stable subdirectories. Tools should write to that target's assets/recon/urls/requests/javascript/endpoints/testing/findings/evidence/reports/runs/logs structure; do not mix targets or duplicate endpoint rows.
+### Installation and verification
+Python is sufficient for the core workspace workflow. Verify optional tools with `jq --version`, `rg --version`, and `sha256sum --version` where available. Do not install dependencies merely for workspace setup. If an optional utility is missing, use Python standard-library equivalents and record the fallback.
 
-### Primary resources
-- [Git documentation](https://git-scm.com/doc) — provenance and recovery.
-- [ripgrep](https://github.com/BurntSushi/ripgrep) — local content search.
-- [jq](https://jqlang.org/) — local JSON processing.
-- [CyberStrike Skill Guide](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/.cyberstrike/skill/SKILL_GUIDE.md) — helper/script standards.
+### Resources
+- https://docs.python.org/3/library/pathlib.html
+- https://docs.python.org/3/library/hashlib.html
+- https://docs.python.org/3/library/json.html
 
-### Reusable helpers
-- Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize URL inventories locally.
-- Run python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript to extract candidate route metadata from already-collected assets.
-- Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before sharing evidence.
-These helpers never contact the target.
-
-### Result handling
-Persist each phase's command/tool version, input list, counts, errors, timestamps, and output paths. Resume from validated artifacts instead of rerunning work blindly; do not claim a phase succeeded if its tool was missing or failed.
+### Artifact integrity
+Create the target workspace once and resume from its manifest; do not silently create a second root. Preserve raw artifacts, store normalized derivatives separately, and record relative path, source, timestamp, tool/version, hash, redaction status, and processing errors. Never put live credentials or private customer data in shared notes or Git.
