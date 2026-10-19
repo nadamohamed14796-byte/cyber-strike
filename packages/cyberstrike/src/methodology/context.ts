@@ -18,7 +18,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "target-workspace-workflow", "attack-bb-methodology", "recon-methodology", "community-tool-selection", "bug-bounty-evidence-workflow",
     "scope analysis", "scope validation", "wildcard scope", "program policy",
   ],
-  mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
+  mobile_application_testing: ["mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: [
     "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-asn-infrastructure",
     "recon-origin-ip-discovery", "recon-email-security", "recon-gitlab-public-recon",
@@ -95,11 +95,10 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 // loads them through SkillTool so per-agent skill permissions remain authoritative.
 const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
-  mobile_application_testing: ["mitre_attack_mobile"],
   passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
   active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
-  authentication_testing: ["wstg-athn", "attack-auth-bypass"],
-  session_management: ["wstg-sess", "attack-session", "attack-jwt"],
+  authentication_testing: ["wstg-athn-04", "attack-auth-bypass"],
+  session_management: ["wstg-sess-01", "attack-session", "attack-jwt"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
   input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
   business_logic: ["attack-business-logic"],
