@@ -161,11 +161,12 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
     return "Set Katana's explicit '-rl 5' (allowed range 1-10) to avoid unbounded default request rates."
   }
   const depthIndex = normalizedArgs.findIndex((arg) => ["-d", "--depth"].includes(arg))
-  if (depthIndex >= 0) {
-    const depth = Number(stripOuterShellQuotes(args[depthIndex + 1] ?? ""))
-    if (!Number.isInteger(depth) || depth < 1 || depth > 5) {
-      return "Katana depth must be between 1 and 5 for a bounded reconnaissance crawl."
-    }
+  if (depthIndex < 0) {
+    return "Set an explicit Katana depth with '-d 3' (allowed range 1-5) so the crawl has a predictable boundary."
+  }
+  const depth = Number(stripOuterShellQuotes(args[depthIndex + 1] ?? ""))
+  if (!Number.isInteger(depth) || depth < 1 || depth > 5) {
+    return "Katana depth must be between 1 and 5 for a bounded reconnaissance crawl."
   }
 
   let target: URL
