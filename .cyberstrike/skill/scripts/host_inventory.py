@@ -64,7 +64,7 @@ def main() -> int:
                 observation["hostname"] = hostname
                 entry["observations"].append(observation)
             except (json.JSONDecodeError, ValueError, TypeError) as exc:
-                errors.append({"line": number, "error": str(exc), "raw": line.rstrip("\\n")})
+                errors.append({"line": number, "error": str(exc), "raw": line.rstrip("\n")})
     finally:
         if args.input != Path("-"):
             lines.close()
@@ -73,14 +73,14 @@ def main() -> int:
         for hostname in sorted(inventory):
             entry = inventory[hostname]
             entry["observation_count"] = len(entry["observations"])
-            output.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\\n")
+            output.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
     finally:
         if args.output:
             output.close()
     if args.errors:
         with args.errors.open("w", encoding="utf-8") as stream:
             for error in errors:
-                stream.write(json.dumps(error, ensure_ascii=False) + "\\n")
+                stream.write(json.dumps(error, ensure_ascii=False) + "\n")
     print(json.dumps({"unique_hostnames": len(inventory), "observations": sum(len(v["observations"]) for v in inventory.values()), "invalid_records": len(errors), "network_requests": 0}, ensure_ascii=False), file=sys.stderr)
     return 1 if errors else 0
 
