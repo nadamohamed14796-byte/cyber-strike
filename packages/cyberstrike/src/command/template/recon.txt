@@ -65,6 +65,20 @@ If an expected tool is unavailable, identify the missing capability and use an e
 
 Do not report a tool as installed merely because its name appears in this prompt.
 
+### 0.3.1 Mandatory phase-by-phase tool selection and readiness
+
+Before each unresolved canonical phase, read `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` and follow its phase-specific capability map. It is a minimum coverage contract, not proof that a candidate is installed.
+
+For every phase:
+1. Inspect checkpoint status and existing artifacts; reuse valid outputs and avoid rerunning completed work without new evidence.
+2. Search and load `recon-methodology`, `community-tool-selection`, and materially relevant specialist skills through the registered skill tool. Verify returned content; a shortlist is not a loaded skill.
+3. Discover native CyberStrike tools and schemas separately from CLI executables. If the repository helper `.cyberstrike/skill/scripts/tool_preflight.py` exists in the active project, run it for relevant CLI candidates and inspect actual version/help output. If the path does not exist, locate and verify the actual helper path before using it.
+4. Choose a primary tool and meaningful complementary source(s). Do not stop after one partial result when another available source adds coverage; do not run every candidate indiscriminately.
+5. Do not install the entire matrix automatically. Inspect official instructions and install only for a justified need, or use a verified alternative and record the gap.
+6. Record actual tool/version, input, redacted invocation, exit status, stderr, partial errors, source provenance, raw and normalized artifact paths, deduplication counts, and validation performed.
+7. Verify saved artifacts and distinguish a source returning zero results from a missing tool, failed run, skipped method, or untested area.
+8. Complete a phase only when applicable source coverage has been attempted, eligible work is exhausted, and required artifacts are verified. Continue independent work after isolated failures, but do not loop indefinitely on the same failure.
+
 ### 0.4 Authorization and impact
 
 Workspace initialization does not establish authorization.
