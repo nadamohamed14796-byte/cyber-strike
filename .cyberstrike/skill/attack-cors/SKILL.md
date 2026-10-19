@@ -203,3 +203,28 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record Origin, Access-Control-Allow-* headers, credentials mode, browser result, and resource sensitivity. Reflected Origin alone is not enough to prove cross-origin data theft.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
+
+### Recommended tools
+- curl — baseline CORS header capture
+- Python requests/httpx — compare Origin values with controls
+- jq — parse captured headers/JSON
+- A local origin-matrix generator for null, same-site, and controlled external origins
+
+### Resources
+- https://portswigger.net/web-security/cors
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids only; consult official docs for supported usage and limitations.
+
+### Helper-script contract
+Record Origin, Access-Control-Allow-Origin/Credentials, preflight result, authenticated context, and whether browser-readable sensitive data is actually exposed. Wildcard headers without sensitive response access are not sufficient proof.
+
+Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
+
+### Handoff
+Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
