@@ -56,10 +56,13 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 
 ## Tools
 
-- dig, dnsx, certificate-transparency search, httpx, and curl.
-- Burp Repeater for controlled Host/SNI comparisons.
-- Python/jq for response fingerprints and deduplication.
+- `dig`, `dnsx`, certificate-transparency sources, `httpx`, and `curl` for scoped DNS/HTTP inventory.
+- `openssl s_client` for certificate/SNI metadata on authorized hostnames.
+- Python/`jq` for response fingerprints and deduplication.
 - Passive DNS and RDAP sources for attribution.
+- `python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt`: normalize collected candidates locally.
+
+Verify `dig -v`, `dnsx -version`, `httpx -version`, `curl --version`, and `openssl version` as applicable. Official docs: https://docs.projectdiscovery.io/, https://curl.se/docs/, https://www.openssl.org/docs/.
 
 ## Virtual-Host Signal Matrix
 
