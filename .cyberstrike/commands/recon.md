@@ -263,6 +263,7 @@ The canonical root workspace is a durable container for one program's policy, as
 
 ## 2.2 Import a supplied scope file
 If the user supplies a complete program scope file/list, import all entries in one operation; do not ask them to select or confirm hosts individually. Preserve the source file and flag unsupported or conflicting entries without silently dropping them.
+If the user explicitly identifies a supplied complete list/file as the authorized scope, accept the complete set in one operation with `user_confirmed_scope_list=true` (and `merge_existing=true` only when adding entries to the existing manifest). This is distinct from inferring siblings from one exact hostname. Use the flag only when the whole supplied list was explicitly identified as in-scope; do not ask which entries to keep. Existing exclusions always remain authoritative. If an official policy URL is available, prefer it; if not, record the user-confirmed-list provenance instead of fabricating a URL.
 
 
 If the user supplies a scope file:
