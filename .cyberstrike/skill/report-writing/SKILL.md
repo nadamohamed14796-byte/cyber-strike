@@ -143,3 +143,28 @@ Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/ma
 
 ### Result handling
 Use exact chronological steps, prerequisites, role/test-account context, expected/actual result, impact evidence, remediation, and explicit unknowns. Keep confirmed facts separate from hypotheses and include score vector/reasoning if you assign CVSS.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
+
+### Recommended tools
+- Python/jq — validate structured finding metadata
+- markdownlint-cli2 — optional Markdown linting
+- validate_evidence_manifest.py — evidence path checks
+- git diff — inspect final report edits
+
+### Resources
+- https://www.hackerone.com/disclosure-guidelines
+- https://bugcrowd.com/resources/levelup
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; use official documentation for current behavior and limitations.
+
+### Helper-script contract
+Generate reports from verified finding records, not scanner prose. Validate reproduction steps, impact, affected asset, evidence references, remediation, and redaction; do not claim unverified impact.
+
+Preserve original evidence separately from normalized outputs. Record tool/version, timestamps, source, confidence, errors, redaction, and stable artifact paths. Use structured output and local fixtures; never overwrite evidence silently.
+
+### Handoff
+Return actual commands and versions, evidence paths, passed/failed/inconclusive checks, false-positive reason where applicable, confidence, limitations, and next skill.
