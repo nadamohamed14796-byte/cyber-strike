@@ -33,8 +33,9 @@ def format_markdown(raw: str) -> str:
     fence_char = ""
     fence_len = 0
     for line in lines:
-        stripped = line.rstrip()
-        fence = re.match(r"^\s{0,3}(`{3,}|~{3,})", stripped)
+        candidate = line.rstrip()
+        fence = re.match(r"^\\s{0,3}(`{3,}|~{3,})", candidate)
+        closing_fence = False
         if fence:
             token = fence.group(1)
             if not in_fence:
@@ -43,8 +44,9 @@ def format_markdown(raw: str) -> str:
                 fence_len = len(token)
             elif token[0] == fence_char and len(token) >= fence_len:
                 in_fence = False
-        if not in_fence:
-            stripped = stripped.rstrip()
+                closing_fence = True
+        # Preserve code-block payload exactly; normalize whitespace only outside it.
+        stripped = line if in_fence and not closing_fence else candidate
         if re.match(r"^#{1,6}\s+\S", stripped):
             while out and out[-1] == "":
                 out.pop()
