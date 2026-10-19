@@ -1569,7 +1569,7 @@ export namespace TargetMemory {
         confirmedEntries.some((entry) => !include.includes(entry) || !isExactUserConfirmedScopeItem(entry)) ||
         include.some((entry) => !isExactUserConfirmedScopeItem(entry))
       ) {
-        throw new Error("User-confirmed scope without an external policy reference must contain only exact hostname, host:port, IP, or HTTP(S) URL entries; wildcard, CIDR, and typed resource categories require an explicit policy import.")
+        throw new Error("User-confirmed scope without an external policy reference must contain exactly one exact hostname, host:port, IP, or HTTP(S) URL for initial setup; when extending a saved manifest, every newly confirmed entry must be exact and explicitly listed. Wildcards, CIDRs, and typed resource categories require an explicit policy import.")
       }
     }
     const excludeSet = new Set(exclude)
