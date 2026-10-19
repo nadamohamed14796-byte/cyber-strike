@@ -93,12 +93,12 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 // These phase-critical skills must survive shortlist ranking even when broad
 // metadata matches score higher. This is discovery guidance only: the agent still
 // loads them through SkillTool so per-agent skill permissions remain authoritative.
-const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
+export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
   passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
   active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
-  authentication_testing: ["wstg-athn-04", "attack-auth-bypass"],
-  session_management: ["wstg-sess-01", "attack-session", "attack-jwt"],
+  authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass"],
+  session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
   input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
   business_logic: ["attack-business-logic"],
