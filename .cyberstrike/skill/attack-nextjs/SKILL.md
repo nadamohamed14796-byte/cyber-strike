@@ -84,10 +84,12 @@ Compare anonymous, owner, and lower-role behavior for a synthetic record. For wr
 
 ## Tools
 
-- **Browser DevTools / Burp:** capture RSC, action, and route-handler exchanges.
-- **Source search:** locate server actions, route handlers, matcher config, server/client imports, and public env usage.
-- **Next.js official documentation/security advisories:** verify version/runtime behavior.
-- **Synthetic test accounts:** validate authorization and cache separation.
+- `rg`: inventory server actions, route handlers, middleware/matcher configuration, cache boundaries, and public environment references in an authorized source checkout.
+- `semgrep`: run applicable JavaScript/TypeScript rules against local source.
+- `npm` / `npx` and the project's test runner: reproduce behavior in a disposable local fixture.
+- Python `httpx` or `curl`: compare a captured, authorized HTTP request when a live check is necessary.
+
+Verify with `node --version`, `npm --version`, `semgrep --version`, and `curl --version`. Official docs: https://nextjs.org/docs, https://semgrep.dev/docs/getting-started/, https://curl.se/docs/. Use test identities and avoid production state changes.
 
 ## Next.js Trust-Boundary Matrix
 
