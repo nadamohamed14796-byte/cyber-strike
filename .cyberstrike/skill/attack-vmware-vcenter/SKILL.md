@@ -191,3 +191,11 @@ grep -iE '^(HTTP/|content-type:|location:|server:|www-authenticate:|strict-trans
 Do not infer a build from a generic login page. Avoid endpoints that return configuration, inventory, VM listings, or secrets. If the exact build cannot be verified without privileged access, mark it unknown and ask the asset owner for confirmation rather than escalating access.
 
 Record product_family, hostname_scope_ref, build_signal_sources, advisory_id, affected_range, fixed_build, prerequisites_confirmed, public_reachability, validation_level, and unknowns. Do not chain to RCE solely from a version match.
+
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use `curl` and `openssl s_client` for low-rate endpoint/TLS metadata checks; use vendor advisories for exact build comparison. Verify `curl --version` and `openssl version`. Official docs: https://curl.se/docs/, https://www.openssl.org/docs/, https://support.broadcom.com/.
+
+### Evidence
+Record exact build evidence, source, timestamp, TLS metadata, and applicable fixed-build advisory. A banner or CVE match alone is not proof that a vulnerable path is reachable.
