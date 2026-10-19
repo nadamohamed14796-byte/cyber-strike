@@ -116,3 +116,25 @@ Persist request_ref, feature_name, controlled_destination, unique_path_marker, a
 - Callback alone with no sensitive response → report only the proven outbound-request behavior and its policy impact; do not inflate to cloud compromise.
 
 Stop if the test reveals a real secret, internal response, or unexpected third-party request; preserve minimal redacted evidence and notify the program through its approved process.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater and a controlled callback/OAST service to confirm server-side outbound requests. Interactsh can help correlate DNS/HTTP callbacks when the program permits use of an external service; no callback does not necessarily disprove SSRF.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official installation.
+- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) documents the client install. With Go 1.20+, the documented command is `go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest`; install Go from https://go.dev/dl/ if needed.
+Use only a unique callback URL and benign test value. Do not probe internal address ranges, cloud metadata endpoints, or retrieve internal files unless the target's written scope explicitly authorizes the exact test. Consider the privacy implications of a third-party OAST provider.
+
+### Primary resources
+- [PortSwigger SSRF](https://portswigger.net/web-security/ssrf) — lab-first methodology.
+- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) — callback workflow and options.
+- [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) — remediation.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares local responses; it does not probe URLs or internal resources.
+
+### Result handling
+Correlate the callback with a unique request ID/time, demonstrate that the server—not the tester's browser—made the request, and stop at the minimum proof needed.
