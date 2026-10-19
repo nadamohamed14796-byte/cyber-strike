@@ -147,20 +147,30 @@ export async function reconPhaseGate(
       manifestPath,
     }
   }
-  if (run.phases[requiredPhase].status !== "running") {
+  // Recon phases are an execution plan, not a blanket tool lock. Once the
+  // target's scope has been validated, permit useful supporting recon commands
+  // even when they belong to an adjacent phase or the operator needs to revisit
+  // an earlier step. Per-target scope checks remain enforced by the caller.
+  // Keep scope validation as the only hard prerequisite here; do not require
+  // every intermediate phase to be marked complete before a tool can run.
+  if (run.phases.scope_validation.status !== "complete") {
     return {
       allowed: false,
-      reason: "Required phase " + requiredPhase + " must be explicitly started; current status is " + run.phases[requiredPhase].status + ".",
+      reason: "Target scope validation must be completed before recon tools can run.",
       manifestPath,
     }
   }
+  const phaseStatus = run.phases[requiredPhase].status
   const unresolved = unresolvedReconPrerequisites(requiredPhase, run.phases)
-  if (unresolved.length) {
-    return {
-      allowed: false,
-      reason: "Required earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + run.phases[phase].status).join(", "),
-      manifestPath,
-    }
+  const notes = [
+    phaseStatus !== "running" ? "phase " + requiredPhase + " is " + phaseStatus : "",
+    unresolved.length ? "planned earlier checkpoints still unresolved: " + unresolved.map((phase) => phase + "=" + run.phases[phase].status).join(", ") : "",
+  ].filter(Boolean)
+  return {
+    allowed: true,
+    reason: notes.length
+      ? "scope gate passed; continuing with supporting recon despite checkpoint state (" + notes.join("; ") + ")"
+      : "scope and phase checks passed",
+    manifestPath,
   }
-  return { allowed: true, reason: "phase gate passed", manifestPath }
 }
