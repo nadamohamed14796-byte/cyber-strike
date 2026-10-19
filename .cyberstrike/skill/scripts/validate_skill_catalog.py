@@ -27,6 +27,30 @@ HYPOTHESIS_CAP = re.compile(
     r"(?:validation|attempt|hypothesis)\s+(?:budget|limit).{0,80}\bat most\s+\d+\b",
     re.IGNORECASE,
 )
+TECHNIQUE_PREFIX = re.compile(r"^((?:T\d{4})(?:\.\d{3})?)(?:[_-]|$)", re.IGNORECASE)
+SKILL_REFERENCE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+def resolve_reference(target: str, references: dict[str, set[str]]) -> bool:
+    """Mirror the runtime's unique exact aliases and explicit attack- prefix fallback."""
+    normalized = target.strip().lower()
+    candidates = references.get(normalized, set())
+    if len(candidates) == 1:
+        return True
+    if normalized.startswith("attack-"):
+        return len(references.get(normalized[len("attack-") :], set())) == 1
+    return False
+
+
+def is_reference_candidate(field: str, target: str, references: dict[str, set[str]]) -> bool:
+    """Prerequisites may be natural-language preconditions; only validate reference-like values."""
+    normalized = target.strip().lower()
+    if field == "chains_with" or normalized in references:
+        return True
+    # A missing one-token slug/ID looks like an intended reference. Multiword prerequisite
+    # strings are operational requirements (for example, "an authorized test identity"),
+    # not skill links, and must not be treated as broken relationships.
+    return bool(SKILL_REFERENCE_TOKEN.fullmatch(target.strip()))
 
 
 def frontmatter(text: str) -> str | None:
@@ -93,6 +117,17 @@ prerequisites:
     assert scalar(meta, "name") == "sample-skill"
     assert yaml_list(meta, "chains_with") == ["first", "second"]
     assert yaml_list(meta, "prerequisites") == ["first", "second"]
+    aliases = {
+        "attack-ssrf": {"attack-ssrf"},
+        "ssrf": {"attack-ssrf"},
+        "t1546.007": {"T1546.007_winlogon"},
+    }
+    assert resolve_reference("attack-ssrf", aliases)
+    assert resolve_reference("T1546.007", aliases)
+    assert not resolve_reference("attack-missing-skill", aliases)
+    assert is_reference_candidate("chains_with", "missing-skill", aliases)
+    assert not is_reference_candidate("prerequisites", "An authorized test identity", aliases)
+    assert is_reference_candidate("prerequisites", "attack-ssrf", aliases)
     print("self-test: PASS")
     return 0
 
@@ -109,8 +144,10 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
     all_names: dict[str, list[str]] = defaultdict(list)
+    references: dict[str, set[str]] = defaultdict(set)
 
-    # Build a best-effort name index across all local reference modules.
+    # Build aliases that match the runtime index: canonical name, directory slug,
+    # OWASP reference, tags, technologies, CWE IDs, and ATT&CK technique prefixes.
     for path in all_files:
         text = path.read_text(encoding="utf-8", errors="replace")
         meta = frontmatter(text)
@@ -119,6 +156,17 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
         name = scalar(meta, "name")
         if name:
             all_names[name].append(path.relative_to(root).as_posix())
+            references[name.strip().lower()].add(name)
+            references[path.parent.name.strip().lower()].add(name)
+            owasp_id = scalar(meta, "owasp_id")
+            if owasp_id:
+                references[owasp_id.strip().lower()].add(name)
+            for field in ("tags", "tech_stack", "cwe_ids"):
+                for alias in yaml_list(meta, field):
+                    references[alias.strip().lower()].add(name)
+            technique = TECHNIQUE_PREFIX.match(name)
+            if technique:
+                references[technique.group(1).strip().lower()].add(name)
 
     duplicate_names = {
         name: paths for name, paths in all_names.items() if len(paths) > 1
@@ -152,8 +200,10 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
 
         for field in ("chains_with", "prerequisites"):
             for target in yaml_list(meta, field):
-                if target not in all_names:
-                    message = f"{label}: {field} target '{target}' did not resolve to a local skill name"
+                if not is_reference_candidate(field, target, references):
+                    continue
+                if not resolve_reference(target, references):
+                    message = f"{label}: {field} target '{target}' did not resolve to a unique local skill reference"
                     (errors if strict_links else warnings).append(message)
 
         if len(all_names.get(name or "", [])) > 1:
