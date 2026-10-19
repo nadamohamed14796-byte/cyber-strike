@@ -108,7 +108,7 @@ Compare anonymous, user, and admin test identities on read-only methods first. U
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and equivalent requests. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -145,3 +145,25 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Guard/pipe/interceptor coverage
 For every controller/transport, map module, guard order, route-level overrides, parameter decorators, DTO validation, serializer/interceptor, and object lookup policy. Compare the same read-only operation as authorized and low-privilege test principals and verify the actual response fields and server-side state. Pay special attention to custom decorators and routes where controller-level guards differ from method-level behavior, plus GraphQL/resolver and websocket gateways. A DTO rejecting malformed input does not demonstrate authorization, and a swagger declaration does not prove enforcement. Route writable security-sensitive properties to mass-assignment review and field disclosure to API property authorization.
+
+
+## Source inventory helper
+
+Run this against the authorized local repository. Use matches to map coverage, then inspect the effective guard and route path; decorators alone do not establish runtime protection.
+
+```bash
+rg -n --glob '*.{ts,js}' \
+  '@(Controller|Resolver|UseGuards|Public|Roles|SetMetadata|Mutation|Query|Subscription)|ValidationPipe|forbidNonWhitelisted|whitelist|APP_GUARD|CanActivate|ExecutionContext' src .
+```
+
+### Guard/DTO evidence fields
+
+Record module_name, controller_or_resolver, route_or_operation, transport, guard_chain, public_override, dto_class, validation_options, principal_role, object_owner, persisted_field_change, effective_permission, negative_control, and cleanup_status.
+
+### Chain rules
+
+- Guard missing on one operation → BFLA only after a low-role controlled request reaches the protected function.
+- Extra DTO field persists → mass-assignment/property authorization, not merely weak validation.
+- Nested object belongs to another test account → BOLA/IDOR if object policy fails.
+- GraphQL/WS path differs from REST → validate each transport independently; do not assume shared middleware.
+- Swagger or error stack visible → information disclosure only if non-public sensitive details are exposed contrary to policy.
