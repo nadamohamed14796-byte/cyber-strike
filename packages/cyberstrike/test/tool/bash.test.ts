@@ -52,7 +52,7 @@ describe("Katana scope policy", () => {
     configuredAt: "2026-01-01T00:00:00.000Z",
   }
   const workspacePath = "/tmp/example-workspace"
-  const safeOutput = path.join(workspacePath, "scans", "katana-urls-run-1.txt")
+  const safeOutput = path.join(workspacePath, "urls", "katana-urls-run-1.txt")
   const safeArgs = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", safeOutput]
 
   test("allows a bounded exact-host crawl when the saved scope is host-wide", () => {
