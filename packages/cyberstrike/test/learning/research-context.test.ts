@@ -6,20 +6,13 @@ import { ReportKnowledge } from "../../src/learning/report-knowledge"
 import { ResearchContext, promptResearchSignals, researchClassForSignalTags } from "../../src/learning/research-context"
 import { tmpdir } from "../fixture/fixture"
 
-test("global research retrieval guidance is available even before target signals exist", async () => {
+test("does not inject global research guidance when no useful signal exists", async () => {
   await using dir = await tmpdir()
   await Instance.provide({
     directory: dir.path,
     fn: async () => {
       const context = ResearchContext.generate("ses_research_baseline_test")
-      expect(context).toContain("Global Research Memory — Signal-Triggered Use")
-      expect(context).toContain("shared across agents and targets")
-      expect(context).toContain("research_knowledge")
-      expect(context).toContain("not evidence about the current target")
-      expect(context).toContain("never copy them as the current target")
-      expect(context).toContain("correlate_javascript")
-      expect(context).toContain("javascript/ directory")
-      expect(context).toContain("target_note")
+      expect(context).toBeNull()
       await Instance.dispose()
     },
   })
