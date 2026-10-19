@@ -78,11 +78,13 @@ Repeat from a clean state or fresh test session where safe, verify cleanup, and 
 
 ## Tools
 
-- **Burp Repeater / browser DevTools:** reproduce controlled requests and browser context.
-- **Vendor advisories and program policy:** validate prerequisites, scope, and known behavior.
-- **CVSS calculator:** derive a vector from demonstrated facts, not desired severity.
-- **Evidence-hygiene:** redact minimal PoC and attachments.
-- **Public issue/report search:** check duplicates and documented behavior without exposing private reports.
+- Python `httpx` or `curl`: reproduce the minimum authorized request and a negative control.
+- `jq`: inspect structured response differences after redaction.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json`: validate artifact metadata.
+- Vendor advisories, program policy, and CVSS documentation: validate prerequisites, scope, known behavior, and severity.
+
+Verify the chosen request client. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://www.first.org/cvss/.
 
 ## Seven-Gate Triage Matrix
 
