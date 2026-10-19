@@ -51,3 +51,26 @@ Return a route delta, source provenance, liveness and authentication state, vers
 
 ### API lifecycle and version-drift map
 Correlate every candidate route with source (client bundle, archived URL, specification, observed traffic), API version, method, last-seen evidence, authentication context, and known successor/deprecation status. Verify a stale route with an ordinary low-impact request and a controlled identity; do not brute-force path dictionaries just because a route is undocumented. Compare old/new route policy, response fields, and write semantics using a synthetic object. A zombie API is a security finding only if a concrete control or data boundary is weaker, not merely because the route responds. Route object/field gaps to IDOR/property authorization and unsupported operation semantics to BFLA or business-logic review.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use browser/proxy history, archived URL sources, and OpenAPI/schema inventories to find forgotten API versions and hosts. Optional tools include ProjectDiscovery httpx/katana and gau for collected asset/URL discovery; keep passive source results separate from active HTTP probes.
+
+### Installation and setup
+- [ProjectDiscovery tool documentation](https://docs.projectdiscovery.io/) — follow the official installation instructions for httpx/katana.
+- [gau project](https://github.com/lc/gau) — use the maintained release/install instructions.
+- curl/jq on Kali/Debian: `sudo apt update && sudo apt install curl jq`.
+Use a curated in-scope URL list and the program's permitted request rates; archive presence alone does not mean the endpoint is currently reachable or in scope.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — inventory and lifecycle risks.
+- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — endpoint validation.
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — supported tool behavior.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` normalizes/deduplicates already-collected candidates and removes query values; it does not fetch them.
+
+### Result handling
+For each candidate preserve discovery source, last-seen time, live-response evidence, method/auth context, API version, and confidence. Keep one canonical endpoint record with multiple source observations.
