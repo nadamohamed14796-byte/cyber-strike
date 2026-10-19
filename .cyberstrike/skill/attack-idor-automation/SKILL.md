@@ -332,7 +332,7 @@ Cross-skill chaining is a hypothesis-generation aid, not permission to perform a
 
 ## Runtime verification-ledger discipline
 
-When this skill is used by the CyberStrike agent, keep each hypothesis tied to one normalized asset, endpoint, and vulnerability class. Record meaningful strategies and variants through the verification-attempt workflow; an exact retry must not be counted as a new strategy. Continue with bounded, materially different checks while the hypothesis remains unresolved, up to the configured 20-distinct-attempt budget. A timeout, blocked precondition, missing test account, weak response difference, or exhausted budget is **inconclusive**, never proof that the issue is a false positive.
+When this skill is used by the CyberStrike agent, keep each hypothesis tied to one normalized asset, endpoint, and vulnerability class. Record meaningful strategies and variants through the verification-attempt workflow; an exact retry must not be counted as a new strategy. Continue with materially different, authorized checks while the hypothesis remains unresolved and each next test can change the conclusion. Do not impose an arbitrary fixed attempt ceiling; deduplicate exact retries and stop when evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. A timeout, blocked precondition, missing test account, weak response difference, or exhausted budget is **inconclusive**, never proof that the issue is a false positive.
 
 Mark a hypothesis confirmed only with direct, durable evidence collected under valid preconditions. Mark it disproven only when valid negative controls and evidence contradict the same hypothesis. Stop earlier for scope ambiguity, unsafe impact, unexpected real-user data, or prohibited state changes. A VRT `tested_not_vulnerable` state must reference the matching evidence-backed disproof record; the skill's own execution notes are not a substitute for the runtime ledger.
 
@@ -349,3 +349,32 @@ Mark a hypothesis confirmed only with direct, durable evidence collected under v
 
 ### Endpoint deduplication and state proof
 Keep one endpoint record keyed by method + normalized route + parameter shape, with separate observations for every parameter, identity, tenant, role, and response context. Do not create one finding or route entry per swapped ID. For each candidate, preserve owner-object, cross-account control, cross-tenant control, and a known-invalid ID baseline; mutate only a controlled object reference and verify returned object identity or authoritative state. Compare reads, updates, deletes, bulk actions, nested objects, exports, and alternate transport only when actually supported. Hand off role-operation failures to BFLA and sensitive-field-only gaps to property authorization, keeping each distinct root cause separately evidenced.
+
+
+## Cross-boundary comparison matrix
+
+Use this matrix to make coverage explicit without spraying identifier guesses. Each row needs a real observed operation and a fixture controlled by the tester.
+
+| Boundary | Safe comparison | What must be observed |
+|---|---|---|
+| Same role, different owner | Account B reads a synthetic object owned by Account A | The returned object marker/owner differs from B's own object and access is not intended |
+| Tenant isolation | Test principal from tenant B requests a synthetic tenant-A fixture | Server-side tenant boundary is crossed, not just a changed status code |
+| Parent/child relationship | Keep parent fixed, then change only child; reverse only if both fixtures are controlled | Authorization is checked against the correct parent and child relationship |
+| Property-level | Submit one benign field change to an object the caller may otherwise access | Protected field changes despite field-level policy; distinguish from object-level BOLA |
+| Bulk request | Use only a small explicit list of test-owned fixture IDs, mixing permitted and denied fixtures if safe | Every item is authorized independently; no real-data enumeration |
+| Export/download/job | Reuse a test-owned export or download reference from normal UI traffic | Content or job result crosses the intended owner/tenant boundary |
+| Revocation/state change | Change test-object membership/ownership through a supported workflow, then recheck access | Access changes (or incorrectly persists) relative to the documented policy |
+
+### Request-template preservation
+
+When normalizing a request, preserve method, route, content type, relevant headers, body shape, and auth context. Keep each distinct parameter as a separate candidate in the same endpoint note; do not duplicate the endpoint merely because it has several object IDs. Record whether the identifier is in the path, query, JSON, GraphQL variables, nested relation, header, or asynchronous job reference.
+
+### Impact chain and handoff rules
+
+- Object readable across owners/tenants → prove the smallest synthetic private marker, then route to report validation.
+- JWT claim appears mutable → route to JWT verification only if the server's accepted principal/permissions change.
+- API returns private fields while the base object is otherwise legitimately accessible → route to object-property authorization, not automatically BOLA.
+- A lower role invokes a privileged operation on its own allowed object → route to function-level authorization; retain BOLA only if the object boundary also fails.
+- A cross-tenant cached response is observed → investigate cache separation as a separate root cause; don't double-report one symptom without independent impact.
+
+Record both the positive and negative controls, the principal/object/tenant tuple, and a state re-read for any allowed mutation. Stop at the minimum safe proof and never extrapolate a single fixture into mass exposure.
