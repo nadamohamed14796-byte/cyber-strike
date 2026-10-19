@@ -120,3 +120,26 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 
 ### Origin attribution versus bypass claims
 Build candidate origins from historical DNS, certificate/deployment metadata, first-party configuration, and observed redirects, but score each by freshness and organization attribution. A CDN/origin relationship does not automatically permit direct-origin requests; verify the candidate is in program scope and that testing the origin is allowed. If permitted, compare one harmless public path through the normal edge and candidate origin, recording TLS, Host/routing, authentication, and applicable controls. Do not bypass a WAF to access protected content or treat an origin IP as a security bug by itself. Confirm a meaningful difference before chaining to host-header, cache, or access-control review.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Prefer passive DNS/certificate history and provider attribution. ProjectDiscovery dnsx and cdncheck can help inspect DNS/CDN signals; public services such as SecurityTrails or Censys may corroborate historical records, subject to their data and disclosure policies.
+
+### Installation and setup
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official tool installation and options.
+- [SecurityTrails API docs](https://docs.securitytrails.com/) — optional passive DNS source.
+- [Censys docs](https://docs.censys.com/) — optional public Internet asset data.
+Treat a guessed origin IP as an attribution hypothesis, not authorization to access it. Do not bypass a CDN/WAF to reach an origin or scan the IP unless the program expressly includes that infrastructure and testing method.
+
+### Primary resources
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — DNS/CDN tool behavior.
+- [Cloudflare origin protection](https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/) — example CDN/origin relationship.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — recon context.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate collected host/URL observations where a URL form is available; it does not resolve names or contact the origin.
+
+### Result handling
+Record DNS source, timestamp, CDN/provider evidence, independent corroboration, and confidence. Keep original target host distinct from any inferred backend address.
