@@ -150,28 +150,3 @@ Use the project's official documentation at https://github.com/ticarpi/jwt_tool 
 
 ### Evidence and result handling
 Store only redacted claims and token fingerprints, never full live tokens, session cookies, signing keys, or secrets. Distinguish decoding, signature validation, and application authorization as separate claims. A tool alert alone is not confirmation.
-## Agent-executable CLI tooling, resources, and helper scripts
-
-Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
-
-### Recommended tools
-- jwt_tool — token structure and validation-policy test aid
-- Python standard library — decode and redact local token metadata
-- curl/Python requests — compare server acceptance with tester-owned tokens
-- jq — structured result inspection
-
-### Resources
-- https://github.com/ticarpi/jwt_tool
-- https://portswigger.net/web-security/jwt
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Community lists are discovery aids. Use official documentation for current flags, supported versions, output formats, and limitations.
-
-### Helper script contract
-Persist only redacted header/claim metadata, algorithm/key-selection observations, token lifecycle result, and protected operation outcome. Never store live bearer values or treat decoding alone as a vulnerability.
-
-Preserve native evidence and normalize a separate copy. Keep source, timestamp, tool/version, errors, confidence, redaction state, and artifact references. Helpers should accept explicit paths, emit JSON/JSONL where practical, handle malformed input, and include local fixtures.
-
-### Handoff
-Return tool/version, command invoked, input/output artifact references, test/control counts, failures, confidence, limitations, and next skill. A missing tool or blocked source must not be reported as a successful empty result.
