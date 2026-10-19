@@ -1,8 +1,26 @@
 import z from "zod"
 import { Tool } from "./tool"
 import path from "path"
+import fs from "node:fs/promises"
 
-const SCRIPTS_DIR = path.resolve(import.meta.dir, "../../data/scripts")
+async function resolveScriptsDir(): Promise<string> {
+  // Release archives place scripts beside the compiled executable. Development
+  // checkouts keep them under packages/cyberstrike/data/scripts.
+  const candidates = [
+    path.join(path.dirname(process.execPath), "data", "scripts"),
+    path.resolve(import.meta.dir, "../../data/scripts"),
+    path.resolve(import.meta.dir, "data/scripts"),
+  ]
+  for (const candidate of candidates) {
+    try {
+      const info = await fs.stat(candidate)
+      if (info.isDirectory()) return candidate
+    } catch {
+      // Try the next supported layout.
+    }
+  }
+  return candidates[0]!
+}
 
 const AVAILABLE_SCRIPTS: Record<string, { description: string; args: string }> = {
   jwt_tamper: {
@@ -52,7 +70,8 @@ export const AttackScriptTool = Tool.define("attack_script", {
     timeout_seconds: z.number().optional().default(120).describe("Maximum execution time in seconds (default: 120)"),
   }),
   async execute(params) {
-    const scriptPath = path.join(SCRIPTS_DIR, `${params.script}.py`)
+    const scriptsDir = await resolveScriptsDir()
+    const scriptPath = path.join(scriptsDir, `${params.script}.py`)
     const file = Bun.file(scriptPath)
     if (!(await file.exists())) {
       return {
