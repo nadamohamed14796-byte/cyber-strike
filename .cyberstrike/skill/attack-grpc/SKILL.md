@@ -164,23 +164,25 @@ Use the TLS options required by the real service; -plaintext is only appropriate
 Record service_name, method_name, rpc_shape, proto_source, tls_validation, principal, metadata_redacted, stream_duration, message_count, authorization_result, state_readback, and cleanup_status. If reflection is disabled, use the allowed proto/client artifacts rather than brute-forcing service names.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Burp Proxy/Repeater/Comparer, observed client requests, OpenAPI/GraphQL schema when available, and jq; use controlled principals and avoid destructive mutations or load tests.
-- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
+Use non-interactive CLI/API tools that can be run and parsed by the agent. Browser UI, extensions, and interactive proxies are not agent dependencies.
 
-### Primary resources
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — risk taxonomy.
-- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — practical methodology.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — access control.
+### Tools and purpose
+- `grpcurl` — inspect service reflection and invoke explicitly authorized methods with test credentials; reflection may be disabled.
+- `buf` — lint, format, and inspect local Protobuf schemas.
+- `jq` — parse JSON output and redact sensitive fields.
+- Python `httpx` — compare HTTP gateway behavior where a gRPC-transcoding layer exists.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved gateway responses offline; it does not issue requests.
 
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
+### Install and verify
+Use upstream docs: https://github.com/fullstorydev/grpcurl and https://buf.build/docs/installation. Verify with `grpcurl --help` and `buf --version`. If reflection is unavailable, use an authorized .proto descriptor or local schema; do not assume a service or method name. Record missing dependencies and do not claim execution without inspected output.
 
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+### Resources
+- https://grpc.io/docs/
+- https://github.com/fullstorydev/grpcurl
+- https://buf.build/docs/
+- https://owasp.org/API-Security/editions/2023/en/0x00-header/
 
-Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+### Evidence and handoff
+Record service/method, schema or descriptor source, caller identity/role, metadata redaction, baseline/control, status and structured error details, and terminal effect. Use controlled principals and avoid destructive mutations or load tests. Mark outcomes confirmed, disproven, or hypothetical; record tool errors and coverage gaps.
