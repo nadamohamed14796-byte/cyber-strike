@@ -168,3 +168,11 @@ Treat extracted routes as documentation leads only. Do not automatically request
 ### Evidence fields
 
 Record device_family, model_signal, firmware_signal_source, vendor_advisory, route_source_asset, route_name_only, auth_policy_expected, read_only_response_ref, sensitive_data_excluded, test_environment, and cleanup_status. Keep physical/operational impact separate from web access-control impact.
+
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use `curl` for bounded read-only checks and local parsers for assets already collected. Verify `curl --version`; official docs: https://curl.se/docs/ and current vendor firmware/security advisory pages.
+
+### Evidence
+Record device model/firmware source, exact authorized endpoint, timestamp, response metadata, and advisory match. Do not attempt default-password checks, configuration changes, or state-changing device operations without explicit authorization.
