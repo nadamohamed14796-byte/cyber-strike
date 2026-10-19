@@ -248,3 +248,29 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record the principal, normal login path, exact failed control, response/state differential, and safe recovery/cleanup. Redact credentials, cookies, reset links, and OTPs.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-invokable CLI tools and local libraries only. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version, official documentation, license, and target-specific impact before use.
+
+### Recommended tools
+- curl/Python requests — baseline and controlled identity comparisons
+- jq — parse response fields and status
+- http_response_diff.py — compare control/variant responses
+- A local role/route matrix generated from API docs
+
+### Resources
+- https://portswigger.net/web-security/access-control
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://owasp.org/API-Security/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use community lists to discover candidates, then verify their current maintenance and CLI behavior from official sources.
+
+### Helper-script contract
+Test one trust boundary at a time with tester-owned accounts and harmless resources. Preserve baseline, changed identity/claim, result, and evidence; do not equate a 200 response with an authorization bypass.
+
+Keep raw evidence separate from normalized results. Record source, timestamp, tool/version, auth context, control result, errors, confidence, and redaction. Helpers should use explicit input/output paths, structured output, and local fixtures.
+
+### Handoff
+Report commands actually run, tool versions, input/output artifact paths, control/variant outcomes, failures, confidence, limitations, and next skill. Missing tools and blocked tests must be explicit.
