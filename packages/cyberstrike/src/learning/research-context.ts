@@ -361,7 +361,7 @@ export namespace ResearchContext {
       ...items,
       "",
       "Use these references only to design controlled tests that match current observed behavior. Record what was tested and whether evidence supports, disproves, or leaves the hypothesis inconclusive.",
-    ].join("\n").slice(0, 10_000)
+    ].join("\n").slice(0, 6_000)
 
     // Record only IDs that survive the actual prompt-size cap; omitted references
     // were not genuinely surfaced to the model and must not influence feedback.
