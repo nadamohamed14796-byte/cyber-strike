@@ -170,3 +170,29 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
+
+### Recommended tools
+- gitleaks/noseyparker — scan local artifacts for secret patterns
+- curl — inspect headers/errors with minimal requests
+- jq/rg — search and redact saved responses
+- http_response_diff.py — compare anonymous/authenticated response controls
+
+### Resources
+- https://github.com/gitleaks/gitleaks
+- https://github.com/praetorian-inc/noseyparker
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
+
+### Helper-script contract
+Store only redacted fingerprints, file/line or response location, source, and exposure context. Never validate leaked credentials by using them or download unrelated sensitive records.
+
+Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
+
+### Handoff
+Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
