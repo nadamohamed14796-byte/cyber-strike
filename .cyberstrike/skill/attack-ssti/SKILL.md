@@ -70,3 +70,25 @@ Return `input_sink`, `baseline_output`, `expression_test`, `server_side_evaluati
 
 ### Template evaluation vs ordinary reflection
 Identify where the value is inserted (HTML escaping, template expression, server-side preview, email/PDF renderer) and establish a normal literal baseline. Use inert arithmetic/string expressions in a disposable fixture to distinguish server-side evaluation from reflection or client-side rendering; do not use file-read, process-execution, or environment-dumping payloads. Repeat with one template context at a time and compare rendered output, not just error codes. A confirmed evaluated expression does not automatically prove RCE; demonstrate only the minimum permitted impact and keep greater capabilities hypothetical until safely proven in an isolated lab. Route parser serialization to deserialization/XXE as appropriate and record the rendering context for remediation.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater with benign template-expression markers and application error/log evidence where authorized. For source review, use the official template-engine documentation and Semgrep if a relevant rule set exists. Avoid jumping directly to command execution.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official installation.
+- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — optional static scan on an authorized source checkout.
+- Use template-engine packages only in a disposable local lab, pinned to the app's actual version; do not install unknown payload repositories or run exploit scripts copied from writeups without inspection.
+
+### Primary resources
+- [PortSwigger server-side template injection](https://portswigger.net/web-security/server-side-template-injection) — identification and lab validation.
+- [Jinja security considerations](https://jinja.palletsprojects.com/en/stable/sandbox/) — if the target uses Jinja.
+- [OWASP Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html) — defensive controls.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares locally captured, sanitized responses offline.
+
+### Result handling
+First establish server-side template evaluation using a harmless expression in a controlled input. Do not use OS command execution, file reads, or secret extraction to prove a finding; explain the engine and trust-boundary failure.
