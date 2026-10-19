@@ -79,7 +79,7 @@ Do not perform exploitation, destructive actions, state-changing requests, brute
 
 Do not bypass authentication, rate limits, access controls, or program restrictions. Respect the target's permitted request methods, automation limits, and operational constraints.
 
-If scope is missing, ambiguous, invalid, or unconfigured, continue passive public research and workspace preparation where appropriate, but do not run active probes.
+If scope is missing, ambiguous, invalid, or unconfigured, review the official policy once and configure the canonical root once. Then run one explicit scope check for the requested origin. If it fails, stop active work and report the exact reason. If workspace attachment fails after a successful scope check, do not try alternate URL spellings, ports, asset types, or repeated scope rewrites. Inspect the single failure once; fix the implementation or report the blocker. Never loosen or rewrite the official scope just to make attachment succeed.
 
 ### 0.5 Target data protection
 
