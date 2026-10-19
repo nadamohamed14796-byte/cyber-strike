@@ -73,3 +73,31 @@ Return `endpoint`, `origin_policy`, `auth_mechanism`, `session_lifecycle`, `mess
 
 ### Handshake vs message-level authorization
 Record handshake origin, cookies/tokens, subprotocol, authenticated principal, session expiry/revocation, message schema, subscription topic, and server-side action separately. Establish a normal permitted message and a known-denied message with two tester-controlled accounts, then change one identity/topic/object dimension at a time. A successful 101 upgrade does not prove message authorization, and a rejected unknown opcode is not a finding. Use harmless read-only subscriptions or synthetic events; never trigger device controls or broadcasts visible to real users. Chain to CSWSH only when the browser automatically carries credentials and a controlled foreign origin can reach a protected action; chain to IDOR/BFLA for demonstrated message/object/function policy failures.
+
+
+## Message catalog and lifecycle matrix
+
+Keep a normalized message inventory keyed by direction + message type + field shape. Do not duplicate the endpoint for every message or object ID.
+
+| Lifecycle stage | Controlled test | Evidence required |
+|---|---|---|
+| Handshake | Valid, absent, expired, and revoked test credential | Principal resolved by server and handshake decision |
+| Origin | Legitimate origin vs controlled origin you own | Browser cookie context and whether a protected test message is available |
+| Subscribe/join | Two test accounts subscribe to their own synthetic channels | Server enforces channel ownership at subscription time |
+| Message/action | Same harmless message under allowed and denied test roles | Per-message authorization result and server-side state |
+| Long-lived connection | Revoke test access, then send/read a harmless message on existing socket | Access is rechecked or remains valid contrary to documented policy |
+| Reconnect | Reconnect with expired/revoked test session | New connection follows expected authentication policy |
+| Event delivery | Emit synthetic event to test channel | Only authorized test principal receives the event |
+| Input validation | Missing/wrong-type/unknown field in a harmless message | Safe rejection without unintended state change or sensitive error leakage |
+
+### Evidence and note fields
+
+Persist connection_id, origin, auth_source, principal, tenant, session_age, message_type, topic/channel, object_ref, schema_version, request_ref, expected_permission, actual_delivery_or_effect, negative_control, and cleanup_verified. Never persist full cookies, bearer tokens, or private message bodies.
+
+### Chain rules
+
+- Cross-origin browser can use ambient cookies and read a protected socket message → CSWSH candidate, with synthetic data only.
+- A message names another object's ID but authorization is missing → BOLA/IDOR.
+- A low role invokes an admin-only message action → BFLA.
+- Message field changes a protected model property → property authorization/mass assignment.
+- Only malformed frames or generic errors are observed → not a finding without a security boundary violation.
