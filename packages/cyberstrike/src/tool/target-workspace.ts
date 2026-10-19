@@ -315,7 +315,9 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           }
         }
       }
-      const sourceForConfiguration = authorizationSource || (userConfirmedScopeList && !authorizationReference ? USER_CONFIRMED_SCOPE_LIST_SOURCE : userConfirmedInitialScope ? USER_CONFIRMED_SCOPE_SOURCE : undefined)
+      const sourceForConfiguration = userConfirmedScopeList && !authorizationReference
+        ? USER_CONFIRMED_SCOPE_LIST_SOURCE + (authorizationSource ? ": " + authorizationSource : "")
+        : authorizationSource || (userConfirmedInitialScope ? USER_CONFIRMED_SCOPE_SOURCE : undefined)
       const userConfirmedScopeProvenance = Boolean(
         !authorizationReference && sourceForConfiguration?.startsWith(USER_CONFIRMED_SCOPE_PREFIX),
       )
