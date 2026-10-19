@@ -70,3 +70,17 @@ Return `endpoint`, `cache_layer`, `candidate_input`, `baseline_cache_state`, `ma
 - `attack-host-header` — host and forwarded-header trust.
 - `attack-open-redirect` — redirect behavior as a possible downstream impact.
 - `attack-triage-validation` — validate exploitability and severity.
+
+
+## Practical differential request
+Use an inert marker and an endpoint whose cache behavior you understand. Do not poison shared production content or place active script/redirect payloads into a shared cache.
+
+```bash
+: "TARGET_URL must be a permitted, low-impact cacheable endpoint"
+curl -sS -D clean-1.headers -o clean-1.body "$TARGET_URL"
+curl -sS -D marker.headers -o marker.body -H 'X-Forwarded-Host: cs-marker.invalid' "$TARGET_URL"
+curl -sS -D clean-2.headers -o clean-2.body "$TARGET_URL"
+sha256sum clean-1.body marker.body clean-2.body
+```
+
+Record Age, Vary, cache status, response hash and the clean follow-up. A difference without a confirmed shared-cache hit is not cache poisoning. Route host-derived behavior to attack-host-header, personalized-content under static-looking paths to attack-cache-deception, and any final claim to attack-triage-validation.
