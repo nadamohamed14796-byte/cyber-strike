@@ -120,25 +120,6 @@ Repeat from a clean state or fresh test session where safe, verify cleanup, and 
 Persist rejected candidates with root-cause fingerprint, tested property, relevant negative control, evidence references, rejection reason, prerequisites, timestamp, and confidence. Do not deduplicate away a new target, tenant boundary, operation, or control state merely because the endpoint matches an old false positive. A blocked test (no credentials, scope unclear, unstable service) is not rejected; preserve the missing prerequisite and a resume condition. If a chain is proposed, validate each step independently and explicitly separate direct impact from downstream hypotheses. Reopen a rejected item only when new evidence changes its fingerprint or invalidates the prior explanation.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Agent-usable tools and purpose
-- `python3 .cyberstrike/skill/scripts/http_response_diff.py --help` — inspect supported options before comparing saved baseline/control responses.
-- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py --help` — inspect supported evidence validation options.
-- `jq` — compare structured observations after redaction.
-- `rg` — search notes/artifacts for evidence references and likely accidental secrets; review matches in context.
-- `pytest` — run local regression tests when the repository provides a test suite.
-
-### Installation and verification
-Use Python standard-library helpers first; verify optional utilities with `jq --version` and `pytest --version`. Follow official project docs and inspect `--help` before assuming flags. A helper result is not proof of vulnerability or complete sanitization. If validation cannot run, record the blocker explicitly.
-
-### Primary resources
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://owasp.org/www-project-top-ten/
-- https://docs.pytest.org/en/stable/
-
-### Decision evidence
-For each hypothesis, record the expected behavior, negative control, observed result, alternative explanations, artifact references, confidence, and disposition. Distinguish confirmed, disproven, and unresolved. Do not turn a missing response, scanner alert, or absent dependency into a pass/fail verdict without supporting evidence.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
