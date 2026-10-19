@@ -128,45 +128,23 @@ Search for common secret-bearing locations, but do not rely on a single regex as
 - Do not describe a hash as proof of integrity unless the manifest and collection process are also controlled.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Burp request/response export, a local Markdown editor, sha256sum, and jq for manifest metadata. Review redaction; hashes alone do not prove provenance.
-- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+### Tools and purpose
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` — check manifest structure before sharing evidence; review findings and actual artifacts manually.
+- `sha256sum` or Python `hashlib` — identify artifact versions and detect accidental changes.
+- `jq` and `rg` — inspect structured metadata and locate likely secrets in local evidence for manual redaction review.
+- `file` and `exiftool` — inspect file type and metadata where available; metadata inspection does not guarantee sanitization.
+- Python standard library — build a manifest and compare raw/derived artifact paths without extra dependencies.
 
-### Primary resources
-- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — assessment evidence.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — reproducible tests and reporting.
+### Install and verify
+Verify with `python3 --version`, `jq --version`, `rg --version`, `sha256sum --version`, and `exiftool -ver` when installed. Prefer OS packages or official upstream releases. If optional tools are unavailable, use Python and manual review; record the gap instead of claiming the artifacts are sanitized.
 
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
-Checks metadata only; manually inspect the artifact and redaction.
+### Resources
+- https://csrc.nist.gov/pubs/sp/800/115/final
+- https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://exiftool.org/
 
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Preserve the sanitized request/response, test identity, timestamp, expected/observed behavior, and cleanup result.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp exports, a local redaction review, hashes to identify raw and derivative files, and the evidence-manifest validator. Use video/screenshot tools only when visual state materially improves reproducibility.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — capture/export workflow.
-- [OBS Studio](https://obsproject.com/download) — optional local recording.
-- Linux sha256sum or Windows PowerShell Get-FileHash — identify artifact versions.
-Keep original captures private and target-local; inspect headers, query strings, form/JSON bodies, cookies, HAR files, screenshots, filenames, logs, and source maps. A regex scan cannot certify sanitization.
-
-### Primary resources
-- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — evidence practices.
-- [Bugcrowd report documentation](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — submission evidence.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — reproducibility.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before sharing evidence; then inspect the actual artifacts manually.
-
-### Result handling
-Keep one manifest entry per artifact with sanitized path, time, hash, test context, redaction review, and claim supported. Never store raw secrets or unrelated personal data in Git or global research.
+### Evidence handling
+Keep original captures private and target-local. Review headers, query strings, form/JSON bodies, cookies, HAR files, screenshots, filenames, logs, source maps, and metadata. A regex scan or manifest validation cannot certify sanitization. Keep one manifest entry per artifact with sanitized path, time, hash, test context, redaction review, and the claim supported. Never store raw secrets or unrelated personal data in Git or global research.
