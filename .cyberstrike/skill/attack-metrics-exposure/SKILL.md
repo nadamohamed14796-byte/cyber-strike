@@ -56,3 +56,10 @@ Record route, exposure context, access control, metadata classes, redacted examp
 
 ### Metric sensitivity and cardinality control
 Capture only a small sample of the metrics endpoint and redact label values before persistence; labels may contain tenant IDs, emails, routes, tokens, or other high-cardinality data. Determine whether the endpoint is intentionally public, restricted to internal networks, or accidentally exposed by reverse proxy configuration. Compare anonymous versus authorized access and confirm whether the content discloses sensitive operational topology or customer identifiers, rather than reporting a generic metrics path. Avoid scraping all time series or inducing load. Chain to information disclosure for proven sensitive labels, or cloud/configuration review when access policy is the root cause.
+
+
+## Evidence normalization
+
+Keep a small redacted sample and record the endpoint, expected audience, principal, label names, data classes, access decision, and time of observation. Avoid retaining entire metric dumps. A label name may indicate a possible privacy issue, but report only when the value or access boundary is actually sensitive and the endpoint is exposed contrary to policy.
+
+Separate metrics, health/readiness, tracing, profiling, debug output, and administrative controls because they have different risk and operational impact. Review configuration and read-only evidence first; do not trigger heavy profiles or diagnostic dumps on a live service. Any follow-up must use an approved synthetic fixture and the minimum proof necessary.
