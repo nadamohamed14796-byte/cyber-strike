@@ -108,7 +108,7 @@ describe("VerificationLedger terminal outcomes", () => {
     })
   })
 
-  test("legacy disproven verdicts with fewer than 20 valid attempts are downgraded and resumable", async () => {
+  test("legacy evidence-backed disproven verdicts remain terminal without a minimum count", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
       directory: tmp.path,
@@ -133,23 +133,12 @@ describe("VerificationLedger terminal outcomes", () => {
         )).run())
 
         expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
-          .every((item) => item.outcome === "inconclusive")).toBe(true)
+          .every((item) => item.outcome === "disproven")).toBe(true)
 
-        const duplicateRetry = VerificationLedger.record({
-          ...common,
-          attempt: attempt("legacy-single-check", "evidence://old-disproof"),
-        })
-        expect(duplicateRetry.attempt.outcome).toBe("inconclusive")
-        expect(duplicateRetry.decision.outcome).toBe("inconclusive")
-
-        const resumed = VerificationLedger.record({
+        expect(() => VerificationLedger.record({
           ...common,
           attempt: attempt("new-valid-check", "evidence://new-valid-check"),
-        })
-        expect(resumed.decision.outcome).toBe("inconclusive")
-        expect(resumed.decision.attemptsUsed).toBe(2)
-        expect(VerificationLedger.list({ sessionID: session.id, hypothesisKey: common.hypothesisKey })
-          .every((item) => item.outcome === "inconclusive")).toBe(true)
+        })).toThrow(/already disproven; terminal hypotheses cannot accept more attempts/i)
         await Instance.dispose()
       },
     })
