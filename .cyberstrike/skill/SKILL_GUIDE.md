@@ -425,3 +425,16 @@ CyberStrike skills are read and acted on by an autonomous agent. The primary Too
 - Treat third-party binaries, templates, wordlists, plugins, and scripts as untrusted until provenance and behavior are reviewed. Never use discovered credentials or copy secret values into global research storage.
 
 Canonical catalog: `.cyberstrike/skill/CLI_TOOLING_CATALOG.md`. Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json` and manually inspect each flagged section.
+
+## Markdown formatting and structure
+
+- Use UTF-8 without a byte-order mark, LF line endings, and exactly one final newline.
+- Keep one blank line between prose paragraphs, headings, lists, tables, and fenced code blocks. Do not stack multiple empty lines for visual spacing.
+- Use descriptive heading levels in order: one document title, then level-two workflow sections, then level-three subsections; do not skip levels just for styling.
+- Fence commands and multi-line examples with a language tag such as `bash`, `python`, `json`, or `http`. Keep command blocks executable and ensure placeholders are unmistakable.
+- Use tables only for compact comparisons or matrices; use bullets for sequential instructions and long explanations.
+- Preserve frontmatter keys and their values during formatting. Do not reflow, reorder, or paraphrase technical instructions as a formatting-only change.
+- Keep sections in a predictable order where applicable: purpose/scope, prerequisites, workflow, decision/evidence criteria, tools/resources/helpers, output/handoff, safety notes. Specialized skills may differ when the workflow requires it.
+- Before mass formatting, run the formatter in check/dry-run mode, inspect the diff, and preserve fenced-code content and frontmatter. Apply changes only after reviewing the proposed diff.
+- Use `python3 .cyberstrike/skill/scripts/format_skill_markdown.py --check` to identify presentation-only changes and `--write` to apply the conservative formatter. Formatting does not validate links, commands, scripts, or technical accuracy.
+
