@@ -81,24 +81,20 @@ Persist integration_name, provider_identity, tenant_binding, signature_policy, s
 Add tests for invalid signature, replay, wrong tenant/provider, unknown field, wrong type, missing required field, malformed downstream response, disallowed redirect, and retry after partial failure. Keep tests synthetic and verify authoritative state rather than the HTTP acknowledgement alone.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer to trace how the application consumes third-party API data, jq/schema validators for local response samples, and an authorized mock/staging upstream to reproduce trust-boundary issues. Never assume a partner API response is safe because it is syntactically valid JSON.
+- Python `httpx` or `curl`: compare observed application behavior against controlled, benign upstream responses.
+- `jq`: parse saved upstream/application JSON for type, schema, and trust-boundary differences.
+- `rg` and `semgrep`: inspect authorized local source for unsafe parsing, missing validation, and trust assumptions.
+- Local fixture server: reproduce a malformed or boundary-case response without affecting a third party.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official installation.
-- jq on Kali/Debian: `sudo apt update && sudo apt install jq`.
-- For an owned service, use its existing OpenAPI/JSON Schema validator or the official library for its language; pin dependencies and test using sanitized synthetic fixtures.
-Do not alter third-party services, replay other users' webhooks, or inject real downstream actions during a production test.
+Verify `curl --version`, the chosen Python client, `jq --version`, and `semgrep --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/, https://semgrep.dev/docs/getting-started/.
 
-### Primary resources
-- [OWASP API Security Top 10 — API10: Unsafe Consumption of APIs](https://owasp.org/API-Security/editions/2023/en/0xa10-unsafe-consumption-of-apis/) — risk description.
-- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) — validation boundaries.
-- [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html) — if upstream URLs are controllable.
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html
+- https://semgrep.dev/docs/
 
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares two already-collected sanitized responses offline.
-
-### Result handling
-Trace the untrusted upstream field to the security-sensitive sink, record the downstream effect using synthetic data, and keep partner keys and customer payloads out of evidence.
+### Proof and limits
+Record the untrusted upstream field, validation/transformation, downstream sink, and observable consequence. Do not claim SSRF, code execution, or data exposure without separate evidence.
