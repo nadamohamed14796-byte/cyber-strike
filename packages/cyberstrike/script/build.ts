@@ -279,6 +279,27 @@ for (const key of Object.keys(binaries)) {
 }
 console.log("hackbrowser-worker.js copied to all platform bin/ directories")
 
+// Bundle external Python helper scripts beside the compiled executable. The
+// attack_script tool resolves this stable layout through process.execPath.
+const scriptsSource = path.join(dir, "data", "scripts")
+const scriptsInfo = await fs.stat(scriptsSource).catch(() => undefined)
+if (!scriptsInfo?.isDirectory()) {
+  throw new Error(`Required bundled scripts directory is missing: ${scriptsSource}`)
+}
+for (const key of Object.keys(binaries)) {
+  const scriptsDestination = path.join(dir, "dist", key, "bin", "data", "scripts")
+  await fs.rm(scriptsDestination, { recursive: true, force: true })
+  await fs.mkdir(path.dirname(scriptsDestination), { recursive: true })
+  await fs.cp(scriptsSource, scriptsDestination, { recursive: true, errorOnExist: true, force: false })
+  const requiredScripts = ["wayback_endpoints.py"]
+  for (const script of requiredScripts) {
+    if (!fs.existsSync(path.join(scriptsDestination, script))) {
+      throw new Error(`Required script was not bundled for ${key}: ${script}`)
+    }
+  }
+}
+console.log("Python helper scripts copied and verified in all platform bin/ directories")
+
 if (Script.release) {
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
