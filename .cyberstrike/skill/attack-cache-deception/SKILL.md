@@ -78,3 +78,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer and browser DevTools cache inspection to compare static-looking and dynamic routes and observe cache behavior. Use a private test resource and cache-busting markers, not real user data.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official installation.
+- [PortSwigger Web Cache Deception labs](https://portswigger.net/web-security/web-cache-deception) — controlled practice.
+- curl on Kali/Debian: sudo apt update && sudo apt install curl.
+Avoid sending requests intended to poison shared caches or cause other users to receive data. Confirm the program permits cache testing and use a unique harmless marker in your own account.
+
+### Primary resources
+- [PortSwigger Web Cache Deception](https://portswigger.net/web-security/web-cache-deception) — cache key/path behavior.
+- [OWASP Caching Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cache_Control_Cheat_Sheet.html) — cache-control basics.
+- [RFC 9111 HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111) — protocol semantics.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare redacted cache headers/responses saved locally.
+
+### Result handling
+Capture cache headers, exact route variant, actor context, and whether a private test marker is delivered incorrectly. Header oddities alone are not proof; clean up controlled cache artifacts where possible.
