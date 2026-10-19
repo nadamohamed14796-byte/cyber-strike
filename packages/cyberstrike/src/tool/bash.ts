@@ -97,20 +97,20 @@ function scannerTargets(command: string[], commandText: string): string[] {
 
 function hostnameMatchesScopeRule(ruleInput: string, hostname: string): boolean {
   let rule = ruleInput.trim().toLowerCase()
-  rule = rule.replace(/^(?:domain|wildcard)[ \\t]*:[ \\t]*/i, "")
-  if (/^https?:\\/\\//i.test(rule) || rule.includes("/") || rule.includes(":")) return false
+  rule = rule.replace(/^(?:domain|wildcard)[ \t]*:[ \t]*/i, "")
+  if (/^https?:\/\//i.test(rule) || rule.includes("/") || rule.includes(":")) return false
   if (rule.startsWith("*.")) {
-    const suffix = rule.slice(2).replace(/\\.$/, "")
+    const suffix = rule.slice(2).replace(/\.$/, "")
     return hostname === suffix || hostname.endsWith("." + suffix)
   }
-  return rule.replace(/\\.$/, "") === hostname
+  return rule.replace(/\.$/, "") === hostname
 }
 
 /**
- * Katana is safe to use from the generic shell only when its crawl is constrained
- * to the exact FQDN and the saved scope grants host-wide access without path/port
- * exclusions. Katana cannot consult CyberStrike's persisted scope before every
- * HTTP request, so narrower manifests must use the scope-aware native request path.
+ * Katana can run from the generic shell only when constrained to one FQDN and
+ * the persisted manifest grants host-wide access without path/port exclusions.
+ * Katana cannot call CyberStrike's scope matcher before every HTTP request, so
+ * a narrower manifest must use a scope-aware request/crawl path instead.
  */
 export function katanaScopeBlockReason(args: string[], targetURL: string, scope: TargetScope | null): string | undefined {
   if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
@@ -119,11 +119,11 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scope:
 
   const normalizedArgs = args.map((arg) => arg.toLowerCase())
   if (normalizedArgs.some((arg) => ["-ns", "--no-scope", "-do", "--display-out-scope", "-cs", "--crawl-scope"].includes(arg))) {
-    return "Katana scope overrides that could widen crawl behavior are not allowed here; rely on the persisted scope and FQDN field scope."
+    return "Katana scope overrides that can widen crawler behavior are not allowed; rely on the persisted scope and FQDN field scope."
   }
   const fieldScopeIndex = normalizedArgs.findIndex((arg) => ["-fs", "--field-scope"].includes(arg))
   if (fieldScopeIndex < 0 || normalizedArgs[fieldScopeIndex + 1] !== "fqdn") {
-    return "Run Katana with '-fs fqdn' so the crawler follows URLs on the exact supplied hostname only."
+    return "Run Katana with '-fs fqdn' so it follows URLs on each explicitly supplied hostname only."
   }
 
   const rateIndex = normalizedArgs.findIndex((arg) => ["-rl", "--rate-limit"].includes(arg))
@@ -145,25 +145,37 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scope:
   } catch {
     return "Katana target must be an absolute HTTP(S) URL."
   }
-  const hostname = target.hostname.toLowerCase().replace(/\\.$/, "")
+  const hostname = target.hostname.toLowerCase().replace(/\.$/, "")
   const broadInclude = scope.scopeItems.some((item) => hostnameMatchesScopeRule(item, hostname))
   if (!broadInclude) {
-    return "Katana requires an exact-host or wildcard-domain scope entry covering " + hostname + "; URL/path/port-only scope entries need a per-request scope-aware crawler."
+    return "Katana requires an exact-host or wildcard-domain scope entry covering " + hostname + "; URL/path/port-only scope entries need per-request scope enforcement."
   }
 
-  // Any URL-shaped exclusion for this hostname (including wildcard host rules)
-  // may express a path/protocol/port boundary that -fs fqdn cannot preserve.
+  // A path/protocol/port exclusion for this host cannot be enforced by -fs fqdn.
   for (const item of scope.excludedItems) {
-    const raw = item.trim().replace(/^(?:url)[ \\t]*:[ \\t]*/i, "")
-    if (!/^https?:\\/\\//i.test(raw)) continue
-    let excluded: URL
-    try { excluded = new URL(raw.replace("*.", "scope-wildcard.")) } catch { continue }
-    const excludedHost = excluded.hostname.toLowerCase().replace(/\\.$/, "")
-    const hostMatches = excludedHost === hostname ||
-      (excludedHost.startsWith("scope-wildcard.") && hostname.endsWith("." + excludedHost.slice("scope-wildcard.".length))) ||
-      hostname === excludedHost.slice("scope-wildcard.".length)
-    if (hostMatches && (excluded.pathname !== "/" || excluded.port || excluded.protocol !== target.protocol)) {
-      return "Katana cannot safely enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler for this target."
+    const raw = item.trim().replace(/^(?:url)[ \t]*:[ \t]*/i, "")
+    if (/^https?:\/\//i.test(raw)) {
+      let excluded: URL
+      try { excluded = new URL(raw.replace("*.", "scope-wildcard.")) } catch { continue }
+      const excludedHost = excluded.hostname.toLowerCase().replace(/\.$/, "")
+      const wildcard = excludedHost.startsWith("scope-wildcard.")
+      const wildcardBase = wildcard ? excludedHost.slice("scope-wildcard.".length) : ""
+      const hostMatches = excludedHost === hostname ||
+        (wildcard && (hostname === wildcardBase || hostname.endsWith("." + wildcardBase)))
+      if (hostMatches && (excluded.pathname !== "/" || excluded.port || excluded.protocol !== target.protocol)) {
+        return "Katana cannot enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+      }
+      continue
+    }
+
+    let exclusion = raw.replace(/^(?:domain|wildcard)[ \t]*:[ \t]*/i, "")
+    if (exclusion.startsWith("*.")) {
+      const suffix = exclusion.slice(2).replace(/\.$/, "")
+      if (hostname === suffix || hostname.endsWith("." + suffix)) {
+        return "Katana cannot safely merge the saved host exclusion '" + item + "' into a single-host crawl."
+      }
+    } else if (exclusion.toLowerCase().replace(/\.$/, "") === hostname) {
+      return "Katana cannot safely merge the saved host exclusion '" + item + "' into a single-host crawl."
     }
   }
   return undefined
