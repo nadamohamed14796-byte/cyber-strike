@@ -121,26 +121,24 @@ Validation note: use a known-good baseline and a control case, change one meanin
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer and jq to compare the same object with different controlled roles/owners; use OpenAPI/JSON Schema if the API publishes a contract. Keep object-level and property-level authorization as separate questions.
+### Agent-usable tools and purpose
+- Python `httpx` or `requests` — replay captured, authorized requests using test-owned accounts and objects.
+- `jq` — compare structured API responses after redaction.
+- `pytest` — encode repeatable authorization expectations when a local test harness or fixture exists.
+- `rg` — inspect authorized source for serializer/schema fields, policy checks, and object-property allowlists.
+- Existing helpers: `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` for saved response comparisons; inspect `authorization_matrix.py --help` before using it to plan explicit test-owned principal/object/action cases.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- jq on Kali/Debian: sudo apt update && sudo apt install jq.
-- For owned source, use the project's existing schema validator; don't add a dependency solely for a single manual check.
-Use synthetic object fields and two authorized accounts. Avoid altering production roles or exposing private data.
+### Installation and verification
+Verify the chosen HTTP client with `python3 -c "import httpx; print(httpx.__version__)"` or the equivalent requests check; verify `pytest --version` and `jq --version` as applicable. Follow official package documentation and inspect helper `--help` before assuming flags. If a dependency or test fixture is unavailable, record the gap and use source/configuration review rather than claiming a test passed.
 
 ### Primary resources
-- [OWASP API Security Top 10 — API3](https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/) — property authorization concerns.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — server-side policy.
-- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — controlled validation.
+- https://owasp.org/API-Security/
+- https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/
+- https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+- https://pytest.org/
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare local, sanitized representations.
-
-### Result handling
-Prove that a controlled unauthorized principal can read/modify a protected field or action. A field present in JSON, even if hidden in the UI, is not by itself a vulnerability.
-
+### Evidence and result handling
+Use only tester-controlled identities and objects. Compare read and write permissions separately, preserve the expected-permission control, and redact personal data and tokens. An extra field in a response is not automatically a vulnerability; establish the specific unauthorized property access or modification and its impact.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Agent-invokable CLI tools and local libraries only. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version, official documentation, license, and target-specific impact before use.
