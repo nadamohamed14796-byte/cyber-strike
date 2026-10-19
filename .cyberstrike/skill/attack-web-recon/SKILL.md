@@ -155,3 +155,31 @@ Tools can be installed even when absent locally, but each recommendation should 
 
 ### Result handling
 Store one canonical record per endpoint template and attach multiple parameter/source observations to it. Keep method, time, source, status class, auth context, and confidence; do not infer vulnerability from endpoint discovery alone.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
+
+### Recommended tools
+- katana — authorized crawling and endpoint discovery
+- gau/waymore — passive historical URL sources
+- httpx — service metadata and response status
+- ffuf or feroxbuster — focused content discovery with approved rates
+- uro/unfurl/jq — URL cleanup and component extraction
+
+### Resources
+- https://github.com/projectdiscovery/katana
+- https://github.com/lc/gau
+- https://github.com/projectdiscovery/httpx
+- https://github.com/ffuf/ffuf
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
+
+### Helper-script contract
+Merge URL sources while retaining provenance, method, parameter names, and observation time. Keep one endpoint record with multiple parameter observations and distinguish passive discoveries from active probes.
+
+Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+
+### Handoff
+Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
