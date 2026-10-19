@@ -391,7 +391,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     // arguments of commands like grep/find for scanner names.
     const executableIndex = commandExecutableIndex(command)
     const executable = executableIndex >= 0 ? path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase() : ""
-    const shellWrappers = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish"])
+    const shellWrappers = SHELL_WRAPPERS
     if (shellWrappers.has(executable)) {
       const commandFlag = command.findIndex((value, index) => index > executableIndex && ["-c", "-lc", "-ec"].includes(stripOuterShellQuotes(value)))
       const payload = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
@@ -602,7 +602,9 @@ const parser = lazy(async () => {
 
 const SHELL_WRAPPERS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish"])
 
-function commandTokens(node: NonNullable<ReturnType<NonNullable<Awaited<ReturnType<typeof parser>>["parse"]>["rootNode"]["child"]>>): string[] {
+type BashCommandNode = { childCount: number; child(index: number): { type: string; text: string } | null }
+
+function commandTokens(node: BashCommandNode): string[] {
   const command: string[] = []
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i)
