@@ -73,6 +73,19 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(safeArgs, "https://example.com", pathExcludedScope)).toContain("path/protocol/port exclusion")
   })
 
+  test("preserves exclusions from ancestor workspace scopes", () => {
+    const inheritedExclusion: TargetScope = {
+      ...baseScope,
+      excludedItems: ["https://example.com/private"],
+    }
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", [baseScope, inheritedExclusion])).toContain("path/protocol/port exclusion")
+  })
+
+  test("interprets typed wildcard scope entries as domain families", () => {
+    const typedWildcard = { ...baseScope, scopeItems: ["wildcard: example.com"] }
+    expect(katanaScopeBlockReason(["-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5"], "https://api.example.com", typedWildcard)).toBeUndefined()
+  })
+
   test("recognizes wildcard authorization but still rejects a scoped port exclusion", () => {
     const wildcardScope = { ...baseScope, scopeItems: ["*.example.com"], excludedItems: ["api.example.com:8443"] }
     expect(katanaScopeBlockReason(safeArgs, "https://api.example.com", wildcardScope)).toContain("port exclusion")
