@@ -133,26 +133,23 @@ Persist valid_control_result, invalid_control_result, single_mutation, server_pr
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and their role
-Burp Repeater/Comparer plus the JWT Editor extension from the official BApp Store; jq for local JSON inspection. Use only test tokens you control.
+### Agent-usable tools and purpose
+- Python standard library `json` and `base64` — decode the non-secret JWT header/payload locally for inspection; decoding is not signature validation.
+- `jq` — inspect redacted structured claims.
+- `jwt_tool` — optional JWT test utility only after reviewing current upstream docs and the target's permitted test boundaries.
+- `rg` — search authorized source/configuration for algorithm allowlists, issuer/audience validation, key selection, and expiry handling.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved, redacted responses offline.
 
-### Install or enable when missing
-Burp Community/Professional: https://portswigger.net/burp ; JWT Editor extension: install via Burp's Extensions/BApp Store and verify publisher/details before enabling; jq on Kali/Debian: `sudo apt install jq`.
-These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+### Installation and verification
+Use the project's official documentation at https://github.com/ticarpi/jwt_tool and verify its current installation method before installing. Check `python3 --version`, `jq --version`, and `jwt_tool -h` where applicable. Do not paste live tokens into public websites or third-party decoders. If the tool is missing, use local parsing and authorized source review; record the gap.
 
 ### Primary resources
-- [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html) — defensive handling and validation.
-- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) — JWT format semantics.
-- [PortSwigger JWT attacks](https://portswigger.net/web-security/jwt) — controlled test methodology.
+- https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html
+- https://portswigger.net/web-security/jwt
+- https://github.com/ticarpi/jwt_tool
 
-### Small reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — local offline comparison only; it does not validate signatures or test a token.
-
-### Runtime and evidence notes
-- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
-- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
-- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
-
+### Evidence and result handling
+Store only redacted claims and token fingerprints, never full live tokens, session cookies, signing keys, or secrets. Distinguish decoding, signature validation, and application authorization as separate claims. A tool alert alone is not confirmation.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
