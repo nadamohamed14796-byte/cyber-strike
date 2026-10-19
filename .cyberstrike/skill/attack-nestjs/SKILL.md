@@ -172,25 +172,14 @@ Record module_name, controller_or_resolver, route_or_operation, transport, guard
 - Swagger or error stack visible → information disclosure only if non-public sensitive details are exposed contrary to policy.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use browser DevTools and Burp for runtime behavior; Node.js/npm and Nest CLI for an owned source project; Semgrep or configured ESLint security rules for source review.
+- `rg`: inventory controllers, guards, decorators, pipes, and resolvers in an authorized source checkout.
+- `semgrep`: scan local TypeScript source with relevant rules.
+- `npm` / project test runner: reproduce DTO and authorization behavior with synthetic fixtures.
+- Python `httpx` or `curl`: compare observed routes using controlled identities when a live check is required.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Installation and setup
-- [Node.js downloads](https://nodejs.org/en/download/) — install a supported release.
-- [NestJS first steps and CLI](https://docs.nestjs.com/first-steps) — use the framework's own setup.
-- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — follow the maintained installation instructions.
+Verify `node --version`, `npm --version`, `semgrep --version`, and `curl --version`. Official docs: https://docs.nestjs.com/security, https://docs.nestjs.com/guards, https://semgrep.dev/docs/getting-started/, https://curl.se/docs/.
 
-Run on a disposable clone or lab project before enabling autofixes or changing dependencies. Confirm versions and preserve the project's lockfile.
-
-### Primary resources
-- [NestJS security](https://docs.nestjs.com/security) — framework-specific controls.
-- [NestJS guards](https://docs.nestjs.com/guards) — authorization integration points.
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API risk taxonomy.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized responses offline.
-
-### Result handling
-Pair every source-level concern with a relevant runtime test where feasible; a finding in code alone may not be reachable or exploitable.
+Pair source-level concerns with a relevant test where feasible. Code findings alone may not be reachable; use a disposable clone/test environment and preserve the lockfile.
