@@ -168,3 +168,25 @@ Record transaction_id, idp_entity_id, sp_entity_id, acs_url, response_issuer, as
 - Unsafe XML parsing is present → XXE review only with separate local/source evidence.
 - Redirect/relay-state destination issue → OAuth/open-redirect review only when a trusted redirect boundary is violated.
 - Signature validation warning with no accepted wrong assertion → configuration lead, not ATO.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Proxy/Repeater with SAML Raider for controlled message inspection, browser DevTools, and test IdP/service-provider accounts. Preserve the original flow as a baseline before examining one property at a time.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
+- [SAML Raider official project](https://github.com/PortSwigger/saml-raider) — recommended installation is through Burp's BApp Store; the project explains manual JAR loading too.
+Use only a test identity, authorized relying party, and test IdP. Never paste live SAML assertions, private keys, or session cookies into public decoders or external services.
+
+### Primary resources
+- [SAML Raider](https://github.com/PortSwigger/saml-raider) — supported inspection functions.
+- [OASIS SAML specifications](https://www.oasis-open.org/standard/saml/) — protocol semantics.
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — identity/session control context.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved, redacted responses offline.
+
+### Result handling
+Keep any assertion fixture synthetic and redact NameID/attributes/signatures where appropriate. Explain which trust/validation check failed and show the relying party's resulting session behavior without exposing another user's data.
