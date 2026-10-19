@@ -161,3 +161,28 @@ Use a narrow, known in-scope host/port and the program-approved scan policy; do 
 
 ### Result handling
 Record only the disclosed host/domain/build metadata that supports the finding, whether the challenge was unauthenticated, the tested endpoint, and the practical impact. Redact user-specific or unrelated data.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
+
+### Recommended tools
+- curl — minimal protocol/banner checks where applicable
+- openssl s_client — TLS metadata when supported
+- nmap NSE scripts only when specifically authorized and reviewed
+- Python/jq — normalize service fingerprints
+
+### Resources
+- https://nmap.org/book/man.html
+- https://www.rfc-editor.org/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; verify project maintenance, license, and supported behavior from official sources.
+
+### Helper-script contract
+Record service/protocol, timestamp, minimal banner, TLS details, and attribution confidence. Avoid credential attempts or internal network expansion; a protocol disclosure is a lead until impact is established.
+
+Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+
+### Handoff
+Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
