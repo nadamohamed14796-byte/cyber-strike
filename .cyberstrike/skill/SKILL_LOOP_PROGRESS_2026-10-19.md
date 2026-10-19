@@ -7,14 +7,17 @@ Each file was read from the current main branch before editing. Successful edits
 - `attack-exceptional-conditions/SKILL.md`: failure-path, retry, partial-transaction, fallback, and cancellation review.
 - `attack-firebase-supabase/SKILL.md`: Firebase/Supabase rules, RLS, storage, identity and tenant-boundary review.
 - `bug-bounty-evidence-workflow/SKILL.md`: evidence-led workflow, statuses, deduplication, triage, and reporting.
+- `attack-variant-analysis/SKILL.md`: root-cause-led sibling search with independent proof gates.
+- `attack-test-corpus-governance/SKILL.md`: corpus provenance, licensing, context, deduplication, and safe handling.
 
 These are unsigned community/local skills. The loader's signing code classifies files without a hash as unverified; do not label them official or signed.
 
 ## Individually read-back-verified edits in this pass
-- Identity/session: attack-session, attack-auth-bypass, attack-ato, attack-mfa-bypass.
+- Identity/session: attack-session, attack-auth-bypass, attack-ato, attack-mfa-bypass, attack-dom-xss, attack-exchange-owa, attack-ntlm-info, recon-asn-infrastructure, attack-django, attack-deserialization, attack-flask-werkzeug.
 - Request/input/API: attack-file-upload, attack-sqli, attack-xss, attack-ssrf, attack-request-smuggling, attack-mass-assignment, attack-bfla, attack-business-logic, attack-race-condition, attack-api-property-authorization, attack-api-resource-consumption, attack-api-noauth-hunt, attack-401-403-bypass, attack-graphql, attack-open-redirect, attack-rate-limit-bypass, attack-websocket, attack-cors, attack-security-headers, attack-unsafe-api-consumption, attack-information-disclosure.
 - Recon/source: attack-javascript-analysis, attack-web-recon, attack-bb-methodology.
 - AI integration: attack-mcp-security, attack-rag-vector-security.
+- Research and governance: attack-variant-analysis, attack-test-corpus-governance.
 - Reporting and infrastructure: attack-report-writing, attack-evidence-hygiene, attack-triage-validation, attack-metrics-exposure.
 
 ## Reviewed but not modified in this pass
@@ -23,7 +26,7 @@ These are unsigned community/local skills. The loader's signing code classifies 
 Some of these skills already had substantial content; the edits add only a distinct topic-specific matrix, evidence contract, helper, or decision rule rather than replacing the whole skill.
 
 ## Helper validation
-The JavaScript inventory helper in attack-javascript-analysis was copied to a local test fixture and syntax-checked. A synthetic source containing a URL with a token query and a separate API path produced only the normalized URL/path without query values. It does not fetch or execute code and does not prove endpoints are live.
+The JavaScript inventory helper in attack-javascript-analysis was copied to a local test fixture and syntax-checked. A synthetic source containing a URL with a token query and a separate API path produced only the normalized URL/path without query values. It does not fetch or execute code and does not prove endpoints are live. The fixed hypothesis wording was also removed from attack-dom-xss, attack-exchange-owa, attack-ntlm-info, recon-asn-infrastructure, attack-django, attack-deserialization, attack-flask-werkzeug, and attack-information-disclosure. The separate runtime 20-attempt implementation remains unchanged.
 
 ## Loader and registry observations
 The source loader recursively discovers SKILL.md files, and the runtime skill index is built from the discovered catalog rather than only from the checked-in index.json. index.json currently contains 129 entries and does not list the newer custom skills; it appears to be a separate curated/publishing registry. New local skills should remain unverified unless the official signing process is deliberately performed by maintainers.
