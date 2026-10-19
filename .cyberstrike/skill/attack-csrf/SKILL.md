@@ -218,3 +218,25 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/browser DevTools to inspect CSRF tokens, SameSite cookies, Origin/Referer validation, and state-changing request behavior. Playwright is optional for regression tests in an owned staging application.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- [Playwright docs](https://playwright.dev/docs/intro) — official test setup.
+Start with read-only or reversible actions; use a disposable account and never trigger real purchases, transfers, password changes, or user-impacting actions unless explicitly authorized.
+
+### Primary resources
+- [PortSwigger CSRF](https://portswigger.net/web-security/csrf) — labs and testing.
+- [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html) — server-side defenses.
+- [MDN SameSite cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#samesitesamesite-value) — browser cookie semantics.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved requests/responses offline.
+
+### Result handling
+Show whether a cross-site attacker-controlled context can trigger a meaningful state change under the victim's credential context. A missing token alone is not enough if another effective control blocks the action.
