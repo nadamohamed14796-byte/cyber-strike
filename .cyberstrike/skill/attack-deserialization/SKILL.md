@@ -163,3 +163,26 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater for controlled format/type variations and Semgrep for source patterns where authorized code is available. Confirm the serialization format and trust boundary before considering engine-specific lab tooling.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official request inspection.
+- [Semgrep](https://semgrep.dev/docs/getting-started/) — optional static analysis.
+- Use a disposable local vulnerable lab when engine-specific tooling is needed; inspect source and dependency provenance before installing payload generators.
+Do not run gadget chains or command-execution payloads against production to prove a parser issue. Prefer safe type-confusion or integrity markers within approved fixtures.
+
+### Primary resources
+- [PortSwigger insecure deserialization](https://portswigger.net/web-security/deserialization) — lab methodology.
+- [OWASP Deserialization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html) — defensive patterns.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — confirmation and evidence.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare sanitized local artifacts.
+
+### Result handling
+Record input format, parser/library/version, controlled marker, observable state/behavior, and plausible mitigation. Parser errors or a suspicious serialized field alone are not proof of code execution.
