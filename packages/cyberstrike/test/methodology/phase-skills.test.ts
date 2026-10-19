@@ -17,21 +17,6 @@ describe("Recon prompt specialization", () => {
 })
 
 describe("Phase-critical skill pinning", () => {
-  const requiredByPhase: Partial<Record<Phase.Id, string[]>> = {
-    scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
-    passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
-    active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
-    authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass"],
-    session_management: ["attack-session", "attack-jwt", "attack-csrf"],
-    authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
-    input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
-    business_logic: ["attack-business-logic"],
-    data_protection: ["attack-information-disclosure", "attack-source-leak"],
-    api_security: ["attack-shadow-api", "attack-bfla"],
-    infrastructure: ["attack-cloud-misconfig"],
-    reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
-  }
-
   test("every pinned phase-critical skill exists in the actual runtime catalog", async () => {
     const catalog = await Skill.all()
     const available = new Set(catalog.map((skill) => skill.name.trim().toLowerCase()))
@@ -53,7 +38,7 @@ describe("Phase-critical skill pinning", () => {
       prerequisites: [],
       severity_boost: {},
     })
-    for (const [phaseID, required] of Object.entries(requiredByPhase) as Array<[Phase.Id, string[]]>) {
+    for (const [phaseID, required] of Object.entries(PHASE_REQUIRED_SKILLS) as Array<[Phase.Id, string[]]>) {
       const ranked = rankSkillsForPhase(phaseID, [
         makeSkill("generic-top-ranked-skill"),
         ...required.map(makeSkill),
