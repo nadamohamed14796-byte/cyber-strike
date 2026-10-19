@@ -152,51 +152,6 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 For every sensitive URL, correlate router/viewset/action, authentication class, permission class, object permission, serializer writable fields, queryset filtering, and middleware order. Compare an allowed synthetic object with another controlled account's fixture while preserving the same endpoint and method. Check detail/list/bulk/custom actions independently: object permissions may run on retrieve but not list/create or custom actions. For writable fields, compare the client-submitted JSON with persisted state rather than response echo alone. Debug pages and browsable API schemas are configuration signals, not impact by themselves. Route field-only access to API property authorization and unexpected writable role/tenant fields to mass-assignment review.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl for a replay of one observed request. Verify optional CLIs locally and use only tools exposed by the current runtime.
-- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
-
-### Primary resources
-- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation guidance.
-- - [Official platform documentation](https://docs.djangoproject.com/en/stable/topics/security/) — check real platform defaults and security semantics.
-
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline and heuristically redacts common secrets; it sends no requests and cannot prove complete sanitization.
-
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp/browser DevTools for runtime behavior, Django's own test tools for an authorized source checkout, and Semgrep for targeted static checks when a relevant rule exists.
-
-### Installation and setup
-- [Django installation](https://docs.djangoproject.com/en/stable/topics/install/) — official version-aware setup.
-- [Django security documentation](https://docs.djangoproject.com/en/stable/topics/security/) — framework behavior.
-- [Semgrep](https://semgrep.dev/docs/getting-started/) — optional static analysis.
-Prefer the repository's pinned Python environment and dependency lock file. Test migrations, settings, and code changes in a disposable environment; do not run debug-mode experiments on production.
-
-### Primary resources
-- [Django security](https://docs.djangoproject.com/en/stable/topics/security/) — CSRF, host headers, cookies, and escaping.
-- [Django testing tools](https://docs.djangoproject.com/en/stable/topics/testing/) — reproducible regression tests.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box verification.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted HTTP responses offline.
-
-### Result handling
-Record Django/Python version, relevant middleware/settings, reachable behavior, and a regression test. A source/config suspicion needs a demonstrated effect or must remain an unconfirmed lead.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Prefer CLI tools, local static analysis, and repeatable test harnesses. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify versions, official installation guidance, license, and dependency provenance before running tools.
