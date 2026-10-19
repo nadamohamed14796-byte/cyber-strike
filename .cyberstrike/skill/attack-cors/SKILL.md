@@ -113,3 +113,51 @@ Start with a harmless origin marker on a read-only in-scope endpoint, then inspe
 
 ### Browser-based origin proof
 Test a controlled origin in a real browser using a synthetic account and harmless endpoint. Record Origin, Access-Control-Allow-Origin, Access-Control-Allow-Credentials, Vary: Origin, preflight behavior, cookies/SameSite context, and which response bytes JavaScript can actually read. An echoed Origin or wildcard header alone is not a finding; prove that untrusted JavaScript reads a sensitive synthetic value and compare with a trusted-origin control. Evaluate headers on API and session routes, not only the homepage. Chain to CSRF only where a cross-site state change is possible; chain to XSS only if a target-origin script execution path is separately demonstrated. Never use real user sessions or export private records.
+
+
+## Minimal local browser proof harness
+
+Use a synthetic test account and a read-only endpoint whose response contains only test data. Serve this file locally (or from a controlled origin you own); do not host it publicly or send it to another user. The script reports only the status and a harmless marker field, not the full response body.
+
+```html
+<!doctype html>
+<meta charset="utf-8">
+<title>Controlled CORS validation</title>
+<pre id="result">Waiting for a controlled test request…</pre>
+<script>
+(async () => {
+  const endpoint = "https://IN-SCOPE-API.example/api/test-profile";
+  const result = document.getElementById("result");
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      credentials: "include",
+      mode: "cors"
+    });
+    result.textContent = JSON.stringify({
+      readableByBrowser: true,
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      // Use only a synthetic field deliberately created for this test.
+      syntheticMarker: (await response.json()).syntheticMarker ?? null
+    }, null, 2);
+  } catch (error) {
+    result.textContent = "Browser did not expose the response: " + error.name;
+  }
+})();
+</script>
+```
+
+Replace the endpoint with the exact authorized test route and ensure the account contains only synthetic data. The harness is an observation aid, not proof by itself: compare with a trusted-origin control and confirm the returned marker should not be readable from the test origin. Never log or transmit private response bodies.
+
+## Preflight vs actual-request decision table
+
+| Request class | Check | Interpretation |
+|---|---|---|
+| Simple GET | Actual response ACAO and credential mode | Browser readability is decisive for read exposure |
+| Non-simple JSON/custom-header request | OPTIONS preflight and actual response separately | Passing preflight alone does not prove actual response readability |
+| Credentialed request | ACAO must be a specific allowed origin and ACAC semantics must permit credentials | Wildcard ACAO does not expose credentialed response to browser JavaScript |
+| Cacheable origin-dependent response | Vary: Origin and actual cache behavior | Missing Vary is a lead; confirm cross-origin cache mix-up separately |
+| Public endpoint | Compare data sensitivity and auth context | Public data is not sensitive exposure even if readable cross-origin |
+
+Add browser_version, page_origin, credential_mode, preflight_result, actual_response_headers, readable_marker, trusted_origin_control, and cache_context to the evidence record. If the browser blocked reading but the server processed a state change, assess CSRF separately rather than reporting CORS data theft.
