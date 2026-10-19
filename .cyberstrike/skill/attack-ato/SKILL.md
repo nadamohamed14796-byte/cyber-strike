@@ -211,22 +211,20 @@ Validation note: use a known-good baseline and a control case, change one meanin
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer, separate browser profiles, and two controlled test accounts to investigate account takeover paths such as recovery, session replacement, identity linking, and authentication-state confusion. Do not test against real users.
+### Agent-usable tools and purpose
+- Python `httpx` or `requests` — controlled request variations using test accounts owned by the tester.
+- `jq` — compare structured responses after redaction.
+- `rg` — inspect already-collected source/configuration for recovery, identity-linking, session invalidation, and authentication-state transitions.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved responses offline; it does not send requests.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- [Firefox downloads/profiles](https://www.mozilla.org/firefox/new/) — isolate test sessions.
-- Use the application's own test MFA/email identities; never outsource live recovery codes or paste tokens into public decoders.
-Prefer read-only flow inspection first. Only trigger a reset/link/invite action on accounts you own and can recover; comply with program rules on email/SMS sends.
+### Installation and verification
+Verify the chosen Python client with `python3 -c "import httpx; print(httpx.__version__)"` or `python3 -c "import requests; print(requests.__version__)"`; verify `jq --version`. Use official OS/package instructions only. If a dependency is missing, record the gap and continue with source/configuration review; do not claim the check ran. Use only accounts and email/MFA identities controlled by the tester, and avoid repeated recovery sends.
 
 ### Primary resources
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — authentication flows.
-- [OWASP Forgot Password Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html) — recovery checks.
-- [PortSwigger authentication](https://portswigger.net/web-security/authentication) — controlled labs.
+- https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
+- https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
+- https://portswigger.net/web-security/authentication
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare sanitized responses offline.
-
-### Result handling
-Confirm the resulting principal/session and the specific control bypassed. Record each step using test identities and redact reset links, cookies, OTPs, and private account data.
+### Evidence and result handling
+Confirm the resulting principal/session and the exact control involved. Redact reset links, cookies, OTPs, and private account data. Keep the claim proportional to the observed evidence.
