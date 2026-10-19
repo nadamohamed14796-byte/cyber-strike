@@ -11,7 +11,7 @@ version: "1.1"
 
 This is a methodology reference, not a requirement to test every input or every class.
 
-1. Confirm the canonical target workspace and persisted authorization scope. Reuse the run's existing scope decision for this unchanged target origin; if no decision exists yet, call `scope_check` once with the exact URL and canonical `target_url` before active testing. Do not repeat it for every endpoint or payload. Active request tools still enforce persisted scope for each exact URL. If scope is missing, ambiguous, invalid, or denied, stop active testing.
+1. Confirm the canonical target workspace and persisted authorization scope. Reuse the run's existing setup decision; do not call `scope_check` again for individual endpoints, payloads, requests, or testers. If no setup decision exists, the orchestrator must perform the single check for the canonical target before active testing. Active request tools still enforce persisted scope for each exact URL. If scope is missing, ambiguous, invalid, or denied, stop active testing.
 2. Use the captured request and response, analyzer findings, source evidence, and prior observations to form one specific hypothesis. A parameter, free-text field, header, JSON body, or reflected value alone is not proof of an injection sink.
 3. Choose only the relevant class and input location. Use `inject_probe` only for those selected classes, then confirm a meaningful lead with `http_replay` and a baseline/negative control.
 4. Use harmless markers and test-owned fixtures. Never extract real records, dump schemas, read system files, execute commands, access cloud metadata/internal services, or trigger destructive or financial side effects to prove a finding.
