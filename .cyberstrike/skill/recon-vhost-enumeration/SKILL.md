@@ -120,3 +120,25 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 
 ### Vhost baseline and soft-404 control
 Establish stable fingerprints for a known host, a known-invalid host header, and a random nonexistent path. Vary only the authority/Host dimension while keeping IP, TLS SNI, path, and request headers clear in the notes. Record status, title, body hash/length, redirects, cookies, and server-selected application; a different title or 200 alone may be a default virtual host. Confirm a discovered vhost through product-specific content or a second source and re-check program scope before active tests. Route valid applications to web recon and host-derived links to host-header review; do not treat shared reverse-proxy routing as a vulnerability without a security consequence.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater to test a small number of evidence-based Host-header candidates, and ffuf only where explicit authorization permits active virtual-host wordlist enumeration. Confirm results against baseline response behavior.
+
+### Installation and setup
+- [ffuf project](https://github.com/ffuf/ffuf) — official releases and usage examples.
+- [Burp Suite](https://portswigger.net/burp) — HTTP history and Repeater.
+Use a curated in-scope hostname and a small candidate set first. Set an explicit rate and stop condition; do not brute-force unrelated hostnames, bypass a CDN/origin boundary, or test a discovered vhost that falls outside the program authorization.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — virtual host and host-header testing context.
+- [ffuf](https://github.com/ffuf/ffuf) — request behavior and output formats.
+- [PortSwigger Host header attacks](https://portswigger.net/web-security/host-header) — lab methodology.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate discovered URLs locally; it does not probe candidate hosts.
+
+### Result handling
+Record baseline status/body size/title, exact Host value, comparison response, and confidence. A different default page or CDN response alone is not proof of a security issue.
