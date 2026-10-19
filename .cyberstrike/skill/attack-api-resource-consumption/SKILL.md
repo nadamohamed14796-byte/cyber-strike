@@ -83,72 +83,22 @@ Persist operation_class, resource_type, normal_input, documented_bound, test_inp
 - If impact cannot be established without stress/load testing that the program does not permit, record the control gap and mark impact unconfirmed; do not perform the prohibited test.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Burp Proxy/Repeater/Comparer, the observed client request, an available OpenAPI schema or GraphQL operation document, and jq for local JSON comparison. Prefer two controlled principals and a harmless fixture; do not load-test or send undocumented destructive mutations.
-- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
-- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
-
-### Primary resources
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API risk taxonomy.
-- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — hands-on test reasoning.
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — authorization design.
-
-### Small, reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-This compares local artifacts offline and heuristically redacts common secrets before displaying differences. It sends no requests and does not prove complete sanitization.
-
-### Evidence and hand-off
-- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
-- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
-
-Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater and application telemetry to check per-user/resource limits safely. A load-testing tool is usually unnecessary for a bug bounty proof; if required, k6 is for an explicitly approved staging/lab capacity test, not for stress-testing public production systems.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- [k6 installation](https://grafana.com/docs/k6/latest/set-up/install-k6/) — official installer and supported environments.
-- jq on Kali/Debian: sudo apt update && sudo apt install jq.
-Do not run load tests, large batches, or resource-exhaustion payloads against a live target unless the written program rules explicitly authorize them. Prefer a minimal test of a disposable resource and stop on service degradation or rate limiting.
-
-### Primary resources
-- [OWASP API Security Top 10 — API4](https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/) — risk and controls.
-- [Grafana k6 docs](https://grafana.com/docs/k6/latest/) — test design and thresholds.
-- [OWASP Denial of Service Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html) — defensive context.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
-
-### Result handling
-Record the documented limit, safe request count/spacing, resource ownership, observed control behavior, and stop condition. Don't claim unbounded impact from a single slow response.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
+### Tools
+- Python `httpx` or `curl`: establish a low-volume baseline and observe documented limit headers.
+- OpenAPI parser: inventory request schemas and identify expensive operations without generating traffic.
+- `jq`: summarize response status, latency metadata, and quota headers from saved output.
+- `k6` or `vegeta`: only for a local/staging service or an explicitly agreed test window; never load-test a public production program by default.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved samples offline.
 
-### Recommended tools
-- OpenAPI parser — inventory request and response schemas
-- Python requests/httpx — low-volume controlled usage tests
-- jq — inspect response metadata and server limits
-- A local load-test harness only for staging or explicit agreed test windows
+### Install and verify
+Verify the chosen request client and `jq --version`. Official docs: https://www.python-httpx.org/, https://curl.se/docs/, https://jqlang.org/, https://grafana.com/docs/k6/latest/ and https://github.com/tsenart/vegeta. If a tool is missing, use schema/source review and record the gap.
 
 ### Resources
 - https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/
 - https://github.com/OAI/OpenAPI-Specification
-- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html
 
-Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
-
-### Helper-script contract
-Model normal request cost and rate policy before testing. Use test-owned resources and an agreed low request budget; record limit headers, response behavior, cost signals, and server-side impact. Never stress production systems.
-
-Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
-
-### Handoff
-Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
+### Evidence and limits
+Model normal request cost and rate policy before testing. Use test-owned resources and an agreed low request volume; record limit headers, response behavior, and stop conditions. Never stress production systems or claim unbounded impact from a single slow response.
