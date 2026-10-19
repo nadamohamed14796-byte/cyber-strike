@@ -111,7 +111,7 @@ The canonical recon playbook defines phase order and completion criteria; specia
 // specialized coverage matrix rather than concatenating a second full workflow
 // with repeated instructions (which needlessly costs thousands of prompt tokens).
 const RECON_COVERAGE_START = "RECON COVERAGE MATRIX"
-const RECON_COVERAGE_END = "\\n4. Collect URLs from independent sources"
+const RECON_COVERAGE_END = "\n4. Collect URLs from independent sources"
 const reconCoverageStart = RECON_METHODOLOGY_PROMPT.indexOf(RECON_COVERAGE_START)
 const reconCoverageEnd = RECON_METHODOLOGY_PROMPT.indexOf(RECON_COVERAGE_END, reconCoverageStart)
 
@@ -122,4 +122,4 @@ if (reconCoverageStart < 0 || reconCoverageEnd <= reconCoverageStart) {
 export const RECON_SPECIALIZED_COVERAGE_PROMPT = [
   "SPECIALIZED RECON COVERAGE — APPLY ONLY WHERE RELEVANT",
   RECON_METHODOLOGY_PROMPT.slice(reconCoverageStart, reconCoverageEnd).trim(),
-].join("\\n\\n")
+].join("\n\n")
