@@ -12,6 +12,7 @@ prerequisites:
   - "An in-scope API operation and a tester-owned object or synthetic fixture"
   - "At least one permitted identity for the relevant role/tenant comparison"
 ---
+
 # API Property-Level Authorization Assessment
 
 ## Objective
@@ -55,7 +56,6 @@ Save the exact endpoint/method, role and tenant, synthetic object ID, expected p
 - https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html
 - https://portswigger.net/web-security/api-testing
 
-
 ## Field-level review matrix
 
 | Property class | Read-side question | Write-side question | Evidence bar |
@@ -94,7 +94,6 @@ For large/nested responses, compare key paths and values separately; a key-name 
 - A GraphQL schema exposes a field name → not a finding until resolver output or mutation behavior violates field policy.
 
 Add property_path, expected_read_policy, expected_write_policy, principal_role, tenant, owner_fixture, request_field_present, response_field_present, persisted_value_changed, independent_readback, negative_control, and cleanup_verified to the evidence record.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
