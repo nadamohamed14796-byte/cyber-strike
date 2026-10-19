@@ -72,3 +72,28 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
+
+### Recommended tools
+- curl — controlled path handling and error capture
+- Python pathlib/urllib.parse — normalize path candidates locally
+- Semgrep/rg — local source and configuration clues
+- jq — normalize results
+
+### Resources
+- https://portswigger.net/web-security/file-path-traversal
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use the upstream community list only to discover candidates. Confirm tool maintenance, provenance, dependencies, and supported usage from official sources.
+
+### Helper-script contract
+Use benign canary files in a lab or explicitly approved fixture. Record canonicalization behavior and access-control result; do not read sensitive system files or execute included content.
+
+Helpers must accept explicit paths, preserve native evidence, write normalized output separately, redact sensitive values, record timestamps and tool versions, handle malformed inputs, and include local fixtures.
+
+### Handoff
+Return the tool/version, command, input/output artifact references, control result, failures, confidence, and limitations. A candidate signal is not a confirmed finding.
