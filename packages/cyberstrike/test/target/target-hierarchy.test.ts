@@ -92,6 +92,20 @@ describe("target asset hierarchy", () => {
         expect(attached.asset.targetURL).toBe("https://fullbarhomologa.modoblackfullbar.com.br")
         expect(attached.asset.parentTargetID).toBe(root.workspace.id)
 
+        // Explicit exclusions override wildcard includes for unrelated domains too.
+        await TargetMemory.configureScope("https://mercadolibre-program.test", {
+          include: ["*.modoblackfullbar.com.br"],
+          exclude: ["fullbarhomologa.modoblackfullbar.com.br"],
+          authorizationSource: "Authorized program scope fixture",
+          authorizationReference: "https://program.example.test/policy",
+        })
+        await expect(
+          TargetMemory.attachAsset(
+            root.workspace.targetURL,
+            "https://fullbarhomologa.modoblackfullbar.com.br",
+            "application",
+          ),
+        ).rejects.toThrow(/not unambiguously authorized/i)
       },
     })
   })
