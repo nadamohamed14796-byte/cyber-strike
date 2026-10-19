@@ -383,9 +383,72 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   return undefined
 }
 
+async function scannerLaunchedByWrapper(command: string[], executableIndex: number): Promise<string | undefined> {
+  const executable = path.basename(stripOuterShellQuotes(command[executableIndex] ?? "")).toLowerCase()
+  const scannerName = (value: string | undefined) => {
+    if (!value) return undefined
+    const name = path.basename(stripOuterShellQuotes(value)).toLowerCase()
+    return SCANNER_PHASES[name] === undefined ? undefined : name
+  }
+  const shellPayload = async (argv: string[], start: number) => {
+    const wrapperName = path.basename(stripOuterShellQuotes(argv[start] ?? "")).toLowerCase()
+    if (!SHELL_WRAPPERS.has(wrapperName)) return undefined
+    const flag = argv.findIndex((arg, index) => index > start && ["-c", "-lc", "-ec"].includes(stripOuterShellQuotes(arg)))
+    if (flag < 0) return undefined
+    return findWrappedScanner(stripOuterShellQuotes(argv[flag + 1] ?? ""))
+  }
+
+  if (executable === "xargs" || executable === "parallel") {
+    const withValue = executable === "xargs"
+      ? new Set(["-E", "--eof", "-e", "-I", "--replace", "-i", "-L", "--max-lines", "-l", "-n", "--max-args", "-P", "--max-procs", "-s", "--max-chars", "-d", "--delimiter", "-a", "--arg-file"])
+      : new Set(["-j", "--jobs", "-S", "--sshlogin", "-I", "--replace", "-N", "--max-args", "-n", "--max-args", "-a", "--arg-file", "-d", "--delimiter"])
+    let index = executableIndex + 1
+    while (index < command.length) {
+      const arg = stripOuterShellQuotes(command[index]!)
+      if (arg === "--") { index++; break }
+      if (!arg.startsWith("-")) break
+      index++
+      if (withValue.has(arg)) index++
+    }
+    const candidate = command[index]
+    const direct = scannerName(candidate)
+    if (direct) return direct
+    return candidate ? shellPayload(command, index) : undefined
+  }
+
+  if (executable === "find") {
+    for (let index = executableIndex + 1; index < command.length; index++) {
+      if (!["-exec", "-execdir"].includes(stripOuterShellQuotes(command[index]!))) continue
+      const candidate = command[index + 1]
+      const direct = scannerName(candidate)
+      if (direct) return direct
+      if (candidate && SHELL_WRAPPERS.has(path.basename(stripOuterShellQuotes(candidate)).toLowerCase())) {
+        const end = command.findIndex((value, i) => i > index + 1 && [";", "+"].includes(stripOuterShellQuotes(value)))
+        const endIndex = end >= 0 ? end : command.length
+        const wrapped = await shellPayload(command.slice(0, endIndex), index + 1)
+        if (wrapped) return wrapped
+      }
+    }
+  }
+
+  if (executable === "env") {
+    for (let index = executableIndex + 1; index < command.length; index++) {
+      if (!["-S", "--split-string"].includes(stripOuterShellQuotes(command[index]!))) continue
+      const wrapped = await findWrappedScanner(stripOuterShellQuotes(command[index + 1] ?? ""))
+      if (wrapped) return wrapped
+    }
+  }
+  return undefined
+}
+
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
+    const executableIndex = commandExecutableIndex(command)
+    const launchedScanner = executableIndex >= 0 ? await scannerLaunchedByWrapper(command, executableIndex) : undefined
+    if (launchedScanner) {
+      throw new Error("Recon execution gate blocked " + launchedScanner + " launched indirectly via a command wrapper. Target-list/executor wrappers cannot enforce per-request scope; invoke a scanner directly with explicit authorized inputs, or use the scope-aware request pipeline.")
+    }
     // Inspect only payloads of an actual shell executable, including simple
     // launcher-prefixed forms such as "sudo bash -lc ...". Never search arbitrary
     // arguments of commands like grep/find for scanner names.
