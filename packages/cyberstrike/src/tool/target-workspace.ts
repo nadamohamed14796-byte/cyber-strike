@@ -276,10 +276,28 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         includeEntries = [...existingScope.scopeItems, ...includeEntries]
         excludeEntries = [...existingScope.excludedItems, ...excludeEntries]
         authorizationSource = authorizationSource || existingScope.authorizationSource
-        authorizationReference = authorizationReference || existingScope.authorizationReference
+        authorizationReference = authorizationReference || existingScope.authorizationReference || undefined
       }
 
       const userConfirmedInitialScope = params.user_confirmed_scope === true && !params.merge_existing && !params.scope_file_path
+      if (userConfirmedInitialScope) {
+        if (includeEntries.length !== 1 || !confirmedScopeCandidate(includeEntries[0])) {
+          return {
+            title: "Initial user-confirmed scope needs one exact asset",
+            output: "No scope changes were made. A first-time confirmation must name one exact hostname, host:port, IP, or HTTP(S) URL. Do not require a policy link or repeat proof; pass the single asset the operator identified.",
+            metadata: { saved: false, reason: "initial_confirmation_not_exact", target_url: targetURL } as TargetWorkspaceMetadata,
+          }
+        }
+        const candidate = confirmedScopeCandidate(includeEntries[0])!
+        const excluded = matchingScopeItems(candidate, excludeEntries)
+        if (excluded.length) {
+          return {
+            title: "Initial scope confirmation conflicts with an exclusion",
+            output: "No scope changes were made. The exact requested asset matches an explicit exclusion: " + excluded.join(", ") + ". Resolve the policy conflict explicitly; no further proof or scope rediscovery is being requested.",
+            metadata: { saved: false, reason: "explicit_exclusion_conflict", target_url: targetURL, excluded_items: excluded } as TargetWorkspaceMetadata,
+          }
+        }
+      }
       const sourceForConfiguration = authorizationSource || (userConfirmedInitialScope ? USER_CONFIRMED_SCOPE_SOURCE : undefined)
       const referenceForConfiguration = authorizationReference || (userConfirmedInitialScope ? undefined : undefined)
       const result = await TargetMemory.configureScope(targetURL, {
