@@ -13,7 +13,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // HackerOne scope exports may include an asset type alongside its identifier.
   // Only web-addressable types can authorize an HTTP target. Non-web assets are
   // retained as scope evidence, but never authorize an unrelated HTTP request.
-  const typed = allowed.match(/^(domain|wildcard|url|cidr|ip address|api|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
+  const typed = rawScope.match(/^(domain|wildcard|url|cidr|ip address|api|ai model|smart contract|smart contracts|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:[ \t]*(.+)$/i)
   if (typed) {
     const assetType = typed[1].replace(/\s+/g, " ").trim().toLowerCase()
     const identifier = typed[2].trim()
