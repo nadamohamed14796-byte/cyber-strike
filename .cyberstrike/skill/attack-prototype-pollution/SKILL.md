@@ -75,3 +75,26 @@ Return `input_path`, `runtime_context`, `marker_used`, `baseline_behavior`, `pro
 
 ### Pollution-to-gadget proof
 Identify the input parser or merge/clone operation, the exact property path, and the affected object scope (local object, browser prototype, server process, or shared request state). In a disposable harness or test account, inject an inert marker into one prototype-sensitive property and verify persistence and downstream reads. Distinguish harmless object mutation from a reachable gadget that changes authorization, output encoding, request routing, or code paths. Do not pollute a shared production process or attempt RCE. Route client-side sources/sinks to DOM-XSS review only when the polluted property reaches an executable sink; route server-side consequences to the relevant framework/input-validation specialist.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp for request correlation, browser DevTools or Burp DOM Invader to inspect client-side source/sink behavior, and Node.js in an isolated lab to understand server-side object behavior. Static grep is only a discovery aid.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — install via PortSwigger; DOM Invader is available in supported Burp browser/testing workflows, documented at https://portswigger.net/burp/documentation/desktop/tools/dom-invader .
+- [Node.js](https://nodejs.org/en/download/) — install a supported release for owned source/lab tests.
+- [Semgrep](https://semgrep.dev/docs/getting-started/) — optional static rules; do not interpret a rule match as a reachable vulnerability.
+Only test controlled input and disposable objects; don't set global process state on a live service.
+
+### Primary resources
+- [PortSwigger prototype pollution](https://portswigger.net/web-security/prototype-pollution) — browser/server patterns.
+- [MDN JavaScript prototypes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Inheritance_and_the_prototype_chain) — language semantics.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — impact confirmation.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript` extracts conservative route candidates from already-collected local assets; it does not execute JS.
+
+### Result handling
+Separate a controllable prototype property from impact. Verify an application-relevant authorization, execution, or integrity consequence with a reversible controlled test.
