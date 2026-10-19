@@ -118,3 +118,28 @@ Repeat from a clean state or fresh test session where safe, verify cleanup, and 
 
 ### Evidence disposition and false-positive-store contract
 Persist rejected candidates with root-cause fingerprint, tested property, relevant negative control, evidence references, rejection reason, prerequisites, timestamp, and confidence. Do not deduplicate away a new target, tenant boundary, operation, or control state merely because the endpoint matches an old false positive. A blocked test (no credentials, scope unclear, unstable service) is not rejected; preserve the missing prerequisite and a resume condition. If a chain is proposed, validate each step independently and explicitly separate direct impact from downstream hypotheses. Reopen a rejected item only when new evidence changes its fingerprint or invalidates the prior explanation.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer and browser DevTools for the minimal reproduction; use the evidence manifest, offline response diff, and local false-positive history to prevent repeat reports. CVSS should be applied only after impact is established.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- [FIRST CVSS v4.0 calculator](https://www.first.org/cvss/calculator/4.0) — web-based, no local installation.
+- jq on Kali/Debian: sudo apt update && sudo apt install jq.
+No tool should automatically convert a scanner error, missing dependency, or untested hypothesis into a false-positive record. Use a test account and control case where possible.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — repeatability and verification.
+- [HackerOne reporting guidance](https://docs.hackerone.com/en/articles/8475116-best-practices-for-submitting-reports) — evidence expectations.
+- [FIRST CVSS](https://www.first.org/cvss/) — scoring method.
+
+### Reusable helpers
+- Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to verify evidence metadata.
+- Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare local responses offline.
+Both need manual interpretation and do not prove a vulnerability by themselves.
+
+### Result handling
+Report each check as passed, failed, blocked, or not run, with reason and evidence reference. Use confirmed, disproven/false positive, and unresolved states distinctly; explain the disconfirming evidence before saving a false-positive pattern.
