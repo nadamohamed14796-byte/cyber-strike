@@ -44,3 +44,50 @@ test("program-root scope can authorize a separate domain without requiring the r
     },
   })
 })
+
+
+test("user-confirmed exact scope without an external policy URL passes the recon scope checkpoint", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const root = await TargetMemory.configureScope("https://program-root.example.test", {
+          include: ["https://authorized-app.example.net"],
+          authorizationSource: "User-confirmed in conversation",
+          userConfirmed: true,
+        })
+        const persisted = await TargetMemory.getScope(root.workspace.targetURL)
+        expect(persisted?.status).toBe("configured")
+        expect(persisted?.authorizationReference).toBeNull()
+        expect(persisted?.authorizationSource).toContain("User-confirmed in conversation")
+
+        const tool = await ReconCheckpointTool.init()
+        const ctx = {
+          sessionID: "ses_recon_user_confirmed_scope",
+          messageID: "msg_recon_user_confirmed_scope",
+          agent: "cyberstrike",
+          abort: new AbortController().signal,
+          messages: [],
+          metadata: () => undefined,
+          ask: async () => {},
+        } as never
+        const begin = await tool.execute({
+          action: "begin",
+          target_url: root.workspace.targetURL,
+          phase: "scope_validation",
+        }, ctx)
+        expect(begin.metadata.saved).toBe(true)
+        const complete = await tool.execute({
+          action: "complete",
+          target_url: root.workspace.targetURL,
+          phase: "scope_validation",
+          summary: "The operator explicitly confirmed the exact application and the confirmation provenance is persisted.",
+        }, ctx)
+        expect(complete.metadata.saved).toBe(true)
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
