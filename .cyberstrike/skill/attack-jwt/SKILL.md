@@ -75,7 +75,6 @@ Record token type (never the live value), algorithm policy, key source, redacted
 - `attack-open-redirect` / `attack-oauth` — redirect and OAuth token-flow boundaries.
 - `attack-triage-validation` — impact confirmation and false-positive review.
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Token acceptance and claim boundary
@@ -129,7 +128,6 @@ Unset the environment variable after use and never print the token itself. This 
 ### Output additions
 
 Persist valid_control_result, invalid_control_result, single_mutation, server_principal, effective_permissions, token_lifecycle_event, revocation_observed, key_source_trust, and cleanup_status. Store only a redacted token fingerprint or non-reversible identifier, never the bearer string or refresh token.
-
 
 ## Tool installation and optional tooling (2026-10-19)
 
