@@ -197,3 +197,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer, two controlled roles, and API documentation/OpenAPI when available. Function-level authorization is about whether the principal may invoke an operation; it is distinct from accessing another object's properties.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- jq on Kali/Debian: sudo apt update && sudo apt install jq.
+- [Postman](https://www.postman.com/downloads/) is optional for an authorized API collection; keep environments/secrets local.
+Test only admin-only actions with controlled roles and non-destructive requests. Never change real privileges, send invitations to users, or trigger production transactions as test proof.
+
+### Primary resources
+- [OWASP API Security Top 10 — API5](https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/) — function authorization risk.
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — policy enforcement.
+- [PortSwigger access control](https://portswigger.net/web-security/access-control) — controlled methodology.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
+
+### Result handling
+Record the endpoint/action, role/permission matrix, expected denial, observed allowed effect, controlled fixture, and alternative explanations. A hidden UI button is not proof that backend authorization is missing.
