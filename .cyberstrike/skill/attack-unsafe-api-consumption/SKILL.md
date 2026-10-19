@@ -49,3 +49,33 @@ Retain the sanitized fixture/event ID, signature/schema result, consumer respons
 ## References
 - https://owasp.org/API-Security/editions/2023/en/0xa10-unsafe-consumption-of-apis/
 - https://owasp.org/www-project-web-security-testing-guide/
+
+
+## Integration contract and trust-boundary ledger
+
+For each integration, record the producer, consumer, authentication principal, signature/transport protection, schema version, idempotency contract, retry behavior, and final side effect. Keep transport authentication, payload integrity, schema validation, and business authorization as separate controls.
+
+| Check | Controlled comparison | Evidence required |
+|---|---|---|
+| Webhook signature | Valid test signature vs invalid/missing signature | Consumer decision and unchanged authoritative state on invalid input |
+| Freshness/replay | Fresh test event vs same event ID/timestamp replay | Duplicate is rejected or safely deduplicated according to contract |
+| Source binding | Correct test tenant/provider vs mismatched controlled issuer/tenant | Consumer binds event to the intended account/tenant |
+| Schema | Valid fixture vs one unknown/wrong-type field | Strict handling before persistence or action |
+| Semantics | In-range synthetic value vs invalid business-state transition | Server enforces invariant independent of producer claims |
+| Response handling | Expected status/content type/schema vs malformed response from a controlled stub | Consumer fails safely without exposing raw downstream body |
+| Redirect/destination | Expected provider endpoint vs controlled disallowed destination in staging | Destination allowlist and redirect policy enforced |
+| Size/timeouts | Small normal response vs bounded staging fixture | Explicit response size and timeout handling without production load |
+| Retry/partial failure | Controlled transient failure followed by retry | Idempotency and compensation prevent duplicate side effects |
+| Error handling | Downstream error with sensitive synthetic marker | Client-facing response/logs do not leak secrets or private payloads |
+
+## Source-to-effect trace
+
+Follow one field from the external response or webhook through parsing, validation, persistence, and use. Mark whether each stage is verified by code, approved logs, or behavior. A response accepted by the parser is not necessarily trusted by the business logic; conversely, an invalid field that is stored but never used may have a different risk from a field that controls identity, URL, permissions, or workflow state.
+
+## Evidence record
+
+Persist integration_name, provider_identity, tenant_binding, signature_policy, schema_version, event_id_fingerprint, freshness_result, idempotency_key_fingerprint, field_path, validation_result, downstream_use, state_before_after, negative_control, log_redaction, and cleanup_status. Never retain webhook signing secrets, full authorization headers, or production payloads in the global knowledge store.
+
+## Regression handoff
+
+Add tests for invalid signature, replay, wrong tenant/provider, unknown field, wrong type, missing required field, malformed downstream response, disallowed redirect, and retry after partial failure. Keep tests synthetic and verify authoritative state rather than the HTTP acknowledgement alone.
