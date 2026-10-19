@@ -108,7 +108,7 @@ Identify deployment rules, static-root mapping, archive retention, source-map pu
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent paths and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never use or test a discovered secret.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -117,7 +117,7 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 1. Use a random-path control while checking candidate artifacts such as source maps, repository metadata, backup files, build manifests, debug bundles, or public package registries.
 2. Confirm the artifact belongs to the in-scope application and whether it contains source code, internal route names, secrets, or personal data; distinguish a public source map from an actual credential leak.
 3. Collect only minimal sanitized snippets/metadata needed to demonstrate exposure. Never reuse a discovered credential, clone unrelated private repositories, or download full data stores.
-4. If a credential appears exposed, record provider/type, repository/file/commit, and key name without copying the value; verify validity only via a single read-only identity check when explicitly allowed.
+4. If a credential appears exposed, record provider/type, repository/file/commit, and key name without copying the value. Do not test or use it; notify the owner/program so they can validate and rotate it through their approved process.
 5. Report reproducible exposure path, real sensitivity, applicable access boundary, and removal/rotation/cache-invalidation remediation; validate the fix with the same control request.
 
 
@@ -149,3 +149,33 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### Secret-like artifact handling
 Inventory the artifact type, repository/build path, exposure context, commit/deploy provenance, and exact file/line fingerprint without copying the secret value. Distinguish public identifiers, example keys, revoked credentials, and live secret candidates; never test a candidate against a service or expand access unless the program explicitly permits a dedicated credential validation method. Prefer provider metadata or source-level configuration evidence that shows what the credential is intended to access. A private source map or .git path alone is not automatically critical. Route credential-like exposures to triage with a redacted fingerprint, source maps to JS analysis, and CI artifacts to CI/CD assessment; keep exploitability claims separate from exposed-material facts.
+
+
+## Artifact validation helpers
+
+Use these only against an explicitly in-scope URL or a local artifact already obtained with authorization. Compare candidate URLs with a random nonexistent path to detect SPA soft-404s. Do not crawl directory listings or download large archives to establish a leak.
+
+```bash
+# Capture headers only; fetch a body only after the path is justified and safe.
+curl -sS -D artifact.headers -o /dev/null "$IN_SCOPE_CANDIDATE_URL"
+grep -iE '^(HTTP/|content-type:|content-length:|content-disposition:|cache-control:|last-modified:)' artifact.headers
+```
+
+For a locally available source map, inspect only metadata first:
+
+```python
+import json
+from pathlib import Path
+
+data = json.loads(Path("app.js.map").read_text())
+print("version:", data.get("version"))
+print("sources_count:", len(data.get("sources", [])))
+print("has_sources_content:", bool(data.get("sourcesContent")))
+print("source_names_sample:", data.get("sources", [])[:10])
+```
+
+Do not print sourcesContent wholesale; it may contain private implementation details or secret-like values. If sensitive material is suspected, record the file and location, redact the value, and stop reading further than needed.
+
+### Exposure triage fields
+
+Record artifact_kind, canonical_url, response_signature, negative_control, scope_basis, intended_visibility, source_provenance, secret_type_only, secret_value_redacted, minimal_proof_ref, owner_notification_path, and cleanup_or_cache_purge_status. Do not store credentials in the knowledge base, reports, commits, or logs.
