@@ -30,7 +30,7 @@ export namespace Tool {
       description: string
       parameters: Parameters
       execute(
-        args: z.input<Parameters>,
+        args: z.output<Parameters>,
         ctx: Context,
       ): Promise<{
         title: string
@@ -42,7 +42,7 @@ export namespace Tool {
     }>
   }
 
-  export type InferParameters<T extends Info> = T extends Info<infer P> ? z.input<P> : never
+  export type InferParameters<T extends Info> = T extends Info<infer P> ? z.output<P> : never
   export type InferMetadata<T extends Info> = T extends Info<any, infer M> ? M : never
 
   export function define<Parameters extends z.ZodType, Result extends Metadata>(
