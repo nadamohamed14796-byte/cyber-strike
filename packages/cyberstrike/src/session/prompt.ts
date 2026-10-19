@@ -827,7 +827,10 @@ export namespace SessionPrompt {
         .map((part) => part.type === "text" ? part.text : "")
         .join(" ")
         .slice(-4000)
-      if (targetWorkflowRequested || targetMemoryCtx || promptResearchSignals(researchSignalText).length > 0) {
+      // Global research is useful for a concrete test hypothesis, not for routine target
+      // setup/recon. Injecting it on every recon turn duplicates large knowledge context
+      // without helping file setup, passive collection, or checkpoint continuation.
+      if (promptResearchSignals(researchSignalText).length > 0) {
         try {
           const researchContext = ResearchContext.generate(Session.root(sessionID), researchSignalText)
           if (researchContext) system.push(researchContext)
