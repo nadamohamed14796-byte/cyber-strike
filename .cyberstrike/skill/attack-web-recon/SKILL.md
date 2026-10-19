@@ -134,28 +134,6 @@ Before using a tool, verify its registered name, argument schema, output path, a
 Each queued item should include canonical_asset, scope_evidence, attribution_confidence, discovery_source, first_seen, last_seen, last_checked, route_key, method, parameter_locations, auth_context, observed_signal, hypothesis, negative_control_needed, candidate_skill, active_test_allowed, evidence_refs, status, blocked_reason, and next_action. Never store credentials or raw secrets in the queue.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Combine passive URL sources with ProjectDiscovery subfinder/dnsx/httpx/katana, gau for historical URLs, and browser/Burp observations. Maintain provenance by tool/source and keep DNS-only leads separate from live HTTP evidence.
-
-### Installation and setup
-- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official install/setup guides for subfinder, dnsx, httpx, katana, and Nuclei.
-- [gau project](https://github.com/lc/gau) — official repository/release instructions.
-- [Burp Suite](https://portswigger.net/burp) — capture ordinary application requests.
-Tools can be installed even when absent locally, but each recommendation should have a specific role. Use maintained official sources, inspect version/help output, and apply the program's permitted rates to active crawling. Passive source results do not authorize testing.
-
-### Primary resources
-- [OWASP WSTG — Information Gathering](https://owasp.org/www-project-web-security-testing-guide/) — methodology.
-- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — tool behavior.
-- [UseOSINT skills](https://github.com/useosint/skills) — provenance and confidence practices.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` deduplicates collected URL candidates, strips query values/fragments, and makes no requests.
-
-### Result handling
-Store one canonical record per endpoint template and attach multiple parameter/source observations to it. Keep method, time, source, status class, auth context, and confidence; do not infer vulnerability from endpoint discovery alone.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
