@@ -177,6 +177,7 @@ test("explicit current research intent is not starved by recent generic API traf
       expect(context).toContain(explicitTitle)
       expect(context).toContain("Knowledge record ID: " + explicit?.id)
       expect(context).toContain("Compare the owner baseline")
+      expect(context!.length).toBeLessThanOrEqual(6_000)
 
       await Instance.dispose()
     },
