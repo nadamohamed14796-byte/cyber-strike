@@ -71,7 +71,6 @@ Return the root-cause pattern, candidate inventory, deduplication key, evidence 
 - https://github.com/trailofbits/skills/tree/main/plugins/variant-analysis
 - https://owasp.org/www-project-web-security-testing-guide/
 
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
