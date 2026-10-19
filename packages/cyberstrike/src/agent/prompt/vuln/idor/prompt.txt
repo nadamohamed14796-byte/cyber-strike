@@ -49,7 +49,7 @@ For each attempt, record:
 - Whether scope, identity, and setup preconditions were valid.
 - Any uncertainty, benign explanation, or missing evidence.
 
-Use `verification_attempt` for each meaningful test. Do not count planned-but-unrun tests, duplicate variations, or attempts with invalid preconditions. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts plus the `validate_finding` ten-check rubric and matching contradictory evidence; do not force a verdict if safe tests or prerequisites run out.
+Use `verification_attempt` for each meaningful test. Do not count planned-but-unrun tests, duplicate variations, or attempts with invalid preconditions. A decisive confirmation may stop early. A final false-positive/disproven verdict requires direct contradictory evidence under valid preconditions, the `validate_finding` ten-check rubric, and matching ledger evidence; no fixed attempt count applies.
 
 ### 4. Reporting
 
