@@ -130,27 +130,7 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 For each host/port, record the exact resolver result, scope basis, service-detection confidence, banner source, protocol/TLS details, and whether the service is owned by the target or a shared provider. Start with low-impact connection checks and conservative timeouts; increase depth only when allowed and a clear hypothesis exists. Distinguish an open socket from an exposed administration function or vulnerable version. Validate protocol identity using service-specific evidence and vendor release notes; account for proxies and backports. Avoid exploit modules or broad UDP/TCP expansion by default. Route confirmed web interfaces to web recon, management planes to the relevant product specialist, and internal-only services to the program's explicit network-testing rules.
 
 
-## Tool installation and optional tooling (2026-10-19)
 
-### Agent-usable tools and purpose
-- `naabu` — optional port discovery for explicitly authorized targets and approved rate settings.
-- `nmap` — service/version validation where active scanning is permitted; use conservative scripts and avoid intrusive checks by default.
-- `tlsx` — collect TLS metadata from approved hostnames.
-- `httpx` — collect HTTP/TLS response metadata after hosts are resolved.
-- `jq` and Python — normalize tool output while preserving original artifacts and errors.
-- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json naabu nmap tlsx httpx` — check local availability/version without sending target traffic.
-
-### Installation and verification
-Use official documentation: https://github.com/projectdiscovery/naabu, https://nmap.org/book/man.html, https://github.com/projectdiscovery/tlsx, and https://github.com/projectdiscovery/httpx. Check local versions before use and inspect each tool's rate, scan-type, and output options. Missing tools must be reported explicitly; do not install an entire suite without a concrete need.
-
-### Resources
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://docs.projectdiscovery.io/
-- https://nmap.org/book/man.html
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-### Evidence and handoff
-Record target/scope source, tool and version, resolved host, ports/protocols, timestamp, errors, and confidence. Keep passive observations separate from active scan results. Use only the program-permitted intensity; a closed/filtered result or missing response is not proof that a service does not exist.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
