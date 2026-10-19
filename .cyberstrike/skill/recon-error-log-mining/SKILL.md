@@ -65,10 +65,12 @@ Check production debug settings, web-server deny rules, deployment packaging, lo
 
 ## Tools
 
-- curl with timeouts, byte ranges, and output-size limits.
-- file, grep, and Python parsers for log-format classification.
-- Burp Suite for request/response evidence and cache comparison.
-- Secret scanners in local-only mode on sanitized excerpts; do not upload target logs to third-party scanning services.
+- `curl` with explicit timeouts, byte ranges, and output-size limits for an observed authorized resource.
+- `file`, `grep`, `rg`, and Python parsers for log-format classification.
+- Local secret scanners on reviewed excerpts; do not upload target logs to third-party scanning services.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json`: validate artifact metadata.
+
+Verify `curl --version`, `file --version`, and the selected parser/scanner. Official docs: https://curl.se/docs/, https://github.com/gitleaks/gitleaks/.
 
 ## Log Disclosure Matrix
 
@@ -132,26 +134,6 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 ### Log validation without collecting secrets
 First confirm the response is a real log artifact rather than a generic debug page or synthetic sample. Inspect a small, bounded excerpt and immediately redact access tokens, session IDs, email addresses, internal URLs, query data, and personal information. Record file/source, exposure path, timestamp, response access policy, and the minimum sensitive marker needed to establish the boundary. Do not recursively crawl or download all logs. Separate a stack trace from a log containing secrets or customer records; a discovered secret must not be tested or used. Route source/build paths to source-leak, metrics data to metrics exposure, and detailed exception disclosure to triage with a specific demonstrated impact statement.
 
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use ripgrep for local log searching, jq for structured JSON logs, and a local editor for context review. If logs contain credentials or private user data, process them in a private target workspace and redact before sharing. Do not access logs unless they were supplied by the authorized owner or collected under the engagement rules.
-
-### Installation and setup
-Kali/Debian: sudo apt update && sudo apt install ripgrep jq. On Windows, use the official [PowerShell installation/documentation](https://learn.microsoft.com/en-us/powershell/) and local text tooling. Optional [Gitleaks](https://github.com/gitleaks/gitleaks) can flag token-like strings in authorized local files; treat its output as sensitive.
-Do not grep through unrelated home directories, production systems, or third-party filesystems.
-
-### Primary resources
-- [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html) — secure logging principles.
-- [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html) — what errors can safely expose.
-- [NIST SP 800-92](https://csrc.nist.gov/pubs/sp/800/92/final) — log management context.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before saving a log-derived artifact reference.
-
-### Result handling
-Keep file/source, timestamp, relevant event, redaction status, and security claim. Do not copy raw session IDs, tokens, request bodies, or personal data into the global research corpus.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
