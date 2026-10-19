@@ -165,3 +165,26 @@ A strong chain is an inconsistent input/state transition causing a violated busi
 
 ### Invariant and state-transition ledger
 Represent each important workflow as allowed states, prerequisites, ownership, expiry, and transitions. State one invariant explicitly (for example, a one-time benefit is consumed once or an approval precedes release), then test one transition boundary using a disposable record and verify authoritative server state before and after. Include retries, stale state, alternate routes, duplicated submission, and concurrent execution only when each branch tests a distinct invariant and the program permits it. A success-shaped response is not proof if state is unchanged; a surprising final state needs a control and repeatable evidence. Chain to IDOR/BFLA when identity or role authorization is missing, or race-condition review when the violation depends on interleaving.
+
+
+## Workflow coverage extension: synchronous, asynchronous, and cross-channel paths
+
+For each business invariant, record where it is enforced and where the state is read back. The same operation may pass through browser validation, API validation, a queue/worker, and a downstream provider; do not assume that identical UI behavior means identical server-side enforcement.
+
+| Workflow surface | Test idea using a disposable fixture | Required proof |
+|---|---|---|
+| Client/API disagreement | Compare UI-calculated values with the normal API request; change one client-supplied field only | Server-authoritative total/eligibility and persisted result |
+| Duplicate/retry | Repeat the same documented idempotent request with the same idempotency key, then a new key only if the contract allows it | Duplicate side effect in the test ledger, not just duplicate 2xx responses |
+| Async job | Submit one test job and compare accepted, queued, completed, and failed states | Final persisted outcome and any duplicate downstream side effect |
+| Cross-channel workflow | Compare web UI and documented mobile/API operation for the same test fixture | One channel skips an invariant enforced by the other |
+| Stale authorization | Change test fixture ownership/membership, then retry an already captured operation | Server policy after the change, not just stale frontend display |
+| Numeric boundaries | Test documented min/max, zero, negative, rounding, currency/units, and integer overflow boundaries where applicable | A persisted value violates a documented invariant; no real monetary movement |
+| Multi-step approval | Compare requester, approver, and low-privilege test roles | Audit trail shows an unauthorized transition or separation-of-duty violation |
+
+### Side-effect inventory
+
+Before an experiment, list possible side effects: email/webhook, billing provider, inventory, entitlement, queue job, audit log, notification, and external integration. Use staging or explicit program-provided safe fixtures when an action can trigger external effects. Do not perform a production test simply because the first request is low impact.
+
+### Report and chain quality gate
+
+A business-logic report should include the expected invariant, normal state transition, altered transition, server-authoritative before/after evidence, the minimum consequence, and cleanup. Route a role-only violation to BFLA; an object ownership violation to BOLA; a duplicate effect caused by request interleaving to race-condition; and a pure abuse-volume control failure to rate-limit analysis. Avoid multiple reports for the same root cause unless each has a distinct, independently evidenced impact.
