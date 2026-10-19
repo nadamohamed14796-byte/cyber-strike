@@ -86,10 +86,12 @@ Compare role/tenant behavior with test accounts, validate authoritative state an
 
 ## Tools
 
-- **Source search / route:list in test or owner-provided environment:** map routes and middleware.
-- **Burp Suite:** compare role and HTTP method variants.
-- **Composer lockfile/advisories:** confirm affected package versions.
-- **Test fixtures:** validate Eloquent write behavior and authorization without production data.
+- `rg` and Laravel's `route:list` in an owner-provided/test environment: map routes and middleware.
+- Composer lockfile/advisory checks: confirm affected package versions.
+- Python `httpx` or `curl`: compare role and HTTP-method variants when a live request is necessary.
+- Test fixtures: validate Eloquent write behavior and authorization without production data.
+
+Verify `php --version`, `composer --version`, and `curl --version`. Official docs: https://laravel.com/docs, https://getcomposer.org/doc/, https://curl.se/docs/. Prefer source/configuration review and disposable fixtures when live validation is not appropriate.
 
 ## Laravel Control Matrix
 
