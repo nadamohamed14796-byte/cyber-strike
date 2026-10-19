@@ -130,3 +130,25 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 
 ### Mail-domain evidence and impact boundary
 For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/alignment, TLS reporting/MTA-STS where relevant, and vendor delegation. Preserve DNS observation time and distinguish no record, lookup failure, stale cache, and misconfiguration. A permissive SPF or DMARC policy is a configuration weakness, not proof of spoofing impact; validate with an authorized synthetic recipient/domain and do not send deceptive mail to real users. Keep third-party SaaS sending sources separate from organizational ownership. Route exposed webmail/Autodiscover to the mail-product review and identity-federation signals to OAuth/SAML only when the actual flow is observed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use dig/nslookup for DNS records and official provider documentation for SPF, DKIM, and DMARC. Optional online DNS checkers should receive only public-domain names that are safe to disclose; do not submit private customer lists or internal hostnames to them.
+
+### Installation and setup
+Kali/Debian: sudo apt update && sudo apt install dnsutils whois. For public-DNS corroboration, [Google Public DNS](https://developers.google.com/speed/public-dns/docs/doh) and [Cloudflare DNS docs](https://developers.cloudflare.com/1.1.1.1/) document query methods. External checkers like [MXToolbox](https://mxtoolbox.com/) are optional and disclose the queried domain to that provider.
+Prefer DNS queries over sending messages. Do not perform phishing, password reset enumeration, mailbox login attempts, or email delivery tests without explicit authorization.
+
+### Primary resources
+- [RFC 7208 — SPF](https://www.rfc-editor.org/rfc/rfc7208) — sender authorization policy.
+- [RFC 6376 — DKIM](https://www.rfc-editor.org/rfc/rfc6376) — message signing.
+- [RFC 7489 — DMARC](https://www.rfc-editor.org/rfc/rfc7489) — alignment and reporting policy.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — context for exposed services.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize already-collected URLs without network access.
+
+### Result handling
+Preserve record type/name/value, authoritative source, TTL/time, and policy interpretation. Do not infer mailbox compromise or SPF bypass from a permissive DNS record alone.
