@@ -2,6 +2,7 @@ import z from "zod"
 import path from "node:path"
 import { Tool } from "../tool"
 import { reconPhaseGate, type ReconPhase } from "../../target/recon-gate"
+import { requiredPhasesForWebRecon } from "./phase"
 import { TargetMemory, type Workspace } from "../../target"
 import type { ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
@@ -72,17 +73,6 @@ const PROGRAMS = {
 } as const satisfies Record<string, { description: string }>
 
 type Program = keyof typeof PROGRAMS
-
-/** Phases where each standalone web-recon program is allowed to run.
- * tech_detect can run during live-host inventory, or as a passive complement
- * while URL collection is already active; it must not force a completed phase
- * to be restarted just to fingerprint the same authorized host.
- */
-export function requiredPhasesForWebRecon(program: Program): ReconPhase[] {
-  if (["sitemap_scan", "robots_scan", "openapi_scan"].includes(program)) return ["url_collection"]
-  if (program === "tech_detect") return ["live_hosts_ports", "url_collection"]
-  return ["vulnerability_testing"]
-}
 
 const dispatch: Record<
   Exclude<Program, "session_scan">,
