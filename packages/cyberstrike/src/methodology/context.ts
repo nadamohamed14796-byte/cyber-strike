@@ -196,6 +196,8 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
   const lines = [
     ...(isReconPhase ? [
       "## Canonical Recon Workflow",
+      "Before every unresolved recon phase, consult .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md when available. It is a minimum capability map, not proof of installed tools. For each phase, discover actual registered native tools separately from CLI candidates; verify CLI availability/version with the repository tool_preflight.py helper only after confirming its real path, inspect actual help/docs, and choose a primary plus meaningful complementary source where needed.",
+      "Record selected/skipped/missing/failed tools and reasons, actual execution outcomes, raw and normalized artifact paths, provenance, deduplication counts, and artifact validation. A tool recommendation or successful command is not phase completion; distinguish missing tools, failed runs, zero-result sources, and not-applicable checks.",
       "Follow methodology/recon.ts for ordered phases, checkpoint gates, persistence, and completion criteria. It owns workflow order; it does not replace detailed skills. Search and load recon-methodology plus specialized sub-workflow skills that materially apply to the current asset/evidence (for example subdomain/DNS, services/ports, virtual hosts, CMS, JS/API discovery, or cloud leads). Do not load unrelated skills or repeat a procedure when the canonical workflow and a loaded skill already cover it.",
       "Use recon_checkpoint and the persisted scope gate as execution controls. Record outputs and provenance in the target workspace before advancing phases.",
       "",
