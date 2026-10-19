@@ -91,3 +91,25 @@ Store action_id, policy_source, identity_key_hypothesis, window_start/end, confi
 - Duplicate one-time operation succeeds because state transition is not atomic → business-logic/race review with a disposable fixture.
 - Only expensive query cost is unbounded → API resource-consumption review.
 - A limit is absent but the action is harmless/public and no meaningful abuse path is demonstrated → document the control observation without claiming high severity.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer to observe the application's documented rate-limit behavior and a tiny, controlled request set. Burp Intruder or equivalent automation is optional and should only be used where program rules permit the exact test rate.
+
+### Installation and setup
+- [Burp Community](https://portswigger.net/burp/communitydownload) — official installer and browser setup.
+- jq on Kali/Debian: `sudo apt update && sudo apt install jq` for local response metadata.
+Do not use proxy rotation, distributed sources, account farms, CAPTCHA-solving services, or other methods intended to evade the program's protections. The aim is to verify security control behavior using a controlled test account, not to exceed a real user's permitted quota.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — resource-consumption risk context.
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — login protection.
+- [PortSwigger rate limiting research/labs](https://portswigger.net/web-security) — controlled test environments.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved response artifacts offline and generates no traffic.
+
+### Result handling
+Record the documented limit, request spacing/count, status/headers, reset behavior, and user-visible impact. Stop as soon as a safe, reproducible control failure is established.
