@@ -77,25 +77,20 @@ Identify accepted content types, parser configuration, DTD/entity behavior, and 
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Repeater with harmless XML and a controlled callback/OAST service only when permitted. Begin with a local vulnerable lab; do not test filesystem reads or internal-network access as proof on production.
+### Agent-usable tools and purpose
+- `curl` or Python `httpx` — replay an observed, authorized XML request with one harmless change at a time.
+- `xmllint` — validate local XML fixtures and distinguish malformed XML from parser behavior.
+- `interactsh-client` — optional controlled callback correlation only when program rules allow an external OAST provider.
+- `rg` — search collected source/configuration for XML parser and external-entity settings.
+### Install and verify
+Use official OS packages or upstream instructions. Verify with `xmllint --version`, `curl --version`, and `interactsh-client -h` when installed. Go-based Interactsh client docs/install: https://github.com/projectdiscovery/interactsh. If missing, record the dependency and use a local lab or code/config review; do not claim a live test ran.
+### Resources
+- https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/projectdiscovery/interactsh
+### Helper
+Use `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` for saved responses only. It makes no network requests.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- [PortSwigger Collaborator](https://portswigger.net/burp/documentation/desktop/tools/collaborator) — built into supported Burp workflows.
-- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) is an alternative; official Go installation instructions are in the repository README.
-Use only a benign unique DNS/HTTP callback and understand any external provider's retention/privacy. Do not attempt to read OS files, cloud metadata, or sensitive internal URLs unless the exact action is explicitly in scope.
-
-### Primary resources
-- [PortSwigger XXE](https://portswigger.net/web-security/xxe) — controlled methodology and labs.
-- [OWASP XXE Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html) — parser hardening.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — evidence requirements.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved XML/API responses offline; it does not execute parser tests.
-
-### Result handling
-Separate entity expansion, external network interaction, and file access as distinct claims. Stop at minimum safe proof and preserve a sanitized request/response plus callback timestamp.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
