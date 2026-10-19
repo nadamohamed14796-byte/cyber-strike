@@ -4,6 +4,7 @@ description: "Review Firebase and Supabase client-facing access rules, row-level
 category: "cloud-security"
 version: "1.0.0"
 tags: [firebase, supabase, firestore, storage, postgresql, rls, authorization]
+chains_with: [attack-api-property-authorization, attack-idor-automation, attack-bfla, cloud-assessment, attack-triage-validation]
 tech_stack: [firebase, firestore, firebase-storage, supabase, postgresql, rest-api]
 prerequisites: ["Authorized project or owner-provided staging fixture", "Use synthetic records and test identities"]
 ---
