@@ -103,6 +103,26 @@ These tools are optional and evidence-specific. Never treat a scanner match as a
 | OpenSSF Scorecard | Repository supply-chain posture | [Repository/docs](https://github.com/ossf/scorecard) |
 | aws / az / gcloud / kubectl | Provider/cluster APIs for authorized read-only inspection | [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) / [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) / [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) / [kubectl](https://kubernetes.io/docs/tasks/tools/) |
 
+## Additional specialist and data-shaping utilities
+
+| Tool | Purpose | Official install/docs |
+|---|---|---|
+| Amass | DNS/ASN/asset relationship discovery | [OWASP Amass docs](https://github.com/owasp-amass/amass) |
+| Findomain | Subdomain discovery | [Repository/docs](https://github.com/Findomain/Findomain) |
+| puredns / massdns | High-volume DNS resolution in an approved scope | [puredns](https://github.com/d3mondev/puredns) / [massdns](https://github.com/blechschmidt/massdns) |
+| mapcidr | CIDR expansion and address-range operations | [ProjectDiscovery docs](https://github.com/projectdiscovery/mapcidr) |
+| gf | Match collected URLs against local pattern sets | [Repository/docs](https://github.com/tomnomnom/gf) |
+| unfurl | Extract URL components from collected URL lists | [Repository/docs](https://github.com/tomnomnom/unfurl) |
+| qsreplace | Replace query parameter values in a local URL list | [Repository/docs](https://github.com/tomnomnom/qsreplace) |
+| uro | Deduplicate and filter noisy URL lists | [Repository/docs](https://github.com/s0md3v/uro) |
+| retire.js | Detect known vulnerable JavaScript libraries in collected assets | [Repository/docs](https://github.com/RetireJS/retire.js) |
+| S3Scanner | Identify exposed S3 bucket configuration/permissions where authorized | [Repository/docs](https://github.com/sa7mon/S3Scanner) |
+| cloudbrute | Cloud resource-name discovery where explicitly in scope | [Repository/docs](https://github.com/0xsha/cloudbrute) |
+| requests-racer | Reproducible concurrency tests in controlled environments | [Repository/docs](https://github.com/0x59/requests-racer) |
+| kiterunner | API route discovery using approved target definitions | [Repository/docs](https://github.com/assetnote/kiterunner) |
+
+Use these only when the relevant phase needs them. Validate the current upstream project, package source, license, CLI flags, rate behavior, and output format before use. Resource discovery never grants authorization; never access, download, or test data outside the written scope.
+
 ## Local reusable CyberStrike helpers
 
 | Script | Use | Network behavior |
