@@ -92,3 +92,14 @@ Header reflection alone, `ACAC: true` alone, and wildcard ACAO alone are not eno
 ## Output contract
 
 Return: `endpoint`, `origin_tested`, `auth_context`, `acao`, `acac`, `vary_origin`, `preflight_result`, `browser_readable`, `data_sensitivity`, `impact`, `confidence`, and redacted evidence references.
+
+
+## Minimal request pair and browser proof
+Use an origin marker you control and a test account with synthetic data. Start with a read-only endpoint and capture response headers without sharing the body with a third-party collector.
+
+```bash
+curl -sS -D cors.headers -o cors.body -H 'Origin: https://origin-marker.invalid' "$TARGET_URL"
+grep -iE '^(access-control-allow-origin|access-control-allow-credentials|vary):' cors.headers
+```
+
+Then verify in a local browser whether the untrusted origin can actually read the protected response under the intended credential mode. Do not count wildcard Access-Control-Allow-Origin alone as impact. Chain to attack-idor-automation only if the readable data is improperly scoped, to attack-security-headers for broader browser policy review, or to attack-csrf if a separate state-changing request is implicated.
