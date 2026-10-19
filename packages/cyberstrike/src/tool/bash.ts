@@ -170,9 +170,14 @@ export function reconScannerInvocationKey(command: string[]): string | undefined
 
 export function scannerTargets(command: string[], commandText: string): string[] {
   const candidates = new Set<string>()
-  for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>\x60]+/gi)) {
-    const value = match[0].replace(/[),;]+$/, "")
-    candidates.add(value)
+  const scannerName = path.basename(stripOuterShellQuotes(command[0] ?? "")).toLowerCase()
+  // waybackurls consumes stdin; an arbitrary URL elsewhere in the pipeline is
+  // not proof that it is the hostname actually fed to the collector.
+  if (scannerName !== "waybackurls") {
+    for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>\x60]+/gi)) {
+      const value = match[0].replace(/[),;]+$/, "")
+      candidates.add(value)
+    }
   }
   const targetFlags = new Set(["-u", "--url", "-target", "--target", "-host", "--host", "-d", "--domain", "-h"])
   for (let i = 0; i < command.length; i++) {
