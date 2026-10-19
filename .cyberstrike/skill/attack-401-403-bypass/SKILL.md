@@ -117,7 +117,7 @@ Repeat the smallest successful variant several times with a fresh connection whe
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
 
@@ -152,3 +152,16 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
 - [PortSwigger: Access control vulnerabilities](https://portswigger.net/web-security/access-control)
 - [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110)
+
+
+## Hands-on field pattern: compare policy, not status codes
+Use a known in-scope read-only endpoint and controlled identities. Keep the method, path, and object constant; change one auth condition at a time.
+
+```bash
+: "Set TARGET_URL and tokens for two authorized test principals in your shell environment"
+curl -sS -D role-a.headers -o role-a.body -H "Authorization: Bearer $TOKEN_A" "$TARGET_URL"
+curl -sS -D role-b.headers -o role-b.body -H "Authorization: Bearer $TOKEN_B" "$TARGET_URL"
+curl -sS -D anonymous.headers -o anonymous.body "$TARGET_URL"
+```
+
+Compare semantic response content and the controlled object's owner/tenant, not just 401/403/200. Redact bodies before attaching evidence. A missing denial on one route only becomes a finding when a forbidden operation or protected data access is demonstrated. Correlate confirmed signals with `attack-bfla`, `attack-idor-automation`, `attack-auth-bypass`, or `attack-triage-validation` as appropriate.
