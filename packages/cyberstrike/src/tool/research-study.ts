@@ -106,7 +106,7 @@ const StudyItem = z.object({
 const ResearchStudyParameters = z.object({
   action: z.enum(["backfill", "begin", "complete", "discover", "next", "read", "reset", "save", "stats"]),
   source: z.string().trim().min(1).max(100).optional(),
-  cycle_id: z.string().trim().min(8).max(100).optional().describe("Exact durable run ID returned by action=begin; pass it on every discover/next/read/save/complete call to prevent stale-cycle writes."),
+  cycle_id: z.string().trim().min(8).max(100).optional().or(z.literal("")).describe("Exact durable run ID returned by action=begin; pass it on every discover/next/read/save/complete call to prevent stale-cycle writes. Omit this field on action=begin; an empty string is accepted for compatibility with callers that serialize unset optional fields."),
   // Per-call discovery window only; /update must expand pages until exhaustion.
   pages: z.number().int().min(1).default(20),
   continue_after_save: z.boolean().default(false),
