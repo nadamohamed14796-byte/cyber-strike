@@ -103,24 +103,21 @@ Persist connection_id, origin, auth_source, principal, tenant, session_age, mess
 - Only malformed frames or generic errors are observed → not a finding without a security boundary violation.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use browser DevTools' Network/WebSocket frames and Burp's WebSockets history/Repeater to compare handshake, message, and authorization behavior. For an isolated client test, wscat or OWASP ZAP's WebSocket add-on can help reproduce a protocol flow.
+### Tools
+- `wscat`: reproduce an observed WebSocket handshake and send benign messages using a tester-owned session.
+- `websocat`: alternative CLI client for repeatable connections and message capture.
+- Python `websockets`: automate a controlled message matrix and save timestamps/statuses.
+- `jq` and `rg`: parse saved JSON frames and inspect local source/configuration.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official browser proxy setup.
-- [wscat project](https://github.com/websockets/wscat) — Node.js/npm client; its README documents installation and usage.
-- [OWASP ZAP](https://www.zaproxy.org/) — official installer; add WebSocket support when relevant.
-Connect only to observed/in-scope endpoints. Use a disposable account and avoid messages that trigger real transactions, notifications, or irreversible state changes.
+### Install and verify
+Official upstream docs: https://github.com/websockets/wscat, https://github.com/vi/websocat, and https://websockets.readthedocs.io/. Verify `wscat --help`, `websocat --help`, or `python3 -c "import websockets; print(websockets.__version__)"` for the chosen client. If unavailable, perform static source/config review and report that live protocol validation was not run.
 
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — testing methodology.
-- [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) — browser semantics.
-- [PortSwigger WebSockets](https://portswigger.net/web-security/websockets) — controlled labs.
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html
+- https://github.com/websockets/wscat
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved handshake/response artifacts; it does not open a WebSocket connection.
-
-### Result handling
-Check origin/authentication separately from per-message authorization. Record sanitized handshake, a representative message, identity context, and server-side outcome.
+### Proof and limits
+Use only observed in-scope WebSocket endpoints and tester-owned sessions. Record handshake headers, origin, role, message type, response, and authorization control. Do not flood connections or send state-changing messages without explicit approval.
