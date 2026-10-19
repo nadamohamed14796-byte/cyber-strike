@@ -94,7 +94,8 @@ Do not bypass authentication, rate limits, access controls, or program restricti
 
 ### 0.4.1 Scope reuse and updates at any point
 
-Reuse the saved scope for unchanged work. Import a supplied complete scope list as one set—never ask the user to choose entries one by one. Add a newly confirmed exact asset to a configured manifest with `merge_existing=true`; initialize scope only when no configured manifest exists. Replace the full list only when the user supplies a replacement or says the whole scope changed. Preserve exclusions and provenance, keep unsupported entries as evidence, and never fabricate a policy link or widen one exact host to a wildcard. Run the agent-level setup check only for a new or changed setup; do not re-check unchanged scope for every host, URL, parameter, or phase. Active tools still enforce the saved scope per request. If an asset is actually excluded/denied, report the concrete reason once and continue independent eligible work without URL-format retry loops.
+Use §0.4 as the single setup/configuration procedure. Reuse the saved decision for unchanged setup; add only an exact user-confirmed asset to an existing manifest with `merge_existing=true`; replace the full list only when the user explicitly supplies a replacement or says scope changed. Preserve exclusions, provenance, and unsupported entries. Never repeat the model-level setup check for each host, URL, parameter, or phase; the persisted request-level gate remains mandatory. If an asset is denied, record the concrete reason once and continue independent eligible work. Retry only when the input or failure cause changes.
+
 
 ### 0.5 Target data protection
 
