@@ -80,10 +80,12 @@ Confirm the resulting principal through a harmless profile endpoint in the test 
 
 ## Tools
 
-- **Burp Suite:** compare authorization requests and callbacks.
-- **OIDC discovery/JWKS viewer:** inspect metadata and public key configuration.
-- **Local JWT decoder:** analyze only test tokens offline.
-- **Android/iOS source tools:** review deep-link registration and callback routing when mobile assets are in scope.
+- Python `httpx` or `curl`: reproduce observed authorization and callback requests with tester-owned identities.
+- Python standard library `json` / `base64` or `jq`: inspect public OIDC metadata and redacted test-token claims offline.
+- `rg`: inspect authorized source/configuration for redirect URI, state, nonce, PKCE, issuer, and audience checks.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify `curl --version`, the chosen Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://openid.net/specs/openid-connect-discovery-1_0.html/.
 
 ## OAuth/OIDC Validation Matrix
 
@@ -172,27 +174,6 @@ Treat one login attempt as a correlated transaction across browser session, auth
 
 Do not create a chain merely because two weaknesses coexist. Every child finding needs its own protocol invariant, observable terminal effect, and evidence reference.
 
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Proxy/Repeater/Comparer, browser DevTools with separate controlled test profiles, and the JWT Editor extension only when token claim/signature inspection is relevant. Capture each authorization flow's baseline and expected redirect/token handling.
-
-### Installation and setup
-- [Burp Community/Professional](https://portswigger.net/burp) — install from PortSwigger and configure the browser through the official setup guide.
-- JWT Editor can be enabled through Burp's official BApp Store; verify its listing and permissions before enabling it.
-- Use a provider's own sandbox or your application’s local identity-provider fixture. Do not paste live access/refresh tokens into public decoders or external services.
-
-### Primary resources
-- [RFC 9700 OAuth 2.0 Security Best Current Practice](https://www.rfc-editor.org/rfc/rfc9700/) — current security requirements for OAuth 2.0.
-- [PortSwigger OAuth authentication](https://portswigger.net/web-security/oauth) — controlled testing methodology.
-- [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html) — identity-layer semantics.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized flow artifacts offline; it does not validate tokens or prove authorization.
-
-### Result handling
-Use test accounts and test clients; preserve state/nonce/PKCE context and redact tokens, authorization codes, and callback query values from saved artifacts.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
