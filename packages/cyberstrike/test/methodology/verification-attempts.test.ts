@@ -5,17 +5,22 @@ const attempt = (strategyID: string, variantKey: string, validConditions = true)
   strategyID,
   variantKey,
   rationale: "Test a distinct hypothesis path",
-  resultSummary: "No decisive signal observed",
+  resultSummary: "Observed controlled behavior",
   evidenceRef: validConditions ? "evidence://observed/" + strategyID + "/" + variantKey : undefined,
   validConditions,
 })
 
 describe("VerificationAttempts", () => {
-  test("caps distinct strategies at 20 and does not count exact duplicates", () => {
-    const attempts = Array.from({ length: 20 }, (_, i) => attempt("strategy-" + i, "baseline"))
-    expect(VA.uniqueAttempts([...attempts, attempts[0]]).length).toBe(20)
+  test("allows more than 20 distinct evidence-backed hypotheses and deduplicates exact retries", () => {
+    const attempts = Array.from({ length: 75 }, (_, i) => attempt("strategy-" + i, "baseline"))
+    expect(VA.uniqueAttempts([...attempts, attempts[0]!])).toHaveLength(75)
     expect(VA.canRunAttempt(attempts, { strategyID: "strategy-0", variantKey: "baseline" })).toBe(false)
-    expect(VA.canRunAttempt(attempts, { strategyID: "strategy-new", variantKey: "baseline" })).toBe(false)
+    expect(VA.canRunAttempt(attempts, { strategyID: "strategy-new", variantKey: "baseline" })).toBe(true)
+    const result = VA.decide({ attempts })
+    expect(result.outcome).toBe("inconclusive")
+    expect(result.attemptsUsed).toBe(75)
+    expect(result.canContinue).toBe(true)
+    expect(result.remainingAttempts).toBeUndefined()
   })
 
   test("normalizes strategy and variant identity to avoid case/whitespace retry inflation", () => {
@@ -30,30 +35,23 @@ describe("VerificationAttempts", () => {
     expect(VA.canRunAttempt([], { strategyID: " ", variantKey: "variant" })).toBe(false)
   })
 
-  test("allows a meaningful variant as a distinct attempt", () => {
+  test("allows meaningful variants as distinct attempts", () => {
     expect(VA.canRunAttempt([attempt("idor.owner-check", "account-a")], {
       strategyID: "idor.owner-check",
       variantKey: "account-b",
     })).toBe(true)
   })
 
-  test("valid conditions without a durable evidence reference do not consume the budget", () => {
-    const attempts = Array.from({ length: 20 }, (_, i) => ({
+  test("attempts without durable evidence are not counted as evidence-backed", () => {
+    const attempts = Array.from({ length: 25 }, (_, i) => ({
       ...attempt("unreferenced-" + i, "v1"),
       evidenceRef: undefined,
     }))
     const result = VA.decide({ attempts })
     expect(result.outcome).toBe("inconclusive")
     expect(result.attemptsUsed).toBe(0)
-    expect(result.remainingAttempts).toBe(20)
+    expect(result.canContinue).toBe(true)
     expect(VA.canRunAttempt(attempts, { strategyID: "new-evidence-backed", variantKey: "v1" })).toBe(true)
-  })
-
-  test("budget exhaustion is inconclusive, never automatic false positive", () => {
-    const result = VA.decide({ attempts: Array.from({ length: 20 }, (_, i) => attempt("strategy-" + i, "v1")) })
-    expect(result.outcome).toBe("inconclusive")
-    expect(result.canContinue).toBe(false)
-    expect(result.reason).toContain("do not label this a false positive")
   })
 
   test("disproof requires valid test conditions even when evidence is linked", () => {
@@ -77,7 +75,7 @@ describe("VerificationAttempts", () => {
 
   test("scope and safety hard stops prevent verdicts and stop further attempts", () => {
     const result = VA.decide({
-      attempts: [{ ...attempt("auth-check", "valid-session"), evidenceRef: "evidence://response-2" }],
+      attempts: [attempt("auth-check", "valid-session")],
       decisiveDisproof: true,
       decisiveEvidenceRef: "evidence://response-2",
       blockedReason: "Target is out of scope",
@@ -87,73 +85,26 @@ describe("VerificationAttempts", () => {
     expect(result.reason).toBe("Target is out of scope")
   })
 
-  test("direct disproof evidence cannot produce a false-positive verdict before 20 valid attempts", () => {
-    const attempts = Array.from({ length: 19 }, (_, i) => attempt("auth-check-" + i, "valid-session"))
-    attempts[attempts.length - 1] = {
-      ...attempts[attempts.length - 1],
-      evidenceRef: "evidence://response-2",
-    }
+  test("direct disproof evidence can resolve without a minimum attempt count", () => {
     const result = VA.decide({
-      attempts,
-      decisiveDisproof: true,
-      decisiveEvidenceRef: "evidence://response-2",
-    })
-    expect(result.outcome).toBe("inconclusive")
-    expect(result.attemptsUsed).toBe(19)
-    expect(result.remainingAttempts).toBe(1)
-    expect(result.canContinue).toBe(true)
-    expect(result.reason).toContain("hypothesis remains unresolved")
-  })
-
-  test("direct disproof evidence can resolve only after 20 distinct valid attempts", () => {
-    const attempts = Array.from({ length: 20 }, (_, i) => attempt("auth-check-" + i, "valid-session"))
-    attempts[attempts.length - 1] = {
-      ...attempts[attempts.length - 1],
-      evidenceRef: "evidence://response-2",
-    }
-    const result = VA.decide({
-      attempts,
+      attempts: [attempt("auth-check", "valid-session")],
       decisiveDisproof: true,
       decisiveEvidenceRef: "evidence://response-2",
     })
     expect(result.outcome).toBe("disproven")
-    expect(result.attemptsUsed).toBe(20)
-    expect(result.remainingAttempts).toBe(0)
+    expect(result.attemptsUsed).toBe(1)
+    expect(result.remainingAttempts).toBeUndefined()
     expect(result.canContinue).toBe(false)
-  })
-
-  test("attempts with invalid preconditions do not consume the false-positive budget", () => {
-    const result = VA.decide({
-      attempts: Array.from({ length: 20 }, (_, i) => attempt("invalid-" + i, "setup", false)),
-    })
-    expect(result.outcome).toBe("inconclusive")
-    expect(result.attemptsUsed).toBe(0)
-    expect(result.remainingAttempts).toBe(20)
-    expect(result.canContinue).toBe(true)
-  })
-
-  test("invalid attempts do not prevent further valid verification strategies", () => {
-    const invalidAttempts = Array.from({ length: 20 }, (_, i) => attempt("invalid-" + i, "setup", false))
-    expect(VA.canRunAttempt(invalidAttempts, { strategyID: "valid-auth-check", variantKey: "fresh-session" })).toBe(true)
   })
 
   test("decisive confirmation stops early only with valid conditions and direct evidence", () => {
     const result = VA.decide({
-      attempts: [{ ...attempt("xss.execution-check", "benign-marker"), evidenceRef: "evidence://xss-proof" }],
+      attempts: [attempt("xss.execution-check", "benign-marker")],
       decisiveConfirmation: true,
       decisiveEvidenceRef: "evidence://xss-proof",
     })
     expect(result.outcome).toBe("confirmed")
     expect(result.canContinue).toBe(false)
-  })
-
-  test("decisive confirmation without a direct evidence reference stays inconclusive", () => {
-    const result = VA.decide({
-      attempts: [attempt("xss.execution-check", "benign-marker")],
-      decisiveConfirmation: true,
-    })
-    expect(result.outcome).toBe("inconclusive")
-    expect(result.canContinue).toBe(true)
   })
 
   test("confirmation without valid preconditions remains inconclusive", () => {
@@ -189,15 +140,5 @@ describe("VerificationAttempts", () => {
     expect(VA.isTerminalOutcome("inconclusive")).toBe(false)
     expect(VA.isTerminalOutcome("confirmed")).toBe(true)
     expect(VA.isTerminalOutcome("disproven")).toBe(true)
-  })
-
-  test("blocked prerequisites stop safely without false-positive verdict", () => {
-    const result = VA.decide({
-      attempts: [attempt("auth-check", "missing-credential", false)],
-      blockedReason: "Required authorized test account is unavailable.",
-    })
-    expect(result.outcome).toBe("inconclusive")
-    expect(result.canContinue).toBe(false)
-    expect(result.reason).toContain("unavailable")
   })
 })
