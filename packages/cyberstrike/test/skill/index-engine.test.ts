@@ -180,6 +180,27 @@ test("full repository skill catalog has no unresolved chain or prerequisite refe
       directory: repoRoot,
       fn: async () => {
         await SkillIndex.rebuild()
+        const allSkills = await Skill.all()
+        expect(allSkills.length).toBeGreaterThan(0)
+
+        // The runtime's actual catalog loader must parse every discovered skill,
+        // preserve its file location, and make it retrievable by canonical name.
+        const unreadable: string[] = []
+        for (const skill of allSkills) {
+          if (!skill.name.trim() || !skill.description.trim() || !skill.content.trim()) {
+            unreadable.push(`${skill.name || "<unnamed>"}: missing metadata or body`)
+            continue
+          }
+          if (!(await fs.stat(skill.location).then(() => true).catch(() => false))) {
+            unreadable.push(`${skill.name}: missing file at ${skill.location}`)
+            continue
+          }
+          const retrieved = await Skill.get(skill.name)
+          if (!retrieved || retrieved.location !== skill.location || !retrieved.content.trim()) {
+            unreadable.push(`${skill.name}: Skill.get did not return its loaded source`)
+          }
+        }
+        expect(unreadable).toEqual([])
         expect(SkillIndex.validateReferences()).toEqual([])
       },
     })
