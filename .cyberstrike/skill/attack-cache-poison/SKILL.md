@@ -149,3 +149,29 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record normal baseline, exact request delta, cache indicators, test marker, and affected context. A reflected input or a cache hit is not enough without a reproducible unsafe cached response.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
+
+### Recommended tools
+- curl — capture cache headers and controlled request variants
+- Python requests/httpx — one-variable cache-key comparisons
+- jq — parse Age, Vary, Cache-Control, and provider-specific headers
+- A local cache experiment ledger with unique harmless markers
+
+### Resources
+- https://portswigger.net/web-security/web-cache-poisoning
+- https://portswigger.net/web-security/web-cache-deception
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
+
+### Helper-script contract
+Use unique harmless markers and controlled cache keys; avoid poisoning shared users' content. Record cache state, request pair, Vary/key behavior, marker persistence, and cleanup/expiry.
+
+Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
+
+### Handoff
+Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
