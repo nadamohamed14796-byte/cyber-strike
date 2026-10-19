@@ -89,3 +89,26 @@ Record ingestion_source, document_fingerprint, source_acl, tenant, chunk_ids, em
 - Poisoned text changes a tool proposal but server denies the tool call → resilience observation, not unauthorized action.
 - Deleted source remains retrievable beyond documented consistency window → stale-index/deletion control gap with synthetic proof.
 - Citation points to a separate publicly reachable resource → evaluate that resource independently; do not attribute its public access to RAG leakage.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use an owned RAG/LLM lab, application logs with secrets redacted, a repeatable prompt/response harness, and a vector-store console/CLI relevant to the deployment. Promptfoo or garak can support controlled LLM security evaluations.
+
+### Installation and setup
+- [Promptfoo installation and red teaming docs](https://www.promptfoo.dev/docs/installation/) — follow the official npm/npx workflow for a local evaluation project.
+- [garak documentation](https://garak.ai/) — install and configure in an isolated test environment.
+- [Docker installation](https://docs.docker.com/get-docker/) — useful for disposable local services where the project's platform supports it.
+Review probes and output before running; configure test-only endpoints, synthetic documents, and limits. Never probe a third-party model or data store outside explicit program authorization.
+
+### Primary resources
+- [OWASP GenAI Security Project](https://genai.owasp.org/) — LLM application risk patterns.
+- [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework) — trust, measurement, and governance.
+- [MCP specification](https://modelcontextprotocol.io/specification) — when retrieval/actions cross a tool boundary.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` validates local evidence metadata; it does not connect to a model or vector database.
+
+### Result handling
+Use synthetic canaries and distinguish prompt injection, retrieval permission errors, cross-tenant retrieval, and ordinary relevance failures. Save only redacted prompts/results necessary to reproduce the issue.
