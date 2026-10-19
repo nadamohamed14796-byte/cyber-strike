@@ -80,10 +80,12 @@ Where source/config is available, identify which serializer, error handler, stor
 
 ## Tools
 
-- **Burp Suite / curl:** compare anonymous and authenticated responses.
-- **jq / JSON parser:** inspect schema and redact sensitive values.
-- **File signature utilities:** distinguish genuine archives/config files from catch-all responses.
-- **Source review / vendor docs:** determine whether the disclosed field is intended and how to remove it safely.
+- Python `httpx` or `curl`: compare anonymous and authenticated responses for an observed in-scope resource.
+- `jq` / JSON parser: inspect schema and redact sensitive values.
+- `file` and archive-listing utilities: distinguish genuine archives/config files from catch-all responses.
+- `rg` and vendor docs: determine whether the disclosed field is intended and how to remove it safely.
+
+Verify `curl --version`, the selected Python client, `jq --version`, and `file --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## Disclosure Classification Matrix
 
@@ -149,27 +151,6 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 ### Confidentiality proof and data minimization
 Classify the candidate bytes before expanding: public documentation, synthetic fixture, ordinary metadata, personal/sensitive data, credential material, or control-plane information. Verify that the response is not already intentionally public through the product UI or documentation and use a relevant anonymous/low-role control. Preserve only a small redacted excerpt or marker proving the boundary; do not dump directories, entire logs, customer records, or secret values. A filename, stack trace, or secret-looking pattern is not impact by itself. Route source maps and repository artifacts to source-leak review, metrics endpoints to metrics exposure, and property-level over-disclosure to API property authorization.
 
-
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl to replay one observed request; use only runtime-exposed integrations.
-- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
-
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-- [OWASP Cheat Sheets](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation.
-
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
-
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
