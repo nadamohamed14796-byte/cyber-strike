@@ -70,10 +70,13 @@ Use a harmless protected operation to confirm the assurance level is checked ser
 
 ## Tools
 
-- **Burp Suite:** compare MFA-required and alternate API paths.
-- **Browser DevTools:** inspect challenge state and transitions.
-- **Test authenticator:** generate valid factors for owned identities.
-- **Source/log review:** verify assurance claims and middleware coverage.
+- Python `httpx` or `curl`: compare MFA-required and alternate API paths with tester-owned identities.
+- `jq`: inspect redacted assurance/principal fields in saved responses.
+- `rg`: inspect local source/configuration for assurance claims and middleware coverage.
+- Test authenticator/library: generate factors only for identities controlled by the tester.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify the chosen client and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. Never use real users' factors or store OTP seeds.
 
 ## MFA Coverage Matrix
 
