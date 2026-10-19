@@ -128,3 +128,26 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 
 ### Service fingerprint and owner gate
 For each host/port, record the exact resolver result, scope basis, service-detection confidence, banner source, protocol/TLS details, and whether the service is owned by the target or a shared provider. Start with low-impact connection checks and conservative timeouts; increase depth only when allowed and a clear hypothesis exists. Distinguish an open socket from an exposed administration function or vulnerable version. Validate protocol identity using service-specific evidence and vendor release notes; account for proxies and backports. Avoid exploit modules or broad UDP/TCP expansion by default. Route confirmed web interfaces to web recon, management planes to the relevant product specialist, and internal-only services to the program's explicit network-testing rules.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Nmap for detailed service discovery and ProjectDiscovery naabu when a scoped port inventory is necessary. Pair results with DNS/HTTP context and manual validation; don't launch a full port scan simply because an asset was discovered.
+
+### Installation and setup
+- [Nmap downloads](https://nmap.org/download.html) — official installation and platform notes.
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official naabu installation/options.
+- [RustScan](https://github.com/RustScan/RustScan) is an optional alternative; read its concurrency settings and use only if compatible with the engagement policy.
+Confirm scope, approved ports/rates, and maintenance windows before scanning. Scan a small approved set first and stop on service instability; no stealth/evasion, proxy rotation, or distributed scanning.
+
+### Primary resources
+- [Nmap Network Scanning](https://nmap.org/book/) — port/service behavior.
+- [Nmap NSE script docs](https://nmap.org/nsedoc/) — inspect scripts before execution.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — service context and verification.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize the resulting web URLs locally; it does not scan ports.
+
+### Result handling
+Record target locator, approved port range, timing/rate, discovered service/version confidence, and whether a result was actively confirmed. A banner alone does not prove a vulnerability.
