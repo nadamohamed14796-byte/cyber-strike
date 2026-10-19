@@ -178,3 +178,26 @@ Normalize duplicate route registrations by method + route template + middleware 
 | Dependencies | Lockfile version and reachable vulnerable call site | Advisory prerequisites and affected call path both match |
 
 Persist framework_version_source, route_template, middleware_chain, parser_schema, input_source, sink_or_side_effect, principal, test_fixture, negative_control, observed_state, and cleanup_status.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Node.js/npm for an authorized source checkout, `npm audit` for dependency advisories, Semgrep for targeted source rules, and Burp/browser DevTools for runtime validation.
+
+### Installation and setup
+- [Node.js download and installation](https://nodejs.org/en/download/) — select a supported release.
+- [npm audit documentation](https://docs.npmjs.com/cli/commands/npm-audit) — check dependencies without blindly applying fixes.
+- [Semgrep installation](https://semgrep.dev/docs/getting-started/) — use official instructions.
+Run dependency changes on a disposable checkout first; review lockfile changes. A dependency advisory does not automatically mean the application is exploitable.
+
+### Primary resources
+- [Node.js security best practices](https://nodejs.org/en/learn/getting-started/security-best-practices) — runtime/application controls.
+- [OWASP NodeGoat](https://owasp.org/www-project-nodegoat/) — controlled learning application.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — application-level checks.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized response artifacts without sending requests.
+
+### Result handling
+Record package name/version, advisory, reachability, and the application's actual use of the affected code. Keep security claims proportional to evidence.
