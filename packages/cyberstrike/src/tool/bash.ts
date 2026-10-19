@@ -258,16 +258,16 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
 
   const outputFlagIndex = normalizedArgs.findIndex((arg) => ["-o", "-output"].includes(arg))
   if (outputFlagIndex < 0 || !args[outputFlagIndex + 1]) {
-    return "Save Katana's raw results with '-o <absolute path under this target workspace/urls/>'; stdout-only crawling cannot complete the URL-collection artifact."
+    return "Save Katana's raw results with '-o <absolute path under this target workspace/scans/>'; stdout-only crawling cannot complete the URL-collection artifact."
   }
   if (!workspacePath) {
     return "Katana output cannot be validated because the canonical target workspace path is unavailable."
   }
   const outputArg = stripOuterShellQuotes(args[outputFlagIndex + 1]!)
   if (!path.isAbsolute(outputArg)) {
-    return "Katana output path must be absolute and remain inside this target workspace's urls/ directory."
+    return "Katana output path must be absolute and remain inside this target workspace's scans/ directory."
   }
-  const urlsRoot = path.resolve(workspacePath, "urls")
+  const scansRoot = path.resolve(workspacePath, "scans")
   const outputPath = path.resolve(outputArg)
   const relativeOutput = path.relative(urlsRoot, outputPath)
   if (!relativeOutput || relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) {
@@ -428,7 +428,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
         }
         const reason = katanaScopeBlockReason(args, scopedURL, scopes, decision.workspace.workspacePath)
         if (reason) {
-          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, -d 3, and a unique absolute -o path under that workspace's urls/ directory. No crawler command was started.")
+          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, -d 3, and a unique absolute -o path under that workspace's scans/ directory. No crawler command was started.")
         }
         const outputFlagIndex = args.findIndex((arg) => ["-o", "-output"].includes(stripOuterShellQuotes(arg).toLowerCase()))
         const outputPath = path.resolve(stripOuterShellQuotes(args[outputFlagIndex + 1]!))
