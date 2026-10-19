@@ -63,3 +63,27 @@ Return corpus ID, source/commit, license status, hash, entry count, normalized/d
 - https://github.com/danielmiessler/SecLists
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/dkleptsov/skill-security-review
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use JSON Schema validation and deterministic tests to keep test cases reproducible, sanitized, and deduplicated. Python's standard library is sufficient for basic checks; pytest and jsonschema help when the corpus has formal fixtures and schemas.
+
+### Installation and setup
+- [pytest installation](https://docs.pytest.org/en/stable/getting-started.html) — official project docs; add it to a development/test environment rather than the global interpreter.
+- [jsonschema](https://python-jsonschema.readthedocs.io/en/stable/) — official Python package documentation.
+- [pre-commit](https://pre-commit.com/) — optional local validation hooks.
+Use a venv and pinned test dependencies. Do not include live secrets, customer payloads, private target URLs, or unredacted reports in the corpus. Validate licenses/provenance and keep a safe synthetic replacement when examples contain sensitive content.
+
+### Primary resources
+- [JSON Schema](https://json-schema.org/) — schema specification.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — test scenario design.
+- [CyberStrike Skill Guide](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/.cyberstrike/skill/SKILL_GUIDE.md) — repo conventions.
+
+### Reusable helpers
+- Run python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --strict-links to check local skill structure and references.
+- Run python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json to inspect the corpus/skill tooling coverage.
+
+### Result handling
+Store source, license, capture date, sanitization decision, schema version, and change rationale. A passing schema test proves structural validity only—not safety, authenticity, coverage, or exploitability.
