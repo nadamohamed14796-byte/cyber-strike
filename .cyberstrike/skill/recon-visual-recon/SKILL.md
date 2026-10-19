@@ -63,7 +63,7 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 
 - Playwright or Chromium headless capture.
 - gowitness or EyeWitness where available.
-- Browser DevTools and Burp Suite for manual follow-up.
+- curl/httpx for request-level follow-up; headless Playwright only when a local fixture requires rendering.
 - Python scripts for URL normalization, screenshot indexing, and metadata export.
 
 ## Visual Triage Matrix
