@@ -178,3 +178,26 @@ For each candidate, trace route → middleware → controller/action → FormReq
 | Debug errors | Active runtime configuration and response | Minimal non-public sensitive detail is actually returned |
 
 Record route_name, method, middleware_chain, policy_or_gate, validation_class, model_fields, job_or_storage_path, test_principal, fixture_state_before_after, negative_control, and cleanup_status. Do not include .env, APP_KEY, raw signed URLs, tokens, or customer records.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and their role
+Burp Suite and browser DevTools for HTTP behavior; Composer/PHP tooling and static source review when authorized source is available; Laravel's own configuration and route inspection.
+
+### Install or enable when missing
+PHP and Composer: use official OS packages or https://getcomposer.org/download/ ; Laravel documentation: https://laravel.com/docs . Add optional tools only from their official project docs and pin versions for reproducibility.
+These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+
+### Primary resources
+- [Laravel security documentation](https://laravel.com/docs/security) — authentication, authorization, and validation.
+- [Laravel routing](https://laravel.com/docs/routing) — route behavior.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box verification.
+
+### Small reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare sanitized local responses; it sends no traffic.
+
+### Runtime and evidence notes
+- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
+- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
+- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.

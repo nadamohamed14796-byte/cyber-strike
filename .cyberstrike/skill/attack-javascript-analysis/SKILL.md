@@ -119,3 +119,26 @@ Use one normalized record per method + route template + content type + parameter
 - candidate_skill, hypothesis, evidence_ref, confidence, false_positive_reason, redaction_status
 
 Never store full cookie/token values or large minified lines. When a candidate appears important, retrieve the exact normal request through the authorized browser and create a sanitized request artifact for the specialist skill.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and their role
+Burp Suite Community/Professional for request correlation; browser DevTools; Node.js; ripgrep; optional Semgrep rules for source/sink patterns.
+
+### Install or enable when missing
+Node.js: https://nodejs.org/en/download/ ; ripgrep on Kali/Debian: `sudo apt update && sudo apt install ripgrep`; Semgrep: follow https://semgrep.dev/docs/getting-started/ and prefer its maintained installer/container. Burp: https://portswigger.net/burp/communitydownload .
+These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+
+### Primary resources
+- [MDN JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) — language/runtime behavior.
+- [PortSwigger DOM-based XSS](https://portswigger.net/web-security/cross-site-scripting/dom-based) — source/sink analysis.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — web testing methodology.
+
+### Small reusable helper
+`python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript` — scans already-collected assets only; routes are leads, not proof.
+
+### Runtime and evidence notes
+- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
+- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
+- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.

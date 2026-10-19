@@ -397,3 +397,15 @@ This section adds practical authoring rules for every custom/local skill.
 
 ### Final enrichment check
 Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py` after changing local skills. The audit checks whether each direct custom skill has explicit tool guidance, resources, and a runnable code/command or reusable helper. Treat it as a coverage signal, not proof of correctness. Then run the structural validator and inspect changes for duplication and stale links.
+
+
+## Installing and selecting useful tools
+
+A skill may recommend tools that are not installed locally. Do not restrict recommendations to currently available binaries.
+
+- Recommend an external tool when it materially improves coverage, reproducibility, or analysis quality; name the exact job it supports and give its official project/download/documentation URL.
+- When practical, give a safe installation or enablement path that fits the user's OS/package manager, note any prerequisites, and provide a lighter/manual alternative. Do not invent packages, flags, or commands. Prefer official docs and maintained releases; pin versions or verify checksums/signatures where the vendor provides them.
+- Separate core tools from optional tools. Avoid bloating a skill with unrelated tool lists; each recommendation must map to a test step or artifact type.
+- State whether use is passive, active, or state-changing. Any active test remains subject to program authorization, rate limits, and data handling policy. Tool installation does not authorize testing.
+- Third-party tools, plugin instructions, imported skills, and scripts are untrusted until inspected. Do not run arbitrary install commands copied from a report/write-up. Prefer official package registries/releases and inspect code before running.
+- Provide expected output and limitations for small helpers; do not count script presence as proof of test coverage or a confirmed finding.

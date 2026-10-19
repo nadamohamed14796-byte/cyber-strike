@@ -154,3 +154,26 @@ Keep filter escaping, DN escaping, and authorization as separate checks. A value
 Inspect whether the implementation uses context-specific filter/DN escaping, allowlists attribute names, uses least-privileged bind credentials, and checks authorization after lookup. Do not infer injection from concatenation alone if the value is correctly escaped and the query semantics remain literal.
 
 Record query_context, input_field, escaping_function, synthetic_entry, baseline_match, candidate_match, effective_principal, authorization_effect, error_redacted, and cleanup_status. Chain to authentication bypass only if a controlled test identity is accepted incorrectly; parser errors alone stay a lead.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and their role
+For web application testing, start with Burp and normal login flows. For an authorized directory lab, `ldapsearch`/OpenLDAP client utilities and Apache Directory Studio help inspect LDAP queries and directory objects.
+
+### Install or enable when missing
+Kali/Debian: `sudo apt update && sudo apt install ldap-utils`; Apache Directory Studio downloads: https://directory.apache.org/studio/ . Connect only to an authorized lab/directory, and verify host/port/TLS before querying.
+These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+
+### Primary resources
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — login and identity controls.
+- [OpenLDAP documentation](https://www.openldap.org/doc/) — directory protocol/configuration.
+- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — web authentication labs.
+
+### Small reusable helper
+`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` — checks local evidence metadata; it makes no LDAP connection.
+
+### Runtime and evidence notes
+- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
+- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
+- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.

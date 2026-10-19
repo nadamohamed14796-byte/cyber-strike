@@ -129,3 +129,26 @@ Unset the environment variable after use and never print the token itself. This 
 ### Output additions
 
 Persist valid_control_result, invalid_control_result, single_mutation, server_principal, effective_permissions, token_lifecycle_event, revocation_observed, key_source_trust, and cleanup_status. Store only a redacted token fingerprint or non-reversible identifier, never the bearer string or refresh token.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and their role
+Burp Repeater/Comparer plus the JWT Editor extension from the official BApp Store; jq for local JSON inspection. Use only test tokens you control.
+
+### Install or enable when missing
+Burp Community/Professional: https://portswigger.net/burp ; JWT Editor extension: install via Burp's Extensions/BApp Store and verify publisher/details before enabling; jq on Kali/Debian: `sudo apt install jq`.
+These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+
+### Primary resources
+- [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html) — defensive handling and validation.
+- [RFC 7519](https://www.rfc-editor.org/rfc/rfc7519) — JWT format semantics.
+- [PortSwigger JWT attacks](https://portswigger.net/web-security/jwt) — controlled test methodology.
+
+### Small reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — local offline comparison only; it does not validate signatures or test a token.
+
+### Runtime and evidence notes
+- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
+- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
+- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
