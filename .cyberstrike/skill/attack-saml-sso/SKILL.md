@@ -107,7 +107,7 @@ Verify the accepted test assertion maps to the intended subject and allowed role
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent assertion mutations and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Use only owned test IdP/SP artifacts.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -144,3 +144,27 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### Assertion-to-session binding map
 Use an IdP/SP configuration and tester-owned identities. Record issuer, audience, recipient, destination, InResponseTo, signature reference, assertion subject, time conditions, relay state, and final SP principal. Change only one binding dimension at a time in a lab or sanctioned test integration; do not forge assertions for real accounts or bypass an external provider. Signature validity alone is not enough if the application maps the assertion to the wrong tenant or role. Confirm the resulting controlled identity and revoke sessions after testing. Route XML parser defects to XXE review and identity-linking outcomes to ATO only when the terminal account-control state is reproduced.
+
+
+## Signature and identity-binding review checklist
+
+For source/configuration review, verify these as separate invariants rather than treating “signature valid” as the entire SAML security decision.
+
+- The signature is verified with an explicitly trusted IdP key and the exact assertion/response consumed by the application.
+- XML canonicalization and reference resolution are delegated to a maintained SAML library; application code does not select a different unsigned node after verification.
+- Response issuer, assertion issuer, audience, recipient, destination, InResponseTo, and time conditions match the expected SP transaction.
+- Assertion IDs are replay-protected, and relay state is integrity-protected and bound to the initiating browser transaction.
+- Subject mapping uses stable provider + tenant + subject identifiers, not display name or mutable email alone.
+- Role/group claims are allowlisted and mapped according to explicit trust policy; arbitrary attributes cannot grant privileged roles.
+- XML parser configuration blocks external entities and unsafe DTD resolution; verify in a local harness, never by reading production files or calling external entities.
+
+### Correlated transaction fields
+
+Record transaction_id, idp_entity_id, sp_entity_id, acs_url, response_issuer, assertion_issuer, signature_reference_target, audience, recipient, destination, in_response_to, relay_state_integrity, time_window_result, replay_result, mapped_test_subject, effective_test_role, and cleanup_status. Do not save raw assertions or session tokens in shared notes.
+
+### Chain gates
+
+- Wrong principal or role accepted in the test SP → ATO/auth-bypass review after terminal-state proof.
+- Unsafe XML parsing is present → XXE review only with separate local/source evidence.
+- Redirect/relay-state destination issue → OAuth/open-redirect review only when a trusted redirect boundary is violated.
+- Signature validation warning with no accepted wrong assertion → configuration lead, not ATO.
