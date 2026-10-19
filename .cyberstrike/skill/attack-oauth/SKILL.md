@@ -110,7 +110,7 @@ Confirm the resulting principal through a harmless profile endpoint in the test 
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
+There is no arbitrary fixed ceiling for meaningful verification hypotheses. Continue while a materially different authorized test can change the conclusion; deduplicate semantically identical retries and stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or safety/scope limits apply. This is not permission for unbounded traffic: comply with program rate rules and stop on instability.
 
 Record each attempt: hypothesis, single changed variable, control/baseline, observed signal, interpretation, confidence and next branch. Prefer paired requests, controlled identities, synthetic records and independent corroboration; retain minimal sanitized evidence.
 
@@ -147,3 +147,27 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 
 ### OAuth/OIDC transaction-binding matrix
 Use a dedicated client and test accounts. Record issuer, client ID, exact redirect URI, state, nonce, PKCE challenge/method, authorization-code binding, token audience, and final subject. Preserve a known-good flow as a control and change one transaction property at a time. Verify the token/session accepted by the relying party and resulting test identity; a provider error, open redirect in isolation, or decoded token is not proof of takeover. Keep sensitive token values out of notes and reports. Route a destination-only redirect issue to open-redirect review, reset-link authority to host-header review, and an identity-control outcome to ATO only after the full terminal state is reproduced.
+
+
+## Transaction correlation and cross-skill impact gates
+
+Treat one login attempt as a correlated transaction across browser session, authorization request, callback, code exchange, ID/access token, and relying-party session. Record a local transaction label rather than raw state, code, or token values. Do not compare artifacts from unrelated sessions as if they belonged to one flow.
+
+| Signal | Follow-up | Proof bar before escalation |
+|---|---|---|
+| Redirect accepted outside the registered callback list | attack-open-redirect | The authorization server accepts the unregistered destination and a meaningful code/token exposure path is shown safely in a controlled client |
+| State is missing or not bound | CSRF/session review | A callback can complete in the wrong initiating browser session or identity, not merely that state looks predictable |
+| ID token audience/issuer mismatch accepted | attack-jwt | The relying party accepts a token intended for a different client/issuer and resolves a wrong test principal |
+| Account-linking flow can bind the wrong identity | attack-ato | A controlled account ends up linked/authenticated as the wrong test identity; never test real users |
+| Token/code appears in a URL or Referer | information-disclosure/session review | A real controlled secret crosses a trust boundary and remains usable; redact it and revoke promptly |
+| Public-client secret found in shipped JS/mobile app | client-design finding | Show the secret is treated as confidential by the server or grants privileged capability; public client IDs alone are expected |
+
+### Controlled transaction checklist
+
+1. Capture a complete successful flow for one tester-owned account.
+2. Create a fresh flow and alter one property (redirect, state, nonce, verifier, issuer/audience, or code reuse) in a controlled test client.
+3. Confirm both the protocol-level response and the relying party's final authenticated principal.
+4. Repeat a valid flow as a positive control to rule out account/session setup errors.
+5. Revoke test tokens and clear disposable registrations or sessions; note anything that could not be cleaned up.
+
+Do not create a chain merely because two weaknesses coexist. Every child finding needs its own protocol invariant, observable terminal effect, and evidence reference.
