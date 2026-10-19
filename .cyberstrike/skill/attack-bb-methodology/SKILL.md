@@ -131,49 +131,21 @@ Every cross-skill edge should store source finding/observation, exact trigger si
 Before ending a work session, report completed phases, phases blocked/partial, new and changed observations, confirmed/disproven/inconclusive hypotheses, evidence paths, cleanup, and one concrete next action. Do not say all resources were covered if a source or tool was unavailable. Preserve useful negative results and deduplicate exact retries without suppressing materially new hypotheses.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Browser/proxy history plus optional local CLI tools such as subfinder, dnsx, httpx, katana, gau, jq, and sort/comm. These are not assumed installed: check command -v first. Label each result as passive, DNS-only, or active HTTP crawling; keep program policy and rate rules binding.
-- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
-- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
+### Tools and purpose
+- `subfinder`, `dnsx`, `httpx`, `katana`, and `gau` — select phase-appropriate passive discovery, DNS validation, HTTP metadata, crawling, and historical URL collection.
+- `jq`, `sort`, `comm`, and Python — normalize/deduplicate results while preserving provenance.
+- Shared helpers under `.cyberstrike/skill/scripts/` — normalize URLs, inventory JavaScript endpoints, compare saved responses, and validate evidence manifests.
 
-### Primary resources
-- [OWASP WSTG — Information Gathering](https://owasp.org/www-project-web-security-testing-guide/)
-- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — optional recon tools and their behavior.
-- [UseOSINT skills](https://github.com/useosint/skills) — provenance and confidence practices.
+### Installation and verification
+Use the official project documentation at https://docs.projectdiscovery.io/ and https://github.com/lc/gau. Verify each selected binary with its documented version/help option before use. Check optional local utilities with `command -v` and their version output. Do not install the entire tool catalog by default; install only what the active phase needs. Record missing dependencies and use a supported fallback.
 
-### Small, reusable helper
-    python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt
-The local helper removes query values and fragments, retains sorted query-key names, and never requests a URL.
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://docs.projectdiscovery.io/
+- https://github.com/useosint/skills
+- https://github.com/vavkamil/awesome-bugbounty-tools
 
-### Evidence and hand-off
-- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
-- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
-
-Operational note: keep source, observation time, confidence, and corroboration with each asset. A discovered host or route is a lead, not scope authorization or a vulnerability by itself.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use a small phase-appropriate toolkit: Burp/browser DevTools for manual testing, subfinder/dnsx/httpx/katana for asset workflow when useful, and local URL/evidence helpers. Choose tools by the question rather than installing an entire collection by default.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — request capture.
-- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — official install for relevant recon utilities.
-- [Python downloads](https://www.python.org/downloads/) — run local standard-library helpers.
-Optional CLI availability is not assumed; if a tool is missing, recommend its official installer and a manual alternative. Active probing must follow each program's written rate and data-handling rules. Do not invent a check result when a tool is unavailable.
-
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — systematic testing.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-- [UseOSINT skills](https://github.com/useosint/skills) — source provenance and corroboration.
-
-### Reusable helpers
-- Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt for locally collected URL normalization.
-- Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json for evidence metadata.
-These helpers are local-only and do not contact a target.
-
-### Result handling
-Preserve phase, source, tool/version, command input, count/error status, artifact path, confidence, and next handoff. Reuse confirmed artifacts and continue only with materially distinct tests.
+### Evidence and handoff
+Label each result passive, DNS-only, or active HTTP; preserve source, observation time, confidence, corroboration, tool/version, errors, and artifact paths. Passive discovery does not authorize active testing. Respect program scope/rates and stop if instability appears. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes and commits. Mark outcomes confirmed, disproven, or hypothetical.
