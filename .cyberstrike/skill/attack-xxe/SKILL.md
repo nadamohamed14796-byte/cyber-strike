@@ -96,3 +96,28 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Separate entity expansion, external network interaction, and file access as distinct claims. Stop at minimum safe proof and preserve a sanitized request/response plus callback timestamp.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
+
+### Recommended tools
+- A local XML fixture harness to compare parser configurations
+- curl/Python requests — controlled request and response capture
+- interactsh only when approved for out-of-band validation
+- jq — parse sanitized result records
+
+### Resources
+- https://portswigger.net/web-security/xxe
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use the upstream community list only to discover candidates. Confirm tool maintenance, provenance, dependencies, and supported usage from official sources.
+
+### Helper-script contract
+Use benign local XML fixtures first. For remote checks, record parser behavior and a unique callback token only when approved; never read local files or probe internal services to demonstrate impact.
+
+Helpers must accept explicit paths, preserve native evidence, write normalized output separately, redact sensitive values, record timestamps and tool versions, handle malformed inputs, and include local fixtures.
+
+### Handoff
+Return the tool/version, command, input/output artifact references, control result, failures, confidence, and limitations. A candidate signal is not a confirmed finding.
