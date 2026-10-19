@@ -208,50 +208,18 @@ Replace example values with observations; do not treat this example as an expect
 Keep each edge case as a separate hypothesis with a baseline and a negative control. If the application intentionally preserves other sessions, assess the documented revoke-one/revoke-all behavior rather than assuming every session must be invalidated.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use browser DevTools' Application/Storage/Network panels, Burp Repeater/Comparer, and isolated browser profiles for controlled account/session comparisons. Use an optional password manager or OS secrets store for test credentials, not shell history.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install and proxy setup.
-- [Firefox downloads](https://www.mozilla.org/firefox/new/) — separate profiles help prevent session/cookie crossover.
-- jq on Kali/Debian: `sudo apt update && sudo apt install jq` for local JSON metadata.
-Do not export live cookies into cloud tools or public JWT/session decoders. Test revocation, rotation, and logout only using accounts you control.
-
-### Primary resources
-- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) — identifier lifecycle and invalidation.
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — session/authentication boundaries.
-- [PortSwigger session management](https://portswigger.net/web-security) — controlled practice.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized local responses offline.
-
-### Result handling
-Keep the session cookie value secret. Report lifecycle behavior (creation, rotation, logout, expiry, privilege change) and expected/actual access using test accounts.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Agent-invokable CLI tools and local libraries only; browser UI, extensions, and interactive intercepting proxies are not required dependencies. Verify official installation docs, version, license, platform support, and impact before use.
-
-### Recommended tools
-- Python requests/httpx — controlled identity/session comparisons
-- jq — parse structured responses
-- http_response_diff.py — compare baseline and test variants
-- Local JSONL matrix for account, role, token lifecycle, and operation
-
+### Agent-usable CLI tools
+- Python `httpx` or `curl`: compare controlled session lifecycle requests and responses.
+- `jq`: parse response/session metadata after redaction.
+- `rg`: inspect local source/configuration for session rotation, invalidation, expiry, and cookie attributes.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+### Install and verify
+Verify `curl --version`, the chosen Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. If tools are unavailable, use source review or a local fixture and note that live validation was not run.
 ### Resources
-- https://portswigger.net/web-security/access-control
-- https://owasp.org/API-Security/
+- https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
 - https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Community lists are discovery aids; confirm tool maintenance and CLI behavior from official sources.
-
-### Helper-script contract
-Use tester-owned accounts and synthetic resources. Change one trust dimension at a time and preserve baseline/control, auth context, result, and redacted evidence. Never retain live bearer tokens or modify real user data.
-
-Preserve raw evidence and normalize a separate copy. Record source, timestamp, tool/version, auth context, errors, confidence, redaction state, and artifact references. Use explicit paths, structured output, and local fixtures.
-
-### Handoff
-Report actual commands and versions, input/output paths, control results, failures, confidence, limitations, and next skill. Missing tools and blocked tests are explicit.
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies
+### Proof and limits
+Test only accounts and sessions controlled by the tester. Record lifecycle state and invalidation behavior; never commit live session identifiers, cookies, or tokens.
