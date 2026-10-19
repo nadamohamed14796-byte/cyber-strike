@@ -80,6 +80,20 @@ function stripDefensiveSections(content: string): string {
   return result.trim()
 }
 
+// Strict production guard for required embedded methodology skills. Kept separate
+// so missing-reference behavior can be tested without loading the full built-in catalog.
+export function assertEmbeddedSkillAvailable(
+  description: string,
+  skillName: string,
+  skill: Skill.Info | undefined,
+): asserts skill is Skill.Info {
+  if (!skill) {
+    throw new Error(
+      `Agent "${description.split("\n")[0].trim()}" references unavailable skill "${skillName}". Check the skill catalog and metadata aliases.`,
+    )
+  }
+}
+
 // Helper function to load vulnerability agent with common prompt prepended
 // and (optionally) statically-embedded WSTG skill content.
 async function loadVulnAgent(
@@ -117,12 +131,11 @@ async function loadVulnAgent(
     // Isolated tests intentionally skip the built-in catalog, so permit only that
     // test context to construct agents without embedded built-in skill text. The
     // runtime skill tool still reports genuinely missing skills as errors.
-    if (!skill) {
-      if (Skill.isCatalogIsolationContext() && availableSkills.length === 0) continue
-      throw new Error(
-        `Agent "${description.split("\n")[0].trim()}" references unavailable skill "${skillNames[i]}". Check the skill catalog and metadata aliases.`,
-      )
-    }
+    // Isolated tests intentionally skip the built-in catalog to keep their
+    // per-instance skill fixtures independent. Outside that context, required
+    // methodology references are validated strictly and cannot disappear silently.
+    if (!skill && Skill.isCatalogIsolationContext()) continue
+    assertEmbeddedSkillAvailable(description, skillNames[i], skill)
     const content = stripDefensiveSections(skill.content)
     if (content) skillBlocks.push(`<skill name="${skillNames[i]}">\n${content}\n</skill>`)
   }
