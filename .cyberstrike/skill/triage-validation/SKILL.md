@@ -12,8 +12,9 @@ tags:
   - reporting
   - cvss
 tech_stack:
-  - burp-suite
-  - http
+  - curl
+  - httpx
+  - jq
   - cvss
   - bug-bounty
 chains_with:
