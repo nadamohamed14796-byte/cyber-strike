@@ -109,7 +109,7 @@ Verify a private test object remains inaccessible anonymously and that the owner
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and equivalent requests. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never list or download unrelated production objects.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -147,3 +147,26 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Object permissions, CORS, and origin isolation
 Distinguish bucket/list permission, object read/write permission, signed-URL authority, content-type behavior, and browser-origin policy as separate checks. Prefer a synthetic object with a unique marker and read-only metadata checks; do not enumerate unrelated keys or fetch customer files. Compare anonymous and authorized access, object-level ACL/policy, CORS response, cache behavior, and URL expiry where an approved fixture exists. A public bucket with no sensitive accessible object is not proven data exposure; CORS headers alone are not browser-readable-data proof. Route content execution to XSS and shared-cache behavior to cache review only when those boundaries are independently observed.
+
+
+## Safe object-header inspection
+
+Use only an explicitly in-scope synthetic object key. Do not list the bucket or guess other keys.
+
+```bash
+curl -sS -I --max-time 8 "$TEST_OBJECT_URL"
+# Optional: owner-authorized metadata check with test credentials and a known test key.
+aws s3api head-object --bucket "$TEST_BUCKET" --key "$TEST_OBJECT_KEY"
+```
+
+Avoid placing signed URL query strings into shell history or logs. Redact signatures before saving headers. A successful HEAD response proves access to that object only; it does not prove bucket listing, other-object access, or XSS.
+
+### Provider-specific behavior checklist
+
+- Verify whether the provider honors each response override and whether it must be included in the signature.
+- Compare Content-Type, Content-Disposition, Cache-Control, Vary, and provider cache status for the same synthetic object.
+- Confirm the CDN cache key and origin behavior separately; a header variation on an origin response does not prove shared-cache contamination.
+- Check object ownership and tenant prefix policy with two test identities only when permitted.
+- Remove the synthetic object through the approved owner path and verify cleanup.
+
+Record provider_name/version, bucket_scope_evidence, test_key, request_auth_mode, override_parameter, signature_validity_source, origin_host, cache_layer, object_policy_result, negative_control, and cleanup_verified.
