@@ -88,3 +88,29 @@ Use a curated list of program-authorized domains, label passive vs active checks
 
 ### Result handling
 Record DNS answer/chain, provider/service signature, time, and non-destructive proof. Do not claim takeover unless ownership/control is demonstrated safely within explicit authorization.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify official install docs, version, license, platform compatibility, and operational impact before use.
+
+### Recommended tools
+- dig/drill — DNS and CNAME chain checks
+- dnsx — resolve candidate records
+- subzy or dnsReaper — fingerprint potential dangling services when explicitly authorized
+- Python — compare provider signatures and DNS state
+
+### Resources
+- https://github.com/projectdiscovery/subzy
+- https://github.com/michenriksen/aquatone
+- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids, not a substitute for reviewing source, release provenance, and supported behavior.
+
+### Helper-script contract
+Record CNAME chain, provider signature, authoritative DNS state, and false-positive controls. Do not claim takeover from a dangling-looking CNAME alone; never register or claim a resource as part of automated validation.
+
+Preserve native evidence; normalize to a separate file. Keep source, timestamp, tool/version, error state, confidence, and redaction. Use explicit paths, machine-readable output, and local test fixtures. Never silently treat missing data as a pass.
+
+### Handoff
+Return actual commands/tool versions, input/output paths, records checked, failures, confidence, limitations, and next skill. A detected service or misconfiguration is a lead until impact is confirmed.
