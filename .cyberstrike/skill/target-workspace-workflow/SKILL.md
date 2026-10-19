@@ -81,3 +81,28 @@ After each stage, persist the output before moving on. On interruption, continue
 
 ### Durable observation and resume contract
 Each run checkpoint should record workspace ID, target/scope provenance, phase reached, completed/pending work, last successful artifact, tool errors, blocked prerequisites, and next safe action. Deduplicate observations by canonical target + method/route + parameter/object shape + security property, while retaining separate result rows for roles, identities, and states. Never overwrite raw evidence on retry; write new run IDs and explicitly link superseded versions. Before declaring work complete, compare planned versus completed phases and label each item confirmed, disproven, inconclusive, blocked, or not run. Global research is a hypothesis source, never target-specific evidence, and target secrets must remain redacted from shared notes.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Git for change provenance, ripgrep/fd for local asset discovery, jq for structured metadata, and the CyberStrike local URL/evidence helpers. Add specialist scanners only when a phase needs them; avoid one giant toolchain for every target.
+
+### Installation and setup
+On Kali/Debian: sudo apt update && sudo apt install git ripgrep fd-find jq. Confirm the binary name for fd varies by distribution (Debian may expose fdfind). Bun/Python should follow their official install pages when a script needs them: https://bun.sh/docs/installation and https://www.python.org/downloads/.
+Keep a single target root and stable subdirectories. Tools should write to that target's assets/recon/urls/requests/javascript/endpoints/testing/findings/evidence/reports/runs/logs structure; do not mix targets or duplicate endpoint rows.
+
+### Primary resources
+- [Git documentation](https://git-scm.com/doc) — provenance and recovery.
+- [ripgrep](https://github.com/BurntSushi/ripgrep) — local content search.
+- [jq](https://jqlang.org/) — local JSON processing.
+- [CyberStrike Skill Guide](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/.cyberstrike/skill/SKILL_GUIDE.md) — helper/script standards.
+
+### Reusable helpers
+- Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize URL inventories locally.
+- Run python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript to extract candidate route metadata from already-collected assets.
+- Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before sharing evidence.
+These helpers never contact the target.
+
+### Result handling
+Persist each phase's command/tool version, input list, counts, errors, timestamps, and output paths. Resume from validated artifacts instead of rerunning work blindly; do not claim a phase succeeded if its tool was missing or failed.
