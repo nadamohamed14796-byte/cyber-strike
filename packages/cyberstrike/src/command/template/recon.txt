@@ -231,6 +231,17 @@ Prefer the official policy over search snippets, third-party summaries, or assum
 
 If a policy cannot be verified, record that fact. Do not manufacture an authorization reference.
 
+### Program root versus an in-scope asset
+
+The canonical root workspace is a durable container for one program's policy, asset inventory, notes, and artifacts. It is not necessarily a network target. A program may explicitly authorize unrelated hostnames, so the root workspace hostname itself does **not** have to appear in the program's include list.
+
+- Configure the reviewed official scope on the canonical program root.
+- Do not reject a valid manifest merely because `scope_check(target="<root hostname>", target_url="<root URL>")` says the root hostname is out of scope.
+- Before any active request, check the exact concrete asset/URL being requested against the root's persisted manifest, including exclusions, protocol, port, and path restrictions.
+- Attach an unrelated host only when its exact origin is explicitly authorized by the saved scope. A configured manifest is not blanket permission for every host.
+- If an attach or scope decision fails, inspect the returned reason and relevant matching code once. Do not keep changing URL formatting or retrying the same unchanged policy error. Record the blocker and continue only with independent, permitted work.
+- Use an actual stable program/root URL as the workspace identity where possible; never silently substitute the root URL for the concrete asset under test.
+
 ## 2.2 Import a supplied scope file
 
 If the user supplies a scope file:
