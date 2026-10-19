@@ -15,6 +15,49 @@ describe("Recon prompt specialization", () => {
   })
 })
 
+describe("Phase-critical skill pinning", () => {
+  const requiredByPhase: Partial<Record<Phase.Id, string[]>> = {
+    scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
+    passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
+    active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
+    authentication_testing: ["wstg-athn-04", "attack-auth-bypass"],
+    session_management: ["wstg-sess-01", "attack-session", "attack-jwt"],
+    authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
+    input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
+    business_logic: ["attack-business-logic"],
+    data_protection: ["attack-information-disclosure", "attack-source-leak"],
+    api_security: ["attack-shadow-api", "attack-bfla"],
+    infrastructure: ["attack-cloud-misconfig"],
+    reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
+  }
+
+  test("phase-critical skills remain present even when the optional shortlist limit is one", () => {
+    const makeSkill = (name: string): SkillIndex.Entry => ({
+      name,
+      description: "Security methodology",
+      tags: [],
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+    for (const [phaseID, required] of Object.entries(requiredByPhase) as Array<[Phase.Id, string[]]>) {
+      const ranked = rankSkillsForPhase(phaseID, [
+        makeSkill("generic-top-ranked-skill"),
+        ...required.map(makeSkill),
+      ], 1)
+      const names = ranked.map((skill) => skill.name)
+      for (const requiredName of required) expect(names, phaseID + " must retain " + requiredName).toContain(requiredName)
+    }
+  })
+
+  test("mobile phase does not require loading a directory-only, non-catalog root skill", () => {
+    expect(skillQueriesForPhase("mobile_application_testing")).not.toContain("mitre_attack_mobile")
+    expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
+  })
+})
+
 describe("Methodology phase skill routing", () => {
   test("every defined phase has a phase-specific skill discovery plan", () => {
     for (const phase of Phase.ALL) {
