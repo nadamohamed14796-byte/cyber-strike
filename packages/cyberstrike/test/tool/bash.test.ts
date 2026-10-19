@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, katanaScopeBlockReason, reconScannerInvocationKey } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, reconScannerInvocationKey } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -37,6 +37,15 @@ describe("tool.bash", () => {
         expect(result.metadata.output).toContain("test")
       },
     })
+  })
+})
+
+describe("Scanner shell-wrapper detection", () => {
+  test("finds nested scanner commands without matching quoted argument text", async () => {
+    expect(await findWrappedScanner("cd /tmp && katana -u https://example.com")).toBe("katana")
+    expect(await findWrappedScanner("sudo bash -lc 'katana -u https://example.com'")).toBe("katana")
+    expect(await findWrappedScanner("printf '%s' 'katana -u https://example.com'")).toBeUndefined()
+    expect(await findWrappedScanner("grep katana notes.txt")).toBeUndefined()
   })
 })
 
