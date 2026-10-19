@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, reconScannerInvocationKey, scannerLaunchedByWrapper } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerTargets } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -50,6 +50,23 @@ describe("Scanner shell-wrapper detection", () => {
     expect(await findWrappedScanner("bash -lc 'find /tmp -exec env FOO=bar katana -u https://example.com \\;'")).toBe("katana")
     expect(await findWrappedScanner("printf '%s' 'katana -u https://example.com'")).toBeUndefined()
     expect(await findWrappedScanner("grep katana notes.txt")).toBeUndefined()
+  })
+})
+
+describe("Scope-aware URL source input extraction", () => {
+  test("extracts literal waybackurls pipeline hostnames for persisted scope checks", () => {
+    expect(scannerTargets(
+      ["waybackurls"],
+      "printf '%s\\n' 'example.com' | waybackurls",
+    )).toContain("https://example.com")
+    expect(scannerTargets(
+      ["waybackurls"],
+      "printf '%s\\n' 'example.com' 'api.example.com' | waybackurls",
+    )).toEqual(expect.arrayContaining(["https://example.com", "https://api.example.com"]))
+  })
+
+  test("does not infer a target from a file name when a source reads a list from disk", () => {
+    expect(scannerTargets(["waybackurls"], "cat domains.txt | waybackurls")).toEqual([])
   })
 })
 
