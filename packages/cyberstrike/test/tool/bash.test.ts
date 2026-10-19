@@ -90,6 +90,15 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(safeArgs, "https://example.com", [baseScope, inheritedExclusion])).toContain("path/protocol/port exclusion")
   })
 
+  test("rejects exact-host URL and scheme-less path exclusions, including wildcard URL exclusions", () => {
+    const exactURLExclusion = { ...baseScope, excludedItems: ["https://example.com/"] }
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", exactURLExclusion)).toContain("URL/path/protocol/port exclusion")
+    const schemeLessURLExclusion = { ...baseScope, excludedItems: ["url: example.com/private"] }
+    expect(katanaScopeBlockReason(safeArgs, "https://example.com", schemeLessURLExclusion)).toContain("URL/path exclusion")
+    const wildcardURLExclusion = { ...baseScope, scopeItems: ["*.example.com"], excludedItems: ["https://*.example.com/"] }
+    expect(katanaScopeBlockReason(safeArgs, "https://api.example.com", wildcardURLExclusion)).toContain("URL/path/protocol/port exclusion")
+  })
+
   test("interprets typed wildcard scope entries as domain families", () => {
     const typedWildcard = { ...baseScope, scopeItems: ["wildcard: example.com"] }
     expect(katanaScopeBlockReason(["-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5"], "https://api.example.com", typedWildcard)).toBeUndefined()
