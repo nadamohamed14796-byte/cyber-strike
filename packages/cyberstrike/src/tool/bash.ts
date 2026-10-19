@@ -199,10 +199,15 @@ export function scannerTargets(command: string[], commandText: string): string[]
     const pipelineIndex = commandText.lastIndexOf("|")
     const inputText = pipelineIndex >= 0 ? commandText.slice(0, pipelineIndex) : ""
     const hostPattern = /(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/gi
-    for (const match of inputText.matchAll(hostPattern)) {
-      const hostname = match[0].toLowerCase().replace(/\.$/, "")
-      if (hostname.includes("waybackurls")) continue
-      candidates.add("https://" + hostname)
+    const literalProducer = /^\s*(?:printf|echo)\b/i.test(inputText)
+    if (literalProducer) {
+      for (const match of inputText.matchAll(hostPattern)) {
+        const hostname = match[0].toLowerCase().replace(/\.$/, "")
+        // Avoid treating filenames (e.g. domains.txt or hosts.json) as authorized hosts.
+        if (/\.(?:txt|list|csv|json|jsonl|xml|yaml|yml|log|md|html|js|map|pdf)$/i.test(hostname)) continue
+        if (hostname.includes("waybackurls")) continue
+        candidates.add("https://" + hostname)
+      }
     }
   }
   return [...candidates]
