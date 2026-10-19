@@ -77,23 +77,20 @@ Record `endpoint`, `header_variant`, `baseline_host`, `observed_host_use`, `prox
 Capture baseline responses for normal Host, observed X-Forwarded-Host/Forwarded handling, and the canonical application URL, changing one authority input at a time in a controlled request. Trace the effect to an absolute link, redirect, cache key, tenant routing, or reset message; reflected text alone is not impact. Compare edge and application behavior without sending mail or triggering real account recovery. Chain to password-reset review only if a controlled test inbox receives a poisoned link, and to cache poisoning only if a shared cache stores and replays the altered response. Record which proxy is trusted and recommend allowlisted canonical host construction.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl to replay one observed request; use only runtime-exposed integrations.
-- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
+### Tools
+- `curl` or Python `httpx`: replay an observed request with a controlled Host or forwarded-host header.
+- `jq` and `rg`: parse saved response metadata and search authorized source/configuration for trusted-host handling.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-- [OWASP Cheat Sheets](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation.
+### Installation and verification
+Verify `curl --version` and the selected Python client; official docs: https://curl.se/docs/ and https://www.python-httpx.org/. If unavailable, inspect local reverse-proxy/application configuration and record the gap.
 
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
+### Resources
+- https://portswigger.net/web-security/host-header
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html
 
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+### Result handling
+Start from a captured request to an explicitly in-scope host. Record the exact header, baseline and candidate response, redirect/location effects, and evidence. A changed response alone does not establish impact; do not poison shared cache or generate links sent to real users.
