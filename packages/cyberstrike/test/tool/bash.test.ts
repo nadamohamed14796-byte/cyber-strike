@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, katanaScopeBlockReason } from "../../src/tool/bash"
+import { BashTool, katanaScopeBlockReason, reconScannerInvocationKey } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -37,6 +37,26 @@ describe("tool.bash", () => {
         expect(result.metadata.output).toContain("test")
       },
     })
+  })
+})
+
+describe("Recon scanner deduplication", () => {
+  test("duplicate source scans share an identity even when output destinations differ", () => {
+    const first = reconScannerInvocationKey([
+      "katana", "-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/first.jsonl",
+    ])
+    const duplicate = reconScannerInvocationKey([
+      "katana", "-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/second.jsonl",
+    ])
+    const complementary = reconScannerInvocationKey([
+      "katana", "-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/api.jsonl",
+    ])
+    expect(first).toBe(duplicate)
+    expect(first).not.toBe(complementary)
+  })
+
+  test("ordinary commands with scanner names as arguments are not deduped as scans", () => {
+    expect(reconScannerInvocationKey(["grep", "katana", "notes.txt"])).toBeUndefined()
   })
 })
 
