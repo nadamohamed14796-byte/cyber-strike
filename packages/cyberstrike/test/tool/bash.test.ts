@@ -153,6 +153,9 @@ describe("Katana scope policy", () => {
     const nestedOutput = path.join(workspacePath, "urls", "nested", "katana.jsonl")
     const nestedArgs = safeArgs.map((arg) => arg === safeOutput ? nestedOutput : arg)
     expect(katanaScopeBlockReason(nestedArgs, "https://example.com", baseScope, workspacePath)).toContain("direct child")
+    const wrongExtension = path.join(workspacePath, "urls", "katana.txt")
+    const wrongExtensionArgs = safeArgs.map((arg) => arg === safeOutput ? wrongExtension : arg)
+    expect(katanaScopeBlockReason(wrongExtensionArgs, "https://example.com", baseScope, workspacePath)).toContain(".jsonl")
   })
 
   test("rejects a crawler command without explicit URL inputs", () => {
@@ -181,8 +184,10 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
   })
 
-  test("rejects unbounded rate limits and scope-broadening flags", () => {
-    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
+  test("requires explicit non-clobbering output and rejects scope-broadening flags", () => {
+    const withoutNoClobber = safeArgs.filter((arg) => arg !== "-ncb")
+    expect(katanaScopeBlockReason(withoutNoClobber, "https://example.com", baseScope, workspacePath)).toContain("no-clobber")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
     expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope, workspacePath)).toContain("scope overrides")
   })
 
