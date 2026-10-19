@@ -72,10 +72,13 @@ If a pre-auth ID exists, verify login rotates it and that a test-supplied identi
 
 ## Tools
 
-- **Browser DevTools:** inspect cookie lifecycle and attributes.
-- **Burp Suite:** compare requests using owned sessions.
-- **Offline JWT decoder:** inspect test-token claims locally.
-- **Source/log review:** verify rotation, expiry, and revocation.
+- Python `httpx` or `curl`: compare controlled session lifecycle requests.
+- `jq`: parse saved session metadata after redaction.
+- `rg`: inspect local source/configuration for rotation, expiry, revocation, and cookie attributes.
+- Python standard library `json` / `base64`: inspect test-token structure locally; decoding is not signature validation.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify the chosen client and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## Session Lifecycle Matrix
 
