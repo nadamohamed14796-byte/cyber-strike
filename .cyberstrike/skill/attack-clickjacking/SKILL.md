@@ -94,7 +94,7 @@ Check login redirects, legacy paths, and error responses for consistent framing 
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
 
@@ -123,3 +123,14 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 
 - [Claude-BugHunter — hunt-clickjacking](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-clickjacking)
 - [OWASP Clickjacking Defense Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html)
+
+
+## Header-first field check
+Fetch only an in-scope page and inspect the actual response headers for every relevant route; a home page's policy may not cover account, consent, or administrative screens.
+
+```bash
+curl -sS -D response.headers -o /dev/null "$TARGET_URL"
+grep -iE '^(content-security-policy|x-frame-options|content-type|set-cookie):' response.headers
+```
+
+If headers are absent or weak, confirm the browser-effective frame-ancestors policy and whether a sensitive action can be framed and triggered in a controlled browser using your own test account. Missing X-Frame-Options by itself is not impact when CSP already blocks framing or the page has no sensitive interaction. Chain only confirmed context to attack-security-headers, attack-csrf, or session/auth skills.
