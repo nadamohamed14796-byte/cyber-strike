@@ -270,13 +270,15 @@ If the user supplies a scope file:
 
 1. Inspect the file safely without executing its contents.
 2. Identify its format, source, integrity, and include/exclude rules.
-3. Compare its contents against the official policy.
-4. Resolve any conflicts conservatively.
+3. If a verified official policy reference is available, compare the supplied entries against it. If the user explicitly confirms the complete list as the authorized scope and no policy reference is available, record that provenance without inventing a reference or asking for per-entry confirmation.
+4. Resolve known conflicts conservatively; preserve unsupported entries as evidence and do not treat them as authorizing HTTP requests.
 5. Import it using the registered `target_workspace` scope-configuration operation.
 
 Prefer an official policy reference when one is supplied or can be verified. If the user explicitly confirms the entire supplied file/list as the authorized scope and no policy reference is available, use `user_confirmed_scope_list=true` and record that provenance rather than fabricating a URL. Never ask the user to confirm each row. If a file/list contains unsupported entries, preserve them as evidence and clearly state that they cannot authorize HTTP requests until supported. Use the appropriate registered-tool call:
 
-Policy import: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
+Policy import: Policy-backed import: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
+
+User-confirmed complete list without a verified policy URL: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", user_confirmed_scope_list=true)`. The same flag applies to a complete explicit `include=[...]` list when no file is provided.
 
 User-confirmed complete list without a verified policy URL: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", user_confirmed_scope_list=true)`. The same flag applies to an explicit complete `include=[...]` list when no file is provided.
 
