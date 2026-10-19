@@ -1091,7 +1091,12 @@ export namespace ReportKnowledge {
           return row.confidence >= 50
         })
         // search() already ranks by query relevance, then confidence/usefulness.
-        // Do not replace that ordering with a confidence-only sort.
+        // Do not replace that ordering with a confidence-only sort. Apply the
+        // requested limit AFTER trust/status filtering so rejected rows cannot consume
+        // the budget, and so one class cannot flood a multi-class research briefing.
+        .slice(0, input.limit === undefined
+          ? Number.MAX_SAFE_INTEGER
+          : Math.max(0, Math.trunc(Number.isFinite(input.limit) ? input.limit : Number.MAX_SAFE_INTEGER)))
     )
   }
 }
