@@ -234,3 +234,29 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record the endpoint, method, unauthenticated baseline, control with a controlled account, returned data class, and practical impact. Redact all secrets and personal data.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-invokable CLI tools and local libraries only. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version, official documentation, license, and target-specific impact before use.
+
+### Recommended tools
+- curl/Python requests — unauthenticated baseline checks
+- jq — parse structured API responses
+- OpenAPI parser/validator such as swagger-cli or Python openapi-spec-validator where schemas exist
+- http_response_diff.py — compare anonymous and authenticated controls
+
+### Resources
+- https://owasp.org/API-Security/editions/2023/en/0xa7-security-misconfiguration/
+- https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
+- https://github.com/OAI/OpenAPI-Specification
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use community lists to discover candidates, then verify their current maintenance and CLI behavior from official sources.
+
+### Helper-script contract
+For each route, preserve method, auth context, response classification, harmless test object, and anonymous/authenticated control pair. Do not enumerate or retain exposed personal data.
+
+Keep raw evidence separate from normalized results. Record source, timestamp, tool/version, auth context, control result, errors, confidence, and redaction. Helpers should use explicit input/output paths, structured output, and local fixtures.
+
+### Handoff
+Report commands actually run, tool versions, input/output artifact paths, control/variant outcomes, failures, confidence, limitations, and next skill. Missing tools and blocked tests must be explicit.
