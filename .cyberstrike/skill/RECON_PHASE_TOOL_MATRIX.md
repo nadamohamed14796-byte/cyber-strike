@@ -4,7 +4,7 @@ This is the operational tool-selection contract for CyberStrike's canonical reco
 
 ## Required preflight for every phase
 
-1. Read the current `recon_checkpoint(action="status")` and inspect the canonical target workspace. Reuse valid artifacts; do not repeat completed work without new evidence or a documented invalidation.
+1. Read the current `recon_checkpoint(action="status", target_url=<canonical program-root URL>)` and inspect the canonical target workspace. `target_url` is required by the tool schema. Reuse valid artifacts; do not repeat completed work without new evidence or a documented invalidation.
 2. Read the applicable skill(s) using the registered skill tool: first `recon-methodology` and `community-tool-selection`, then the task-specific skill(s) below. A search result or candidate list is not a loaded skill.
 3. Check local candidates without installing them:
    `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <candidate names...>`
