@@ -104,7 +104,7 @@ Confirm the diagnostics page is removed or access-controlled and that the respon
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent path checks and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Minimize captured diagnostic content and never use exposed secrets.
 
 Record each attempt: hypothesis, single changed variable, control/baseline, observed signal, interpretation, confidence and next branch. Prefer paired requests, controlled identities, synthetic records and independent corroboration; retain minimal sanitized evidence.
 
@@ -142,3 +142,17 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 
 ### Sensitive-value minimization and adjacent-risk test
 Verify the response is genuine PHP configuration output and preserve only a redacted section demonstrating the configuration boundary. Do not scrape or publish environment values, filesystem paths, request headers, or secrets from the page. Distinguish internal path disclosure, loaded-module/version hints, and actual credential exposure, and corroborate version findings with vendor advisories and deployment context. A phpinfo page alone does not prove RCE; review adjacent execution prerequisites offline or in a lab and label any untested link as a hypothesis. Chain to source/config exposure only when a distinct reachable artifact is confirmed, and use the evidence-hygiene skill before report submission.
+
+
+## Minimal capture and remediation verification
+
+Prefer response headers and an existence check first. If genuine phpinfo output is returned, stop broad collection and preserve only a redacted excerpt of the exact sensitive property needed for the report.
+
+```bash
+curl -sS --max-time 6 -D candidate.headers -o /dev/null "$IN_SCOPE_CANDIDATE_URL"
+grep -iE '^(HTTP/|content-type:|cache-control:|content-length:)' candidate.headers
+```
+
+A 200 or HTML content type is not proof of phpinfo. If content inspection is needed, use a private local response artifact and remove it after producing a minimal redacted excerpt. Do not save a full phpinfo page to shared notes or attach it to a report.
+
+Record endpoint, anonymous_or_role_access, phpinfo_signature_observed, minimal_sensitive_field_category, exact_value_redacted, random_path_control, cache_context, owner_remediation, and retest_result. Treat adjacent RCE or credential exposure as a separate hypothesis requiring independent proof.
