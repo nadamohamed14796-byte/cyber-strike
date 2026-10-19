@@ -744,7 +744,7 @@ Before reporting completion:
 6. Reconcile reported counts against persisted inventories.
 7. Distinguish unique entities from observations and duplicate records.
 8. Identify any unfinished frontier or failed operation.
-9. Confirm that every active operation had a valid scope preflight.
+9. Confirm that every active operation was protected by the registered tool's persisted-scope enforcement.
 10. Ensure no secret values have leaked into general notes or the final report.
 11. Confirm that the resume point identifies a concrete next action.
 12. Ensure that no endpoint or technology indicator has been mislabeled as a vulnerability.
