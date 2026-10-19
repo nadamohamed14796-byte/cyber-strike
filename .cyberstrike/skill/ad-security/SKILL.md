@@ -218,46 +218,19 @@ Reports should include sanitized domain/host context, the exact relationship or 
 Treat email-authentication weaknesses as a signal, not standalone impact. Correlate SPF/DKIM/DMARC policy with the actual sending path, From-domain alignment, receiver disposition, and a controlled mailbox you own. Chain only when independently observed: spoofable domain use → receiver accepts a controlled test message → a credible impersonation path in the program's threat model. Do not claim account takeover from a missing DNS record alone. Link the result to `recon-email-security`, `attack-security-headers` where browser delivery context matters, and `attack-triage-validation`.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Use only the native audit/telemetry tooling of an explicitly authorized lab (for example, Event Viewer/PowerShell on Windows, journalctl/auditd on Linux, klist for Kerberos context, or provider logs where relevant). Check availability before commands; do not use internal post-exploitation techniques against public bug-bounty assets.
-- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
-- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
+- PowerShell/RSAT: read-only directory inspection in an authorized Windows lab or approved domain.
+- `ldapsearch`: query only a scoped test directory where the protocol and base DN are explicitly permitted.
+- Impacket utilities: protocol analysis only in a dedicated isolated lab; review current upstream usage and dependencies before installing.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json`: validate sanitized lab evidence metadata.
 
-### Primary resources
-- [MITRE ATT&CK](https://attack.mitre.org/) — behavior taxonomy and detection context.
-- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — authorized assessment and evidence handling.
+Verify PowerShell/RSAT availability, `ldapsearch -VV`, and the selected Impacket package version before use. Official docs: https://learn.microsoft.com/en-us/windows-server/remote/remote-server-administration-tools, https://www.openldap.org/software/man.cgi?query=ldapsearch, https://github.com/fortra/impacket.
 
-### Small, reusable helper
-    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
-Keep an artifact manifest for read-only findings and configuration snapshots; do not store credentials or raw personal data in the manifest.
+### Resources
+- https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/
+- https://attack.mitre.org/matrices/enterprise/
+- https://learn.microsoft.com/en-us/windows-server/security/kerberos/kerberos-authentication-overview
 
-### Evidence and hand-off
-- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
-- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
-
-Lab boundary: this skill is for systems you own or an explicitly authorized isolated environment. Do not apply internal post-exploitation workflows to public bug-bounty assets. Record the lab, principal, starting state, and cleanup plan.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Microsoft RSAT/PowerShell and Windows audit logs for defensive directory inspection. For an isolated Active Directory lab, BloodHound CE can visualize directory relationships and Impacket can support protocol analysis; these are not tools for public-web bounty targets.
-
-### Installation and setup
-- [Windows RSAT](https://learn.microsoft.com/en-us/windows-server/remote/remote-server-administration-tools) — Microsoft-supported administration tools.
-- [BloodHound CE](https://bloodhound.specterops.io/get-started/installation) — official lab setup.
-- [Impacket](https://github.com/fortra/impacket) — official source and installation notes; use a dedicated virtual environment.
-Only use synthetic lab identities or written-approved accounts. Do not run credential theft, password spraying, ticket abuse, or lateral movement against an unapproved domain.
-
-### Primary resources
-- [Microsoft Active Directory documentation](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/) — directory design and security.
-- [MITRE ATT&CK Enterprise](https://attack.mitre.org/matrices/enterprise/) — behavior/detection mapping.
-- [Microsoft Kerberos overview](https://learn.microsoft.com/en-us/windows-server/security/kerberos/kerberos-authentication-overview) — protocol semantics.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to preserve sanitized lab evidence.
-
-### Result handling
-Record lab/domain context, role, relevant event/permission, expected vs observed access, and cleanup; never save passwords, ticket blobs, hashes, or user data in shared notes.
+### Evidence and limits
+Use synthetic lab identities or written-approved accounts. Record domain context, role, permission/event, expected vs observed access, and cleanup. Do not apply internal directory workflows to public bug-bounty targets or store credentials/ticket blobs in shared notes.
