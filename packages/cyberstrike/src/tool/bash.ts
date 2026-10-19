@@ -382,7 +382,10 @@ async function assertScannerReconGate(command: string[], commandText: string): P
         if (visited.has(current.id)) throw new Error("target workspace ancestry contains a cycle")
         visited.add(current.id)
         const currentScope = await TargetMemory.getScope(current.targetURL)
-        if (currentScope?.status === "configured") scopes.push(currentScope)
+        if (!currentScope || currentScope.status !== "configured" || currentScope.scopeItems.length === 0) {
+          throw new Error("workspace " + current.targetURL + " has no configured persisted scope")
+        }
+        scopes.push(currentScope)
         if (!current.parentTargetID) break
         current = allWorkspaces.get(current.parentTargetID)
         if (!current) throw new Error("parent target workspace is missing; refusing to weaken inherited scope")
