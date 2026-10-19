@@ -81,7 +81,7 @@ export namespace Skill {
   // Instance.directory values concurrently. Use the fixture's per-directory marker
   // first, so one test changing process.env cannot make another fixture load global
   // built-in skills (or make a real repository instance lose its built-in catalog).
-  function isSkillCatalogIsolationContext(): boolean {
+  export function isCatalogIsolationContext(): boolean {
     const directory = path.resolve(Instance.directory)
     const basename = path.basename(directory)
     if (basename.startsWith("cyberstrike-test-")) return true
@@ -234,7 +234,7 @@ export namespace Skill {
     // Built-in skills: resolve .cyberstrike/ relative to this source file
     // so they're always found regardless of Instance.directory (web UI header).
     // Skip in test mode to preserve test isolation.
-    if (!isSkillCatalogIsolationContext()) {
+    if (!isCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
@@ -391,7 +391,7 @@ export namespace Skill {
     }
 
     // Built-in skills
-    if (!isSkillCatalogIsolationContext()) {
+    if (!isCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
       if (await Filesystem.isDir(builtinDir)) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
