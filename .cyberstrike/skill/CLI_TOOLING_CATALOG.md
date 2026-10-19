@@ -58,6 +58,35 @@ The example is illustrative. It does not mean every tool should run on every tar
 
 Template scanners and fuzzers must only be run on approved targets at permitted rates. Inspect a template's requests and destructive behavior before use. A match, banner, or error alone is not a confirmed vulnerability.
 
+## API, JavaScript, authentication, and protocol analysis
+
+| Tool | Purpose | Official install/docs |
+|---|---|---|
+| jsluice | Extract URLs/endpoints and useful patterns from local JavaScript | [Repository/docs](https://github.com/0x240x23elu/JSluice) |
+| LinkFinder | Extract candidate endpoints from collected JavaScript | [Repository/docs](https://github.com/GerbenJavado/LinkFinder) |
+| xnLinkFinder | Extract URL/endpoint candidates from local assets and archives | [Repository/docs](https://github.com/xnl-h4ck3r/xnLinkFinder) |
+| jwt_tool | Inspect JWT structure and support controlled validation | [Repository/docs](https://github.com/ticarpi/jwt_tool) |
+| graphql-cop | Check GraphQL security configuration in authorized environments | [Repository/docs](https://github.com/dolevf/graphql-cop) |
+| Clairvoyance | Infer GraphQL schema where permitted | [Repository/docs](https://github.com/nikitastupin/clairvoyance) |
+| websocat / wscat | CLI WebSocket connection and message testing | [websocat](https://github.com/vi/websocat) / [wscat](https://github.com/websockets/wscat) |
+| testssl.sh | TLS protocol/cipher/certificate checks | [Repository/docs](https://github.com/testssl/testssl.sh) |
+| interactsh-client | Correlate approved out-of-band DNS/HTTP callbacks | [Repository/docs](https://github.com/projectdiscovery/interactsh) |
+
+## Secrets, source exposure, and takeover triage
+
+| Tool | Purpose | Official install/docs |
+|---|---|---|
+| Gitleaks | Scan authorized local repositories for secret-like patterns | [Repository/docs](https://github.com/gitleaks/gitleaks) |
+| TruffleHog | Source-aware secret discovery/verification | [Repository/docs](https://github.com/trufflesecurity/trufflehog) |
+| Nosey Parker | Search source trees for credential patterns | [Repository/docs](https://github.com/praetorian-inc/noseyparker) |
+| detect-secrets | Baseline-oriented secret detection for repositories | [Repository/docs](https://github.com/Yelp/detect-secrets) |
+| whispers | Find likely secrets in local JavaScript/source artifacts | [Repository/docs](https://github.com/Skyscanner/whispers) |
+| git-dumper | Retrieve exposed Git repository content only when authorized and explicitly permitted | [Repository/docs](https://github.com/arthaud/git-dumper) |
+| subzy | Candidate subdomain takeover checks | [Repository/docs](https://github.com/PentestPad/subzy) |
+| can-i-take-over-xyz | Reference database for takeover service conditions | [Repository/docs](https://github.com/EdOverflow/can-i-take-over-xyz) |
+
+These tools are optional and evidence-specific. Never treat a scanner match as a confirmed finding, use retrieved secrets, or access private data. For takeover checks, verify DNS/service ownership and current provider conditions; a dangling-looking record alone is not proof. Review a tool's network behavior and template set before use.
+ 
 ## Code, secrets, dependencies, cloud, and CI
 
 | Tool | Purpose | Official install/docs |
