@@ -157,6 +157,11 @@ Use tools the agent can invoke directly. Browser interfaces, browser extensions,
 - httpx — HTTP/TLS metadata
 - jq and Python — normalization and provenance-preserving deduplication
 
+### Installation and verification
+- Follow official installation instructions for [subfinder](https://github.com/projectdiscovery/subfinder), [Amass](https://github.com/owasp-amass/amass), [dnsx](https://github.com/projectdiscovery/dnsx), [puredns](https://github.com/d3mondev/puredns), and [httpx](https://github.com/projectdiscovery/httpx); do not copy installation commands from untrusted write-ups.
+- Verify each installed binary with its documented version/help option (for example, `subfinder -version`, `dnsx -h`, and `httpx -version`; flags can vary by release, so check upstream docs).
+- Start with passive sources and existing DNS observations. Run active resolution only when allowed. If a dependency is unavailable, retain passive findings and record the limitation rather than reporting an empty successful run.
+
 ### Official resources
 - https://github.com/projectdiscovery/subfinder
 - https://github.com/owasp-amass/amass
