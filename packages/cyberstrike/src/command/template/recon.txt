@@ -83,13 +83,13 @@ For every phase:
 
 Workspace initialization does not establish authorization.
 
-Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. Revalidate scope for each candidate before active probing.
+Use active reconnaissance only against assets and operations authorized by the applicable program/customer policy or explicitly confirmed by the user for that exact asset. Apply saved exclusions before inclusions. During setup, call the agent-level scope checker once for the actual starting asset with the canonical program-root workspace as `target_url`; the root hostname may itself be out of scope. Active-request tools still enforce the persisted manifest for every concrete request.
 
 Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
 
 Do not bypass authentication, rate limits, access controls, or program restrictions. Respect the target's permitted request methods, automation limits, and operational constraints.
 
-If scope is missing, ambiguous, invalid, or unconfigured, continue passive public research and workspace preparation where appropriate, but do not run active probes.
+If scope is missing or unconfigured and the user explicitly confirms one exact asset, configure that single asset with `user_confirmed_scope=true` and record the confirmation in target notes; do not demand a separate policy URL or repeat proof. If a manifest already exists, reuse it or merge only the exact newly confirmed asset. If the actual asset is excluded or the manifest is invalid/unreadable, do not actively probe it; explain the specific blocker without restarting discovery. Continue independent passive research and workspace preparation where appropriate.
 
 ### 0.5 Target data protection
 
@@ -276,7 +276,7 @@ Record the returned source SHA-256, saved path, configuration result, and any un
 
 ## 2.3 Configure scope without a supplied file
 
-If no scope file is provided, construct the manifest only from verified official policy evidence.
+If no scope file is provided, use verified official policy evidence for a full program manifest. If the user explicitly confirms one exact asset instead, configure only that exact entry with `user_confirmed_scope=true`, preserve that provenance in the manifest and notes, and do not fabricate an external policy reference.
 
 When the registered tool supports the interface below, use:
 
