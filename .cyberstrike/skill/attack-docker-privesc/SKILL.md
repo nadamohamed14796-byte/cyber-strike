@@ -114,7 +114,7 @@ Remove unnecessary socket mounts/privileges, drop capabilities, apply user names
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful, authorized read-only hypotheses. Continue while a distinct check can change the conclusion; deduplicate equivalent configuration checks and stop when evidence resolves the question, relevant branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. Do not perform host escape or modify production infrastructure.
 
 Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
 
@@ -150,3 +150,21 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 
 ### Container-to-host boundary proof
 Map runtime identity, group memberships, mounted sockets, host bind mounts, privileged flags, namespace settings, and capability grants from the approved test environment. Treat each as a distinct trust boundary; do not execute a host escape against a production workload. A mounted Docker socket or privileged flag is a strong configuration signal, but document the effective host authority reachable by the actual container identity using non-destructive read-only checks. Validate exploitability only in a disposable lab. Route image build-secret leakage to source/CI review and Kubernetes pod identity or RBAC gaps to the Kubernetes assessment skill.
+
+
+## Read-only runtime snapshot
+
+Run only inside an authorized container or on owner-provided configuration. These commands inspect metadata and do not attempt to use the Docker daemon or cross a host boundary.
+
+```bash
+id
+grep -E '^(Uid|Gid|Groups|CapEff|NoNewPrivs|Seccomp):' /proc/self/status
+findmnt -o TARGET,SOURCE,FSTYPE,OPTIONS
+test -S /var/run/docker.sock && stat -c '%A %U:%G %n' /var/run/docker.sock
+```
+
+If Docker CLI metadata inspection is authorized, inspect configuration only; do not invoke container creation, exec, copy, or privileged operations as part of this assessment. Redact mount source paths and environment values before storing evidence.
+
+### Evidence record additions
+
+Record runtime_version, container_image_digest, effective_uid_gid, groups, effective_capabilities, seccomp_status, lsm_status, socket_mode_owner, mount_sources_redacted, host_namespace_flags, workload_need, lab_validation_only, and cleanup_status. Separate configured risk from demonstrated host impact.
