@@ -77,7 +77,7 @@ describe("target asset hierarchy", () => {
     await Instance.provide({
       directory: tmp.path,
       async fn() {
-        const root = await TargetMemory.configureScope("https://mercadolibre-program.test", {
+        const root = await TargetMemory.configureScope("https://mercadolibre", {
           include: ["https://fullbarhomologa.modoblackfullbar.com.br"],
           authorizationSource: "Authorized program scope fixture",
           authorizationReference: "https://program.example.test/policy",
