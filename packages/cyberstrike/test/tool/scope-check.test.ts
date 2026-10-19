@@ -173,3 +173,32 @@ describe("scope_check uses persisted target scope when a workspace is supplied",
     })
   })
 })
+
+
+describe("scope_check output size", () => {
+  test("returns matching entries and counts instead of dumping a large scope manifest", async () => {
+    const info = await ScopeCheckTool.init()
+    const scopeItems = [
+      "*.example.com",
+      ...Array.from({ length: 1000 }, (_, index) => "host-" + index + ".example.net"),
+    ]
+    const result = await info.execute(
+      { target: "api.example.com", scope_items: scopeItems },
+      {
+        sessionID: "ses_scope_compact_output",
+        messageID: "msg_scope_compact_output",
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => undefined,
+        ask: async () => undefined,
+      },
+    )
+
+    expect(result.metadata.include_match_count).toBe(1)
+    expect(result.metadata.results).toHaveLength(1)
+    expect(result.output).toContain("Matching inclusions (1)")
+    expect(result.output).not.toContain("host-999.example.net")
+    expect(result.output.length).toBeLessThan(2000)
+  })
+})
