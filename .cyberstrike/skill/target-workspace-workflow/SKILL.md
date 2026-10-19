@@ -24,7 +24,7 @@ When the user supplies a target, a scope file, a list of domains/subdomains, a r
 1. Call \`target_workspace(action="init", target_url="<stable root/program URL>")\` before starting recon or active testing.
 2. Record the exact canonical absolute workspace path returned by the tool. It is the only default root for all target-specific output in this engagement.
 3. Verify the paths in the tool result. Do not assume a directory exists because it appeared in a plan or because another tool printed a success-looking message.
-4. Workspace creation is bookkeeping only, not authorization. For a full program manifest or an actual policy change, use the official policy. If the user explicitly confirms one exact asset is in scope, accept that without demanding a policy link or proof. If no manifest exists, configure one exact entry with user_confirmed_scope=true and record that provenance in target notes; never infer sibling assets or wildcards.
+4. Workspace creation is bookkeeping only, not authorization. For a full program manifest or an actual policy change, use the official policy. If the user explicitly confirms one exact asset is in scope, accept that without demanding a policy link or proof. If no configured manifest exists (even if the workspace was already initialized), configure one exact entry with user_confirmed_scope=true and record that provenance in target notes; never infer sibling assets or wildcards.
 
 ## Authorization and scope
 
