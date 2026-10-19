@@ -47,6 +47,8 @@ def format_markdown(raw: str) -> str:
                 closing_fence = True
         # Preserve code-block payload exactly; normalize whitespace only outside it.
         stripped = line if in_fence and not closing_fence else candidate
+        if not in_fence and stripped == "" and out and out[-1] == "":
+            continue
         if re.match(r"^#{1,6}\s+\S", stripped):
             while out and out[-1] == "":
                 out.pop()
