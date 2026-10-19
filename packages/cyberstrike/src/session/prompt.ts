@@ -802,9 +802,15 @@ export namespace SessionPrompt {
       // Keep the contract available even when the engagement runs from a directory without
       // an AGENTS.md. Search recent user turns so terse follow-ups still retain target intent.
       const targetTaskText = msgs
-        .flatMap((msg) => msg.info.role === "user" && "parts" in msg ? msg.parts : [])
-        .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
-        .map((part) => part.type === "text" ? part.text : "")
+        .map((msg) => ({
+          role: msg.info.role,
+          text: msg.parts
+            .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
+            .map((part) => part.type === "text" ? part.text : "")
+            .join(" "),
+        }))
+        .filter((message) => message.role === "user")
+        .map((message) => message.text)
         .join(" ")
         .slice(-12000)
       const targetWorkflowRequested =
