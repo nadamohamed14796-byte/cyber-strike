@@ -202,10 +202,10 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
       // HackerOne URL exclusions may omit the scheme, e.g. "url: example.com/private".
       // FQDN filtering cannot preserve those narrower request boundaries either.
       if (raw.includes("/")) {
-        let excludedURL: URL
+        let excludedURL: URL | undefined
         try { excludedURL = new URL("https://" + raw.replace("*.", "scope-wildcard.")) }
-        catch { excludedURL = undefined as never }
-        if (excludedURL! && (excludedURL.hostname.toLowerCase() === hostname ||
+        catch { excludedURL = undefined }
+        if (excludedURL && (excludedURL.hostname.toLowerCase() === hostname ||
             hostname.endsWith("." + excludedURL.hostname.toLowerCase().replace(/^scope-wildcard\./, "")))) {
           return "Katana cannot enforce the saved URL/path exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
         }
