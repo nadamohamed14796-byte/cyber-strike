@@ -153,3 +153,46 @@ Use only a controlled account and a disposable object. Compare the normal same-s
 
 ### CSRF request-pair and state proof
 Use a disposable test account, a reversible state-changing feature, and a baseline request captured from the legitimate UI. Test the same operation through a locally hosted cross-origin page or documented test harness, varying one defense dimension at a time (token, Origin/Referer, SameSite cookie behavior, content type, or required custom header). Confirm the server-side state transition, then restore it. A 2xx response without a state change is not proof; JSON CORS constraints and SameSite behavior may be valid defenses. Chain to clickjacking only when framing/interaction is separately shown, or session/cookie review only when ambient credentials are the enabling condition.
+
+## Advanced branch: distinguish request trigger, credential inclusion, and response readability
+
+These are three separate questions and must be logged separately:
+1. Can a cross-site context cause the browser to send the mutation?
+2. Does the browser attach the ambient credential under the actual cookie/SameSite and fetch context?
+3. Does the attacker need to read the response, or is a blind state change enough?
+
+A CSRF can succeed without reading the response. Conversely, CORS can allow a read without enabling a state-changing request. Do not use a successful curl/Repeater replay as proof of a cross-site browser attack.
+
+### Safe request-pair checklist
+
+- Save a sanitized legitimate baseline: method, URL, content type, Origin/Referer, CSRF token location, custom headers, cookie names/attributes, and before-state.
+- Use only a local proof page and a disposable test-owned record. Never embed a real session token or target a real user.
+- Change one defense dimension per comparison: remove token; use a different test-session token; change Origin; use a browser-compatible simple form; or inspect whether SameSite suppresses the cookie.
+- Re-read server-side state through the legitimate UI/API after each attempt. A 2xx, redirect, or generic success message is not enough.
+- Restore the original value after proof and retain sanitized evidence of cleanup.
+
+```html
+<!doctype html>
+<meta charset="utf-8">
+<title>Local CSRF test harness — use only with a disposable in-scope account</title>
+<form method="POST" action="https://TARGET-HOST.example/account/preferences">
+  <input type="hidden" name="displayName" value="csrf-test-marker">
+  <button type="submit">Send controlled test request</button>
+</form>
+```
+
+Replace the example host/path/field with the exact in-scope endpoint and a reversible field from a tester-owned account. This is a manual harness template, not a claim that a target is vulnerable. Do not add credentials, tokens, destructive fields, or automatic submission.
+
+### Chain decision table
+
+| Observed prerequisite | Next skill | What must be independently proven |
+|---|---|---|
+| Browser includes ambient session cookie on a cross-site request | attack-session | Cookie/session behavior actually enables the state change |
+| Sensitive action can be framed and requires a user click | attack-clickjacking | Framing is possible and the interaction has meaningful effect |
+| Foreign origin can read sensitive response bytes | attack-cors | Browser JavaScript can read controlled synthetic sensitive data |
+| Cross-site request causes an unintended business workflow transition | attack-business-logic | Workflow rule is violated beyond the generic CSRF condition |
+| Script executes on the trusted origin and can act with its privileges | attack-xss | A separate script-execution path exists; do not infer XSS from CSRF |
+
+### Output additions
+
+Persist browser_context, credential_included, cross_site_request_sent, response_readable, server_state_changed, defense_variant, negative_control, cleanup_verified, and chain_basis. If any of the first three browser facts is unknown, mark the result inconclusive rather than filling gaps with assumptions.
