@@ -112,7 +112,7 @@ Trace the exact filter/handler/service configuration and patch. Add a regression
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and equivalent requests. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never retrieve sensitive Actuator data or trigger state-changing management operations on production.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -149,3 +149,17 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### Spring security-chain and actuator review
 Identify the deployed product/profile, reverse-proxy path, ordered SecurityFilterChain matchers, controller mappings, method-level annotations, Actuator exposure/configuration, and serialization settings. Test one read-only endpoint as anonymous and controlled roles; compare the actual resolved data and policy across management/application ports only when in scope. An Actuator endpoint name, Spring banner, or OpenAPI listing is a lead rather than a vulnerability. Confirm that exposed environment/heap/health details are sensitive and not intentionally public, and never download heap dumps or secrets to prove access. Route expression/deserialization findings to the corresponding input specialists and route role/object gaps to BFLA/IDOR.
+
+
+## Local source-review helper
+
+Use this only on an authorized local repository. Search hits need contextual review; a missing annotation may be covered by a global filter chain.
+
+```bash
+rg -n --glob '*.{java,kt,yml,yaml,properties}' \
+  'SecurityFilterChain|authorizeHttpRequests|requestMatchers|@PreAuthorize|@Secured|@RolesAllowed|management\.endpoints|include:|exclude:|@RequestMapping|@RestController' .
+```
+
+### Evidence fields
+
+Record application_port_vs_management_port, context_path, active_profile_source, filter_chain_order, matched_route, method_security, actuator_exposure_config, principal, data_classification, random_path_control, and cleanup_status. Do not fetch secret-bearing endpoints to fill unknown fields; use source/config evidence or mark the fact unverified.
