@@ -87,3 +87,15 @@ This document describes decision logic, not a claim that a runtime command exist
 - Claude-BugHunter methodology: https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/bb-methodology/SKILL.md
 - Recon Skills: https://github.com/uphiago/recon-skills
 - OWASP WSTG: https://owasp.org/www-project-web-security-testing-guide/
+
+
+## Practical hunting loop: hypothesis → request → decision
+For each promising route, keep a lightweight note that links the observed signal to exactly one testable policy statement. Prefer replaying an already-captured request and altering one variable; do not invent a command/API because a skill mentions it.
+
+```bash
+# Adapt paths to the real target-workspace layout and available CyberStrike CLI.
+find "$TARGET_WORKSPACE" -type f \\( -path '*/requests/*' -o -path '*/endpoints/*' -o -path '*/findings/*' \\) -print 2>/dev/null | sort
+cyberstrike --help
+```
+
+Keep exploration open-ended while each new test is materially different and useful. Deduplicate by target + endpoint + security property + strategy, not by an arbitrary total count. Stop at decisive evidence, an exhausted set of relevant hypotheses, missing valid prerequisites, or a real program/safety boundary. Chain the strongest observed signal to its specialist skill, then triage before reporting.
