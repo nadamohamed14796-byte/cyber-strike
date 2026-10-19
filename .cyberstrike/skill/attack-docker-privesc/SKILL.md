@@ -170,46 +170,12 @@ If Docker CLI metadata inspection is authorized, inspect configuration only; do 
 Record runtime_version, container_image_digest, effective_uid_gid, groups, effective_capabilities, seccomp_status, lsm_status, socket_mode_owner, mount_sources_redacted, host_namespace_flags, workload_need, lab_validation_only, and cleanup_status. Separate configured risk from demonstrated host impact.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Native audit and telemetry tools in an explicitly authorized lab (for example Event Viewer/PowerShell, journalctl/auditd, klist, or provider logs). Never reuse internal post-exploitation flows on public bounty targets.
-- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+- `id` and `/proc/self/status`: inspect the current container identity/capability metadata in an authorized lab.
+- `findmnt` and mountinfo: review mount sources/flags without reading host data.
+- `docker inspect` / `docker compose config`: read-only configuration inspection in an authorized environment.
+- Docker Bench, kube-bench, and static manifest checks: audit configuration without escape payloads.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json`: validate evidence metadata.
 
-### Primary resources
-- [MITRE ATT&CK](https://attack.mitre.org/) — behavior taxonomy.
-- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — authorized assessment and evidence.
-- - [Official platform documentation](https://docs.docker.com/engine/security/) — check real platform defaults and security semantics.
-
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
-Checks metadata only; manually inspect the artifact and redaction.
-
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Use only an authorized isolated lab. Record starting state, principal, cleanup, and telemetry; do not apply internal post-exploitation workflows to public bounty targets.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Docker's read-only inspect/log commands and Docker Bench for Security or Trivy for configuration/image review in an authorized container lab. Prefer defensive configuration evidence over running privilege-escalation payloads.
-
-### Installation and setup
-- [Docker Engine installation](https://docs.docker.com/engine/install/) — official packages.
-- [Docker Bench for Security](https://github.com/docker/docker-bench-security) — review the script before running and use a lab.
-- [Trivy installation](https://trivy.dev/latest/docs/getting-started/installation/) — image/configuration scan.
-Do not run privileged containers, mount host root, or change daemon settings on production to demonstrate impact. Use a disposable VM and verify the active Docker context.
-
-### Primary resources
-- [Docker Engine security](https://docs.docker.com/engine/security/) — isolation model.
-- [Docker Bench for Security](https://github.com/docker/docker-bench-security) — hardening checks.
-- [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker) — configuration baseline.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to record local lab evidence metadata.
-
-### Result handling
-Document image/container ID, effective capabilities/mounts/user, starting state, specific boundary failure, telemetry, and cleanup. Keep this workflow inside authorized container labs; no persistence, data extraction, or lateral movement against third-party hosts.
+Verify each tool with its documented `--version` or `--help`. Official docs: https://docs.docker.com/, https://github.com/docker/docker-bench-security, https://github.com/aquasecurity/kube-bench. Use a disposable lab for any active reproduction; do not attempt host escape or modify production workloads.
