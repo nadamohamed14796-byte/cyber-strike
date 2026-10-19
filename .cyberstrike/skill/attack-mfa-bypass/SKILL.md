@@ -158,3 +158,19 @@ Record account_fixture, factor_type, challenge_purpose, session_assurance_before
 - Recovery path accepts a factorless identity and changes account control → ATO review only with controlled identities and complete terminal-state proof.
 - Missing step-up permits one protected action but not login bypass → report the exact action/assurance boundary; do not call it a full MFA bypass.
 - UI omits MFA but backend rejects the operation → false positive for bypass; note the UI inconsistency separately only if it has independent impact.
+
+
+## Regression handoff for MFA state and assurance
+
+The regression should assert server-side state, not text or visual challenge presence.
+
+- After first-factor success, the principal is authenticated only at the documented assurance level.
+- Completing a valid challenge upgrades assurance for the same intended account and session.
+- A challenge cannot be replayed across account, session, purpose, or expiry window.
+- Factor removal/replacement requires the documented recent-authentication level.
+- Recovery and password reset do not silently mark an unverified factor as trusted.
+- A revoked remembered device cannot continue satisfying a fresh step-up requirement.
+- Existing sessions follow the documented policy after MFA changes; test both revoke-one and revoke-all behavior if the product exposes both.
+- Valid low-risk public actions remain usable where intended, preventing overbroad regressions.
+
+For each case, include expected assurance, observed assurance, principal, challenge binding, protected operation, relevant negative control, retry/lockout safety, and cleanup. If assurance is supplied by an identity provider, preserve the issuer and the exact claim mapping with sensitive values redacted.
