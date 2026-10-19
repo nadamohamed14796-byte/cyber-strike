@@ -71,10 +71,12 @@ Review role claims, policy evaluators, middleware, service-to-service authorizat
 
 ## Tools
 
-- **Burp Suite:** replay identical requests under different controlled sessions.
-- **OpenAPI/GraphQL tools:** inventory operations and declared roles.
-- **Route/source review:** map handlers to policy checks.
-- **Synthetic fixtures:** reproduce mutations without business impact.
+- Python `httpx` or `curl`: replay observed API operations under two tester-controlled roles.
+- `jq`: parse JSON responses and compare permitted fields/actions.
+- `rg`: inspect local route handlers, OpenAPI schemas, and authorization checks.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved redacted responses offline.
+
+Verify `curl --version`, the selected Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## Role-to-Function Coverage Matrix
 
