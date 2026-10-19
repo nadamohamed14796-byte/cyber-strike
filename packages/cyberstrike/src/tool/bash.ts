@@ -160,12 +160,19 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scope:
       const excludedHost = excluded.hostname.toLowerCase().replace(/\.$/, "")
       const wildcard = excludedHost.startsWith("scope-wildcard.")
       const wildcardBase = wildcard ? excludedHost.slice("scope-wildcard.".length) : ""
+      const authority = raw.match(/^https?:\/\/([^/]+)/i)?.[1] ?? ""
+      const explicitPort = /:\d+$/.test(authority)
       const hostMatches = excludedHost === hostname ||
         (wildcard && (hostname === wildcardBase || hostname.endsWith("." + wildcardBase)))
-      if (hostMatches && (excluded.pathname !== "/" || excluded.port || excluded.protocol !== target.protocol)) {
+      if (hostMatches && (excluded.pathname !== "/" || excluded.port || explicitPort || excluded.protocol !== target.protocol)) {
         return "Katana cannot enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
       }
       continue
+    }
+
+    const hostPort = raw.match(/^([^:/]+):(\d{1,5})$/)
+    if (hostPort && hostPort[1]!.toLowerCase().replace(/\.$/, "") === hostname) {
+      return "Katana cannot enforce the saved port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
     }
 
     let exclusion = raw.replace(/^(?:domain|wildcard)[ \t]*:[ \t]*/i, "")
