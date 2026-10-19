@@ -297,3 +297,26 @@ Separate protocol/configuration indicators from demonstrated security impact. St
 | Detection | relevant event IDs and expected telemetry | sanitized event evidence without collecting unrelated logs |
 
 A requested service ticket, SPN, or delegation flag alone is not proof of compromise. Do not crack, reuse, export, or store real users' password material or tickets; do not access unrelated users' data. Document the account role, relevant configuration, authorized test, timestamps, and practical impact.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Windows RSAT/PowerShell and built-in Kerberos event/log tooling for defensive verification. In an isolated AD lab, Impacket or BloodHound CE may support protocol and relationship analysis; inspect each tool's capabilities and use only synthetic lab identities.
+
+### Installation and setup
+- [Windows RSAT installation](https://learn.microsoft.com/en-us/windows-server/remote/remote-server-administration-tools) — Microsoft-supported tools.
+- [Impacket](https://github.com/fortra/impacket) — official source and install instructions; install in an isolated Python virtual environment.
+- [BloodHound Community Edition](https://bloodhound.specterops.io/get-started/installation) — official installation and lab setup.
+Do not run credential extraction, ticket abuse, password spraying, or lateral movement against public bounty targets or an unapproved domain. Prefer event-log analysis and benign test accounts.
+
+### Primary resources
+- [Microsoft Kerberos authentication overview](https://learn.microsoft.com/en-us/windows-server/security/kerberos/kerberos-authentication-overview) — protocol context.
+- [Microsoft audit Kerberos authentication service](https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/audit-kerberos-authentication-service) — defensive telemetry.
+- [MITRE ATT&CK Credential Access](https://attack.mitre.org/tactics/TA0006/) — detection context.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to track sanitized lab observations without storing tickets or credentials.
+
+### Result handling
+Record lab/domain context, affected account class, relevant event IDs/telemetry, and mitigation. Never store passwords, hashes, ticket blobs, or real account data in shared notes.
