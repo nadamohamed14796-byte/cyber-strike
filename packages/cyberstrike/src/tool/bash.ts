@@ -191,14 +191,24 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
         const excludedHost = excluded.hostname.toLowerCase().replace(/\.$/, "")
         const wildcard = excludedHost.startsWith("scope-wildcard.")
         const wildcardBase = wildcard ? excludedHost.slice("scope-wildcard.".length) : ""
-        const authority = raw.match(/^https?:\/\/([^/]+)/i)?.[1] ?? ""
-        const explicitPort = /:\d+$/.test(authority)
         const hostMatches = excludedHost === hostname ||
           (wildcard && (hostname === wildcardBase || hostname.endsWith("." + wildcardBase)))
-        if (hostMatches && (excluded.pathname !== "/" || excluded.port || explicitPort || excluded.protocol !== target.protocol)) {
-          return "Katana cannot enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+        if (hostMatches) {
+          return "Katana cannot enforce the saved URL/path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
         }
         continue
+      }
+
+      // HackerOne URL exclusions may omit the scheme, e.g. "url: example.com/private".
+      // FQDN filtering cannot preserve those narrower request boundaries either.
+      if (raw.includes("/")) {
+        let excludedURL: URL
+        try { excludedURL = new URL("https://" + raw.replace("*.", "scope-wildcard.")) }
+        catch { excludedURL = undefined as never }
+        if (excludedURL! && (excludedURL.hostname.toLowerCase() === hostname ||
+            hostname.endsWith("." + excludedURL.hostname.toLowerCase().replace(/^scope-wildcard\./, "")))) {
+          return "Katana cannot enforce the saved URL/path exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+        }
       }
 
       const hostPort = raw.match(/^([^:/]+):(\d{1,5})$/)
