@@ -180,12 +180,12 @@ Record source_file_line, input_source, transformations, sink_api, argument_mode,
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Agent-executable tools
+### Agent-usable tools and purpose
 - `rg` — trace candidate source-to-sink flows in an authorized local source tree.
-- `semgrep` — run relevant static rules against a local checkout; treat findings as leads until data flow is confirmed.
-- `curl` or Python `httpx` — send a captured, permitted request with a benign marker only.
+- `semgrep` — run relevant static rules against a local checkout; findings are leads until data flow is confirmed.
+- `curl` or Python `httpx` — reproduce a captured, permitted request with a benign marker only.
 - `strace` or platform-native process logs — investigate behavior in a disposable local reproduction, not on production without explicit approval.
-- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved redacted responses offline.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved redacted responses offline; it sends no requests.
 
 ### Installation and verification
 Install Semgrep using https://semgrep.dev/docs/getting-started/ and verify with `semgrep --version`. Verify `rg --version` and `curl --version`; verify Python httpx with `python3 -c "import httpx; print(httpx.__version__)"` when selected. Use official OS package sources or upstream instructions. If unavailable, record the missing dependency and continue with source review or a disposable lab; do not claim the check ran.
@@ -197,4 +197,4 @@ Install Semgrep using https://semgrep.dev/docs/getting-started/ and verify with 
 - https://cwe.mitre.org/data/definitions/78.html
 
 ### Safety and result handling
-No browser UI, browser extension, or interactive proxy is an agent dependency. Do not use destructive commands, persistence, file reads, environment dumps, or credential access as proof. A sink match, error, delay, or reflected input is not proof of execution. Confirm only the approved harmless behavior, preserve minimal redacted evidence, and stop.
+Browser UI, browser extensions, and interactive proxies are not agent dependencies. Do not use destructive commands, persistence, file reads, environment dumps, or credential access as proof. A sink match, error, delay, or reflected input is not proof of execution. Confirm only approved harmless behavior, preserve minimal redacted evidence, and stop.
