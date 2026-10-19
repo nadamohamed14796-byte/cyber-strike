@@ -43,3 +43,26 @@ Preserve the canonical request, one-variable variant, response/state comparison,
 ## References
 - https://portswigger.net/web-security/api-testing/server-side-parameter-pollution
 - https://owasp.org/API-Security/editions/2023/en/0x00-header/
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer for controlled variations of one observed parameter; Param Miner can help discover likely parameter names and backend parsing differences, but its probes must be permitted by the target's rules.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official installation.
+- Param Miner may be installed through Burp's official BApp Store; inspect extension details before enabling.
+- For local response artifacts, jq is available on Kali/Debian via `sudo apt update && sudo apt install jq`.
+Avoid bulk parameter fuzzing on production unless explicitly allowed. Start with one or a few observed parameters and an owned test record.
+
+### Primary resources
+- [PortSwigger server-side parameter pollution](https://portswigger.net/web-security/api-testing/server-side-parameter-pollution) — backend parsing and parameter-boundary checks.
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API input/authorization context.
+- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) — defensive input handling.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares already-saved redacted responses offline.
+
+### Result handling
+Record the baseline and the exact single-variable change. Require a changed backend operation or security boundary—not merely a parser error—to confirm impact.
