@@ -5,6 +5,8 @@
  * false-positive verdict: exhausting the budget can only produce INCONCLUSIVE.
  */
 export namespace VerificationAttempts {
+  export const MAX_ATTEMPTS = 20
+
   export type Outcome = "confirmed" | "disproven" | "inconclusive"
 
   export interface Attempt {
@@ -65,7 +67,7 @@ export namespace VerificationAttempts {
   export interface Decision {
     outcome: Outcome
     attemptsUsed: number
-    remainingAttempts: null
+    remainingAttempts: number
     canContinue: boolean
     reason: string
   }
@@ -102,7 +104,7 @@ export namespace VerificationAttempts {
     // Count only unique attempts with valid preconditions and durable evidence.
     // Counts are informational; they are not an arbitrary ceiling or verdict threshold.
     const attemptsUsed = attempts.filter(isEvidenceBackedValidAttempt).length
-    const remainingAttempts = null
+    const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
     // Hard stops (scope, safety, or unavailable target) always win over verdicts.
     if (input.blockedReason) {
