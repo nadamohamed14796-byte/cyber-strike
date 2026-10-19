@@ -220,48 +220,17 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/browser DevTools to inspect CSRF tokens, SameSite cookies, Origin/Referer validation, and state-changing request behavior. Playwright is optional for regression tests in an owned staging application.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- [Playwright docs](https://playwright.dev/docs/intro) — official test setup.
-Start with read-only or reversible actions; use a disposable account and never trigger real purchases, transfers, password changes, or user-impacting actions unless explicitly authorized.
-
-### Primary resources
-- [PortSwigger CSRF](https://portswigger.net/web-security/csrf) — labs and testing.
-- [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html) — server-side defenses.
-- [MDN SameSite cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#samesitesamesite-value) — browser cookie semantics.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved requests/responses offline.
-
-### Result handling
-Show whether a cross-site attacker-controlled context can trigger a meaningful state change under the victim's credential context. A missing token alone is not enough if another effective control blocks the action.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
-
-### Recommended tools
-- curl — compare state-changing request controls
-- Python requests/httpx — replay only with test-owned accounts and reversible state
-- jq — inspect token/header behavior
-- A local CSRF case matrix for method, content type, token, and origin
-
+### Agent-usable CLI tools
+- `curl` or Python `httpx`: compare a captured, authorized state-changing request with and without the expected anti-CSRF control, using tester-owned accounts and disposable changes.
+- `jq` and `rg`: parse saved response data and inspect local code/configuration for token validation and cookie settings.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved response samples offline.
+### Installation and verification
+Verify `curl --version`, `python3 -c "import httpx; print(httpx.__version__)"`, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. Missing tools: use a local fixture or source review and record the gap.
 ### Resources
-- https://portswigger.net/web-security/csrf
 - https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Community lists are discovery aids only; consult official docs for supported usage and limitations.
-
-### Helper-script contract
-Store baseline and modified request metadata, cookie/SameSite context, token validation, Origin/Referer checks, and server-side state outcome. Use disposable records and avoid irreversible actions.
-
-Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
-
-### Handoff
-Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
+- https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies
+### Proof and limits
+Use only tester-controlled accounts and reversible test actions. Record token, Origin/Referer, SameSite, and state-change controls; do not alter another user's data.
