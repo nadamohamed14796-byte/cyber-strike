@@ -72,10 +72,13 @@ Review DTOs, serializer schemas, writable-field lists, nested relation binding, 
 
 ## Tools
 
-- **Burp Repeater:** compare allowed/disallowed properties.
-- **OpenAPI/schema:** enumerate documented writable fields.
-- **Source review:** inspect DTOs, allowlists, and nested binding.
-- **Test UI/database:** verify persistence rather than response-only output.
+- Python `httpx` or `curl`: compare observed update requests using test-owned records and reversible changes.
+- OpenAPI/schema parser: inventory documented writable fields when a schema exists.
+- `rg`: inspect local DTOs, serializers, allowlists, and nested binding.
+- `jq`: compare saved request/response fields after redaction.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify the chosen request client and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. Use local fixtures or source review when live validation is unsafe.
 
 ## Writable Field Classification Matrix
 
@@ -172,28 +175,6 @@ A new key in the response only shows a shape difference. For a write-side findin
 
 Persist allowed_field_control, candidate_property, expected_authority, request_field_present, server_persisted_value, independent_readback, effective_permission_delta, cleanup_verified, and root_cause_confidence. Never commit secrets or raw production records.
 
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and their role
-Burp Proxy/Repeater/Comparer to replay the application's own requests; jq for JSON body shaping; source review and OpenAPI schema if available. Use an owned disposable record.
-
-### Install or enable when missing
-Burp: https://portswigger.net/burp/communitydownload ; jq on Kali/Debian: `sudo apt update && sudo apt install jq` . Optional API fuzzing or schema tools should be installed only from their official documentation and used at policy-approved rates.
-These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
-
-### Primary resources
-- [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html) — over-posting risk and prevention.
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — property-level authorization context.
-- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — endpoint/request discovery.
-
-### Small reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — local redacted response comparison; verify resulting server-side state with the authorized fixture.
-
-### Runtime and evidence notes
-- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
-- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
-- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
