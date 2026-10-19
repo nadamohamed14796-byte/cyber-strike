@@ -56,6 +56,8 @@ describe("Indirect scanner wrapper policy", () => {
     expect(await scannerLaunchedByWrapper(["find", "/tmp", "-exec", "katana", "-u", "https://example.com", ";"], 0)).toBe("katana")
     expect(await scannerLaunchedByWrapper(["find", "/tmp", "-exec", "sh", "-c", "katana -u https://example.com", ";"], 0)).toBe("katana")
     expect(await scannerLaunchedByWrapper(["xargs", "grep", "katana", "notes.txt"], 0)).toBeUndefined()
+    expect(await scannerLaunchedByWrapper(["find", "/tmp", "-iname", "*katana*"], 0)).toBeUndefined()
+    expect(await scannerLaunchedByWrapper(["env", "FOO=bar", "katana", "-u", "https://example.com"], 0)).toBeUndefined()
   })
 
   test("parses env split-string as a command but ignores quoted text in ordinary arguments", async () => {
