@@ -77,11 +77,14 @@ Inspect screenshots at full resolution and scan report/attachment copies for tok
 
 ## Tools
 
-- **Burp Repeater:** capture a minimal reproducible request/response pair.
-- **Browser DevTools:** record browser-side behavior without exposing storage/token panels.
-- **jq / JSON parser:** redact auth headers, cookie arrays, and sensitive response fields in HAR/JSON.
-- **Image editor:** apply opaque redaction rather than potentially reversible blur.
-- **Secret/PII scanner:** perform a final leak check on report and attachment copies.
+- `jq` / Python JSON parser: redact auth headers, cookie arrays, and sensitive response fields in local JSON/HAR exports.
+- `rg`: find likely credential/PII markers in local artifacts before sharing.
+- `exiftool`: inspect image/document metadata in local evidence.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json`: validate required evidence metadata.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+- ImageMagick convert/magick: apply opaque redaction to image copies where needed; preserve private originals separately.
+
+Verify `jq --version`, `exiftool -ver`, and the selected image tool's version. Official docs: https://jqlang.org/, https://exiftool.org/, https://imagemagick.org/.
 
 ## Evidence Redaction and Reproducibility Matrix
 
