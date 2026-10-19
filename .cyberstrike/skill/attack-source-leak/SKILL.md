@@ -79,7 +79,7 @@ Identify deployment rules, static-root mapping, archive retention, source-map pu
 
 ## Tools
 
-- **curl / browser DevTools:** inspect bounded responses and delivered assets.
+- **curl or Python httpx:** inspect bounded responses and delivered assets for an observed in-scope URL.
 - **file / unzip -l / JSON parser:** validate artifact signatures/structure without extracting everything.
 - **Git metadata checks:** confirm only the minimal marker and stop; do not reconstruct the repository unless specifically authorized.
 - **Secret scanning tools:** run locally on already authorized source; suppress full values in output.
