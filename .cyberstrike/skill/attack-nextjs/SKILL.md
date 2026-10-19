@@ -182,3 +182,26 @@ rg -n --glob '*.{js,jsx,ts,tsx}' \
 - Secret-like build output → source-leak review; never use the secret to prove impact.
 
 Record router_mode, framework_version_source, route_or_action, middleware_chain, auth_principal, object_fixture, serialized_field_paths, cache_context, negative_control, server_state, and cleanup_status.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Node.js/npm for an owned source copy, browser DevTools plus Burp for request/response verification, and Semgrep for targeted static analysis where the source is available.
+
+### Installation and setup
+- [Official Next.js installation guide](https://nextjs.org/docs/app/getting-started/installation) lists the current Node.js requirement and npm/pnpm/yarn/Bun setup.
+- [Node.js downloads](https://nodejs.org/en/download/) — use a supported release.
+- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — use the maintained installation instructions.
+For source review, use a disposable clone and preserve the project's lockfile. Do not assume a development route or source-code issue is reachable in production.
+
+### Primary resources
+- [Next.js security documentation](https://nextjs.org/docs/app/guides/data-security) — data-access and server/client boundary concepts.
+- [Next.js authentication guide](https://nextjs.org/docs/app/guides/authentication) — session and authorization integration.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box verification.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized, previously saved responses offline.
+
+### Result handling
+Pair static findings with an appropriate runtime test and a control. Avoid storing cookies, user data, or unredacted server-component output in shared notes.
