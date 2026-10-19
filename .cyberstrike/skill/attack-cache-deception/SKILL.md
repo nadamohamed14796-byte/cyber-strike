@@ -101,3 +101,28 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Capture cache headers, exact route variant, actor context, and whether a private test marker is delivered incorrectly. Header oddities alone are not proof; clean up controlled cache artifacts where possible.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
+
+### Recommended tools
+- curl — capture cache headers and path normalization behavior
+- Python urllib.parse — normalize URL/path candidates
+- http_response_diff.py — compare cached/uncached responses
+- jq — parse cache metadata
+
+### Resources
+- https://portswigger.net/web-security/web-cache-deception
+- https://portswigger.net/web-security/web-cache-poisoning
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
+
+### Helper-script contract
+Use only synthetic non-sensitive paths and test accounts. Record whether private content crosses identities or cache boundaries; do not use real users' pages or cache private data into shared objects.
+
+Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
+
+### Handoff
+Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
