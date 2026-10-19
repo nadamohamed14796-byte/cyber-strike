@@ -74,10 +74,13 @@ Review credential validation, session creation, callback state/nonce, token issu
 
 ## Tools
 
-- **Burp Repeater:** compare authentication flows and API variants.
-- **Browser DevTools:** inspect redirects, cookies, and frontend/server mismatch.
-- **Offline token decoders:** inspect test-token claims without sending secrets to external sites.
-- **Source/log review:** confirm principal resolution and guard coverage.
+- Python `httpx` or `curl`: compare captured authentication requests and controlled auth states.
+- `jq`: inspect redacted principal/role fields and structured responses.
+- `rg`: inspect local source/configuration for principal resolution and route guards.
+- Python standard library `json` / `base64`: inspect test-token structure locally; decoding is not signature validation.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify with `curl --version`, the selected Python client, and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## Authentication Control Matrix
 
