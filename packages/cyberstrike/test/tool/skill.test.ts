@@ -163,6 +163,61 @@ owasp_id: T1078.004
     }
   })
 
+  test("outline previews a skill without loading its full content", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillDir = path.join(dir, ".cyberstrike", "skill", "large-skill")
+        await Bun.write(
+          path.join(skillDir, "SKILL.md"),
+          [
+            "---",
+            "name: large-skill",
+            "description: A skill used to test compact previews.",
+            "---",
+            "",
+            "# Main Guide",
+            "",
+            "A short introduction.",
+            "",
+            "## Phase One",
+            "",
+            "DETAILS_SHOULD_NOT_BE_IN_OUTLINE",
+            ...Array.from({ length: 300 }, (_, index) => "Long procedure line " + index),
+            "",
+            "## Verification",
+            "",
+            "Check the evidence.",
+          ].join("\n"),
+        )
+      },
+    })
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const result = await tool.execute(
+            { action: "outline", name: "large-skill" },
+            { ...baseCtx, ask: async () => { throw new Error("outline must not request load permission") } },
+          )
+          expect(result.output).toContain("## Main Guide")
+          expect(result.output).toContain("## Phase One")
+          expect(result.output).toContain("## Verification")
+          expect(result.output).toContain("full skill content has NOT been loaded")
+          expect(result.output).not.toContain("DETAILS_SHOULD_NOT_BE_IN_OUTLINE")
+          expect(result.output.length).toBeLessThanOrEqual(2_400)
+          expect(SkillContext.isLoaded("large-skill")).toBe(false)
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("execute returns skill content block with files", async () => {
     await using tmp = await tmpdir({
       git: true,
