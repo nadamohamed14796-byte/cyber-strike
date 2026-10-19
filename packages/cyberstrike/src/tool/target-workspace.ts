@@ -75,8 +75,10 @@ function confirmedScopeCandidate(input: string): URL | undefined {
   if (!/^https?:\/\//i.test(value) && /[\\/*{}]/.test(value)) return undefined
   let candidateValue = value
   if (!/^https?:\/\//i.test(value)) {
-    const rawIPv6 = value.match(/^\[?([0-9a-f:]+)\]?$/i)
-    candidateValue = rawIPv6 && value.includes(":") && !/^[^:]+:\d+$/.test(value)
+    const rawIPv6 = (value.startsWith("[") || value.split(":").length >= 3)
+      ? value.match(/^\[?([0-9a-f:]+)\]?$/i)
+      : undefined
+    candidateValue = rawIPv6 && value.includes(":")
       ? "https://[" + rawIPv6[1] + "]"
       : "https://" + value
   }
@@ -299,12 +301,15 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         }
       }
       const sourceForConfiguration = authorizationSource || (userConfirmedInitialScope ? USER_CONFIRMED_SCOPE_SOURCE : undefined)
+      const userConfirmedScopeProvenance = Boolean(
+        !authorizationReference && sourceForConfiguration?.startsWith(USER_CONFIRMED_SCOPE_PREFIX),
+      )
       const result = await TargetMemory.configureScope(targetURL, {
         include: includeEntries,
         exclude: excludeEntries,
         authorizationSource: required(sourceForConfiguration, "authorization_source"),
         authorizationReference,
-        userConfirmed: userConfirmedInitialScope,
+        userConfirmed: userConfirmedInitialScope || userConfirmedScopeProvenance,
       })
 
       if (sourceContents !== undefined && sourceHash && sourceFilename && sourceArtifactPath) {
