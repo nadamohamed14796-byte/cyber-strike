@@ -282,7 +282,7 @@ If the policy explicitly authorizes a wildcard, record the precise rule and its 
 
 During setup, call the registered scope checker exactly once for the canonical target/workspace using its actual schema. Persist the decision in the run manifest and reuse it throughout the run; do not manually check every candidate origin. Active-request tools must enforce the persisted policy for every concrete request. Only start a new setup check when a new run begins or the canonical target/policy configuration changes. If the single check is inconclusive, stop active work rather than retrying in a loop. If supported, use:
 
-`scope_check(target="<exact candidate>", target_url="<canonical root target>")`
+`scope_check(target="<canonical root target>", target_url="<canonical root target>")`
 
 Verify that the result represents an explicit, configured authorization decision.
 
