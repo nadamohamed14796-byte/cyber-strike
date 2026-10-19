@@ -3,6 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
+import { TargetMemory } from "../../src/target"
 import { TargetArtifactTool } from "../../src/tool/target-artifact"
 import { TargetWorkspaceTool } from "../../src/tool/target-workspace"
 import { PermissionNext } from "../../src/permission/next"
@@ -77,6 +78,9 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       expect(mergedScope.excludedItems).toEqual(["admin.example.com"])
       expect(mergedScope.authorizationSource).toBe("Example authorized disclosure program")
       expect(mergedScope.authorizationReference).toBe("https://hackerone.com/example")
+      const confirmedNotes = await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")
+      expect(confirmedNotes).toContain("User-confirmed in-scope asset: new.example.net")
+      expect(confirmedNotes).toContain("without requesting a separate policy URL or repeated proof")
 
       const child = await tool.execute({
         action: "attach_asset",
@@ -247,6 +251,83 @@ test("target artifact tool writes only inside an existing workspace and protects
       expect(missing.metadata.saved).toBe(false)
       expect(missing.metadata.reason).toBe("workspace_missing")
       } finally { await Instance.dispose() }
+    },
+  })
+})
+
+
+test("explicit user confirmation can initialize one exact asset without a policy URL and records useful notes", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const init = await tool.execute({ action: "init", target_url: "https://program-root.example.test" }, {} as never)
+        const rootPath = init.metadata.workspace!
+        const saved = await tool.execute({
+          action: "configure_scope",
+          target_url: "https://program-root.example.test",
+          include: ["https://fullbarhomologa.modoblackfullbar.com.br"],
+          user_confirmed_scope: true,
+        }, {} as never)
+
+        expect(saved.metadata.saved).toBe(true)
+        expect(saved.metadata.scope_configured).toBe(true)
+        const scope = await TargetMemory.getScope("https://program-root.example.test")
+        expect(scope?.status).toBe("configured")
+        expect(scope?.authorizationReference).toBeNull()
+        expect(scope?.authorizationSource).toContain("User-confirmed in conversation")
+        expect(scope?.scopeItems).toEqual(["https://fullbarhomologa.modoblackfullbar.com.br"])
+        const manifest = JSON.parse(await fs.readFile(path.join(rootPath, "scope", "scope.json"), "utf-8"))
+        expect(manifest.authorizationReference).toBeNull()
+        expect(manifest.authorizationSource).toContain("User-confirmed in conversation")
+        const notes = await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")
+        expect(notes).toContain("User-confirmed in-scope asset: https://fullbarhomologa.modoblackfullbar.com.br")
+        expect(notes).toContain("No wildcard or sibling assets were inferred")
+        expect((await TargetMemory.checkURLScope("https://fullbarhomologa.modoblackfullbar.com.br/")).allowed).toBe(true)
+        expect((await TargetMemory.checkURLScope("https://unrelated.modoblackfullbar.com.br/")).allowed).toBe(false)
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
+
+test("user-confirmed incremental scope extension cannot override an explicit exclusion", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const init = await tool.execute({ action: "init", target_url: "https://program-root.example.test" }, {} as never)
+        await tool.execute({
+          action: "configure_scope",
+          target_url: "https://program-root.example.test",
+          include: ["example.test", "*.example.test"],
+          exclude: ["admin.example.test"],
+          authorization_source: "Example program",
+          authorization_reference: "https://hackerone.com/example",
+        }, {} as never)
+
+        const blocked = await tool.execute({
+          action: "configure_scope",
+          target_url: "https://program-root.example.test",
+          include: ["admin.example.test"],
+          merge_existing: true,
+        }, {} as never)
+        expect(blocked.metadata.saved).toBe(false)
+        expect(blocked.metadata.reason).toBe("explicit_exclusion_conflict")
+        const scope = await TargetMemory.getScope("https://program-root.example.test")
+        expect(scope?.scopeItems).toEqual(["example.test", "*.example.test"])
+        expect(scope?.excludedItems).toEqual(["admin.example.test"])
+        const notes = await fs.readFile(path.join(init.metadata.workspace!, "notes.md"), "utf-8")
+        expect(notes).toContain("Scope confirmation conflicts with a saved exclusion")
+        expect(notes).toContain("admin.example.test")
+      } finally {
+        await Instance.dispose()
+      }
     },
   })
 })
