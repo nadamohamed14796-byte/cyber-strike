@@ -79,10 +79,12 @@ Verify a private test object remains inaccessible anonymously and that the owner
 
 ## Tools
 
-- **curl:** compare object response headers with bounded GET/HEAD requests.
-- **AWS CLI/SDK for a test bucket:** examine signed response parameters using tester-owned credentials.
-- **Browser DevTools:** inspect origin and rendering headers without executing active content.
-- **Cloud console / policy review:** check public access blocks, bucket policy, object ownership, and CDN cache keys.
+- `curl`: compare object response headers with bounded GET/HEAD requests.
+- AWS CLI/SDK or MinIO client: inspect only a test bucket/object with tester-owned credentials.
+- `jq`: parse policy and response metadata from authorized artifacts.
+- `rg`: inspect collected source/configuration for bucket policy, object ownership, and CDN cache-key behavior.
+
+Verify `curl --version`, `jq --version`, and the selected provider CLI's `--version`. Official docs: https://curl.se/docs/, https://jqlang.org/, https://min.io/docs/, https://docs.aws.amazon.com/cli/.
 
 ## Object Response and Origin Isolation Matrix
 
@@ -171,29 +173,6 @@ Avoid placing signed URL query strings into shell history or logs. Redact signat
 
 Record provider_name/version, bucket_scope_evidence, test_key, request_auth_mode, override_parameter, signature_validity_source, origin_host, cache_layer, object_policy_result, negative_control, and cleanup_verified.
 
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use MinIO Client (`mc`) for authorized object-store inspection, AWS CLI for S3-compatible semantics where relevant, and an isolated MinIO container/lab for reproducible tests.
-
-### Installation and setup
-- [MinIO Client installation](https://min.io/docs/minio/linux/reference/minio-mc.html) — use the official release/setup steps.
-- [AWS CLI installation](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) — install from the official guide.
-- [MinIO documentation](https://min.io/docs/) — container and server setup.
-
-Confirm the active alias, account, and bucket before reading or changing resources. Do not put production access keys in shell history or test fixtures. Installation does not authorize changes.
-
-### Primary resources
-- [MinIO documentation](https://min.io/docs/) — policies, buckets, and client behavior.
-- [S3 security best practices](https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html) — compatible authorization concepts.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — least privilege.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` checks local evidence metadata without connecting to an object store.
-
-### Result handling
-Start with read-only policy and object metadata checks. Use synthetic objects for mutation tests and preserve a sanitized record of the active principal/context.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
