@@ -234,7 +234,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
       const skill = await Skill.get(canonicalName)
       if (!skill) {
-        const sample = accessibleSkills.slice(0, 12).map((entry) => entry.name)
+        const sample = accessibleSkills.slice(0, 5).map((entry) => entry.name)
         const suffix = accessibleSkills.length > sample.length ? ", …" : ""
         throw new Error(
           `Skill "${params.name}" was not found or has an ambiguous metadata reference. ` +

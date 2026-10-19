@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { Instance } from "../../src/project/instance"
-import { Database } from "../../src/storage/db"
+import { Database, eq } from "../../src/storage/db"
 import { FalsePositiveKnowledgeTable } from "../../src/methodology/false-positive-knowledge.sql"
 import { FalsePositiveKnowledge } from "../../src/methodology/false-positive-knowledge"
 import { tmpdir } from "../fixture/fixture"
@@ -43,7 +43,7 @@ test("false-positive memory persists normalized lessons across targets and redac
       expect(matches[0]?.benignExplanation).not.toContain("secret-cookie")
       expect(matches[0]?.benignExplanation).not.toContain("secret-csrf")
       expect(matches[0]?.benignExplanation).toContain("[REDACTED]")
-      const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).all())
+      const rows = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).where(eq(FalsePositiveKnowledgeTable.source_finding_id, "finding-source-1")).all())
       expect(rows).toHaveLength(1)
       expect(rows[0]?.source_validation_id).toBe("validation-source-2")
       expect(rows[0]?.active).toBe(1)
@@ -55,7 +55,7 @@ test("false-positive memory persists normalized lessons across targets and redac
         description: "Possible broken access control",
         endpoint: "GET /api/users/98765/profile",
       })).toHaveLength(0)
-      const reopened = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).all())
+      const reopened = Database.use((db) => db.select().from(FalsePositiveKnowledgeTable).where(eq(FalsePositiveKnowledgeTable.source_finding_id, "finding-source-1")).all())
       expect(reopened[0]?.active).toBe(0)
       expect(reopened[0]?.last_verdict).toBe("reopened")
     },
