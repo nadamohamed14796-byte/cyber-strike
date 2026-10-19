@@ -140,7 +140,7 @@ test("injection methodology skill enforces scope, evidence, and non-destructive 
   const content = await fs.readFile(skillPath, "utf8")
   expect(content).toContain("persisted authorization scope")
   expect(content).toContain("A parameter, free-text field, header, JSON body, or reflected value alone is not proof")
-  expect(content).toContain("20 distinct valid evidence-backed attempts")
+  expect(content).toContain("no fixed attempt count applies")
   expect(content).not.toContain("Detection Payloads (test in every input)")
   expect(content).not.toContain("--dump")
   expect(content).not.toContain("file:///etc/passwd")
