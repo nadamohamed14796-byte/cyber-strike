@@ -53,3 +53,68 @@ Save an endpoint/parameter inventory with asset, file hash, source, method, rout
 
 ### High-signal JS-to-request correlation
 For every extracted route, retain bundle URL/hash, line/offset, first-party confidence, method/parameter template, auth/tenant hints, sink/source pair, and whether an actual browser request corroborates it. Search results and token-like strings remain metadata, never copy a value into a request. Prioritize admin/tenant flows, export/import, billing, file transfer, URL-fetch inputs, account recovery, and versioned APIs. A route string without traffic or docs may be dead code; a client-side role check does not establish server authorization. Chain to IDOR/property authorization only after correlating a real request and controlled fixture, to SSRF only on a confirmed server fetch path, and to DOM XSS only after reachability from an untrusted source is shown.
+
+
+## Repeatable inventory script (local assets only)
+
+This helper inventories URL-like strings from files already collected for an authorized target. It prints normalized URL/path candidates and source locations, not surrounding source lines or token-like values. It does not fetch URLs, execute JavaScript, or prove that a route is live.
+
+```python
+from pathlib import Path
+import re
+import sys
+from urllib.parse import urlsplit
+
+ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else "./javascript")
+EXTS = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".html", ".json", ".map"}
+URL_RE = re.compile(r"""https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+""")
+PATH_RE = re.compile(r"""(?<![A-Za-z0-9])/(?:api|graphql|rest|v[0-9]+|oauth|auth|admin|internal)/[A-Za-z0-9_./{}:-]{1,180}""", re.I)
+SECRET_RE = re.compile(r"(token|secret|password|api[_-]?key|authorization|cookie)", re.I)
+
+def safe_candidate(value):
+    value = value.strip().strip("\"' ),;")
+    if SECRET_RE.search(value):
+        return None
+    if value.startswith("/"):
+        return value.split("?", 1)[0]
+    parts = urlsplit(value)
+    if not parts.scheme or not parts.hostname:
+        return None
+    return f"{parts.scheme}://{parts.hostname}{parts.path}".rstrip("/")
+
+if not ROOT.exists():
+    raise SystemExit(f"Asset directory not found: {ROOT}")
+
+seen = set()
+for file in ROOT.rglob("*"):
+    if not file.is_file() or file.suffix.lower() not in EXTS:
+        continue
+    try:
+        source = file.read_text("utf-8", errors="ignore")
+    except OSError:
+        continue
+    for line_no, line in enumerate(source.splitlines(), 1):
+        for candidate in URL_RE.findall(line) + PATH_RE.findall(line):
+            normalized = safe_candidate(candidate)
+            if not normalized:
+                continue
+            key = (str(file), line_no, normalized)
+            if key in seen:
+                continue
+            seen.add(key)
+            print(f"{file}:{line_no}\t{normalized}")
+```
+
+Review and deduplicate results manually. Source-map files can contain full original source; do not share them publicly or commit them. The helper is intentionally conservative and may miss concatenated/dynamically assembled routes; do not interpret its output as complete coverage.
+
+## Endpoint inventory schema
+
+Use one normalized record per method + route template + content type + parameter shape. Attach multiple parameter observations and source locations to that record.
+
+- asset_url, asset_sha256, asset_type, first_party_confidence, source_location
+- route_template, method_observed, content_type, api_version, query_keys, body_key_paths
+- auth_header_names (names only), cookie_names (names only), role_tenant_hints, identifier_fields
+- source_sink_pairs, redirect_or_fetch_inputs, live_request_ref, observed_status_class
+- candidate_skill, hypothesis, evidence_ref, confidence, false_positive_reason, redaction_status
+
+Never store full cookie/token values or large minified lines. When a candidate appears important, retrieve the exact normal request through the authorized browser and create a sanitized request artifact for the specialist skill.
