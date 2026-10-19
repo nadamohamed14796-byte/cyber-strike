@@ -201,3 +201,30 @@ Run dependency changes on a disposable checkout first; review lockfile changes. 
 
 ### Result handling
 Record package name/version, advisory, reachability, and the application's actual use of the affected code. Keep security claims proportional to evidence.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Prefer CLI tools, local static analysis, and repeatable test harnesses. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify versions, official installation guidance, license, and dependency provenance before running tools.
+
+### Recommended tools
+- Semgrep — JavaScript/TypeScript source patterns
+- npm audit — dependency advisories
+- retire.js — known vulnerable browser-side dependencies
+- Node test runner — deterministic local regression fixtures
+
+### Resources
+- https://semgrep.dev/docs/
+- https://docs.npmjs.com/cli/commands/npm-audit
+- https://github.com/RetireJS/retire.js
+- https://nodejs.org/api/test.html
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are for discovery only; use official framework and tool docs for current behavior.
+
+### Helper-script contract
+Preserve package-lock hash, package/version/advisory, source path, and test fixture. Avoid installing dependencies from untrusted sources just to analyze a target; use local source and lockfiles first.
+
+Keep raw evidence separate from normalized output. Preserve package/version, rule/advisory ID, source path, tool/version, timestamps, error state, confidence, and redaction. Use deterministic local fixtures and JSON/JSONL output where useful.
+
+### Handoff
+Return commands actually executed, tool versions, input/output artifacts, checks passed/failed, limitations, and next skill. Do not present a static-analysis warning as a confirmed runtime vulnerability.
