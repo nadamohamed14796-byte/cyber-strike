@@ -106,7 +106,6 @@ Verify `semgrep --version`, `curl --version`, and the selected Python client. Of
 - Severity must reflect demonstrated sandbox and privilege boundaries, not hypothetical host access.
 - Do not run reverse shells, persistence, destructive commands, internal scans, or secret-reading commands as a default PoC.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never exceed the explicitly authorized proof boundary or turn validation into post-exploitation.
@@ -120,7 +119,6 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 3. If command execution is specifically authorized, constrain proof to a fixed benign command with a unique nonce, hard timeout, no persistence, no credential access, and no external side effect.
 4. Do not install tools, create users, read secrets, establish shells, alter files, or chain to post-exploitation. Stop immediately if impact exceeds the agreed proof.
 5. Capture the minimum sanitized request/result, establish repeatability with a negative control, and recommend the exact input-validation/API separation/patch fix with a regression test.
-
 
 ### Verdict gates
 
@@ -140,12 +138,10 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [elementalsouls/Claude-BugHunter — hunt-rce](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-rce)
 - [OWASP — OS Command Injection Defense Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Execution boundary and proof discipline
 Map the input-to-execution path, process identity, sandbox/container boundary, and downstream effect before testing. Prefer static/source evidence and an isolated lab; use an inert observable proof such as a controlled marker or test harness log, never commands that read secrets, change persistence, fetch payloads, or affect neighboring systems. Separate template evaluation, command construction, deserialization, file processing, and a vulnerable dependency because each requires a different root cause. A delay, error string, or reflected command text alone is not RCE. If only a reachable sink is shown, mark it as a candidate; confirm execution with a safe fixture, then state exactly the demonstrated authority and stop.
-
 
 ## Source-to-sink code-review checklist
 
@@ -178,7 +174,6 @@ Review wrappers, argument arrays, shell flags, environment-variable expansion, t
 - Confirmed command execution does not authorize host discovery, credential access, persistence, or lateral movement. Stop at the agreed harmless proof.
 
 Record source_file_line, input_source, transformations, sink_api, argument_mode, validation, sandbox_context, approved_proof_type, observed_result, negative_control, and cleanup_status.
-
 
 ## Tool installation and optional tooling (2026-10-19)
 
