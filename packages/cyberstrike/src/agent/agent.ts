@@ -118,7 +118,7 @@ async function loadVulnAgent(
     // test context to construct agents without embedded built-in skill text. The
     // runtime skill tool still reports genuinely missing skills as errors.
     if (!skill) {
-      if (Skill.isCatalogIsolationContext()) continue
+      if (Skill.isCatalogIsolationContext() && availableSkills.length === 0) continue
       throw new Error(
         `Agent "${description.split("\n")[0].trim()}" references unavailable skill "${skillNames[i]}". Check the skill catalog and metadata aliases.`,
       )
