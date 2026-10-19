@@ -93,3 +93,29 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record the original confirmed primitive, what adjacent variant was tested, the control expectation, evidence, and result. Do not call sibling variants vulnerable until independently reproduced.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
+
+### Recommended tools
+- Semgrep — source pattern matching when source is available
+- nuclei with reviewed templates for known variants
+- Python/jq — normalize variant records and compare observed behavior
+- http_response_diff.py — baseline/variant response comparison
+
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/projectdiscovery/nuclei
+- https://semgrep.dev/docs/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; use official documentation for current behavior and limitations.
+
+### Helper-script contract
+Track each variant by root cause, precondition, code path/endpoint, control, result, and evidence pointer. Avoid treating payload permutations as distinct hypotheses unless they test a different behavior.
+
+Preserve original evidence separately from normalized outputs. Record tool/version, timestamps, source, confidence, errors, redaction, and stable artifact paths. Use structured output and local fixtures; never overwrite evidence silently.
+
+### Handoff
+Return actual commands and versions, evidence paths, passed/failed/inconclusive checks, false-positive reason where applicable, confidence, limitations, and next skill.
