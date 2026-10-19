@@ -98,7 +98,6 @@ Check error disclosure, metadata handling, and TLS validation. Redact credential
 - Invalid protobuf rejection is normal, not DoS proof.
 - Stop before large streams, high concurrency, resource exhaustion, or unauthorized state-changing RPCs.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate equivalent requests and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Avoid resource-exhaustion testing and honor the program's transport/request rules.
@@ -112,7 +111,6 @@ Maintain an attempt ledger: hypothesis, single changed variable, baseline/contro
 3. Check method-level authorization and object ownership using only synthetic identifiers; when reflection is enabled, distinguish intentional development discovery from exposed sensitive capability.
 4. Validate input constraints with benign type/length boundary values and low request volume; do not send oversized messages or high-rate streams that could exhaust resources.
 5. Capture sanitized status/trailers, method, principal, request schema/version, and control result. Confirm the denied operation is genuinely forbidden and propose a method-level policy regression test.
-
 
 ### Verdict gates
 
@@ -132,12 +130,10 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [Claude-BugHunter — hunt-grpc](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-grpc)
 - [gRPC Authentication Guide](https://grpc.io/docs/guides/auth/)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### RPC method/metadata differential
 Build a service-method inventory from permitted reflection, protobuf descriptors, observed clients, and normal traffic. For each sensitive method compare an allowed test principal, a denied principal, and an invalid/nonexistent request as controls. Preserve message shape and metadata while varying one of authentication, role, object, or tenant context. Status details and reflection exposure alone are not a vulnerability; verify protected output or server-side state. Check alternate transports and gateway mappings where observed. Route object-level failures to IDOR, role/function failures to BFLA, and oversized pagination/expensive methods to resource-consumption review using non-load tests only.
-
 
 ## Streaming and metadata lifecycle checks
 
@@ -162,7 +158,6 @@ grpcurl -connect-timeout 3 -max-time 5 -plaintext "$GRPC_TEST_HOST:$GRPC_TEST_PO
 Use the TLS options required by the real service; -plaintext is only appropriate for an explicitly approved plaintext test service. Never disable certificate validation on a production target to make the command succeed.
 
 Record service_name, method_name, rpc_shape, proto_source, tls_validation, principal, metadata_redacted, stream_duration, message_count, authorization_result, state_readback, and cleanup_status. If reflection is disabled, use the allowed proto/client artifacts rather than brute-forcing service names.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
