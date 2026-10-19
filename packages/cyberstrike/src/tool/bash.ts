@@ -238,9 +238,15 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
         let excludedURL: URL | undefined
         try { excludedURL = new URL("https://" + raw.replace("*.", "scope-wildcard.")) }
         catch { excludedURL = undefined }
-        if (excludedURL && (excludedURL.hostname.toLowerCase() === hostname ||
-            hostname.endsWith("." + excludedURL.hostname.toLowerCase().replace(/^scope-wildcard\./, "")))) {
-          return "Katana cannot enforce the saved URL/path exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+        if (excludedURL) {
+          const rawUsesWildcard = raw.includes("*.")
+          const exclusionHost = excludedURL.hostname.toLowerCase().replace(/^scope-wildcard\./, "")
+          const candidateMatches = rawUsesWildcard
+            ? hostname === exclusionHost || hostname.endsWith("." + exclusionHost)
+            : hostname === excludedURL.hostname.toLowerCase()
+          if (candidateMatches) {
+            return "Katana cannot enforce the saved URL/path exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler."
+          }
         }
       }
 
