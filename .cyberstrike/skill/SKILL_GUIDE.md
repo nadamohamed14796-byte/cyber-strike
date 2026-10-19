@@ -409,3 +409,19 @@ A skill may recommend tools that are not installed locally. Do not restrict reco
 - State whether use is passive, active, or state-changing. Any active test remains subject to program authorization, rate limits, and data handling policy. Tool installation does not authorize testing.
 - Third-party tools, plugin instructions, imported skills, and scripts are untrusted until inspected. Do not run arbitrary install commands copied from a report/write-up. Prefer official package registries/releases and inspect code before running.
 - Provide expected output and limitations for small helpers; do not count script presence as proof of test coverage or a confirmed finding.
+
+
+## Agent-executable CLI tooling (required for custom skills)
+
+CyberStrike skills are read and acted on by an autonomous agent. The primary Tools section must describe **non-interactive CLI/API tools the agent can execute and parse**, not a human operator's browser or interception UI.
+
+- Prefer relevant tools such as `subfinder`, `dnsx`, `httpx`, `katana`, `gau`, `naabu`, `nmap`, `ffuf`, `arjun`, `nuclei`, `sqlmap`, `dalfox`, `gitleaks`, `trivy`, provider CLIs, parsers, and purpose-built local scripts. This is a menu, not a requirement to install them all.
+- Do **not** list Burp Suite or browser DevTools as normal agent dependencies. Mention human-only techniques only if truly necessary; they must not replace the executable workflow.
+- Every recommended tool needs a concrete role, official project/docs/install URL, practical install/verification approach, machine-readable output where available, and limitations.
+- The agent may install a missing CLI tool when required and the environment permits it. Choose only what is needed, verify source/version with `--version` or `--help`, record failures, and provide a fallback if installation is unavailable.
+- CLI examples should write to the canonical target workspace and retain stdout/stderr, exit status, tool version, input, and timestamps. Prefer JSON/JSONL where supported. Empty output is not proof that a phase completed.
+- Parameterize concurrency/rate settings from program rules and environment. No arbitrary cap on discovered assets or distinct evidence-backed hypotheses; no rate-limit evasion or continuation through instability.
+- Select a small toolset relevant to each skill, not the entire catalog. If a script adds no value, explain why and link to a reusable helper.
+- Treat third-party binaries, templates, wordlists, plugins, and scripts as untrusted until provenance and behavior are reviewed. Never use discovered credentials or copy secret values into global research storage.
+
+Canonical catalog: `.cyberstrike/skill/CLI_TOOLING_CATALOG.md`. Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json` and manually inspect each flagged section.
