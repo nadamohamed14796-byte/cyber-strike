@@ -3,7 +3,8 @@ import fs from "node:fs/promises"
 import { constants as fsConstants } from "node:fs"
 import path from "node:path"
 import { createHash } from "node:crypto"
-import { TargetMemory, type TargetAssetType } from "../target"
+import { TargetMemory, type TargetAssetType, USER_CONFIRMED_SCOPE_SOURCE } from "../target"
+import { matchingScopeItems } from "../target/scope-index"
 import { parseScopeFileContents, resolveScopeFilePath } from "../target/scope-file"
 import { Tool } from "./tool"
 import { assertExternalDirectory } from "./external-directory"
@@ -14,7 +15,8 @@ const Parameters = z.object({
   include: z.array(z.string().min(1)).optional(),
   scope_file_path: z.string().min(1).optional().describe("Path to a UTF-8 scope file. Imports exact entries, preserves a copy under the canonical target workspace, and records an import checkpoint in notes.md."),
   exclude: z.array(z.string().min(1)).optional(),
-  merge_existing: z.boolean().optional().describe("When true, add the supplied include/exclude entries to the already configured scope without replacing or re-importing the existing scope list. Requires an existing configured scope; preserves its authorization source/reference unless explicitly supplied."),
+  merge_existing: z.boolean().optional().describe("Incrementally add exact entries to the configured scope without re-importing the full list. Treat this as the operator-confirmed asset path; preserve existing includes/exclusions/provenance and record the confirmation in notes. Saved exclusions remain authoritative."),
+  user_confirmed_scope: z.boolean().optional().describe("Set true only when the user explicitly confirms the exact supplied asset is in scope. Allows an initial exact-asset manifest without demanding an external policy URL; records that provenance in the manifest and notes. Does not override explicit exclusions or authorize related assets."),
   authorization_source: z.string().optional(),
   authorization_reference: z.string().optional(),
   parent_target_url: z.string().optional(),
@@ -63,11 +65,35 @@ function required(value: string | undefined, name: string): string {
   return value.trim()
 }
 
+const USER_CONFIRMED_SCOPE_PREFIX = "User-confirmed in conversation"
+
+/** Parse one specific incremental asset; never mistake a wildcard or CIDR for an exact confirmation. */
+function confirmedScopeCandidate(input: string): URL | undefined {
+  const value = input.trim()
+  if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return undefined
+  if (/^\\d{1,3}(?:\\.\\d{1,3}){3}\\/\\d{1,2}$/.test(value) || /^\\[?[0-9a-f:.]+\\]?\\/\\d{1,3}$/i.test(value)) return undefined
+  if (!/^https?:\\/\\//i.test(value) && /[\\/*{}]/.test(value)) return undefined
+  let candidateValue = value
+  if (!/^https?:\\/\\//i.test(value)) {
+    const rawIPv6 = value.match(/^\\[?([0-9a-f:]+)\\]?$/i)
+    candidateValue = rawIPv6 && value.includes(":") && !/^[^:]+:\\d+$/.test(value)
+      ? "https://[" + rawIPv6[1] + "]"
+      : "https://" + value
+  }
+  try {
+    const url = new URL(candidateValue)
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || !url.hostname || url.hostname.includes("*") || url.username || url.password || url.search || url.hash) return undefined
+    return url
+  } catch {
+    return undefined
+  }
+}
+
 export const TargetWorkspaceTool = Tool.define("target_workspace", {
   description: [
     "Manage the canonical target workspace before target-specific reconnaissance or testing.",
     "Always initialize the parent/program root with action=init before processing scope files, running recon, or saving artifacts. This creates a project-scoped .cyberstrike/targets/<slug> tree, notes.md, target.json, workspace.json, scope/scope.json and the standard artifact directories.",
-    "Workspace creation is NOT authorization. Init leaves scope unconfigured. For a full initial scope import, use the reviewed official program/customer policy and its HTTPS reference. For an incremental asset that the user explicitly confirms is in scope, trust that confirmation, add only the exact asset with merge_existing=true, and preserve the existing manifest provenance and exclusions; do not demand a separate policy link or repeat scope discovery.",
+    "Workspace creation is NOT authorization. Init leaves scope unconfigured. Use available verified policy metadata for a full policy import. If the user explicitly confirms an exact asset is in scope, trust that confirmation without repeatedly demanding proof: merge only that asset into a configured scope, or configure an initial exact-asset scope with user_confirmed_scope=true when no manifest exists. Record the confirmation in target notes, preserve existing provenance, and never override exclusions or infer related assets.",
     "Attach only a child host permitted by the saved parent scope. Child workspaces are nested beneath the parent assets directory. For huge scopes, store the original candidate list in the root workspace and create child workspaces as assets are validated/processed; do not create hundreds of thousands of empty directories.",
     "Use show/list to retrieve canonical absolute paths. For initial setup or a changed full scope list, use action=configure_scope with scope_file_path; it imports exact entries, stores a copy under the root workspace scope directory, and records the count/source hash in notes.md. For a user-confirmed incremental addition to an already configured scope, use action=configure_scope with only the new include/exclude entries and merge_existing=true; this merges with the saved manifest without reading the original scope file again. Use target_artifact for other target files and target_note for observations tied to evidence. Never invent an alternate output directory.",
   ].join("\n"),
@@ -187,6 +213,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       let excludeEntries = params.exclude ?? []
       let authorizationSource = params.authorization_source?.trim()
       let authorizationReference = params.authorization_reference?.trim()
+      let previousScopeItems: string[] | undefined
 
       if (params.merge_existing) {
         if (params.scope_file_path) {
@@ -201,24 +228,66 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           }
         }
         const existingScope = await TargetMemory.getScope(existingWorkspace.targetURL)
-        if (!existingScope || existingScope.status !== "configured" || !existingScope.scopeItems.length || !existingScope.authorizationSource || !existingScope.authorizationReference) {
+        if (!existingScope || existingScope.status !== "configured" || !existingScope.scopeItems.length || !existingScope.authorizationSource || (!existingScope.authorizationReference && !existingScope.authorizationSource.startsWith(USER_CONFIRMED_SCOPE_PREFIX))) {
           return {
             title: "Scope update stopped: no configured scope to extend",
             output: "The existing scope is missing or unconfigured. Configure the initial official policy scope first; no scope was changed.",
             metadata: { saved: false, reason: "scope_not_configured", target_url: existingWorkspace.targetURL } as TargetWorkspaceMetadata,
           }
         }
+        // An incremental merge is for a specific asset, not a new wildcard/CIDR policy import.
+        for (const entry of params.include ?? []) {
+          const candidate = confirmedScopeCandidate(entry)
+          if (!candidate) {
+            return {
+              title: "Scope extension needs one exact asset",
+              output: "No scope changes were made. Incremental scope updates accept a specific hostname, host:port, IP, or explicit HTTP(S) URL per entry, not wildcard hosts, CIDRs, or typed resource categories. Correct only the ambiguous entry; do not restart policy discovery.",
+              metadata: { saved: false, reason: "incremental_entry_not_exact", target_url: existingWorkspace.targetURL } as TargetWorkspaceMetadata,
+            }
+          }
+          const excluded = matchingScopeItems(candidate, existingScope.excludedItems)
+          if (excluded.length) {
+            const identity = "scope-exclusion-conflict:" + createHash("sha256").update(entry + "\\0" + excluded.join("\\0")).digest("hex").slice(0, 20)
+            try {
+              await TargetMemory.addNote(existingWorkspace.targetURL, {
+                kind: "manual",
+                title: "Scope confirmation conflicts with a saved exclusion",
+                content: [
+                  "The operator identified this exact asset for an incremental scope update, but the saved manifest explicitly excludes it.",
+                  "Requested asset: " + entry,
+                  "Matching exclusion(s): " + excluded.join(", "),
+                  "No scope entry was changed. Explicit exclusions remain authoritative until the operator explicitly resolves the policy conflict.",
+                ].join("\\n"),
+                source: "user-confirmed-scope-conflict",
+                status: "observed",
+                tags: ["scope", "exclusion", "blocked"],
+                upsertByIdentity: true,
+                identityKey: identity,
+              })
+            } catch { /* The scope conflict remains the result if note persistence is unavailable. */ }
+            return {
+              title: "Scope extension conflicts with a saved exclusion",
+              output: "No scope changes were made. The requested asset " + entry + " matches saved exclusion(s): " + excluded.join(", ") + ". This is the specific blocker, not a request for more proof. If the actual program policy changed, update the exclusion explicitly and resume without repeating discovery.",
+              metadata: { saved: false, reason: "explicit_exclusion_conflict", target_url: existingWorkspace.targetURL, excluded_items: excluded } as TargetWorkspaceMetadata,
+            }
+          }
+        }
+        previousScopeItems = [...existingScope.scopeItems]
         includeEntries = [...existingScope.scopeItems, ...includeEntries]
         excludeEntries = [...existingScope.excludedItems, ...excludeEntries]
         authorizationSource = authorizationSource || existingScope.authorizationSource
         authorizationReference = authorizationReference || existingScope.authorizationReference
       }
 
+      const userConfirmedInitialScope = params.user_confirmed_scope === true && !params.merge_existing && !params.scope_file_path
+      const sourceForConfiguration = authorizationSource || (userConfirmedInitialScope ? USER_CONFIRMED_SCOPE_SOURCE : undefined)
+      const referenceForConfiguration = authorizationReference || (userConfirmedInitialScope ? undefined : undefined)
       const result = await TargetMemory.configureScope(targetURL, {
         include: includeEntries,
         exclude: excludeEntries,
-        authorizationSource: required(authorizationSource, "authorization_source"),
-        authorizationReference: required(authorizationReference, "authorization_reference"),
+        authorizationSource: required(sourceForConfiguration, "authorization_source"),
+        authorizationReference: referenceForConfiguration ?? authorizationReference,
+        userConfirmed: userConfirmedInitialScope,
       })
 
       if (sourceContents !== undefined && sourceHash && sourceFilename && sourceArtifactPath) {
@@ -245,6 +314,36 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         })
       }
 
+      let confirmationNotesSaved = 0
+      const confirmationNoteErrors: string[] = []
+      const entriesToDocument = params.merge_existing && previousScopeItems
+        ? result.scope.scopeItems.filter((entry) => !previousScopeItems!.includes(entry))
+        : userConfirmedInitialScope ? result.scope.scopeItems : []
+      for (const entry of entriesToDocument) {
+        const identityKey = "scope-confirmation:" + createHash("sha256").update(entry).digest("hex").slice(0, 24)
+        try {
+          await TargetMemory.addNote(result.workspace.targetURL, {
+            kind: "manual",
+            title: "User-confirmed in-scope asset: " + entry,
+            content: [
+              "The operator explicitly confirmed this exact asset is in scope. The exact entry was saved to the persisted scope manifest without requesting a separate policy URL or repeated proof.",
+              "Exact persisted include entry: " + entry + ".",
+              "Existing include entries, exclusions, and authorization provenance were preserved. No wildcard or sibling assets were inferred.",
+              "Authorization basis: " + result.scope.authorizationSource + (result.scope.authorizationReference ? " (" + result.scope.authorizationReference + ")" : " (explicit confirmation in the current conversation; no external policy URL was supplied)") + ".",
+              "Active request tools still enforce the persisted scope on each concrete URL; explicit exclusions remain authoritative.",
+            ].join("\\n"),
+            source: "user-confirmed-scope",
+            status: "observed",
+            tags: ["scope", "user-confirmed", "authorization-provenance"],
+            upsertByIdentity: true,
+            identityKey,
+          })
+          confirmationNotesSaved++
+        } catch (error) {
+          confirmationNoteErrors.push(entry + ": " + (error instanceof Error ? error.message : String(error)))
+        }
+      }
+
       const requiredFiles = [
         path.join(result.workspace.workspacePath, "workspace.json"),
         path.join(result.workspace.workspacePath, "scope", "scope.json"),
@@ -269,12 +368,14 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           ...(sourceHash ? ["Original scope SHA-256: " + sourceHash] : []),
           ...(sourceContents !== undefined ? ["Usable lines imported: " + fileEntries.length] : []),
           "Authorization source: " + result.scope.authorizationSource,
-          "Official policy reference: " + result.scope.authorizationReference,
+          "Authorization reference: " + (result.scope.authorizationReference ?? "user-confirmed in conversation; recorded in notes.md"),
           "Included entries: " + result.scope.scopeItems.length,
           "Excluded entries: " + result.scope.excludedItems.length,
           "Workspace integrity: manifests and notes verified",
           "Authorized child workspaces attached/reorganized: " + result.associatedAssets.length,
-          params.merge_existing ? "Scope update mode: merged only the supplied entries into the saved scope; existing entries/exclusions and policy provenance were preserved." : "Scope configured. Reuse the saved manifest; do not re-import it unless the user provides an updated scope file.",
+          params.merge_existing ? "Scope update mode: merged only the supplied exact entries into the saved scope; existing entries/exclusions and policy provenance were preserved." : userConfirmedInitialScope ? "Initial scope basis: explicit operator confirmation; no external policy link was demanded or fabricated." : "Scope configured. Reuse the saved manifest; do not re-import it unless the user provides an updated scope file.",
+          ...(entriesToDocument.length ? ["User-confirmation notes saved: " + confirmationNotesSaved] : []),
+          ...(confirmationNoteErrors.length ? ["WARNING: scope was saved, but confirmation-note persistence failed for: " + confirmationNoteErrors.join("; ")] : []),
         ].join("\n"),
         metadata: {
           saved: true,
