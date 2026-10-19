@@ -158,7 +158,28 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form"].includes(value))
     if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
   }
-  const targets = scannerTargets(command.slice(scannerIndex), commandText)
+  let targets = scannerTargets(command.slice(scannerIndex), commandText)
+
+  // Passive Wayback CDX lookups are requests to a research provider, not scans of
+  // that provider. Authorize the domain being queried against the persisted target
+  // scope and URL-collection checkpoint, while only allowing the read-only CDX API.
+  if (["curl", "wget"].includes(scanner) && targets.length === 1) {
+    const requestURL = new URL(targets[0]!)
+    if (requestURL.hostname === "web.archive.org" && requestURL.pathname === "/cdx/search/cdx") {
+      const methodIndex = args.findIndex((value) => ["-x", "--request", "--method"].includes(value.toLowerCase()))
+      const explicitMethod = methodIndex >= 0 ? args[methodIndex + 1]?.toUpperCase() : undefined
+      const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form", "--post-data", "--post-file"].includes(value))
+      if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) {
+        throw new Error("Recon execution gate blocked archive lookup: only read-only GET/HEAD CDX requests are permitted.")
+      }
+      const archivedPattern = requestURL.searchParams.get("url")
+      const domain = archivedPattern?.replace(/^\\*\\./, "").split(/[/*?]/, 1)[0]?.toLowerCase()
+      if (!domain || !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$/.test(domain)) {
+        throw new Error("Recon execution gate blocked archive lookup: CDX query must identify a concrete target domain.")
+      }
+      targets = ["https://" + domain + "/"]
+    }
+  }
   if (!targets.length) {
     throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s). Target-list/file mode is blocked until each target can be checked against persisted scope and phase checkpoints.")
   }
