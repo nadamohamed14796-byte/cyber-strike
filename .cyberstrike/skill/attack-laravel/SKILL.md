@@ -182,49 +182,21 @@ Record route_name, method, middleware_chain, policy_or_gate, validation_class, m
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and their role
-Burp Suite and browser DevTools for HTTP behavior; Composer/PHP tooling and static source review when authorized source is available; Laravel's own configuration and route inspection.
+### Agent-usable tools and purpose
+- `rg` — search an authorized local source tree for route declarations, middleware, policies, mass-assignment configuration, and validation rules.
+- `composer` — inspect installed dependency versions and audit dependencies when the project has a Composer lockfile.
+- `php` and the project's test runner — run existing tests or a disposable local reproduction; do not modify production state.
+- `semgrep` — apply relevant PHP/Laravel static rules to a local checkout.
+- `jq` and Python — parse redacted JSON artifacts and compare saved responses.
 
-### Install or enable when missing
-PHP and Composer: use official OS packages or https://getcomposer.org/download/ ; Laravel documentation: https://laravel.com/docs . Add optional tools only from their official project docs and pin versions for reproducibility.
-These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
+### Installation and verification
+Use the official docs for [Composer](https://getcomposer.org/doc/) and [Semgrep](https://semgrep.dev/docs/getting-started/). Verify with `composer --version`, `php --version`, and `semgrep --version` as applicable. Only run Composer commands in an authorized checkout and understand whether they change dependencies or lockfiles. If source code is unavailable, use captured, redacted observations and do not claim source-level validation.
 
 ### Primary resources
-- [Laravel security documentation](https://laravel.com/docs/security) — authentication, authorization, and validation.
-- [Laravel routing](https://laravel.com/docs/routing) — route behavior.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box verification.
-
-### Small reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare sanitized local responses; it sends no traffic.
-
-### Runtime and evidence notes
-- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
-- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
-- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
-
-## Agent-executable CLI tooling, resources, and helper scripts
-
-Prefer CLI tools, local static analysis, and repeatable test harnesses. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify versions, official installation guidance, license, and dependency provenance before running tools.
-
-### Recommended tools
-- Semgrep — PHP/Laravel source patterns
-- Composer audit — dependency advisory checks
-- PHPStan or Psalm — static analysis when source is available
-- curl/Python requests — controlled behavior checks
-
-### Resources
-- https://semgrep.dev/docs/
-- https://getcomposer.org/doc/03-cli.md#audit
-- https://phpstan.org/
 - https://laravel.com/docs
-- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://semgrep.dev/docs/
 
-Community lists are for discovery only; use official framework and tool docs for current behavior.
-
-### Helper-script contract
-Record Laravel/PHP/package versions, advisory IDs, route/middleware configuration, and safe runtime corroboration. Never print .env contents or application keys.
-
-Keep raw evidence separate from normalized output. Preserve package/version, rule/advisory ID, source path, tool/version, timestamps, error state, confidence, and redaction. Use deterministic local fixtures and JSON/JSONL output where useful.
-
-### Handoff
-Return commands actually executed, tool versions, input/output artifacts, checks passed/failed, limitations, and next skill. Do not present a static-analysis warning as a confirmed runtime vulnerability.
+### Helper and evidence
+Use `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` for saved samples only. Record the route/middleware/policy evidence, control case, dependency versions, and any missing test preconditions. Keep secrets and raw session tokens out of logs and reports.
