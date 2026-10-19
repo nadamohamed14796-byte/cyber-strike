@@ -89,12 +89,10 @@ Verify actual scope resolution, inventory, HTTP probing, crawling, normalization
 - Recon Skills: https://github.com/uphiago/recon-skills
 - OWASP WSTG: https://owasp.org/www-project-web-security-testing-guide/
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Recon-to-hunt handoff contract
 For every asset/endpoint, separate asset attribution confidence from security confidence. Preserve source, timestamp, normalization, DNS chain, HTTP fingerprint, first-party vs third-party attribution, authentication observation, method/parameters, and a canonical deduplication key. Delta each new recon run against the previous snapshot and enqueue only new or materially changed observations; never label a route vulnerable because it is live or appears in JavaScript. Use the following signal routes: object IDs/tenant hints → IDOR; new role-only routes → BFLA; URL-consuming features → SSRF; sensitive fields → API property authorization; host/cache differences → header/cache skills. correlate_javascript and http_replay are runtime calls only where registered; verify tool availability before claiming execution.
-
 
 ## Durable recon loop and phase gates
 
@@ -132,7 +130,6 @@ Before using a tool, verify its registered name, argument schema, output path, a
 ## Handoff record
 
 Each queued item should include canonical_asset, scope_evidence, attribution_confidence, discovery_source, first_seen, last_seen, last_checked, route_key, method, parameter_locations, auth_context, observed_signal, hypothesis, negative_control_needed, candidate_skill, active_test_allowed, evidence_refs, status, blocked_reason, and next_action. Never store credentials or raw secrets in the queue.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
