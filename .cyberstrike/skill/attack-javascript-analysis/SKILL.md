@@ -118,7 +118,7 @@ Use one normalized record per method + route template + content type + parameter
 - source_sink_pairs, redirect_or_fetch_inputs, live_request_ref, observed_status_class
 - candidate_skill, hypothesis, evidence_ref, confidence, false_positive_reason, redaction_status
 
-Never store full cookie/token values or large minified lines. When a candidate appears important, retrieve the exact normal request through the authorized browser and create a sanitized request artifact for the specialist skill.
+Never store full cookie/token values or large minified lines. When a candidate appears important, use an already-captured, authorized normal-request artifact or a request supplied by the user; sanitize it before passing it to the specialist skill. Browser UI is not an agent dependency.
 
 
 ## Agent-executable CLI tooling, resources, and helper scripts
