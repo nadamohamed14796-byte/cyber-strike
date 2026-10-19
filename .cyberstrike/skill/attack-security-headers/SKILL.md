@@ -92,3 +92,20 @@ For each suspected issue, persist:
 - evidence_ref, confidence, cleanup, and next_decision.
 
 Use confirmed, disproven, inconclusive, or blocked. Keep one parent observation linked to several distinct findings only when each child has its own independently demonstrated impact. A missing header is not itself an exploit chain.
+
+
+## Additional header interactions and deployment checks
+
+- Multiple values: inspect duplicate or conflicting CSP, HSTS, CORS, and framing headers as the browser interprets them; do not assume the first or last value wins across every browser/proxy.
+- Edge/origin drift: compare the same controlled response through the public edge and approved origin access, if available. Record whether a CDN, gateway, or application layer added or removed the policy; do not bypass access controls to reach an origin.
+- CSP nonce lifecycle: verify nonce uniqueness and per-response binding through controlled page loads. A nonce visible in one response is not automatically reusable; only assess execution if an actual controlled injection source exists.
+- frame-ancestors vs X-Frame-Options: document modern/legacy browser behavior and effective policy, not just the presence of both.
+- CORS headers on errors and redirects: check whether sensitive error bodies or intermediate redirects are readable cross-origin; use synthetic data and browser proof.
+- Vary: Origin and cache key: a header difference is only a lead; validate cache separation using two controlled origins and harmless synthetic responses.
+- HSTS subdomain coverage: list which in-scope hostnames are HTTPS-capable before recommending includeSubDomains or preload; avoid breaking unrelated hosts.
+- Cross-origin isolation: COOP, COEP, and CORP are not interchangeable. Tie each recommendation to the resource-loading or browsing-context property it protects.
+- Permissions Policy: evaluate the specific feature and embedding context; absence alone is not proof of sensitive capability exposure.
+
+### Remediation quality gate
+
+For each recommendation, record the affected route class, required browser behavior, compatible policy, deployment layer that owns the header, and regression test. Avoid globally applying a restrictive CSP or HSTS policy without checking legitimate scripts, subdomains, third-party integrations, and rollout requirements.
