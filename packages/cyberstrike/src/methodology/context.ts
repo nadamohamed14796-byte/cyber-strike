@@ -14,17 +14,17 @@ import { SkillIndex } from "../skill/index-engine"
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   // The canonical recon workflow owns phase ordering. Skills provide detailed, conditional sub-workflows.
   scope_analysis: [
-    "target-workspace-workflow", "attack-bb-methodology", "recon-methodology",
+    "target-workspace-workflow", "attack-bb-methodology", "recon-methodology", "community-tool-selection",
     "scope analysis", "scope validation", "wildcard scope", "program policy",
   ],
   mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: [
-    "recon-methodology", "recon-subdomain-enumeration", "recon-asn-infrastructure",
+    "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-asn-infrastructure",
     "recon-origin-ip-discovery", "recon-email-security", "recon-gitlab-public-recon",
     "recon-visual-recon", "passive reconnaissance", "OSINT", "certificate transparency",
   ],
   active_recon: [
-    "recon-methodology", "recon-subdomain-enumeration", "recon-port-service-discovery",
+    "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-port-service-discovery",
     "recon-vhost-enumeration", "recon-cms-detection", "recon-origin-ip-discovery",
     "recon-asn-infrastructure", "recon-visual-recon", "attack-web-recon",
     "endpoint enumeration", "parameter discovery", "JavaScript analysis",
@@ -51,7 +51,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "authorization", "IDOR", "access control",
   ],
   input_validation: [
-    "wstg-inpv", "wstg-clnt", "wstg-injection", "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf",
+    "community-tool-selection", "wstg-inpv", "wstg-clnt", "wstg-injection", "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf",
     "attack-ssti", "attack-xxe", "attack-deserialization", "attack-file-upload",
     "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
     "attack-open-redirect", "attack-host-header", "attack-cache-poison", "llm-security", "injection",
@@ -68,14 +68,14 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "attack-ntlm-info", "data protection", "sensitive data", "TLS",
   ],
   api_security: [
-    "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
+    "community-tool-selection", "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
     "attack-grpc", "attack-mass-assignment", "attack-nosqli", "attack-rate-limit-bypass",
     "attack-websocket", "attack-cors", "attack-host-header", "attack-cache-poison",
     "attack-clickjacking", "attack-open-redirect", "attack-jwt", "llm-security",
     "API security", "GraphQL", "REST API",
   ],
   infrastructure: [
-    "attack-cloud-misconfig",
+    "community-tool-selection", "attack-cloud-misconfig",
     "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-docker-privesc",
     "k8s-assessment", "ad-security", "attack-ldap", "attack-ntlm-info",
     "aws-postexploit", "azure-postexploit", "gcp-postexploit", "k8s-postexploit",
@@ -84,7 +84,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "cloud security", "network exposure",
   ],
   reporting: [
-    "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
+    "community-tool-selection", "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
     "bugcrowd-reporting", "triage-validation", "evidence-hygiene", "report-writing",
   ],
 }
