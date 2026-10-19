@@ -57,3 +57,25 @@ Record operation, invariant, fault condition, principal/tenant, expected result,
 - https://cwe.mitre.org/data/definitions/703.html
 - https://cwe.mitre.org/data/definitions/636.html
 - https://owasp.org/Top10/2025/A10_2025-Mishandling_of_Exceptional_Conditions/
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl for a replay of one observed request. Verify optional CLIs locally and use only tools exposed by the current runtime.
+- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
+- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
+- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation guidance.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
+Compares local artifacts offline and heuristically redacts common secrets; it sends no requests and cannot prove complete sanitization.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.

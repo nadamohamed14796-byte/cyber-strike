@@ -126,3 +126,24 @@ Search for common secret-bearing locations, but do not rely on a single regex as
 - Keep private originals out of Git and cloud-shared folders unless specifically authorized.
 - If a secret is accidentally committed or transmitted, treat it as exposed: revoke/rotate it through the authorized owner and remove the artifact where possible; deleting a later copy does not erase Git history.
 - Do not describe a hash as proof of integrity unless the manifest and collection process are also controlled.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Burp request/response export, a local Markdown editor, sha256sum, and jq for manifest metadata. Review redaction; hashes alone do not prove provenance.
+- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — assessment evidence.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — reproducible tests and reporting.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
+Checks metadata only; manually inspect the artifact and redaction.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Preserve the sanitized request/response, test identity, timestamp, expected/observed behavior, and cleanup result.

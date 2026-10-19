@@ -141,3 +141,25 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 
 ### Parser boundary and inert proof
 Identify the exact serialized format, trust source, signature/integrity wrapper, and parser version before choosing a test. First compare valid application-generated input with a malformed but inert structure in a lab/staging fixture; observe parser errors and type handling without gadget payloads, command execution, or access to host files. A stack trace or acceptance of a new object type is only a lead until the security boundary and consequence are reproduced. If untrusted data comes from a partner API or webhook, route the ingestion boundary to unsafe API consumption; if only XML external entities are implicated, route to XXE. Do not treat deserialization RCE as proven without a safe isolated demonstration and direct evidence.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl for a replay of one observed request. Verify optional CLIs locally and use only tools exposed by the current runtime.
+- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
+- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
+- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation guidance.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
+Compares local artifacts offline and heuristically redacts common secrets; it sends no requests and cannot prove complete sanitization.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.

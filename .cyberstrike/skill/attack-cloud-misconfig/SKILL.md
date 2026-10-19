@@ -170,3 +170,24 @@ Separate four facts: the resource belongs to the authorized target, it is reacha
 
 ### Effective permission and resource proof
 Start from the approved account/project/subscription and exact role; preserve read-only identity and policy outputs before interpreting a setting. For each public-storage or IAM lead, check effective access (resource policy plus identity/organization boundaries), object existence, intended public contract, and a benign canary where one is available. Do not enumerate or retrieve customer contents to prove access. A permissive configuration is not automatically exploitable if a higher-level control blocks it; an exposed empty resource may have no demonstrated data impact. Route workload URL fetches to SSRF and externally consumed credentials to secret-exposure triage without using them. Include a minimally sufficient remediation and a regression check for the exact policy edge.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Authorized provider CLIs/consoles in read-only mode first (AWS CLI, Azure CLI, gcloud, kubectl, Terraform plan, or a relevant configuration scanner). Confirm account/project/context before reading.
+- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/) — web-facing controls.
+- [MITRE ATT&CK](https://attack.mitre.org/) — threat context.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
+Checks metadata only; manually inspect the artifact and redaction.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.

@@ -168,3 +168,25 @@ If Docker CLI metadata inspection is authorized, inspect configuration only; do 
 ### Evidence record additions
 
 Record runtime_version, container_image_digest, effective_uid_gid, groups, effective_capabilities, seccomp_status, lsm_status, socket_mode_owner, mount_sources_redacted, host_namespace_flags, workload_need, lab_validation_only, and cleanup_status. Separate configured risk from demonstrated host impact.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Native audit and telemetry tools in an explicitly authorized lab (for example Event Viewer/PowerShell, journalctl/auditd, klist, or provider logs). Never reuse internal post-exploitation flows on public bounty targets.
+- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [MITRE ATT&CK](https://attack.mitre.org/) — behavior taxonomy.
+- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — authorized assessment and evidence.
+- - [Official platform documentation](https://docs.docker.com/engine/security/) — check real platform defaults and security semantics.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
+Checks metadata only; manually inspect the artifact and redaction.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Use only an authorized isolated lab. Record starting state, principal, cleanup, and telemetry; do not apply internal post-exploitation workflows to public bounty targets.
