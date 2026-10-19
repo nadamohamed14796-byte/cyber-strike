@@ -104,7 +104,7 @@ Inspect archive extraction, image conversion, document preview, antivirus, XML p
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially different, authorized tests while the result can change the conclusion; deduplicate equivalent encodings/retries and stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. This does not override program rate limits or safe-production constraints.
 
 Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
 
@@ -140,3 +140,33 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 ### Upload lifecycle and retrieval proof
 Trace the complete lifecycle: authorization to upload, content validation, filename normalization, storage key, processing/transformation, retrieval authorization, content type, and browser origin. Use a benign file with a unique marker and harmless declared/actual-type mismatch; do not upload executable malware, web shells, oversized files, or active content to production. Verify the stored object is isolated and cannot alter another user's content, then inspect whether retrieval runs through a safe download origin with expected Content-Disposition and X-Content-Type-Options. A filename/path anomaly is not code execution unless a distinct execution path is proven. Chain to SSRF only for a confirmed server-side URL fetch and to XSS only if retrieved content executes in a relevant browser origin.
+
+
+## Practical inert-file verification and chain matrix
+
+### Create and inspect a harmless fixture locally
+
+```bash
+umask 077
+printf 'cyberstrike-upload-canary-%s\n' "$(date +%s)" > upload-canary.txt
+file --mime-type upload-canary.txt
+sha256sum upload-canary.txt
+```
+
+Upload only to an explicitly authorized feature. Record the local hash, reported server-side type (if available), object ID, and retrieval headers. Never use a real user's file as the test fixture.
+
+### Lifecycle matrix
+
+| Stage | Safe observation | Next branch only if this signal exists |
+|---|---|---|
+| Upload authorization | A controlled lower-privilege identity can upload a test-owned fixture contrary to policy | BFLA or object authorization, depending on the failed boundary |
+| Type validation | Server accepts a benign mismatch but later interprets it unsafely | Content-type/browser behavior; not RCE without a proven execution path |
+| Storage key/path | Normalization points outside the intended test-object prefix | Path traversal review only within the approved fixture/sandbox |
+| Retrieval authorization | A second controlled identity can retrieve the private fixture | IDOR/BOLA with object-owner and access-policy evidence |
+| Browser serving | The inert fixture is served inline from a privileged application origin with a risky type | XSS review only if browser interpretation/execution is demonstrated safely |
+| Server-side processing | Source/config indicates a URL fetch, archive extraction, or parser invocation | SSRF/archive/parser skill only after that processor and input flow are established |
+| Shared caching | Private fixture response is stored/replayed across contexts | Cache deception/poisoning review with cache-layer evidence |
+
+### Evidence additions
+
+Store upload_request_ref, fixture_hash, detected_type, generated_key, processing_path, retrieval_auth_context, response_content_type, content_disposition, nosniff_behavior, origin, before_after_access, cleanup_verified, and chain_basis. Keep the fixture and notes free of credentials. If the storage provider or processing stage is not observable, state that uncertainty instead of inferring it.
