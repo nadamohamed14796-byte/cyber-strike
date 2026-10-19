@@ -138,3 +138,29 @@ Use only a unique callback URL and benign test value. Do not probe internal addr
 
 ### Result handling
 Correlate the callback with a unique request ID/time, demonstrate that the server—not the tester's browser—made the request, and stop at the minimum proof needed.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
+
+### Recommended tools
+- curl — baseline and redirect behavior checks
+- Python requests/httpx — controlled request variations
+- interactsh — only an approved out-of-band callback endpoint
+- jq/rg — parse response and local source clues
+
+### Resources
+- https://portswigger.net/web-security/ssrf
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/projectdiscovery/interactsh
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids. Use official documentation for current flags, supported versions, output formats, and limitations.
+
+### Helper script contract
+Use a callback correlation record with unique non-sensitive token, request timestamp, interaction protocol, and evidence path. Never probe cloud metadata or internal services without explicit authorization; callback absence is inconclusive, not proof of safety.
+
+Preserve native evidence and normalize a separate copy. Keep source, timestamp, tool/version, errors, confidence, redaction state, and artifact references. Helpers should accept explicit paths, emit JSON/JSONL where practical, handle malformed input, and include local fixtures.
+
+### Handoff
+Return tool/version, command invoked, input/output artifact references, test/control counts, failures, confidence, limitations, and next skill. A missing tool or blocked source must not be reported as a successful empty result.
