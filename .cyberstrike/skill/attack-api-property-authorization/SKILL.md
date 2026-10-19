@@ -54,3 +54,43 @@ Save the exact endpoint/method, role and tenant, synthetic object ID, expected p
 - https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/
 - https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html
 - https://portswigger.net/web-security/api-testing
+
+
+## Field-level review matrix
+
+| Property class | Read-side question | Write-side question | Evidence bar |
+|---|---|---|---|
+| Identity/ownership | Is owner, tenant, or membership metadata exposed beyond policy? | Can caller reassign owner/tenant on a test object? | Server-authoritative owner/tenant after read-back |
+| Role/privilege | Is role/permission metadata private to admins? | Can caller set role, scopes, or approval state? | Never promote a real account; use an isolated fixture and explicit authorization |
+| Billing/entitlement | Are internal price, billing, or entitlement fields returned? | Can a client-supplied amount/status override server calculation? | Synthetic transaction and documented invariant; no real financial actions |
+| Security/session | Are recovery state, MFA state, API-key metadata, or internal security flags exposed? | Can caller change security controls without required proof? | Safe test account and state comparison; do not retrieve live secrets |
+| Internal/derived | Are internal IDs, debug fields, or computed fields returned unnecessarily? | Are server-derived values accepted from client input? | Field is shown to be trusted/used, not merely echoed |
+| Nested/bulk | Are child fields filtered per object and role? | Does each item/field get validated individually? | Controlled fixtures and per-item/per-field result |
+
+### JSON response key inventory (keys only)
+
+Use this on a saved, redacted response from an authorized test fixture. It lists property paths without printing values.
+
+```bash
+jq -r 'paths(scalars) | map(tostring) | join(".")' response.json | sort -u
+```
+
+For large/nested responses, compare key paths and values separately; a key-name difference is a lead, while the sensitivity policy and actual value matter for confirmation. Do not run this against a bulk dump of real customer data.
+
+### Minimal write validation
+
+1. Save the normal request and current server-side value for one synthetic object.
+2. Submit exactly one harmless candidate property using the normal method/content type.
+3. Re-read the object through an independent request or UI; do not trust the update response echo.
+4. Compare the stored value and any derived behavior with the documented field policy.
+5. Restore the fixture and record cleanup.
+
+### Chaining rules
+
+- Unauthorized object itself is reachable → BOLA/IDOR; property issue remains separate only if a distinct field-level control also fails.
+- Operation is admin-only regardless of object → BFLA.
+- Protected field is accepted through generic model binding → mass-assignment review; do not assume all writable properties are vulnerable.
+- Sensitive data is cached across identities → cache review only after cross-context replay is demonstrated.
+- A GraphQL schema exposes a field name → not a finding until resolver output or mutation behavior violates field policy.
+
+Add property_path, expected_read_policy, expected_write_policy, principal_role, tenant, owner_fixture, request_field_present, response_field_present, persisted_value_changed, independent_readback, negative_control, and cleanup_verified to the evidence record.
