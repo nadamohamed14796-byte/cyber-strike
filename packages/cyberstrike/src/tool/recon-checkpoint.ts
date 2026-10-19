@@ -2,7 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
 import { Session } from "../session"
-import { TargetMemory } from "../target"
+import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE } from "../target"
 import {
   RECON_PHASES as PHASES,
   initialReconRun as initialRun,
@@ -149,9 +149,14 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           } catch (error) {
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation because the saved authorization manifest is invalid: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_manifest_invalid" } }
           }
+          const userConfirmedScope = Boolean(
+            scope?.authorizationSource?.startsWith(USER_CONFIRMED_SCOPE_SOURCE) &&
+            scope.authorizationReference === null,
+          )
           if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0 ||
-            !scope.authorizationSource?.trim() || !scope.authorizationReference?.startsWith("https://")) {
-            return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the canonical program workspace must have a configured, non-empty scope manifest with authorization source and HTTPS policy reference. The root workspace URL itself does not have to be in scope.", metadata: { saved: false, reason: "scope_manifest_unconfigured" } }
+            !scope.authorizationSource?.trim() ||
+            (!scope.authorizationReference?.startsWith("https://") && !userConfirmedScope)) {
+            return { title: "Scope validation rejected", output: "Cannot complete scope_validation: configure a non-empty scope manifest with saved authorization provenance. An explicit user-confirmed exact asset is a valid provenance source and does not require a separate policy URL. The root workspace URL itself does not have to be in scope.", metadata: { saved: false, reason: "scope_manifest_unconfigured" } }
           }
         }
         if (status === "complete" && phase === "workspace_setup") {
