@@ -229,7 +229,7 @@ Locate the official program or customer policy and establish:
 
 Prefer the official policy over search snippets, third-party summaries, or assumptions.
 
-If a policy cannot be verified, record that fact. Do not manufacture an authorization reference.
+If a policy cannot be verified, record that fact. Do not manufacture an authorization reference. Once a scope manifest and official policy reference are saved, ordinary follow-up messages and user-confirmed additions do not require fetching the entire policy or scope file again. Reuse the saved manifest unless the user supplies a replacement scope file or says the policy changed.
 
 ### Program root versus an in-scope asset
 
