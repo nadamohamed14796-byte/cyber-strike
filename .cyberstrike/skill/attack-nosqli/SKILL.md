@@ -103,7 +103,7 @@ If source is available, follow the value through decoding, schema validation, qu
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent JSON encodings and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Do not enumerate or extract production data.
 
 Record each attempt: hypothesis, single changed variable, control/baseline, observed signal, interpretation, confidence and next branch. Prefer paired requests, controlled identities, synthetic records and independent corroboration; retain minimal sanitized evidence.
 
@@ -141,3 +141,34 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 
 ### Query-operator and data-boundary evidence
 Identify whether user input is interpreted as a scalar, object, operator, regular expression, filter, or aggregation stage. Establish a normal test-account query and a known-invalid query, then vary the input type once while keeping identity and data constant. Use only a synthetic fixture and compare query semantics or returned fixture membership; never enumerate real records or dump collections. A syntax error or changed response size alone is ambiguous. Confirm that the server interprets the input as control structure and that the effect crosses a protected data/auth boundary. Route authentication effects to auth-bypass review, and generic untrusted-object binding to mass-assignment/schema review.
+
+
+## Structured-input differential ledger
+
+For each input, record its expected schema type and actual interpretation. Keep JSON structure explicit—string, number, boolean, null, array, and object are different test dimensions.
+
+| Input contract | Safe comparison | What must be shown |
+|---|---|---|
+| Scalar username/search | Valid scalar vs wrong JSON type | Query semantics change beyond validation error |
+| Nested filter | Documented filter object vs one unsupported nested key in a synthetic dataset | Server interprets untrusted key as query control rather than rejecting it |
+| Operator-capable field | Known-match and known-no-match controls | Unauthorized fixture membership or authentication outcome changes |
+| Aggregation/report filter | One small documented filter vs invalid type in staging | Query path is reachable and result differs semantically |
+| Login/session | Valid owned credentials vs malformed-type input | Server issues a session for an identity without valid proof; status alone is insufficient |
+| ODM/driver boundary | Source trace of input validation and query construction | Reachable untrusted value reaches a query sink without safe schema/type enforcement |
+
+### Safe local JSON type inspection
+
+```bash
+jq -r 'paths(scalars) as $p | [($p | map(tostring) | join(".")), (getpath($p) | type)] | @tsv' request-redacted.json
+```
+
+Use a redacted request captured from your own test account. The command inventories scalar paths/types; it does not prove query injection.
+
+### Chain routing
+
+- Query semantics alter login identity → auth-bypass review, with a tester-owned identity and no real-user guessing.
+- Query semantics expose another controlled object's fields → BOLA/property authorization as separate checks.
+- Input is accepted as a structured model field but not interpreted as a query operator → mass-assignment/schema validation, not NoSQL injection.
+- Only a parser error is observed → keep as a lead; do not infer database-wide access or code execution.
+
+Persist input_json_path, expected_type, actual_type, known_match_control, known_no_match_control, candidate_result, synthetic_fixture_ids, session_issued, query_sink_evidence, and cleanup_status.
