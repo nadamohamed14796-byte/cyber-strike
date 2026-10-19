@@ -152,3 +152,28 @@ Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/ma
 
 ### Result handling
 Keep file/source, timestamp, relevant event, redaction status, and security claim. Do not copy raw session IDs, tokens, request bodies, or personal data into the global research corpus.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
+
+### Recommended tools
+- rg — search locally supplied logs for high-signal error patterns
+- jq — parse JSON logs
+- Python — redact tokens/PII and aggregate repeated stack signatures
+- Semgrep only for related local source analysis
+
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; verify project maintenance, license, and supported behavior from official sources.
+
+### Helper-script contract
+Process only logs the user is authorized to inspect. Redact tokens, cookies, personal data, and internal secrets before storing output; preserve source file/line and a stable redacted fingerprint.
+
+Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+
+### Handoff
+Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
