@@ -179,3 +179,26 @@ Do not print sourcesContent wholesale; it may contain private implementation det
 ### Exposure triage fields
 
 Record artifact_kind, canonical_url, response_signature, negative_control, scope_basis, intended_visibility, source_provenance, secret_type_only, secret_value_redacted, minimal_proof_ref, owner_notification_path, and cleanup_or_cache_purge_status. Do not store credentials in the knowledge base, reports, commits, or logs.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use ripgrep for exact local string searches, Gitleaks for secret-pattern triage over authorized local source/assets, and Burp/browser DevTools to verify whether a suspected exposed artifact is publicly retrievable. Secret scanners are noisy and their output must be treated as sensitive.
+
+### Installation and setup
+- [Gitleaks official releases/install](https://github.com/gitleaks/gitleaks) — use release binaries or documented package instructions.
+- [TruffleHog documentation](https://docs.trufflesecurity.com/) — optional secret-scanning alternative; prefer local scanning and review how the selected mode handles data.
+- Kali/Debian: `sudo apt update && sudo apt install ripgrep`.
+Do not paste discovered key values into tickets, chat, or global research. Never validate a token by using it against a service; report the fingerprint/location to the authorized owner and rotate exposed credentials through approved processes.
+
+### Primary resources
+- [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html) — handling and remediation.
+- [Gitleaks](https://github.com/gitleaks/gitleaks) — local scanning behavior.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — disclosure validation.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript` extracts route candidates from local assets and avoids printing source lines; it is not a secret verifier.
+
+### Result handling
+Store file/hash/location and a redacted fingerprint, not the value. Distinguish a placeholder, public identifier, expired credential, and credible secret without attempting unauthorized use.
