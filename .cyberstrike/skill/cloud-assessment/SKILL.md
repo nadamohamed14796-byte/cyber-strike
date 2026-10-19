@@ -80,3 +80,28 @@ Return provider and scope, resource identifier (redacted as required), control/b
 
 ### Multi-cloud evidence and attribution
 Normalize each finding to provider, account/project/subscription, resource identifier, identity used, policy source, effective permission, region, observation time, and confidence. Do not equate IP/ASN ownership or a provider fingerprint with authorization to test adjacent tenants. Compare identity policy, resource policy, organization guardrails, network reachability, and workload identity together before claiming access. Prefer read-only configuration review and synthetic canary resources; never retrieve customer content to strengthen a report. Route provider-specific storage/IAM details to the relevant provider skill and outbound fetch behavior to SSRF only when each boundary is independently evidenced.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Prowler and ScoutSuite provide cloud-configuration coverage; Checkov reviews IaC; Trivy reviews containers/dependencies. Prefer provider-native read-only commands to understand identity/context before launching a scanner.
+
+### Installation and setup
+- [Prowler](https://docs.prowler.com/) — official installation and current provider support.
+- [ScoutSuite](https://github.com/nccgroup/ScoutSuite) — official repo and setup.
+- [Checkov](https://www.checkov.io/2.Basics/Installing%20Checkov.html) — IaC configuration checks.
+- [Trivy](https://trivy.dev/latest/docs/getting-started/installation/) — image/dependency review.
+Use a test account/read-only role, verify account/project/tenant/region, and review scanner permissions and output storage. Do not enable remediation or destructive actions by default. Installation does not grant authorization.
+
+### Primary resources
+- [AWS Security](https://docs.aws.amazon.com/security/) — if AWS resources are in scope.
+- [Azure security](https://learn.microsoft.com/en-us/azure/security/) — Azure controls.
+- [Google Cloud security](https://cloud.google.com/security) — GCP controls.
+- [CIS Benchmarks](https://www.cisecurity.org/cis-benchmarks) — baseline configuration controls.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to validate the local evidence index.
+
+### Result handling
+State provider/account context, the precise control and resource, scanner version, remediation status, and exceptions. Do not persist keys or unrelated inventory.
