@@ -187,11 +187,10 @@ export function rankSkillsForPhase(
   const seen = new Set<string>()
   const maxSelected = Math.max(0, limit)
 
-  // Reserve shortlist slots for phase-critical skills first. Match normalized
-  // canonical names, and never surface a tampered skill even if it is required.
+  // Never drop phase-critical skills just because a caller requests a small
+  // shortlist. The limit caps optional candidates; required skills are additive.
   const requiredNames = PHASE_REQUIRED_SKILLS[phaseId] ?? []
   for (const requiredName of requiredNames) {
-    if (selected.length >= maxSelected) break
     const normalizedRequiredName = normalizeSkillText(requiredName)
     const item = ranked.find((candidate) => normalizeSkillText(candidate.entry.name) === normalizedRequiredName)
     if (!item || seen.has(item.entry.name)) continue
@@ -199,8 +198,9 @@ export function rankSkillsForPhase(
     seen.add(item.entry.name)
   }
 
+  const totalLimit = Math.max(maxSelected, selected.length)
   for (const item of ranked) {
-    if (selected.length >= maxSelected) break
+    if (selected.length >= totalLimit) break
     if (seen.has(item.entry.name)) continue
     selected.push(item)
     seen.add(item.entry.name)
@@ -256,6 +256,13 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       verified: item.verified,
     }))
     const selected = rankSkillsForPhase(phaseId, entries, 6, observedTechStack)
+    const catalogNames = new Set(entries.map((entry) => normalizeSkillText(entry.name)))
+    const missingRequired = (PHASE_REQUIRED_SKILLS[phaseId] ?? []).filter(
+      (name) => !catalogNames.has(normalizeSkillText(name)),
+    )
+    if (missingRequired.length > 0) {
+      lines.push("Required phase skill(s) missing from the current catalog: " + missingRequired.join(", ") + ". Search the skill catalog once for an allowed canonical alternative; if still missing, report this specific gap and do not claim the skill was loaded.")
+    }
     if (selected.length === 0) {
       lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
     } else {
