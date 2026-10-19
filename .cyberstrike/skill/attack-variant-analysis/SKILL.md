@@ -72,28 +72,6 @@ Return the root-cause pattern, candidate inventory, deduplication key, evidence 
 - https://owasp.org/www-project-web-security-testing-guide/
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-For authorized source/code review, use Semgrep for targeted static patterns and CodeQL when its supported build/language setup fits. For black-box testing, use Burp to compare related endpoints and identify whether a confirmed control failure has adjacent variants; do not brute-force unrelated routes.
-
-### Installation and setup
-- [Semgrep](https://semgrep.dev/docs/getting-started/) — official install and rules.
-- [CodeQL CLI](https://docs.github.com/en/code-security/codeql-cli/getting-started-with-the-codeql-cli) — official supported installation/analysis workflow.
-- [Burp Suite](https://portswigger.net/burp) — manual runtime verification.
-Source scanners can require a built database and are not universally applicable to every language. Run on an authorized source checkout or controlled lab; do not use variant testing as permission to broaden the target scope or request rate.
-
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — testing context and impact.
-- [Semgrep rules](https://semgrep.dev/r) — language-specific patterns.
-- [CodeQL documentation](https://codeql.github.com/docs/) — query/database semantics.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare sanitized variants offline.
-
-### Result handling
-Record the original confirmed primitive, what adjacent variant was tested, the control expectation, evidence, and result. Do not call sibling variants vulnerable until independently reproduced.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
