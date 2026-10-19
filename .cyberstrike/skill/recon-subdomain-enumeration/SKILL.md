@@ -164,3 +164,32 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize a
 
 ### Result handling
 Record source, observation time, record type, resolver, confidence, live status, and next phase. Deduplicate assets without discarding alternate discovery sources.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+
+### Recommended tools
+- subfinder — passive subdomain discovery
+- amass — asset relationship mapping
+- dnsx — DNS resolution and record checks
+- puredns — wildcard-aware resolution when active discovery is authorized
+- httpx — HTTP/TLS metadata
+- jq and Python — normalization and provenance-preserving deduplication
+
+### Official resources
+- https://github.com/projectdiscovery/subfinder
+- https://github.com/owasp-amass/amass
+- https://github.com/projectdiscovery/dnsx
+- https://github.com/projectdiscovery/httpx
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
+
+### Helper script and output contract
+Create a JSONL host normalizer that retains every source observation, timestamps, DNS answers/TTL, wildcard-control results, and attribution confidence. Do not collapse provenance when deduplicating hostnames.
+
+Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
+
+### Handoff
+Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
