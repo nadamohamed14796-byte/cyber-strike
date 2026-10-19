@@ -1284,7 +1284,30 @@ export namespace TargetMemory {
     }
     const matchingParent = await findAuthorizedParent(candidate.origin)
     if (!matchingParent || matchingParent.id !== parent.id) {
-      throw new Error("The asset is not unambiguously authorized by this parent's saved scope; check includes, exclusions, protocol, and port.")
+      // An explicitly scoped asset may live on an unrelated registrable domain
+      // (for example, a third-party application listed directly in a bounty
+      // program). In that case the general ancestor discovery can fail to select
+      // the caller's root workspace even though that root's persisted manifest
+      // authorizes this exact origin. Re-check the selected parent directly;
+      // never infer authorization from the caller's assertion or bypass exclusions.
+      const parentScope = await getScope(parent.targetURL)
+      const candidateHref = candidate.origin + "/"
+      const parentIsRoot = parent.parentTargetID === null
+      const isDNSChild = candidate.hostname !== parent.hostname &&
+        candidate.hostname.endsWith("." + parent.hostname) &&
+        new URL(parent.targetURL).pathname === "/"
+      const explicitlyIncluded = !!parentScope &&
+        parentScope.status === "configured" &&
+        parentScope.scopeItems.length > 0 &&
+        matchingScopeItems(candidateHref, parentScope.scopeItems).length > 0
+      const explicitlyExcluded = !!parentScope &&
+        matchingScopeItems(candidateHref, parentScope.excludedItems).length > 0
+      const chainAuthorized = explicitlyIncluded && !explicitlyExcluded &&
+        (parentIsRoot || isDNSChild) &&
+        await parentChainAuthorizes(candidate, parent)
+      if (!chainAuthorized) {
+        throw new Error("The asset is not unambiguously authorized by this parent's saved scope; check includes, exclusions, protocol, and port.")
+      }
     }
     const asset = await ensure(candidate.origin, { parentTargetURL: parent.targetURL, assetType })
     await syncAssetRegistry(parent)
