@@ -8,7 +8,7 @@ import PROMPT_REVIEW from "./template/review.txt"
 import PROMPT_RECON from "./template/recon.txt"
 import { MCP } from "../mcp"
 import { Skill } from "../skill"
-import { RECON_METHODOLOGY_PROMPT } from "../methodology/recon"
+import { RECON_SPECIALIZED_COVERAGE_PROMPT } from "../methodology/recon"
 
 export namespace Command {
   export const Event = {
@@ -87,7 +87,7 @@ export namespace Command {
         name: Default.RECON,
         description: "run or resume the canonical, scope-gated reconnaissance workflow",
         source: "command",
-        template: [PROMPT_RECON, RECON_METHODOLOGY_PROMPT].join("\n\n"),
+        template: [PROMPT_RECON, RECON_SPECIALIZED_COVERAGE_PROMPT].join("\n\n"),
         hints: hints("$ARGUMENTS"),
       },
       [Default.UPDATE]: {
