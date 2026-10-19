@@ -5,8 +5,6 @@
  * false-positive verdict: exhausting the budget can only produce INCONCLUSIVE.
  */
 export namespace VerificationAttempts {
-  export const MAX_ATTEMPTS = 20
-
   export type Outcome = "confirmed" | "disproven" | "inconclusive"
 
   export interface Attempt {
@@ -67,7 +65,7 @@ export namespace VerificationAttempts {
   export interface Decision {
     outcome: Outcome
     attemptsUsed: number
-    remainingAttempts: number
+    remainingAttempts: null
     canContinue: boolean
     reason: string
   }
@@ -95,16 +93,16 @@ export namespace VerificationAttempts {
   export function canRunAttempt(attempts: Attempt[], next: Pick<Attempt, "strategyID" | "variantKey">): boolean {
     const unique = uniqueAttempts(attempts)
     const validAttemptCount = unique.filter(isEvidenceBackedValidAttempt).length
-    return validAttemptCount < MAX_ATTEMPTS && Boolean(next.strategyID.trim() && next.variantKey.trim()) &&
+    return Boolean(next.strategyID.trim() && next.variantKey.trim()) &&
       !unique.some((attempt) => attemptKey(attempt) === attemptKey(next))
   }
 
   export function decide(input: DecisionInput): Decision {
     const attempts = uniqueAttempts(input.attempts)
-    // Only attempts with valid preconditions AND durable evidence count toward
-    // the 20-attempt false-positive gate. Missing evidence is not a valid observation.
+    // Count only unique attempts with valid preconditions and durable evidence.
+    // Counts are informational; they are not an arbitrary ceiling or verdict threshold.
     const attemptsUsed = attempts.filter(isEvidenceBackedValidAttempt).length
-    const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
+    const remainingAttempts = null
 
     // Hard stops (scope, safety, or unavailable target) always win over verdicts.
     if (input.blockedReason) {
@@ -117,24 +115,22 @@ export namespace VerificationAttempts {
       return { outcome: "confirmed", attemptsUsed, remainingAttempts, canContinue: false, reason: "Decisive evidence supports the vulnerability hypothesis." }
     }
 
-    const hasValidDisproof = input.decisiveDisproof && hasDecisiveEvidence && attempts[attempts.length - 1] && isEvidenceBackedValidAttempt(attempts[attempts.length - 1]!)
-    if (hasValidDisproof && attemptsUsed >= MAX_ATTEMPTS) {
-      return { outcome: "disproven", attemptsUsed, remainingAttempts, canContinue: false, reason: "Direct evidence contradicts the hypothesis after 20 distinct valid verification attempts." }
-    }
-    if (hasValidDisproof && attemptsUsed < MAX_ATTEMPTS) {
+    const hasValidDisproof = Boolean(
+      input.decisiveDisproof &&
+      hasDecisiveEvidence &&
+      attempts[attempts.length - 1] &&
+      isEvidenceBackedValidAttempt(attempts[attempts.length - 1]!),
+    )
+    if (hasValidDisproof) {
       return {
-        outcome: "inconclusive",
+        outcome: "disproven",
         attemptsUsed,
         remainingAttempts,
-        canContinue: true,
-        reason: "Direct evidence currently contradicts the hypothesis, but a false-positive verdict requires 20 distinct valid verification attempts.",
+        canContinue: false,
+        reason: "Direct evidence contradicts the stated hypothesis under valid test conditions.",
       }
     }
 
-    if (attemptsUsed >= MAX_ATTEMPTS) {
-      return { outcome: "inconclusive", attemptsUsed, remainingAttempts: 0, canContinue: false, reason: "The 20-distinct-attempt budget is exhausted without decisive evidence; do not label this a false positive." }
-    }
-
-    return { outcome: "inconclusive", attemptsUsed, remainingAttempts, canContinue: true, reason: "More adaptive, non-duplicate verification is required before a final verdict." }
+    return { outcome: "inconclusive", attemptsUsed, remainingAttempts, canContinue: true, reason: "The hypothesis remains unresolved; continue only while a materially distinct, evidence-producing check can change the conclusion." }
   }
 }
