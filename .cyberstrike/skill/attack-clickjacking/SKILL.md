@@ -67,10 +67,12 @@ Check login redirects, legacy paths, and error responses for consistent framing 
 
 ## Tools
 
-- **Browser DevTools:** inspect frame behavior and CSP console messages.
-- **curl:** capture route-specific headers.
-- **Local HTML page:** reproduce framing from a test origin.
-- **Burp Suite:** compare redirects/error paths.
+- `curl`: capture route-specific headers and redirect chains for an observed authorized URL.
+- Python `httpx`: compare CSP/X-Frame-Options across documented routes.
+- `rg`: inspect local source/configuration for framing policy and sensitive actions.
+- Playwright headless API may test a local fixture when effective framing behavior needs reproduction; it is optional, not a core dependency.
+
+Verify with `curl --version` and the selected Python client. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://playwright.dev/python/.
 
 ## Framing Policy Matrix
 
