@@ -46,35 +46,35 @@ describe("Methodology phase skill routing", () => {
       ],
       session_management: ["wstg-sess", "wstg-auth-session", "attack-session", "attack-jwt", "attack-csrf", "attack-saml-sso"],
       authorization_testing: [
-        "wstg-authz", "wstg-apit-02", "wstg-auth-session", "attack-idor-automation", "attack-mass-assignment", "attack-bfla",
+        "wstg-authz", "wstg-apit-02", "wstg-auth-session", "attack-idor-automation", "attack-api-property-authorization", "attack-firebase-supabase", "attack-mass-assignment", "attack-bfla",
         "attack-api-noauth-hunt", "attack-cors",
       ],
       input_validation: [
-        "wstg-inpv", "wstg-clnt", "wstg-injection", "attack-dom-xss", "attack-nosqli", "attack-deserialization", "attack-file-upload",
+        "wstg-inpv", "wstg-clnt", "wstg-injection", "attack-dom-xss", "attack-nosqli", "attack-deserialization", "attack-file-upload", "attack-file-inclusion", "attack-server-side-parameter-pollution", "attack-unsafe-api-consumption", "attack-exceptional-conditions",
         "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
         "attack-host-header", "attack-cache-poison",
       ],
       business_logic: [
         "wstg-busl", "wstg-logic-client-api", "attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass",
-        "attack-clickjacking", "attack-host-header", "attack-cache-poison",
+        "attack-clickjacking", "attack-host-header", "attack-cache-poison", "attack-cache-deception", "attack-api-resource-consumption", "attack-exceptional-conditions",
       ],
       data_protection: [
         "wstg-cryp", "wstg-errh", "wstg-conf", "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
       ],
       api_security: [
-        "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-schema-enumeration", "attack-grpc",
+        "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-api-property-authorization", "attack-api-resource-consumption", "attack-server-side-parameter-pollution", "attack-unsafe-api-consumption", "attack-firebase-supabase", "attack-mcp-security", "attack-rag-vector-security", "attack-shadow-api", "attack-security-headers", "attack-metrics-exposure", "attack-cache-deception", "attack-graphql", "attack-schema-enumeration", "attack-grpc",
         "attack-mass-assignment", "attack-nosqli", "attack-websocket",
         "attack-host-header", "attack-cache-poison", "attack-clickjacking", "llm-security",
       ],
       infrastructure: [
-        "attack-cloud-misconfig", "cloud-assessment", "ci-assessment",
+        "attack-cloud-misconfig", "cloud-assessment", "ci-assessment", "attack-database-service-exposure", "attack-firebase-supabase",
         "cicd-attacks", "k8s-assessment", "ad-security", "attack-ldap",
         "aws-postexploit", "azure-postexploit", "gcp-postexploit", "k8s-postexploit",
         "windows-postexploit", "linux-postexploit", "macos-postexploit", "ebpf-attacks",
         "kerberos-attacks", "mitre_attack", "mitre_attack_ics", "CIS benchmarks", "NIST controls",
       ],
       reporting: [
-        "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
+        "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing", "bug-bounty-evidence-workflow", "attack-variant-analysis", "attack-metrics-exposure",
         "bugcrowd-reporting", "triage-validation", "evidence-hygiene", "report-writing",
       ],
     }

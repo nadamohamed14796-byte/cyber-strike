@@ -37,6 +37,14 @@ jobs:
           git config --global user.email "bot@cyberstrike.io"
           git config --global user.name "cyberstrike"
 
+      - name: Validate skill catalog, cross-skill links, tooling guidance, and publication registry
+        run: |
+          python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --self-test
+          python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --strict-links
+          python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --strict
+          bun run packages/cyberstrike/script/generate-registry.ts
+          git diff --exit-code -- .cyberstrike/skill/index.json || { git --no-pager diff -- .cyberstrike/skill/index.json; exit 1; }
+
       - name: Install Chromium for browser integration tests
         run: bunx playwright install --with-deps chromium
 

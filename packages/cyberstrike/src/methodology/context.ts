@@ -14,19 +14,19 @@ import { SkillIndex } from "../skill/index-engine"
 const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   // The canonical recon workflow owns phase ordering. Skills provide detailed, conditional sub-workflows.
   scope_analysis: [
-    "target-workspace-workflow", "attack-bb-methodology", "recon-methodology", "community-tool-selection",
+    "target-workspace-workflow", "attack-bb-methodology", "recon-methodology", "community-tool-selection", "bug-bounty-evidence-workflow",
     "scope analysis", "scope validation", "wildcard scope", "program policy",
   ],
   mobile_application_testing: ["mitre_attack_mobile", "mobile application security", "OWASP MASVS", "OWASP MSTG", "Android security", "iOS security"],
   passive_recon: [
     "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-asn-infrastructure",
     "recon-origin-ip-discovery", "recon-email-security", "recon-gitlab-public-recon",
-    "recon-visual-recon", "passive reconnaissance", "OSINT", "certificate transparency",
+    "recon-visual-recon", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "recon-error-log-mining", "passive reconnaissance", "OSINT", "certificate transparency",
   ],
   active_recon: [
     "recon-methodology", "community-tool-selection", "recon-subdomain-enumeration", "recon-port-service-discovery",
     "recon-vhost-enumeration", "recon-cms-detection", "recon-origin-ip-discovery",
-    "recon-asn-infrastructure", "recon-visual-recon", "attack-web-recon",
+    "recon-asn-infrastructure", "recon-visual-recon", "attack-web-recon", "attack-shadow-api", "attack-javascript-analysis", "attack-subdomain-takeover", "attack-database-service-exposure", "recon-error-log-mining",
     "endpoint enumeration", "parameter discovery", "JavaScript analysis",
   ],
   technology_profiling: [
@@ -34,7 +34,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "attack-django", "attack-fastapi", "attack-flask-werkzeug", "attack-laravel",
     "attack-nestjs", "attack-nextjs", "attack-nodejs", "attack-springboot",
     "attack-wordpress", "attack-exchange-owa", "attack-zimbra", "attack-hikvision-isapi",
-    "attack-vmware-vcenter", "attack-minio-s3", "llm-security",
+    "attack-vmware-vcenter", "attack-minio-s3", "attack-firebase-supabase", "attack-mcp-security", "attack-rag-vector-security", "llm-security",
   ],
   authentication_testing: [
     "wstg-athn", "wstg-idnt", "wstg-auth-session", "attack-auth-bypass", "attack-401-403-bypass", "attack-ato", "attack-mfa-bypass",
@@ -47,36 +47,36 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   ],
   authorization_testing: [
     "wstg-authz", "wstg-apit-02", "wstg-auth-session", "attack-idor-automation", "attack-mass-assignment", "attack-bfla",
-    "attack-api-noauth-hunt", "attack-401-403-bypass", "attack-cors",
+    "attack-api-noauth-hunt", "attack-api-property-authorization", "attack-firebase-supabase", "attack-401-403-bypass", "attack-cors",
     "authorization", "IDOR", "access control",
   ],
   input_validation: [
     "community-tool-selection", "wstg-inpv", "wstg-clnt", "wstg-injection", "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf",
     "attack-ssti", "attack-xxe", "attack-deserialization", "attack-file-upload",
-    "attack-rce", "attack-prototype-pollution", "attack-request-smuggling",
+    "attack-rce", "attack-prototype-pollution", "attack-file-inclusion", "attack-server-side-parameter-pollution", "attack-unsafe-api-consumption", "attack-exceptional-conditions", "attack-request-smuggling",
     "attack-open-redirect", "attack-host-header", "attack-cache-poison", "llm-security", "injection",
     "XSS", "SQL injection", "SSRF",
   ],
   business_logic: [
     "wstg-busl", "wstg-logic-client-api", "attack-business-logic", "attack-race-condition", "attack-mass-assignment",
     "attack-rate-limit-bypass", "attack-csrf", "attack-clickjacking",
-    "attack-host-header", "attack-cache-poison", "business logic", "race condition",
+    "attack-host-header", "attack-cache-poison", "attack-cache-deception", "attack-api-resource-consumption", "attack-exceptional-conditions", "business logic", "race condition",
     "attack-bb-methodology",
   ],
   data_protection: [
     "wstg-cryp", "wstg-errh", "wstg-conf", "attack-information-disclosure", "attack-source-leak", "attack-phpinfo-exposure",
-    "attack-ntlm-info", "data protection", "sensitive data", "TLS",
+    "attack-ntlm-info", "attack-security-headers", "attack-metrics-exposure", "data protection", "sensitive data", "TLS",
   ],
   api_security: [
     "community-tool-selection", "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
     "attack-grpc", "attack-mass-assignment", "attack-nosqli", "attack-rate-limit-bypass",
-    "attack-websocket", "attack-cors", "attack-host-header", "attack-cache-poison",
+    "attack-websocket", "attack-cors", "attack-api-property-authorization", "attack-api-resource-consumption", "attack-server-side-parameter-pollution", "attack-unsafe-api-consumption", "attack-firebase-supabase", "attack-mcp-security", "attack-rag-vector-security", "attack-shadow-api", "attack-security-headers", "attack-metrics-exposure", "attack-host-header", "attack-cache-poison", "attack-cache-deception",
     "attack-clickjacking", "attack-open-redirect", "attack-jwt", "llm-security",
     "API security", "GraphQL", "REST API",
   ],
   infrastructure: [
     "community-tool-selection", "attack-cloud-misconfig",
-    "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-docker-privesc",
+    "cloud-assessment", "ci-assessment", "cicd-attacks", "attack-database-service-exposure", "attack-firebase-supabase", "attack-docker-privesc",
     "k8s-assessment", "ad-security", "attack-ldap", "attack-ntlm-info",
     "aws-postexploit", "azure-postexploit", "gcp-postexploit", "k8s-postexploit",
     "windows-postexploit", "linux-postexploit", "macos-postexploit", "ebpf-attacks",
@@ -85,7 +85,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   ],
   reporting: [
     "community-tool-selection", "attack-triage-validation", "attack-evidence-hygiene", "attack-report-writing",
-    "bugcrowd-reporting", "triage-validation", "evidence-hygiene", "report-writing",
+    "bugcrowd-reporting", "bug-bounty-evidence-workflow", "attack-variant-analysis", "attack-metrics-exposure", "triage-validation", "evidence-hygiene", "report-writing",
   ],
 }
 
