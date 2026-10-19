@@ -74,10 +74,12 @@ If source is available, follow the value through decoding, schema validation, qu
 
 ## Tools
 
-- **Burp Suite Repeater:** compare scalar, object, and invalid-type requests.
-- **curl / jq:** preserve JSON types and inspect controlled fixture results.
-- **OpenAPI/GraphQL schema viewer:** establish expected types and resolver contracts.
-- **Source review:** verify operator filtering, ODM sanitization, and authorization checks.
+- Python `httpx` or `curl`: repeat a captured, authorized request with one harmless input variation and a control.
+- `jq` and `rg`: inspect saved JSON responses and authorized local query construction.
+- `mongosh`: only for an explicitly authorized local/test database or source/configuration review.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved samples offline.
+
+Verify the selected Python client, `jq --version`, and `mongosh --version` when applicable. Official docs: https://www.python-httpx.org/, https://jqlang.org/, https://www.mongodb.com/docs/mongodb-shell/. Never dump collections or modify/delete data.
 
 ## NoSQL Operator and Boundary Matrix
 
