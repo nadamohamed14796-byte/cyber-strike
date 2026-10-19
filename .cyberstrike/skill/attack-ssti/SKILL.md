@@ -92,3 +92,28 @@ Use Burp Repeater with benign template-expression markers and application error/
 
 ### Result handling
 First establish server-side template evaluation using a harmless expression in a controlled input. Do not use OS command execution, file reads, or secret extraction to prove a finding; explain the engine and trust-boundary failure.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
+
+### Recommended tools
+- A local template-engine fixture for identifying expression evaluation
+- Semgrep — local source/configuration clues when source is available
+- curl/Python requests — minimal controlled inputs
+- jq — structured output comparison
+
+### Resources
+- https://portswigger.net/web-security/server-side-template-injection
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use the upstream community list only to discover candidates. Confirm tool maintenance, provenance, dependencies, and supported usage from official sources.
+
+### Helper-script contract
+Keep payloads non-destructive and engine-specific. Separate reflected text from server-side expression evaluation; do not attempt command execution or filesystem access on production systems.
+
+Helpers must accept explicit paths, preserve native evidence, write normalized output separately, redact sensitive values, record timestamps and tool versions, handle malformed inputs, and include local fixtures.
+
+### Handoff
+Return the tool/version, command, input/output artifact references, control result, failures, confidence, and limitations. A candidate signal is not a confirmed finding.
