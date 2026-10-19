@@ -141,10 +141,20 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   if (urlFlagIndexes.length === 0) {
     return "Pass an explicit '-u https://authorized-host' input for each authorized host; URL-list/file inputs are not accepted by the generic shell crawler gate."
   }
+  const inputURLs: URL[] = []
   for (const index of urlFlagIndexes) {
     const value = args[index + 1] ? stripOuterShellQuotes(args[index + 1]!) : ""
     if (!value || !/^https?:\/\//i.test(value)) {
       return "Every Katana '-u' input must be an explicit absolute HTTP(S) URL, not a filename, wildcard, or unresolved target list."
+    }
+    try {
+      const parsed = new URL(value)
+      if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) {
+        return "Every Katana '-u' input must be a credential-free HTTP(S) URL."
+      }
+      inputURLs.push(parsed)
+    } catch {
+      return "Every Katana '-u' input must be a valid absolute HTTP(S) URL."
     }
   }
   if (normalizedArgs.some((arg) => ["-ns", "--no-scope", "-do", "--display-out-scope", "-cs", "--crawl-scope"].includes(arg))) {
@@ -176,6 +186,9 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
     return "Katana target must be an absolute HTTP(S) URL."
   }
   const hostname = target.hostname.toLowerCase().replace(/\.$/, "")
+  if (!inputURLs.some((input) => input.origin === target.origin)) {
+    return "The target checked against persisted scope must match one of this Katana command's explicit '-u' origins."
+  }
 
   // Every configured scope in the asset's ancestry is authoritative. FQDN is
   // insufficient for URL/path/port-only inclusions or any narrower exclusions.
