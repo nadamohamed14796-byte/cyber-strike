@@ -60,11 +60,11 @@ describe("Katana scope policy", () => {
   })
 
   test("accepts ordinary single- or double-quoted shell URL and numeric arguments", () => {
-    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-o", "'/tmp/example-workspace/scans/katana-urls-run-1.txt'"]
+    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-o", "'/tmp/example-workspace/urls/katana-urls-run-1.txt'"]
     expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
 
-  test("requires a unique output path inside the canonical workspace scans folder", () => {
+  test("requires a unique output path inside the canonical workspace urls folder", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/tmp/outside.txt"], "https://example.com", baseScope, workspacePath)).toContain("inside")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
