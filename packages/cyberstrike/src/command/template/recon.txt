@@ -243,7 +243,7 @@ Locate the official program or customer policy and establish:
 
 Prefer the official policy over search snippets, third-party summaries, or assumptions.
 
-If a policy cannot be verified, record that fact. Do not manufacture an authorization reference. Once a scope manifest and official policy reference are saved, ordinary follow-up messages and user-confirmed additions do not require fetching the entire policy or scope file again. Reuse the saved manifest unless the user supplies a replacement scope file or says the policy changed.
+For a full program-scope import or an actual policy change, prefer the official policy and record its provenance. If no policy reference can be verified, do not fabricate one. An explicit user confirmation for one exact asset is a separate valid provenance path: save it as user-confirmed in the manifest and notes without requiring an external reference. Reuse the saved manifest for ordinary follow-ups; do not refetch/re-import the full policy or scope list unless the user supplies a replacement or says the policy changed.
 
 ### Program root versus an in-scope asset
 
@@ -290,9 +290,9 @@ If the policy explicitly authorizes a wildcard, record the precise rule and its 
 
 ## 2.4 Persist and enforce scope decisions
 
-During setup, call the registered scope checker exactly once for the canonical target/workspace using its actual schema. Persist the decision in the run manifest and reuse it throughout the run; do not manually check every candidate origin. Active-request tools must enforce the persisted policy for every concrete request. Only start a new setup check when a new run begins or the canonical target/policy configuration changes. If the single check is inconclusive, stop active work rather than retrying in a loop. If supported, use:
+During setup, call the registered scope checker exactly once for the concrete starting asset, using the canonical program-root workspace only as the scope-manifest selector
 
-`scope_check(target="<canonical root target>", target_url="<canonical root target>")`
+`scope_check(target="<actual starting asset URL>", target_url="<canonical program-root workspace URL>")`
 
 Verify that the result represents an explicit, configured authorization decision.
 
