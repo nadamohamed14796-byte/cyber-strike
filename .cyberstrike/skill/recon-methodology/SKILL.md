@@ -114,3 +114,28 @@ Return normalized asset and endpoint inventories, scope decisions, provenance, d
 
 ### Delta-driven prioritization and handoff
 Every recon wave should diff hosts, DNS/CNAME/provider changes, TLS/HTTP fingerprints, new API paths, methods/parameters, JavaScript hashes, authentication state, and third-party destinations against the previous snapshot. Reuse observations only while their source freshness/TTL remains credible; revalidate changes and stale evidence rather than repeating a whole scan. Keep asset ownership confidence separate from vulnerability confidence. Each queue item must state the security property, expected policy, prerequisites, baseline needed, exact next observation, and stopping condition. A candidate with missing credentials stays blocked, not safe. Hand off only signal-matched cases to specialist skills and preserve the source/provenance for later audit.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Build the workflow from passive asset sources, DNS resolution, live HTTP confirmation, URL collection, and manual browser/proxy observation. Optional specialists: subfinder, dnsx, httpx, katana, gau, naabu, Nmap, and Burp—only each for a named phase.
+
+### Installation and setup
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — official installation for subfinder, dnsx, httpx, katana, naabu, and Nuclei.
+- [gau](https://github.com/lc/gau) — official source and releases.
+- [Nmap](https://nmap.org/download.html) — official downloads and package guidance.
+- [Burp Suite](https://portswigger.net/burp) — request capture.
+Install only the tools that add coverage to the current target; no requirement to install the full list. Keep passive and active results distinct, use curated in-scope inputs, and obey program request-rate rules. Discovery does not expand scope automatically.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — end-to-end methodology.
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — tool behaviors and output.
+- [UseOSINT skills](https://github.com/useosint/skills) — source provenance/corroboration.
+- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate URL inventories while stripping sensitive query values locally.
+
+### Result handling
+Keep source, phase, time, tool/version, live/passive status, confidence, and next action. Use one endpoint record with multiple parameter/source observations instead of duplicate records.
