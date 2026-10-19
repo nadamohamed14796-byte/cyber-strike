@@ -866,27 +866,23 @@ export namespace TargetMemory {
   }
 
 
-  /** A parent must authorize this exact host and every ancestor must authorize it too. */
+  /**
+   * Every configured ancestor must authorize the asset, but a program workspace is
+   * a policy container, not necessarily a DNS parent. HackerOne programs routinely
+   * include unrelated domains; requiring hostname suffixes here rejects valid assets
+   * even when the saved scope manifest explicitly includes them.
+   */
   async function parentChainAuthorizes(candidate: URL, workspace: Workspace): Promise<boolean> {
     const candidateHref = candidate.origin + "/"
-    const ownBase = new URL(workspace.targetURL)
-    if (
-      ownBase.hostname === candidate.hostname ||
-      !candidate.hostname.endsWith("." + ownBase.hostname) ||
-      ownBase.protocol !== candidate.protocol ||
-      ownBase.port !== candidate.port ||
-      ownBase.pathname !== "/"
-    ) return false
-
     let current: Workspace | null = workspace
     const visited = new Set<string>()
     while (current) {
       if (visited.has(current.id)) return false
       visited.add(current.id)
-      const base = new URL(current.targetURL)
       let scope: TargetScope | null
       try { scope = await getScope(current.targetURL) } catch { return false }
       if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) return false
+      // Exclusions always override includes at every configured level.
       if (matchingScopeItems(candidateHref, scope.excludedItems).length) return false
       if (!matchingScopeItems(candidateHref, scope.scopeItems).length) return false
       if (!current.parentTargetID) return true
@@ -899,7 +895,12 @@ export namespace TargetMemory {
     return false
   }
 
-  /** Pick the most-specific parent; a configured narrower policy cannot be bypassed via an ancestor. */
+  /**
+   * Select the most-specific authorized DNS ancestor when one exists. Otherwise,
+   * allow a root program workspace to own an explicitly scoped, unrelated domain.
+   * Matching and exclusions remain authoritative; this does not infer authorization
+   * from the workspace's name or from an asset being observed.
+   */
   async function findAuthorizedParent(candidateURL: string): Promise<Workspace | null> {
     let candidate: URL
     try { candidate = new URL(candidateURL) } catch { return null }
@@ -907,25 +908,40 @@ export namespace TargetMemory {
     const candidates = list()
       .filter((workspace) => {
         const base = new URL(workspace.targetURL)
-        return base.hostname !== candidate.hostname &&
+        const isDNSAncestor = candidate.hostname !== base.hostname &&
           candidate.hostname.endsWith("." + base.hostname) &&
-          base.protocol === candidate.protocol &&
-          base.port === candidate.port &&
           base.pathname === "/"
+        // Child workspaces remain tied to their DNS subtree. Only root program
+        // workspaces may own explicitly listed domains outside their own hostname.
+        return candidate.hostname !== base.hostname && (isDNSAncestor || workspace.parentTargetID === null)
       })
-      .sort((a, b) => new URL(b.targetURL).hostname.length - new URL(a.targetURL).hostname.length)
+      .sort((a, b) => {
+        const aHost = new URL(a.targetURL).hostname
+        const bHost = new URL(b.targetURL).hostname
+        const aAncestor = candidate.hostname.endsWith("." + aHost)
+        const bAncestor = candidate.hostname.endsWith("." + bHost)
+        if (aAncestor !== bAncestor) return aAncestor ? -1 : 1
+        return bHost.length - aHost.length
+      })
 
     for (const workspace of candidates) {
       let scope: TargetScope | null
       try { scope = await getScope(workspace.targetURL) } catch { return null }
-      // An unconfigured intermediate host is not a delegation boundary; try its ancestor.
+      // Unconfigured intermediate workspaces are not authorization boundaries.
       if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) continue
       const href = candidate.origin + "/"
-      // A narrower, configured exclusion must never fall back to a wider wildcard parent.
-      if (matchingScopeItems(href, scope.excludedItems).length) return null
-      if (!matchingScopeItems(href, scope.scopeItems).length) return null
-      // Every configured ancestor must also authorize this origin.
-      if (!await parentChainAuthorizes(candidate, workspace)) return null
+      if (matchingScopeItems(href, scope.excludedItems).length) {
+        // Never fall back to a broader root when the most-specific matching policy excludes it.
+        const isDNSAncestor = candidate.hostname.endsWith("." + new URL(workspace.targetURL).hostname)
+        if (isDNSAncestor) return null
+        continue
+      }
+      if (!matchingScopeItems(href, scope.scopeItems).length) continue
+      if (!await parentChainAuthorizes(candidate, workspace)) {
+        const isDNSAncestor = candidate.hostname.endsWith("." + new URL(workspace.targetURL).hostname)
+        if (isDNSAncestor) return null
+        continue
+      }
       return workspace
     }
     return null
