@@ -77,10 +77,12 @@ Record process identity, permission boundary, sandbox/container limits, and remo
 
 ## Tools
 
-- **Burp Suite / curl:** bounded single-request comparisons.
-- **Semgrep / language-native search:** find execution sinks and trace data flow.
-- **Staging container/test harness:** reproduce without production side effects.
-- **Application logs:** corroborate an approved canary when logs are in scope.
+- `rg` and `semgrep`: find execution sinks and trace input flow in authorized local source.
+- Python `httpx` or `curl`: bounded single-request comparisons using a benign marker only.
+- Staging container/test harness: reproduce behavior without production side effects.
+- Application logs: corroborate an approved canary when logs are explicitly in scope.
+
+Verify `semgrep --version`, `curl --version`, and the selected Python client. Official docs: https://semgrep.dev/docs/getting-started/, https://curl.se/docs/, https://www.python-httpx.org/. Do not use destructive commands, persistence, file reads, or credential access as proof.
 
 ## Execution Primitive and Proof Matrix
 
