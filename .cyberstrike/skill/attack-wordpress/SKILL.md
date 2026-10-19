@@ -223,3 +223,29 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate
 
 ### Result handling
 Distinguish fingerprinted version exposure from an exploitable vulnerability; verify the affected component/version, reachable vulnerable feature, and safe proof. Use a disposable site for write tests.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local test harnesses; browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Verify official installation docs, tool version, license, dependency provenance, and target impact before use.
+
+### Recommended tools
+- WPScan — WordPress-specific checks with authorized API/configuration
+- WhatWeb — technology fingerprinting
+- Trivy/Semgrep — local plugin/theme source or container checks when available
+- jq/Python — normalize plugin/version/advisory inventory
+
+### Resources
+- https://wpscan.com/
+- https://github.com/urbanadventurer/WhatWeb
+- https://developer.wordpress.org/advanced-administration/security/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids; official docs and advisories are the source of truth for tool behavior and affected versions.
+
+### Helper-script contract
+Record core/plugin/theme version evidence and vendor advisory references. Do not run brute-force or destructive checks; a guessed plugin version is not confirmation that a vulnerable code path is present.
+
+Preserve native evidence and write normalized results separately. Retain tool/version, timestamps, source, rule/advisory IDs, error state, confidence, and redaction. Use deterministic fixtures and structured output.
+
+### Handoff
+Return actual commands, versions, inputs/outputs, checks passed/failed, limitations, and next skill. Static or version-based signals are not confirmed vulnerabilities without evidence of an affected path.
