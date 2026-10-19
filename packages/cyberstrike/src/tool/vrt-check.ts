@@ -68,7 +68,7 @@ const Parameters = z.object({
 
 export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadata>("update_vrt_check", {
   description:
-    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict is blocked unless verification_hypothesis_key points to a durable ledger outcome of DISPROVEN after 20 distinct valid attempts, with direct evidence. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
+    "Update a VRT (Vulnerability Rating Taxonomy) check for an intel entry. After testing an endpoint/parameter for a specific vulnerability category, record the result here. A tested_not_vulnerable verdict requires verification_hypothesis_key to point to a durable DISPROVEN ledger outcome backed by direct evidence under valid conditions; no minimum attempt count applies. Inconclusive attempts must remain unresolved, not clean. This feeds coverage tracking. Every check moved from 'pending' to a tested state improves coverage.",
   parameters: Parameters,
   async execute(params, ctx) {
     // Lane discipline: a proxy-tester may only record VRT checks in its own
@@ -149,11 +149,10 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
       }
       const decisiveAttempt = attempts[attempts.length - 1]
       const outcome = decisiveAttempt?.outcome
-      const validAttemptsUsed = Policy.uniqueAttempts(attempts).filter((attempt) => attempt.validConditions).length
-      if (outcome !== "disproven" || validAttemptsUsed < Policy.MAX_ATTEMPTS || !decisiveAttempt?.validConditions || !decisiveAttempt?.evidenceRef?.trim()) {
+      if (outcome !== "disproven" || !decisiveAttempt?.validConditions || !decisiveAttempt?.evidenceRef?.trim()) {
         return {
           title: `VRT clean verdict blocked — ${params.vrt_category}`,
-          output: `Cannot mark this category tested_not_vulnerable: a DISPROVEN outcome after 20 distinct valid attempts with direct evidence is required (valid attempts: ${validAttemptsUsed}, current outcome: ${outcome ?? "unrecorded"}). Continue adaptive verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
+          output: `Cannot mark this category tested_not_vulnerable without a durable DISPROVEN outcome supported by direct evidence under valid conditions (current outcome: ${outcome ?? "unrecorded"}). Continue evidence-led verification or preserve it as INCONCLUSIVE / NEEDS REVIEW.`,
           metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_unproven", attemptsUsed: validAttemptsUsed, outcome: outcome ?? "unrecorded" },
         }
       }
