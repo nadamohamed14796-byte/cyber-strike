@@ -207,29 +207,6 @@ For source review, trace the request from credential extraction through verifier
 For each regression, record route registration, effective middleware chain, expected principal, actual principal, authorization decision, fixture, negative control, and test result. Do not turn a source-search match or missing string into a confirmed finding.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Burp Proxy/Repeater, browser DevTools Application/Network, and the application's normal login/session flows using controlled accounts. Use password managers or environment-local secrets handling; never paste live cookies, reset links, OTPs, or tokens into logs.
-- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
-- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
-
-### Primary resources
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — auth controls.
-- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) — session lifecycle.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-
-### Small, reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-This compares local artifacts offline and heuristically redacts common secrets before displaying differences. It sends no requests and does not prove complete sanitization.
-
-### Evidence and hand-off
-- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
-- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
-
-Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
-
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 ### Agent-usable CLI tools
