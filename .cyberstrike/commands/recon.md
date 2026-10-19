@@ -73,13 +73,13 @@ Do not report a tool as installed merely because its name appears in this prompt
 
 Workspace initialization does not establish authorization.
 
-Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. Revalidate scope for each candidate before active probing.
+Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. For each distinct candidate origin, perform one explicit `scope_check` during setup and retain its decision in the run manifest. Do not repeatedly call `scope_check` for the same unchanged origin, re-fetch the same policy, or reconfigure the same saved scope. Active-request tools still enforce persisted scope internally for every request; this enforcement is mandatory and is not a reason for the agent to manually repeat checks.
 
 Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
 
 Do not bypass authentication, rate limits, access controls, or program restrictions. Respect the target's permitted request methods, automation limits, and operational constraints.
 
-If scope is missing, ambiguous, invalid, or unconfigured, continue passive public research and workspace preparation where appropriate, but do not run active probes.
+If scope is missing, ambiguous, invalid, or unconfigured, review the official policy once and configure the canonical root once. Then run one explicit scope check for the requested origin. If it fails, stop active work and report the exact reason. If workspace attachment fails after a successful scope check, do not try alternate URL spellings, ports, asset types, or repeated scope rewrites. Inspect the single failure once; fix the implementation or report the blocker. Never loosen or rewrite the official scope just to make attachment succeed.
 
 ### 0.5 Target data protection
 
