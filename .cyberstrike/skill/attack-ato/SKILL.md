@@ -76,10 +76,12 @@ Record whether issue affects a single test identity, role, or integration. Resto
 
 ## Tools
 
-- **Burp Suite:** capture identity lifecycle requests.
-- **Browser DevTools:** inspect redirects, cookies, and state transitions.
-- **Offline token tools:** inspect only artifacts issued to test identities.
-- **Test tenant/logs:** validate principal mapping without user data.
+- Python `httpx` or `curl`: reproduce observed identity-lifecycle requests using two tester-owned accounts.
+- `jq`: inspect redacted principal/session metadata.
+- `rg`: review local source/configuration for recovery, identity-linking, and session invalidation.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify the selected client and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. Never use real users' identities or retain live reset links, cookies, or OTPs.
 
 ## ATO Evidence and Severity Matrix
 
