@@ -191,11 +191,11 @@ test("invalid-precondition attempts do not count toward false-positive classific
   const result = assessFindingChecks(checks, invalidAttempts)
   expect(result.verdict).toBe("inconclusive")
   expect(result.attemptCount).toBe(0)
-  expect(result.attemptsRemaining).toBe(20)
-  expect(result.output).toContain("0/20 distinct valid evidence-backed attempts")
+  expect(result.attemptsRemaining).toBeUndefined()
+  expect(result.output).toContain("no fixed attempt-count threshold applies")
 })
 
-test("unresolved checklist questions block a false-positive verdict even after 20 attempts", () => {
+test("unresolved checklist questions block a false-positive verdict regardless of attempt count", () => {
   const checks = checklist({
     reproducible: { status: "fail", reason: "Controlled replay did not reproduce the claim", evidence: "Twenty distinct valid attempts matched the expected baseline" },
     unexpected_behavior: { status: "fail", reason: "Observed behavior matched intended behavior", evidence: "Controlled comparisons showed no claimed behavior" },
@@ -204,7 +204,7 @@ test("unresolved checklist questions block a false-positive verdict even after 2
   const result = assessFindingChecks(checks, makeAttempts(20))
   expect(result.verdict).toBe("inconclusive")
   expect(result.unknownCheckIDs).toContain("security_impact")
-  expect(result.output).toContain("20/20 distinct valid evidence-backed attempts")
+  expect(result.output).toContain("attempt counts do not override unanswered checklist questions")
   expect(result.nextStep).toContain("Resolve the unknown checks before making a final verdict")
 })
 
@@ -213,11 +213,10 @@ test("false positive requires multiple evidence-backed contradictions and explai
     reproducible: { status: "fail", reason: "Repeated controlled attempts did not reproduce the claim", evidence: "Three replays returned the expected owner-bound record" },
     unexpected_behavior: { status: "fail", reason: "Observed response matches intended owner-only behavior", evidence: "Response body and status match the same-account baseline" },
   })
-  expect(assessFindingChecks(checks, makeAttempts(19)).verdict).toBe("inconclusive")
   const result = assessFindingChecks(checks, makeAttempts(20))
   expect(result.verdict).toBe("false_positive")
   expect(result.attemptCount).toBe(20)
-  expect(result.attemptsRemaining).toBe(0)
+  expect(result.attemptsRemaining).toBeUndefined()
   expect(result.output).toContain("#1")
   expect(result.output).toContain("#3")
 })
@@ -458,13 +457,13 @@ test("does not count duplicate variation keys as additional attempts across asse
       const one = await FindingValidation.record({ sessionID: session.id, vulnerabilityID: finding.id, checks: checklist(), attempts: first })
       expect(one.attemptCount).toBe(10)
       expect(one.ledgerAttemptCount).toBe(0)
-      expect(one.ledgerAttemptsRemaining).toBe(20)
+      expect(one.ledgerAttemptsRemaining).toBeUndefined()
       const repeated = first.slice(0, 5).map((attempt) => ({ ...attempt, evidence: attempt.evidence + " repeated observation" }))
       const two = await FindingValidation.record({ sessionID: session.id, vulnerabilityID: finding.id, checks: checklist(), attempts: repeated })
       expect(two.attemptCount).toBe(10)
       expect(two.ledgerAttemptCount).toBe(0)
-      expect(two.ledgerAttemptsRemaining).toBe(20)
-      expect(two.attemptsRemaining).toBe(10)
+      expect(two.ledgerAttemptsRemaining).toBeUndefined()
+      expect(two.attemptsRemaining).toBeUndefined()
       expect(two.verdict).not.toBe("false_positive")
       await Session.remove(session.id)
     },
@@ -493,7 +492,7 @@ test("does not allow one variation to count twice under different strategy label
 })
 
 
-test("accumulates 20 distinct attempts across separate validation calls before false-positive classification", async () => {
+test("accumulates distinct attempts across separate validation calls without a fixed threshold", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
     directory: dir.path,
