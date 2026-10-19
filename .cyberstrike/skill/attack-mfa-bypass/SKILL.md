@@ -97,7 +97,7 @@ Use a harmless protected operation to confirm the assurance level is checked ser
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never bypass program retry limits or risk locking out real users.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -133,3 +133,28 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Factor-state transition proof
 Use two controlled test accounts and map enrollment, challenge, recovery, device trust, remembered sessions, factor replacement, step-up authorization, and logout/revocation. Preserve a valid challenge baseline and compare missing, expired, wrong-purpose, and previously consumed test proof one dimension at a time. Verify server-side assurance level and protected action, not merely the UI's MFA badge. Stop before lockout or recovery of any real account. Chain to ATO only if an unauthorized test principal reaches control of the test account; chain to session review when an existing session retains privileges after a factor/security change.
+
+
+## MFA assurance and recovery decision matrix
+
+| Path | Safe comparison | Proof required |
+|---|---|---|
+| Password-only session | Valid first factor before/after MFA challenge | Server denies MFA-gated endpoint until challenge success |
+| Remembered device | Normal trusted device vs revoked/expired test trust | Old trust does not bypass configured reauthentication |
+| Recovery code | Valid owned code, then same code reused | One-time behavior and account binding are enforced |
+| Factor replacement | Fresh authenticated test session vs stale/low-assurance session | Server requires the documented assurance level before replacement |
+| Password reset | Test account before/after reset | Expected session/factor invalidation and notification behavior |
+| SSO/federation | Valid test identity with known assurance claim vs one lacking it | Relying party enforces required acr/amr or equivalent policy |
+| Mobile/API alternate path | Same protected operation through observed clients | Backend applies the same assurance requirement, not just the UI |
+| Step-up sensitive action | Normal fresh step-up vs expired/missing test proof | Protected server action is denied without fresh proof |
+
+### Safe test evidence
+
+Record account_fixture, factor_type, challenge_purpose, session_assurance_before_after, recovery_artifact_state, device_trust_state, endpoint_result, protected_action_result, retry_policy_observed, and cleanup_verified. Never store OTPs, recovery codes, authenticator seeds, or full tokens.
+
+### Chain rules
+
+- Session remains privileged after MFA change → session lifecycle review.
+- Recovery path accepts a factorless identity and changes account control → ATO review only with controlled identities and complete terminal-state proof.
+- Missing step-up permits one protected action but not login bypass → report the exact action/assurance boundary; do not call it a full MFA bypass.
+- UI omits MFA but backend rejects the operation → false positive for bypass; note the UI inconsistency separately only if it has independent impact.
