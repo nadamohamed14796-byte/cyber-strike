@@ -171,3 +171,21 @@ Compare semantic response content and the controlled object's owner/tenant, not 
 
 ### Evidence-led branches
 Use a controlled request pair for each boundary: canonical path versus an observed equivalent representation; allowed role versus denied role; supported method versus a known denied method; normal authority versus a documented proxy-derived authority. Preserve method, body, credentials, and content type unless that is the one variable being tested. A changed status is only a clue—confirm that the protected resource or operation became available. Compare against a random non-existent route and a legitimate denied baseline to catch soft-404s, routing fallbacks, and edge-generated responses. Chain to BOLA/BFLA only when the reachable resource or function exposes a distinct authorization gap; chain to request-smuggling review only when evidence actually indicates parser disagreement across HTTP layers.
+
+
+## Normalization differential record
+
+Use only a route and variants already observed in the application, and begin with a read-only resource. Keep a control request and change one normalization dimension at a time; do not fuzz a large path dictionary.
+
+```bash
+# Example structure only: replace with the canonical route and one permitted variant.
+curl --path-as-is -sS -D canonical.headers -o canonical.body "$BASE_URL/observed/protected-route"
+curl --path-as-is -sS -D variant.headers -o variant.body "$BASE_URL/observed/PROTECTED-ROUTE"
+sha256sum canonical.body variant.body
+```
+
+A body hash is a triage aid, not proof. Compare stable protected markers, redirect destinations, content type, and server-side authorization outcome. Use the exact normalization behavior documented or observed for the target framework; do not assume case sensitivity, separator handling, or percent-decoding rules.
+
+### Layer-attribution fields
+
+Record client_protocol, edge_status, final_status, redirect_chain, canonical_route, variant_dimension, response_marker, auth_principal, expected_policy, observed_policy, layer_attribution_confidence, negative_control, and cleanup_status. If edge and origin logs are unavailable, describe the layer as unknown rather than naming a proxy from headers alone.
