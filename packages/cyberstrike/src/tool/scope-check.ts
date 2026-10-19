@@ -51,7 +51,7 @@ export const ScopeCheckTool = Tool.define("scope_check", {
             "In scope: NO",
             "No configured parent/child authorization scope was found.",
             "Configure it with: cyberstrike target scope <url> --include <domain> --source <program> --reference <official-https-url>",
-            "Do NOT perform active testing until the official program scope has been reviewed and configured.",
+            "If the user explicitly confirms one exact asset is in scope, configure only that exact asset with target_workspace(action=\"configure_scope\", user_confirmed_scope=true) for an initial manifest or merge_existing=true for an existing manifest, then save the confirmation in target notes. Do not demand a separate policy link or ask for proof again. Otherwise, configure verified program scope before active testing.",
           ].join("\n"),
           metadata: { target, inScope: false, scopeConfigured: false, scopeSource: "missing-or-unconfigured", results: [] },
         }
