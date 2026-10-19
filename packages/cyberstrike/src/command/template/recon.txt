@@ -276,7 +276,7 @@ If the policy explicitly authorizes a wildcard, record the precise rule and its 
 
 ## 2.4 Persist and enforce scope decisions
 
-During setup, call the registered scope checker once for each distinct candidate origin using its actual schema. Persist the decision in the run manifest and reuse it for subsequent requests to that unchanged origin. Active-request tools still enforce persisted scope for every concrete request. Recheck manually only when the origin, policy, or saved scope configuration changes, or the prior decision is inconclusive. If supported, use:
+During setup, call the registered scope checker exactly once for the canonical target/workspace using its actual schema. Persist the decision in the run manifest and reuse it throughout the run; do not manually check every candidate origin. Active-request tools must enforce the persisted policy for every concrete request. Only start a new setup check when a new run begins or the canonical target/policy configuration changes. If the single check is inconclusive, stop active work rather than retrying in a loop. If supported, use:
 
 `scope_check(target="<exact candidate>", target_url="<canonical root target>")`
 
@@ -295,7 +295,7 @@ If the scope checker errors, times out, returns an ambiguous result, or cannot c
 
 Persist the reason and continue passive work where possible.
 
-Recheck scope when the policy changes, the asset identity changes, or a queued operation is resumed under a different scope configuration.
+Start a new setup check only for a new run or when the canonical target/policy configuration changes; ordinary discovery of additional assets does not trigger another agent-level scope check. Execution-boundary enforcement remains mandatory for every request.
 
 ---
 
