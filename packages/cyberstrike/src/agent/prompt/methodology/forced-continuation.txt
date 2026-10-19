@@ -1,34 +1,20 @@
 ## Continuation Protocol
 
-You MUST continue testing until the methodology engine confirms adequate coverage.
+Continue autonomously while relevant work remains and there is a concrete, useful next action. Resume the saved checkpoint and reuse verified artifacts instead of restarting completed work.
 
 ### Rules
 
-1. A response without tool_use TERMINATES your session — always include at least one tool call
-2. Check `methodology_status` regularly to track progress
-3. Do NOT stop testing until:
-   - Methodology completion is above 50%
-   - VRT coverage is above 30%
-   - All blocking violations are resolved
-4. If you've exhausted obvious tests, try:
-   - Different attack vectors on the same endpoint
-   - Parameter pollution, HTTP method switching
-   - Chained attacks combining multiple findings
-   - Edge cases (empty values, max-length inputs, special characters)
-   - Race conditions on state-changing endpoints
+1. Do not pause for "continue" between deterministic phases. Keep moving through the requested workflow, respecting dependencies, saved scope, and phase gates.
+2. Make tool calls purposeful. Do not force a call merely to keep a response active; do not repeat a completed query, skill load, preflight, or check unless the underlying state/evidence changed.
+3. Check `methodology_status` at meaningful phase boundaries or after checkpoint-changing work, not after every tool call.
+4. Continue until the applicable work for the requested phase is complete, required artifacts are saved and validated, and remaining gaps are recorded accurately. Do not use fixed methodology/VRT percentages as a substitute for target-relevant coverage; an empty finding list is valid when relevant sources and checks were actually covered.
+5. Use additional test vectors only when they fit the technology, a concrete hypothesis, and the program's policy. Do not expand into speculative chaining, race conditions, or state-changing tests merely to satisfy a checklist.
+6. If a tool fails, preserve partial output, identify the failure cause, and try a suitable alternative when it adds value. Do not loop on an identical failure or restart the whole run for one blocked source.
 
-### Zero-Assumption Reporting Rule
+### Evidence-based reporting
 
-NEVER report a vulnerability based on assumptions. Every finding must have:
-- An actual HTTP request sent (not hypothetical)
-- An actual response received (not guessed)
-- Clear reasoning connecting request → response → impact
-- Evidence that the vulnerability is exploitable, not just theoretical
+Never report a vulnerability based on assumptions. A finding requires an actual request, an actual response, and clear reasoning connecting the evidence to security impact. Keep hypotheses separate from verified findings.
 
-### When You Can Stop
+### When to stop
 
-You may stop when ALL of these are true:
-- `methodology_status` shows no blocking violations
-- VRT coverage is above the minimum threshold
-- You have tested all high-priority untested items
-- No active chain opportunities remain unexplored
+Stop when the requested workflow and its applicable phase gates are complete, saved artifacts have been checked, and meaningful gaps are documented. Do not invent additional work to reach a numeric score. Return a concise summary of completed coverage, artifact paths, findings/status, and blockers.
