@@ -73,6 +73,17 @@ const PROGRAMS = {
 
 type Program = keyof typeof PROGRAMS
 
+/** Phases where each standalone web-recon program is allowed to run.
+ * tech_detect can run during live-host inventory, or as a passive complement
+ * while URL collection is already active; it must not force a completed phase
+ * to be restarted just to fingerprint the same authorized host.
+ */
+export function requiredPhasesForWebRecon(program: Program): ReconPhase[] {
+  if (["sitemap_scan", "robots_scan", "openapi_scan"].includes(program)) return ["url_collection"]
+  if (program === "tech_detect") return ["live_hosts_ports", "url_collection"]
+  return ["vulnerability_testing"]
+}
+
 const dispatch: Record<
   Exclude<Program, "session_scan">,
   (target: string, args: string[], timeout: number, scopeCheck?: ScopeCheck) => Promise<WebReconResult>
@@ -248,13 +259,25 @@ export const WebReconTool = Tool.define("web_recon", {
         return fail("[-] Could not prepare the canonical target workspace before reconnaissance: " + (error instanceof Error ? error.message : String(error)) + ". No network probes were sent.")
       }
 
-      const requiredPhase: ReconPhase =
-        ["sitemap_scan", "robots_scan", "openapi_scan"].includes(program)
-          ? "url_collection"
-          : program === "tech_detect"
-            ? "live_hosts_ports"
-            : "vulnerability_testing"
-      const gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
+      const requiredPhases = requiredPhasesForWebRecon(program)
+      let requiredPhase = requiredPhases[0]
+      let gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
+      // If host inventory is already complete and URL collection is the active
+      // phase, allow the passive technology fingerprint to contribute there.
+      // Never reopen/restart the completed live_hosts_ports checkpoint.
+      if (
+        !gate.allowed &&
+        program === "tech_detect" &&
+        gate.reason.includes("current status is complete") &&
+        requiredPhases[1]
+      ) {
+        const fallbackPhase = requiredPhases[1]
+        const fallbackGate = await reconPhaseGate(targetWorkspace!, fallbackPhase)
+        if (fallbackGate.allowed) {
+          requiredPhase = fallbackPhase
+          gate = fallbackGate
+        }
+      }
       if (!gate.allowed) {
         return fail([
           "[-] Recon phase gate blocked " + program + ".",
