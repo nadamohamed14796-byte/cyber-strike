@@ -462,6 +462,12 @@ export function mergeStructuredJavaScriptEndpoints(
       byKey.set(key, endpoint)
     }
     endpoint.sourceFiles = unique([...endpoint.sourceFiles, ...source.sourceFiles])
+    endpoint.pathParameters = unique([...(endpoint.pathParameters ?? []), ...(source.pathParameters ?? [])])
+    endpoint.queryParameters = unique([...(endpoint.queryParameters ?? []), ...(source.queryParameters ?? [])])
+    endpoint.bodyParameters = unique([...(endpoint.bodyParameters ?? []), ...(source.bodyParameters ?? [])])
+    endpoint.headerNames = unique([...(endpoint.headerNames ?? []), ...(source.headerNames ?? [])])
+    endpoint.authSignals = unique([...(endpoint.authSignals ?? []), ...(source.authSignals ?? [])])
+    endpoint.cookieSignals = unique([...(endpoint.cookieSignals ?? []), ...(source.cookieSignals ?? [])])
     endpoint.observedRequestIDs = unique([...endpoint.observedRequestIDs, ...sourceObservedIDs])
     if (endpoint.observedRequestIDs.length) {
       endpoint.observedInTraffic = true
