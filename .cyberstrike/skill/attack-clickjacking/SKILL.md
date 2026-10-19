@@ -154,7 +154,7 @@ Inventory sensitive views and test whether a controlled foreign-origin page can 
 - `curl` — capture route-specific response headers for an observed, authorized URL.
 - Python `httpx` — compare headers across documented routes and save structured results.
 - `rg` — search local source/configuration for frame policy, CSP, and sensitive actions.
-- Playwright's headless CLI/API may be used against a local fixture when effective frame behavior needs reproduction; do not require interactive browser DevTools.
+- Playwright's headless CLI/API may be used against a local fixture when effective frame behavior needs reproduction; do not require an interactive browser interface.
 
 ### Installation and verification
 Verify `curl --version` and the chosen Python client. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, and https://playwright.dev/python/. If a headless browser dependency is unavailable, report that effective framing was not tested and use header/source review only.
