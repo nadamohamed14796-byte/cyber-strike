@@ -178,6 +178,12 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   if (!Number.isInteger(depth) || depth < 1 || depth > 5) {
     return "Katana depth must be between 1 and 5 for a bounded reconnaissance crawl."
   }
+  if (!normalizedArgs.some((arg) => ["-j", "-json", "-jsonl"].includes(arg))) {
+    return "Use Katana JSONL output ('-j') so URL source and request metadata remain available for deduplication and triage."
+  }
+  if (!normalizedArgs.some((arg) => ["-ncb", "-no-clobber"].includes(arg))) {
+    return "Use '-ncb' to prevent a concurrent or retried crawl from overwriting an existing evidence artifact."
+  }
 
   let target: URL
   try {
