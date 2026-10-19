@@ -85,10 +85,13 @@ State the exact mutation reached, the privilege level required to exploit it, an
 
 ## Tools
 
-- **Browser DevTools:** confirm cookie behavior and actual browser request.
-- **Burp Suite:** compare normal and reduced-defense requests.
-- **Local/staging test page:** safely reproduce cross-origin forms.
-- **Source review:** validate CSRF middleware coverage.
+- Python `httpx` or `curl`: reproduce an observed request using tester-owned accounts and a reversible state change.
+- `jq`: inspect saved response fields and test outcomes.
+- `rg`: review local CSRF middleware, cookie configuration, and route guards.
+- Local test page/fixture: validate cross-origin form behavior without real user data.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved samples offline.
+
+Verify with `curl --version`, the selected Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## CSRF Defense Decision Matrix
 
