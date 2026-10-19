@@ -78,3 +78,41 @@ Return `input_feature`, `destination_controlled`, `outbound_request_confirmed`, 
 
 ### Server-side fetch trust boundary
 Inventory the exact feature that consumes a URL, the server-side component performing the request, redirect behavior, DNS resolution time, allowed schemes/ports, and response exposure. Begin with a controlled callback host you own and inert content; compare a known-good URL to one boundary mutation at a time. Do not query cloud metadata endpoints, localhost/admin services, or internal networks on a public program unless explicitly authorized and specifically permitted. A DNS callback proves outbound resolution at most, not data access or credential theft. Route URL parsing inconsistencies to input validation, unsafe external API responses to unsafe API consumption, and secret-like source artifacts to evidence-safe triage without using them.
+
+
+## Request-shape matrix and controlled callback workflow
+
+For each feature, preserve the normal request shape and change only the URL field. The following is a template; replace the endpoint and field using an observed in-scope request, and use a callback hostname you control.
+
+```http
+POST /api/integrations/preview HTTP/1.1
+Host: TARGET-HOST.example
+Content-Type: application/json
+Authorization: Bearer [TEST_TOKEN_REDACTED]
+
+{"url":"https://CALLBACK-HOST-YOU-CONTROL.example/ssrf-check/UNIQUE-RUN-ID"}
+```
+
+Do not send this request to an assumed route or invent a tool schema. First capture the legitimate UI/API request and identify the actual URL-consuming field. Record the callback request metadata without collecting request bodies or credentials.
+
+| Branch | Safe test | Evidence needed | Do not infer |
+|---|---|---|---|
+| Fetch existence | Controlled callback with unique path | Correlated callback timestamp/path plus matching app action | Internal-network access |
+| Redirect handling | Redirect only between two callback endpoints you control, if permitted | Whether the server follows the redirect and which destination receives the request | That a private destination can be reached |
+| Response-based | Return a harmless unique text marker from your controlled server | Marker appears in the application's response/job result | Access to sensitive internal content |
+| Scheme validation | Inspect observed/documented accepted schemes; test benign unsupported scheme only when permitted | Server-side parser/fetcher behavior and rejection path | Code execution or local file read |
+| DNS/egress policy | Review implementation/config and approved logs first | Resolved destination and enforcement decision from authorized telemetry | DNS resolution alone as HTTP reachability |
+| Async jobs | Create one disposable job and inspect its status/result | Server-side fetch tied to that job ID and cleanup | A stored URL being fetched |
+
+### Correlation fields
+
+Persist request_ref, feature_name, controlled_destination, unique_path_marker, app_job_id, callback_timestamp, redirect_hop_count, resolved_address_class (only when legitimately observable), response_marker_seen, and cleanup_status. Do not store the callback service's private credentials or raw authorization headers.
+
+### Chain gates
+
+- Host-derived URL or redirect destination comes from untrusted authority metadata → host-header/open-redirect review only when that data flow is observed.
+- Server fetch returns private content to the caller → demonstrate with a synthetic marker in an approved test environment; do not fetch internal secrets.
+- URL fetch is delegated to a vendor/service → identify the actual trust boundary before attributing the request to the target.
+- Callback alone with no sensitive response → report only the proven outbound-request behavior and its policy impact; do not inflate to cloud compromise.
+
+Stop if the test reveals a real secret, internal response, or unexpected third-party request; preserve minimal redacted evidence and notify the program through its approved process.
