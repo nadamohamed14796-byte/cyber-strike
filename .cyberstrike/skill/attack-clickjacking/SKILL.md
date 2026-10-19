@@ -92,7 +92,7 @@ Check login redirects, legacy paths, and error responses for consistent framing 
 - Never use real-user clickjacking or deceptive delivery pages.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary attempt ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -134,3 +134,7 @@ grep -iE '^(content-security-policy|x-frame-options|content-type|set-cookie):' r
 ```
 
 If headers are absent or weak, confirm the browser-effective frame-ancestors policy and whether a sensitive action can be framed and triggered in a controlled browser using your own test account. Missing X-Frame-Options by itself is not impact when CSP already blocks framing or the page has no sensitive interaction. Chain only confirmed context to attack-security-headers, attack-csrf, or session/auth skills.
+
+
+## Enrichment: route-level header inspection
+Inspect every sensitive route, not just the home page. Verify the browser-effective CSP frame-ancestors directive and X-Frame-Options behavior, then use a controlled browser and your own test account to establish whether a meaningful action can be framed. Missing X-Frame-Options is not itself a finding when CSP already blocks framing or the page has no sensitive interaction. Chain to security-headers and CSRF checks only when the corresponding browser behavior is observed.
