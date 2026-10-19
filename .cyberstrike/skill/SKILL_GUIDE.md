@@ -287,7 +287,6 @@ For every `attack-*` and `recon-*` skill, quality is measured by a reproducible 
 
 ---
 
-
 ## Naming Conventions
 
 | Skill Type          | Name Pattern                    | Example                     |
@@ -361,7 +360,6 @@ cd packages/cyberstrike && bun run dev
 cyberstrike skill sign <skill-name>
 ```
 
-
 ## Evidence-led loop and cross-source synthesis
 
 For the custom hunting skills, combine the practical test depth of the local Recon Skills and Claude-BugHunter-derived procedures with the workflow discipline of Agentic Bug Hunter, the source/attribution confidence practices of UseOSINT, and the untrusted-skill/contract-mismatch checks from Superagent Security Skills. Adapt the concepts to CyberStrike paths and registered tools; do not copy upstream internal commands or claim an integration exists just because a source mentions it.
@@ -398,7 +396,6 @@ This section adds practical authoring rules for every custom/local skill.
 ### Final enrichment check
 Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py` after changing local skills. The audit checks whether each direct custom skill has explicit tool guidance, resources, and a runnable code/command or reusable helper. Treat it as a coverage signal, not proof of correctness. Then run the structural validator and inspect changes for duplication and stale links.
 
-
 ## Installing and selecting useful tools
 
 A skill may recommend tools that are not installed locally. Do not restrict recommendations to currently available binaries.
@@ -409,7 +406,6 @@ A skill may recommend tools that are not installed locally. Do not restrict reco
 - State whether use is passive, active, or state-changing. Any active test remains subject to program authorization, rate limits, and data handling policy. Tool installation does not authorize testing.
 - Third-party tools, plugin instructions, imported skills, and scripts are untrusted until inspected. Do not run arbitrary install commands copied from a report/write-up. Prefer official package registries/releases and inspect code before running.
 - Provide expected output and limitations for small helpers; do not count script presence as proof of test coverage or a confirmed finding.
-
 
 ## Agent-executable CLI tooling (required for custom skills)
 
@@ -437,4 +433,3 @@ Canonical catalog: `.cyberstrike/skill/CLI_TOOLING_CATALOG.md`. Run `python3 .cy
 - Keep sections in a predictable order where applicable: purpose/scope, prerequisites, workflow, decision/evidence criteria, tools/resources/helpers, output/handoff, safety notes. Specialized skills may differ when the workflow requires it.
 - Before mass formatting, run the formatter in check/dry-run mode, inspect the diff, and preserve fenced-code content and frontmatter. Apply changes only after reviewing the proposed diff.
 - Use `python3 .cyberstrike/skill/scripts/format_skill_markdown.py --check` to identify presentation-only changes and `--write` to apply the conservative formatter. Formatting does not validate links, commands, scripts, or technical accuracy.
-
