@@ -336,7 +336,7 @@ test("user-confirmed incremental scope extension cannot override an explicit exc
           merge_existing: true,
         }, {} as never)
         expect(blocked.metadata.saved).toBe(false)
-        expect(blocked.output).toContain("explicit exclusion")
+        expect(blocked.output).toContain("matches saved exclusion")
         const scope = await TargetMemory.getScope("https://program-root.example.test")
         expect(scope?.scopeItems).toEqual(["example.test", "*.example.test"])
         expect(scope?.excludedItems).toEqual(["admin.example.test"])
