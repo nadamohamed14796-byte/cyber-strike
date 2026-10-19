@@ -115,7 +115,7 @@ Trace the route, middleware, schema, service, and sink. Document a minimal faili
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate equivalent requests and retries. Stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Production safety and program rules remain mandatory.
 
 Record each attempt: hypothesis, single changed variable, control/baseline, observed signal, interpretation, confidence and next branch. Prefer paired requests, controlled identities, synthetic records and independent corroboration; retain minimal sanitized evidence.
 
@@ -152,3 +152,29 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 
 ### Middleware and parser differential
 Record the exact route, middleware order, body parser, validation schema, session attachment, proxy trust configuration, async job handoff, and storage sink. Compare valid baseline input with one harmless type/boundary mutation at a time; verify the operation and persisted state, not just a stack trace. Check alternate content types, duplicate parameters, nested objects, and error paths only where the server accepts them. A route-level guard may be bypassed by a second mounted transport, so map both UI and API traffic. Route duplicate-query parse differences to server-side parameter pollution, sensitive writable fields to mass assignment, and URL-fetch behavior to SSRF.
+
+
+## Practical source-to-sink search and route inventory
+
+Run against the authorized local source tree. Search is for triage; inspect surrounding code and reachability before classifying a finding.
+
+```bash
+rg -n --glob '*.{js,mjs,cjs,ts,tsx}' \
+  'app\.(get|post|put|patch|delete|use)|router\.(get|post|put|patch|delete|use)|setTrustProxy|trust proxy|child_process|eval\(|new Function|innerHTML|path\.join|fetch\(' src .
+```
+
+Normalize duplicate route registrations by method + route template + middleware chain. Trace body parsing, authentication, authorization, validation, handler, service, and side effect in that order. A route declaration alone does not show that middleware is missing.
+
+### Node-specific review matrix
+
+| Component | Review | Confirmation |
+|---|---|---|
+| Express router | Mounted router order, inherited middleware, error handlers | Controlled request reaches protected handler without required guard |
+| Fastify | Hooks, schema validation, encapsulation, route config | Guard is absent from the actual encapsulated route |
+| Koa/custom middleware | Composition order and async error paths | Security check is skipped on an observed path |
+| Proxy trust | Trust proxy configuration and forwarded headers | Actual client/authority decision changes, not just logged value |
+| File/path APIs | Path resolution and ownership check | Test-owned fixture crosses its intended directory/object boundary |
+| Async job | Job owner/tenant metadata and result download | A second test identity can read only the synthetic job result |
+| Dependencies | Lockfile version and reachable vulnerable call site | Advisory prerequisites and affected call path both match |
+
+Persist framework_version_source, route_template, middleware_chain, parser_schema, input_source, sink_or_side_effect, principal, test_fixture, negative_control, observed_state, and cleanup_status.
