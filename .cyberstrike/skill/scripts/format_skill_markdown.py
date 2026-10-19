@@ -34,7 +34,7 @@ def format_markdown(raw: str) -> str:
     fence_len = 0
     for line in lines:
         candidate = line.rstrip()
-        fence = re.match(r"^\\s{0,3}(`{3,}|~{3,})", candidate)
+        fence = re.match(r"^\s{0,3}(`{3,}|~{3,})", candidate)
         closing_fence = False
         if fence:
             token = fence.group(1)
