@@ -78,12 +78,10 @@ Verify the actual evidence-storage API, redaction implementation, retention poli
 - Claude-BugHunter evidence hygiene: https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/evidence-hygiene/SKILL.md
 - Recon Skills: https://github.com/uphiago/recon-skills
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Artifact lifecycle and independent replay
 Every evidence item must have a stable artifact ID, originating request/session, timestamp, target-local path, redaction state, hash where practical, and a short statement of what it proves. Keep raw captures private and target-local; create a redacted derivative for model context and submissions. Scrub cookies, Authorization, query tokens, reset links, private response fields, user identifiers, and secret-bearing JavaScript before output. Verify replay uses tester-owned identities and the same preconditions. When redaction makes a finding impossible to reproduce, preserve a local private raw artifact and refer to its hash; do not copy the raw value into global notes, public research, commits, or reports.
-
 
 ## Artifact manifest and redaction validation
 
@@ -126,7 +124,6 @@ Search for common secret-bearing locations, but do not rely on a single regex as
 - Keep private originals out of Git and cloud-shared folders unless specifically authorized.
 - If a secret is accidentally committed or transmitted, treat it as exposed: revoke/rotate it through the authorized owner and remove the artifact where possible; deleting a later copy does not erase Git history.
 - Do not describe a hash as proof of integrity unless the manifest and collection process are also controlled.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
