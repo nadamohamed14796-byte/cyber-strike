@@ -156,14 +156,24 @@ async function prepareCrawl(opts: LauncherOptions): Promise<PreparedWorker> {
   // here so the error surfaces as a clean message instead.
   // Bun.resolve mirrors the worker's actual module lookup (upward traversal
   // from bin/ + NODE_PATH), so no false positives on non-standard installs.
-  let playwrightEntry: string
-  try {
-    playwrightEntry = await Bun.resolve("playwright", Global.Path.bin)
-  } catch {
+  let playwrightEntry: string | undefined
+  const playwrightLookupBases = [...new Set([Global.Path.bin, Global.Path.data])]
+  for (const base of playwrightLookupBases) {
+    try {
+      playwrightEntry = await Bun.resolve("playwright", base)
+      break
+    } catch {
+      // The documented install prefix is Global.Path.data, while the worker
+      // lives under Global.Path.bin. Check both roots so the preflight uses
+      // the same install location that its remediation command writes to.
+    }
+  }
+  if (!playwrightEntry) {
     throw new Error(
-      `playwright is not installed. Run:\n` +
-        `  npm install --prefix ${Global.Path.data} playwright\n` +
-        `  npx playwright install chromium`,
+      `playwright could not be resolved from the CyberStrike worker or data directory. Searched: ${playwrightLookupBases.join(", ")}.\n` +
+        `Install it into CyberStrike's data directory, then install Chromium:\n` +
+        `  npm install --prefix ${Global.Path.data} playwright@1.58.2\n` +
+        `  ${runtime} ${path.join(Global.Path.data, "node_modules", "playwright", "cli.js")} install chromium`,
     )
   }
 
