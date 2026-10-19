@@ -65,7 +65,7 @@ describe("Katana scope policy", () => {
   })
 
   test("requires a unique output path inside the canonical workspace urls folder", () => {
-    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/outside.txt"], "https://example.com", baseScope, workspacePath)).toContain("inside")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
@@ -81,9 +81,9 @@ describe("Katana scope policy", () => {
   test("requires explicit bounded crawl depth and a workspace-local output file", () => {
     const noDepth = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/tmp/katana.txt"]
     expect(katanaScopeBlockReason(noDepth, "https://example.com", baseScope, "/workspace/example")).toContain("explicit Katana depth")
-    const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3"]
+    const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"]
     expect(katanaScopeBlockReason(noOutput, "https://example.com", baseScope, "/workspace/example")).toContain("raw results")
-    const outsideOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", "/tmp/katana.txt"]
+    const outsideOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/katana.jsonl"]
     expect(katanaScopeBlockReason(outsideOutput, "https://example.com", baseScope, "/workspace/example")).toContain("inside this target workspace")
   })
 
