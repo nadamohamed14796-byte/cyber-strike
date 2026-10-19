@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { Phase } from "../../src/methodology/phase"
-import { rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
+import { PHASE_REQUIRED_SKILLS, rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
+import { Skill } from "../../src/skill"
 import type { SkillIndex } from "../../src/skill/index-engine"
 import { RECON_METHODOLOGY_PROMPT, RECON_SPECIALIZED_COVERAGE_PROMPT } from "../../src/methodology/recon"
 
@@ -20,8 +21,8 @@ describe("Phase-critical skill pinning", () => {
     scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
     passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
     active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
-    authentication_testing: ["wstg-athn-04", "attack-auth-bypass"],
-    session_management: ["wstg-sess-01", "attack-session", "attack-jwt"],
+    authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass"],
+    session_management: ["attack-session", "attack-jwt", "attack-csrf"],
     authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
     input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
     business_logic: ["attack-business-logic"],
@@ -30,6 +31,16 @@ describe("Phase-critical skill pinning", () => {
     infrastructure: ["attack-cloud-misconfig"],
     reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
   }
+
+  test("every pinned phase-critical skill exists in the actual runtime catalog", async () => {
+    const catalog = await Skill.all()
+    const available = new Set(catalog.map((skill) => skill.name.trim().toLowerCase()))
+    for (const [phaseID, required] of Object.entries(PHASE_REQUIRED_SKILLS) as Array<[Phase.Id, string[]]>) {
+      for (const name of required) {
+        expect(available, phaseID + " requires loadable skill " + name).toContain(name.toLowerCase())
+      }
+    }
+  })
 
   test("phase-critical skills remain present even when the optional shortlist limit is one", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
