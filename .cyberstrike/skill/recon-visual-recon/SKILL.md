@@ -144,16 +144,15 @@ Capture consistent screenshots at the same viewport and auth context, then clust
 ## Tool installation and optional tooling (2026-10-19)
 
 ### Recommended tools and purpose
-Use browser screenshots for manual high-signal assets and an optional headless screenshot utility such as gowitness to compare unauthenticated pages at scale. Capture only the public/in-scope page state required for assessment.
+Use a headless CLI screenshot utility such as gowitness to compare approved public pages at scale; prefer machine-readable HTTP metadata when screenshots add no value. Capture only the public/in-scope page state required for assessment.
 
 ### Installation and setup
 - [gowitness project](https://github.com/sensepost/gowitness) — official release and setup instructions.
 - [ProjectDiscovery httpx](https://docs.projectdiscovery.io/tools/httpx/overview) — response/title/technology metadata and supported screenshot options.
-- [Browser DevTools](https://developer.chrome.com/docs/devtools/) — manual inspection.
 Use an approved URL list, modest concurrency, and unauthenticated public pages by default. Screenshots may capture personal information, account data, or private messages; review/redact before persistence and avoid storing full page contents.
 
 ### Primary resources
-- [Chrome DevTools](https://developer.chrome.com/docs/devtools/) — browser investigation.
+- [Playwright](https://playwright.dev/docs/intro) — optional headless fixture automation.
 - [gowitness](https://github.com/sensepost/gowitness) — supported screenshot behavior.
 - [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — visual clues as leads, not proof.
 
