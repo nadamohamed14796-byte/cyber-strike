@@ -28,8 +28,8 @@ test("program-root scope can authorize a separate domain without requiring the r
         abort: new AbortController().signal,
         messages: [],
         metadata: () => undefined,
-        ask: async () => undefined,
-      }
+        ask: async () => {},
+      } as never
       const execute = (action: "begin" | "complete", phase: "scope_validation" | "workspace_setup" | "asset_discovery", summary?: string) =>
         tool.execute({ action, target_url: root.workspace.targetURL, phase, summary }, ctx)
 
