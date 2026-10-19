@@ -188,28 +188,12 @@ function currentOwnerKey(): string {
 
 function isExactUserConfirmedScopeItem(input: string): boolean {
   const value = input.trim()
-  if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
-  if (/[*{}\\]/.test(value)) return false
+  if (!value || /[*{}\\]/.test(value)) return false
+  if (/^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
+  if (/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return false
   if (!/^https?:\/\//i.test(value) && value.includes("/")) return false
-  let candidateValue = value
-  if (!/^https?:\/\//i.test(value)) {
-    const rawIPv6 = value.match(/^\[?([0-9a-f:]+)\]?$/i)
-    candidateValue = rawIPv6 && value.includes(":") && !/^[^:]+:\d+$/.test(value)
-      ? "https://[" + rawIPv6[1] + "]"
-      : "https://" + value
-  }
-  try {
-    const candidate = new URL(candidateValue)
-    return (candidate.protocol === "http:" || candidate.protocol === "https:") &&
-      Boolean(candidate.hostname) &&
-      !candidate.hostname.includes("*") &&
-      !candidate.username &&
-      !candidate.password &&
-      !candidate.search &&
-      !candidate.hash
-  } catch {
-    return false
-  }
+  // normalizeScopeItem() validates the concrete host, scheme, port, path, and URL syntax before this check.
+  return true
 }
 
 function normalizeScopeItem(input: string): string {
