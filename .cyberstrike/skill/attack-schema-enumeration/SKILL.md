@@ -178,24 +178,23 @@ This reports declared metadata only. It does not prove runtime enforcement, and 
 Deduplicate operations by protocol + method/operation + normalized route/schema version. Keep separate findings only when there is a distinct violated control or impact. Record schema_source, schema_version, visibility_policy, operation_id, declared_security, runtime_auth_result, field_sensitivity, object_policy_result, and next_skill_trigger. If schema parsing fails, preserve the parse error and source provenance; do not label the schema absent.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp's request history, Repeater, and the InQL extension for GraphQL query/operation exploration where relevant. Use the published OpenAPI/GraphQL schema first when the application documents it.
+### Tools and purpose
+- `graphql-inspector` — compare GraphQL schemas and report changes when a schema is available.
+- `graphql-cop` — optional configuration checks against an explicitly authorized GraphQL endpoint; verify current project maintenance and options first.
+- `jq` and `yq` — inspect local JSON/YAML/OpenAPI schema artifacts.
+- `python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` — normalize locally collected API/schema URLs; it does not contact them.
+- Python `httpx` or `curl` — retrieve a documented schema endpoint only when permitted, preserving response and auth context.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
-- InQL is available from the official [PortSwigger BApp Store](https://portswigger.net/bappstore); review the extension listing before enabling.
-- For local schema parsing, use the project's supported parser or a maintained JSON/YAML tool; do not upload private schemas or traffic to untrusted online viewers.
-Use only documented/observed APIs or approved schema endpoints; don't use enumeration to access unrelated tenant data.
+### Installation and verification
+Follow official docs at https://github.com/GraphQLInspector/graphql-inspector, https://github.com/dolevf/graphql-cop, https://jqlang.org/, and https://github.com/mikefarah/yq. Verify selected binaries with `--version` or `--help`; check the project README for current commands before use. If unavailable, inspect the schema locally and record the gap. Never upload private schemas or traffic to untrusted online viewers.
 
-### Primary resources
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API inventory and excessive data exposure.
-- [PortSwigger GraphQL API testing](https://portswigger.net/web-security/graphql) — controlled tests.
-- [GraphQL specification](https://spec.graphql.org/) — schema/introspection semantics.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` normalizes locally collected schema/API URLs without contacting them.
+### Resources
+- https://owasp.org/API-Security/editions/2023/en/0x00-header/
+- https://portswigger.net/web-security/graphql
+- https://spec.graphql.org/
+- https://github.com/OAI/OpenAPI-Specification
 
 ### Result handling
-Record schema source, access context, timestamp, and whether the exposed schema yields a practical security consequence. Public introspection alone may be expected behavior and is not automatically a vulnerability.
+Use documented or observed APIs and approved schema endpoints only. Record schema source, access context, timestamp, and whether the exposed schema yields a practical security consequence. Public introspection alone may be expected behavior and is not automatically a vulnerability.
