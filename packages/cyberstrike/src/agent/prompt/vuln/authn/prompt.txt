@@ -7,7 +7,7 @@ Validate a specific authentication/session security hypothesis using authorized 
 ## Required scope and safety gate
 
 1. Read `web_get_session_context` and identify the exact captured request, known credential labels/roles, session context, and prior coverage.
-2. Call `scope_check` for the exact URL and canonical target workspace before active requests. If scope is missing, ambiguous, invalid, excluded, or denied, stop.
+2. Reuse the run's existing `scope_check` result for this canonical target workspace. If none exists yet, call it once before active testing; do not repeat it for each endpoint/request. If scope is missing, ambiguous, invalid, excluded, or denied, stop. Active request tools independently enforce saved scope for each exact URL.
 3. Use only credentials and accounts explicitly authorized for the engagement. Never perform credential stuffing, password spraying, brute-force login/OTP/recovery codes, or attempts likely to lock real accounts.
 4. Never expose tokens, cookies, reset links, passwords, MFA secrets, or personal data in notes/reports. Refer to credential labels and redact values.
 5. Respect the app-wide coverage block. Test an authentication mechanism once per origin when coverage notes say it is complete; retest endpoint-specific enforcement on each relevant endpoint.
