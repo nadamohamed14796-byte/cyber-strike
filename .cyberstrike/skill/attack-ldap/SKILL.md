@@ -98,7 +98,7 @@ Check RFC filter escaping separately from DN escaping, allowlisted attributes, s
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Do not broaden into directory enumeration or credential guessing.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -134,3 +134,23 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Directory filter vs authorization outcome
 Identify the feature and query context first—search filter, user lookup, group membership, or distinguished name—and capture one valid and one known-invalid tester-controlled query. Use inert syntax boundary variations and compare result semantics, not just error text; a filter error is not proof that an attacker can change the query meaning. Check that any result stays within the intended directory attributes and authorization policy. Avoid broad directory dumps, password/hash collection, or authentication against real users. Route a confirmed identity-boundary effect to authentication/BFLA, and keep parser error disclosures separate unless they reveal material sensitive data.
+
+
+## Query-context differential and evidence record
+
+Keep filter escaping, DN escaping, and authorization as separate checks. A value safe for one context may not be safe for another.
+
+| Context | Normal control | Candidate comparison | Required proof |
+|---|---|---|---|
+| User lookup | Exact known test username | Reserved characters in the same input field | Query semantics change beyond literal matching |
+| Search filter | One synthetic entry and a known-no-match value | Single reserved-character variation | Unexpected synthetic result or source-confirmed unsafe construction |
+| DN construction | Known test OU and synthetic DN | One escaped-name boundary | Lookup escapes intended OU/object boundary in lab |
+| Group membership | Test principal in a synthetic group | Controlled membership/query variation | Effective authorization changes unexpectedly |
+| Attribute selection | Documented allowed attribute | One unsupported attribute | Server rejects it or unsafe field access is demonstrated |
+| Error handling | Normal invalid input | Malformed syntax canary | Sensitive implementation detail is actually disclosed |
+
+### Root-cause review
+
+Inspect whether the implementation uses context-specific filter/DN escaping, allowlists attribute names, uses least-privileged bind credentials, and checks authorization after lookup. Do not infer injection from concatenation alone if the value is correctly escaped and the query semantics remain literal.
+
+Record query_context, input_field, escaping_function, synthetic_entry, baseline_match, candidate_match, effective_principal, authorization_effect, error_redacted, and cleanup_status. Chain to authentication bypass only if a controlled test identity is accepted incorrectly; parser errors alone stay a lead.
