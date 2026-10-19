@@ -141,17 +141,14 @@ Preserve raw outputs and normalize a separate copy. Helpers should retain proven
 Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
 
 
-## Mandatory phase tool coverage
+## Adaptive tool readiness and phase coverage
 
-Before each unresolved canonical recon phase, read `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` and use its phase-specific capability map. This matrix is a minimum checklist, not an installed-tool list. Search and load relevant specialist skills through the registered skill tool, then verify local CLI availability with `tool_preflight.py` when that helper exists in the active workspace. Inspect the actual tool help/version and official usage before invocation.
+At the start of a recon run, inspect the checkpoint/workspace and read `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` once. Keep a compact runtime inventory of tools, CLI versions/schemas, and loaded skill content so later phases can reuse them.
 
-For every phase, record:
-- capability needed, selected primary method, and why it fits the evidence;
-- complementary source/alternative considered and whether it adds distinct coverage;
-- actual availability/version, execution result/exit status, and any stderr or partial output;
-- raw and normalized artifact paths, provenance, deduplication counts, and validation performed;
-- missing tools, skipped candidates, failures, and the reason each did not run.
-
-Do not stop after one tool returns partial data if another relevant available source could materially improve coverage. Conversely, do not run every tool in a catalog by default. Never install the entire matrix automatically. Install only for a concrete need after reviewing official instructions, provenance, compatibility, and permission; otherwise use a verified alternative or report the capability gap. “Tool missing,” “tool failed,” “source returned zero results,” and “not applicable” are distinct outcomes.
-
-A phase is complete only when its applicable source coverage has been attempted, its eligible frontier is exhausted, and its persisted artifacts are verified. A successful command or a skill recommendation alone is not completion. Preserve partial results and continue independent work when possible; never loop indefinitely on a repeated failure.
+- Load this methodology and `community-tool-selection` once when their content is not available in the active context. Search and load specialist skills on demand when observed technology, a concrete endpoint/request shape, or a test hypothesis makes them useful. A later phase may load a new skill; do not force all specialist skills to load at the beginning. Reuse loaded skill content until evidence/task/context changes or a prior load failed.
+- Inspect the registered CyberStrike tool schema before first use. For CLI tools, preflight only candidates that might actually help and verify executable/help/version once per runtime or version change. Do not repeat the same preflight at every phase boundary.
+- There is no fixed tool-count limit and no ban on scripts/code. Choose a relevant primary method and add as many genuinely useful alternatives as the evidence requires. Use alternatives when they add independent coverage, corroboration, or recovery from a failure; don't duplicate methods merely to increase counts or refuse a script solely because other tools are selected.
+- Preserve phase ordering and prerequisites. A matrix row is a capability map, not a requirement to execute every listed candidate. Do not install the entire catalog; install only for a concrete need when no sufficient verified alternative is available and installation is permitted.
+- For each phase, persist the capability needed, methods actually used and why, source/tool/version/status, errors/partial output, raw/normalized artifact paths, provenance, deduplication counts, and validation. Keep large outputs in target-local artifacts and put counts/paths in the model context.
+- Distinguish missing tool, failed execution, zero results, blocked source, not applicable, and work not attempted. Preserve partial results and use a suitable alternative when it adds value; retry only when the failure cause changes or a bounded retry is justified.
+- A phase is complete only when applicable source coverage is attempted, the eligible frontier is exhausted, and artifacts are verified. Actual request-level scope enforcement is still required even though the agent-level setup check is not repeated for each URL or phase.
