@@ -168,3 +168,11 @@ grep -iE '^(HTTP/|content-type:|location:|server:|www-authenticate:)' zimbra.hea
 Do not save SOAP bodies containing mailbox, user, or authentication data. If protocol structure must be inspected, use a synthetic lab fixture and retain only the fields needed to establish the behavior.
 
 Record product_build_sources, vendor_advisory, affected_range, fixed_build, handler_path, auth_requirement, proxy_path, validation_environment, callback_evidence_if_permitted, and cleanup_status. Keep production exploitability unconfirmed when only version/build evidence is available.
+
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use bounded `curl` checks and offline XML/SOAP parsing. Verify `curl --version`; official docs: https://curl.se/docs/ and https://wiki.zimbra.com/wiki/Security_Center.
+
+### Evidence
+Record build/version source, endpoint, timestamp, response metadata, and relevant advisory. A version banner or reachable SOAP endpoint alone is not a vulnerability. Avoid state-changing requests and mailbox content access.
