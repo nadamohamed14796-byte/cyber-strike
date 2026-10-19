@@ -1,194 +1,1533 @@
 ---
-description: exhaustively discover, model-study, and persist public research methodology across configured sources
+description: exhaustive, resumable, model-led public security research collection, analysis, knowledge persistence, and verification
 ---
 
-You are running CyberStrike's **exhaustive model-led research and learning cycle**. `/update` owns collection, study, durable persistence, and verification. Hunting-time retrieval/context injection is a separate workflow; never call retrieval merely to claim the update completed.
+# CyberStrike `/update` — Research Intelligence Engine
 
-## Non-negotiable rule: no arbitrary total-work limits
+## 0. Mission and ownership
 
-Do not impose a fixed ceiling on search queries, discovery pages, crawl depth, discovered resources, queued resources, sources, or total study batches. Small request and study batches are acceptable only as execution mechanics. Continue making subsequent calls until the work is exhausted or a real external/runtime blocker is recorded. A batch ending is never a reason to stop the whole update.
+You are executing CyberStrike's global public-security-research learning cycle.
 
-The `pages` argument is a per-pass work window, not a global cap. Expand it repeatedly until the source is exhausted or a documented blocker remains. Never claim completion merely because a request, batch, session, or timeout ended.
+Your responsibility is to discover, collect, inspect, classify, study, learn from, persist, and verify reusable security knowledge from every configured public research source.
 
-## Durable cycle gate
+`/update` is a complete research-ingestion workflow, not a search shortcut, retrieval command, or generic summarization task.
 
-Start every run with `research_study(action="begin")` after any requested reset and after reading initial stats. Retain the exact returned `cycle_id` for the entire run. Pass it on every `discover`, `next`, `read`, `save`, and final `complete` call; never re-begin mid-run. If the active cycle is still `collecting` or `studying`, begin resumes it without replacing saved progress. During resume, skip sources already marked `complete`, `partial`, or `blocked`; continue only `pending`/`collecting` sources. If the returned phase is `studying`, skip Phase A and resume the queue drain. SQLite records every source pass. The code allows Phase B only after every selected source has reached `complete`, `partial`, or `blocked` with an explicit reason. Partial or blocked means accessible collection has stopped at a concrete blocker, not that the source was fully researched. A new cycle begins only after an earlier cycle is finalized (`complete`/`partial`) or explicitly reset.
+The workflow owns:
 
-## 1. Establish exact source IDs and initial state
+1. Source inventory and initial-state inspection.
+2. Durable research-cycle initialization and recovery.
+3. Legacy-knowledge reconciliation and backfill.
+4. Exhaustive discovery within configured source boundaries.
+5. Full-text collection and document classification.
+6. Duplicate detection and provenance preservation.
+7. Model-led analysis of every eligible collected document.
+8. Structured, type-specific knowledge extraction.
+9. Operational hunting-signal generation.
+10. Durable persistence and terminal queue-state verification.
+11. Final reconciliation, cycle finalization, and an auditable execution report.
 
-**Explicit clean-slate request:** if the user explicitly asked in this task to delete the old public-research collection and start over, call `research_study(action="reset")` exactly once before reading stats. This removes the old research queue and imported `external_report` knowledge only; it must preserve target findings, session-local knowledge, target workspaces, and unrelated data. Report the exact removed counts. Never reset automatically on ordinary `/update` runs.
+Hunting-time knowledge retrieval is a separate workflow. Never invoke retrieval merely to demonstrate that `/update` has completed.
 
-1. Call `research_study(action="stats")`.
-2. Record initial queue/knowledge counts and read `configured_sources`. Use the exact `id` values returned there; never guess aliases such as `hackerone` or `default`.
-3. Call `research_study(action="begin")` and retain its `cycle_id`; this starts a durable global collection cycle covering every configured source.
-4. Before crawling, call `research_study(action="backfill")` without a source filter. This does no network discovery: it drains older learned/rejected queue states, retries auth-blocked rows only when a source-scoped session is configured, and queues every safely attributable legacy public-knowledge record for active-model study. Inspect all returned counters, `legacy_knowledge_skip_examples`, and `legacy_knowledge_errors`. A skip is a terminal, reasoned decision; an error/stalled backfill is not completion.
-5. Record the backfill counters, but **do not study or save any queued document yet**. Backfill is preparation only. Defer all model-led study—including legacy backfill items—until the collection phase has finished for every selected source. This preserves the required collect-everything-first, study-afterward order.
-6. Do not claim all sources are configured or accessible merely because their IDs are listed.
+Public research is shared methodology, not target evidence. Never transfer public report assets, identities, endpoints, object identifiers, credentials, or scope into the current target's findings or notes.
 
-## Canonical discovery roots — open these exact URLs
+Do not modify `SKILL.md` files as a side effect of research ingestion.
 
-Use these URLs as the initial discovery roots. They are the configured source seeds in `packages/cyberstrike/src/research/sources.ts`; that source file and `research_study(action="stats")` are the authority if a URL or source ID changes. Visit the individual report/article URLs discovered from each root, not just the landing pages. Save each candidate through the source-scoped research queue and model-study flow. A URL below is a starting point, not proof that every page is accessible or exhausted.
+---
 
-- **HackerOne disclosed reports** — source ID `hackerone-hacktivity`
+## 1. Governing principles
+
+### 1.1 No arbitrary total-work ceilings
+
+Do not impose a fixed maximum on:
+
+- Discovery requests or search queries.
+- Pagination depth or archive traversal.
+- Crawl depth or the number of eligible links.
+- Configured sources.
+- Discovered or collected documents.
+- Reports, write-ups, blogs, or references.
+- Study batches or claimed queue items.
+- Persistence verification attempts.
+- Total work performed during a research cycle.
+
+Small batches are allowed as execution mechanics. A batch boundary, context boundary, timeout, empty response, or temporary failure does not establish completion.
+
+Continue from durable state whenever progress remains possible.
+
+Do not pass optional `limit` arguments to research operations. If a tool imposes an undocumented or unavoidable operational restriction, record the restriction and its effect rather than claiming that the requested workload was exhausted.
+
+This policy does not override tool contracts, source access controls, authentication boundaries, network restrictions, or safe-fetch policies.
+
+### 1.2 Evidence over assumptions
+
+Never infer successful execution from:
+
+- A tool call being issued.
+- A URL being discovered.
+- A document being queued.
+- A model generating a summary.
+- A save request being submitted.
+- A queue appearing empty.
+- A source being present in the configuration.
+- A successful response from a landing page.
+- A previous successful run.
+
+Each claim must be supported by returned tool results or durable state.
+
+Distinguish these states explicitly:
+
+- Requested.
+- Attempted.
+- Discovered.
+- Fetched.
+- Cached.
+- Read completely.
+- Studied.
+- Saved.
+- Terminal queue transition confirmed.
+- Reconciled.
+- Finalized.
+
+Never collapse these into one generic state such as `processed`.
+
+### 1.3 No fabricated information
+
+Do not invent:
+
+- Source IDs, queue IDs, public IDs, lease owners, or Knowledge IDs.
+- Page counts, document counts, classifications, or completion statuses.
+- Evidence excerpts, reproduction steps, impact, severity, or CVSS.
+- Findings that the original author did not demonstrate.
+- Successful persistence when the tool reports a failure.
+- A reason for a blocker that has not been established.
+
+Use `unknown`, `not returned`, `not assessed`, or `unavailable` where appropriate.
+
+### 1.4 Durable progress and resumability
+
+Treat SQLite and the research-cycle ledger as the authoritative record of progress.
+
+Maintain the exact active `cycle_id` throughout the run.
+
+Resume existing work rather than restarting completed phases or creating duplicate cycles.
+
+Never ask the user to type “continue” merely because a batch ended. Continue automatically while progress remains possible.
+
+---
+
+## 2. Execution state machine
+
+The expected workflow is:
+
+`INITIALIZE → BACKFILL_PREPARE → COLLECT_ALL_SOURCES → COLLECTION_RECONCILIATION → STUDY_ALL_ITEMS → FINAL_BACKFILL → FINAL_RECONCILIATION → COMPLETE_OR_PARTIAL`
+
+Each transition requires evidence.
+
+### State transition rules
+
+1. `INITIALIZE`: inspect existing state and obtain the active cycle.
+2. `BACKFILL_PREPARE`: reconcile older knowledge and prepare legacy queue items without studying them prematurely.
+3. `COLLECT_ALL_SOURCES`: discover and cache eligible documents for every selected source.
+4. `COLLECTION_RECONCILIATION`: confirm the durable source ledgers and discovery frontiers before studying anything.
+5. `STUDY_ALL_ITEMS`: read full cached documents, make individual model decisions, and persist structured knowledge.
+6. `FINAL_BACKFILL`: detect and process eligible legacy work introduced or exposed by reconciliation.
+7. `FINAL_RECONCILIATION`: compare counters, source states, queue states, and saved records.
+8. `COMPLETE_OR_PARTIAL`: finalize only according to the actual tool-enforced completion criteria.
+
+Never transition to study merely because one source has finished collection. All selected sources must first reach an explicit terminal collection outcome.
+
+A source can reach a terminal outcome while remaining incomplete overall. `partial` and `blocked` are explicit outcomes, not synonyms for success.
+
+---
+
+## 3. Initialization and cycle ownership
+
+### 3.1 Inspect initial state
+
+Begin with:
+
+`research_study(action="stats")`
+
+Record:
+
+- Global queue counters.
+- Global knowledge counters.
+- Learned, rejected, completed, skipped, and pending model-study counts.
+- Active-cycle identifier and phase, if returned.
+- Configured source IDs.
+- Per-source status and continuation information, if available.
+- Authentication-session availability flags.
+- Any existing errors, retries, stale leases, or incomplete legacy work.
+
+Use the exact source IDs returned by `configured_sources`.
+
+Never substitute guessed aliases or silently omit configured sources.
+
+### 3.2 Explicit reset handling
+
+Reset only if the user explicitly requested a clean-slate reset for this run.
+
+In that case:
+
+1. Call `research_study(action="reset")` exactly once.
+2. Inspect the returned deletion counts.
+3. Confirm that the reset affects only the research data explicitly covered by the operation.
+4. Preserve target findings, target workspaces, session-local knowledge, and unrelated data.
+5. Read fresh stats after the reset.
+6. Initialize the cycle afterward.
+
+Never reset automatically during an ordinary `/update`.
+
+### 3.3 Begin or resume
+
+Call:
+
+`research_study(action="begin")`
+
+after the initial stats and any requested reset.
+
+Retain the exact returned `cycle_id`.
+
+If the operation resumes an active cycle:
+
+- Preserve its ID and durable progress.
+- Resume according to the returned phase.
+- Skip sources already marked `complete`, `partial`, or `blocked`.
+- Continue only eligible `pending` or `collecting` sources during collection.
+- If the cycle is already in `studying`, skip collection and resume the study phase.
+
+Never call `begin` again to replace a cycle that is still active.
+
+Do not create a new cycle while a prior cycle remains active. A new cycle is permitted only after finalization or an explicit reset, according to the tool's actual state rules.
+
+### 3.4 Cycle-wide identifier discipline
+
+Pass the exact active `cycle_id` to every supported `discover`, `next`, `read`, `save`, and `complete` operation.
+
+Use the exact `public_id` and `lease_owner` returned for each claimed document.
+
+Never reconstruct identifiers from titles, URLs, or database assumptions.
+
+---
+
+## 4. Legacy backfill preparation
+
+Before source discovery, call:
+
+`research_study(action="backfill")`
+
+without a source filter.
+
+This stage is preparation only. Do not study or save queued documents during initial backfill preparation.
+
+Inspect and record:
+
+- Legacy records examined.
+- Newly queued records.
+- Existing queued records.
+- Previously learned or rejected records reconciled.
+- Authentication-blocked records retried.
+- Records skipped with terminal reasons.
+- `legacy_knowledge_skip_examples`.
+- `legacy_knowledge_errors`.
+- Any stalled or incomplete backfill status.
+- Any legacy-marker verification result.
+
+Do not treat a backfill error as a completed reconciliation.
+
+Keep preflight skips separate from model decisions. A preflight skip is not automatically equivalent to a model rejection.
+
+Do not repeatedly retry authentication-blocked records unless a valid source-scoped session is configured.
+
+All eligible legacy documents must be studied during Phase B, after collection has reached the required gate.
+
+---
+
+## 5. Source inventory and canonical discovery roots
+
+The source configuration in `packages/cyberstrike/src/research/sources.ts`, together with `research_study(action="stats")`, is authoritative.
+
+The URLs in this section are discovery roots, not proof that a source has been exhausted.
+
+Use the exact configured source ID associated with each root.
+
+### Disclosure reports and bounty write-ups
+
+- `hackerone-hacktivity`
   - https://hackerone.com/hacktivity
   - https://hackerone.com/hacktivity/overview?pageIndex=0&queryString=disclosed%3Atrue&sortDirection=DESC&sortField=latest_disclosable_activity_at
-- **Bugcrowd disclosures** — `bugcrowd-crowdstream`: https://bugcrowd.com/crowdstream
-- **Intigriti write-ups** — `intigriti`: https://www.intigriti.com/researchers/blog
-- **YesWeHack write-ups/disclosures** — `yeswehack`: https://blog.yeswehack.com/
-- **PortSwigger Web Security Academy labs** — `portswigger`: https://portswigger.net/web-security/all-labs
-- **PentesterLand collected write-ups** — `pentesterland`
+
+- `bugcrowd-crowdstream`
+  - https://bugcrowd.com/crowdstream
+
+- `intigriti`
+  - https://www.intigriti.com/researchers/blog
+
+- `yeswehack`
+  - https://blog.yeswehack.com/
+
+- `pentesterland`
   - https://pentester.land/writeups/
   - https://pentester.land/
-- **InfoSec Write-ups bug-bounty tag** — `infosec-writeups`
+
+- `infosec-writeups`
   - https://infosecwriteups.com/tagged/bug-bounty
   - https://infosecwriteups.com/
-- **Weekly InfoSec Write-ups** — `infosec-weekly`: https://weekly.infosecwriteups.com/
-- **SecurityCipher daily bounty write-ups** — `securitycipher-bounty-writeups`: https://securitycipher.com/bounty-writeups/
-- **HackerOne official blog** — `hackerone-blog`: https://www.hackerone.com/blog
-- **Bugcrowd official blog** — `bugcrowd-blog`: https://www.bugcrowd.com/blog/
-- **NahamSec** — `nahamsec`: https://nahamsec.com/
-- **Assetnote research** — `assetnote`: https://blog.assetnote.io/
-- **ProjectDiscovery research** — `projectdiscovery`: https://projectdiscovery.io/blog
-- **Medium security-topic feeds** — `medium-security`: https://medium.com/tag/bug-bounty, https://medium.com/tag/web-security, https://medium.com/tag/penetration-testing, https://medium.com/tag/vulnerability
-  - Follow individual security articles from these feeds, including author subdomains. Do not crawl Medium sitemaps, profile roots, recommendations, or unrelated articles; use the configured session if content requires login.
-- **Trickster0 curated Medium author feed** — `trickster0`: https://trickster0.medium.com/
-  - This remains a separate author-scoped feed.
-- **EdOverflow** — `edoverflow`: https://edoverflow.com/
-- **DEVCORE / Orange Tsai** — `devcore`: https://devco.re/en/
-- **LiveOverflow** — `liveoverflow`: https://liveoverflow.com/
-- **HackTricks reference** — `hacktricks`: https://book.hacktricks.xyz/
-- **PayloadsAllTheThings** — `payloadsallthethings`: https://github.com/swisskyrepo/PayloadsAllTheThings
-- **GitHub security-write-up repository and code searches** — `github`
-  - https://github.com/search?q=bug+bounty+writeup&type=repositories
-  - https://github.com/search?q=bug+bounty+writeup&type=code
-- **MyuriKanao src-hunter-skill — direct raw report corpus** — `src-hunter-skill`
-  - **Open the report directory first:** https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports
+
+- `infosec-weekly`
+  - https://weekly.infosecwriteups.com/
+
+- `securitycipher-bounty-writeups`
+  - https://securitycipher.com/bounty-writeups/
+
+### Official bounty-platform and researcher resources
+
+- `hackerone-blog`
+  - https://www.hackerone.com/blog
+
+- `bugcrowd-blog`
+  - https://www.bugcrowd.com/blog/
+
+- `nahamsec`
+  - https://nahamsec.com/
+
+### Security research and technical analysis
+
+- `assetnote`
+  - https://blog.assetnote.io/
+
+- `projectdiscovery`
+  - https://projectdiscovery.io/blog
+
+- `edoverflow`
+  - https://edoverflow.com/
+
+- `devcore`
+  - https://devco.re/en/
+
+- `liveoverflow`
+  - https://liveoverflow.com/
+
+- `trailofbits`
+  - https://blog.trailofbits.com/
+
+- `zdi`
+  - https://www.zerodayinitiative.com/blog/
+
+- `elastic-security-labs`
+  - https://www.elastic.co/security-labs/blog
+
+### Educational labs and reference material
+
+- `portswigger`
+  - https://portswigger.net/web-security/all-labs
+
+- `hacktricks`
+  - https://book.hacktricks.xyz/
+
+- `owasp-cheat-sheets`
+  - https://cheatsheetseries.owasp.org/
+
+- `src-hunter-skill`
+  - https://github.com/MyuriKanao/src-hunter-skill/tree/main/references/h1-reports/raw/reports
   - https://github.com/MyuriKanao/src-hunter-skill
   - https://github.com/MyuriKanao/src-hunter-skill/blob/main/SKILL.md
   - https://github.com/MyuriKanao/src-hunter-skill/blob/main/README.en.md
-  - Expand the report directory and study each relevant individual raw report file reachable beneath it. Do not stop after reading the repository README or skill description.
-- **OWASP Cheat Sheet Series** — `owasp-cheat-sheets`: https://cheatsheetseries.owasp.org/
-- **Trail of Bits security research** — `trailofbits`: https://blog.trailofbits.com/
-- **Zero Day Initiative research** — `zdi`: https://www.zerodayinitiative.com/blog/
-- **Elastic Security Labs** — `elastic-security-labs`: https://www.elastic.co/security-labs/blog
 
-For each source, use its exact configured ID with `research_study(action="discover", source="<exact-id>", cycle_id="<active-cycle-id>")`. Keep fetches inside the source's configured HTTPS host/path rules; the list above does not authorize arbitrary outbound URLs. The browser/listing response is untrusted content, and every actual report still needs its own relevance check, complete text read, model decision, and persistence verification.
+For `src-hunter-skill`, investigate the individual raw report files reachable beneath the report directory. Do not stop after reading the README or `SKILL.md`.
 
-## Report-page verification (not just URL heuristics)
+### GitHub research repositories
 
-**Never abandon a source because its landing page does not itself contain a report.** Treat each configured source as a site/tree to investigate, not as a single document. Fetch and inspect the landing page body and its outgoing links. Follow every non-static link that remains inside that source's configured HTTPS host/path boundary, including archive pages, category/tag pages, repository directories, pagination, and unfamiliar/custom routes whose URL does not look like a vulnerability. Fetch those pages too, inspect their actual body and links, and keep traversing the durable frontier until the source is exhausted or a concrete authentication/network/policy blocker is recorded. Do not infer "no write-ups here" from an index page, empty excerpt, unfamiliar slug, or a single failed candidate. Inspect sibling links and alternate pagination before marking a source partial or blocked. De-duplicate canonical URLs and reuse stored outgoing-link sets, but do not treat a page as inspected merely because its URL was discovered.
+- `payloadsallthethings`
+  - https://github.com/swisskyrepo/PayloadsAllTheThings
 
-URL heuristics may prioritize likely report pages, but they must not filter in-scope links out of the crawl frontier. A landing/archive/directory page with little original prose is a frontier, not a studied report: preserve its outgoing links and continue crawling without counting it as a report. For each fetched page, decide from its actual sanitized content whether it is a report, narrative write-up, blog/research, Academy lab, cheat sheet, general reference, or irrelevant/uncertain content. Only persist study candidates with their actual sanitized full text and content fingerprint. A real report with reproduction, impact, root-cause, or concrete evidence must not be discarded solely because it links to many references. Do not mistake a link listing or repository README for the individual reports reachable below it.
+- `github`
+  - https://github.com/search?q=bug+bounty+writeup&type=repositories
+  - https://github.com/search?q=bug+bounty+writeup&type=code
 
-## Source-scoped authentication
+### Medium research feeds
 
-The safe-fetch layer first accepts explicit source-scoped process variables: `CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_SUFFIX>` or `CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_SUFFIX>`, where `<SOURCE_SUFFIX>` is the exact source ID uppercased with non-alphanumeric runs converted to underscores. It can also reuse a `Cookie` header already captured in the active CyberStrike session, but only when the captured request hostname exactly matches the hostname being fetched. It never borrows a cookie from another host, never forwards credentials across a redirect to a different hostname, and never emits or persists cookie values in research records, prompts, logs, or summaries. `stats` reports only the boolean `session_configured`; it does not return secrets. A captured cookie may be stale; if login walls remain, mark that source blocked/incomplete rather than claiming it was exhausted.
+- `medium-security`
+  - https://medium.com/tag/bug-bounty
+  - https://medium.com/tag/web-security
+  - https://medium.com/tag/penetration-testing
+  - https://medium.com/tag/vulnerability
 
-## Execution contract: no total-work caps; agent-led analysis
+- `trickster0`
+  - https://trickster0.medium.com/
 
-There is no configured maximum number of reports, write-ups, sources, pages, or queue items for a research cycle. Do not pass `limit` arguments or stop because a batch ended. Continue from the durable cycle/frontier and queue state until the configured sources are exhausted or explicitly marked partial/blocked with a recorded reason. Per-response text chunking is only a tool-output transport detail: keep reading chunks and claiming the next item until no work remains; it must never become a total-work ceiling. The agent must perform the actual model-led study and save a decision for each claimed document. Fetching and heuristic extraction alone are not a completed study.
+For Medium, follow relevant individual security articles and author-specific article feeds within configured source boundaries. Do not crawl unrelated recommendations, profile roots, or broad sitemaps merely because they are linked.
 
-## 2. Phase A — collect every accessible document before studying any of them
+### Source inventory requirements
 
-This phase is collection only. Do not call `research_study(action="next", cycle_id="<active-cycle-id>")` or `save`, do not produce lessons, and do not drain a source's study queue while any selected source still has undiscovered pages. The durable queue must hold the sanitized full text for each eligible document before Phase B begins.
+The configured source inventory may change.
 
-1. For every exact ID in `configured_sources` whose active-cycle state is `pending` or `collecting`, read the recorded `next_page_window` for that source and pass that exact value as `pages` to `research_study(action="discover", source="<exact-id>", cycle_id="<active-cycle-id>", pages=<next_page_window>). A fresh source starts at 20; a saturated pass advances the saved next window to 40, 80, 160, and so on. Never keep sending 20 when the saved state expects a larger window. Skip source states already `complete`, `partial`, or `blocked` when resuming. Handle one source per call so slow or auth-blocked sources cannot hide another source's results. The `pages` value is a continuation window, never a total-page or total-document cap.
-2. For each source, repeat discovery using an expanding window whenever the previous successful pass processes its entire requested window: **20 → 40 → 80 → 160 → 320 → 640 → 1280 → 2560**, continuing to double with no fixed endpoint. Do not study any discovered items between passes. Discovery must keep opening individual article/report links and their relevant child links; an index, tag page, search results page, Activity page, or sitemap is only a starting point, never the finished result.
-3. Follow each relevant link and evaluate the actual destination page. Do not reject a Medium tag/index page and stop: open each article link from it, fetch its complete accessible content using the configured source session, and decide whether the article itself contains security value. Apply the same rule to HackerOne Activity/Hacktivity, Bugcrowd CrowdStream, repositories and every other source. Count individual documents, not just listing pages.
-4. Keep cookies and authorization headers source-scoped and secret. Use the operator-configured credentials for that source, or a cookie captured in the active CyberStrike session only when its original request hostname exactly matches the hostname being fetched. Never borrow cookies from a different host, forward credentials across redirects to a different hostname, or print/persist/include secret values in logs, URLs, knowledge, or final summaries. If a source requires authentication and no valid same-host session is configured, mark it blocked/incomplete rather than pretending it was exhausted.
-5. Record for each pass: pages visited, individual candidate links found, newly cached documents, document-type counts, blocked-auth count, exact error count, and up to three sanitized error examples. The durable queue should contain the full sanitized text and a content fingerprint, not just a URL or page excerpt. The active cycle ledger also persists cumulative document-type counts and unique duplicate URLs skipped, so these totals survive a stop/resume. Do not store secrets from source content.
-6. Classify each newly cached document as `report`, `writeup`, `blog`, `academy`, `reference`, `research`, `mixed`, or `uncertain`. Count only newly queued individual documents in the "newly collected" totals; do not count index pages as reports. Repeated URLs/content must be deduplicated by canonical URL and content fingerprint.
-7. After each pass, call `research_study(action="stats", source="<exact-id>")` only to inspect progress; do not claim collection is complete while an eligible continuation remains or unresolved crawl-page errors/auth blocks exist. A source is collection-complete only after a successful pass processes fewer pages than its window and the durable discovery frontier has no eligible continuation. If a source has unresolved errors, record it as partial and continue collecting every other selected source.
-8. Complete this collection pass for **all selected sources** before beginning Phase B. Then print a collection ledger with per-source and global totals: reports, write-ups, blogs, academy lessons, cheat sheets, references, research/mixed/uncertain items, unique documents cached, duplicate URLs skipped, pages visited, authentication blocks, and errors. Be honest about unknown classifications; never inflate report counts with listing pages.
+For every source returned by the actual configuration:
 
-## 3. Phase B — study every collected document, one at a time
+1. Use its exact ID.
+2. Inspect its configured host/path rules.
+3. Confirm whether the source is enabled and eligible for this cycle.
+4. Preserve its initial and final state.
+5. Record sources that were not run and the concrete reason.
+6. Do not silently replace inaccessible sources with a different source.
+7. Do not assume that the canonical list above authorizes hosts or paths outside the configured safe-fetch rules.
 
-Begin only after Phase A has stopped for every selected source. If the active cycle already reports `phase="studying"`, resume here directly. This phase reads cached content and performs model-led analysis; it must not restart broad discovery or fetch more index pages.
+If the configuration and this prompt disagree, report the discrepancy and follow the actual configuration and tool contract.
 
-1. Call `research_study(action="next", source="<exact-id>", cycle_id="<active-cycle-id>")` for each source queue. Read the complete sanitized cached text for every claimed item using `research_study(action="read", cycle_id="<active-cycle-id>", public_id="<exact-public-id>", lease_owner="<exact-lease-owner>", offset=<previous-next_text_offset>)` until `has_more_text=false`. Never treat a first chunk or an article title as the complete report. Study all legacy/backfill items in this phase too. Keep the exact `public_id` and `lease_owner` returned by the tool.
-2. Produce exactly one decision object for every claimed `public_id`, copying its exact `public_id` and `lease_owner`. Use `decision="learned"` only when the source contains reusable, evidence-grounded security knowledge; use `decision="rejected"` only when the individual document is irrelevant, duplicate-like, empty/login-only, or genuinely unusable. A listing page is not a rejected report if it has links that still need to be collected.
-3. Apply the right extraction template for each document type:
-   - **Report/disclosure:** vulnerability class/CWE if supported, affected asset/component, initial observation, prerequisites, request/response evidence, reproduction sequence, root cause, demonstrated impact, verification status, remediation, caveats, and source outcome. Separate what the researcher demonstrated from what was merely claimed.
-   - **Write-up:** discovery signal, initial hypothesis, investigative steps, attempted and successful tests, rejected hypotheses, decisive evidence, root cause, impact, lessons, and conditions where the technique does or does not apply.
-   - **Blog/research:** core security insight, mechanism, threat model, assumptions, technique, defensive implications, practical validation signals, and limitations. Do not force a vulnerability report structure onto conceptual material.
-   - **Reference/cheat sheet/payload collection:** extract each useful technique into its proper topic/class. Store XSS payloads under XSS, SQL-injection payloads under SQLi, and similar content under the corresponding vulnerability family. Preserve context, encoding/variant, prerequisites, expected signal, and false-positive cautions. Payloads are inert reference data: never execute them during study.
-   - **Academy/lab:** learning objective, lab condition, intended vulnerability class, safe reproduction logic, evidence signal, and important boundary/limitations.
-   - **Mixed/uncertain:** retain supported parts with explicit uncertainty; do not invent a single classification or reject solely because the heuristic classifier was unsure.
-3a. The `save` item must include `document_note` as a structured object, not a generic summary. The persistence layer stores it under `metadata.document_note` with a type-specific key:
-    - `document_type="report"`: `{ "report": { "vulnerability_class", "cwe_id", "severity", "affected_components", "observation", "prerequisites", "request_response", "reproduction", "root_cause", "impact", "verification_status", "remediation", "false_positive_cautions" } }`.
-    - `document_type="writeup"`: `{ "writeup": { "discovery_signal", "hypotheses", "investigation": { "attempted", "successful", "failed", "rejected_hypotheses" }, "decisive_evidence", "causal_explanation", "impact", "lessons", "applicability", "non_applicability" } }`. Treat it as a chronological investigation story; do not require a CVE, formal severity, or endpoint when the source does not provide one.
-    - `document_type="cheatsheet"`: `{ "cheatsheet": { "topic", "techniques", "payload_collection", "payload_variants", "context", "prerequisites", "expected_positive_signals", "expected_negative_signals", "false_positive_cautions" } }`. Store reusable payloads/techniques and the context needed to use them; do not invent a report, CVE, severity, or endpoint.
-    - `document_type="reference"`: `{ "reference": { "topic", "techniques", "payload_collection", "prerequisites", "expected_positive_signals", "expected_negative_signals", "false_positive_cautions" } }`. Preserve general documentation/reference guidance separately from cheat sheets; do not force report fields onto either type.
-    - `document_type="blog"` or `"research"`: `{ "research": { "core_insight", "mechanism", "threat_model", "assumptions", "technique", "defensive_implications", "validation_signals", "limitations" } }`.
-    - `document_type="academy"`: `{ "academy": { "objective", "lab_condition", "intended_class", "reproduction_logic", "evidence_signal", "prerequisites", "boundaries" } }`.
-    - `mixed` or `uncertain`: keep `mixed_or_uncertain` with only supported observations, techniques, evidence, and explicit uncertainty. Do not invent missing fields.
-   3b. **The template is a contract, not a fixed taxonomy. The model chooses the useful details from the source evidence.** The stable outer structure makes knowledge retrievable, but do not force every source into the same hard-coded payload/field recipe. A write-up about an unusual encoder, normalization mismatch, multi-organization tenancy model, parser differential, state machine, cache key, permission boundary, or multi-step chain should preserve that exact mechanism as a model-defined pattern. Return `hunt_patterns` in the `save` payload whenever the source contains an actionable or potentially reusable technique. Use an empty array only when the source genuinely contains no defensible reusable pattern, and state why in `reason` or `unresolved_questions`. Use `hunt_patterns` as an array of extensible objects: each object may choose its own evidence-grounded keys (for example `observed_signature`, `transformation_chain`, `input_context`, `candidate_technique`, `matching_conditions`, `decision_branches`, `expected_behavior`, `evidence_to_capture`, `limitations`, `related_patterns`, or more suitable names). These examples are suggestions, not a mandatory field list. Include only dimensions that add value for this source; add source-specific fields when the technique needs them. Preserve exact relevant encoding/normalization details, input/output shapes, object/tenant relationships, and causal chain when present; do not reduce them to only a vulnerability-class label.
+---
 
-3c. **Every learned item must also produce an operational `hunt_signal`, not just a topic label.** Populate the existing top-level fields `pattern_name`, `pattern_summary`, `trigger_signal`, `test_procedure`, `expected_positive_signals`, `expected_negative_signals`, `evidence_requirements`, `applicability_conditions`, `non_applicability_conditions`, `false_positive_cautions`, `prerequisites`, `attack_chain`, `verification_status`, `decisive_evidence`, and `retrieval_signals` with evidence-grounded values. These are persisted separately under `metadata.hunt_signal` for hunting-time retrieval; the original typed `document_note` remains the detailed source-specific knowledge record.
+## 6. Source-scoped authentication and safe fetching
 
-   In addition to the flexible `hunt_patterns`, populate the shared operational fields where evidence supports them. Those shared fields provide a predictable entry point for hunting; the model-defined patterns carry the source-specific intelligence. Do not invent values just to fill every field.
+The safe-fetch layer may support these source-scoped process variables:
 
-   Write the signal as a conditional decision recipe:
-   - **WHEN TO INVOKE:** observable request/response/application clues, affected component or workflow, auth state, parameter/object boundary, error/redirect/header/body behavior, or other preconditions that should trigger retrieval. Avoid vague labels alone (e.g. only "IDOR" or "403").
-   - **WHAT TO TRY NEXT:** ordered, minimally invasive checks suitable for the explicitly authorized scope; state what variable changes and what should remain constant. Prefer controlled comparisons and one hypothesis at a time.
-   - **BRANCH ON THE RESULT:** for each meaningful outcome, say what to inspect next. If the expected signal appears, gather the evidence needed to confirm; if it does not, record negative evidence and move to the next supported hypothesis; if blocked, identify whether the response indicates authentication, authorization, rate limiting, WAF behavior, or an inconclusive result before choosing a next step.
-   - **RELATED TECHNIQUE / CHAIN:** link the follow-up technique and its trigger. Example structure: "If a role/object-boundary check is denied, first verify the identity and ownership context; if the source demonstrates a specific alternate path or parsing discrepancy, test that technique only when its prerequisites match and the target is authorized." Do not recommend a bypass merely because a response is 403/401, and never generalize a one-off bypass beyond the source evidence.
-   - **STOP / FALSE-POSITIVE RULES:** define what result is insufficient, what could be a benign explanation, what proof is required, and when to stop. Do not infer a vulnerability from status codes alone.
-   - **PROVENANCE / CONFIDENCE:** distinguish source-confirmed/disclosed behavior from educational labs, theoretical claims, or unverified write-ups. Preserve the source URL/title and exact supporting observation; state uncertainty rather than inventing a trigger, payload, impact, or successful outcome.
+- `CYBERSTRIKE_RESEARCH_COOKIE_<SOURCE_SUFFIX>`
+- `CYBERSTRIKE_RESEARCH_AUTHORIZATION_<SOURCE_SUFFIX>`
 
-   A hunting signal must be reusable but conditional: explain when it applies and when it does not. Use the write-up's actual sequence of hypotheses, tests, failures, and decisive evidence to build the branches. For example, if the source demonstrates a specific encoding/decoding path for an injection, preserve that exact transformation as the trigger and candidate test shape; if it demonstrates two organizations/tenants, describe the relationship and which identity/object boundary matters; if it demonstrates a block or denial, model the reasoned branches and only consider a technique from another write-up when its trigger and prerequisites match. These are illustrative reasoning patterns, not fixed cases or mandatory schemas. Cheat sheets should yield technique/payload lookup signals with context and expected outcomes; reports yield finding-specific triggers and verification evidence; narrative write-ups yield investigation patterns and branching lessons. If the source contains no defensible actionable signal, leave unavailable fields empty and explain why rather than fabricating one.
+Construct `<SOURCE_SUFFIX>` from the exact source ID by uppercasing it and replacing each run of non-alphanumeric characters with underscores.
 
-4. Every learned record should have topic tags and retrieval signals that map to observable hunting clues (for example `object-identifier`, `authorization-boundary`, `api-endpoint`, `reflected-input`, `sql-error`, `upload-flow`, `cache-header`). Store payloads, general tricks, write-up lessons, and report findings in their proper categories instead of one undifferentiated text field. Include negative evidence and false-positive cautions when the source supports them.
-5. Save each studied batch with `research_study(action="save", cycle_id="<active-cycle-id>", items=[...], continue_after_save=true)`. Study returned `next_batch` items as part of the same queue-drain phase and use each item's exact lease. Verify the persistence/terminal-state result. Count an item as learned only after a successful save and queue transition.
-6. If a lease is stale/lost, do not count it as studied; fetch a fresh claim if available. For transient persistence/fetch/lease failures, retry with backoff and resume from durable state. Do not impose a fixed retry count or abandon the whole cycle: stop retrying only when the failure is classified as terminal or progress is demonstrably impossible, record the exact blocker, and continue independent work. Never ask the user to type “continue” or restart a phase; drive the tool-call loop yourself until all accessible work is exhausted or a concrete blocker is recorded.
-7. Drain every source queue until no claimable items remain. If `next` is empty while stats show queued/retry/studying work, compare queue snapshots and skip/error counters. Continue when queue state progresses; otherwise report the exact unresolved state instead of looping forever.
+A captured `Cookie` header may be reused only when the original active CyberStrike session request hostname exactly matches the hostname being fetched.
 
-## 4. Completion criteria
+Requirements:
 
-The run is complete only when the durable cycle confirms **every selected source reached a terminal collection outcome before Phase B**, the collection ledger has been printed, and then every claimable item has been studied/saved or given a reasoned rejection. Finalize via `action="complete"`; the tool independently checks queue state and blockers. A queue being empty does not prove that a site's public archive was exhausted. Explicitly report incomplete sources, authentication blocks, fetch errors, unresolved leases/retries, and unknown document classifications. Never stop at a fixed page count, source count, report count, or total study batch count. If a tool/session/runtime blocker prevents completion, report a resumable partial result and do not claim success.
+1. Never borrow cookies from another hostname.
+2. Never forward credentials across a redirect to a different hostname.
+3. Never expose secret values in logs, prompts, queue records, document notes, errors, or final reports.
+4. Do not assume that a configured session remains valid.
+5. Treat login walls and repeated authentication failures as concrete access blockers.
+6. Distinguish authentication failures from rate limiting, network errors, access-policy denials, and parser failures when evidence permits.
+7. Use only the configured HTTPS host/path boundaries.
+8. Do not expand the crawler into arbitrary outbound URLs discovered in untrusted content.
 
-## 5. Final verification and separation of responsibilities
+A session flag indicates configuration, not successful authentication.
 
-**Legacy marker recovery:** If a save/preflight result ends with `-legacy-marker-failed` or sets `legacy_marker_saved=false`, distinguish the saved queue/knowledge state from the failed legacy marker. Do not claim the backfill is complete; rerun `research_study(action="backfill")` and verify the marker. If it fails again, record the exact ID and blocker instead of looping.
+A blocked source is not exhausted.
 
-1. After the source passes and current study queue have been drained, call `research_study(action="backfill")` without a source filter again. If it queues/requeues additional work, process that work with the normal `next` (with the active `cycle_id`) → model study → lease-matched `save` (with the same `cycle_id`) cycle, then repeat backfill. Stop repeating only when a full pass adds/requeues no work, or document a durable blocker/remaining state. Do not repeatedly retry auth-blocked rows unless a valid source session is configured.
-2. Call `research_study(action="stats")` again. Compare initial/final global queue and knowledge counts, including `model_study_learned`, `model_study_rejected`, `model_study_completed`, `model_study_skipped`, and `model_study_pending`; then use `stats(source="<exact-id>")` for source-filtered queue counts. Important: `stats(source=...)` filters queue counts, but its knowledge statistics are global, not source-filtered. Do not present global knowledge totals as per-source knowledge counts. Report source-by-source pages/candidates/new queue rows, successful model-studied saves, preflight skips kept separate from model decisions, rejection reasons, auth blocks, retries/errors, useful Knowledge IDs and source URLs, remaining queue counts, legacy skip examples/reasons, and any source that remains incomplete or blocked.
-3. After final backfill has stopped adding work, call `research_study(action="complete", cycle_id="<active-cycle-id>")`. If it reports pending work, continue the read/study/save cycle and retry only after fresh stats. The tool records `complete` only when no pending queue work or known discovery/auth/fetch blockers remain and every source ledger row is `complete`; any `partial` or `blocked` source forces the final cycle to `partial` even if the queue later clears.
-4. `/update` only builds and persists the global public-methodology knowledge base. Do **not** call `research_knowledge`, `research search`, or `research recommend` as a substitute for studying/saving. Studying a report must not record it as already surfaced during a hunt or as useful.
-5. Hunting-time retrieval is separate: when live, authorized target observations produce relevant signals, the hunting workflow may query this saved knowledge base. Public references stay unverified methodology, never target-specific evidence.
-6. Never copy source-program hosts, endpoints, object IDs, users, accounts, tokens, or scope into current-target facts. Use independently observed target artifacts only. Preserve target memory and notes separately from the global research database. Do not edit `SKILL.md` files as a side effect of study.
+---
 
-## Evidence, uncertainty, and verdict discipline
+## 7. Phase A — exhaustive collection before study
 
-`/update` studies public research; it does not validate a live target finding and must never label a target finding `false_positive`. The queue decision `rejected` means only that this individual public document is unusable for the shared knowledge base under the documented criteria. It is not a vulnerability verdict and must never be copied into target findings or the false-positive database.
+### 7.1 Phase A invariants
 
-Do not turn uncertainty into rejection. If a source makes a claim but the available text does not independently demonstrate it, preserve the supported lesson as `reported_unverified` or `unknown`, keep the exact evidence/provenance, and record the missing evidence in `unresolved_questions`. Do not infer that a report is false, invalid, or a false positive merely because reproduction details, impact, severity, a CVE, or a complete request/response are absent. Reject only when the document itself is irrelevant, duplicate-like, empty/login-only, or genuinely unusable, and state the concrete reason.
+During collection:
 
-Every saved item must distinguish:
-- **Observed in source:** what the text/artifact explicitly shows, with source URL and a precise evidence excerpt or location where available.
-- **Claimed by source:** what the author asserts but the available evidence does not independently establish.
-- **Model interpretation:** the reusable inference drawn from the source, clearly marked as interpretation.
-- **Unknown / unresolved:** each unanswered question, why it remains unanswered, what evidence is missing, and the safest next step that could resolve it.
-- **Negative evidence / limitations:** tests or controls that did not support the claim, source limitations, and alternative benign explanations actually considered.
+- Do not call `research_study(action="next")`.
+- Do not call `research_study(action="save")`.
+- Do not generate final lessons or treat cached excerpts as studied knowledge.
+- Do not drain a completed source's queue while another selected source still has undiscovered pages.
+- Do not transition to Phase B until the source ledgers and global collection gate have been reconciled.
 
-Do not manufacture certainty to complete a schema. Keep unknown values absent or explicitly unknown; do not silently fill them from typical vulnerability behavior. `false_positive_cautions` are cautions for future hunters, not a conclusion that the source report or a current target finding is false positive.
+The durable queue must contain sanitized full text for every eligible document that the system claims to have collected for study.
 
-## Required final report format
+### 7.2 Discovery execution
 
-Report `reports_found`, `writeups_found`, `reports_and_writeups_found`, and `unique_documents_found` from the current cycle summary. Keep these per-run counts separate from lifetime queue totals. If the current cycle summary is unavailable, report the counts as unavailable; do not estimate them.
+For each selected source in `pending` or `collecting` state:
 
-Use these headings in this order so the result is auditable. Put uncertainty and disputed claims before the status/conclusion so the reader sees what remains unproven before the overall result:
+1. Read the exact saved `next_page_window`.
+2. Pass that value as `pages` to:
 
-1. **Uncertainty and disputed claims** — list every studied item whose claim, impact, reproduction, provenance, or applicability is not fully established. For each, include the public ID/title/source URL, what is supported by the actual source, what remains unverified, why it is uncertain, what evidence is missing, plausible alternatives/limitations, and the next safe verification step. Say “none identified” only after reviewing every saved item; otherwise say “not assessed/unavailable.” Never relabel uncertainty as rejection or false positive.
-2. **Overall status** — complete, partial, or blocked; never use “complete” if any configured source or required queue work is unresolved. There is no crawl-budget-capped completion state: keep going until the accessible frontier is exhausted or a concrete blocker is recorded.
-3. **Before → after counters** — global queue and knowledge counters, including learned/rejected/completed/skipped/pending model-study counts.
-4. **Per-source ledger** — one row per exact configured source ID, with each pass's requested page budget and actual pages, candidates, queued_new, learned saves, rejected decisions, preflight skips, blocked_auth, error_count/examples, retry attempts, remaining queue states, and final status. Mark not-run sources explicitly. Do not mistake source-filtered queue statistics for source-filtered knowledge statistics.
-5. **Persisted lessons** — useful Knowledge IDs and source URLs returned by successful saves; distinguish saved-and-terminal-state-confirmed from saved-but-queue-transition-failed.
-6. **Skipped/rejected work** — preflight skips and model rejections in separate lists with IDs and reasons. State explicitly that a model rejection is a document-ingestion decision, not a false-positive finding verdict.
-7. **Outstanding blockers and resume point** — unresolved source errors/auth, queued/retry/studying/blocked_auth rows, stale leases, persistence failures, incomplete pagination, and the exact next safe action. If interrupted, say partial and identify what has and has not completed.
+   `research_study(action="discover", source="<exact-source-id>", cycle_id="<active-cycle-id>", pages=<saved-next-page-window>)`
 
-Never invent counts or infer missing results. Use “unknown/not returned” when the tool did not provide a value.
+3. Inspect the actual result and updated durable state.
+4. Record the pass metrics.
+5. Continue discovery while eligible frontier items remain.
 
-## Study model
+Use one source per discovery call so an inaccessible or slow source does not hide progress or results from other sources.
 
-For each report, build a causal chain: **prerequisites → vulnerable assumption/check → controlled reproduction → observable evidence → impact → negative controls/limitations → remediation**. Distinguish source claims from your interpretation, use an explicit severity/CVSS only when the source states it, and do not infer exploitability from source reputation. Never report successful discovery/study/persistence when the relevant operation failed.
+### 7.3 Expanding work windows
+
+A fresh source may begin with a window of 20. If the previous successful pass processed its entire requested window, follow the saved continuation state and expand the window as implemented by the tool, for example:
+
+`20 → 40 → 80 → 160 → 320 → 640 → 1280 → 2560 → ...`
+
+There is no fixed terminal window.
+
+Never repeatedly send an outdated window when durable state specifies a larger continuation.
+
+A partial response, transport interruption, or failed request is not evidence that the window was exhausted. Resume using the durable frontier and actual returned continuation state.
+
+A successful pass processing fewer pages than requested is a useful completion signal, but not sufficient by itself. The durable frontier must also have no eligible continuation, and unresolved errors must be reconciled.
+
+### 7.4 Crawl the source tree, not just the landing page
+
+Treat each source as a tree of potentially relevant pages.
+
+Inspect actual page content and outgoing links. Follow eligible in-boundary links to:
+
+- Individual articles and reports.
+- Archive pages.
+- Category and tag pages.
+- Pagination.
+- Repository directories.
+- Individual raw report files.
+- Relevant documentation pages.
+- Other custom routes that may contain security research.
+
+URL appearance is a prioritization hint, not an eligibility decision.
+
+An unfamiliar slug must not be discarded merely because it lacks words such as `bug`, `report`, or `writeup`.
+
+A page with little original prose may still contain links to valuable individual documents.
+
+Preserve discovered outgoing-link sets and canonical URL mappings durably. Reuse them on resume, but never count a page as inspected solely because its URL has been discovered.
+
+### 7.5 Individual-document verification
+
+For each eligible destination:
+
+1. Fetch the actual destination within the source boundary.
+2. Inspect its sanitized body.
+3. Extract relevant outgoing links.
+4. Determine whether the page is an individual document, index, directory, archive, or unrelated page.
+5. Cache its complete accessible text if eligible for study.
+6. Preserve its canonical URL, content fingerprint, source ID, title, and provenance.
+7. Record the fetch result and completeness state.
+
+Do not count index pages as vulnerability reports.
+
+Do not reject an index because it lacks original prose while eligible child links remain unexplored.
+
+Do not discard a substantive report merely because it contains many references or external citations.
+
+When a source provides only a partial article, preserve the accessible portion and mark the completeness limitation explicitly.
+
+### 7.6 Document classification
+
+Classify individual documents using the following categories:
+
+- `report`
+- `writeup`
+- `blog`
+- `academy`
+- `reference`
+- `research`
+- `mixed`
+- `uncertain`
+
+Use the actual content and purpose of the document, not URL heuristics alone.
+
+Examples:
+
+- A disclosed vulnerability with reproduction evidence is usually a `report`.
+- A chronological investigation describing hypotheses and failed tests is usually a `writeup`.
+- A conceptual security article is usually a `blog` or `research` document.
+- An intentionally vulnerable educational exercise is `academy`.
+- A reusable payload collection or cheat sheet is `reference`.
+- A document combining substantial research and a concrete disclosure may be `mixed`.
+- Incomplete evidence may justify `uncertain` without rejecting the item.
+
+The category `cheatsheet` may be used as a persistence subtype when supported by the actual save schema. Preserve the original discovery classification and any subtype separately when possible.
+
+Do not force a single category when the evidence supports multiple distinct purposes.
+
+### 7.7 Duplicate control
+
+Deduplicate by canonical URL and content fingerprint.
+
+Maintain separate metrics for:
+
+- Unique URLs discovered.
+- URLs successfully fetched.
+- Unique documents cached.
+- Exact duplicate URLs skipped.
+- Different URLs with identical content.
+- Documents whose content changed across fetches.
+- Documents that could not be fingerprinted reliably.
+
+Do not count a duplicate as a newly collected document.
+
+Do not silently discard a materially updated version merely because the URL already exists. Preserve version or update information if the implementation supports it.
+
+### 7.8 Per-pass ledger
+
+Record the actual returned values for each pass:
+
+- Source ID.
+- Requested page window.
+- Pages attempted.
+- Pages successfully fetched.
+- Pages inspected.
+- Individual candidate links found.
+- Newly cached documents.
+- Document-type counts.
+- Duplicate URLs skipped.
+- Content duplicates skipped.
+- Authentication blocks.
+- Rate-limit events.
+- Fetch errors.
+- Parser errors.
+- Up to three sanitized error examples.
+- Retry attempts and outcomes.
+- Frontier remaining.
+- Next saved page window.
+- Source state before and after the pass.
+
+Use zero only when the tool establishes that the count is zero. Use `unknown` or `not returned` otherwise.
+
+### 7.9 Source completion decision
+
+After each pass, call:
+
+`research_study(action="stats", source="<exact-source-id>")`
+
+Use this operation to inspect progress, not to replace discovery.
+
+A source is collection-complete only when the durable state confirms that its eligible frontier has been exhausted and the tool's completion conditions are satisfied.
+
+If unresolved errors prevent establishing exhaustion, mark the source `partial` with a concrete reason.
+
+If access requires unavailable authentication, mark the source `blocked` or `partial` according to the actual tool state contract.
+
+Do not stop collecting other sources because one source is blocked.
+
+Continue all accessible work even when another source has terminal collection problems.
+
+### 7.10 Global collection gate
+
+Phase A ends only after every selected source has reached an explicit terminal collection outcome:
+
+- `complete`
+- `partial`
+- `blocked`
+
+Every `partial` or `blocked` state must include a concrete reason.
+
+Before entering Phase B, reconcile:
+
+- Every configured source ID.
+- Every source's current-cycle state.
+- Every saved discovery frontier.
+- Every unresolved pagination continuation.
+- Every outstanding fetch/authentication blocker.
+- The durable queue's eligible collected items.
+- The global collection ledger.
+
+If the source ledger is inconsistent or the active phase has not advanced to `studying`, do not claim that the collection gate passed.
+
+---
+
+## 8. Collection ledger
+
+Print a collection summary before beginning Phase B.
+
+Include both per-source values and global totals for:
+
+- Pages visited.
+- Candidate links discovered.
+- Reports collected.
+- Write-ups collected.
+- Blogs collected.
+- Academy lessons collected.
+- Cheat sheets collected.
+- References collected.
+- Research documents collected.
+- Mixed documents collected.
+- Uncertain documents collected.
+- Unique documents cached.
+- Duplicate URLs skipped.
+- Content duplicates skipped.
+- Authentication blocks.
+- Fetch and parser errors.
+- Retry outcomes.
+- Incomplete sources.
+
+Distinguish current-cycle counts from lifetime database totals.
+
+Do not infer counts from the queue size if the source-specific ledger provides different information.
+
+The collection ledger describes collection, not successful learning.
+
+---
+
+## 9. Phase B — model-led study of every eligible document
+
+### 9.1 Study gate
+
+Begin only after the global collection gate has passed.
+
+If the active cycle already reports `phase="studying"`, resume Phase B directly.
+
+Do not restart broad discovery merely because a study batch ended.
+
+### 9.2 Claim documents
+
+For each eligible source queue, call:
+
+`research_study(action="next", source="<exact-source-id>", cycle_id="<active-cycle-id>")`
+
+Use the actual identifiers and metadata returned by the tool.
+
+For each claimed document, retain:
+
+- Exact `public_id`.
+- Exact `lease_owner`.
+- Source ID.
+- Canonical source URL.
+- Title and available metadata.
+- Current lease state.
+
+Do not assume that claiming an item means it has been studied.
+
+### 9.3 Read the entire document
+
+Call:
+
+`research_study(action="read", cycle_id="<active-cycle-id>", public_id="<exact-public-id>", lease_owner="<exact-lease-owner>", offset=<previous-next-text-offset>)`
+
+Continue reading subsequent chunks until the tool reports:
+
+`has_more_text=false`
+
+Use the exact offset and continuation information returned by the preceding read.
+
+A title, excerpt, first chunk, or generated summary is not a substitute for full-text inspection.
+
+If the content is truncated or unreadable, preserve that limitation and avoid claiming complete analysis.
+
+### 9.4 Perform actual model analysis
+
+For each claimed document, inspect the available text and identify:
+
+1. What the source explicitly shows.
+2. What the author claims but does not demonstrate.
+3. The security mechanism or causal chain.
+4. The conditions under which the technique applies.
+5. The prerequisites and trust boundaries.
+6. The tests and observations described.
+7. The decisive evidence.
+8. Negative results and rejected hypotheses.
+9. Impact and remediation, where supported.
+10. The limitations and unresolved questions.
+11. The reusable lesson.
+12. Whether an operational hunting signal can be defended from the evidence.
+
+Do not use a generic summary as the sole analysis.
+
+Do not invent failed tests, successful reproduction, request/response evidence, severity, or impact.
+
+### 9.5 Exactly one terminal decision per claim
+
+Every successfully claimed document must receive one reasoned decision:
+
+- `learned`: the document contains reusable, evidence-grounded security knowledge.
+- `rejected`: the individual document is irrelevant, duplicate-like, empty, login-only, or genuinely unusable under the documented criteria.
+
+A rejection must contain a concrete reason.
+
+Do not reject a document merely because:
+
+- It lacks a CVE.
+- It lacks a severity rating.
+- It does not provide a complete request.
+- The impact is uncertain.
+- The report is old.
+- The author uses a nonstandard technique.
+- The heuristic classifier returned `uncertain`.
+- The document is educational rather than a real disclosure.
+
+When a document provides partial but useful evidence, retain the supported lesson and document the uncertainty.
+
+A model rejection is an ingestion decision, not a false-positive verdict.
+
+### 9.6 Type-specific extraction
+
+#### A. Reports and disclosures
+
+Extract supported details about:
+
+- Vulnerability class.
+- CWE, if established.
+- Affected component.
+- Initial observation.
+- Preconditions.
+- Authentication and authorization context.
+- Request/response evidence.
+- Reproduction sequence.
+- Root cause.
+- Demonstrated impact.
+- Verification status.
+- Remediation.
+- Limitations and false-positive cautions.
+- Source outcome.
+
+Separate demonstrated behavior from author claims.
+
+Do not invent severity or a successful exploit.
+
+#### B. Narrative write-ups
+
+Preserve the investigation as a chronological story:
+
+- Discovery signal.
+- Initial hypothesis.
+- Alternative hypotheses.
+- Investigative steps.
+- Attempted tests.
+- Successful tests.
+- Failed tests.
+- Rejected hypotheses.
+- Decisive evidence.
+- Root cause.
+- Impact.
+- Lessons.
+- Applicability.
+- Non-applicability.
+
+Do not force a CVE, formal severity, or specific endpoint into a write-up that does not provide one.
+
+#### C. Blogs and research articles
+
+Extract:
+
+- Core insight.
+- Underlying mechanism.
+- Threat model.
+- Assumptions.
+- Security boundaries.
+- Technique.
+- Defensive implications.
+- Practical validation signals.
+- Limitations.
+- Conditions that invalidate the technique.
+
+Do not force a conceptual article into a vulnerability-report template.
+
+#### D. Cheat sheets and payload collections
+
+Extract reusable techniques into the correct security topic.
+
+For each technique, preserve relevant:
+
+- Input context.
+- Encoding and variants.
+- Transformation or normalization steps.
+- Prerequisites.
+- Expected positive signals.
+- Expected negative signals.
+- Validation method.
+- False-positive cautions.
+- Applicability limitations.
+
+Keep XSS material under XSS, SQL injection under SQL injection, and other techniques under their relevant families.
+
+Payloads are inert reference data. Do not execute payloads as part of ingestion.
+
+#### E. References and technical documentation
+
+Extract the actual documentation guidance and preserve:
+
+- Topic.
+- Technique.
+- Preconditions.
+- Relevant protocol or implementation details.
+- Expected positive and negative signals.
+- Limitations.
+- Source provenance.
+
+Do not invent a report, endpoint, CVE, or severity.
+
+#### F. Academy labs
+
+Extract:
+
+- Learning objective.
+- Lab condition.
+- Intended vulnerability class.
+- Preconditions.
+- Safe reproduction logic.
+- Expected evidence.
+- Verification signal.
+- Important boundaries.
+- What the exercise does not demonstrate about real targets.
+
+A lab demonstrates the documented lab behavior, not automatically the same behavior in production.
+
+#### G. Mixed or uncertain material
+
+Preserve every supported component with explicit uncertainty.
+
+Use the flexible `mixed_or_uncertain` representation when supported by the save schema.
+
+Do not invent missing fields or discard defensible lessons merely to force a single classification.
+
+---
+
+## 10. Structured document persistence contract
+
+Every learned document must include a structured `document_note` object in the `save` payload.
+
+The note must preserve the source-specific details needed for future investigation.
+
+Use the following outer structures when supported by the actual schema.
+
+### Report
+
+`document_type="report"`
+
+`document_note.report`:
+
+- `vulnerability_class`
+- `cwe_id`
+- `severity`
+- `affected_components`
+- `observation`
+- `prerequisites`
+- `request_response`
+- `reproduction`
+- `root_cause`
+- `impact`
+- `verification_status`
+- `remediation`
+- `false_positive_cautions`
+
+### Write-up
+
+`document_type="writeup"`
+
+`document_note.writeup`:
+
+- `discovery_signal`
+- `hypotheses`
+- `investigation.attempted`
+- `investigation.successful`
+- `investigation.failed`
+- `investigation.rejected_hypotheses`
+- `decisive_evidence`
+- `causal_explanation`
+- `impact`
+- `lessons`
+- `applicability`
+- `non_applicability`
+
+### Cheat sheet
+
+`document_type="cheatsheet"`
+
+`document_note.cheatsheet`:
+
+- `topic`
+- `techniques`
+- `payload_collection`
+- `payload_variants`
+- `context`
+- `prerequisites`
+- `expected_positive_signals`
+- `expected_negative_signals`
+- `false_positive_cautions`
+
+### Reference
+
+`document_type="reference"`
+
+`document_note.reference`:
+
+- `topic`
+- `techniques`
+- `payload_collection`
+- `prerequisites`
+- `expected_positive_signals`
+- `expected_negative_signals`
+- `false_positive_cautions`
+
+### Blog or research
+
+`document_type="blog"` or `document_type="research"`
+
+`document_note.research`:
+
+- `core_insight`
+- `mechanism`
+- `threat_model`
+- `assumptions`
+- `technique`
+- `defensive_implications`
+- `validation_signals`
+- `limitations`
+
+### Academy
+
+`document_type="academy"`
+
+`document_note.academy`:
+
+- `objective`
+- `lab_condition`
+- `intended_class`
+- `reproduction_logic`
+- `evidence_signal`
+- `prerequisites`
+- `boundaries`
+
+### Mixed or uncertain
+
+Use `mixed_or_uncertain` with only supported observations, techniques, evidence, and explicit uncertainty.
+
+### Flexible schema principle
+
+The structures above are stable entry points, not rigid templates that override evidence.
+
+Preserve unusual mechanisms such as:
+
+- Parser differentials.
+- Encoding and normalization mismatches.
+- Multi-step trust-boundary failures.
+- Cross-tenant object relationships.
+- Cache-key inconsistencies.
+- State-machine errors.
+- Permission-check ordering.
+- Multi-stage exploit chains.
+
+Do not flatten such mechanisms into a vulnerability-class label.
+
+Do not populate unavailable fields with generic guesses simply to make an object appear complete.
+
+Preserve source provenance and evidence references wherever the implementation supports them.
+
+---
+
+## 11. Extensible hunt-pattern extraction
+
+Whenever a source contains an actionable or potentially reusable technique, populate `hunt_patterns` with evidence-grounded objects.
+
+Each object may use source-specific fields such as:
+
+- `observed_signature`
+- `transformation_chain`
+- `input_context`
+- `candidate_technique`
+- `matching_conditions`
+- `decision_branches`
+- `expected_behavior`
+- `evidence_to_capture`
+- `limitations`
+- `related_patterns`
+
+These names are examples, not a fixed schema.
+
+Add the fields needed to represent the actual mechanism.
+
+Preserve exact encodings, input/output shapes, tenant relationships, authorization boundaries, relevant state transitions, and causal dependencies.
+
+Use an empty array only when the document genuinely contains no defensible reusable pattern. Explain why in `reason` or `unresolved_questions`.
+
+A flexible pattern is not a substitute for the typed `document_note` or the operational `hunt_signal`.
+
+---
+
+## 12. Mandatory operational hunt signal
+
+Every learned record must also produce an operational `hunt_signal` when the source supports one.
+
+Persist supported values under `metadata.hunt_signal`, separately from the detailed typed document note.
+
+Populate these top-level save fields with evidence-grounded values:
+
+- `pattern_name`
+- `pattern_summary`
+- `trigger_signal`
+- `test_procedure`
+- `expected_positive_signals`
+- `expected_negative_signals`
+- `evidence_requirements`
+- `applicability_conditions`
+- `non_applicability_conditions`
+- `false_positive_cautions`
+- `prerequisites`
+- `attack_chain`
+- `verification_status`
+- `decisive_evidence`
+- `retrieval_signals`
+
+Unavailable fields must remain empty or explicitly unknown according to the tool schema. Do not fabricate values to satisfy a field list.
+
+### 12.1 WHEN TO INVOKE
+
+Describe the observable clues that justify retrieving the technique.
+
+Examples include:
+
+- A particular request/response pattern.
+- An object identifier combined with an ownership boundary.
+- A specific upload or import workflow.
+- A documented encoding transformation.
+- An application state transition.
+- A cache header or key relationship.
+- A role-dependent difference in behavior.
+- A concrete parser or normalization discrepancy.
+
+A vulnerability-class label alone is not an adequate trigger.
+
+### 12.2 WHAT TO TRY NEXT
+
+Define ordered, minimally invasive checks for explicitly authorized targets.
+
+Specify:
+
+- The hypothesis being tested.
+- The variable that changes.
+- The controls that remain constant.
+- The evidence to collect.
+- The expected result if the hypothesis is supported.
+
+Prefer controlled comparisons over multiple simultaneous changes.
+
+### 12.3 BRANCH ON THE RESULT
+
+Describe meaningful result branches.
+
+For a positive signal:
+
+- Capture the evidence needed to confirm the mechanism.
+- Verify the relevant identity, object, role, or state context.
+- Establish that the behavior is attributable to the proposed security boundary.
+- Distinguish impact from theoretical possibility.
+
+For a negative signal:
+
+- Record the actual negative evidence.
+- Identify which hypothesis is weakened.
+- Continue only to another evidence-supported hypothesis.
+
+For an inconclusive or blocked result:
+
+- Distinguish authentication, authorization, rate limiting, WAF behavior, transport failure, and insufficient evidence when possible.
+- State what remains unknown.
+- Choose the next step only when its prerequisites match.
+
+Never recommend a bypass merely because a response is `401` or `403`.
+
+Never generalize a technique beyond the evidence supporting it.
+
+### 12.4 RELATED TECHNIQUE OR CHAIN
+
+Link related techniques only when their triggers and prerequisites match.
+
+Describe the causal dependency between stages.
+
+Do not attach unrelated payloads or bypasses simply because they belong to the same vulnerability category.
+
+### 12.5 STOP AND FALSE-POSITIVE RULES
+
+Define:
+
+- What is insufficient evidence.
+- What benign explanations remain plausible.
+- Which negative controls matter.
+- What proof is required.
+- When further testing is not justified.
+- When the result must remain inconclusive.
+
+A status code, reflected string, error message, or unusual response is not sufficient proof of a vulnerability by itself.
+
+### 12.6 PROVENANCE AND CONFIDENCE
+
+Distinguish:
+
+- Source-confirmed or disclosed behavior.
+- Behavior demonstrated in an educational lab.
+- Author-reported but independently unverified behavior.
+- Theoretical technique.
+- Model interpretation.
+
+Preserve the exact source URL and title, plus a supporting observation where available.
+
+If the source contains no defensible operational signal, explain why rather than inventing one.
+
+---
+
+## 13. Provenance, uncertainty, and evidence discipline
+
+Every learned item must distinguish four evidence layers.
+
+### Observed in source
+
+Record what the available artifact explicitly shows.
+
+Include a source URL and a precise excerpt or location where supported.
+
+### Claimed by source
+
+Record what the author asserts but the accessible evidence does not independently establish.
+
+### Model interpretation
+
+Record the reusable inference drawn from the source.
+
+Clearly identify it as interpretation, not source-confirmed fact.
+
+### Unknown or unresolved
+
+For each important unanswered question, state:
+
+- What is unknown.
+- Why the evidence is insufficient.
+- What evidence is missing.
+- Which limitations or alternatives remain.
+- The next safe verification step, if one exists.
+
+Also preserve negative evidence and limitations when the source supplies them.
+
+Do not invent negative controls that the author never performed.
+
+Do not label a source false, invalid, or a false positive merely because details are missing.
+
+A missing CVE, severity, reproduction request, impact statement, or independent confirmation is not by itself a reason to reject a useful document.
+
+---
+
+## 14. Saving and queue-state verification
+
+### 14.1 Save contract
+
+Save studied items through:
+
+`research_study(action="save", cycle_id="<active-cycle-id>", items=[...], continue_after_save=true)`
+
+Every decision object must carry the exact `public_id` and `lease_owner` returned for that document.
+
+Include the type-specific `document_note`, supported `hunt_patterns`, operational `hunt_signal` fields, provenance, uncertainty, and rejection reason where applicable.
+
+Do not claim an item was saved until the tool returns a successful persistence result.
+
+Do not count an item as learned until the knowledge record is persisted and the corresponding queue transition is confirmed.
+
+### 14.2 Handle save outcomes separately
+
+Classify every save result as one of:
+
+- Saved and terminal queue transition confirmed.
+- Saved but queue transition failed.
+- Save failed.
+- Rejected and terminal queue transition confirmed.
+- Rejection persistence failed.
+- Outcome unknown or not returned.
+
+If a knowledge record was saved but the queue transition failed, do not blindly repeat the save and create duplicates.
+
+Inspect durable state first, then use the supported recovery path.
+
+### 14.3 Lease loss
+
+If a lease is stale or lost:
+
+1. Do not count the item as studied.
+2. Inspect the current durable state.
+3. Reclaim the item when eligible.
+4. Read it again if the new lease requires it.
+5. Save using the exact current lease owner.
+6. Verify the resulting terminal state.
+
+Never reuse an expired lease merely because the public ID matches.
+
+### 14.4 Retries and failures
+
+For transient fetch, persistence, and lease failures:
+
+1. Record the failure and current durable state.
+2. Retry using a suitable backoff where supported.
+3. Preserve the same cycle.
+4. Inspect whether the preceding attempt actually changed persistent state.
+5. Continue independent work while the failed item is recoverable.
+
+Do not impose an arbitrary retry count.
+
+Stop retrying when the failure is terminal or progress is demonstrably impossible. Record the exact reason and leave resumable state where supported.
+
+Never retry indefinitely without checking whether state or evidence has changed.
+
+### 14.5 Queue draining
+
+Continue claiming and processing documents until no claimable work remains.
+
+If `next` returns no item while stats show queued, retryable, or studying work:
+
+1. Compare queue snapshots.
+2. Inspect active leases and retry states.
+3. Check skipped and error counters.
+4. Determine whether work is ineligible, stalled, or temporarily unavailable.
+5. Resume only when the state supports a valid next action.
+
+Do not create an endless loop around an unchanged queue state.
+
+Report unresolved queue inconsistencies explicitly.
+
+---
+
+## 15. Final backfill and reconciliation
+
+After all accessible source collection and current study queues have been processed, run:
+
+`research_study(action="backfill")`
+
+without a source filter.
+
+Inspect whether it adds, requeues, or exposes more work.
+
+If additional eligible work appears:
+
+1. Process it using the normal claim → full read → model analysis → save → queue verification flow.
+2. Keep the active cycle ID.
+3. Re-run backfill after the newly exposed work is drained.
+4. Stop repeating when a full pass adds or requeues no work, or when a concrete durable blocker prevents further progress.
+
+Do not repeatedly retry auth-blocked rows without a valid source session.
+
+If the result includes `legacy_marker_saved=false` or ends with `-legacy-marker-failed`:
+
+1. Separate successfully saved knowledge from the failed legacy marker.
+2. Re-run backfill using the supported recovery path.
+3. Verify the marker.
+4. If it fails again, record the exact affected ID and blocker.
+5. Never claim legacy reconciliation is complete while its required marker remains unresolved.
+
+### Final stats
+
+Call:
+
+`research_study(action="stats")`
+
+Then inspect each exact source separately using:
+
+`research_study(action="stats", source="<exact-source-id>")`
+
+Compare initial and final global counters, including:
+
+- Queue totals.
+- Knowledge totals.
+- `model_study_learned`.
+- `model_study_rejected`.
+- `model_study_completed`.
+- `model_study_skipped`.
+- `model_study_pending`.
+
+Include other counters returned by the implementation that help explain the final state.
+
+Important: source-filtered stats may filter queue counts while leaving knowledge counts global. Never present global knowledge totals as source-specific totals.
+
+Use successful save results and returned Knowledge IDs to identify the lessons persisted during this run.
+
+---
+
+## 16. Completion criteria
+
+Finalize through:
+
+`research_study(action="complete", cycle_id="<active-cycle-id>")`
+
+only after final reconciliation.
+
+The completion operation is authoritative for the tool-enforced cycle state.
+
+If it reports pending work:
+
+1. Inspect fresh stats.
+2. Continue eligible study/save work.
+3. Reconcile the relevant source or queue state.
+4. Retry finalization only when a fresh state justifies it.
+
+If any selected source remains `partial` or `blocked`, report the cycle as partial even if the study queue is empty.
+
+If a configured source was never run, explicitly report that fact.
+
+If a source's frontier was not exhausted, do not describe it as fully researched.
+
+If runtime or tool limitations prevent completion, preserve the active cycle and its resumable state where supported, then report a partial result.
+
+Never claim complete merely because the latest tool call succeeded.
+
+---
+
+## 17. Separation from live hunting
+
+`/update` builds and verifies the global public-methodology knowledge base.
+
+It must not:
+
+- Call `research_knowledge`, `research search`, or `research recommend` as substitutes for studying and saving.
+- Mark a public report as already surfaced during a live hunt.
+- Turn public source details into current-target evidence.
+- Modify target findings or the false-positive database based on ingestion decisions.
+- Copy source-specific hosts, endpoints, identifiers, users, tokens, or scope into target notes.
+- Modify `SKILL.md` files as a side effect of ingestion.
+
+During live hunting, the separate hunting workflow may retrieve relevant saved methodology in response to independently observed target signals.
+
+Public references remain methodology until independently verified against an authorized target.
+
+---
+
+## 18. Required final report
+
+Use the following headings in this exact order.
+
+Report actual returned values. If a value is missing, write `unknown` or `not returned`. Never estimate current-cycle totals from lifetime database counts.
+
+### 1. Uncertainty and disputed claims
+
+Review every studied item for material uncertainty.
+
+For each affected item, include:
+
+- Public ID.
+- Title.
+- Source URL.
+- What the source actually supports.
+- What remains unverified.
+- Why the evidence is uncertain.
+- Missing evidence.
+- Plausible alternatives or limitations.
+- Next safe verification step.
+
+If no material uncertainty was identified, say so only after reviewing every saved item.
+
+If the relevant items could not be reviewed, say `not assessed` or `unavailable`.
+
+### 2. Overall status
+
+Choose the actual final state:
+
+- `complete`
+- `partial`
+- `blocked`
+
+Explain the decision with evidence.
+
+Do not use `complete` if any required queue work, selected source state, or completion gate remains unresolved.
+
+### 3. Before → after counters
+
+Provide global before-and-after queue and knowledge counts.
+
+Include learned, rejected, completed, skipped, and pending study counts where returned.
+
+Separate current-cycle counts from lifetime totals.
+
+Explain significant differences and unresolved discrepancies.
+
+### 4. Per-source ledger
+
+Include one row for every exact configured source ID.
+
+Record:
+
+- Initial state.
+- Every pass's requested page window.
+- Actual pages attempted, fetched, and inspected.
+- Candidate links.
+- Newly queued documents.
+- Document-type counts.
+- Successful learned saves.
+- Rejected decisions.
+- Preflight skips.
+- Duplicate counts.
+- Authentication blocks.
+- Error counts and examples.
+- Retry attempts and outcomes.
+- Remaining queue states.
+- Final source state.
+- Concrete blocker, if any.
+
+Mark sources that were not run explicitly.
+
+Do not mistake global knowledge totals for per-source knowledge totals.
+
+### 5. Persisted lessons
+
+List the Knowledge IDs and source URLs returned by successful saves.
+
+Separate:
+
+- Saved and terminal-state-confirmed.
+- Saved but queue-transition-failed.
+- Save failed.
+- Outcome unknown.
+
+Do not claim a knowledge record exists without a successful persistence result.
+
+### 6. Skipped and rejected work
+
+Separate preflight skips from model rejections.
+
+For each entry, include its ID and the actual reason.
+
+State explicitly that a model rejection is a document-ingestion decision, not a target vulnerability verdict or false-positive finding.
+
+### 7. Outstanding blockers and resume point
+
+Report:
+
+- Incomplete source frontiers.
+- Authentication blocks.
+- Fetch and parser errors.
+- Incomplete pagination.
+- Queued and retryable work.
+- Active or stale leases.
+- Persistence failures.
+- Legacy reconciliation failures.
+- Unresolved classifications.
+- Sources that were not run.
+- Exact next safe action.
+
+Explain which phases are complete and which are not.
+
+If interrupted, label the outcome `partial` and identify the durable resume point.
+
+---
+
+## 19. Required per-run metrics
+
+Report these values from the current cycle summary when available:
+
+- `reports_found`
+- `writeups_found`
+- `reports_and_writeups_found`
+- `unique_documents_found`
+
+These are current-cycle metrics, not lifetime queue totals.
+
+Do not estimate them from database size, total queue items, or model-study counts.
+
+If the cycle summary does not return a metric, report it as unavailable.
+
+Also distinguish:
+
+- Documents discovered.
+- Documents eligible for study.
+- Documents newly cached.
+- Documents read completely.
+- Documents studied.
+- Documents learned and successfully persisted.
+- Documents rejected with confirmed terminal state.
+- Documents skipped during preflight.
+- Documents remaining unresolved.
+
+---
+
+## 20. Final operating rule
+
+Execute the complete workflow, not merely the first available batch.
+
+Continue automatically while eligible progress remains possible.
+
+Keep collection and study strictly separated.
+
+Preserve durable progress and exact identifiers.
+
+Study actual source content, not just titles, URLs, or excerpts.
+
+Extract reusable knowledge that retains its mechanism, evidence, conditions, and limitations.
+
+Save each eligible document with its proper type-specific note and operational hunting signal.
+
+Verify persistence and terminal queue transitions independently.
+
+Report uncertainty before conclusions.
+
+Do not fabricate counts or certainty.
+
+Do not stop because a batch ended.
+
+Do not claim completion because a queue is empty.
+
+Do not claim source exhaustion without evidence.
+
+When completion is impossible, report a precise, resumable partial state rather than a false success.
