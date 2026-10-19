@@ -311,6 +311,11 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         authorizationSource: required(sourceForConfiguration, "authorization_source"),
         authorizationReference,
         userConfirmed: userConfirmedInitialScope || userConfirmedScopeProvenance,
+        userConfirmedExactEntries: userConfirmedInitialScope
+          ? [includeEntries[0]]
+          : params.merge_existing && userConfirmedScopeProvenance
+            ? (params.include ?? [])
+            : undefined,
       })
 
       if (sourceContents !== undefined && sourceHash && sourceFilename && sourceArtifactPath) {

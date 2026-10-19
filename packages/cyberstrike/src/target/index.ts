@@ -1542,7 +1542,7 @@ export namespace TargetMemory {
   /** Configure a scope only with explicit authorization provenance and at least one allowed item. */
   export async function configureScope(
     input: string,
-    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference?: string | null; userConfirmed?: boolean },
+    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference?: string | null; userConfirmed?: boolean; userConfirmedExactEntries?: string[] },
   ): Promise<{ workspace: Workspace; scope: TargetScope; associatedAssets: Workspace[] }> {
     const include = [...new Set((options.include ?? []).map(normalizeScopeItem))]
     const exclude = [...new Set((options.exclude ?? []).map(normalizeScopeItem))]
@@ -1559,8 +1559,18 @@ export namespace TargetMemory {
     if ((!reference || !reference.startsWith("https://")) && !userConfirmedWithoutReference) {
       throw new Error("An HTTPS authorization reference is required for policy imports. For a user-confirmed exact asset, set userConfirmed=true and record that conversation-based provenance.")
     }
-    if (userConfirmedWithoutReference && (include.length !== 1 || !isExactUserConfirmedScopeItem(include[0]))) {
-      throw new Error("User-confirmed scope without an external policy reference must contain exactly one exact hostname, host:port, IP, or HTTP(S) URL; wildcard, CIDR, and typed resource categories require an explicit policy import.")
+    const userConfirmedExactEntries = [...new Set((options.userConfirmedExactEntries ?? []).map(normalizeScopeItem))]
+    if (userConfirmedWithoutReference) {
+      const confirmedEntries = userConfirmedExactEntries.length
+        ? userConfirmedExactEntries
+        : include.length === 1 ? include : []
+      if (
+        confirmedEntries.length === 0 ||
+        confirmedEntries.some((entry) => !include.includes(entry) || !isExactUserConfirmedScopeItem(entry)) ||
+        include.some((entry) => !isExactUserConfirmedScopeItem(entry))
+      ) {
+        throw new Error("User-confirmed scope without an external policy reference must contain only exact hostname, host:port, IP, or HTTP(S) URL entries; wildcard, CIDR, and typed resource categories require an explicit policy import.")
+      }
     }
     const excludeSet = new Set(exclude)
     const overlap = include.filter((item) => excludeSet.has(item))
