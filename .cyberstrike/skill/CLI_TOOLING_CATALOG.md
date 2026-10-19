@@ -1,5 +1,7 @@
 # CyberStrike CLI Tooling Catalog
 
+For phase-by-phase mapping, also consult [`TOOLING_CATALOG.md`](TOOLING_CATALOG.md). Keep the two catalogs aligned when adding or replacing a tool; choose by skill/task rather than installing the whole catalog.
+
 This catalog is a **selection/install reference for an agent**, not a blanket install list. Pick only tools that fit a phase. Prefer machine-readable output and retain process exit code, stderr, version, input scope, start/end time, and output path.
 
 ## General installation behavior
