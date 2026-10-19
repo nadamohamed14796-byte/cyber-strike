@@ -54,6 +54,36 @@ afterEach(() => {
   }
 })
 
+test("research cycle begin tolerates an empty optional cycle_id from serialized tool callers", async () => {
+  await using dir = await tmpdir({ git: true })
+  await Instance.provide({
+    directory: dir.path,
+    fn: async () => {
+      const tool = await ResearchStudyTool.init()
+      const context = {
+        sessionID: "ses_empty_cycle_id_compat",
+        messageID: "msg_empty_cycle_id_compat",
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => {},
+        ask: async () => {},
+      } as any
+
+      const result = await tool["execute"]({
+        action: "begin",
+        cycle_id: "",
+        pages: 20,
+        continue_after_save: false,
+      }, context)
+      const summary = JSON.parse(result.output)
+      expect(summary.cycle_id).toMatch(/^research-/)
+      expect(summary.source_ids).toEqual(RESEARCH_SOURCES.map((source) => source.id))
+      await Instance.dispose()
+    },
+  })
+})
+
 test("agent-led research study persists model analysis and completes its queue lease", async () => {
   await using dir = await tmpdir({ git: true })
   await Instance.provide({
