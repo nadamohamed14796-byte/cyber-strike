@@ -73,7 +73,7 @@ Do not report a tool as installed merely because its name appears in this prompt
 
 Workspace initialization does not establish authorization.
 
-Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. Revalidate scope for each candidate before active probing.
+Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. For each distinct candidate origin, perform one explicit `scope_check` during setup and retain its decision in the run manifest. Do not repeatedly call `scope_check` for the same unchanged origin, re-fetch the same policy, or reconfigure the same saved scope. Active-request tools still enforce persisted scope internally for every request; this enforcement is mandatory and is not a reason for the agent to manually repeat checks.
 
 Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
 
