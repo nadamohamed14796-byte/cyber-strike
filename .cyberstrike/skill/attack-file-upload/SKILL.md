@@ -75,10 +75,13 @@ Inspect archive extraction, image conversion, document preview, antivirus, XML p
 
 ## Tools
 
-- **Burp Suite:** inspect multipart requests and presigned-upload flows.
-- **file/libmagic:** identify benign test-file signatures.
-- **Browser DevTools / curl:** record serving headers and rendering behavior.
-- **Scoped cloud console/API:** confirm test-object policy without listing unrelated objects.
+- `curl` or Python `httpx`: reproduce an observed authorized multipart/presigned upload request with a benign fixture.
+- `file` / `libmagic`: inspect actual file type rather than trusting the extension.
+- `exiftool`: inspect metadata in local test fixtures.
+- `rg`: inspect local source/configuration for file validation, storage, and serving paths.
+- Provider CLI/API only when explicitly authorized: inspect the specific test object's policy without enumerating unrelated objects.
+
+Verify with `curl --version`, the chosen Python client, `file --version`, and `exiftool -ver`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://exiftool.org/.
 
 ## Upload Validation and Storage Matrix
 
