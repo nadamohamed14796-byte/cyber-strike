@@ -83,10 +83,12 @@ Trace the exact filter/handler/service configuration and patch. Add a regression
 
 ## Tools
 
-- **curl / Burp Suite:** bounded request comparison under test roles.
-- **Source/config review:** inspect filter chains, method annotations and management exposure.
-- **Dependency/SBOM scanner:** identify version candidates and vendor patch range.
-- **Official Spring docs/security advisories:** confirm configuration and supported fixes.
+- `curl` or Python `httpx`: compare bounded requests under tester-owned roles.
+- `rg`: inspect filter chains, method annotations, and management endpoint exposure in authorized source.
+- Dependency/SBOM scanner: identify version candidates and vendor patch ranges.
+- Official Spring docs/security advisories: confirm configuration and supported fixes.
+
+Verify `curl --version`, the chosen Python client, and the selected scanner's `--version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://docs.spring.io/spring-boot/index.html/.
 
 ## Spring Boot Exposure and Authorization Matrix
 
@@ -164,48 +166,6 @@ rg -n --glob '*.{java,kt,yml,yaml,properties}' \
 
 Record application_port_vs_management_port, context_path, active_profile_source, filter_chain_order, matched_route, method_security, actuator_exposure_config, principal, data_classification, random_path_control, and cleanup_status. Do not fetch secret-bearing endpoints to fill unknown fields; use source/config evidence or mark the fact unverified.
 
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp for HTTP behavior, Maven or Gradle for dependency/configuration analysis on an authorized source checkout, and Semgrep for targeted static checks when the source is available.
-
-### Installation and setup
-- [Spring Security documentation](https://spring.io/projects/spring-security) — version-specific integration.
-- [Maven installation](https://maven.apache.org/install.html) or [Gradle installation](https://gradle.org/install/) — follow the project's existing wrapper when available rather than replacing build versions.
-- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — optional source review.
-Run dependency checks on a disposable copy and preserve lock/build files. A default actuator path or static rule match is a lead; verify actual exposure/access control.
-
-### Primary resources
-- [Spring Boot security](https://docs.spring.io/spring-boot/reference/web/spring-security.html) — official behavior/configuration.
-- [Spring Actuator reference](https://docs.spring.io/spring-boot/reference/actuator/index.html) — management endpoints.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box evidence.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized responses saved locally.
-
-### Result handling
-Record exact app/version, route, authentication context, and the sensitive operation/data actually exposed. Redact actuator environment/config output before storing evidence.
-
-
-## Management-plane differential matrix
-
-Compare application and management contexts without assuming that a conventional path or port is enabled.
-
-| Surface | Review | Confirmation |
-|---|---|---|
-| Separate management port/context | Compare bind address, network exposure, filter chain, and active profile | Actual externally reachable management route with policy mismatch |
-| Health/readiness | Check component details and authorization | Sensitive dependency/config data beyond intended public status |
-| Metrics/prometheus | Check endpoint policy, labels, and tenant/user data | Minimum redacted sensitive marker and access boundary |
-| Environment/config properties | Review allow/deny lists and sanitization in source/config first | Do not retrieve secret-bearing production values; use a synthetic lab fixture or approved configuration evidence |
-| Heap/thread/diagnostic endpoints | Determine whether endpoints are enabled and who can call them | Do not trigger expensive dumps/profiles on production; use staging and owner-approved controls |
-| Shutdown/loggers/mappings | Check state-changing/admin endpoints and role enforcement | Read-only configuration proof or isolated staging validation |
-| Security filter chains | Trace order, matchers, dispatcher types, and method-level annotations | Effective request path demonstrates the missing control; annotation absence alone is insufficient |
-| Error/async dispatch | Compare normal, error, and forwarded request paths | Same protected resource is denied on normal path but exposed on the alternate path |
-
-### Regression handoff
-
-Test that management endpoints bind to the intended interface, sensitive endpoints are disabled or explicitly authorized, health output is minimal, metrics labels are sanitized, and error/async dispatches retain the same policy. Record Spring Boot/Security version and effective configuration source; do not assume defaults across major versions.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
