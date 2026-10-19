@@ -36,6 +36,7 @@ This is a discovery and selection guide for agent-executable CLI tools, local li
 - `http_response_diff.py`: baseline/controlled-variant comparison.
 - `validate_evidence_manifest.py`: evidence manifest validation.
 - `audit_skill_enrichment.py`: audit direct skills for executable tooling guidance.
+- `tool_preflight.py`: check local CLI availability and version output without installing tools or contacting targets.
 - `validate_skill_catalog.py`: structural catalog checks.
 
 Inspect each helper's actual CLI and tests before assuming flags or behavior.
