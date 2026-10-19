@@ -103,7 +103,7 @@ Prefer source/configuration review, a program-provided dataset, or a synthetic r
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent encodings and cosmetic retries. Stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Program rate limits, request timeouts, and production-safety constraints remain mandatory.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -139,3 +139,27 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### SQL injection differential discipline
 Build a normal baseline and a known-invalid control for the same parameter/operation. Use harmless syntax/type-boundary probes and compare database-specific behavior, server-side result membership, or a lab trace while keeping identity, transaction state, and other parameters fixed. Timing signals require repeatable controls for jitter and cache/cold-start effects; one delay or error string is not confirmation. Do not dump tables, enumerate real records, alter data, or use destructive stacked statements. Where a controlled lab is available, corroborate the parser boundary with query instrumentation or a synthetic fixture. Keep impact claims to the demonstrated read/write/control capability and recommend parameterized queries with a regression case.
+
+
+## Input-surface matrix and evidence-driven chaining
+
+Map each input to its actual server-side use before probing. Keep one row per parameter location in the endpoint inventory, not one duplicate endpoint per value.
+
+| Input location | Candidate query behavior | Safe validation |
+|---|---|---|
+| Search/filter value | Value interpolation or unsafe predicate construction | Paired benign predicates against synthetic results |
+| Sort/order/field name | Identifier interpolation that cannot use ordinary value binding | Test only documented/observed allowed field names; verify rejection of an invalid identifier |
+| JSON/form body | Type coercion, nested filters, bulk IDs | Change one field in a controlled fixture and compare server-side result membership |
+| GraphQL argument | Resolver query construction or nested lookup | Exercise one argument/resolver with test-owned objects |
+| Header/cookie/path | Context-dependent query parameter or tenant selector | Establish that the application actually uses it before testing query behavior |
+| Delayed workflow input | Stored value consumed by later reporting/import task | Use a disposable test record and inspect the authorized later workflow |
+
+### Chain only from observed signals
+
+- Query predicate changes authentication decision → investigate auth bypass separately, with a test identity and no account lockout.
+- Query input affects object selection → route to IDOR/BOLA only if object authorization is also broken.
+- A JSON or GraphQL resolver has a separate document-store query → route to NoSQL injection only if the backing query semantics support that hypothesis.
+- Error disclosure reveals a stack/DB detail → information disclosure is a separate low-impact lead; it does not prove SQL injection by itself.
+- File read, command execution, or database-wide extraction is never inferred from SQL syntax behavior. Do not pursue those impacts in production without explicit authorization and an approved safe environment.
+
+For every result retain baseline_ref, control_ref, exact_parameter_location, predicate_or_type_change, stable_result_difference, synthetic_fixture, query_sink_evidence, cleanup_status, and confidence. If the database dialect or sink is unknown, state it rather than guessing payload families.
