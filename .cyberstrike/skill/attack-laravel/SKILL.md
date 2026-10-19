@@ -182,23 +182,12 @@ For each candidate, trace route → middleware → controller/action → FormReq
 Record route_name, method, middleware_chain, policy_or_gate, validation_class, model_fields, job_or_storage_path, test_principal, fixture_state_before_after, negative_control, and cleanup_status. Do not include .env, APP_KEY, raw signed URLs, tokens, or customer records.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Agent-usable tools and purpose
-- `rg` — search an authorized local source tree for route declarations, middleware, policies, mass-assignment configuration, and validation rules.
-- `composer` — inspect installed dependency versions and audit dependencies when the project has a Composer lockfile.
-- `php` and the project's test runner — run existing tests or a disposable local reproduction; do not modify production state.
-- `semgrep` — apply relevant PHP/Laravel static rules to a local checkout.
-- `jq` and Python — parse redacted JSON artifacts and compare saved responses.
+- `rg`: map Laravel routes, middleware, policies, requests, and Eloquent write paths in an authorized source checkout.
+- `composer audit`: correlate locked dependencies with published advisories.
+- `php artisan route:list` in a test/owner-provided environment: enumerate routes and middleware.
+- Python `httpx` or `curl`: compare role and method variants only when live testing is needed.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Installation and verification
-Use the official docs for [Composer](https://getcomposer.org/doc/) and [Semgrep](https://semgrep.dev/docs/getting-started/). Verify with `composer --version`, `php --version`, and `semgrep --version` as applicable. Only run Composer commands in an authorized checkout and understand whether they change dependencies or lockfiles. If source code is unavailable, use captured, redacted observations and do not claim source-level validation.
-
-### Primary resources
-- https://laravel.com/docs
-- https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://semgrep.dev/docs/
-
-### Helper and evidence
-Use `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` for saved samples only. Record the route/middleware/policy evidence, control case, dependency versions, and any missing test preconditions. Keep secrets and raw session tokens out of logs and reports.
+Verify `php --version`, `composer --version`, and `curl --version`. Official docs: https://laravel.com/docs, https://getcomposer.org/doc/, https://curl.se/docs/. Use test fixtures and avoid production state changes.
