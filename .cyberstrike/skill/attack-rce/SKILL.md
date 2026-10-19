@@ -105,7 +105,7 @@ Record process identity, permission boundary, sandbox/container limits, and remo
 - Do not run reverse shells, persistence, destructive commands, internal scans, or secret-reading commands as a default PoC.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -137,3 +137,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [uphiago/recon-skills — hunt-rce](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-rce)
 - [elementalsouls/Claude-BugHunter — hunt-rce](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-rce)
 - [OWASP — OS Command Injection Defense Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Execution boundary and proof discipline
+Map the input-to-execution path, process identity, sandbox/container boundary, and downstream effect before testing. Prefer static/source evidence and an isolated lab; use an inert observable proof such as a controlled marker or test harness log, never commands that read secrets, change persistence, fetch payloads, or affect neighboring systems. Separate template evaluation, command construction, deserialization, file processing, and a vulnerable dependency because each requires a different root cause. A delay, error string, or reflected command text alone is not RCE. If only a reachable sink is shown, mark it as a candidate; confirm execution with a safe fixture, then state exactly the demonstrated authority and stop.

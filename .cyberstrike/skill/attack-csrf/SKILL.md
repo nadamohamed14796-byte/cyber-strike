@@ -147,3 +147,9 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 
 ## Enrichment: browser-triggered state change
 Use only a controlled account and a disposable object. Compare the normal same-site state-changing request with a controlled cross-origin browser attempt, then re-read the object's state and capture the actual server decision. Record whether cookies are sent, which SameSite policy applies, token validation, and Origin/Referer behavior. A missing token is not sufficient if another server-side control rejects the request. Chain to session management or clickjacking only when the respective condition is shown independently.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### CSRF request-pair and state proof
+Use a disposable test account, a reversible state-changing feature, and a baseline request captured from the legitimate UI. Test the same operation through a locally hosted cross-origin page or documented test harness, varying one defense dimension at a time (token, Origin/Referer, SameSite cookie behavior, content type, or required custom header). Confirm the server-side state transition, then restore it. A 2xx response without a state change is not proof; JSON CORS constraints and SameSite behavior may be valid defenses. Chain to clickjacking only when framing/interaction is separately shown, or session/cookie review only when ambient credentials are the enabling condition.

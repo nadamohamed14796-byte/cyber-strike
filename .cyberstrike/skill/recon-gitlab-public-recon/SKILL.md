@@ -90,7 +90,7 @@ A report should identify the public asset, why it belongs to the organization, w
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -121,3 +121,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - [GitLab CI/CD Security](https://docs.gitlab.com/ci/security/)
 - [GitLab REST API](https://docs.gitlab.com/api/)
 - [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Repository attribution and secret-safe handling
+Confirm namespace/organization attribution and public visibility before pivoting through group projects, forks, issue attachments, packages, snippets, build artifacts, and commit history. Preserve repository URL, commit hash, path/line, observed time, and whether the content is current, deleted, forked, or generated. Secret-like matches must be recorded as type plus redacted fingerprint; do not test or reuse credentials or access projects beyond what is public and authorized. Distinguish public code disclosure from an exploitable credential or CI trust boundary. Route workflow/runner problems to CI/CD review, first-party JavaScript to JS analysis, and secret candidates to evidence-safe triage without invoking them.

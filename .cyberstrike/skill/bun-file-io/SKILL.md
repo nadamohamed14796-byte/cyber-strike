@@ -90,3 +90,9 @@ Prefer APIs that operate relative to a trusted directory handle where supported,
 - Use Bun APIs first.
 - Use `path.join`/`path.resolve` for paths.
 - Use `try/catch` for multi-step async flows and `.catch(...)` for local promise-chain recovery; choose the clearest control flow.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Regression checks for agent workspace writes
+For every write/copy/delete path, distinguish the trusted workspace root from user-controlled relative paths, symlinks, archive members, and tool-provided filenames. Test traversal, absolute paths, symlink swaps, overwrite collisions, interrupted writes, and read/write errors in a disposable fixture. Prefer atomic creation or temp-file-plus-rename where supported; validate the resolved destination remains under the intended root immediately before mutation. Ensure failure results are not reported as persisted artifacts, and test binary/large files without loading them into model context. Add a regression test for each discovered boundary bug and keep destructive operations opt-in or constrained to disposable fixtures.

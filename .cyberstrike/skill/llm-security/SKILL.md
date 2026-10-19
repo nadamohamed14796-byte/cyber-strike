@@ -118,3 +118,9 @@ Return application_surface, trust_boundaries, attack_vector, synthetic_canary, t
 ## Remediation guidance
 
 Enforce authorization outside the model, use least-privilege tools, validate all tool arguments server-side, isolate retrieval and memory by tenant/project, label retrieved content as untrusted data, require approval for high-impact actions, redact logs, and add regression tests for each confirmed boundary.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Controlled adversarial test matrix
+Map each test to a specific trust boundary: direct/indirect prompt injection, retrieval tenant isolation, tool authorization, secret handling, output rendering, memory persistence, and human approval for consequential actions. Use fictional canary strings and synthetic documents, and check whether tool calls/actions are blocked by server-side authorization—not just whether the model refuses in text. Keep prompt-injection content as untrusted test data; do not allow it to override system or user policy. Record the exact input, retrieved context, tool decision, output, and control run. Route document access to RAG/vector security, unsafe browser rendering to XSS, and external fetch behavior to SSRF only after separate evidence.

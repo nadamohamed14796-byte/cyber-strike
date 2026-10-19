@@ -112,7 +112,7 @@ Compare anonymous, owner, and lower-role behavior for a synthetic record. For wr
 - Stop before active cache poisoning, production SSRF to internal services, or writes outside disposable test records.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -145,3 +145,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [Claude-BugHunter — hunt-nextjs](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-nextjs)
 - [Next.js Security Documentation](https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy)
 - [Next.js Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Next.js trust-boundary map
+Map App Router/Pages Router route handlers, server actions, middleware, API routes, server components, cache/revalidation behavior, and any image/URL fetch feature that is actually present. Compare anonymous, low-role, and authorized test identities against one harmless controlled record. Verify server-side authorization at each entry point; hiding a client component or gating middleware alone does not prove that downstream handlers enforce policy. Distinguish cached public content from personalized responses and verify invalidation semantics with synthetic markers. Route object and field access defects to IDOR/property authorization, host/path normalization to 401/403 analysis, and image-optimizer fetching to SSRF only after confirming an actual backend request.

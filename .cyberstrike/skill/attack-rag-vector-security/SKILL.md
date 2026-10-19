@@ -48,3 +48,9 @@ Useful chains include cross-tenant retrieval → confidential context enters ano
 
 ## Output
 Record model/version, index/namespace, principal, source document fingerprint, query, retrieved IDs/provenance, expected and observed policy, downstream action, sanitized evidence, impact and remediation. Never store private prompts or production document contents when a fingerprint and controlled marker are enough.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Retrieval authorization and provenance matrix
+Use clearly labeled synthetic documents across two test users/tenants, with unique harmless markers in title and body. Test retrieval, citation, metadata filters, reranking, deletion, cache reuse, and conversation-memory boundaries while changing one principal/document boundary at a time. A model mentioning a marker does not automatically prove cross-tenant leakage unless the fixture was inaccessible by policy and retrieval context can be tied to the other tenant's record. Separate prompt injection from retrieval authorization and from unsafe tool actions. Chain to LLM security for instruction/tool-boundary behavior, property authorization for exposed metadata fields, and data-isolation review for cross-tenant retrieval; do not insert real confidential documents.

@@ -74,3 +74,9 @@ Use provider-native policy simulation, read-only APIs, and approved test identit
 ## Output contract
 
 Return provider and scope, resource identifier (redacted as required), control/baseline reference, evidence source, effective permission or exposure, preconditions, impact, confidence, and least-privilege remediation. Default to read-only evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Multi-cloud evidence and attribution
+Normalize each finding to provider, account/project/subscription, resource identifier, identity used, policy source, effective permission, region, observation time, and confidence. Do not equate IP/ASN ownership or a provider fingerprint with authorization to test adjacent tenants. Compare identity policy, resource policy, organization guardrails, network reachability, and workload identity together before claiming access. Prefer read-only configuration review and synthetic canary resources; never retrieve customer content to strengthen a report. Route provider-specific storage/IAM details to the relevant provider skill and outbound fetch behavior to SSRF only when each boundary is independently evidenced.

@@ -110,3 +110,9 @@ Inspect screenshots at full resolution and scan report/attachment copies for tok
 - [uphiago/recon-skills — evidence-hygiene](https://github.com/uphiago/recon-skills/tree/main/redteam/evidence-hygiene)
 - [Claude-BugHunter — evidence-hygiene](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/evidence-hygiene)
 - [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Evidence integrity and redaction regression
+For each artifact, retain a stable reference, target-local path, timestamp, request/response identity, sanitized status, hash when practical, and claim it supports. Keep immutable raw evidence separate from redacted derivatives. Before each handoff, scan for cookies, Authorization headers, reset links, private identifiers, source secrets, and unrelated customer content. Verify that redaction preserves the request semantics needed for reproduction; if not, keep a private raw artifact and refer to its hash rather than exposing its values. Re-open the redacted artifact before submission and confirm cleanup/revocation state is recorded.

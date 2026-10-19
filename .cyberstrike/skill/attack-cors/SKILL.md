@@ -107,3 +107,9 @@ Then verify in a local browser whether the untrusted origin can actually read th
 
 ## Enrichment: browser proof
 Start with a harmless origin marker on a read-only in-scope endpoint, then inspect Access-Control-Allow-Origin, Access-Control-Allow-Credentials, and Vary. Confirm in a local browser whether an origin you control can read the protected response while using a controlled test account. Do not send the response body to an external collector. A wildcard or reflected origin alone is not impact without browser-enforced access to sensitive data. Link to object-authorization checks only when the returned data is private to another identity or tenant.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Browser-based origin proof
+Test a controlled origin in a real browser using a synthetic account and harmless endpoint. Record Origin, Access-Control-Allow-Origin, Access-Control-Allow-Credentials, Vary: Origin, preflight behavior, cookies/SameSite context, and which response bytes JavaScript can actually read. An echoed Origin or wildcard header alone is not a finding; prove that untrusted JavaScript reads a sensitive synthetic value and compare with a trusted-origin control. Evaluate headers on API and session routes, not only the homepage. Chain to CSRF only where a cross-site state change is possible; chain to XSS only if a target-origin script execution path is separately demonstrated. Never use real user sessions or export private records.

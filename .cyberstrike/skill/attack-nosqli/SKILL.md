@@ -101,7 +101,7 @@ If source is available, follow the value through decoding, schema validation, qu
 - Stop before accessing another tenant's data, iterating identifiers, scripting in the DB, or modifying service configuration.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
 
@@ -135,3 +135,9 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 - [uphiago/recon-skills — hunt-nosqli](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-nosqli)
 - [elementalsouls/Claude-BugHunter — hunt-sqli (adjacent NoSQL content)](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-sqli)
 - [OWASP — NoSQL Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/NoSQL_Security_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Query-operator and data-boundary evidence
+Identify whether user input is interpreted as a scalar, object, operator, regular expression, filter, or aggregation stage. Establish a normal test-account query and a known-invalid query, then vary the input type once while keeping identity and data constant. Use only a synthetic fixture and compare query semantics or returned fixture membership; never enumerate real records or dump collections. A syntax error or changed response size alone is ambiguous. Confirm that the server interprets the input as control structure and that the effect crosses a protected data/auth boundary. Route authentication effects to auth-bypass review, and generic untrusted-object binding to mass-assignment/schema review.

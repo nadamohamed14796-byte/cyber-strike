@@ -105,7 +105,7 @@ Confirm whether metadata is genuinely non-public and security-relevant. Stop at 
 - No spraying, credential stuffing, relay, coercion, mailbox access, or high-rate lockout testing in this skill.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
 
@@ -139,3 +139,9 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [uphiago/recon-skills — exchange-owa-attack](https://github.com/uphiago/recon-skills/tree/main/recon/exchange-owa-attack)
 - [Microsoft Exchange Server documentation](https://learn.microsoft.com/en-us/exchange/)
 - [Microsoft Security Update Guide](https://msrc.microsoft.com/update-guide)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Product/version confidence and exposure boundary
+Distinguish Exchange on-premises, Exchange Online, OWA, Autodiscover, hybrid identity, reverse-proxy, and unrelated endpoints by corroborating multiple version/product-specific signals. Public banners, an NTLM challenge, or a reachable OWA route do not establish a vulnerable build or exploitability. Match the exact product/build to current vendor advisories and consider backports and mitigations; use read-only evidence for external bug bounty work and validate exploit behavior only in an isolated lab or under explicit rules. Chain to identity/federation review only when the affected authentication boundary is observed, and to information disclosure only when a sensitive response is directly demonstrated.

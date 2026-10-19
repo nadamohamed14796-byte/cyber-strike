@@ -112,7 +112,7 @@ Trace the dependency and handler in source, keep a minimal sanitized request/res
 - Stop before internal SSRF, large uploads, queue flooding, or production file reads/writes.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
 
@@ -145,3 +145,9 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [Claude-BugHunter — hunt-fastapi](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-fastapi)
 - [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
 - [FastAPI Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Dependency and schema differential
+For each router operation, map path/method, dependency injection chain, authentication and authorization dependencies, Pydantic request/response models, and any background task or URL-fetch feature. Compare a high-role and low-role test account using the same disposable object; do not assume a dependency attached to the router covers every mounted path or transport. Check whether response models filter internal fields, whether nested writable fields alter persisted state, and whether generated OpenAPI security matches actual enforcement. Route object-specific read/write gaps to IDOR/property authorization and URL-consuming features to SSRF only after confirming server-side fetching.

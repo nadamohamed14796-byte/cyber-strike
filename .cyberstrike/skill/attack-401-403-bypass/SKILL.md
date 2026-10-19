@@ -115,7 +115,7 @@ Repeat the smallest successful variant several times with a fresh connection whe
 - Stop when a test risks changing real records or affecting other users; obtain explicit permission for state-changing validation.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -165,3 +165,9 @@ curl -sS -D anonymous.headers -o anonymous.body "$TARGET_URL"
 ```
 
 Compare semantic response content and the controlled object's owner/tenant, not just 401/403/200. Redact bodies before attaching evidence. A missing denial on one route only becomes a finding when a forbidden operation or protected data access is demonstrated. Correlate confirmed signals with `attack-bfla`, `attack-idor-automation`, `attack-auth-bypass`, or `attack-triage-validation` as appropriate.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Evidence-led branches
+Use a controlled request pair for each boundary: canonical path versus an observed equivalent representation; allowed role versus denied role; supported method versus a known denied method; normal authority versus a documented proxy-derived authority. Preserve method, body, credentials, and content type unless that is the one variable being tested. A changed status is only a clue—confirm that the protected resource or operation became available. Compare against a random non-existent route and a legitimate denied baseline to catch soft-404s, routing fallbacks, and edge-generated responses. Chain to BOLA/BFLA only when the reachable resource or function exposes a distinct authorization gap; chain to request-smuggling review only when evidence actually indicates parser disagreement across HTTP layers.

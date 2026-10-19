@@ -84,7 +84,7 @@ A reportable issue requires a control that can be bypassed or an unintended serv
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -114,3 +114,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - Source merged: [uphiago/recon-skills — recon/origin-ip-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/origin-ip-discovery/SKILL.md)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [RFC 6066: TLS Server Name Indication](https://www.rfc-editor.org/rfc/rfc6066)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Origin attribution versus bypass claims
+Build candidate origins from historical DNS, certificate/deployment metadata, first-party configuration, and observed redirects, but score each by freshness and organization attribution. A CDN/origin relationship does not automatically permit direct-origin requests; verify the candidate is in program scope and that testing the origin is allowed. If permitted, compare one harmless public path through the normal edge and candidate origin, recording TLS, Host/routing, authentication, and applicable controls. Do not bypass a WAF to access protected content or treat an origin IP as a security bug by itself. Confirm a meaningful difference before chaining to host-header, cache, or access-control review.

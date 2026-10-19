@@ -103,7 +103,7 @@ Record whether issue affects a single test identity, role, or integration. Resto
 - Stop after test proof; do not access or modify real users' data or credentials.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -152,3 +152,9 @@ curl -sS -D baseline.headers -o baseline.body "$TARGET_URL"
 ```
 
 Impact requires a demonstrated unauthorized account/session transition, not merely an unusual email or response. Chain to `attack-forgot-password`, `attack-session`, `attack-mfa-bypass`, or `attack-oauth` only when the corresponding weakness is independently observed.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Identity-chain validation
+Map the whole state transition—registration or recovery start, token issuance, verification, credential/factor change, session creation, and post-authentication principal. Use two tester-owned accounts with separate controlled inboxes and record which identity each token is bound to. A reset email arriving, a token parsing, or a page rendering does not prove takeover. Prove the terminal state only by authenticating into the disposable test account and checking a harmless identity endpoint; then revoke sessions and restore factors. Chain to MFA, reset, OAuth/OIDC, or session review only when the observed defect crosses that specific boundary. Treat an isolated weak recovery control as its own finding unless the account-control consequence is reproduced.

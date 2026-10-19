@@ -105,7 +105,7 @@ Verify the accepted test assertion maps to the intended subject and allowed role
 - Do not edit production assertions to impersonate real users, test third-party IdPs, or attempt external entity file/network access.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -138,3 +138,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [uphiago — hunt-saml](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-saml)
 - [Claude-BugHunter — hunt-saml](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-saml)
 - [OWASP — SAML Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SAML_Security_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Assertion-to-session binding map
+Use an IdP/SP configuration and tester-owned identities. Record issuer, audience, recipient, destination, InResponseTo, signature reference, assertion subject, time conditions, relay state, and final SP principal. Change only one binding dimension at a time in a lab or sanctioned test integration; do not forge assertions for real accounts or bypass an external provider. Signature validity alone is not enough if the application maps the assertion to the wrong tenant or role. Confirm the resulting controlled identity and revoke sessions after testing. Route XML parser defects to XXE review and identity-linking outcomes to ATO only when the terminal account-control state is reproduced.

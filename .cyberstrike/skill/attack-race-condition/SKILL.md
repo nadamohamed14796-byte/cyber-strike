@@ -76,3 +76,9 @@ Return `invariant`, `sequential_baseline`, `concurrency_level`, `request_timing`
 - `attack-graphql` — compare concurrent GraphQL and REST mutations.
 - `attack-idor-automation` — authorization boundaries on the same object.
 - `attack-triage-validation` — validate impact and exclude timing false positives.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Concurrency proof without production stress
+Write down the invariant, sequential baseline, expected final state, and exact controlled test object before scheduling any concurrent operation. Use the lowest concurrency needed to create overlap in a staging environment or disposable fixture; preserve request timestamps/correlation IDs and independently read back authoritative state. Network jitter, retries, idempotency behavior, and client double-clicks can mimic a race, so compare against sequential and single-request controls. Never race real purchases, transfers, refunds, seat/stock claims, or shared public benefits. Route the confirmed invariant violation to business-logic review and separately identify whether idempotency, locking, or atomic transition enforcement is the root cause.

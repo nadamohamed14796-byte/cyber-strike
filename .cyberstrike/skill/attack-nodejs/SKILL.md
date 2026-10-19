@@ -113,7 +113,7 @@ Trace the route, middleware, schema, service, and sink. Document a minimal faili
 - Do not use prototype pollution, command execution, deserialization gadgets, file writes, or SSRF payloads on production when a non-destructive validation is sufficient.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
 
@@ -146,3 +146,9 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 - [Claude-BugHunter — hunt-nodejs](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-nodejs)
 - [Express Security Best Practices](https://expressjs.com/en/advanced/best-practice-security.html)
 - [Node.js Security Best Practices](https://nodejs.org/en/learn/getting-started/security-best-practices)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Middleware and parser differential
+Record the exact route, middleware order, body parser, validation schema, session attachment, proxy trust configuration, async job handoff, and storage sink. Compare valid baseline input with one harmless type/boundary mutation at a time; verify the operation and persisted state, not just a stack trace. Check alternate content types, duplicate parameters, nested objects, and error paths only where the server accepts them. A route-level guard may be bypassed by a second mounted transport, so map both UI and API traffic. Route duplicate-query parse differences to server-side parameter pollution, sensitive writable fields to mass assignment, and URL-fetch behavior to SSRF.

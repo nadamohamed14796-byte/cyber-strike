@@ -69,3 +69,9 @@ Return `input_path`, `runtime_context`, `marker_used`, `baseline_behavior`, `pro
 - `attack-xss` — validate client-side execution separately.
 - `attack-ssti` — template/server-side sinks, if applicable.
 - `attack-triage-validation` — establish impact and rule out false positives.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Pollution-to-gadget proof
+Identify the input parser or merge/clone operation, the exact property path, and the affected object scope (local object, browser prototype, server process, or shared request state). In a disposable harness or test account, inject an inert marker into one prototype-sensitive property and verify persistence and downstream reads. Distinguish harmless object mutation from a reachable gadget that changes authorization, output encoding, request routing, or code paths. Do not pollute a shared production process or attempt RCE. Route client-side sources/sinks to DOM-XSS review only when the polluted property reaches an executable sink; route server-side consequences to the relevant framework/input-validation specialist.

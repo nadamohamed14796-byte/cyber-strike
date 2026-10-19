@@ -17,6 +17,10 @@ prerequisites:
 version: "1.1"
 ---
 
+## Scope and safety overlay
+This is an internal defensive/lab reference, not an automatically invoked public-web bug-bounty skill. Do not attach programs, alter kernel observability, evade monitoring, persist, harvest credentials, or run cleanup actions on production systems or third-party targets. Use only a disposable VM/cluster with explicit authorization; prefer read-only policy inventory, safe instrumentation, and detection-validation scenarios. Any eBPF program lifecycle action must identify the exact lab-owned object and show a dry-run/cleanup plan. Do not use this skill to bypass telemetry or hide activity; for a bug bounty report, document the externally reachable misconfiguration and its minimum safe proof instead.
+
+
 # eBPF Post-Exploitation Methodology
 
 eBPF (Extended Berkeley Packet Filter) enables kernel-level instrumentation without loading kernel modules. After gaining root on a Linux target, eBPF programs can intercept system calls, userspace function calls, and network traffic — operating below userland monitoring tools.

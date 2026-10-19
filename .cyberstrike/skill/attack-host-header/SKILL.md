@@ -69,3 +69,9 @@ Record `endpoint`, `header_variant`, `baseline_host`, `observed_host_use`, `prox
 - `attack-cache-poison` — shared cache impact.
 - `attack-open-redirect` — untrusted navigation.
 - Request parser inconsistencies belong to the approved request-smuggling assessment, not this skill.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Host-derived trust matrix
+Capture baseline responses for normal Host, observed X-Forwarded-Host/Forwarded handling, and the canonical application URL, changing one authority input at a time in a controlled request. Trace the effect to an absolute link, redirect, cache key, tenant routing, or reset message; reflected text alone is not impact. Compare edge and application behavior without sending mail or triggering real account recovery. Chain to password-reset review only if a controlled test inbox receives a poisoned link, and to cache poisoning only if a shared cache stores and replays the altered response. Record which proxy is trusted and recommend allowlisted canonical host construction.

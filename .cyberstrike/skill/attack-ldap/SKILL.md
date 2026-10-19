@@ -96,7 +96,7 @@ Check RFC filter escaping separately from DN escaping, allowlisted attributes, s
 - Stop before broad production queries, employee enumeration, sensitive attributes, or directory changes.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -128,3 +128,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [uphiago — hunt-ldap](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-ldap)
 - [Claude-BugHunter — hunt-ldap](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-ldap)
 - [OWASP LDAP Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/LDAP_Injection_Prevention_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Directory filter vs authorization outcome
+Identify the feature and query context first—search filter, user lookup, group membership, or distinguished name—and capture one valid and one known-invalid tester-controlled query. Use inert syntax boundary variations and compare result semantics, not just error text; a filter error is not proof that an attacker can change the query meaning. Check that any result stays within the intended directory attributes and authorization policy. Avoid broad directory dumps, password/hash collection, or authentication against real users. Route a confirmed identity-boundary effect to authentication/BFLA, and keep parser error disclosures separate unless they reveal material sensitive data.

@@ -91,7 +91,7 @@ Prefer passive DNS and analysis of legitimate test messages. If active spoofing 
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -124,3 +124,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - [RFC 7489 — DMARC](https://www.rfc-editor.org/rfc/rfc7489)
 - [RFC 8461 — MTA-STS](https://www.rfc-editor.org/rfc/rfc8461)
 - [RFC 8460 — TLS Reporting](https://www.rfc-editor.org/rfc/rfc8460)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Mail-domain evidence and impact boundary
+For each sending domain/subdomain, map MX, SPF, DKIM selectors, DMARC policy/alignment, TLS reporting/MTA-STS where relevant, and vendor delegation. Preserve DNS observation time and distinguish no record, lookup failure, stale cache, and misconfiguration. A permissive SPF or DMARC policy is a configuration weakness, not proof of spoofing impact; validate with an authorized synthetic recipient/domain and do not send deceptive mail to real users. Keep third-party SaaS sending sources separate from organizational ownership. Route exposed webmail/Autodiscover to the mail-product review and identity-federation signals to OAuth/SAML only when the actual flow is observed.

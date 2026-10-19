@@ -114,3 +114,9 @@ Use the current platform form and policy. HackerOne commonly uses summary/detail
 - [Claude-BugHunter — report-writing](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/report-writing)
 - [FIRST CVSS Calculator](https://www.first.org/cvss/calculator/3.1)
 - [OWASP Vulnerability Disclosure Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Vulnerability_Disclosure_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Report fact/assumption split
+Create a short claim ledger before writing: observed fact, artifact, inference, confidence, and omitted alternative explanations. The title and summary must name the real actor, affected route/feature, prerequisite, and demonstrated consequence. Include one direct negative control and the exact expected-versus-observed difference, then describe remediation plus a regression test tied to the root cause. Do not claim user counts, broad tenant reach, RCE, or ATO based on hypothetical siblings or chain links. If severity depends on a platform rubric, cite the applicable rule and explain the measured impact; preserve an artifact manifest with redaction and cleanup status.

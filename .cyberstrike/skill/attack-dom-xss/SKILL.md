@@ -97,7 +97,7 @@ Determine whether code runs in the application origin, a sandboxed iframe, or a 
 - Stop if testing requires delivery to an uninvolved user, tenant crossing, or third-party payload execution.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
 
@@ -129,3 +129,9 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [uphiago/recon-skills — hunt-dom](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-dom)
 - [elementalsouls/Claude-BugHunter — hunt-dom](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-dom)
 - [OWASP — DOM based XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Source-to-sink proof and route expansion
+Trace one attacker-controlled source through transformations to a concrete sink and verify the path is reachable in a clean authorized browser session. Record source URL/parameter, framework/component, sanitizer or encoding, sink, execution context, and evidence from the DOM or console. Start with a unique inert marker and non-executing probe; only use a harmless confirmation payload where program rules explicitly permit it. Test equivalent rendering contexts (HTML text, attribute, URL, script, CSS) separately because encoding that protects one context may fail another. Chain to stored-XSS review when another user sees persisted content, or prototype-pollution review only when the polluted property reaches a demonstrated security-relevant gadget.

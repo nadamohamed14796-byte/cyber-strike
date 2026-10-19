@@ -48,3 +48,9 @@ Never exfiltrate secrets, deploy a payload, modify production pipelines, or trig
 ## Output contract
 
 Return the attack graph, trigger and trust boundary, source evidence, required preconditions, reachable capability, whether validation was static or active, confidence, and remediation. State clearly when a path remains hypothetical.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Pipeline attack-path validation
+Represent each candidate as a chain of trust transitions: untrusted input → workflow/runner execution → artifact or token exposure → privileged deployment. For each edge record the controlling policy, whether the attacker can influence it, the evidence source, and a negative control. Prioritize pull-request triggers, untrusted artifact reuse, mutable action/dependency references, workflow permission inheritance, secret scope, and cross-environment deployment gates when visible in repository configuration. Do not trigger production deployments, poison shared caches/artifacts, or use real CI credentials as proof; reproduce in a disposable fork or lab. If no path crosses into a privileged resource, record the configuration weakness without claiming compromise.

@@ -72,3 +72,9 @@ Describe the exact server-side request capability, allowed scheme/host boundary,
 ## Output contract
 
 Return `input_feature`, `destination_controlled`, `outbound_request_confirmed`, `redirect_behavior`, `response_body_exposed`, `network_boundary_tested`, `impact`, `cleanup_status`, `confidence`, and redacted evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Server-side fetch trust boundary
+Inventory the exact feature that consumes a URL, the server-side component performing the request, redirect behavior, DNS resolution time, allowed schemes/ports, and response exposure. Begin with a controlled callback host you own and inert content; compare a known-good URL to one boundary mutation at a time. Do not query cloud metadata endpoints, localhost/admin services, or internal networks on a public program unless explicitly authorized and specifically permitted. A DNS callback proves outbound resolution at most, not data access or credential theft. Route URL parsing inconsistencies to input validation, unsafe external API responses to unsafe API consumption, and secret-like source artifacts to evidence-safe triage without using them.

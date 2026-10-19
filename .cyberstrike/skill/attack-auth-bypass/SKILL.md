@@ -100,7 +100,7 @@ Review credential validation, session creation, callback state/nonce, token issu
 - Stop if testing requires credential guessing, real-account recovery, or out-of-scope identity-provider access.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -149,3 +149,9 @@ diff -u <(sed -E 's/(Set-Cookie:).*/\\1 [REDACTED]/I' anon.headers) <(sed -E 's/
 ```
 
 Explain the failed control explicitly: authentication, function authorization, object authorization, or session binding. Chain to `attack-401-403-bypass`, `attack-bfla`, `attack-idor-automation`, or `attack-session` based on that proven boundary.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Prove the principal, not the response
+Keep one protected read-only action and one known-public action as controls. Compare absent, malformed, expired, revoked, and valid test credentials while preserving the same route and request semantics; then verify the server-side subject/role through a harmless endpoint. A 200, a public shell, or middleware inconsistency is not authentication bypass unless a protected principal or operation is actually granted. Check alternate API versions and legacy routes only when discovered or documented. If authentication is absent but object policy still blocks access, route to API no-auth/BOLA; if identity exists but role checks fail, route to BFLA. Use only test accounts and never probe another person's account identifier.

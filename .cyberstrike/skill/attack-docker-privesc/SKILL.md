@@ -112,7 +112,7 @@ Remove unnecessary socket mounts/privileges, drop capabilities, apply user names
 - Stop before host file reads/writes, privileged container creation, chroot, host process inspection, credential access, or persistence. Use a disposable lab for escape validation only.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
 
@@ -144,3 +144,9 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [uphiago/recon-skills — docker-privesc](https://github.com/uphiago/recon-skills/tree/main/infra/docker-privesc)
 - [Docker Engine security](https://docs.docker.com/engine/security/)
 - [OWASP Kubernetes Top 10 / container security guidance](https://owasp.org/www-project-kubernetes-top-ten/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Container-to-host boundary proof
+Map runtime identity, group memberships, mounted sockets, host bind mounts, privileged flags, namespace settings, and capability grants from the approved test environment. Treat each as a distinct trust boundary; do not execute a host escape against a production workload. A mounted Docker socket or privileged flag is a strong configuration signal, but document the effective host authority reachable by the actual container identity using non-destructive read-only checks. Validate exploitability only in a disposable lab. Route image build-secret leakage to source/CI review and Kubernetes pod identity or RBAC gaps to the Kubernetes assessment skill.

@@ -110,7 +110,7 @@ Trace the exact filter/handler/service configuration and patch. Add a regression
 - Never request heap dumps, full environment/config properties, logfiles or other secret-bearing diagnostics on production unless explicitly authorized and carefully scoped.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -143,3 +143,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [Claude-BugHunter — hunt-springboot](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-springboot)
 - [Spring Boot Actuator Endpoints](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html)
 - [Spring Security Reference](https://docs.spring.io/spring-security/reference/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Spring security-chain and actuator review
+Identify the deployed product/profile, reverse-proxy path, ordered SecurityFilterChain matchers, controller mappings, method-level annotations, Actuator exposure/configuration, and serialization settings. Test one read-only endpoint as anonymous and controlled roles; compare the actual resolved data and policy across management/application ports only when in scope. An Actuator endpoint name, Spring banner, or OpenAPI listing is a lead rather than a vulnerability. Confirm that exposed environment/heap/health details are sensitive and not intentionally public, and never download heap dumps or secrets to prove access. Route expression/deserialization findings to the corresponding input specialists and route role/object gaps to BFLA/IDOR.

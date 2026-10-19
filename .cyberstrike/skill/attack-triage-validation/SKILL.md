@@ -86,3 +86,9 @@ Verify the actual finding schema and evidence lifecycle before wiring this skill
 - Claude-BugHunter triage validation: https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/triage-validation/SKILL.md
 - Recon Skills quality baseline: https://github.com/uphiago/recon-skills
 - OWASP WSTG: https://owasp.org/www-project-web-security-testing-guide/
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Verdict consistency and false-positive persistence
+For each finding, maintain distinct fields for observed signal, expected policy, reproduced behavior, confidence, demonstrated impact, alternative explanation, and final disposition. Do not auto-promote because a specialist skill ran or a scanner returned high severity. A false-positive conclusion needs a relevant control or contradictory observation that actually explains the signal; lack of access, unavailable prerequisites, unstable responses, and exhausted-safe testing are blocked/inconclusive, not false positives. Record the exact request/identity/object state tried so the false-positive store can deduplicate the same root cause without suppressing a materially different boundary. Require all chain links to have independent evidence before describing combined impact.

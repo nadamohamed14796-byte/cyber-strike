@@ -115,3 +115,9 @@ Run triage-validation and evidence-hygiene first. Verify exact VRT, clean title,
 - [Claude-BugHunter — bugcrowd-reporting](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/bugcrowd-reporting)
 - [Bugcrowd Vulnerability Rating Taxonomy](https://bugcrowd.com/vulnerability-rating-taxonomy)
 - [Bugcrowd — Disclosure and submission guidance](https://docs.bugcrowd.com/researchers/reporting-a-bug/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Submission decision record
+Before selecting a VRT node, record the program rule, exact reproduced behavior, actor prerequisites, evidence links, severity criteria, and why nearby VRT categories do not fit. Treat out-of-scope, duplicate, N/A, and severity override states as separate decisions, not reasons to remove relevant evidence. When the finding depends on a chain, explain each independently verified link and label untested links as hypotheses. Validate attachment redaction and the exact submission fields; do not include unredacted HARs, cookies, customer data, or speculative reach estimates. Keep a copy of the submitted evidence set so later triage can reproduce the same request and expected/observed contrast.

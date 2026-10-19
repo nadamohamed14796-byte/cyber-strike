@@ -67,3 +67,9 @@ Capture handshake metadata, origin, auth context, message schema, expected polic
 ## Output contract
 
 Return `endpoint`, `origin_policy`, `auth_mechanism`, `session_lifecycle`, `message_action`, `object_boundary`, `observed_effect`, `cleanup_status`, `impact`, `confidence`, and redacted evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Handshake vs message-level authorization
+Record handshake origin, cookies/tokens, subprotocol, authenticated principal, session expiry/revocation, message schema, subscription topic, and server-side action separately. Establish a normal permitted message and a known-denied message with two tester-controlled accounts, then change one identity/topic/object dimension at a time. A successful 101 upgrade does not prove message authorization, and a rejected unknown opcode is not a finding. Use harmless read-only subscriptions or synthetic events; never trigger device controls or broadcasts visible to real users. Chain to CSWSH only when the browser automatically carries credentials and a controlled foreign origin can reach a protected action; chain to IDOR/BFLA for demonstrated message/object/function policy failures.

@@ -112,3 +112,9 @@ Repeat from a clean state or fresh test session where safe, verify cleanup, and 
 - [Claude-BugHunter — triage-validation](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/triage-validation)
 - [FIRST — CVSS v3.1 Specification](https://www.first.org/cvss/v3.1/specification-document)
 - [FIRST — CVSS v4.0 Specification](https://www.first.org/cvss/v4-0/specification-document)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Evidence disposition and false-positive-store contract
+Persist rejected candidates with root-cause fingerprint, tested property, relevant negative control, evidence references, rejection reason, prerequisites, timestamp, and confidence. Do not deduplicate away a new target, tenant boundary, operation, or control state merely because the endpoint matches an old false positive. A blocked test (no credentials, scope unclear, unstable service) is not rejected; preserve the missing prerequisite and a resume condition. If a chain is proposed, validate each step independently and explicitly separate direct impact from downstream hypotheses. Reopen a rejected item only when new evidence changes its fingerprint or invalidates the prior explanation.

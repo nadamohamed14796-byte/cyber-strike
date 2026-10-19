@@ -52,3 +52,9 @@ For every chain, keep observed facts separate from hypotheses. Report actor, bro
 
 ## Output
 Return per-route header inventory, enforced versus report-only policy, browser behavior, chain candidates, confirmed impact, sanitized evidence, cleanup, and remediation. Prefer narrowly scoped and compatible policy recommendations over blindly adding headers that break application behavior.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Route-by-route header correlation
+Capture headers for the homepage, authenticated profile, sensitive state-changing page, API response, redirect, error route, and file/download response; normalize duplicate headers and record browser context. Evaluate the policy the client actually enforces, not just whether a header string exists. Missing HSTS is not automatically downgrade impact; CSP Report-Only is not enforcement; SameSite and cookie flags must be interpreted with flow context; CORS must be proven in a browser. Chain only along a demonstrated consequence: frameable sensitive interaction → clickjacking; untrusted-origin read → CORS; cross-site state change → CSRF; host-derived link → host-header; shared response contamination → cache poisoning. One absent header should not be inflated into several findings without distinct impacts.

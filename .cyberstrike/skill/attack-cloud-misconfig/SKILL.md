@@ -114,7 +114,7 @@ Create a minimal policy diff showing the excess permission and a regression test
 - Never dump storage, enumerate real data, retrieve metadata credentials, create access keys, or modify production configuration.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -164,3 +164,9 @@ Run only the provider-specific query supported by the actual toolchain and appro
 
 ## Enrichment: evidence chain for a cloud finding
 Separate four facts: the resource belongs to the authorized target, it is reachable, its access policy is weaker than intended, and a controlled test demonstrates the resulting exposure or action. A provider fingerprint, public DNS name, or secret-like string is only a lead. Prefer read-only configuration inspection and synthetic test objects; do not use found credentials or enumerate unrelated tenant resources. Chain a confirmed storage finding to the matching provider skill, an identity-policy weakness to IAM analysis, and a customer-facing exposure to triage/reporting.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Effective permission and resource proof
+Start from the approved account/project/subscription and exact role; preserve read-only identity and policy outputs before interpreting a setting. For each public-storage or IAM lead, check effective access (resource policy plus identity/organization boundaries), object existence, intended public contract, and a benign canary where one is available. Do not enumerate or retrieve customer contents to prove access. A permissive configuration is not automatically exploitable if a higher-level control blocks it; an exposed empty resource may have no demonstrated data impact. Route workload URL fetches to SSRF and externally consumed credentials to secret-exposure triage without using them. Include a minimally sufficient remediation and a regression check for the exact policy edge.

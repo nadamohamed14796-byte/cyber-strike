@@ -150,3 +150,9 @@ Do not create privileged pods, mount host filesystems, read unrelated secrets, o
 | resource_limits_audit | CPU/memory limits, LimitRange, ResourceQuota | 5.4.x |
 | ingress_audit | TLS, wildcard hosts, snippet injection | — |
 | serviceaccount_audit | Auto-mount tokens, cluster-admin SAs, unused SAs | 5.1.x |
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Kubernetes identity and workload boundary matrix
+For each test cluster, record context/cluster identity, namespace, service account, RBAC verbs/resources, workload security context, mounted secrets, network policies, admission controls, and exposed control-plane routes. Use read-only effective-permission checks and synthetic namespace fixtures; do not list or export real secrets, exec into production workloads, create privileged pods, or alter cluster-wide resources without explicit authorization. A permissive RBAC rule is a posture issue until a controlled principal is shown to access a protected fixture. Route cloud workload identity to cloud assessment and container host-boundary configuration to Docker/container review. Include cleanup status and the precise resource/policy path in the evidence.

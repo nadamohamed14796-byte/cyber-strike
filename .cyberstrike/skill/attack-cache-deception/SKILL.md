@@ -49,3 +49,9 @@ The impact chain is private/dynamic response â†’ cache classification mismatch â
 
 ## Output
 Record route pair, cache layer, response policy, synthetic marker, storage/reuse evidence, identity context, impact boundaries, cleanup, and redacted evidence. Do not claim broad user exposure from same-account behavior alone.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Cache isolation proof
+Use a synthetic private marker belonging only to a test account and a route that is normally dynamic. Capture the baseline, the controlled path variant, cache headers (Age, Vary, Cache-Control, provider cache status), and a clean repeat request. Distinguish browser cache, service worker, application cache, reverse proxy, and CDN behavior. Do not attempt to retrieve another real user's personalized response; cross-identity validation requires two test-controlled accounts and explicit permission. Route a cache-key input that changes shared response content to cache-poisoning review; route host-derived links to host-header review; report only when the cache boundary and realistic exposure are demonstrated.

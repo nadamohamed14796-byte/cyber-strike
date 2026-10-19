@@ -66,3 +66,9 @@ Stop after the minimal reproducible result. Record the protocol path, test confi
 ## Output contract
 
 Return `front_end`, `back_end`, `protocol_path`, `test_method`, `parser_differential`, `reproducibility`, `impact_confirmed`, `test_environment`, `cleanup_status`, `confidence`, and redacted evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Parser-differential evidence and stop gate
+Map the supported protocol path (client, CDN/WAF, reverse proxy, server) and preserve exact raw request bytes plus connection context in a controlled environment. Establish normal request framing first and use vendor-recommended safe checks or a lab harness; never attempt to desynchronize shared production users or deliver a request to another user's connection. A timeout, 400, or backend error alone does not prove smuggling. Require evidence of inconsistent parsing across layers and a contained downstream consequence. Chain to 401/403 review only where normalization changes the authorization decision; to cache review only after a safe cache differential is independently reproduced. Report ambiguity as inconclusive and stop at the minimum proof.

@@ -108,7 +108,7 @@ Confirm the resulting principal through a harmless profile endpoint in the test 
 - Do not trick real users, exchange their codes, exfiltrate tokens, or test third-party IdPs without explicit scope.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
 
@@ -141,3 +141,9 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 - [Claude-BugHunter — hunt-oauth](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-oauth)
 - [RFC 9700 — Best Current Practice for OAuth 2.0 Security](https://www.rfc-editor.org/rfc/rfc9700.html)
 - [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### OAuth/OIDC transaction-binding matrix
+Use a dedicated client and test accounts. Record issuer, client ID, exact redirect URI, state, nonce, PKCE challenge/method, authorization-code binding, token audience, and final subject. Preserve a known-good flow as a control and change one transaction property at a time. Verify the token/session accepted by the relying party and resulting test identity; a provider error, open redirect in isolation, or decoded token is not proof of takeover. Keep sensitive token values out of notes and reports. Route a destination-only redirect issue to open-redirect review, reset-link authority to host-header review, and an identity-control outcome to ATO only after the full terminal state is reproduced.

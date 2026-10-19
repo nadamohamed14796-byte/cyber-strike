@@ -102,7 +102,7 @@ Inspect archive extraction, image conversion, document preview, antivirus, XML p
 - Stop if testing would overwrite non-test content, stress a processor, access other tenants, or cross into cloud resources not explicitly in scope.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
 
@@ -134,3 +134,9 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [uphiago/recon-skills — hunt-file-upload](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-file-upload)
 - [elementalsouls/Claude-BugHunter — hunt-file-upload](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-file-upload)
 - [OWASP — File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Upload lifecycle and retrieval proof
+Trace the complete lifecycle: authorization to upload, content validation, filename normalization, storage key, processing/transformation, retrieval authorization, content type, and browser origin. Use a benign file with a unique marker and harmless declared/actual-type mismatch; do not upload executable malware, web shells, oversized files, or active content to production. Verify the stored object is isolated and cannot alter another user's content, then inspect whether retrieval runs through a safe download origin with expected Content-Disposition and X-Content-Type-Options. A filename/path anomaly is not code execution unless a distinct execution path is proven. Chain to SSRF only for a confirmed server-side URL fetch and to XSS only if retrieved content executes in a relevant browser origin.

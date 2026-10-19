@@ -62,3 +62,9 @@ Explain the security control being bypassed and the bounded action enabled, such
 ## Output contract
 
 Return `endpoint`, `action_type`, `test_account`, `request_budget`, `limit_key_hypothesis`, `threshold_observed`, `retry_behavior`, `impact`, `stop_reason`, `confidence`, and redacted evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Rate-control semantics and business consequence
+Determine the key the control appears to count (account, session, client, source IP, route, action, or time window) using a small approved set of test-owned identities in staging/sandbox. Record reset window, retry semantics, response headers, server-side outcome, and a normal/blocked control. Do not rotate proxies, evade detection, brute force credentials, or generate load on a production service. A missing 429 is not proof if downstream action is still protected. Assess a realistic consequence such as one-use challenge replay only with vendor test fixtures; route login/MFA outcomes to auth skills and paid/limited business operations to workflow review.

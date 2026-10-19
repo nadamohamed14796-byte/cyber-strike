@@ -99,3 +99,9 @@ cyberstrike --help
 ```
 
 Keep exploration open-ended while each new test is materially different and useful. Deduplicate by target + endpoint + security property + strategy, not by an arbitrary total count. Stop at decisive evidence, an exhausted set of relevant hypotheses, missing valid prerequisites, or a real program/safety boundary. Chain the strongest observed signal to its specialist skill, then triage before reporting.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Branch-selection and learning loop
+At the end of each focused pass, record the most useful observation, the assumption it changed, and one next experiment that distinguishes competing explanations. When a result is interesting, cluster nearby routes in the same controller, API version, workflow, or trust boundary; test the same security property on siblings with their own baseline instead of copying an exploit blindly. Keep a negative-result note that says exactly which identity, object, method, and state were exercised, so future sessions do not repeat indistinguishable probes. Keep exploring when a new hypothesis can change the conclusion and is authorized; stop when the property is established, the meaningful branches are exhausted, or policy/safety blocks the next step.

@@ -74,3 +74,9 @@ Record token type (never the live value), algorithm policy, key source, redacted
 - `attack-idor-automation` — object authorization after authentication.
 - `attack-open-redirect` / `attack-oauth` — redirect and OAuth token-flow boundaries.
 - `attack-triage-validation` — impact confirmation and false-positive review.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Token acceptance and claim boundary
+Separate local parsing from server acceptance. Record issuer, audience, expiry/not-before, key ID, algorithm, signing-key provenance, token transport, session context, and the harmless protected operation used as the acceptance oracle. Use tester-owned tokens only; never print or persist complete bearer values. Change one claim or validation dimension at a time, retain an unmodified-token control, and verify whether the server resolved a different principal or permission. A decoded payload, alg string, or rejected malformed token is not a finding. Chain to ATO only if a controlled identity becomes usable by an unauthorized party; chain to OAuth/OIDC review when issuance, audience, or callback binding is the source of the trust failure.

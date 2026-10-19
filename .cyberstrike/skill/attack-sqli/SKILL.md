@@ -101,7 +101,7 @@ Prefer source/configuration review, a program-provided dataset, or a synthetic r
 - Stop at unexpected state changes, real data exposure, service instability, rate-limit warnings, or scope uncertainty.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -133,3 +133,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [uphiago/recon-skills — hunt-sqli](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-sqli)
 - [elementalsouls/Claude-BugHunter — hunt-sqli](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-sqli)
 - [OWASP — SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### SQL injection differential discipline
+Build a normal baseline and a known-invalid control for the same parameter/operation. Use harmless syntax/type-boundary probes and compare database-specific behavior, server-side result membership, or a lab trace while keeping identity, transaction state, and other parameters fixed. Timing signals require repeatable controls for jitter and cache/cold-start effects; one delay or error string is not confirmation. Do not dump tables, enumerate real records, alter data, or use destructive stacked statements. Where a controlled lab is available, corroborate the parser boundary with query instrumentation or a synthetic fixture. Keep impact claims to the demonstrated read/write/control capability and recommend parameterized queries with a regression case.

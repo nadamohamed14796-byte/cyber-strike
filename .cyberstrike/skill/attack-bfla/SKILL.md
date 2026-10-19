@@ -97,7 +97,7 @@ Review role claims, policy evaluators, middleware, service-to-service authorizat
 - Avoid production deletes, exports, grants, or mutations without disposable fixtures.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -145,3 +145,9 @@ sha256sum low.body high.body
 ```
 
 A route reachable to a low role is not enough: establish that the protected function actually ran or returned a privileged result, while ruling out client-side-only differences and generic error pages. Continue through materially different role/function combinations rather than stopping at a fixed attempt count. Chain to `attack-idor-automation` for object-level checks, `attack-mass-assignment` for field-level writes, and `attack-business-logic` when a sensitive workflow is implicated.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Role-to-operation differential
+Build the matrix from observed requests and documented roles, not from hidden buttons alone. For every sensitive operation compare (a) known-allowed action by a high-role test account, (b) the same action by a low-role account, and (c) an operation that should be denied to both as a negative control. Preserve the operation, object, tenant, and content type while changing only the principal. Confirm that server-side state or protected output changed; if only a status differs, investigate gateway behavior first. Route object-specific failures to IDOR/BOLA, sensitive-field-only differences to API property authorization, and workflow invariants to business-logic testing. Never use real customer records or non-reversible actions to prove privilege impact.

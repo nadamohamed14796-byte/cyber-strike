@@ -97,3 +97,9 @@ sha256sum clean.body marker.body follow-up.body
 ```
 
 Inspect cache status, Age/Vary, the clean follow-up, and whether the altered response was truly served from a shared cache. Reflection alone is not cache poisoning. Correlate with host-header and cache-deception testing only when the relevant behavior is independently observed.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Cache-key differential and safe chain
+Build a baseline with status, body hash, Cache-Control, Age, Vary, and provider cache markers, then alter one observed candidate input at a time (query, host-derived value, forwarded scheme, or content-negotiation header). Use an inert per-test marker on a low-impact response and verify a second clean request receives the same changed response before concluding shared-cache contamination. Do not poison executable content, login flows, or shared content visible to others. A host-derived reset URL is a separate host-header hypothesis; a private route variant cached as static is cache deception. Chain only when the response mutation and cache persistence are both evidenced, and record cache layer uncertainty as inconclusive.

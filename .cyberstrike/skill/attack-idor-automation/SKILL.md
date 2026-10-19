@@ -343,3 +343,9 @@ Mark a hypothesis confirmed only with direct, durable evidence collected under v
 - [OWASP REST Assessment Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Assessment_Cheat_Sheet.html)
 - [PortSwigger Web Security Academy — Access Control](https://portswigger.net/web-security/access-control/idor)
 
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Endpoint deduplication and state proof
+Keep one endpoint record keyed by method + normalized route + parameter shape, with separate observations for every parameter, identity, tenant, role, and response context. Do not create one finding or route entry per swapped ID. For each candidate, preserve owner-object, cross-account control, cross-tenant control, and a known-invalid ID baseline; mutate only a controlled object reference and verify returned object identity or authoritative state. Compare reads, updates, deletes, bulk actions, nested objects, exports, and alternate transport only when actually supported. Hand off role-operation failures to BFLA and sensitive-field-only gaps to property authorization, keeping each distinct root cause separately evidenced.

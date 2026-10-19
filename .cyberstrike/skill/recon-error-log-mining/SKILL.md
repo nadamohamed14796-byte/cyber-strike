@@ -94,7 +94,7 @@ Check production debug settings, web-server deny rules, deployment packaging, lo
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -125,3 +125,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
 - [CWE-200: Exposure of Sensitive Information](https://cwe.mitre.org/data/definitions/200.html)
 - [CWE-532: Insertion of Sensitive Information into Log File](https://cwe.mitre.org/data/definitions/532.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Log validation without collecting secrets
+First confirm the response is a real log artifact rather than a generic debug page or synthetic sample. Inspect a small, bounded excerpt and immediately redact access tokens, session IDs, email addresses, internal URLs, query data, and personal information. Record file/source, exposure path, timestamp, response access policy, and the minimum sensitive marker needed to establish the boundary. Do not recursively crawl or download all logs. Separate a stack trace from a log containing secrets or customer records; a discovered secret must not be tested or used. Route source/build paths to source-leak, metrics data to metrics exposure, and detailed exception disclosure to triage with a specific demonstrated impact statement.

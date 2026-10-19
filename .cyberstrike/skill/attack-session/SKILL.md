@@ -98,7 +98,7 @@ If a pre-auth ID exists, verify login rotates it and that a test-supplied identi
 - Never steal, replay, or share anyone else's token.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -130,3 +130,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [uphiago — hunt-session](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-session)
 - [Claude-BugHunter — hunt-session](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-session)
 - [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Session lifecycle and privilege transition
+Record session issue, storage, renewal, privilege change, logout, password reset, MFA change, and expiry as a timeline using tester-owned accounts. Reuse the same harmless authenticated endpoint as a control and verify server-side revocation/rotation, not just cookie changes in browser storage. Treat session identifiers as secrets and persist only redacted fingerprints. Consider subdomains, alternate devices, and multiple sessions only when they are part of the intended product behavior. Chain to ATO only when a controlled unauthorized principal is established, to CSRF when ambient cookie authority enables a cross-site action, and to cache deception only when personalized content crosses the cache boundary.

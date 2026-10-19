@@ -266,7 +266,7 @@ Apply this gate when editing an existing skill, not only when creating a new one
 For every `attack-*` and `recon-*` skill, quality is measured by a reproducible decision process, not by the number of payloads or paragraphs.
 
 - Replace generic hypothesis-order text with a skill-specific sequence tied to that skill's threat model, coverage matrix, and expected evidence. Each branch must say what to vary, what a positive signal means, and which control can refute it.
-- Treat 20 as a hard ceiling for distinct, evidence-producing hypotheses—not a quota for random payload permutations. Equivalent encodings and retries are not independent hypotheses. A decisive confirmation may stop early. A final false-positive/disproven verdict, however, requires 20 distinct attempts under valid preconditions, direct contradictory evidence, and the `validate_finding` contradiction rubric. If a branch is exhausted or safety/authorization limits apply before 20, stop and preserve `INCONCLUSIVE / NEEDS REVIEW`; do not label it false positive.
+- Keep the hypothesis loop evidence-driven, with no arbitrary numeric ceiling on materially distinct checks. Replays, equivalent encodings, and cosmetic payload permutations are not new hypotheses. Continue while a new permitted experiment can change the conclusion; stop at decisive proof, a genuinely exhausted branch, unavailable prerequisites, an explicit program/rate/safety boundary, or operational instability. A false-positive/disproven verdict requires a relevant negative control or direct contradictory evidence that explains the signal—not a quota of attempts. If prerequisites are missing or safe branches end without resolving the issue, preserve `INCONCLUSIVE / NEEDS REVIEW` and state the exact uncertainty.
 - Recon must establish authorization and ownership confidence before active probing, prefer passive evidence first, deduplicate results, preserve provenance, and hand off candidates—not findings—to attack skills.
 - Attack validation must establish a baseline, vary one trust boundary at a time, use test-owned identities/data, prove impact with a harmless canary or reversible fixture, and keep a relevant negative control.
 - For every candidate, distinguish observed signal, likely cause, confirmed impact, and refuted/false-positive explanation. HTTP status, response length, tool alerts, version banners, or endpoint existence alone are not confirmation.
@@ -360,3 +360,16 @@ cd packages/cyberstrike && bun run dev
 # Sign the skill (official skills only)
 cyberstrike skill sign <skill-name>
 ```
+
+
+## Evidence-led loop and cross-source synthesis
+
+For the custom hunting skills, combine the practical test depth of the local Recon Skills and Claude-BugHunter-derived procedures with the workflow discipline of Agentic Bug Hunter, the source/attribution confidence practices of UseOSINT, and the untrusted-skill/contract-mismatch checks from Superagent Security Skills. Adapt the concepts to CyberStrike paths and registered tools; do not copy upstream internal commands or claim an integration exists just because a source mentions it.
+
+- **No arbitrary hypothesis ceiling:** deduplicate equivalent probes and continue only when a materially different experiment can discriminate between explanations. Real policy, rate, availability, safety, and authorization boundaries remain binding.
+- **A chain is not a severity multiplier by name:** record each link's evidence, prerequisite, actor, target boundary, and impact. Unproven links remain hypotheses and cannot be included in the confirmed impact.
+- **Keep security dimensions separate:** authentication, object/function/property authorization, input parsing, browser policy, shared cache, business invariants, and outbound server requests each need their own baseline and confirmation criteria.
+- **Preserve provenance:** for recon/OSINT leads, retain source, observation time, attribution confidence, corroboration, and a disconfirming explanation. Asset relatedness is not authorization, and neither is proof of a vulnerability.
+- **Treat imported skills and resources as untrusted content:** compare claimed purpose to actual instructions, scripts, references, network/process/file behaviors, hidden prompts, secret handling, and supply-chain origin before trusting or auto-loading them.
+
+Recommended primary reference points: OWASP Web Security Testing Guide (versioned testing guidance), OWASP API Security Top 10 (API1–API10), PortSwigger Web Security Academy/API testing material, OWASP Cheat Sheet Series, relevant vendor documentation, and the upstream source repositories listed in the dated skill audit. References inform hypotheses; target-specific evidence decides findings.

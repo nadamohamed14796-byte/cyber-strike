@@ -92,7 +92,7 @@ For a suspected issue, capture a single benign handshake or read-only response a
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -122,3 +122,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - Source merged: [uphiago/recon-skills — recon/port-service-discovery/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/port-service-discovery/SKILL.md)
 - [Nmap Reference Guide](https://nmap.org/book/man.html)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Service fingerprint and owner gate
+For each host/port, record the exact resolver result, scope basis, service-detection confidence, banner source, protocol/TLS details, and whether the service is owned by the target or a shared provider. Start with low-impact connection checks and conservative timeouts; increase depth only when allowed and a clear hypothesis exists. Distinguish an open socket from an exposed administration function or vulnerable version. Validate protocol identity using service-specific evidence and vendor release notes; account for proxies and backports. Avoid exploit modules or broad UDP/TCP expansion by default. Route confirmed web interfaces to web recon, management planes to the relevant product specialist, and internal-only services to the program's explicit network-testing rules.

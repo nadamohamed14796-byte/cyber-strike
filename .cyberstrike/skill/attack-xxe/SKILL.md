@@ -67,3 +67,9 @@ Recommend disabling external general/parameter entities and DTD processing when 
 ## Output contract
 
 Return `xml_surface`, `parser_evidence`, `doctype_behavior`, `external_resolution`, `callback_evidence`, `impact_class`, `environment`, `cleanup_status`, `confidence`, and redacted evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### XML parser behavior and external resolution boundary
+Identify accepted content types, parser configuration, DTD/entity behavior, and whether XML is handled by the application, gateway, or a downstream service. Establish a normal XML fixture and use a local lab callback or synthetic file controlled by the tester only when the program explicitly permits external-resolution testing. Do not attempt to read operating-system files, cloud metadata, internal endpoints, or environment secrets from production. A parser error that mentions DOCTYPE is not confirmation; verify whether external resolution occurred and what controlled result reached the response/log. Route non-XML serialized formats to deserialization review and outbound URL fetch behavior to SSRF only if a distinct source-to-request path is shown.

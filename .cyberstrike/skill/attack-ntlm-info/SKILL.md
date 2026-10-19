@@ -100,7 +100,7 @@ Report only if disclosure exceeds expected policy or supports a separately confi
 - Do not perform password spraying, hash capture/cracking, relay, coercion, or outbound authentication tests as part of this skill.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
 
@@ -132,3 +132,9 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 - [uphiago/recon-skills — exchange-owa-attack](https://github.com/uphiago/recon-skills/tree/main/recon/exchange-owa-attack)
 - [Microsoft — NTLM Overview](https://learn.microsoft.com/en-us/windows-server/security/kerberos/ntlm-overview)
 - [Microsoft — Restrict NTLM](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/jj852267%28v%3Dws.11%29))
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Challenge metadata and severity gate
+Capture only the permitted NTLM challenge metadata and redact internal names, domains, workstation IDs, and hashes not needed in the report. Distinguish protocol negotiation disclosure from credential capture, relayability, or authentication bypass; do not induce inbound authentication, collect NetNTLM material from users, or attempt relay. Corroborate which externally reachable product generated the challenge and whether the information is already intentionally disclosed. Report only the demonstrated confidentiality or configuration consequence and its prerequisites. Chain to Exchange/identity configuration review when the product context is confirmed, not merely because a header contains NTLM.

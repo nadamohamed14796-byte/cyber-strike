@@ -10,6 +10,10 @@ prerequisites: [ad-security]
 version: "1.2.0"
 ---
 
+## Scope and safety overlay
+Kerberos attack examples are for an isolated, explicitly authorized lab or defensive assessment. Do not request tickets to attack real employee/service accounts, spray passwords, relay authentication, dump credentials, or use extracted material on a third-party domain. Use synthetic principals and lab domain controllers; avoid collecting password hashes or tickets outside the minimum synthetic evidence. For public-web bug bounty, do not invoke this skill from an NTLM/Kerberos banner alone; first establish that internal identity testing is in the written scope. Prefer configuration evidence and detection/control validation over credential compromise.
+
+
 # Kerberos Attack Techniques
 
 ## Kerberos Authentication Flow

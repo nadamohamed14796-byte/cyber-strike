@@ -106,7 +106,7 @@ Identify deployment rules, static-root mapping, archive retention, source-map pu
 - Stop before downloading full private repositories, archives, databases, mail, or logs with customer data.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -143,3 +143,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [uphiago/recon-skills — source leak hunt](https://github.com/uphiago/recon-skills/tree/main/recon/source-leak-hunt)
 - [OWASP — Source Code Disclosure](https://owasp.org/www-project-web-security-testing-guide/)
 - [CWE-538 — Insertion of Sensitive Information into Externally-Accessible File or Directory](https://cwe.mitre.org/data/definitions/538.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Secret-like artifact handling
+Inventory the artifact type, repository/build path, exposure context, commit/deploy provenance, and exact file/line fingerprint without copying the secret value. Distinguish public identifiers, example keys, revoked credentials, and live secret candidates; never test a candidate against a service or expand access unless the program explicitly permits a dedicated credential validation method. Prefer provider metadata or source-level configuration evidence that shows what the credential is intended to access. A private source map or .git path alone is not automatically critical. Route credential-like exposures to triage with a redacted fingerprint, source maps to JS analysis, and CI artifacts to CI/CD assessment; keep exploitability claims separate from exposed-material facts.

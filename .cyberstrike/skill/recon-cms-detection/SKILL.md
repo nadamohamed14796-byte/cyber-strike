@@ -100,7 +100,7 @@ Map a confirmed component/version to a credible advisory, then verify the vulner
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -130,3 +130,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - Source merged: [uphiago/recon-skills — recon/cms-detection/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/cms-detection/SKILL.md)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [NIST National Vulnerability Database](https://nvd.nist.gov/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Fingerprint-to-vulnerability gate
+Maintain independent confidence for CMS identity, component identity/version, deployment ownership, and vulnerability applicability. Corroborate a fingerprint with multiple signals and account for reverse-proxy caches, custom themes, backported fixes, and misleading banners. Before invoking a version-specific skill, verify the affected component is reachable and that the preconditions are plausible; do not map a scanner's version label directly to a confirmed CVE. Use passive/GET-only probes where possible, preserve response hashes and the exact fingerprint source, and stop when no meaningful permitted observation remains. Chain to the CMS-specific skill only after identity evidence, then require that skill's independent proof gate.

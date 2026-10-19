@@ -100,7 +100,7 @@ For each cluster, record observed roles, major workflows, visible API routes, fr
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive evidence first and perform active checks only when explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive evidence first and perform active checks only when explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -133,3 +133,9 @@ Return normalized asset, scope/provenance, capture conditions, confidence, dupli
 - Source merged: [uphiago/recon-skills — recon/visual-recon/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/visual-recon/SKILL.md)
 - [Playwright documentation](https://playwright.dev/docs/intro)
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Visual clusters as testable hypotheses
+Capture consistent screenshots at the same viewport and auth context, then cluster only as a navigation aid—not as proof that two apps share code or ownership. Retain URL, screenshot hash/path, title, favicon/theme fingerprint, response status, and comparison rationale. Convert each visual anomaly into one question (different tenant, admin console, old version, hidden workflow, unexpected login state) and verify with normal HTTP evidence. Avoid screenshotting personal information and redact account names/IDs. Route admin-specific paths to BFLA, tenant/object references to IDOR, and visually different auth flows to the authentication specialist only after the request behavior corroborates the visual clue.

@@ -87,7 +87,7 @@ Represent relationships as domain → DNS record → IP → ASN/prefix → servi
 - Prefer targeted service checks over high-rate scans of broad ranges.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
 
@@ -120,3 +120,9 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 - [RIPE NCC — IP and ASN resources](https://www.ripe.net/)
 - [BGP.tools](https://bgp.tools/)
 - [RFC 9082 — RDAP Query Format](https://www.rfc-editor.org/rfc/rfc9082)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Ownership-confidence ladder and scan boundary
+For every IP/prefix/ASN pivot, retain the organization attribution source, relationship type (owned subsidiary, provider, shared cloud/CDN, stale historical link), observation date, and confidence. Corroborate with first-party asset lists, RDAP/RIR records, certificates, DNS, and product branding before assigning ownership; ASN membership alone never authorizes scanning every announced address. Keep passive-only leads separate from active-scan candidates and record why a candidate passes the target's actual program scope. Use new IPs to discover relationships, not to widen scope implicitly. Route confirmed public service exposure to service discovery and cloud-owned resource policy questions to cloud assessment.

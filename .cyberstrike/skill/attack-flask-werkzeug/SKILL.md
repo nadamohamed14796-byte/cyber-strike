@@ -106,7 +106,7 @@ Disable debug mode in production, use a production WSGI server, avoid detailed e
 - Stop before accessing local files, reading environment variables, executing code, or exfiltrating debugger output.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
 
@@ -140,3 +140,9 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [uphiago/recon-skills — flask-werkzeug-attack](https://github.com/uphiago/recon-skills/tree/main/recon/flask-werkzeug-attack)
 - [Flask — Debugging Application Errors](https://flask.palletsprojects.com/en/stable/debugging/)
 - [Werkzeug — Debugger](https://werkzeug.palletsprojects.com/en/stable/debug/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Debugger and deployment confirmation
+Differentiate a generic Flask traceback from the interactive Werkzeug debugger and from a sanitized error page. Record whether the debug console is actually enabled, exposed, and reachable; never attempt to execute code in a live console. Confirm debug configuration through authorized source/config review or a disposable staging environment, and preserve only a redacted excerpt. Check proxy trust, environment separation, and error-handler consistency across routes. A framework fingerprint or stack trace alone should remain an informational lead unless sensitive data or an unsafe interactive console is directly demonstrated. Recommend disabling debug in production and adding a deployment regression check.

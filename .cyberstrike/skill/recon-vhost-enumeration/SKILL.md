@@ -84,7 +84,7 @@ Review staging, preview, legacy, API, upload, tenant, and administrative hosts f
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -114,3 +114,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 - Source merged: [uphiago/recon-skills — recon/vhost-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/vhost-enumeration/SKILL.md)
 - [RFC 9110: HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110)
 - [RFC 6066: TLS Server Name Indication](https://www.rfc-editor.org/rfc/rfc6066)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Vhost baseline and soft-404 control
+Establish stable fingerprints for a known host, a known-invalid host header, and a random nonexistent path. Vary only the authority/Host dimension while keeping IP, TLS SNI, path, and request headers clear in the notes. Record status, title, body hash/length, redirects, cookies, and server-selected application; a different title or 200 alone may be a default virtual host. Confirm a discovered vhost through product-specific content or a second source and re-check program scope before active tests. Route valid applications to web recon and host-derived links to host-header review; do not treat shared reverse-proxy routing as a vulnerability without a security consequence.

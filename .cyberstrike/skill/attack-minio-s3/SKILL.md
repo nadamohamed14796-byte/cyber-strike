@@ -107,7 +107,7 @@ Verify a private test object remains inaccessible anonymously and that the owner
 - Do not upload active HTML/SVG/JavaScript, use an external victim-delivery PoC, expose real bucket names/secrets, or poison shared production caches.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -141,3 +141,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [uphiago/recon-skills — s3-minio-content-type-xss](https://github.com/uphiago/recon-skills/tree/main/recon/s3-minio-content-type-xss)
 - [AWS S3 — GetObject response header overrides](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
 - [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Object permissions, CORS, and origin isolation
+Distinguish bucket/list permission, object read/write permission, signed-URL authority, content-type behavior, and browser-origin policy as separate checks. Prefer a synthetic object with a unique marker and read-only metadata checks; do not enumerate unrelated keys or fetch customer files. Compare anonymous and authorized access, object-level ACL/policy, CORS response, cache behavior, and URL expiry where an approved fixture exists. A public bucket with no sensitive accessible object is not proven data exposure; CORS headers alone are not browser-readable-data proof. Route content execution to XSS and shared-cache behavior to cache review only when those boundaries are independently observed.

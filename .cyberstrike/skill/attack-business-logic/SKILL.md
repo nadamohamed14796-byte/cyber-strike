@@ -97,7 +97,7 @@ Use a lab or disposable item with a small agreed request budget. Do not issue hi
 - Stop before real financial transfers, purchases, benefit redemption, or high-volume concurrency.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -159,3 +159,9 @@ Verify: re-read the same fixture and compare persisted state and audit event
 ```
 
 A strong chain is an inconsistent input/state transition causing a violated business invariant and a measurable unauthorized consequence. Link to race-condition, rate-limit, function-level authorization, or object-level authorization skills only when their trigger is observed.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Invariant and state-transition ledger
+Represent each important workflow as allowed states, prerequisites, ownership, expiry, and transitions. State one invariant explicitly (for example, a one-time benefit is consumed once or an approval precedes release), then test one transition boundary using a disposable record and verify authoritative server state before and after. Include retries, stale state, alternate routes, duplicated submission, and concurrent execution only when each branch tests a distinct invariant and the program permits it. A success-shaped response is not proof if state is unchanged; a surprising final state needs a control and repeatable evidence. Chain to IDOR/BFLA when identity or role authorization is missing, or race-condition review when the violation depends on interleaving.

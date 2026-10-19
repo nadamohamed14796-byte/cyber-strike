@@ -47,3 +47,9 @@ Save an endpoint/parameter inventory with asset, file hash, source, method, rout
 - A token-like string is a public identifier or dummy fixture.
 - Client-side hiding is mistaken for server-side authorization.
 - A sink appears in code but is unreachable from attacker-controlled input.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### High-signal JS-to-request correlation
+For every extracted route, retain bundle URL/hash, line/offset, first-party confidence, method/parameter template, auth/tenant hints, sink/source pair, and whether an actual browser request corroborates it. Search results and token-like strings remain metadata, never copy a value into a request. Prioritize admin/tenant flows, export/import, billing, file transfer, URL-fetch inputs, account recovery, and versioned APIs. A route string without traffic or docs may be dead code; a client-side role check does not establish server authorization. Chain to IDOR/property authorization only after correlating a real request and controlled fixture, to SSRF only on a confirmed server fetch path, and to DOM XSS only after reachability from an untrusted source is shown.

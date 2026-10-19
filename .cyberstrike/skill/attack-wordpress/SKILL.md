@@ -149,7 +149,7 @@ Treat each proposed chain as a sequence of individually verified edges: componen
 - Stop before high-volume scans, credential testing, service stress, file writes, shell uploads, internal-network access, real-data collection, or any action outside written authorization.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
 
@@ -194,3 +194,9 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 - [WordPress REST API Handbook](https://developer.wordpress.org/rest-api/)
 - [WPScan Vulnerability Database](https://wpscan.com/)
 - [NIST National Vulnerability Database](https://nvd.nist.gov/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Plugin/core route differential
+Inventory core, theme, plugin, REST/AJAX routes, capabilities, nonce checks, version evidence, and the exact code path where possible. Compare anonymous and two controlled WordPress roles against a synthetic post/media/user fixture, checking read, update, delete, upload, and custom plugin methods independently. A visible plugin version or XML-RPC exposure is not a vulnerability without a specific reachable behavior. Validate CVE applicability against exact version/build and any backport; do not mass-enumerate users or test destructive plugin actions on production. Route custom REST permission callbacks to BFLA/property authorization, upload processing to file-upload, and origin/header issues to CORS/CSRF only when their effects are separately proven.

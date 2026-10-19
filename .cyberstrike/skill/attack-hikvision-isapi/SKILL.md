@@ -111,7 +111,7 @@ Capture only the response headers, error code, and a short sanitized non-sensiti
 - Stop before default credential tests, camera feeds, audio/video, settings changes, firmware upload, internal SSRF, or any physical/operational effect.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
 
@@ -145,3 +145,9 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [uphiago/recon-skills — scada-hikvision-isapi](https://github.com/uphiago/recon-skills/tree/main/recon/scada-hikvision-isapi)
 - [Hikvision support and security advisories](https://www.hikvision.com/en/support/)
 - [ONVIF specifications](https://www.onvif.org/profiles/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Device-management safety and evidence
+Treat camera/control endpoints as operational technology: verify ownership and written permission first, prefer passive firmware/banner evidence and read-only metadata, and avoid PTZ movement, reboot, account changes, recording deletion, or firmware mutation. Distinguish vendor/version identification from a reachable sensitive action, and redact device identifiers, credentials, image/video content, and network details not needed for reproduction. Confirm whether the path is an intended public live view or an administrative control plane. Only chain an authentication defect to information exposure when controlled evidence demonstrates protected device data; do not collect feeds or access other users' cameras.

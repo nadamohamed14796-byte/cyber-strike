@@ -45,3 +45,9 @@ A finding needs demonstrated impact, such as unauthorized object access, a privi
 
 ## Output
 Return a route delta, source provenance, liveness and authentication state, version differences, observed security-control failures, redacted evidence, confidence, and next specialist skill.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### API lifecycle and version-drift map
+Correlate every candidate route with source (client bundle, archived URL, specification, observed traffic), API version, method, last-seen evidence, authentication context, and known successor/deprecation status. Verify a stale route with an ordinary low-impact request and a controlled identity; do not brute-force path dictionaries just because a route is undocumented. Compare old/new route policy, response fields, and write semantics using a synthetic object. A zombie API is a security finding only if a concrete control or data boundary is weaker, not merely because the route responds. Route object/field gaps to IDOR/property authorization and unsupported operation semantics to BFLA or business-logic review.

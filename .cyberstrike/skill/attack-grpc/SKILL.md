@@ -99,7 +99,7 @@ Check error disclosure, metadata handling, and TLS validation. Redact credential
 - Stop before large streams, high concurrency, resource exhaustion, or unauthorized state-changing RPCs.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
 
@@ -131,3 +131,9 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 - [uphiago — hunt-grpc](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-grpc)
 - [Claude-BugHunter — hunt-grpc](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-grpc)
 - [gRPC Authentication Guide](https://grpc.io/docs/guides/auth/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### RPC method/metadata differential
+Build a service-method inventory from permitted reflection, protobuf descriptors, observed clients, and normal traffic. For each sensitive method compare an allowed test principal, a denied principal, and an invalid/nonexistent request as controls. Preserve message shape and metadata while varying one of authentication, role, object, or tenant context. Status details and reflection exposure alone are not a vulnerability; verify protected output or server-side state. Check alternate transports and gateway mappings where observed. Route object-level failures to IDOR, role/function failures to BFLA, and oversized pagination/expensive methods to resource-consumption review using non-load tests only.

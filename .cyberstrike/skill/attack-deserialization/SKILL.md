@@ -103,7 +103,7 @@ Trace the deserialization principal, permissions, sandbox, and dependency versio
 - Stop when type behavior is established; use an isolated harness for deeper impact proof.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
 
@@ -135,3 +135,9 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [uphiago/recon-skills — hunt-deserialization](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-deserialization)
 - [elementalsouls/Claude-BugHunter — hunt-deserialization](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-deserialization)
 - [OWASP — Deserialization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Parser boundary and inert proof
+Identify the exact serialized format, trust source, signature/integrity wrapper, and parser version before choosing a test. First compare valid application-generated input with a malformed but inert structure in a lab/staging fixture; observe parser errors and type handling without gadget payloads, command execution, or access to host files. A stack trace or acceptance of a new object type is only a lead until the security boundary and consequence are reproduced. If untrusted data comes from a partner API or webhook, route the ingestion boundary to unsafe API consumption; if only XML external entities are implicated, route to XXE. Do not treat deserialization RCE as proven without a safe isolated demonstration and direct evidence.

@@ -102,7 +102,7 @@ Confirm the diagnostics page is removed or access-controlled and that the respon
 - Stop before webshells, command execution, filesystem reads, disable_functions bypasses, or any file-write operation.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 The 20-attempt budget is a ceiling for independent, evidence-producing hypotheses, not a quota for payload mutations. If a signal remains plausible, follow relevant branches up to the ceiling; stop early when impact is decisive, no relevant branch remains, or safety/scope limits apply. Cosmetic input changes with the same semantics are not separate attempts.
 
@@ -136,3 +136,9 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 - [uphiago/recon-skills — phpinfo-to-rce](https://github.com/uphiago/recon-skills/tree/main/recon/phpinfo-to-rce)
 - [PHP Manual — phpinfo](https://www.php.net/manual/en/function.phpinfo.php)
 - [PHP Manual — Core INI directives](https://www.php.net/manual/en/ini.core.php)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Sensitive-value minimization and adjacent-risk test
+Verify the response is genuine PHP configuration output and preserve only a redacted section demonstrating the configuration boundary. Do not scrape or publish environment values, filesystem paths, request headers, or secrets from the page. Distinguish internal path disclosure, loaded-module/version hints, and actual credential exposure, and corroborate version findings with vendor advisories and deployment context. A phpinfo page alone does not prove RCE; review adjacent execution prerequisites offline or in a lab and label any untested link as a hypothesis. Chain to source/config exposure only when a distinct reachable artifact is confirmed, and use the evidence-hygiene skill before report submission.

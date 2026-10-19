@@ -50,3 +50,9 @@ Metrics exposure may amplify a separately confirmed SSRF/cloud/IAM finding by re
 
 ## Output
 Record route, exposure context, access control, metadata classes, redacted examples, data sensitivity, demonstrated impact, confidence, cleanup, and specific remediation.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Metric sensitivity and cardinality control
+Capture only a small sample of the metrics endpoint and redact label values before persistence; labels may contain tenant IDs, emails, routes, tokens, or other high-cardinality data. Determine whether the endpoint is intentionally public, restricted to internal networks, or accidentally exposed by reverse proxy configuration. Compare anonymous versus authorized access and confirm whether the content discloses sensitive operational topology or customer identifiers, rather than reporting a generic metrics path. Avoid scraping all time series or inducing load. Chain to information disclosure for proven sensitive labels, or cloud/configuration review when access policy is the root cause.

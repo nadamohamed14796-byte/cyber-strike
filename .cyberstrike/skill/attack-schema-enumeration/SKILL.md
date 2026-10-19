@@ -99,7 +99,7 @@ Review schema/docs publishing policy, GraphQL resolver guards, gRPC method-level
 - Stop before broad mutation enumeration, real record access, or destructive method execution.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
 
@@ -132,3 +132,9 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [GraphQL — Introspection](https://graphql.org/learn/introspection/)
 - [OpenAPI Specification](https://spec.openapis.org/oas/latest.html)
 - [gRPC Server Reflection](https://grpc.io/docs/guides/reflection/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Schema existence versus operation exposure
+Record where the schema came from (public docs, authenticated route, source bundle, introspection, or client descriptor), which principal could read it, and which operations/fields are executable. Compare the same harmless operation across anonymous and controlled roles, then check object/property permissions separately. A schema or introspection response may be intended for developer tooling and does not prove data access. Prioritize undocumented write operations, privileged mutations, deprecated versions, and fields that cross tenant boundaries. Route object references to IDOR, field-level visibility/mutation to API property authorization, cost controls to API resource consumption, and stale versions to shadow-API/inventory review.

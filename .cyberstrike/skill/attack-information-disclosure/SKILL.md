@@ -108,7 +108,7 @@ Where source/config is available, identify which serializer, error handler, stor
 - Stop immediately if real secrets or unrelated personal data appear; minimize evidence and follow the program's disclosure process.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -142,3 +142,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [OWASP — Information Exposure Through Error Messages](https://owasp.org/www-community/Improper_Error_Handling)
 - [OWASP — Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
 - [CWE-200 — Exposure of Sensitive Information](https://cwe.mitre.org/data/definitions/200.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Confidentiality proof and data minimization
+Classify the candidate bytes before expanding: public documentation, synthetic fixture, ordinary metadata, personal/sensitive data, credential material, or control-plane information. Verify that the response is not already intentionally public through the product UI or documentation and use a relevant anonymous/low-role control. Preserve only a small redacted excerpt or marker proving the boundary; do not dump directories, entire logs, customer records, or secret values. A filename, stack trace, or secret-looking pattern is not impact by itself. Route source maps and repository artifacts to source-leak review, metrics endpoints to metrics exposure, and property-level over-disclosure to API property authorization.

@@ -6,6 +6,10 @@ chains_with: [attack-security-headers, recon-email-security, attack-triage-valid
 version: "1.0"
 ---
 
+## Authorized assessment boundary
+This skill covers enterprise Active Directory/internal identity controls and is not a default public-web bug-bounty workflow. Do not run credential dumping, password spraying, ticket attacks, DCSync, persistence, lateral movement, or evasion on a public target or an environment without explicit written authorization and a defined lab/engagement scope. For public programs, use passive asset/identity clues only when permitted and route findings to defensive configuration review. Use synthetic accounts, test domain controllers, narrow read-only checks, and documented cleanup in an isolated lab; never collect real employee credentials or secrets.
+
+
 # Active Directory Security Testing
 
 ## Credential Access Techniques

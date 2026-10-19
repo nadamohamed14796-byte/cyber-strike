@@ -250,3 +250,8 @@ Current `main` snapshot (2026-10-12) contains 7,726 `SKILL.md` files. Five skill
 | elementalsouls/Claude-BugHunter | [skills/vmware-vcenter-attack/SKILL.md](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/vmware-vcenter-attack/SKILL.md) | NEW DESTINATION REQUIRED | Unmapped — merge decision required |
 | elementalsouls/Claude-BugHunter | [skills/web2-recon/SKILL.md](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/web2-recon/SKILL.md) | .cyberstrike/skill/recon-methodology/SKILL.md | Mapped — content audit/reference verification pending |
 | elementalsouls/Claude-BugHunter | [skills/web3-audit/SKILL.md](https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/web3-audit/SKILL.md) | NEW DESTINATION REQUIRED | Unmapped — merge decision required |
+
+
+## Follow-up audit — 2026-10-19
+
+The historical counts and pending-review notes above describe an earlier merge snapshot; they are not the current inventory. The main tree was measured at 19,641 paths / 7,734 SKILL.md files before the current quality pass. See [.cyberstrike/skill/SKILL_QUALITY_AUDIT_2026-10-19.md](.cyberstrike/skill/SKILL_QUALITY_AUDIT_2026-10-19.md) for the dated review of 105 pre-existing purpose-built local skills, five API/web specialists plus a skill-supply-chain audit skill added in this pass, replacement of arbitrary hypothesis ceilings, and the rationale for leaving upstream compliance/framework copies unmodified.

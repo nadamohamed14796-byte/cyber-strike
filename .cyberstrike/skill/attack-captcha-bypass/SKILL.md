@@ -147,3 +147,9 @@ Do not use proxy rotation or solve/bypass services against a live program. Impac
 
 ## Enrichment: safe server-side validation
 Use staging or an expressly authorized test account. Compare a normal action with a missing, expired, or replayed challenge token while keeping the rest of the request unchanged. Confirm from server-side state whether the action was rejected. Do not use proxy rotation, third-party solving services, or high-volume submissions against a live program. A client-side challenge disappearing is not impact; the server must actually permit an abuse-sensitive action that policy says should be blocked. Chain to rate-limit testing only where program rules expressly permit that assessment.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Challenge decision matrix
+Record challenge provider/test mode, action, session, hostname/site-key, token issue time, server verification outcome, and final protected-operation state. Prefer vendor test keys or staging fixtures; compare a documented valid fixture with absent/invalid/expired test data and one different harmless action. Widget rendering, a token existing in the browser, or an error response is not a bypass unless a server-side protected action completes without the intended challenge proof. Chain to rate-limit or ATO only when their separate controls are also tested with disposable accounts. Never outsource challenge solving, brute-force tokens, or deliberately disrupt a production provider.

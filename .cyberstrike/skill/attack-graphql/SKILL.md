@@ -86,3 +86,9 @@ Record the operation, redacted variables, caller role, expected authorization ru
 - `attack-cors` — browser cross-origin response exposure.
 - `attack-race-condition` — concurrent state transitions.
 - `attack-triage-validation` — false-positive and impact review.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### GraphQL depth: operation, object, property, and cost
+Keep a canonical inventory of query/mutation/subscription operation, variables, aliases, fragments, nested fields, principal, and object fixture. Compare the same operation under anonymous and test roles, then inspect whether every returned sensitive field and every mutation target has its own authorization decision. Introspection visibility is not proof of exposure; a field may be documented but intentionally public. Use only small, benign queries and measure cost through response/latency metadata rather than load testing production. Route cross-owner object access to IDOR/BOLA, unauthorized property selection to API property authorization, and unbounded query cost to API resource-consumption review.

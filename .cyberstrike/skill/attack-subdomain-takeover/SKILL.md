@@ -59,3 +59,9 @@ Explain which hostname is affected, the DNS record and provider, whether takeove
 ## Output contract
 
 Return `hostname`, `scope_evidence`, `dns_chain`, `provider`, `orphan_signal`, `claimability_status`, `proof_method`, `impact`, `confidence`, and redacted evidence.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Current ownership, not stale DNS alone
+Record the DNS chain, target provider, record freshness, provider-specific claimability evidence, and the intended scope/ownership decision. A dangling CNAME, NXDOMAIN, generic provider error, or archived screenshot is not proof that an attacker can claim the resource today. Prefer provider documentation and read-only confirmation; never register a target's namespace, publish content, or alter DNS as a proof. Exclude shared CDN/cloud tenancy and domains that the program does not authorize. Chain to source-leak or certificate-transparency recon only as a discovery source; report takeover only when current claimability is demonstrated under permitted conditions, otherwise preserve an inconclusive lead with exact evidence gaps.

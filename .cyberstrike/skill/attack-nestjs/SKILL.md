@@ -106,7 +106,7 @@ Compare anonymous, user, and admin test identities on read-only methods first. U
 - Stop before privileged changes, broad resolver enumeration, or mutations without a disposable fixture.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -139,3 +139,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [Claude-BugHunter — hunt-nestjs](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-nestjs)
 - [NestJS Guards](https://docs.nestjs.com/guards)
 - [NestJS Validation](https://docs.nestjs.com/techniques/validation)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Guard/pipe/interceptor coverage
+For every controller/transport, map module, guard order, route-level overrides, parameter decorators, DTO validation, serializer/interceptor, and object lookup policy. Compare the same read-only operation as authorized and low-privilege test principals and verify the actual response fields and server-side state. Pay special attention to custom decorators and routes where controller-level guards differ from method-level behavior, plus GraphQL/resolver and websocket gateways. A DTO rejecting malformed input does not demonstrate authorization, and a swagger declaration does not prove enforcement. Route writable security-sensitive properties to mass-assignment review and field disclosure to API property authorization.

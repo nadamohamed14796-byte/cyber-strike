@@ -99,7 +99,7 @@ Review DTOs, serializer schemas, writable-field lists, nested relation binding, 
 - Stop before changing real roles, billing, verification, or shared objects.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -131,3 +131,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [uphiago — hunt-mass-assignment](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-mass-assignment)
 - [Claude-BugHunter — hunt-misc related coverage](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-misc)
 - [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Writable-property verification contract
+Derive candidate properties from API schemas, normal frontend traffic, source/model definitions, and controlled response differences; classify each as user-editable, server-managed, role/tenant/security-sensitive, or unknown. Add one property to a normal update for a tester-owned object, then verify authoritative state and re-read through the allowed UI/API. Do not treat an echoed field or ignored property as success. Compare nested objects and alternate update endpoints where supported, but avoid any field that triggers money movement, role assignment, or irreversible actions unless explicit program rules permit a disposable fixture. Chain to BFLA or property-level authorization only when the actual principal/property boundary is distinct and demonstrated.

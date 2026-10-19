@@ -95,7 +95,7 @@ Use a harmless protected operation to confirm the assurance level is checked ser
 - Do not brute-force OTPs, test lockout with repeated guesses, intercept another person's factor, or degrade a real account.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -127,3 +127,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [uphiago — hunt-mfa-bypass](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-mfa-bypass)
 - [Claude-BugHunter — hunt-mfa-bypass](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-mfa-bypass)
 - [OWASP Multifactor Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Factor-state transition proof
+Use two controlled test accounts and map enrollment, challenge, recovery, device trust, remembered sessions, factor replacement, step-up authorization, and logout/revocation. Preserve a valid challenge baseline and compare missing, expired, wrong-purpose, and previously consumed test proof one dimension at a time. Verify server-side assurance level and protected action, not merely the UI's MFA badge. Stop before lockout or recovery of any real account. Chain to ATO only if an unauthorized test principal reaches control of the test account; chain to session review when an existing session retains privileges after a factor/security change.

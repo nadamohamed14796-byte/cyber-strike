@@ -138,3 +138,9 @@ If headers are absent or weak, confirm the browser-effective frame-ancestors pol
 
 ## Enrichment: route-level header inspection
 Inspect every sensitive route, not just the home page. Verify the browser-effective CSP frame-ancestors directive and X-Frame-Options behavior, then use a controlled browser and your own test account to establish whether a meaningful action can be framed. Missing X-Frame-Options is not itself a finding when CSP already blocks framing or the page has no sensitive interaction. Chain to security-headers and CSRF checks only when the corresponding browser behavior is observed.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Interaction consequence, not frameability alone
+Inventory sensitive views and test whether a controlled foreign-origin page can render the exact route while signed in to a disposable account. Preserve screenshots/console policy evidence but do not overlay deceptive UI or trigger a sensitive action. A meaningful chain requires all links: framing is allowed, the intended victim context would be authenticated, a user gesture could trigger a security-relevant state transition, and existing confirmation/CSRF/origin defenses do not prevent it. Chain to CSRF only when a distinct request-forgery weakness is evidenced; missing X-Frame-Options alone is not impact. Record route-specific differences because login/error/public routes may legitimately be frameable.

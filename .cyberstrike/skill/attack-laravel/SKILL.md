@@ -113,7 +113,7 @@ Compare role/tenant behavior with test accounts, validate authoritative state an
 - Do not retrieve .env/APP_KEY, access real exports, run artisan destructive operations, or write files in production.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
 
@@ -146,3 +146,9 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 - [Claude-BugHunter — hunt-laravel](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-laravel)
 - [Laravel Authentication](https://laravel.com/docs/authentication)
 - [Laravel Authorization](https://laravel.com/docs/authorization)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Route/middleware/model correlation
+Correlate each sensitive named route with its HTTP verbs, middleware stack, controller/policy, FormRequest validation, Eloquent fillable/guarded fields, and final persisted record. Compare a normal update on a disposable object against one added protected property at a time and verify the database-backed state instead of trusting the echoed JSON. Check nested relations, bulk endpoints, signed URLs, queues, and alternate API versions only if present. Route unauthorized records to IDOR, writable protected fields to mass assignment, and unsafe file/URL processing to the relevant specialist; name an exploit chain only when each link is independently observed.

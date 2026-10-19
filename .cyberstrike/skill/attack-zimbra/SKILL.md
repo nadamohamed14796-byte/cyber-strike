@@ -30,6 +30,10 @@ severity_boost:
   attack-ssrf: "A Zimbra proxy issue has SSRF impact only when a controlled callback or harmless approved test service confirms a server-side request."
 ---
 
+## Public bug-bounty boundary
+Treat groupware and mail systems as high-impact services. Confirm explicit product ownership and engagement rules before any active request; default to passive version/configuration review and harmless read-only checks. Do not enumerate mailboxes, access messages, alter accounts, upload files, attempt persistence, or validate exploit payloads on production. Version banners are not a confirmed CVE; check exact build, mitigation/backport state, reachable component, and safe proof criteria. Use an isolated lab for exploit validation, redact tenant/mail identifiers, and stop at minimum sufficient evidence.
+
+
 # Zimbra Collaboration Security Assessment
 
 ## Objective
@@ -103,7 +107,7 @@ For a candidate advisory, record product branch, version, patch level, reachable
 - Do not attempt file writes, shell uploads, internal target sweeps, default credentials, password guessing, or customer mailbox reads.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
 

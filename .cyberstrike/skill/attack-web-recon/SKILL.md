@@ -88,3 +88,9 @@ Verify actual scope resolution, inventory, HTTP probing, crawling, normalization
 - Claude-BugHunter web recon: https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/web2-recon/SKILL.md
 - Recon Skills: https://github.com/uphiago/recon-skills
 - OWASP WSTG: https://owasp.org/www-project-web-security-testing-guide/
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Recon-to-hunt handoff contract
+For every asset/endpoint, separate asset attribution confidence from security confidence. Preserve source, timestamp, normalization, DNS chain, HTTP fingerprint, first-party vs third-party attribution, authentication observation, method/parameters, and a canonical deduplication key. Delta each new recon run against the previous snapshot and enqueue only new or materially changed observations; never label a route vulnerable because it is live or appears in JavaScript. Use the following signal routes: object IDs/tenant hints → IDOR; new role-only routes → BFLA; URL-consuming features → SSRF; sensitive fields → API property authorization; host/cache differences → header/cache skills. correlate_javascript and http_replay are runtime calls only where registered; verify tool availability before claiming execution.

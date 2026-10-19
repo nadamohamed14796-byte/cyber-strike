@@ -97,7 +97,7 @@ Determine whether the root cause is missing authentication middleware, route-spe
 - A schema, stack trace, server version, or endpoint name is supporting context, not proof of impact.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -147,3 +147,9 @@ sha256sum anon.body auth.body
 ```
 
 A body-hash difference is only a triage signal; inspect redacted schemas and protected marker fields. Check alternate API versions and methods only when they are observed and authorized. Chain to `attack-shadow-api` for version drift, `attack-idor-automation` for object-boundary signals, or `attack-bfla` for function-level exposure.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Anonymous-to-authenticated differential
+For every candidate API route, compare the same method, content type, object fixture, and request body as anonymous, invalid/expired, low-privilege, and authorized test identities. First classify whether the operation is intended to be public; OpenAPI documentation, a 200 status, OPTIONS, schema visibility, and a login-free health response are not proof of sensitive exposure. For JSON, compare field-level data and object ownership rather than raw response length. For writes, use a disposable fixture and verify server-side state; do not test irreversible actions. Route object-boundary failures to IDOR/BOLA, role-operation failures to BFLA, property differences to API property authorization, and undocumented/version drift to shadow-API review.

@@ -99,7 +99,7 @@ Inspect host-header influence on reset links, redirects, referrer leakage, token
 - Stop before any account/mailbox not owned by the tester, bulk messages, or token guessing.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
 
@@ -130,3 +130,9 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 - [Claude-BugHunter — hunt-forgot-password](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-forgot-password)
 - [OWASP Forgot Password Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Reset-token binding matrix
+Use two tester-owned accounts with separate inboxes. Track token issue, delivery, expiry, single-use behavior, destination account, session binding, redirect destination, and post-reset session revocation. Change one property at a time and verify the final credential state using the disposable account—not by exposing the token in logs. Include re-requesting a token, invalidating a prior token, and completing an old link after a new request only where safe. A predictable-looking URL or email behavior is not ATO without account-control proof. Chain to host-header review only if a manipulated host changes a generated reset link; chain to session review only if old sessions remain valid after a policy-required reset.

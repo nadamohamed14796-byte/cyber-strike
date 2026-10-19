@@ -123,7 +123,7 @@ State exposed service, verified build confidence, advisory, preconditions, and w
 - Keep active proof in an isolated lab unless a separate explicit production exploit authorization and rollback plan exist.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
 
@@ -156,3 +156,9 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 - [Broadcom Security Advisories](https://support.broadcom.com/security-advisories)
 - [CISA Known Exploited Vulnerabilities Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)
 - [VMware vSphere Documentation](https://docs.vmware.com/en/VMware-vSphere/index.html)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Product-specific advisory verification
+Distinguish vCenter Server from ESXi, Workstation, Horizon, NSX, and proxy appliances; correlate multiple fingerprints with a current vendor build/advisory matrix and account for backports. External-only public bounty testing should remain read-only and should not attempt administrative changes, exploit payloads, or cluster operations. Version evidence and exposed management ports establish posture, not CVE exploitability. Validate suspected exploit behavior in an isolated matching lab or through explicit rules of engagement; retain exact product/build and mitigation assumptions. Route SSO/federation context to SAML/OAuth review only when a distinct identity boundary is involved.

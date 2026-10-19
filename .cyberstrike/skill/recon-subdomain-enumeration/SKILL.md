@@ -94,7 +94,7 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 
 ## Signal Confidence, Attempt Budget, and Handoff
 
-Treat recon output as a candidate lead, not a finding. The validation budget is at most 20 distinct hypotheses per candidate asset; it is not permission for 20 scans or repeated probes. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
+Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
 
 ### Evidence record and confidence
 
@@ -135,3 +135,9 @@ Replace both example hosts with the actual authorized program and child. Never a
 - [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
 - [Certificate Transparency](https://certificate.transparency.dev/)
 - [RFC 1034 — Domain Names: Concepts and Facilities](https://www.rfc-editor.org/rfc/rfc1034)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Discovery provenance and wildcard handling
+Keep each candidate with source, timestamp, DNS answers/CNAME chain, wildcard-DNS check, HTTP fingerprint, ownership evidence, and explicit scope decision. Deduplicate normalized hostnames while preserving their discovery sources; never discard method, port, or auth context when later joining URL inventories. Correlate passive findings with current DNS and a second independent ownership signal before active probing. A historical hostname, third-party CNAME, wildcard response, or cert-transparency entry is a lead—not proof of live ownership or permission. Delta newly observed hosts against earlier runs, and route confirmed HTTP hosts to web recon while keeping cloud/CDN/shared-hosting ambiguity passive until resolved.

@@ -70,3 +70,9 @@ Use least-privilege tokens, immutable action pins, isolated ephemeral runners, p
 ## Output contract
 
 Return repository/workflow path, trigger, permissions, runner type, trust boundary, evidence lines, reachable impact, confidence, and remediation. Redact all secret values and private infrastructure details.
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Trust chain from event to release
+Build a graph of trigger source, workflow permissions, token lifetime, dependency/action pinning, runner trust, artifact provenance, environment approval, and deployment authority. Trace the shortest realistic path from an untrusted contribution or artifact to a privileged release step. Confirm the effective permission with configuration and a harmless test fixture; workflow names, available secrets, or a successful CI badge do not prove that an attacker can retrieve or use them. Validate dangerous behavior only in a fork/sandbox or with synthetic credentials, then recommend least-privilege permissions, immutable references, runner isolation, and a regression test for the specific path.

@@ -111,7 +111,7 @@ Tie the defect to a reachable view/serializer/query/configuration and write a re
 - Stop before reading settings/secrets, accessing real records, dumping databases, or writing production files.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
 
@@ -144,3 +144,9 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [Claude-BugHunter — hunt-django](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-django)
 - [Django Security](https://docs.djangoproject.com/en/stable/topics/security/)
 - [Django REST Framework Permissions](https://www.django-rest-framework.org/api-guide/permissions/)
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Django/DRF route-to-control map
+For every sensitive URL, correlate router/viewset/action, authentication class, permission class, object permission, serializer writable fields, queryset filtering, and middleware order. Compare an allowed synthetic object with another controlled account's fixture while preserving the same endpoint and method. Check detail/list/bulk/custom actions independently: object permissions may run on retrieve but not list/create or custom actions. For writable fields, compare the client-submitted JSON with persisted state rather than response echo alone. Debug pages and browsable API schemas are configuration signals, not impact by themselves. Route field-only access to API property authorization and unexpected writable role/tenant fields to mass-assignment review.

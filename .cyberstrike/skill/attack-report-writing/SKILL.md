@@ -80,3 +80,9 @@ The skill should consume a validated finding and references to redacted artifact
 - Claude-BugHunter report writing: https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/report-writing/SKILL.md
 - Recon Skills: https://github.com/uphiago/recon-skills
 - OWASP WSTG: https://owasp.org/www-project-web-security-testing-guide/
+
+
+## Targeted quality-loop enrichment (2026-10-19)
+
+### Evidence-to-claim traceability
+Create a claim map before drafting: each sentence about access, affected data/action, prerequisites, and scale must point to one sanitized artifact or be labeled as inference. Keep the primary finding focused on one root cause and one end-to-end impact path; mention sibling routes only when independently reproduced, and avoid combining unrelated defects into an inflated severity. Include a direct negative control, setup/reset instructions, observed versus expected behavior, role/tenant context, remediation, and a regression test. If broader impact would require untested assumptions, state that limitation instead of filling it in. Check the target program's duplicate policy and disclosure template before submission.
