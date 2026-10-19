@@ -206,3 +206,30 @@ Compare application and management contexts without assuming that a conventional
 ### Regression handoff
 
 Test that management endpoints bind to the intended interface, sensitive endpoints are disabled or explicitly authorized, health output is minimal, metrics labels are sanitized, and error/async dispatches retain the same policy. Record Spring Boot/Security version and effective configuration source; do not assume defaults across major versions.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local test harnesses; browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Verify official installation docs, tool version, license, dependency provenance, and target impact before use.
+
+### Recommended tools
+- Semgrep — Java/Spring source patterns
+- OWASP Dependency-Check — Java dependency advisories
+- Trivy — container/dependency checks where applicable
+- curl — safe actuator/auth exposure checks
+
+### Resources
+- https://semgrep.dev/docs/
+- https://owasp.org/www-project-dependency-check/
+- https://trivy.dev/latest/
+- https://docs.spring.io/spring-boot/index.html
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids; official docs and advisories are the source of truth for tool behavior and affected versions.
+
+### Helper-script contract
+Correlate dependency advisories with actual package versions and reachable configuration. Treat actuator/banner fingerprints as leads; record auth state, route exposure, version evidence, and redacted output.
+
+Preserve native evidence and write normalized results separately. Retain tool/version, timestamps, source, rule/advisory IDs, error state, confidence, and redaction. Use deterministic fixtures and structured output.
+
+### Handoff
+Return actual commands, versions, inputs/outputs, checks passed/failed, limitations, and next skill. Static or version-based signals are not confirmed vulnerabilities without evidence of an affected path.
