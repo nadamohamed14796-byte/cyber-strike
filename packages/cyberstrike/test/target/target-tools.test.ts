@@ -287,6 +287,24 @@ test("explicit user confirmation can initialize one exact asset without a policy
         expect(notes).toContain("No wildcard or sibling assets were inferred")
         expect((await TargetMemory.checkURLScope("https://fullbarhomologa.modoblackfullbar.com.br/")).allowed).toBe(true)
         expect((await TargetMemory.checkURLScope("https://unrelated.modoblackfullbar.com.br/")).allowed).toBe(false)
+
+        // A second explicit confirmation extends the same user-confirmed manifest;
+        // its missing external policy URL must not turn the continuation into a blocker.
+        const added = await tool.execute({
+          action: "configure_scope",
+          target_url: "https://program-root.example.test",
+          include: ["https://api.fullbarhomologa.modoblackfullbar.com.br"],
+          merge_existing: true,
+        }, {} as never)
+        expect(added.metadata.saved).toBe(true)
+        const extended = await TargetMemory.getScope("https://program-root.example.test")
+        expect(extended?.authorizationReference).toBeNull()
+        expect(extended?.scopeItems).toEqual([
+          "https://fullbarhomologa.modoblackfullbar.com.br",
+          "https://api.fullbarhomologa.modoblackfullbar.com.br",
+        ])
+        const extendedNotes = await fs.readFile(path.join(rootPath, "notes.md"), "utf-8")
+        expect(extendedNotes).toContain("User-confirmed in-scope asset: https://api.fullbarhomologa.modoblackfullbar.com.br")
       } finally {
         await Instance.dispose()
       }
