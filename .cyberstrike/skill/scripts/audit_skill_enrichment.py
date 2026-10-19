@@ -6,7 +6,7 @@ from pathlib import Path
 
 DEFAULT_ROOT=Path(".cyberstrike/skill")
 EXCLUDED={"CIS_benchmarks","NIST","WEB","mitre_attack","mitre_attack_ics","mitre_attack_mobile","mitre_attack_test","scripts"}
-TOOL_MARKERS=("## Agent-executable CLI tooling (2026-10-19)","## Tool installation and optional tooling (2026-10-19)","## Practical tooling, references, and helper scripts (2026-10-19)")
+TOOL_MARKERS=("## Agent-executable CLI tooling, resources, and helper scripts","## Agent-executable CLI tooling (2026-10-19)","## Tool installation and optional tooling (2026-10-19)","## Practical tooling, references, and helper scripts (2026-10-19)")
 UI_FIRST=re.compile(r"\b(Burp Suite|Burp Proxy|Burp Repeater|browser DevTools|DOM Invader)\b",re.I)
 URL=re.compile(r"https?://[^\s)]+")
 CLI=re.compile(r"`(?:[a-zA-Z0-9_.-]+\s+[^`]+|python3\s+[^`]+)`")
