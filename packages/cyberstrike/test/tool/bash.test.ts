@@ -168,6 +168,10 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(noDepth, "https://example.com", baseScope, "/workspace/example")).toContain("explicit Katana depth")
     const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"]
     expect(katanaScopeBlockReason(noOutput, "https://example.com", baseScope, "/workspace/example")).toContain("raw results")
+    const deeperCrawl = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "8", "-j", "-ncb", "-o", "/workspace/example/urls/katana.jsonl"]
+    expect(katanaScopeBlockReason(deeperCrawl, "https://example.com", baseScope, "/workspace/example")).toBeUndefined()
+    const invalidDepth = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "0", "-j", "-ncb", "-o", "/workspace/example/urls/katana-invalid.jsonl"]
+    expect(katanaScopeBlockReason(invalidDepth, "https://example.com", baseScope, "/workspace/example")).toContain("positive safe integer")
     const outsideOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/katana.jsonl"]
     expect(katanaScopeBlockReason(outsideOutput, "https://example.com", baseScope, "/workspace/example")).toContain("output path must name a file inside")
   })
