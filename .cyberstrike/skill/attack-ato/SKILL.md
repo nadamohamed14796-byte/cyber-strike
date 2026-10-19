@@ -209,22 +209,22 @@ This compares local artifacts offline and heuristically redacts common secrets b
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Agent-usable tools and purpose
-- Python `httpx` or `requests` — controlled request variations using test accounts owned by the tester.
-- `jq` — compare structured responses after redaction.
-- `rg` — inspect already-collected source/configuration for recovery, identity-linking, session invalidation, and authentication-state transitions.
-- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved responses offline; it does not send requests.
+### Tools
+- Python `httpx` or `requests` — compare observed authentication and recovery requests using two tester-owned accounts.
+- `jq` — parse structured response/session metadata after redaction.
+- `rg` — inspect collected source/configuration for recovery, identity-linking, and session invalidation.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved responses offline.
 
 ### Installation and verification
-Verify the chosen Python client with `python3 -c "import httpx; print(httpx.__version__)"` or `python3 -c "import requests; print(requests.__version__)"`; verify `jq --version`. Use official OS/package instructions only. If a dependency is missing, record the gap and continue with source/configuration review; do not claim the check ran. Use only accounts and email/MFA identities controlled by the tester, and avoid repeated recovery sends.
+Verify the chosen Python client with `python3 -c "import httpx; print(httpx.__version__)"` or the equivalent requests import; verify `jq --version`. Official docs: https://www.python-httpx.org/, https://jqlang.org/. If unavailable, use source/configuration review and record that live validation was not run.
 
-### Primary resources
+### Resources
 - https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
 - https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
 - https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
 - https://portswigger.net/web-security/authentication
 
-### Evidence and result handling
-Confirm the resulting principal/session and the exact control involved. Redact reset links, cookies, OTPs, and private account data. Keep the claim proportional to the observed evidence.
+### Proof and limits
+Use only identities controlled by the tester and avoid repeated recovery sends. Confirm the resulting principal/session and the exact control involved. Redact reset links, cookies, OTPs, and private account data.
