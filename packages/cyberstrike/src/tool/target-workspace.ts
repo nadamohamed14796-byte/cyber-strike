@@ -14,6 +14,7 @@ const Parameters = z.object({
   include: z.array(z.string().min(1)).optional(),
   scope_file_path: z.string().min(1).optional().describe("Path to a UTF-8 scope file. Imports exact entries, preserves a copy under the canonical target workspace, and records an import checkpoint in notes.md."),
   exclude: z.array(z.string().min(1)).optional(),
+  merge_existing: z.boolean().optional().describe("When true, add the supplied include/exclude entries to the already configured scope without replacing or re-importing the existing scope list. Requires an existing configured scope; preserves its authorization source/reference unless explicitly supplied."),
   authorization_source: z.string().optional(),
   authorization_reference: z.string().optional(),
   parent_target_url: z.string().optional(),
@@ -97,7 +98,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           "Scope status: " + (scope?.status ?? "missing"),
           "Notes file: " + workspace.workspacePath + "/notes.md",
           "Scope file: " + workspace.workspacePath + "/scope/scope.json",
-          "Authorization: " + (scope?.status === "configured" ? "configured; still check each candidate" : "UNCONFIGURED — do not perform active testing"),
+          "Authorization: " + (scope?.status === "configured" ? "configured; reuse saved scope and let active tools enforce each concrete request" : "UNCONFIGURED — do not perform active testing"),
           "Workspace integrity: metadata, scope manifest, and notes verified.",
           "Workspace creation does not grant permission to test.",
         ].join("\n"),
@@ -182,12 +183,42 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         await TargetMemory.writeWorkspaceFile(existingWorkspace, "scope/" + sourceFilename, sourceContents!)
       }
 
-      const includeEntries = [...(params.include ?? []), ...fileEntries]
+      let includeEntries = [...(params.include ?? []), ...fileEntries]
+      let excludeEntries = params.exclude ?? []
+      let authorizationSource = params.authorization_source?.trim()
+      let authorizationReference = params.authorization_reference?.trim()
+
+      if (params.merge_existing) {
+        if (params.scope_file_path) {
+          throw new Error("merge_existing cannot be combined with scope_file_path. Add individual entries without re-importing the full scope file.")
+        }
+        const existingWorkspace = await TargetMemory.get(targetURL)
+        if (!existingWorkspace) {
+          return {
+            title: "Scope update stopped: target workspace missing",
+            output: "Initialize/open the canonical root and configure its initial scope before adding entries. No scope was changed.",
+            metadata: { saved: false, reason: "workspace_missing", target_url: targetURL } as TargetWorkspaceMetadata,
+          }
+        }
+        const existingScope = await TargetMemory.getScope(existingWorkspace.targetURL)
+        if (!existingScope || existingScope.status !== "configured" || !existingScope.scopeItems.length || !existingScope.authorizationSource || !existingScope.authorizationReference) {
+          return {
+            title: "Scope update stopped: no configured scope to extend",
+            output: "The existing scope is missing or unconfigured. Configure the initial official policy scope first; no scope was changed.",
+            metadata: { saved: false, reason: "scope_not_configured", target_url: existingWorkspace.targetURL } as TargetWorkspaceMetadata,
+          }
+        }
+        includeEntries = [...existingScope.scopeItems, ...includeEntries]
+        excludeEntries = [...existingScope.excludedItems, ...excludeEntries]
+        authorizationSource = authorizationSource || existingScope.authorizationSource
+        authorizationReference = authorizationReference || existingScope.authorizationReference
+      }
+
       const result = await TargetMemory.configureScope(targetURL, {
         include: includeEntries,
-        exclude: params.exclude ?? [],
-        authorizationSource: required(params.authorization_source, "authorization_source"),
-        authorizationReference: required(params.authorization_reference, "authorization_reference"),
+        exclude: excludeEntries,
+        authorizationSource: required(authorizationSource, "authorization_source"),
+        authorizationReference: required(authorizationReference, "authorization_reference"),
       })
 
       if (sourceContents !== undefined && sourceHash && sourceFilename && sourceArtifactPath) {
@@ -243,7 +274,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           "Excluded entries: " + result.scope.excludedItems.length,
           "Workspace integrity: manifests and notes verified",
           "Authorized child workspaces attached/reorganized: " + result.associatedAssets.length,
-          "Use scope_check before active testing of each candidate.",
+          params.merge_existing ? "Scope update mode: merged only the supplied entries into the saved scope; existing entries/exclusions and policy provenance were preserved." : "Scope configured. Reuse the saved manifest; do not re-import it unless the user provides an updated scope file.",
         ].join("\n"),
         metadata: {
           saved: true,
