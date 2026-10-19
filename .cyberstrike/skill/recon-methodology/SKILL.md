@@ -116,25 +116,6 @@ Return normalized asset and endpoint inventories, scope decisions, provenance, d
 Every recon wave should diff hosts, DNS/CNAME/provider changes, TLS/HTTP fingerprints, new API paths, methods/parameters, JavaScript hashes, authentication state, and third-party destinations against the previous snapshot. Reuse observations only while their source freshness/TTL remains credible; revalidate changes and stale evidence rather than repeating a whole scan. Keep asset ownership confidence separate from vulnerability confidence. Each queue item must state the security property, expected policy, prerequisites, baseline needed, exact next observation, and stopping condition. A candidate with missing credentials stays blocked, not safe. Hand off only signal-matched cases to specialist skills and preserve the source/provenance for later audit.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Agent-usable tools and purpose
-- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json subfinder amass dnsx httpx katana gau` — check local availability/version only; no target traffic.
-- `jq` and Python — parse, normalize, and correlate structured outputs.
-- `rg` — search local artifact collections for endpoints, technology clues, and provenance markers.
-- Use `subfinder`, `amass`, `dnsx`, `httpx`, `katana`, and `gau` only for the specific recon stage and only when active/passive use is permitted by program rules.
-- Existing helpers: `normalize_urls.py` and `host_inventory.py` preserve normalized outputs and discovery provenance.
-
-### Installation and verification
-Consult upstream docs before installing: https://docs.projectdiscovery.io/, https://github.com/owasp-amass/amass, and https://github.com/lc/gau. Check each binary's version/help and output schema. Do not treat an unavailable binary as an empty target result; record the missing dependency and choose a supported alternative.
-
-### Resources
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://docs.projectdiscovery.io/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-### Handoff contract
-Keep each stage's raw output, normalized copy, tool/version, timestamps, errors, and counts. Deduplicate data without dropping alternate sources. Report passive observations separately from active validation and state the next phase explicitly.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
