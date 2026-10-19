@@ -54,7 +54,7 @@ test("blocks a redirect outside the configured HTTPS source hosts", async () => 
   expect(redirectModes).toEqual(["manual"])
 })
 
-test("follows same-host HTTPS redirects and returns the bounded response body", async () => {
+test("follows same-host HTTPS redirects and returns the complete response body", async () => {
   const requested: string[] = []
   const redirectModes: RequestRedirect[] = []
 
@@ -82,7 +82,7 @@ test("follows same-host HTTPS redirects and returns the bounded response body", 
   expect(redirectModes).toEqual(["manual", "manual"])
 })
 
-test("rejects oversized responses even when Content-Length is absent", async () => {
+test("reads complete research documents even when Content-Length is absent", async () => {
   const requested: string[] = []
 
   await withFetch(
@@ -94,9 +94,8 @@ test("rejects oversized responses even when Content-Length is absent", async () 
       })
     }) as typeof fetch,
     async () => {
-      await expect(fetchTest("https://research.example/large", source)).rejects.toThrow(
-        "research document too large",
-      )
+      const result = await fetchTest("https://research.example/large", source)
+      expect(result).toHaveLength(1_500_001)
     },
   )
 
