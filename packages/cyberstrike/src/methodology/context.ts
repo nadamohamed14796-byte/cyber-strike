@@ -90,6 +90,15 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   ],
 }
 
+// These phase-critical skills must survive shortlist ranking even when broad
+// metadata matches score higher. This is discovery guidance only: the agent still
+// loads them through SkillTool so per-agent skill permissions remain authoritative.
+const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
+  passive_recon: ["recon-methodology", "attack-javascript-analysis"],
+  active_recon: ["recon-methodology", "attack-javascript-analysis", "community-tool-selection"],
+  business_logic: ["attack-business-logic"],
+}
+
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
   // Include methodology-defined required tags as first-class search terms. The
   // canonical recon workflow owns ordering; relevant skills add detailed procedures.
@@ -176,15 +185,28 @@ export function rankSkillsForPhase(
   ranked.sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
   const selected: RankedPhaseSkill[] = []
   const seen = new Set<string>()
+  const maxSelected = Math.max(0, limit)
+
+  // Reserve shortlist slots for phase-critical skills first. Match normalized
+  // canonical names, and never surface a tampered skill even if it is required.
+  const requiredNames = PHASE_REQUIRED_SKILLS[phaseId] ?? []
+  for (const requiredName of requiredNames) {
+    if (selected.length >= maxSelected) break
+    const normalizedRequiredName = normalizeSkillText(requiredName)
+    const item = ranked.find((candidate) => normalizeSkillText(candidate.entry.name) === normalizedRequiredName)
+    if (!item || seen.has(item.entry.name)) continue
+    selected.push(item)
+    seen.add(item.entry.name)
+  }
 
   for (const item of ranked) {
-    if (selected.length >= Math.max(0, limit)) break
+    if (selected.length >= maxSelected) break
     if (seen.has(item.entry.name)) continue
     selected.push(item)
     seen.add(item.entry.name)
   }
 
-  return selected.slice(0, Math.max(0, limit)).map(({ entry, score, query }) => ({
+  return selected.map(({ entry, score, query }) => ({
     name: entry.name,
     description: entry.description,
     query,
@@ -204,7 +226,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       "",
     ] : []),
     "## Required Skill Preflight",
-    "Load the general skill for the current phase once, then load only specialist skills that materially match the current evidence. Use `skill` action=`search` when the shortlist has no suitable match or new evidence introduces a genuinely new task; use `load` with the exact canonical name and verify returned content.",
+    "Load the general skill for the current phase once, then load only specialist skills that materially match the current evidence. Phase-critical skills are pinned into the shortlist and must be attempted when listed: for business_logic, load attack-business-logic; for passive/active recon, load recon-methodology and attack-javascript-analysis (plus community-tool-selection for active_recon). Use `skill` action=`load` with the exact canonical name and verify returned content before proceeding. If load returns not found/denied, search once for an allowed canonical alternative and record the precise gap; never silently skip the required procedure.",
     "The candidate list is a shortlist, not proof a skill is loaded. Do not search or load the same skill repeatedly within one task; reuse content already present in the conversation. Avoid loading unrelated skills or the entire catalog.",
     "A recommendation is not a loaded skill. Search again only when new evidence changes the phase’s needs (for example, a newly observed framework, auth flow, or vulnerability signal), then load the smallest useful set.",
     "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
