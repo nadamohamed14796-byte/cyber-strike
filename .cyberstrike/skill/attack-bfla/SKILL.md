@@ -99,7 +99,7 @@ Review role claims, policy evaluators, middleware, service-to-service authorizat
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
 
@@ -133,3 +133,15 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [uphiago — hunt-broken-function-level-auth](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-broken-function-level-auth)
 - [OWASP API Security — BFLA](https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/)
 - [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+
+
+## Hands-on field pattern: same function, different roles
+Choose a non-destructive function already observed in the application. Use the same method and payload with two controlled roles; retain the expected permission matrix from documentation or product behavior.
+
+```bash
+curl -sS -D low.headers -o low.body -H "Authorization: Bearer $LOW_ROLE_TOKEN" "$FUNCTION_URL"
+curl -sS -D high.headers -o high.body -H "Authorization: Bearer $HIGH_ROLE_TOKEN" "$FUNCTION_URL"
+sha256sum low.body high.body
+```
+
+A route reachable to a low role is not enough: establish that the protected function actually ran or returned a privileged result, while ruling out client-side-only differences and generic error pages. Continue through materially different role/function combinations rather than stopping at a fixed attempt count. Chain to `attack-idor-automation` for object-level checks, `attack-mass-assignment` for field-level writes, and `attack-business-logic` when a sensitive workflow is implicated.
