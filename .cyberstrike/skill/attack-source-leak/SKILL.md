@@ -202,3 +202,29 @@ Do not paste discovered key values into tickets, chat, or global research. Never
 
 ### Result handling
 Store file/hash/location and a redacted fingerprint, not the value. Distinguish a placeholder, public identifier, expired credential, and credible secret without attempting unauthorized use.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
+
+### Recommended tools
+- gitleaks — local secret scanning
+- noseyparker — secret detection across local text and history
+- git — inspect exposed repository metadata in authorized scope
+- jsluice — local JS route/secret-pattern candidates
+
+### Resources
+- https://github.com/gitleaks/gitleaks
+- https://github.com/praetorian-inc/noseyparker
+- https://github.com/BishopFox/jsluice
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; verify project maintenance, license, and supported behavior from official sources.
+
+### Helper-script contract
+Store finding type, file/path, line/offset, commit, detector, and redacted fingerprint only. Never print, use, or submit discovered credential values; prioritize reporting/rotation guidance.
+
+Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+
+### Handoff
+Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
