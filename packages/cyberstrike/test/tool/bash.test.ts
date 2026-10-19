@@ -51,11 +51,18 @@ describe("Recon scanner deduplication", () => {
     const complementary = reconScannerInvocationKey([
       "katana", "-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/api.jsonl",
     ])
+    const wrappedFirst = reconScannerInvocationKey([
+      "sudo", "-u", "tester", "katana", "-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/wrapped-first.jsonl",
+    ])
+    const wrappedDuplicate = reconScannerInvocationKey([
+      "sudo", "-u", "tester", "katana", "-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/wrapped-second.jsonl",
+    ])
     expect(first).toBe(duplicate)
     expect(first).not.toBe(complementary)
+    expect(wrappedFirst).toBe(wrappedDuplicate)
   })
 
-  test("ordinary commands with scanner names as arguments are not deduped as scans", () => {
+  test("ordinary commands with scanner names as arguments are not identified as scans", () => {
     expect(reconScannerInvocationKey(["grep", "katana", "notes.txt"])).toBeUndefined()
   })
 })
