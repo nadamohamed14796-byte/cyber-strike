@@ -196,27 +196,25 @@ Record the controllable input, encoding/context, execution sink, affected origin
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
+Use command-line tools and local libraries the agent can run and parse directly. Browser UI, extensions, and interactive proxies are not dependencies. Check the installed version and official usage before running commands, and never report a check as completed unless its output was inspected.
 
-### Recommended tools
-- dalfox — focused XSS candidate analysis
-- XSStrike — context-aware XSS testing as a corroborator
-- Semgrep/rg — local source and sink review where source is available
-- Python requests/httpx — controlled baseline and payload response comparison
+### Tools
+- `dalfox` — identify and validate candidate XSS behavior on explicitly authorized targets; begin with low-impact settings and verify every candidate manually.
+- `semgrep` and `rg` — review collected source for risky DOM sinks, unsafe rendering, and sanitization boundaries.
+- Python `httpx` or `requests` — reproduce an observed request with a controlled input and compare the response.
+- `jq` — parse saved JSON results and remove sensitive fields before sharing.
+- Existing helper: `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript` — inventory candidate URLs from local JavaScript files; it does not prove a source-to-sink flow.
+
+### Installation and verification
+Use the official instructions at https://github.com/hahwul/dalfox and https://semgrep.dev/docs/getting-started/. Verify with `dalfox version` or `dalfox --help`, and `semgrep --version`. Check Python dependencies with `python3 -c "import httpx; print(httpx.__version__)"` or the corresponding `requests` import. If a tool is missing, record that and continue with available source review or local fixtures; do not silently claim success.
 
 ### Resources
-- https://github.com/hahwul/dalfox
-- https://github.com/s0md3v/XSStrike
 - https://portswigger.net/web-security/cross-site-scripting
 - https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
+- https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
+- https://github.com/hahwul/dalfox
+- https://semgrep.dev/docs/
 
-Community lists are discovery aids. Use official documentation for current flags, supported versions, output formats, and limitations.
-
-### Helper script contract
-Create a local payload/result parser that records context, encoding, reflection location, execution evidence if safely observable, control response, and false-positive reason. Do not label reflection alone as exploitable XSS.
-
-Preserve native evidence and normalize a separate copy. Keep source, timestamp, tool/version, errors, confidence, redaction state, and artifact references. Helpers should accept explicit paths, emit JSON/JSONL where practical, handle malformed input, and include local fixtures.
-
-### Handoff
-Return tool/version, command invoked, input/output artifact references, test/control counts, failures, confidence, limitations, and next skill. A missing tool or blocked source must not be reported as a successful empty result.
+### Evidence and fallback
+Record the controllable input, context/encoding, relevant sink, control response, and safe evidence. Reflection alone is not proof of exploitable XSS. Keep credentials and real user data out of fixtures and artifacts. Use a disposable local fixture when live validation is not appropriate.
