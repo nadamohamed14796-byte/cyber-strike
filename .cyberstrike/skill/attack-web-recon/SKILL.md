@@ -94,3 +94,41 @@ Verify actual scope resolution, inventory, HTTP probing, crawling, normalization
 
 ### Recon-to-hunt handoff contract
 For every asset/endpoint, separate asset attribution confidence from security confidence. Preserve source, timestamp, normalization, DNS chain, HTTP fingerprint, first-party vs third-party attribution, authentication observation, method/parameters, and a canonical deduplication key. Delta each new recon run against the previous snapshot and enqueue only new or materially changed observations; never label a route vulnerable because it is live or appears in JavaScript. Use the following signal routes: object IDs/tenant hints → IDOR; new role-only routes → BFLA; URL-consuming features → SSRF; sensitive fields → API property authorization; host/cache differences → header/cache skills. correlate_javascript and http_replay are runtime calls only where registered; verify tool availability before claiming execution.
+
+
+## Durable recon loop and phase gates
+
+Treat recon as a resumable workflow, not a one-shot scan. Before each phase, load the target workspace's existing notes and artifacts, compare against the last completed run, and reuse valid results. Never create a second workspace root for the same canonical target.
+
+| Phase | Required input | Completion evidence | Next phase gate |
+|---|---|---|---|
+| Scope/attribution | Program rules, root domains, exclusions, asset evidence | Canonical scope snapshot with provenance and unresolved cases | Active work only on resolved in-scope assets |
+| Passive discovery | Scope snapshot and source list | Candidate hosts with source/time/confidence | DNS validation |
+| DNS/alias | Candidate hosts | A/AAAA/CNAME/NS/TXT observations, wildcard and parked-domain notes | HTTP only for eligible hosts |
+| HTTP/service | Eligible resolved hosts | Status/redirect/TLS/title/fingerprint with timestamps | Crawl/API mapping |
+| URL/API | Live app, approved archives/specs, captured requests | Normalized method + route + content-type + parameter-shape inventory | JS correlation and focused review |
+| JavaScript | Captured first-party assets and hashes | Candidate routes/sinks/auth hints with source offsets and redaction | Correlate with actual requests |
+| Triage | All phase artifacts | Deduplicated queue with evidence, confidence, next skill, and blocked reason | Testing only when a concrete signal exists |
+
+A phase can be complete with zero findings if the evidence supports that conclusion. It must not be marked complete if a tool failed, input was missing, or output was not persisted; use blocked/partial and record the reason.
+
+## Normalization and deduplication contract
+
+- Host identity: canonical lowercase hostname with trailing dot removed, while preserving scheme/port and source provenance where those change the service boundary.
+- URL identity: method + normalized path template + content type + parameter shape + auth context. Do not merge GET and POST, different API versions, or distinct nested object relationships.
+- Endpoint parameters: one endpoint record may carry many parameter observations. Never create duplicate endpoint records solely because several IDs/parameters exist.
+- Asset attribution: keep CNAME target, hosting provider, certificate evidence, and first-party confidence separate from scope eligibility.
+- Time: preserve first_seen, last_seen, source timestamp, and last_checked so stale archive results are not presented as live.
+- Diffs: report new, removed, changed, stale, and unresolved assets separately. Do not delete old notes simply because a current run did not rediscover them.
+
+## Source reliability and coverage
+
+For each discovery source, track whether it was attempted, succeeded, returned zero results, failed, or was blocked. A zero-result response is not proof that no assets exist. Record source coverage by source family (program data, certificate transparency, DNS, archives, code, browser traffic, API schema, JS bundles, and service probes) and avoid claiming exhaustive coverage unless the actual run supports it.
+
+## Tool execution and failure handling
+
+Before using a tool, verify its registered name, argument schema, output path, and side effects. Capture exit status and stderr separately from findings. Retry only when a transient failure is plausible and policy permits; do not silently replace a failed source with a guessed command. If an asset resolves to shared hosting, a third-party service, or an ambiguous tenant, preserve the lead and block active testing until attribution is resolved.
+
+## Handoff record
+
+Each queued item should include canonical_asset, scope_evidence, attribution_confidence, discovery_source, first_seen, last_seen, last_checked, route_key, method, parameter_locations, auth_context, observed_signal, hypothesis, negative_control_needed, candidate_skill, active_test_allowed, evidence_refs, status, blocked_reason, and next_action. Never store credentials or raw secrets in the queue.
