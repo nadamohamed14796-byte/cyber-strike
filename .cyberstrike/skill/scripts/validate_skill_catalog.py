@@ -22,6 +22,8 @@ from typing import Any
 DEFAULT_ROOT = Path(".cyberstrike/skill")
 HYPOTHESIS_CAP = re.compile(
     r"maximum\s+\d+\s+distinct hypotheses|"
+    r"\bup to\s+\d+\s+(?:distinct\s+)?hypotheses\b|"
+    r"\b\d+\s*[- ]attempt\s+budget\b|"
     r"(?:validation|attempt|hypothesis)\s+(?:budget|limit).{0,80}\bat most\s+\d+\b",
     re.IGNORECASE,
 )
