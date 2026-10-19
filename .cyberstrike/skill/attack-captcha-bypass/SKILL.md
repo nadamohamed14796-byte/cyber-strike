@@ -175,3 +175,26 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater and browser DevTools to verify that server-side endpoints enforce CAPTCHA proof, expiration, and binding to the intended action/session. Playwright can support repeatable tests in an owned staging app; do not use CAPTCHA-solving services or automate abuse on public services.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- [Playwright installation](https://playwright.dev/docs/intro) — official Node.js/Python setup for owned test applications.
+- [Node.js](https://nodejs.org/en/download/) — use a supported version if installing Playwright through npm.
+Test with a controlled account and a provider's test keys where available. Never attempt to bypass anti-bot controls to increase production account creation, scraping, or credential attempts.
+
+### Primary resources
+- [OWASP Automated Threats to Web Applications](https://owasp.org/www-project-automated-threats-to-web-applications/) — abuse/defense context.
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — endpoint controls.
+- [Playwright docs](https://playwright.dev/docs/intro) — reproducible browser tests.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare safe, saved responses offline.
+
+### Result handling
+Establish whether the server rejects missing/expired/mismatched test proof. A visual CAPTCHA, hidden field, or browser-side check is not evidence of the server-side enforcement result.
