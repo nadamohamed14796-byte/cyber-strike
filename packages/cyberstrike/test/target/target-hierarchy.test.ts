@@ -92,12 +92,6 @@ describe("target asset hierarchy", () => {
         expect(attached.asset.targetURL).toBe("https://fullbarhomologa.modoblackfullbar.com.br")
         expect(attached.asset.parentTargetID).toBe(root.workspace.id)
 
-        await TargetMemory.configureScope("https://mercadolibre-program.test", {
-          include: ["https://fullbarhomologa.modoblackfullbar.com.br"],
-          exclude: ["https://fullbarhomologa.modoblackfullbar.com.br"],
-          authorizationSource: "Authorized program scope fixture",
-          authorizationReference: "https://program.example.test/policy",
-        }).catch(() => undefined)
       },
     })
   })
