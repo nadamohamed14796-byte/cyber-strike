@@ -90,7 +90,7 @@ Treat these as prioritization signals, not proof. Do not infer a vulnerability f
 
 ### Phase 1 — Build an endpoint inventory
 
-Browse the application using the test account and capture requests in an approved proxy such as Burp Suite. For every candidate, record:
+Start from the target workspace's observed request artifacts, endpoint inventory, JavaScript/API schema evidence, or extension-provided request records. Reproduce a known request with curl or Python httpx; do not require a browser or interactive proxy. For every candidate, record:
 
 - Method, route, content type, and authentication mechanism.
 - Object identifiers in the path, query, headers, body, GraphQL variables, or nested structures.
