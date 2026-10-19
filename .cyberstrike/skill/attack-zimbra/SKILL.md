@@ -109,7 +109,7 @@ For a candidate advisory, record product branch, version, patch level, reachable
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+Do not impose an arbitrary fixed ceiling on meaningful, authorized read-only hypotheses. Continue while a distinct check can change the conclusion; deduplicate equivalent requests and stop when evidence resolves the question, relevant branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. Do not test credentials, access mail, or invoke exploit payloads on production.
 
 Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
 
@@ -141,3 +141,28 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 - [uphiago/recon-skills — zimbra-attack](https://github.com/uphiago/recon-skills/tree/main/recon/zimbra-attack)
 - [Zimbra Security Center](https://www.zimbra.com/security/)
 - [NIST National Vulnerability Database](https://nvd.nist.gov/)
+
+
+## Product/version and SOAP evidence ledger
+
+For a Zimbra candidate, record the product family, build evidence, affected advisory, reverse-proxy path, authentication requirement, and whether the relevant handler is actually reachable. Keep unknowns explicit rather than converting version similarity into exploitability.
+
+| Evidence | Safe collection | Not sufficient alone |
+|---|---|---|
+| UI/static assets | Response headers and asset metadata | Branding or asset name |
+| Version/build | Read-only documented endpoint or owner-provided config | One generic banner |
+| SOAP surface | Normal traffic or docs; parse synthetic responses locally | Endpoint responds |
+| Proxy behavior | One controlled callback only if explicitly authorized | URL parameter exists |
+| Upload handler | Source/config review or isolated vendor lab | Route name or status code |
+| Admin surface | Login page/access-control metadata | Login page implies admin access |
+
+### Safe response capture
+
+```bash
+curl -sS --max-time 6 -D zimbra.headers -o /dev/null "$IN_SCOPE_ZIMBRA_URL"
+grep -iE '^(HTTP/|content-type:|location:|server:|www-authenticate:)' zimbra.headers
+```
+
+Do not save SOAP bodies containing mailbox, user, or authentication data. If protocol structure must be inspected, use a synthetic lab fixture and retain only the fields needed to establish the behavior.
+
+Record product_build_sources, vendor_advisory, affected_range, fixed_build, handler_path, auth_requirement, proxy_path, validation_environment, callback_evidence_if_permitted, and cleanup_status. Keep production exploitability unconfirmed when only version/build evidence is available.
