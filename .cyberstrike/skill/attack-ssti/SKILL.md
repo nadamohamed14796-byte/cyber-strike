@@ -72,23 +72,6 @@ Return `input_sink`, `baseline_output`, `expression_test`, `server_side_evaluati
 Identify where the value is inserted (HTML escaping, template expression, server-side preview, email/PDF renderer) and establish a normal literal baseline. Use inert arithmetic/string expressions in a disposable fixture to distinguish server-side evaluation from reflection or client-side rendering; do not use file-read, process-execution, or environment-dumping payloads. Repeat with one template context at a time and compare rendered output, not just error codes. A confirmed evaluated expression does not automatically prove RCE; demonstrate only the minimum permitted impact and keep greater capabilities hypothetical until safely proven in an isolated lab. Route parser serialization to deserialization/XXE as appropriate and record the rendering context for remediation.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Agent-usable tools and purpose
-- `curl` or Python `httpx` — reproduce an observed, authorized request with inert arithmetic/string markers.
-- `rg` — search already-collected source/configuration for template engine selection, unsafe rendering, and escaping.
-- `semgrep` — run applicable rules against an authorized local source checkout; verify the rule matches the actual template engine.
-- Language-specific test runner — reproduce behavior in a disposable local fixture when source is available.
-### Install and verify
-Install Semgrep using its official guide at https://semgrep.dev/docs/getting-started/ and verify with `semgrep --version`; verify request clients with `curl --version` or `python3 -c "import httpx; print(httpx.__version__)"`. If unavailable, continue with source review and inert test fixtures; record the gap instead of implying execution.
-### Resources
-- https://portswigger.net/web-security/server-side-template-injection
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://semgrep.dev/docs/
-### Helper
-Use `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` to compare saved, redacted output. Do not use OS command execution, file reads, or secret extraction as production proof.
-
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
