@@ -126,6 +126,16 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   }
 
   const normalizedArgs = args.map((arg) => arg.toLowerCase())
+  const urlFlagIndexes = normalizedArgs.map((arg, index) => ["-u", "--url"].includes(arg) ? index : -1).filter((index) => index >= 0)
+  if (urlFlagIndexes.length === 0) {
+    return "Pass an explicit '-u https://authorized-host' input for each authorized host; URL-list/file inputs are not accepted by the generic shell crawler gate."
+  }
+  for (const index of urlFlagIndexes) {
+    const value = args[index + 1]
+    if (!value || !/^https?:\/\//i.test(value)) {
+      return "Every Katana '-u' input must be an explicit absolute HTTP(S) URL, not a filename, wildcard, or unresolved target list."
+    }
+  }
   if (normalizedArgs.some((arg) => ["-ns", "--no-scope", "-do", "--display-out-scope", "-cs", "--crawl-scope"].includes(arg))) {
     return "Katana scope overrides that can widen crawler behavior are not allowed; rely on the persisted scope and FQDN field scope."
   }
