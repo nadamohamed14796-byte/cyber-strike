@@ -70,13 +70,13 @@ const USER_CONFIRMED_SCOPE_PREFIX = "User-confirmed in conversation"
 /** Parse one specific incremental asset; never mistake a wildcard or CIDR for an exact confirmation. */
 function confirmedScopeCandidate(input: string): URL | undefined {
   const value = input.trim()
-  if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return undefined
-  if (/^\\d{1,3}(?:\\.\\d{1,3}){3}\\/\\d{1,2}$/.test(value) || /^\\[?[0-9a-f:.]+\\]?\\/\\d{1,3}$/i.test(value)) return undefined
-  if (!/^https?:\\/\\//i.test(value) && /[\\/*{}]/.test(value)) return undefined
+  if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return undefined
+  if (/^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return undefined
+  if (!/^https?:\/\//i.test(value) && /[\\/*{}]/.test(value)) return undefined
   let candidateValue = value
-  if (!/^https?:\\/\\//i.test(value)) {
-    const rawIPv6 = value.match(/^\\[?([0-9a-f:]+)\\]?$/i)
-    candidateValue = rawIPv6 && value.includes(":") && !/^[^:]+:\\d+$/.test(value)
+  if (!/^https?:\/\//i.test(value)) {
+    const rawIPv6 = value.match(/^\[?([0-9a-f:]+)\]?$/i)
+    candidateValue = rawIPv6 && value.includes(":") && !/^[^:]+:\d+$/.test(value)
       ? "https://[" + rawIPv6[1] + "]"
       : "https://" + value
   }
@@ -247,7 +247,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           }
           const excluded = matchingScopeItems(candidate, existingScope.excludedItems)
           if (excluded.length) {
-            const identity = "scope-exclusion-conflict:" + createHash("sha256").update(entry + "\\0" + excluded.join("\\0")).digest("hex").slice(0, 20)
+            const identity = "scope-exclusion-conflict:" + createHash("sha256").update(entry + "\0" + excluded.join("\0")).digest("hex").slice(0, 20)
             try {
               await TargetMemory.addNote(existingWorkspace.targetURL, {
                 kind: "manual",
@@ -257,7 +257,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
                   "Requested asset: " + entry,
                   "Matching exclusion(s): " + excluded.join(", "),
                   "No scope entry was changed. Explicit exclusions remain authoritative until the operator explicitly resolves the policy conflict.",
-                ].join("\\n"),
+                ].join("\n"),
                 source: "user-confirmed-scope-conflict",
                 status: "observed",
                 tags: ["scope", "exclusion", "blocked"],
