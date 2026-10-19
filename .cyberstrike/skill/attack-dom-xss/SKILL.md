@@ -159,24 +159,19 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Browser DevTools to trace sources/sinks and Burp DOM Invader to identify client-side flows. Semgrep is an optional source-code cross-check; it cannot prove a sink is attacker-reachable by itself.
-
-### Installation and setup
-- [DOM Invader docs](https://portswigger.net/burp/documentation/desktop/tools/dom-invader) — supported Burp browser workflow.
-- [Burp Suite](https://portswigger.net/burp) — official installation.
-- [Semgrep](https://semgrep.dev/docs/getting-started/) — static analysis on an authorized source checkout.
-Use a test account and harmless marker. Don't capture real user content or send private scripts to online analysis services.
-
-### Primary resources
-- [PortSwigger DOM-based XSS](https://portswigger.net/web-security/cross-site-scripting/dom-based) — source/sink reasoning.
-- [OWASP DOM-based XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html) — defenses.
-- [MDN DOM API](https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model) — runtime semantics.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript to extract route candidates from locally collected assets; it does not execute scripts or confirm data flow.
-
-### Result handling
-Record attacker-controllable source, path to sink, required user/browser context, actual execution evidence, and mitigation. A dangerous API call without a reachable input remains a lead.
+### Agent-usable CLI tools
+- `rg`: find candidate DOM sources, sinks, sanitizers, and unsafe HTML APIs in collected JavaScript.
+- `semgrep`: scan an authorized local source checkout for applicable DOM-XSS patterns; treat matches as leads.
+- `jsluice`: extract candidate URLs and endpoints from collected JavaScript assets; output is inventory, not exploit proof.
+- `node`: run a minimal local HTML/JavaScript fixture to verify source-to-sink behavior without using real accounts or data.
+- Existing helper `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript`: inventory route candidates from local files.
+### Install and verify
+Install from official docs: https://semgrep.dev/docs/getting-started/, https://nodejs.org/en/download/, and the upstream jsluice repository documentation. Verify `semgrep --version`, `node --version`, and each tool's `--help`. If missing, continue with local source review or fixtures and record the gap.
+### Resources
+- https://portswigger.net/web-security/cross-site-scripting/dom-based
+- https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML
+- https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
+### Proof and limits
+Trace controllable source to an executable sink and show the relevant context/encoding. Static matches and reflected text are leads, not proof. Keep the workflow CLI/local-fixture based; do not require browser UI or interactive extensions.
