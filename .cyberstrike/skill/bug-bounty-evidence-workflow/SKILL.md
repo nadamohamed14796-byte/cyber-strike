@@ -4,6 +4,7 @@ description: "Orchestrate evidence-led bug bounty work from inventory through hy
 category: "bug-bounty-methodology"
 version: "1.0.0"
 tags: [bug-bounty, evidence, triage, reporting, deduplication, source-review]
+chains_with: [attack-bb-methodology, attack-triage-validation, attack-evidence-hygiene, attack-report-writing, skill-supply-chain-audit]
 prerequisites: ["Operate only on authorized targets", "Treat public writeups as hypotheses, not proof"]
 ---
 
