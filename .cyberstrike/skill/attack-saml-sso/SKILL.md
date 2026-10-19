@@ -170,23 +170,26 @@ Record transaction_id, idp_entity_id, sp_entity_id, acs_url, response_issuer, as
 - Signature validation warning with no accepted wrong assertion → configuration lead, not ATO.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp Proxy/Repeater with SAML Raider for controlled message inspection, browser DevTools, and test IdP/service-provider accounts. Preserve the original flow as a baseline before examining one property at a time.
+Use non-interactive CLI tools and local fixtures the agent can run and parse. Browser UI, extensions, and interactive proxies are not agent dependencies.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
-- [SAML Raider official project](https://github.com/PortSwigger/saml-raider) — recommended installation is through Burp's BApp Store; the project explains manual JAR loading too.
-Use only a test identity, authorized relying party, and test IdP. Never paste live SAML assertions, private keys, or session cookies into public decoders or external services.
+### Tools and purpose
+- Python `lxml` or the standard XML parser — inspect synthetic SAML messages and validate XML structure locally; do not treat parse success as signature or trust validation.
+- `xmlsec1` — inspect/verify XML signatures only against a controlled fixture and known test keys.
+- `curl` or Python `httpx` — reproduce an observed, authorized protocol flow with tester-owned identities.
+- `jq` — parse structured service metadata and redact fields in saved outputs.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved redacted responses offline.
 
-### Primary resources
-- [SAML Raider](https://github.com/PortSwigger/saml-raider) — supported inspection functions.
-- [OASIS SAML specifications](https://www.oasis-open.org/standard/saml/) — protocol semantics.
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — identity/session control context.
+### Install and verify
+Install XML tooling from official OS repositories or the upstream project documentation. Verify with `xmlsec1 --version`, `curl --version`, and `python3 -c "import lxml; print(lxml.__version__)"` when selected. If unavailable, inspect synthetic fixtures with the standard library and record the limitation. Do not upload live assertions, private keys, or session material to public decoders.
 
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved, redacted responses offline.
+### Resources
+- https://www.oasis-open.org/standard/saml/
+- https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/lxml/lxml
+- https://github.com/lsh123/xmlsec
 
-### Result handling
-Keep any assertion fixture synthetic and redact NameID/attributes/signatures where appropriate. Explain which trust/validation check failed and show the relying party's resulting session behavior without exposing another user's data.
+### Evidence and result handling
+Use a test identity and authorized relying party. Preserve synthetic or redacted assertions, issuer/audience/recipient/destination checks, signature-validation result, and the relying party's resulting session behavior. A malformed message or XML parse result alone does not prove authentication bypass. Never expose another user's data.
