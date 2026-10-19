@@ -168,21 +168,24 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use curl/Burp to inspect frame-related response headers and browser DevTools to verify actual framing behavior in a local/controlled test page. A minimal HTML fixture is usually enough; no automated exploit kit is needed.
+### Tools
+- `curl` — capture route-specific response headers for an observed, authorized URL.
+- Python `httpx` — compare headers across documented routes and save structured results.
+- `rg` — search local source/configuration for frame policy, CSP, and sensitive actions.
+- Playwright's headless CLI/API may be used against a local fixture when effective frame behavior needs reproduction; do not require interactive browser DevTools.
 
-### Installation and setup
-Kali/Debian: sudo apt update && sudo apt install curl. [Burp Suite](https://portswigger.net/burp) is optional for request/response comparison. Use an owned test page or approved lab to test framing and authenticated UI state; do not trick other users into visiting a test page.
+### Installation and verification
+Verify `curl --version` and the chosen Python client. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, and https://playwright.dev/python/. If a headless browser dependency is unavailable, report that effective framing was not tested and use header/source review only.
 
-### Primary resources
-- [OWASP Clickjacking Defense Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html) — frame restrictions.
-- [MDN X-Frame-Options](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options) — browser behavior.
-- [MDN CSP frame-ancestors](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) — modern control.
+### Resources
+- https://portswigger.net/web-security/clickjacking
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors
 
 ### Reusable helper
-Use curl -sS -D headers.txt -o /dev/null --max-time 15 https://IN-SCOPE-HOST/PATH to save one authorized response's headers; redact cookies before sharing.
+`curl -sS -D headers.txt -o /dev/null --max-time 15 https://IN-SCOPE-HOST/PATH` saves one authorized response's headers. Redact cookies before sharing; headers alone do not prove exploitability.
 
 ### Result handling
-Verify effective browser framing rather than relying only on a header checklist. Explain whether a sensitive authenticated action can be framed and why that matters.
+Verify effective framing in a local fixture or approved test environment when possible. Explain whether a sensitive authenticated action can be framed and why it matters; do not treat a missing header alone as confirmed impact.
