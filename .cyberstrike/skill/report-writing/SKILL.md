@@ -120,3 +120,26 @@ Use the current platform form and policy. HackerOne commonly uses summary/detail
 
 ### Report fact/assumption split
 Create a short claim ledger before writing: observed fact, artifact, inference, confidence, and omitted alternative explanations. The title and summary must name the real actor, affected route/feature, prerequisite, and demonstrated consequence. Include one direct negative control and the exact expected-versus-observed difference, then describe remediation plus a regression test tied to the root cause. Do not claim user counts, broad tenant reach, RCE, or ATO based on hypothetical siblings or chain links. If severity depends on a platform rubric, cite the applicable rule and explain the measured impact; preserve an artifact manifest with redaction and cleanup status.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Markdown editing, a local evidence-manifest validator, sanitized request/response captures, and FIRST's CVSS calculator when severity scoring is needed. Human review is mandatory before submitting.
+
+### Installation and setup
+- [FIRST CVSS v4.0 calculator](https://www.first.org/cvss/calculator/4.0) — web tool, no install required.
+- [Burp Suite](https://portswigger.net/burp) — export only the relevant sanitized evidence.
+- jq is optional for JSON manifests; on Kali/Debian use sudo apt update && sudo apt install jq.
+Do not feed private findings, raw tokens, or program-confidential information into external writing/scoring services. Check disclosure policy before sharing any report outside the submission platform.
+
+### Primary resources
+- [HackerOne report writing best practices](https://docs.hackerone.com/en/articles/8475116-best-practices-for-submitting-reports) — clear, reproducible reports.
+- [Bugcrowd reporting a bug](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — evidence and reproduction expectations.
+- [FIRST CVSS](https://www.first.org/cvss/) — scoring standard.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before drafting the final evidence links; review real artifacts manually.
+
+### Result handling
+Use exact chronological steps, prerequisites, role/test-account context, expected/actual result, impact evidence, remediation, and explicit unknowns. Keep confirmed facts separate from hypotheses and include score vector/reasoning if you assign CVSS.
