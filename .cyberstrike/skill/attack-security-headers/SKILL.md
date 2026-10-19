@@ -111,25 +111,6 @@ Use confirmed, disproven, inconclusive, or blocked. Keep one parent observation 
 For each recommendation, record the affected route class, required browser behavior, compatible policy, deployment layer that owns the header, and regression test. Avoid globally applying a restrictive CSP or HSTS policy without checking legitimate scripts, subdomains, third-party integrations, and rollout requirements.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use curl and browser DevTools to inspect response headers, Burp to compare routes/content types, and Mozilla Observatory as an optional external cross-check only for a public hostname that is safe to submit to a third party.
-
-### Installation and setup
-Kali/Debian: `sudo apt update && sudo apt install curl`. Burp Community: https://portswigger.net/burp/communitydownload . Do not submit private staging hosts, authenticated URLs, or sensitive hostnames to external scanners. Prefer local header capture for private targets.
-
-### Primary resources
-- [OWASP Secure Headers Project](https://owasp.org/www-project-secure-headers/) — header intent and browser protections.
-- [MDN HTTP headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers) — browser interpretation.
-- [Mozilla Observatory](https://observatory.mozilla.org/) — optional public-site review; use only where external disclosure is acceptable.
-
-### Reusable helper
-`curl -sS -D headers.txt -o /dev/null --max-time 15 'https://IN-SCOPE-HOST/PATH'` saves response headers from one user-approved request. Redact cookies and tokens before sharing the file.
-
-### Result handling
-Tie each missing/misconfigured header to a route-specific impact and realistic threat model. A scanner grade or missing header in isolation is not proof of exploitable impact.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify official install docs, version, license, platform compatibility, and operational impact before use.
