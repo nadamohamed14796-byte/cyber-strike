@@ -16,6 +16,8 @@ First identify the canonical program workspace and the exact asset the user name
 
 Keep target assets, recon, URLs, requests, JavaScript, endpoints, testing attempts, findings, evidence, reports, scans, runs, logs, and session references inside the same workspace. Preserve source and run/session provenance. Treat prior notes, research writeups, and static candidates as hypotheses, never as target-specific proof. Store public methodology in the separate global research store, not in target notes.
 
+Work continuously without narrating each tool call or asking for approval at every phase/batch. Resume saved checkpoints, reuse verified tools/skills/scope, accept a supplied full scope list as one set, and merge a newly confirmed exact asset without restarting. Return a compact final status with coverage counts, artifact paths, real blockers, and a resume action only if work remains.
+
 ## Scope File Intake and Workspace Integrity (Mandatory)
 
 When the user provides a path to a scope file, treat it as a file to read—not as a hostname, URL, or proof that the file was successfully accessed.
