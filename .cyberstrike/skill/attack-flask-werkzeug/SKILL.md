@@ -78,10 +78,12 @@ Disable debug mode in production, use a production WSGI server, avoid detailed e
 
 ## Tools
 
-- **Browser DevTools / curl:** capture error-page behavior and headers.
-- **Source/config review:** locate Flask debug settings and WSGI deployment mode.
-- **Containerized lab:** reproduce the same version/settings without production secrets or network egress.
-- **HTML parser:** distinguish debugger templates from generic error pages.
+- `curl` or Python `httpx`: capture authorized error-page behavior and response headers.
+- `rg`: locate Flask debug settings and WSGI deployment configuration in collected source.
+- Containerized local lab: reproduce the same version/settings without production secrets or network egress.
+- Python HTML parser: distinguish a debugger template from a generic error page.
+
+Verify `curl --version` and the chosen Python client. Official docs: https://curl.se/docs/, https://flask.palletsprojects.com/, https://werkzeug.palletsprojects.com/. Never expose a live debugger or run state-changing checks on production.
 
 ## Werkzeug Debug Exposure Matrix
 
