@@ -72,6 +72,36 @@ describe("target asset hierarchy", () => {
     })
   })
 
+  test("attaches explicitly scoped domains unrelated to the program workspace hostname", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const root = await TargetMemory.configureScope("https://mercadolibre-program.test", {
+          include: ["https://fullbarhomologa.modoblackfullbar.com.br"],
+          authorizationSource: "Authorized program scope fixture",
+          authorizationReference: "https://program.example.test/policy",
+        })
+
+        const attached = await TargetMemory.attachAsset(
+          root.workspace.targetURL,
+          "https://fullbarhomologa.modoblackfullbar.com.br",
+          "application",
+        )
+        expect(attached.parent.id).toBe(root.workspace.id)
+        expect(attached.asset.targetURL).toBe("https://fullbarhomologa.modoblackfullbar.com.br")
+        expect(attached.asset.parentTargetID).toBe(root.workspace.id)
+
+        await TargetMemory.configureScope("https://mercadolibre-program.test", {
+          include: ["https://fullbarhomologa.modoblackfullbar.com.br"],
+          exclude: ["https://fullbarhomologa.modoblackfullbar.com.br"],
+          authorizationSource: "Authorized program scope fixture",
+          authorizationReference: "https://program.example.test/policy",
+        }).catch(() => undefined)
+      },
+    })
+  })
+
   test("explicit parent selection cannot bypass a parent exclusion or ancestor scope", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
