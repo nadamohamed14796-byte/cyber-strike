@@ -367,7 +367,7 @@ For each script, document:
 
 Create scripts only for tools whose availability and actual behavior have been verified.
 
-Scripts must default to passive or dry-run behavior, require explicit scope preflight before active requests, use persisted allowlists, enforce applicable rate limits, redact sensitive values, and write only to the canonical workspace.
+Scripts must default to passive or dry-run behavior, rely on registered active-request tools to enforce the persisted scope for each outbound URL, use persisted allowlists, enforce applicable rate limits, redact sensitive values, and write only to the canonical workspace. Do not repeat the model-level `scope_check` for every request.
 
 Do not execute active scripts until the scope manifest, candidate authorization, and script preconditions have been checked.
 
