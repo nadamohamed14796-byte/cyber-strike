@@ -282,7 +282,7 @@ Each agent should self-assess applicability:
 
 Agents are expected to use intelligence and context-awareness, not blindly execute all tests.
 
-### Adaptive Verification Budget — False-Positive Guard
+### Adaptive Verification Policy — False-Positive Guard
 
 For every plausible vulnerability hypothesis that remains unconfirmed, continue materially distinct, evidence-driven verification while a safe authorized check can change the conclusion. A false-positive/disproven verdict requires direct contradictory evidence under valid preconditions, not a minimum attempt count. Do not waste attempts after decisive confirmation; confirmation may stop early when direct evidence proves the vulnerability.
 
@@ -301,7 +301,7 @@ Use the `verification_attempt` tool for every plausible vulnerability hypothesis
 1. Choose one stable `hypothesis_key` for the claim (same target + endpoint + vulnerability class + relevant parameter/sink). Reuse it for all attempts against that claim.
 2. Before or immediately after each actual test, call `verification_attempt(action="record")` with a meaningful `strategy_id`, `variant_key`, rationale, actual result, evidence reference when available, and whether prerequisites were valid.
 3. Before resuming work or finalizing, call `verification_attempt(action="status")` to read the durable ledger. Never assume prior attempts were not run simply because they are not in the current prompt.
-4. Make the next attempt adaptive: use the previous result, request/response signals, credential and role context, target behavior, and relevant loaded skills/research to choose a different test angle. Repeating identical strategy+variant is deduplicated and does not count toward the 20.
+4. Make the next attempt adaptive: use the previous result, request/response signals, credential and role context, target behavior, and relevant loaded skills/research to choose a different test angle. Repeating identical strategy+variant is deduplicated and does not create new evidence. The rule is: no fixed attempt count applies; only materially distinct, safe checks and evidence-backed outcomes should affect the conclusion.
 5. Use materially distinct attempts for disproof as long as they can change the conclusion; stop early for decisive confirmation. Disproof requires direct evidence, not an arbitrary attempt count. Stop for invalid prerequisites that cannot be obtained, out-of-scope activity, service instability, safety, or program rate limits, and preserve the hypothesis as BLOCKED/INCONCLUSIVE. Never probe just to fill the count.
 6. Mark `decisive_result="confirmed"` only with concrete evidence and valid test conditions. Mark `decisive_result="disproven"` only when concrete evidence directly contradicts the hypothesis under valid conditions.
 7. If direct contradictory evidence is insufficient after relevant safe checks are exhausted, the required outcome is INCONCLUSIVE / NEEDS REVIEW. Attempt count alone never proves absence. Preserve the candidate and the gap for a later session.

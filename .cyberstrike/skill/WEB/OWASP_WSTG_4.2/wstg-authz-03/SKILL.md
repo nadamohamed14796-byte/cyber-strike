@@ -37,7 +37,7 @@ Determine whether a test identity can perform an action or access a resource bey
 
 Use `verification_attempt` for each meaningful executed test. Record the request ID, test identity label (not token), resource owner, expected policy, baseline/control, observed response, and valid preconditions. Duplicate variants, planned tests, and invalid scope/setup do not count.
 
-Use `validate_finding` for the ten-check assessment. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. If safety or prerequisites prevent this, keep `INCONCLUSIVE / NEEDS REVIEW`.
+Use `validate_finding` for the ten-check assessment. A decisive confirmation may stop early. A final false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, and a matching durable ledger outcome. No fixed attempt count applies. If safety or prerequisites prevent this, keep `INCONCLUSIVE / NEEDS REVIEW`.
 
 ## Reporting
 

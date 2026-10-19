@@ -125,6 +125,7 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
         sessionID,
         hypothesisKey: params.verification_hypothesis_key,
       })
+      const validAttemptsUsed = Policy.uniqueAttempts(attempts).filter((attempt) => Policy.isEvidenceBackedValidAttempt(attempt)).length
       const identityMismatch = attempts.some((attempt) =>
         !Policy.sameHypothesisIdentity(
           {
@@ -144,7 +145,7 @@ export const UpdateVrtCheckTool = Tool.define<typeof Parameters, VrtCheckMetadat
         return {
           title: `VRT clean verdict blocked — mismatched verification identity`,
           output: "The verification ledger belongs to a different asset or vulnerability class than this VRT check. Use a hypothesis_key bound to this entry and category; no clean verdict was written.",
-          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_identity_mismatch", attemptsUsed: Policy.uniqueAttempts(attempts).filter((attempt) => attempt.validConditions).length },
+          metadata: { entryID: params.entry_id, category: params.vrt_category, status: "blocked_identity_mismatch", attemptsUsed: validAttemptsUsed },
         }
       }
       const decisiveAttempt = attempts[attempts.length - 1]

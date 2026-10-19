@@ -236,7 +236,7 @@ export function assessFindingChecks(input: FindingValidationInputCheck[], attemp
     "All ten checks (status, reason, and evidence):",
     ...checks.map(formatCheck),
     "",
-    "Evidence-backed validation attempts recorded: " + validAttempts.filter((attempt) => attempt.validConditions && Boolean(attempt.evidence?.trim())).length + ". No fixed attempt-count threshold applies.",
+    "Evidence-backed validation attempts recorded: " + validAttempts.filter((attempt) => attempt.validConditions && Boolean(attempt.evidence?.trim())).length + ". no fixed attempt-count threshold applies; evidence and resolved checks govern the verdict, not counts.",
     "",
     "Check results: " + passed.length + " passed, " + failed.length + " failed, " + unknown.length + " unknown, " + notApplicable.length + " not applicable (10 total).",
     "Next step: " + nextStep,
@@ -501,7 +501,7 @@ export namespace FindingValidation {
     }
 
     const strategyPlan = recommendValidationStrategies([finding.title, finding.description, finding.endpoint].join(" "))
-    const strategyGuidance = assessment.attemptsRemaining > 0
+    const strategyGuidance = assessment.verdict === "inconclusive"
       ? "\nCase-specific strategy suggestions (choose only relevant, safe tests; do not blindly run all): " + strategyPlan.join(", ")
       : ""
     return {

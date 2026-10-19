@@ -143,11 +143,7 @@ from the previous evidence and vulnerability class; use distinct `strategy_id` a
 payloads, planned-but-unrun tests, and attempts with invalid scope/identity/setup do not
 count toward the budget.
 
-A final **disproven / false-positive** verdict requires direct contradictory evidence under valid preconditions and multiple evidence-backed contradictions including a primary contradiction through `validate_finding`; no fixed attempt count applies. A decisive
-confirmation may stop early when direct evidence proves impact. Scope, authorization, or
-safety blockers stop testing and leave the result inconclusive; reaching 20 attempts
-without decisive evidence also means `INCONCLUSIVE / NEEDS REVIEW`, never an automatic
-false positive. Do not run 20 mechanical permutations just to satisfy a counter.
+A final **disproven / false-positive** verdict requires direct contradictory evidence under valid preconditions, multiple evidence-backed contradictions including a primary contradiction through `validate_finding`, and a matching durable ledger outcome. No fixed attempt count applies. A decisive confirmation may stop early when direct evidence proves impact. Scope, authorization, safety blockers, or exhaustion of relevant safe checks leave the result `INCONCLUSIVE / NEEDS REVIEW`, never an automatic false positive. Do not run mechanical permutations to satisfy a counter.
 
 
 ## Decision Loop

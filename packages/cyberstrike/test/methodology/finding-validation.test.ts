@@ -208,6 +208,16 @@ test("unresolved checklist questions block a false-positive verdict regardless o
   expect(result.nextStep).toContain("Resolve the unknown checks before making a final verdict")
 })
 
+test("false positive has no fixed attempt-count threshold when evidence gates are met", () => {
+  const checks = checklist({
+    reproducible: { status: "fail", reason: "Controlled replay did not reproduce the claim", evidence: "The controlled replay returned the expected owner-bound record" },
+    unexpected_behavior: { status: "fail", reason: "Observed response matches intended behavior", evidence: "The response matched the same-account baseline" },
+  })
+  const result = assessFindingChecks(checks, makeAttempts(2))
+  expect(result.verdict).toBe("false_positive")
+  expect(result.attemptCount).toBe(2)
+})
+
 test("false positive requires multiple evidence-backed contradictions and explains failed numbers", () => {
   const checks = checklist({
     reproducible: { status: "fail", reason: "Repeated controlled attempts did not reproduce the claim", evidence: "Three replays returned the expected owner-bound record" },
