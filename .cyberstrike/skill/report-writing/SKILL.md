@@ -78,11 +78,14 @@ Use the current platform form and policy. HackerOne commonly uses summary/detail
 
 ## Tools
 
-- **Markdown editor:** maintain readable report structure and request/response blocks.
-- **Burp Repeater / curl:** capture exact reproducible HTTP steps.
-- **CVSS calculator:** derive a vector from observed conditions.
-- **Evidence-hygiene:** check screenshots, HAR, and report body for secrets/PII.
-- **Program policy/VRT/vendor docs:** align category, scope, severity, and remediation.
+- Markdown/plain-text editor and local diff: maintain readable report structure and review revisions.
+- `curl` or Python `httpx`: reproduce exact HTTP steps from an observed request artifact.
+- CVSS calculator: derive a vector from observed conditions and preserve the inputs.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json`: validate evidence metadata before sharing.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved redacted responses offline.
+- Program policy/VRT/vendor docs: align category, scope, severity, and remediation.
+
+Verify `curl --version` and the selected Python client. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/.
 
 ## Report Structure and Quality Matrix
 
