@@ -152,3 +152,28 @@ The local helper removes query values and fragments, retains sorted query-key na
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Operational note: keep source, observation time, confidence, and corroboration with each asset. A discovered host or route is a lead, not scope authorization or a vulnerability by itself.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use a small phase-appropriate toolkit: Burp/browser DevTools for manual testing, subfinder/dnsx/httpx/katana for asset workflow when useful, and local URL/evidence helpers. Choose tools by the question rather than installing an entire collection by default.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — request capture.
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — official install for relevant recon utilities.
+- [Python downloads](https://www.python.org/downloads/) — run local standard-library helpers.
+Optional CLI availability is not assumed; if a tool is missing, recommend its official installer and a manual alternative. Active probing must follow each program's written rate and data-handling rules. Do not invent a check result when a tool is unavailable.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — systematic testing.
+- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
+- [UseOSINT skills](https://github.com/useosint/skills) — source provenance and corroboration.
+
+### Reusable helpers
+- Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt for locally collected URL normalization.
+- Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json for evidence metadata.
+These helpers are local-only and do not contact a target.
+
+### Result handling
+Preserve phase, source, tool/version, command input, count/error status, artifact path, confidence, and next handoff. Reuse confirmed artifacts and continue only with materially distinct tests.
