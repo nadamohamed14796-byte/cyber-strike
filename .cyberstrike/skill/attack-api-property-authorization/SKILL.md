@@ -140,3 +140,29 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Prove that a controlled unauthorized principal can read/modify a protected field or action. A field present in JSON, even if hidden in the UI, is not by itself a vulnerability.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-invokable CLI tools and local libraries only. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version, official documentation, license, and target-specific impact before use.
+
+### Recommended tools
+- Python requests/httpx — role/identity test matrix
+- jq — inspect property-level differences
+- http_response_diff.py — paired response comparison
+- OpenAPI schema parser where available
+
+### Resources
+- https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/
+- https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/
+- https://portswigger.net/web-security/access-control
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use community lists to discover candidates, then verify their current maintenance and CLI behavior from official sources.
+
+### Helper-script contract
+Build controlled role/identity matrices and use test-owned records. Record allowed versus denied action, property, object owner, server-side effect, and response evidence. Avoid modifying real user records.
+
+Keep raw evidence separate from normalized results. Record source, timestamp, tool/version, auth context, control result, errors, confidence, and redaction. Helpers should use explicit input/output paths, structured output, and local fixtures.
+
+### Handoff
+Report commands actually run, tool versions, input/output artifact paths, control/variant outcomes, failures, confidence, limitations, and next skill. Missing tools and blocked tests must be explicit.
