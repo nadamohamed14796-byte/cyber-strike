@@ -88,7 +88,7 @@ Template scanners and fuzzers must only be run on approved targets at permitted 
 | can-i-take-over-xyz | Reference database for takeover service conditions | [Repository/docs](https://github.com/EdOverflow/can-i-take-over-xyz) |
 
 These tools are optional and evidence-specific. Never treat a scanner match as a confirmed finding, use retrieved secrets, or access private data. For takeover checks, verify DNS/service ownership and current provider conditions; a dangling-looking record alone is not proof. Review a tool's network behavior and template set before use.
- 
+
 ## Code, secrets, dependencies, cloud, and CI
 
 | Tool | Purpose | Official install/docs |
