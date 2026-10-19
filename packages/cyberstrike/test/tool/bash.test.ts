@@ -111,6 +111,12 @@ describe("Recon scanner deduplication", () => {
     expect(wrappedFirst).toBe(wrappedDuplicate)
   })
 
+  test("installed active testing tools are recognized by the scope/phase gate", () => {
+    for (const scanner of ["x8", "arjun", "commix", "ssrfmap", "nosqlmap", "crlfuzz", "git-dumper", "sqlmap", "dalfox", "wpscan"]) {
+      expect(reconScannerInvocationKey([scanner, "-u", "https://example.com"])).toBeDefined()
+    }
+  })
+
   test("ordinary commands with scanner names as arguments are not identified as scans", () => {
     expect(reconScannerInvocationKey(["grep", "katana", "notes.txt"])).toBeUndefined()
   })
