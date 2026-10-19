@@ -33,6 +33,8 @@ const TARGET_DIRECTORIES = [
   "research",
 ] as const
 
+export const USER_CONFIRMED_SCOPE_SOURCE = "User-confirmed in conversation"
+
 export type TargetNoteKind =
   | "manual"
   | "asset"
@@ -1489,10 +1491,13 @@ export namespace TargetMemory {
       throw new Error("Target scope manifest identity or schema does not match this workspace.")
     }
     if (scope.status === "configured") {
+      const userConfirmedWithoutReference = Boolean(
+        scope.authorizationSource?.startsWith(USER_CONFIRMED_SCOPE_SOURCE) && scope.authorizationReference === null,
+      )
       if (
         scope.scopeItems.length === 0 ||
         !scope.authorizationSource?.trim() ||
-        !scope.authorizationReference?.startsWith("https://") ||
+        (!scope.authorizationReference?.startsWith("https://") && !userConfirmedWithoutReference) ||
         !scope.configuredAt ||
         !Number.isFinite(Date.parse(scope.configuredAt))
       ) {
@@ -1508,8 +1513,8 @@ export namespace TargetMemory {
       ) {
         throw new Error("Target scope manifest contains non-canonical or contradictory entries.")
       }
-      const reference = normalizedSourceURL(scope.authorizationReference)
-      if (!reference || reference !== scope.authorizationReference) {
+      const reference = scope.authorizationReference ? normalizedSourceURL(scope.authorizationReference) : null
+      if ((!reference && !userConfirmedWithoutReference) || (reference && reference !== scope.authorizationReference)) {
         throw new Error("Target scope authorization reference is invalid or contains unsafe URL data.")
       }
     }
@@ -1527,16 +1532,22 @@ export namespace TargetMemory {
   /** Configure a scope only with explicit authorization provenance and at least one allowed item. */
   export async function configureScope(
     input: string,
-    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference: string },
+    options: { include: string[]; exclude?: string[]; authorizationSource: string; authorizationReference?: string | null; userConfirmed?: boolean },
   ): Promise<{ workspace: Workspace; scope: TargetScope; associatedAssets: Workspace[] }> {
     const include = [...new Set((options.include ?? []).map(normalizeScopeItem))]
     const exclude = [...new Set((options.exclude ?? []).map(normalizeScopeItem))]
-    const authorizationSource = redactTargetNoteLine(options.authorizationSource ?? "", 200)
+    const suppliedSource = redactTargetNoteLine(options.authorizationSource ?? "", 200)
+    const reference = normalizedSourceURL(options.authorizationReference ?? undefined)
+    const userConfirmedWithoutReference = options.userConfirmed === true && !options.authorizationReference?.trim()
+    const authorizationSource = userConfirmedWithoutReference
+      ? suppliedSource.startsWith(USER_CONFIRMED_SCOPE_SOURCE)
+        ? suppliedSource
+        : suppliedSource ? `${USER_CONFIRMED_SCOPE_SOURCE}: ${suppliedSource}`.slice(0, 200) : USER_CONFIRMED_SCOPE_SOURCE
+      : suppliedSource
     if (!include.length) throw new Error("At least one explicitly authorized in-scope item is required.")
     if (!authorizationSource) throw new Error("An authorization source is required (for example, the program name).")
-    const reference = normalizedSourceURL(options.authorizationReference)
-    if (!reference || !reference.startsWith("https://")) {
-      throw new Error("An HTTPS authorization reference is required; do not use a private or credential-bearing URL.")
+    if ((!reference || !reference.startsWith("https://")) && !userConfirmedWithoutReference) {
+      throw new Error("An HTTPS authorization reference is required for policy imports. For a user-confirmed exact asset, set userConfirmed=true and record that conversation-based provenance.")
     }
     const excludeSet = new Set(exclude)
     const overlap = include.filter((item) => excludeSet.has(item))
@@ -1550,7 +1561,7 @@ export namespace TargetMemory {
       scopeItems: include,
       excludedItems: exclude,
       authorizationSource,
-      authorizationReference: reference,
+      authorizationReference: reference ?? null,
       configuredAt: new Date().toISOString(),
     }
     await writeWorkspaceFile(workspace, "scope/scope.json", JSON.stringify(scope, null, 2) + "\n")
