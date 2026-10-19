@@ -256,9 +256,9 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       verified: item.verified,
     }))
     const selected = rankSkillsForPhase(phaseId, entries, 6, observedTechStack)
-    const catalogNames = new Set(entries.map((entry) => normalizeSkillText(entry.name)))
+    const eligibleNames = new Set(selected.map((entry) => normalizeSkillText(entry.name)))
     const missingRequired = (PHASE_REQUIRED_SKILLS[phaseId] ?? []).filter(
-      (name) => !catalogNames.has(normalizeSkillText(name)),
+      (name) => !eligibleNames.has(normalizeSkillText(name)),
     )
     if (missingRequired.length > 0) {
       lines.push("Required phase skill(s) missing from the current catalog: " + missingRequired.join(", ") + ". Search the skill catalog once for an allowed canonical alternative; if still missing, report this specific gap and do not claim the skill was loaded.")
