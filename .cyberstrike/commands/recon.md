@@ -93,6 +93,42 @@ Preserve only the evidence necessary for legitimate target analysis. Do not copy
 
 ---
 
+## 0.6 Mandatory phase-gate integration
+
+The registered `recon_checkpoint` tool is the authoritative ordered execution gate. This prompt's descriptive stages do not replace the persisted phase ledger.
+
+After resolving and initializing/reusing the canonical root workspace, call `recon_checkpoint(action="status", target_url="<root target>")` before selecting work. Inspect the full phase status and resume the first unresolved phase; do not create a parallel run or skip ahead.
+
+The required phase order is:
+
+1. `scope_validation`
+2. `workspace_setup`
+3. `asset_discovery`
+4. `live_hosts_ports`
+5. `url_collection`
+6. `directory_fuzzing`
+7. `parameter_discovery`
+8. `parameter_fuzzing`
+9. `javascript_analysis`
+10. `endpoint_inventory`
+11. `vulnerability_testing`
+12. `reporting`
+
+For each phase:
+- Call `recon_checkpoint(action="begin", target_url="<root target>", phase="<phase>")` before doing its work.
+- Perform only work permitted by the current phase, actual tool capabilities, persisted scope, and program policy.
+- Save raw evidence and normalized artifacts to the canonical workspace and verify their exact paths and counts.
+- Call `recon_checkpoint(action="complete", target_url="<root target>", phase="<phase>", summary="<evidence-based summary>", counts={...}, artifacts=["<exact canonical artifact path>", ...])` only after required artifacts are verified.
+- Use `block`, `fail`, or `unavailable` only according to the tool's actual schema and semantics, with a concrete reason. Do not use `unavailable` to bypass mandatory scope validation, workspace setup, or endpoint inventory.
+- If a phase is already complete, do not rerun it unless new evidence or a documented invalidation justifies it. If upstream evidence changes, explicitly identify which downstream phases need re-evaluation.
+- If a previous phase is blocked or failed, resolve or resume it before starting a later phase. Independent passive work may continue only if it does not violate the gate's ordering or scope constraints.
+
+The tool schema defines the exact accepted actions, phase names, count fields, and artifact fields. Inspect its registered schema if uncertain; never guess unsupported fields. The phase gate is separate from the scope checker: a phase being open does not authorize network requests, and scope approval does not permit skipping phases.
+
+Do not start vulnerability testing, Nuclei, broad fuzzing, or state-changing tests until the checkpoint gate accepts the phase and the endpoint inventory artifact has been verified. Active requests still require an explicit persisted scope approval for the exact candidate and permitted operation.
+
+The reporting phase must persist the consolidated report to `reports/recon-final.md`, verify that exact artifact, and include its canonical absolute path when completing `reporting`. The overall run is complete only when the phase ledger, persisted evidence, and report agree; otherwise return partial or blocked with the exact resume point.
+
 # 1. Resolve the target identity
 
 ## 1.1 Parse the request
