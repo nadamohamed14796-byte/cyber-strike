@@ -98,7 +98,6 @@ Review schema/docs publishing policy, GraphQL resolver guards, gRPC method-level
 - Gateway errors can block routes even when a schema lists them; verify actual routing within scope.
 - Stop before broad mutation enumeration, real record access, or destructive method execution.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent queries and retries. Stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Respect program limits and avoid broad enumeration.
@@ -112,7 +111,6 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 3. Compare anonymous and test-role visibility of schema metadata separately from access to actual fields/methods; exposed documentation may be intentional and does not prove a data-access weakness.
 4. Check whether discovered sensitive operations enforce server-side authorization with a test-owned object and harmless canary, rather than calling every operation.
 5. Return normalized operation names, source/provenance, auth requirements, confidence, and relevant next-skill triggers. Redact arguments and stop if results reveal secrets or unrelated private data.
-
 
 ### Verdict gates
 
@@ -133,12 +131,10 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [OpenAPI Specification](https://spec.openapis.org/oas/latest.html)
 - [gRPC Server Reflection](https://grpc.io/docs/guides/reflection/)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Schema existence versus operation exposure
 Record where the schema came from (public docs, authenticated route, source bundle, introspection, or client descriptor), which principal could read it, and which operations/fields are executable. Compare the same harmless operation across anonymous and controlled roles, then check object/property permissions separately. A schema or introspection response may be intended for developer tooling and does not prove data access. Prioritize undocumented write operations, privileged mutations, deprecated versions, and fields that cross tenant boundaries. Route object references to IDOR, field-level visibility/mutation to API property authorization, cost controls to API resource consumption, and stale versions to shadow-API/inventory review.
-
 
 ## Schema-to-operation trace
 
@@ -176,7 +172,6 @@ This reports declared metadata only. It does not prove runtime enforcement, and 
 ### Handoff and deduplication
 
 Deduplicate operations by protocol + method/operation + normalized route/schema version. Keep separate findings only when there is a distinct violated control or impact. Record schema_source, schema_version, visibility_policy, operation_id, declared_security, runtime_auth_result, field_sensitivity, object_policy_result, and next_skill_trigger. If schema parsing fails, preserve the parse error and source provenance; do not label the schema absent.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
