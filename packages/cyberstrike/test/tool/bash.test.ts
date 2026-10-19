@@ -87,7 +87,7 @@ describe("Katana scope policy", () => {
     const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"]
     expect(katanaScopeBlockReason(noOutput, "https://example.com", baseScope, "/workspace/example")).toContain("raw results")
     const outsideOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/katana.jsonl"]
-    expect(katanaScopeBlockReason(outsideOutput, "https://example.com", baseScope, "/workspace/example")).toContain("inside this target workspace")
+    expect(katanaScopeBlockReason(outsideOutput, "https://example.com", baseScope, "/workspace/example")).toContain("output path must name a file inside")
   })
 
   test("rejects duplicate scope-sensitive flags so checked and effective settings cannot diverge", () => {
