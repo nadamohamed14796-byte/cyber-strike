@@ -136,3 +136,26 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 
 ### Fingerprint-to-vulnerability gate
 Maintain independent confidence for CMS identity, component identity/version, deployment ownership, and vulnerability applicability. Corroborate a fingerprint with multiple signals and account for reverse-proxy caches, custom themes, backported fixes, and misleading banners. Before invoking a version-specific skill, verify the affected component is reachable and that the preconditions are plausible; do not map a scanner's version label directly to a confirmed CVE. Use passive/GET-only probes where possible, preserve response hashes and the exact fingerprint source, and stop when no meaningful permitted observation remains. Chain to the CMS-specific skill only after identity evidence, then require that skill's independent proof gate.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use passive fingerprint sources and browser response evidence first. WhatWeb or ProjectDiscovery httpx technology detection can help identify likely CMS/framework versions; Wappalyzer is a useful browser add-on for a second opinion.
+
+### Installation and setup
+- [WhatWeb project](https://github.com/urbanadventurer/WhatWeb) — official source and install instructions.
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official httpx installation/usage.
+- [Wappalyzer](https://www.wappalyzer.com/) — browser extension and technology lookup.
+Use only in-scope hosts and policy-permitted request rates. Fingerprints are probabilistic; don't run CMS exploit modules solely because a scanner guessed a version.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — fingerprinting and verification.
+- [WhatWeb](https://github.com/urbanadventurer/WhatWeb) — signatures and options.
+- [Wappalyzer](https://www.wappalyzer.com/) — independent fingerprinting context.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate URLs collected through browser, passive sources, and scanners.
+
+### Result handling
+Keep each fingerprint's source/time/confidence and confirm version clues with headers, assets, or a normal route. Don't collapse uncertainty into an exact version without corroboration.
