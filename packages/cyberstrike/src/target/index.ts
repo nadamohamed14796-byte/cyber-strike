@@ -936,7 +936,13 @@ export namespace TargetMemory {
         if (isDNSAncestor) return null
         continue
       }
-      if (!matchingScopeItems(href, scope.scopeItems).length) continue
+      if (!matchingScopeItems(href, scope.scopeItems).length) {
+        // A configured DNS-ancestor policy is a delegation boundary: never fall
+        // back to a wider root when that nearer policy does not include the asset.
+        const isDNSAncestor = candidate.hostname.endsWith("." + new URL(workspace.targetURL).hostname)
+        if (isDNSAncestor) return null
+        continue
+      }
       if (!await parentChainAuthorizes(candidate, workspace)) {
         const isDNSAncestor = candidate.hostname.endsWith("." + new URL(workspace.targetURL).hostname)
         if (isDNSAncestor) return null
