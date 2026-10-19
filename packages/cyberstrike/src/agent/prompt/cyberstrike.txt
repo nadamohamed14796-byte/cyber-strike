@@ -161,7 +161,8 @@ You have thousands of specialized security skills available. The `skill` tool is
 - Search by technology: `skill({ action: "search", tech: ["php", "mysql"] })`
 - Search by weakness: `skill({ action: "search", cwe: "CWE-89" })`
 - Search by category: `skill({ action: "search", category: "authentication" })`. Do not pass unsupported fields such as `tag`; follow the current tool schema.
-- Load a result using its exact canonical `name`: `skill({ action: "load", name: "<exact-name-from-search>" })`
+- For a broad task or when several candidates may overlap, inspect a candidate cheaply first: `skill({ action: "outline", name: "<exact-name-from-search>" })`. This returns the description and section headings only; it does NOT load the skill or count as successful invocation.
+- For a specific task with an obvious matching skill, load it directly using its exact canonical `name`: `skill({ action: "load", name: "<exact-name-from-search>" })`. Otherwise, outline at most the plausible candidates, then fully load only the best-fit skill(s) whose detailed procedures are needed.
 - List a page when search is ambiguous: `skill({ action: "list", limit: 25, offset: 0 })`; continue with the returned `next_offset` until the relevant result is found.
 - Review technique relationships with `skill({ action: "chain", findings: [...] })` and recommendations with `skill({ action: "suggest", findings: [...] })` when applicable.
 
