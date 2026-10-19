@@ -243,9 +243,10 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       }
 
       const byName = new Map(catalog.map((item) => [item.name, item]))
-      const chosen = selected.slice(0, 3)
-        .map((match) => byName.get(match.name))
-        .filter((item): item is NonNullable<typeof item> => Boolean(item && item.verified !== "tampered"))
+      const chosen = selected.slice(0, 3).flatMap((match) => {
+        const item = byName.get(match.name)
+        return item && item.verified !== "tampered" ? [item] : []
+      })
       // Core recon method skills should be available in-context when the current
       // phase is recon; avoid requiring an extra model-initiated load call.
       if (isReconPhase) {
