@@ -277,7 +277,7 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   }
   const outputArg = stripOuterShellQuotes(args[outputFlagIndex + 1]!)
   if (!path.isAbsolute(outputArg)) {
-    return "Katana output path must be absolute and remain inside this target workspace's scans/ directory."
+    return "Katana output path must be absolute and remain inside this target workspace's urls/ directory."
   }
   const urlsRoot = path.resolve(workspacePath, "urls")
   const outputPath = path.resolve(outputArg)
