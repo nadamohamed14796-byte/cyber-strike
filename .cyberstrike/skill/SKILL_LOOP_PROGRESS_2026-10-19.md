@@ -12,10 +12,14 @@ These are unsigned community/local skills. The loader's signing code classifies 
 
 ## Individually read-back-verified edits in this pass
 - Identity/session: attack-session, attack-auth-bypass, attack-ato, attack-mfa-bypass.
-- Request/input/API: attack-file-upload, attack-sqli, attack-xss, attack-ssrf, attack-request-smuggling, attack-mass-assignment, attack-bfla, attack-api-property-authorization, attack-api-resource-consumption, attack-api-noauth-hunt, attack-401-403-bypass, attack-graphql, attack-open-redirect, attack-rate-limit-bypass, attack-websocket, attack-cors, attack-security-headers, attack-unsafe-api-consumption.
+- Request/input/API: attack-file-upload, attack-sqli, attack-xss, attack-ssrf, attack-request-smuggling, attack-mass-assignment, attack-bfla, attack-business-logic, attack-race-condition, attack-api-property-authorization, attack-api-resource-consumption, attack-api-noauth-hunt, attack-401-403-bypass, attack-graphql, attack-open-redirect, attack-rate-limit-bypass, attack-websocket, attack-cors, attack-security-headers, attack-unsafe-api-consumption.
 - Recon/source: attack-javascript-analysis, attack-web-recon, attack-bb-methodology.
 - AI integration: attack-mcp-security, attack-rag-vector-security.
-- Infrastructure/reporting: attack-metrics-exposure, attack-report-writing, attack-evidence-hygiene, attack-triage-validation.
+- Reporting: attack-report-writing, attack-evidence-hygiene, attack-triage-validation.
+
+## Reviewed but not modified in this pass
+- attack-metrics-exposure was read in full; an additional write was blocked by the editing tool's safety checks, so no enrichment is claimed for that file.
+- attack-deserialization, attack-information-disclosure, attack-django, attack-wordpress, attack-file-inclusion, attack-csrf, attack-cache-poison, attack-cloud-assessment, and recon-subdomain-enumeration were reviewed or inspected; several attempted writes were blocked and those files are not counted as changed.
 
 Some of these skills already had substantial content; the edits add only a distinct topic-specific matrix, evidence contract, helper, or decision rule rather than replacing the whole skill.
 
