@@ -86,10 +86,12 @@ Trace the route, middleware, schema, service, and sink. Document a minimal faili
 
 ## Tools
 
-- **Source search / Semgrep:** trace middleware, parsers, and server-side sinks.
-- **Burp Suite / curl:** replay one route with controlled values.
-- **npm audit / lockfile review:** correlate dependencies to current advisories without assuming reachability.
-- **Node test harness/container:** reproduce risky parsing/sink behavior with synthetic data.
+- `rg` and `semgrep`: trace middleware, parsers, and server-side sinks in an authorized local source checkout.
+- Python `httpx` or `curl`: replay one observed route with controlled values.
+- `npm audit` and lockfile review: correlate dependencies to current advisories without assuming reachability.
+- Node.js test harness/container: reproduce parsing behavior with synthetic data.
+
+Verify `node --version`, `npm --version`, `npm audit --help`, `semgrep --version`, and `curl --version`. Official docs: https://nodejs.org/en/download/, https://docs.npmjs.com/cli/commands/npm-audit, https://semgrep.dev/docs/getting-started/.
 
 ## Node.js Request and Sink Matrix
 
