@@ -155,46 +155,21 @@ Use staging or an expressly authorized test account. Compare a normal action wit
 Record challenge provider/test mode, action, session, hostname/site-key, token issue time, server verification outcome, and final protected-operation state. Prefer vendor test keys or staging fixtures; compare a documented valid fixture with absent/invalid/expired test data and one different harmless action. Widget rendering, a token existing in the browser, or an error response is not a bypass unless a server-side protected action completes without the intended challenge proof. Chain to rate-limit or ATO only when their separate controls are also tested with disposable accounts. Never outsource challenge solving, brute-force tokens, or deliberately disrupt a production provider.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl for a replay of one observed request. Verify optional CLIs locally and use only tools exposed by the current runtime.
-- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
+### Tools
+- Python `httpx` or `curl`: compare observed server-side responses for a controlled test session and provider test keys.
+- `jq`: parse saved JSON status and verification metadata.
+- Playwright CLI/API may be used for repeatable tests in an owned staging application; it is not required for the core agent workflow.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Primary resources
-- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation guidance.
+### Install and verify
+Verify `curl --version`, the chosen Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/, and https://playwright.dev/docs/intro. If a tool is unavailable, inspect server-side validation or use a local fixture and record the gap.
 
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline and heuristically redacts common secrets; it sends no requests and cannot prove complete sanitization.
+### Resources
+- https://owasp.org/www-project-automated-threats-to-web-applications/
+- https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- https://playwright.dev/docs/intro
 
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater and browser DevTools to verify that server-side endpoints enforce CAPTCHA proof, expiration, and binding to the intended action/session. Playwright can support repeatable tests in an owned staging app; do not use CAPTCHA-solving services or automate abuse on public services.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- [Playwright installation](https://playwright.dev/docs/intro) — official Node.js/Python setup for owned test applications.
-- [Node.js](https://nodejs.org/en/download/) — use a supported version if installing Playwright through npm.
-Test with a controlled account and a provider's test keys where available. Never attempt to bypass anti-bot controls to increase production account creation, scraping, or credential attempts.
-
-### Primary resources
-- [OWASP Automated Threats to Web Applications](https://owasp.org/www-project-automated-threats-to-web-applications/) — abuse/defense context.
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — endpoint controls.
-- [Playwright docs](https://playwright.dev/docs/intro) — reproducible browser tests.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare safe, saved responses offline.
-
-### Result handling
-Establish whether the server rejects missing/expired/mismatched test proof. A visual CAPTCHA, hidden field, or browser-side check is not evidence of the server-side enforcement result.
+### Evidence and limits
+Use provider test keys or an owned staging application. Establish whether the server rejects missing, expired, mismatched, or action-unbound test proof. Do not use CAPTCHA-solving services or automate abuse on public services. A visual challenge or client-side check alone does not establish server-side enforcement.
