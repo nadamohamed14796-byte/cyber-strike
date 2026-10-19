@@ -120,6 +120,13 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(safeArgs, "https://example.com", exactURLExclusion, workspacePath)).toContain("URL/path/protocol/port exclusion")
     const schemeLessURLExclusion = { ...baseScope, excludedItems: ["url: example.com/private"] }
     expect(katanaScopeBlockReason(safeArgs, "https://example.com", schemeLessURLExclusion, workspacePath)).toContain("URL/path exclusion")
+    const exactHostExclusionWithWildcardInclude = {
+      ...baseScope,
+      scopeItems: ["*.example.com"],
+      excludedItems: ["url: example.com/private"],
+    }
+    const apiArgsForExactExclusion = safeArgs.map((arg) => arg === "https://example.com" ? "https://api.example.com" : arg)
+    expect(katanaScopeBlockReason(apiArgsForExactExclusion, "https://api.example.com", exactHostExclusionWithWildcardInclude, workspacePath)).toBeUndefined()
     const wildcardURLExclusion = { ...baseScope, scopeItems: ["*.example.com"], excludedItems: ["https://*.example.com/"] }
     const apiArgs = safeArgs.map((arg) => arg === "https://example.com" ? "https://api.example.com" : arg)
     expect(katanaScopeBlockReason(apiArgs, "https://api.example.com", wildcardURLExclusion, workspacePath)).toContain("URL/path/protocol/port exclusion")
