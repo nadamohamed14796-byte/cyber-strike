@@ -201,3 +201,30 @@ These tools are optional additions, not a claim that they already exist on the t
 - Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
 - Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
 - If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Prefer CLI tools, local static analysis, and repeatable test harnesses. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify versions, official installation guidance, license, and dependency provenance before running tools.
+
+### Recommended tools
+- Semgrep — PHP/Laravel source patterns
+- Composer audit — dependency advisory checks
+- PHPStan or Psalm — static analysis when source is available
+- curl/Python requests — controlled behavior checks
+
+### Resources
+- https://semgrep.dev/docs/
+- https://getcomposer.org/doc/03-cli.md#audit
+- https://phpstan.org/
+- https://laravel.com/docs
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are for discovery only; use official framework and tool docs for current behavior.
+
+### Helper-script contract
+Record Laravel/PHP/package versions, advisory IDs, route/middleware configuration, and safe runtime corroboration. Never print .env contents or application keys.
+
+Keep raw evidence separate from normalized output. Preserve package/version, rule/advisory ID, source path, tool/version, timestamps, error state, confidence, and redaction. Use deterministic local fixtures and JSON/JSONL output where useful.
+
+### Handoff
+Return commands actually executed, tool versions, input/output artifacts, checks passed/failed, limitations, and next skill. Do not present a static-analysis warning as a confirmed runtime vulnerability.
