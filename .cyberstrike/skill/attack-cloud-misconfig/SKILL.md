@@ -216,3 +216,31 @@ Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/ma
 
 ### Result handling
 Record provider/account context, resource/control, effective permission, observed exposure, and remediation state. Never put credentials or unrelated cloud inventory in shared notes.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify official install docs, version, license, platform compatibility, and operational impact before use.
+
+### Recommended tools
+- Prowler — AWS security posture checks when applicable
+- ScoutSuite — cloud posture inventory when applicable
+- Trivy — container/IaC/config checks
+- Checkov — IaC policy scanning
+- Provider CLI in read-only mode only with explicit authorization
+
+### Resources
+- https://github.com/prowler-cloud/prowler
+- https://github.com/nccgroup/ScoutSuite
+- https://trivy.dev/latest/
+- https://www.checkov.io/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids, not a substitute for reviewing source, release provenance, and supported behavior.
+
+### Helper-script contract
+Prefer static configuration or read-only inventory. Preserve cloud account/resource identifiers in redacted form, policy ID, region, permission context, and evidence. Do not alter IAM, storage permissions, or production resources.
+
+Preserve native evidence; normalize to a separate file. Keep source, timestamp, tool/version, error state, confidence, and redaction. Use explicit paths, machine-readable output, and local test fixtures. Never silently treat missing data as a pass.
+
+### Handoff
+Return actual commands/tool versions, input/output paths, records checked, failures, confidence, limitations, and next skill. A detected service or misconfiguration is a lead until impact is confirmed.
