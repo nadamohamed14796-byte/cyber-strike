@@ -215,25 +215,23 @@ Validation note: use a known-good baseline and a control case, change one meanin
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Proxy/Repeater, browser DevTools, and jq to inspect ordinary API requests and compare unauthenticated vs authenticated behavior. An OpenAPI document or local Postman collection can help understand intended auth requirements.
+### Agent-usable tools and purpose
+- `curl` or Python `httpx` — compare an observed endpoint's anonymous baseline with a tester-owned authenticated control.
+- `jq` — parse response JSON while filtering sensitive fields.
+- `swagger-cli` or Python `openapi-spec-validator` — validate an available OpenAPI document; schema validation is not authorization proof.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved, redacted responses offline.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- jq on Kali/Debian: sudo apt update && sudo apt install jq.
-- [Postman downloads](https://www.postman.com/downloads/) — optional API client; keep private collections/environment values local.
-Prefer read-only requests and synthetic resources. Never bulk-enumerate or copy other users' data; a public endpoint may be intended to be public.
+### Installation and verification
+Verify with `curl --version`, `jq --version`, and the selected Python import check. Install OpenAPI tooling only from its official documentation: https://github.com/APIDevTools/swagger-cli and https://openapi-spec-validator.readthedocs.io/. If a dependency is missing, use saved responses and source/schema review; explicitly record that no live request comparison was performed.
 
 ### Primary resources
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — authentication and access-control risks.
-- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — request-level methodology.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — policy expectations.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare sanitized local responses; it sends no requests.
+- https://owasp.org/API-Security/editions/2023/en/0xa7-security-misconfiguration/
+- https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
+- https://github.com/OAI/OpenAPI-Specification
+- https://portswigger.net/web-security/api-testing
 
 ### Result handling
-Record the endpoint, method, unauthenticated baseline, control with a controlled account, returned data class, and practical impact. Redact all secrets and personal data.
+Use read-only requests and synthetic resources. Record endpoint/method, anonymous baseline, controlled-account control, returned data class, and demonstrated impact. Do not bulk-enumerate or retain other users' data; a public endpoint may be intentional. Redact credentials and personal data.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
