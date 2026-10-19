@@ -89,7 +89,7 @@ Represent relationships as domain → DNS record → IP → ASN/prefix → servi
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+Do not impose an arbitrary fixed ceiling on meaningful attribution hypotheses. Continue materially distinct, authorized passive checks while evidence can change the conclusion; deduplicate repeated sources and equivalent observations. Stop when attribution is resolved, relevant sources are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. ASN membership alone never authorizes active scanning.
 
 Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
 
