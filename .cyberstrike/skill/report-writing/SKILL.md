@@ -122,25 +122,7 @@ Use the current platform form and policy. HackerOne commonly uses summary/detail
 Create a short claim ledger before writing: observed fact, artifact, inference, confidence, and omitted alternative explanations. The title and summary must name the real actor, affected route/feature, prerequisite, and demonstrated consequence. Include one direct negative control and the exact expected-versus-observed difference, then describe remediation plus a regression test tied to the root cause. Do not claim user counts, broad tenant reach, RCE, or ATO based on hypothetical siblings or chain links. If severity depends on a platform rubric, cite the applicable rule and explain the measured impact; preserve an artifact manifest with redaction and cleanup status.
 
 
-## Tool installation and optional tooling (2026-10-19)
 
-### Agent-usable tools and purpose
-- `python3` standard library — validate report structure and redact copied artifacts before inclusion.
-- `jq` — inspect structured evidence manifests and JSON results.
-- `rg` — search drafts for unredacted token-like values, secrets, or accidental personal data before review; matches require human/context review.
-- Existing helper `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py --help` — inspect supported manifest validation arguments before running.
-- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved redacted responses offline.
-
-### Installation and verification
-Verify `python3 --version` and `jq --version`. Use official OS package sources and inspect helper `--help` before assuming flags. Helpers are aids, not proof that evidence is complete or fully sanitized. If a validator is unavailable, record the gap and manually check each artifact reference.
-
-### Primary resources
-- https://docs.hackerone.com/en/articles/8494552-writing-a-good-report
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
-
-### Report quality gate
-State the exact affected asset, preconditions, reproducible steps, expected versus observed behavior, impact grounded in evidence, and remediation. Link sanitized evidence; remove live credentials, session tokens, personal data, and unrelated customer content. Distinguish confirmed facts from hypotheses and do not claim a tool/test was run without inspected output.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
