@@ -204,9 +204,9 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       "",
     ] : []),
     "## Required Skill Preflight",
-    "Before doing phase work, use the `skill` tool action=`search` to discover relevant skills for each distinct task, then action=`load` with the exact skill name. Wait for each tool result and verify the skill content was returned before claiming it is loaded.",
-    "The candidate list below is a ranked shortlist, not the complete catalog. Search again for every applicable subtask, observed technology/framework, protocol, and vulnerability class; load all skills that materially apply to the current evidence, not unrelated skills from the whole catalog.",
-    "Load the general phase methodology plus specialized skills for each distinct work area. A recommendation is not a loaded skill, and a generic skill does not satisfy coverage for a specialized task. Re-check the catalog when new endpoints, assets, authentication flows, technologies, or vulnerability signals appear.",
+    "Load the general skill for the current phase once, then load only specialist skills that materially match the current evidence. Use `skill` action=`search` when the shortlist has no suitable match or new evidence introduces a genuinely new task; use `load` with the exact canonical name and verify returned content.",
+    "The candidate list is a shortlist, not proof a skill is loaded. Do not search or load the same skill repeatedly within one task; reuse content already present in the conversation. Avoid loading unrelated skills or the entire catalog.",
+    "A recommendation is not a loaded skill. Search again only when new evidence changes the phase’s needs (for example, a newly observed framework, auth flow, or vulnerability signal), then load the smallest useful set.",
     "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
   ]
 
