@@ -190,3 +190,26 @@ Checks metadata only; manually inspect the artifact and redaction.
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Use only an authorized isolated lab. Record starting state, principal, cleanup, and telemetry; do not apply internal post-exploitation workflows to public bounty targets.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Docker's read-only inspect/log commands and Docker Bench for Security or Trivy for configuration/image review in an authorized container lab. Prefer defensive configuration evidence over running privilege-escalation payloads.
+
+### Installation and setup
+- [Docker Engine installation](https://docs.docker.com/engine/install/) — official packages.
+- [Docker Bench for Security](https://github.com/docker/docker-bench-security) — review the script before running and use a lab.
+- [Trivy installation](https://trivy.dev/latest/docs/getting-started/installation/) — image/configuration scan.
+Do not run privileged containers, mount host root, or change daemon settings on production to demonstrate impact. Use a disposable VM and verify the active Docker context.
+
+### Primary resources
+- [Docker Engine security](https://docs.docker.com/engine/security/) — isolation model.
+- [Docker Bench for Security](https://github.com/docker/docker-bench-security) — hardening checks.
+- [CIS Docker Benchmark](https://www.cisecurity.org/benchmark/docker) — configuration baseline.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to record local lab evidence metadata.
+
+### Result handling
+Document image/container ID, effective capabilities/mounts/user, starting state, specific boundary failure, telemetry, and cleanup. Keep this workflow inside authorized container labs; no persistence, data extraction, or lateral movement against third-party hosts.
