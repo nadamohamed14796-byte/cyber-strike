@@ -214,24 +214,18 @@ This compares local artifacts offline and heuristically redacts common secrets b
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer to compare a normal authorized request with a single changed header, path normalization, method, or auth context. Param Miner can support candidate discovery when its probes are allowed; curl helps reproduce a minimal case from the terminal.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install and proxy configuration.
-- Param Miner is available via Burp's official BApp Store; review extension details first.
-- Kali/Debian: sudo apt update && sudo apt install curl.
-Start from an observed in-scope request and test one variant at a time; do not use proxy rotation, distributed sources, or automated evasion to bypass program limits.
-
-### Primary resources
-- [PortSwigger access control](https://portswigger.net/web-security/access-control) — authorization semantics.
-- [PortSwigger path traversal](https://portswigger.net/web-security/file-path-traversal) — normalization context when relevant.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — policy design.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted responses offline.
-
-### Result handling
-Require a specific protected resource or action becoming accessible to the wrong controlled principal. Record status/body/state differential and alternative explanations; status code changes alone are not proof.
+### Agent-usable CLI tools
+- `curl` or Python `httpx`: reproduce an observed request and vary one path, method, or header at a time.
+- `jq` and `rg`: parse saved responses and inspect local source/configuration clues.
+- `ffuf`: optional low-rate candidate path discovery from an approved wordlist; only test explicitly authorized hosts and keep rate settings compliant.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+### Installation and verification
+Verify with `curl --version`, `python3 -c "import httpx; print(httpx.__version__)"`, `jq --version`, and `ffuf -V` as applicable. Follow official docs at https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/, and https://github.com/ffuf/ffuf. Missing tools should be recorded with a manual or source-review fallback.
+### Resources
+- https://portswigger.net/web-security/access-control
+- https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
+- https://github.com/ffuf/ffuf
+### Proof and limits
+Require an observable authorization difference for a controlled principal/resource; status changes alone are not proof. Do not use proxy rotation or rate-limit evasion.
