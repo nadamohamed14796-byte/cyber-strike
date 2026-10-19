@@ -101,7 +101,7 @@ Inspect host-header influence on reset links, redirects, referrer leakage, token
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate equivalent requests and cosmetic encodings. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Program retry limits and user-safety constraints remain mandatory.
 
 Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
 
@@ -136,3 +136,29 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 ### Reset-token binding matrix
 Use two tester-owned accounts with separate inboxes. Track token issue, delivery, expiry, single-use behavior, destination account, session binding, redirect destination, and post-reset session revocation. Change one property at a time and verify the final credential state using the disposable account—not by exposing the token in logs. Include re-requesting a token, invalidating a prior token, and completing an old link after a new request only where safe. A predictable-looking URL or email behavior is not ATO without account-control proof. Chain to host-header review only if a manipulated host changes a generated reset link; chain to session review only if old sessions remain valid after a policy-required reset.
+
+
+## Recovery transaction sequence and notification safety
+
+Treat recovery as a stateful transaction, not one endpoint. Record the stages below for the same test account and mailbox.
+
+| Stage | Controlled check | Required observation |
+|---|---|---|
+| Request | Request reset for a tester-owned account | Response behavior and test mailbox event |
+| Re-request | Request a second reset only within policy | Whether earlier proof is invalidated as documented |
+| Verify | Submit malformed/expired/reused proof | Rejected without changing account state |
+| Complete | Use valid proof for the intended account/action | Test account's credential state changes exactly once |
+| Existing sessions | Reuse the tester's old session on a harmless protected endpoint | Revocation matches the product's documented policy |
+| Link construction | Compare generated URL with trusted canonical host | Untrusted request authority does not control the destination |
+| Notification | Inspect message headers and destination for owned mailbox | No unintended recipient or token disclosure in logs/referrer |
+
+### Evidence hygiene
+
+Store mailbox message ID, request correlation ID, timestamps, token metadata (not token value), account fixture, state before/after, and cleanup result. Keep raw recovery links and codes out of reports, shell history, shared notes, and commits. If a raw token accidentally appears in output, revoke it and remove the artifact.
+
+### Chain rules
+
+- Generated reset URL is influenced by Host/forwarded metadata → host-header review; do not follow links containing real tokens.
+- Old session stays authorized after reset contrary to policy → session lifecycle review.
+- Recovery proof crosses accounts or actions → identity binding defect; demonstrate only between two test-owned accounts.
+- Different response wording without a reliable oracle → record as possible enumeration only if policy and repeatable evidence support it; do not overstate takeover.
