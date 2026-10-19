@@ -105,3 +105,27 @@ Keep exploration open-ended while each new test is materially different and usef
 
 ### Branch-selection and learning loop
 At the end of each focused pass, record the most useful observation, the assumption it changed, and one next experiment that distinguishes competing explanations. When a result is interesting, cluster nearby routes in the same controller, API version, workflow, or trust boundary; test the same security property on siblings with their own baseline instead of copying an exploit blindly. Keep a negative-result note that says exactly which identity, object, method, and state were exercised, so future sessions do not repeat indistinguishable probes. Keep exploring when a new hypothesis can change the conclusion and is authorized; stop when the property is established, the meaningful branches are exhausted, or policy/safety blocks the next step.
+
+
+## Coverage ledger and adaptive branch selection
+
+For each workstream, maintain separate counts for assets discovered, endpoints normalized, hypotheses created, hypotheses attempted, findings confirmed, hypotheses disproven, blocked cases, and inconclusive cases. These counts must come from persisted records, not estimates in the model's prose.
+
+Use a branch table to prevent repetitive hunting:
+
+| Signal | Competing explanations | Cheapest discriminating check | Specialist handoff |
+|---|---|---|---|
+| 200 on protected-looking route | Public route, login shell, cached response, actual protected data | Compare anonymous and controlled authenticated baseline; inspect synthetic marker | Auth/BOLA/BFLA based on boundary |
+| Input reflected in response | Safe encoding, inert reflection, HTML/JS context execution | Identify exact output context and controlled browser behavior | XSS only if execution is reachable |
+| Secret-like string in JS | Public identifier, dummy value, credential, dead code | Record source and type without printing/using value; inspect approved docs/config | Secret triage/evidence hygiene |
+| URL parameter accepted | Browser redirect, server-side fetch, ignored field | Correlate with actual navigation or controlled callback | Open redirect or SSRF based on observed actor |
+| Header absent | Hardening gap, modern equivalent control, irrelevant response type | Inspect effective browser behavior on the relevant route | Header skill plus independently proven child impact |
+| Two requests succeed | Idempotent behavior, duplicate response, duplicate side effect | Read authoritative state after a sequential control | Business logic/race only with invariant violation |
+
+### Evidence-to-chain graph
+
+Every cross-skill edge should store source finding/observation, exact trigger signal, child hypothesis, required independent proof, and relationship type (prerequisite, shared root cause, impact amplifier, or sibling lead). A child skill should not inherit the parent's verdict automatically. If the parent is disproven, re-evaluate the child only if it has independent evidence.
+
+### Session closeout
+
+Before ending a work session, report completed phases, phases blocked/partial, new and changed observations, confirmed/disproven/inconclusive hypotheses, evidence paths, cleanup, and one concrete next action. Do not say all resources were covered if a source or tool was unavailable. Preserve useful negative results and deduplicate exact retries without suppressing materially new hypotheses.
