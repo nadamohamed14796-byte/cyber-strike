@@ -5,6 +5,7 @@
 // framework/vendor skill discovered by the runtime loader.
 import path from "path"
 import { existsSync, readdirSync } from "fs"
+import { SkillSigning } from "../src/skill/signing"
 
 const root = path.resolve(import.meta.dir, "../../..")
 const skillDir = path.join(root, ".cyberstrike", "skill")
@@ -15,7 +16,7 @@ type RegistryEntry = {
   description: string
   category?: string
   owasp_id?: string
-  verified: "official" | "unverified"
+  verified: SkillSigning.VerificationStatus
   tags: string[]
   tech_stack: string[]
   cwe_ids: string[]
@@ -82,10 +83,18 @@ async function main() {
     walk(dir, "")
     files.sort()
 
+    const sha256 = parseScalar(fm, "sha256")
+    const signature = parseScalar(fm, "signature")
+    const signedBy = parseScalar(fm, "signed_by")
+    const verified = await SkillSigning.verify({ content, sha256, signature, signed_by: signedBy })
+    if (verified === "tampered") {
+      throw new Error(`Refusing to refresh registry with a tampered or invalidly signed skill: ${skillPath}`)
+    }
+
     const entry: RegistryEntry = {
       name: item.name,
       description: parseScalar(fm, "description") ?? "",
-      verified: parseScalar(fm, "signed_by") ? "official" : "unverified",
+      verified,
       tags: parseArray(fm, "tags"),
       tech_stack: parseArray(fm, "tech_stack"),
       cwe_ids: parseArray(fm, "cwe_ids"),
@@ -102,7 +111,7 @@ async function main() {
   await Bun.write(indexPath, JSON.stringify(index, null, 2) + "\n")
   console.log(`Refreshed curated registry at ${indexPath}`)
   console.log(`  ${entries.length} allowlisted skills indexed`)
-  console.log(`  ${entries.filter((entry) => entry.verified === "official").length} signed/official; ${entries.filter((entry) => entry.verified === "unverified").length} unverified`)
+  console.log(`  ${entries.filter((entry) => entry.verified === "official").length} official; ${entries.filter((entry) => entry.verified === "community").length} community; ${entries.filter((entry) => entry.verified === "unverified").length} unverified`)
 }
 
 main().catch((error) => {
