@@ -60,11 +60,11 @@ describe("Katana scope policy", () => {
   })
 
   test("accepts ordinary single- or double-quoted shell URL and numeric arguments", () => {
-    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-j", "-ncb", "-o", "'/tmp/example-workspace/scans/katana-urls-run-1.jsonl'"]
+    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-j", "-ncb", "-o", "'/tmp/example-workspace/urls/katana-urls-run-1.jsonl'"]
     expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
 
-  test("requires a unique output path inside the canonical workspace scans folder", () => {
+  test("requires a unique output path inside the canonical workspace urls folder", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/outside.txt"], "https://example.com", baseScope, workspacePath)).toContain("inside")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
@@ -88,7 +88,7 @@ describe("Katana scope policy", () => {
   })
 
   test("rejects duplicate scope-sensitive flags so checked and effective settings cannot diverge", () => {
-    expect(katanaScopeBlockReason([...safeArgs, "-o", path.join(workspacePath, "scans", "other.jsonl")], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
+    expect(katanaScopeBlockReason([...safeArgs, "-o", path.join(workspacePath, "urls", "other.jsonl")], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
   })
 
