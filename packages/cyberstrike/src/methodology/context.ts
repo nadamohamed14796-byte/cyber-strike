@@ -228,17 +228,13 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
   const lines = [
     ...(isReconPhase ? [
       "## Canonical Recon Workflow",
-      "Before every unresolved recon phase, consult .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md when available. It is a minimum capability map, not proof of installed tools. For each phase, discover actual registered native tools separately from CLI candidates; verify CLI availability/version with the repository tool_preflight.py helper only after confirming its real path, inspect actual help/docs, and choose a primary plus meaningful complementary source where needed.",
-      "Record selected/skipped/missing/failed tools and reasons, actual execution outcomes, raw and normalized artifact paths, provenance, deduplication counts, and artifact validation. A tool recommendation or successful command is not phase completion; distinguish missing tools, failed runs, zero-result sources, and not-applicable checks.",
-      "Follow methodology/recon.ts for ordered phases, checkpoint gates, persistence, and completion criteria. It owns workflow order; it does not replace detailed skills. Search and load recon-methodology plus specialized sub-workflow skills that materially apply to the current asset/evidence (for example subdomain/DNS, services/ports, virtual hosts, CMS, JS/API discovery, or cloud leads). Do not load unrelated skills or repeat a procedure when the canonical workflow and a loaded skill already cover it.",
-      "Use recon_checkpoint and the persisted scope gate as execution controls. Record outputs and provenance in the target workspace before advancing phases.",
+      "Follow the ordered phases and checkpoint rules in methodology/recon.ts. Read .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md once per run. Discover registered native tools separately from CLI candidates; preflight a CLI only once per runtime/version change. Choose a primary method and use alternatives only when they add coverage or recover a failure.",
+      "Persist useful raw and normalized artifacts with provenance, counts, and errors. Distinguish zero results from failed/unavailable/blocked sources, and complete a phase only after its artifacts are verified. Reuse completed outputs; do not repeat equivalent work without new evidence or a changed failure cause.",
       "",
     ] : []),
     "## Required Skill Preflight",
-    `Load the general skill for the current phase once, then load only specialist skills that materially match the current evidence. Phase-critical skills for ${phaseId}: ${(PHASE_REQUIRED_SKILLS[phaseId] ?? []).join(", ") || "none pinned"}. Use the skill tool action=load with each exact canonical name and verify returned content before proceeding. If a listed skill is missing/denied, search once for an allowed canonical alternative and record the precise gap; never silently skip the required procedure.`,
-    "The candidate list is a shortlist, not proof a skill is loaded. Do not search or load the same skill repeatedly within one task; reuse content already present in the conversation. Avoid loading unrelated skills or the entire catalog.",
-    "A recommendation is not a loaded skill. Search again only when new evidence changes the phase’s needs (for example, a newly observed framework, auth flow, or vulnerability signal), then load the smallest useful set.",
-    "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
+    `Phase-critical skills for ${phaseId}: ${(PHASE_REQUIRED_SKILLS[phaseId] ?? []).join(", ") || "none pinned"}. Load each relevant required skill by exact canonical name with the skill tool action=load, and verify returned content. Load only additional specialists justified by current evidence; reuse skills already loaded in this task.`,
+    "The ranked list is a shortlist, not proof a skill is loaded. If a required skill is missing or denied, search once for an allowed canonical alternative and record the exact gap; never claim a failed load succeeded. Search/load again only when new evidence changes the phase's needs. Do not begin active testing if scope validation failed.",
   ]
 
   try {
