@@ -369,7 +369,7 @@ export namespace MethodologyContext {
     )
     sections.push("- After testing a VRT check, update it via `update_vrt_check` with evidence")
     sections.push("- Check `methodology_status` before reporting done")
-    sections.push("- Use `scope_check` before testing new targets")
+    sections.push("- Reuse the single setup `scope_check` decision for the canonical target/workspace; do not call it for every discovered host or request. Active request tools enforce persisted scope internally.")
 
     // 8 & 9. Delegation briefing + work queue are ORCHESTRATOR-only routing views
     // (which specialist to dispatch next). Testers can't delegate, so skip them for
