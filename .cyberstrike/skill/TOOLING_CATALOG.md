@@ -1,5 +1,7 @@
 # CyberStrike Skill Tooling Catalog
 
+Use this task-oriented matrix together with [`CLI_TOOLING_CATALOG.md`](CLI_TOOLING_CATALOG.md), which contains broader install guidance and additional specialist CLI options. This file maps tool families to phases; the companion catalog supplies install/source details. Neither is a blanket install list.
+
 This is a discovery and selection guide for agent-executable CLI tools, local libraries, datasets, references, and helper scripts. Browser UI, browser extensions, and interactive intercepting proxies are not agent dependencies.
 
 ## Tool selection by task
