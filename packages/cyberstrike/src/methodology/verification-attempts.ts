@@ -134,6 +134,10 @@ export namespace VerificationAttempts {
       }
     }
 
+    if (attemptsUsed >= MAX_ATTEMPTS) {
+      return { outcome: "inconclusive", attemptsUsed, remainingAttempts: 0, canContinue: false, reason: "The 20-distinct-attempt budget is exhausted without decisive evidence; do not label this a false positive." }
+    }
+
     return { outcome: "inconclusive", attemptsUsed, remainingAttempts, canContinue: true, reason: "The hypothesis remains unresolved; continue only while a materially distinct, evidence-producing check can change the conclusion." }
   }
 }
