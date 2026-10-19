@@ -141,3 +141,29 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
+
+### Recommended tools
+- graphql-cop — audit common GraphQL security issues
+- InQL CLI or local schema parser where supported
+- curl/Python requests — controlled query comparison
+- jq — inspect structured errors and schema outputs
+
+### Resources
+- https://github.com/dolevf/graphql-cop
+- https://github.com/PortSwigger/InQL
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids. Use official documentation for current flags, supported versions, output formats, and limitations.
+
+### Helper script contract
+Normalize operations by operation name, variables, auth context, and response shape. Use low-cost read-only queries first; record whether introspection is enabled separately from authorization or data exposure.
+
+Preserve native evidence and normalize a separate copy. Keep source, timestamp, tool/version, errors, confidence, redaction state, and artifact references. Helpers should accept explicit paths, emit JSON/JSONL where practical, handle malformed input, and include local fixtures.
+
+### Handoff
+Return tool/version, command invoked, input/output artifact references, test/control counts, failures, confidence, limitations, and next skill. A missing tool or blocked source must not be reported as a successful empty result.
