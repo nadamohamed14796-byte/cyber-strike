@@ -70,10 +70,12 @@ Inspect timeout/provider-error branches in code or staging. Do not intentionally
 
 ## Tools
 
-- **Browser DevTools:** trace challenge and verification calls.
-- **Burp Suite:** compare direct API requests in a sandbox.
-- **Provider sandbox keys:** deterministic positive/negative test cases.
-- **Source/log review:** confirm token verification, action/host binding, and error handling.
+- Python `httpx` or `curl`: compare server-side verification responses using provider test keys and an owned staging app.
+- `jq`: parse saved verification results and structured error fields.
+- `rg`: inspect local source/configuration for token validation, action binding, and expiry checks.
+- Playwright headless API may automate tests in an owned staging app; it is optional and not required for core analysis.
+
+Verify with `curl --version`, the chosen Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/, https://playwright.dev/docs/intro/.
 
 ## Challenge Enforcement Matrix
 
