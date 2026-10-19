@@ -169,3 +169,30 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Prefer CLI tools, local static analysis, and repeatable test harnesses. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify versions, official installation guidance, license, and dependency provenance before running tools.
+
+### Recommended tools
+- Semgrep — Flask/Python source patterns
+- pip-audit — dependency advisory checks
+- Bandit — Python static checks
+- curl/Python requests — controlled route and session checks
+
+### Resources
+- https://semgrep.dev/docs/
+- https://github.com/pypa/pip-audit
+- https://bandit.readthedocs.io/
+- https://flask.palletsprojects.com/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are for discovery only; use official framework and tool docs for current behavior.
+
+### Helper-script contract
+Review session/cookie configuration, debug mode, route decorators, and template rendering with source evidence. Avoid exposing config secrets or triggering destructive application actions.
+
+Keep raw evidence separate from normalized output. Preserve package/version, rule/advisory ID, source path, tool/version, timestamps, error state, confidence, and redaction. Use deterministic local fixtures and JSON/JSONL output where useful.
+
+### Handoff
+Return commands actually executed, tool versions, input/output artifacts, checks passed/failed, limitations, and next skill. Do not present a static-analysis warning as a confirmed runtime vulnerability.
