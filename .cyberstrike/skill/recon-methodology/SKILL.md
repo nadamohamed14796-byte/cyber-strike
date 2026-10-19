@@ -118,28 +118,23 @@ Every recon wave should diff hosts, DNS/CNAME/provider changes, TLS/HTTP fingerp
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Build the workflow from passive asset sources, DNS resolution, live HTTP confirmation, URL collection, and manual browser/proxy observation. Optional specialists: subfinder, dnsx, httpx, katana, gau, naabu, Nmap, and Burp—only each for a named phase.
+### Agent-usable tools and purpose
+- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json subfinder amass dnsx httpx katana gau` — check local availability/version only; no target traffic.
+- `jq` and Python — parse, normalize, and correlate structured outputs.
+- `rg` — search local artifact collections for endpoints, technology clues, and provenance markers.
+- Use `subfinder`, `amass`, `dnsx`, `httpx`, `katana`, and `gau` only for the specific recon stage and only when active/passive use is permitted by program rules.
+- Existing helpers: `normalize_urls.py` and `host_inventory.py` preserve normalized outputs and discovery provenance.
 
-### Installation and setup
-- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — official installation for subfinder, dnsx, httpx, katana, naabu, and Nuclei.
-- [gau](https://github.com/lc/gau) — official source and releases.
-- [Nmap](https://nmap.org/download.html) — official downloads and package guidance.
-- [Burp Suite](https://portswigger.net/burp) — request capture.
-Install only the tools that add coverage to the current target; no requirement to install the full list. Keep passive and active results distinct, use curated in-scope inputs, and obey program request-rate rules. Discovery does not expand scope automatically.
+### Installation and verification
+Consult upstream docs before installing: https://docs.projectdiscovery.io/, https://github.com/owasp-amass/amass, and https://github.com/lc/gau. Check each binary's version/help and output schema. Do not treat an unavailable binary as an empty target result; record the missing dependency and choose a supported alternative.
 
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — end-to-end methodology.
-- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — tool behaviors and output.
-- [UseOSINT skills](https://github.com/useosint/skills) — source provenance/corroboration.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://docs.projectdiscovery.io/
+- https://github.com/vavkamil/awesome-bugbounty-tools
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate URL inventories while stripping sensitive query values locally.
-
-### Result handling
-Keep source, phase, time, tool/version, live/passive status, confidence, and next action. Use one endpoint record with multiple parameter/source observations instead of duplicate records.
-
+### Handoff contract
+Keep each stage's raw output, normalized copy, tool/version, timestamps, errors, and counts. Deduplicate data without dropping alternate sources. Report passive observations separately from active validation and state the next phase explicitly.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
