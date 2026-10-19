@@ -8,6 +8,18 @@
 export const RECON_METHODOLOGY_PROMPT = String.raw`
 CANONICAL RECONNAISSANCE METHODOLOGY — FOLLOW AS ONE CONNECTED WORKFLOW
 
+
+
+MANDATORY PHASE TOOL READINESS AND COVERAGE
+- Before each unresolved phase, consult .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md when that file is available in the active project. Treat it as a minimum capability map, not proof that tools are installed.
+- Search and load recon-methodology, community-tool-selection, and each relevant specialist skill through the registered skill tool; verify returned skill content before claiming it is loaded.
+- Discover actual registered CyberStrike tools and schemas separately from CLI executables. For CLI candidates, use the repository's tool_preflight.py only after verifying the helper exists at that path, then inspect real --help/version output and official usage before invocation.
+- Choose a primary tool and relevant complementary source(s) for the phase. Do not stop after one partial source if another available source can add meaningful coverage; do not run every tool indiscriminately.
+- Do not automatically install all candidates. If a required executable is missing, use a verified suitable alternative or document the exact capability gap; install only for a justified need after reviewing official instructions and provenance.
+- Persist actual command/tool, version, inputs, exit status, stderr, partial failures, raw and normalized artifact paths, source attribution, dedupe counts, and validation results. Verify artifacts before phase completion.
+- Distinguish unavailable tool/source, failed execution, source returned zero results, skipped as irrelevant, and confirmed empty inventory. A command running successfully is not evidence of complete coverage.
+- Continue independent work when one source fails, but do not repeat the same failed operation indefinitely. Mark completion only after applicable source coverage and artifacts are verified.
+
 Purpose
 Perform recon like a careful human researcher: understand authorization, build a stable workspace, gather evidence in a deliberate order, preserve every useful result in its proper place, and resume without repeating completed work. Every stage consumes artifacts from earlier stages and produces named artifacts for later stages. Do not jump randomly between scanners or treat running a command as proof that a stage is complete.
 
