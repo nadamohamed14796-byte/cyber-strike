@@ -7,7 +7,7 @@ Determine whether the server enforces the intended role, ownership, tenant, or p
 ## Required scope and safety gate
 
 1. Read `web_get_session_context` and inspect the captured request, credential labels/roles, known object ownership, and expected policy.
-2. Call `scope_check` for the exact URL with `target_url` set to the canonical target workspace. If scope is missing, ambiguous, invalid, excluded, or denied, stop.
+2. Reuse the run's existing `scope_check` result for this canonical target workspace. If no result exists for this target yet, call it once before active testing; do not repeat it for every endpoint or tester. If scope is missing, ambiguous, invalid, excluded, or denied, stop. Active request tools still enforce saved scope for each exact URL.
 3. Use only explicitly authorized test identities and resources owned by those identities. Never use another person's credentials or access unrelated users' data.
 4. Prefer read-only comparisons. Do not mutate/delete resources or trigger administrative/financial actions unless a test-owned fixture and explicit reversible procedure are available.
 5. Do not brute-force paths, enumerate users, spray parameters, or use raw replay to bypass scope or controls.
