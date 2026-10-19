@@ -117,3 +117,29 @@ These helpers are support checks; human review still needs to inspect the actual
 
 ### Result handling
 Output the checks attempted, passed, failed, blocked, and not run, plus evidence refs and reasons. Confirmed and false-positive verdicts require evidence; uncertainty stays explicit.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
+
+### Recommended tools
+- http_response_diff.py — baseline/control comparison
+- validate_evidence_manifest.py — evidence completeness
+- jq/Python — parse triage ledger and deduplicate findings
+- A local JSONL ledger for hypothesis, controls, evidence, and disposition
+
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://portswigger.net/web-security
+- https://www.hackerone.com/disclosure-guidelines
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; use official documentation for current behavior and limitations.
+
+### Helper-script contract
+For every finding, record each meaningful test condition, control, result, confidence, evidence, and disposition reason. Keep false positives with reproducible reason codes; never count a blocked or unexecuted test as passed.
+
+Preserve original evidence separately from normalized outputs. Record tool/version, timestamps, source, confidence, errors, redaction, and stable artifact paths. Use structured output and local fixtures; never overwrite evidence silently.
+
+### Handoff
+Return actual commands and versions, evidence paths, passed/failed/inconclusive checks, false-positive reason where applicable, confidence, limitations, and next skill.
