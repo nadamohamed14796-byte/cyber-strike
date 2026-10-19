@@ -124,3 +124,26 @@ Enforce authorization outside the model, use least-privilege tools, validate all
 
 ### Controlled adversarial test matrix
 Map each test to a specific trust boundary: direct/indirect prompt injection, retrieval tenant isolation, tool authorization, secret handling, output rendering, memory persistence, and human approval for consequential actions. Use fictional canary strings and synthetic documents, and check whether tool calls/actions are blocked by server-side authorization—not just whether the model refuses in text. Keep prompt-injection content as untrusted test data; do not allow it to override system or user policy. Record the exact input, retrieved context, tool decision, output, and control run. Route document access to RAG/vector security, unsafe browser rendering to XSS, and external fetch behavior to SSRF only after separate evidence.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use a controlled local model/app and repeatable test harness; Promptfoo or garak can add structured LLM security probes, while application logs help trace retrieval, tool calls, and output. Keep all test prompts and documents synthetic unless the program explicitly authorizes otherwise.
+
+### Installation and setup
+- [Promptfoo installation](https://www.promptfoo.dev/docs/installation/) — official setup and red-team evaluation docs.
+- [garak documentation](https://garak.ai/) — official install/configuration.
+- [Docker](https://docs.docker.com/get-docker/) — optional isolation for a local lab.
+Review the selected probes before running them. Point tools at an owned local endpoint or explicitly authorized service and configure request limits. Do not send private prompts, secrets, or customer data to external evaluation services.
+
+### Primary resources
+- [OWASP GenAI Security Project](https://genai.owasp.org/) — threat taxonomy.
+- [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework) — evaluation/governance.
+- [MCP specification](https://modelcontextprotocol.io/specification) — tool boundary, if relevant.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted responses offline.
+
+### Result handling
+Classify input injection, retrieval permission failure, cross-tenant data access, unsafe tool invocation, and ordinary model-quality issues separately. Store minimal redacted evidence; a surprising answer is not automatically a security vulnerability.
