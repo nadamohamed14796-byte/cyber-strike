@@ -96,7 +96,7 @@ Inspect timeout/provider-error branches in code or staging. Do not intentionally
 - Avoid challenge-solving services, high-volume retries, credential stuffing, and production load tests.
 
 
-## Adaptive Verification Contract (maximum 20 distinct hypotheses)
+## Adaptive Verification Contract (evidence-driven; no arbitrary attempt ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
@@ -143,3 +143,7 @@ Verify: server-side action did not occur when challenge validation should fail
 ```
 
 Do not use proxy rotation or solve/bypass services against a live program. Impact is a demonstrated abuse-sensitive action available without an enforced control, not merely a client-side challenge disappearing. Chain to attack-rate-limit-bypass only when the program permits abuse-control validation and there is a separately observed enforcement weakness.
+
+
+## Enrichment: safe server-side validation
+Use staging or an expressly authorized test account. Compare a normal action with a missing, expired, or replayed challenge token while keeping the rest of the request unchanged. Confirm from server-side state whether the action was rejected. Do not use proxy rotation, third-party solving services, or high-volume submissions against a live program. A client-side challenge disappearing is not impact; the server must actually permit an abuse-sensitive action that policy says should be blocked. Chain to rate-limit testing only where program rules expressly permit that assessment.
