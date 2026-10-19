@@ -120,6 +120,26 @@ describe("Methodology phase skill routing", () => {
     expect(names).toContain("recon-port-service-discovery")
   })
 
+  test("business logic critical skill remains in a short ranked list", () => {
+    const makeSkill = (name: string): SkillIndex.Entry => ({
+      name,
+      description: "General business logic security testing",
+      tags: [],
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+
+    const entries = [
+      makeSkill("generic-business-testing-one"),
+      makeSkill("generic-business-testing-two"),
+      makeSkill("attack-business-logic"),
+    ]
+    const ranked = rankSkillsForPhase("business_logic", entries, 2)
+    expect(ranked.map((skill) => skill.name)).toContain("attack-business-logic")
+  })
   test("phase ranking uses required tags and metadata rather than only display-name phrases", () => {
     const makeSkill = (overrides: Partial<SkillIndex.Entry>): SkillIndex.Entry => ({
       name: "generic-web-testing",
