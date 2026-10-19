@@ -72,10 +72,13 @@ Inspect host-header influence on reset links, redirects, referrer leakage, token
 
 ## Tools
 
-- **Burp Suite:** compare reset request/verify/complete stages.
-- **Dedicated test mailbox:** inspect reset links for owned accounts.
-- **Browser DevTools:** inspect redirects and referrer policy.
-- **Source/log review:** examine token generation, binding, expiry, and one-time consumption.
+- Python `httpx` or `curl`: compare observed reset/verify/complete requests using tester-owned accounts.
+- Dedicated test mailbox/API: inspect reset links only for accounts controlled by the tester.
+- `jq`: parse redacted reset response metadata.
+- `rg`: review local source/configuration for token generation, account/action binding, expiry, and one-time use.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+
+Verify `curl --version`, the chosen Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## Recovery Token Control Matrix
 
