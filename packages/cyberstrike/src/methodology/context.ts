@@ -94,9 +94,19 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 // metadata matches score higher. This is discovery guidance only: the agent still
 // loads them through SkillTool so per-agent skill permissions remain authoritative.
 const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
-  passive_recon: ["recon-methodology", "attack-javascript-analysis"],
-  active_recon: ["recon-methodology", "attack-javascript-analysis", "community-tool-selection"],
+  scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
+  mobile_application_testing: ["mitre_attack_mobile"],
+  passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
+  active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
+  authentication_testing: ["wstg-athn", "attack-auth-bypass"],
+  session_management: ["wstg-sess", "attack-session", "attack-jwt"],
+  authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
+  input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
   business_logic: ["attack-business-logic"],
+  data_protection: ["attack-information-disclosure", "attack-source-leak"],
+  api_security: ["attack-shadow-api", "attack-bfla"],
+  infrastructure: ["attack-cloud-misconfig"],
+  reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
 }
 
 export function skillQueriesForPhase(phaseId: Phase.Id): string[] {
@@ -226,7 +236,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       "",
     ] : []),
     "## Required Skill Preflight",
-    "Load the general skill for the current phase once, then load only specialist skills that materially match the current evidence. Phase-critical skills are pinned into the shortlist and must be attempted when listed: for business_logic, load attack-business-logic; for passive/active recon, load recon-methodology and attack-javascript-analysis (plus community-tool-selection for active_recon). Use `skill` action=`load` with the exact canonical name and verify returned content before proceeding. If load returns not found/denied, search once for an allowed canonical alternative and record the precise gap; never silently skip the required procedure.",
+    `Load the general skill for the current phase once, then load only specialist skills that materially match the current evidence. Phase-critical skills for ${phaseId}: ${(PHASE_REQUIRED_SKILLS[phaseId] ?? []).join(", ") || "none pinned"}. Load each listed skill using `skill` action=`load` with its exact canonical name and verify returned content before proceeding. If a listed skill is missing/denied, search once for an allowed canonical alternative and record the precise gap; never silently skip the required procedure.`,
     "The candidate list is a shortlist, not proof a skill is loaded. Do not search or load the same skill repeatedly within one task; reuse content already present in the conversation. Avoid loading unrelated skills or the entire catalog.",
     "A recommendation is not a loaded skill. Search again only when new evidence changes the phase’s needs (for example, a newly observed framework, auth flow, or vulnerability signal), then load the smallest useful set.",
     "If loading is denied or unavailable, search for an allowed alternative and record the exact gap. Never claim success when the tool failed. Do not proceed to active testing when scope validation or required scope checks fail.",
