@@ -52,7 +52,7 @@ describe("Katana scope policy", () => {
     configuredAt: "2026-01-01T00:00:00.000Z",
   }
   const workspacePath = "/tmp/example-workspace"
-  const safeOutput = path.join(workspacePath, "urls", "katana-urls-run-1.jsonl")
+  const safeOutput = path.join(workspacePath, "scans", "katana-urls-run-1.jsonl")
   const safeArgs = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-jc", "-j", "-ncb", "-silent", "-o", safeOutput]
 
   test("allows a bounded exact-host crawl when the saved scope is host-wide", () => {
@@ -60,11 +60,11 @@ describe("Katana scope policy", () => {
   })
 
   test("accepts ordinary single- or double-quoted shell URL and numeric arguments", () => {
-    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-j", "-ncb", "-o", "'/tmp/example-workspace/urls/katana-urls-run-1.jsonl'"]
+    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"', "-j", "-ncb", "-o", "'/tmp/example-workspace/scans/katana-urls-run-1.jsonl'"]
     expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope, workspacePath)).toBeUndefined()
   })
 
-  test("requires a unique output path inside the canonical workspace urls folder", () => {
+  test("requires a unique output path inside the canonical workspace scans folder", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"], "https://example.com", baseScope, workspacePath)).toContain("raw results")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", "/tmp/outside.txt"], "https://example.com", baseScope, workspacePath)).toContain("inside")
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
