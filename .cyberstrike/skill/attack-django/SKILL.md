@@ -173,3 +173,26 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp/browser DevTools for runtime behavior, Django's own test tools for an authorized source checkout, and Semgrep for targeted static checks when a relevant rule exists.
+
+### Installation and setup
+- [Django installation](https://docs.djangoproject.com/en/stable/topics/install/) — official version-aware setup.
+- [Django security documentation](https://docs.djangoproject.com/en/stable/topics/security/) — framework behavior.
+- [Semgrep](https://semgrep.dev/docs/getting-started/) — optional static analysis.
+Prefer the repository's pinned Python environment and dependency lock file. Test migrations, settings, and code changes in a disposable environment; do not run debug-mode experiments on production.
+
+### Primary resources
+- [Django security](https://docs.djangoproject.com/en/stable/topics/security/) — CSRF, host headers, cookies, and escaping.
+- [Django testing tools](https://docs.djangoproject.com/en/stable/topics/testing/) — reproducible regression tests.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — black-box verification.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted HTTP responses offline.
+
+### Result handling
+Record Django/Python version, relevant middleware/settings, reachable behavior, and a regression test. A source/config suspicion needs a demonstrated effect or must remain an unconfirmed lead.
