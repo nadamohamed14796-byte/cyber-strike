@@ -80,3 +80,52 @@ Record token type (never the live value), algorithm policy, key source, redacted
 
 ### Token acceptance and claim boundary
 Separate local parsing from server acceptance. Record issuer, audience, expiry/not-before, key ID, algorithm, signing-key provenance, token transport, session context, and the harmless protected operation used as the acceptance oracle. Use tester-owned tokens only; never print or persist complete bearer values. Change one claim or validation dimension at a time, retain an unmodified-token control, and verify whether the server resolved a different principal or permission. A decoded payload, alg string, or rejected malformed token is not a finding. Chain to ATO only if a controlled identity becomes usable by an unauthorized party; chain to OAuth/OIDC review when issuance, audience, or callback binding is the source of the trust failure.
+
+## Validation matrix: one trust decision per test
+
+| Dimension | Controlled variant | Expected secure result | Evidence that matters |
+|---|---|---|---|
+| Algorithm | Missing, unsupported, or mismatched alg in a test token | Reject before protected operation | Server decision plus unchanged protected state |
+| Signature | Alter one payload byte without re-signing | Reject | Same endpoint and identity context as valid-token control |
+| Issuer/audience | Use a token from the same test issuer with wrong iss/aud | Reject for this relying party | Token issuer/audience and relying-party policy |
+| Time claims | Expired or not-yet-valid test token | Reject outside documented skew | Exact timestamps and server clock assumptions |
+| Key selection | Unknown/duplicate kid or untrusted remote-key hint | Reject or ignore untrusted hint safely | Whether untrusted key material was actually consulted |
+| Authorization claims | Change one role/scope claim in an isolated fixture | No additional privilege without trusted issuance | A harmless operation whose permission is independently known |
+| Lifecycle | Logout, password reset, key rotation, or account disable | Behavior matches documented revocation/rotation contract | Before/after acceptance with old and new test tokens |
+
+Do not combine several token mutations in one request: if the result changes, the root cause becomes ambiguous. Preserve one valid-token control and one invalid-token control for each branch.
+
+### Local decode helper (inspection only, not signature verification)
+
+```python
+import base64
+import json
+import os
+
+# Supply a tester-owned token via an environment variable; do not paste it into source or commit it.
+token = os.environ["JWT_TEST_TOKEN"].strip()
+parts = token.split(".")
+if len(parts) != 3:
+    raise SystemExit("Not a compact signed JWT with three segments")
+
+def decode_segment(segment):
+    segment += "=" * (-len(segment) % 4)
+    return json.loads(base64.urlsafe_b64decode(segment.encode()))
+
+print("header:", json.dumps(decode_segment(parts[0]), indent=2))
+print("claims:", json.dumps(decode_segment(parts[1]), indent=2))
+print("NOTE: decoded claims are untrusted input; this does not verify the signature.")
+```
+
+Unset the environment variable after use and never print the token itself. This helper is only for local inspection; the server-side acceptance test remains authoritative.
+
+### Chain routing
+
+- Accepted token with wrong tenant/object access → attack-idor-automation, using only two test-owned identities/fixtures.
+- Wrong audience, callback, issuer, or token binding in an OAuth/OIDC flow → attack-oauth.
+- Token/session remains valid after a security event contrary to the documented contract → attack-session.
+- A token claim appears elevated but protected operations remain denied → record as disproven, not privilege escalation.
+
+### Output additions
+
+Persist valid_control_result, invalid_control_result, single_mutation, server_principal, effective_permissions, token_lifecycle_event, revocation_observed, key_source_trust, and cleanup_status. Store only a redacted token fingerprint or non-reversible identifier, never the bearer string or refresh token.
