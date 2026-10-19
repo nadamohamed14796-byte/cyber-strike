@@ -274,9 +274,11 @@ If the user supplies a scope file:
 4. Resolve any conflicts conservatively.
 5. Import it using the registered `target_workspace` scope-configuration operation.
 
-Use the actual registered schema. If it matches the following interface, provide the canonical target, absolute scope-file path, verified authorization source, official HTTPS reference, and any additional verified exclusions:
+Prefer an official policy reference when one is supplied or can be verified. If the user explicitly confirms the entire supplied file/list as the authorized scope and no policy reference is available, use `user_confirmed_scope_list=true` and record that provenance rather than fabricating a URL. Never ask the user to confirm each row. If a file/list contains unsupported entries, preserve them as evidence and clearly state that they cannot authorize HTTP requests until supported. Use the appropriate registered-tool call:
 
-`target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
+Policy import: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
+
+User-confirmed complete list without a verified policy URL: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", user_confirmed_scope_list=true)`. The same flag applies to an explicit complete `include=[...]` list when no file is provided.
 
 Do not paste a large scope file into the model context unnecessarily.
 
@@ -284,7 +286,7 @@ Record the returned source SHA-256, saved path, configuration result, and any un
 
 ## 2.3 Configure scope without a supplied file
 
-If no scope file is provided, construct the manifest only from verified official policy evidence.
+If no scope file is provided, prefer verified official policy evidence for a full program manifest. If the user explicitly identifies a complete supplied include list as the authorized scope, pass the whole list together with `user_confirmed_scope_list=true`; do not ask them to choose entries one by one or fabricate a policy reference. For a single exact asset confirmation, use `user_confirmed_scope=true` only for initial setup or `merge_existing=true` for an additive update.
 
 When the registered tool supports the interface below, use:
 
