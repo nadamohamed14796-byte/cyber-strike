@@ -54,3 +54,27 @@ Return the attack graph, trigger and trust boundary, source evidence, required p
 
 ### Pipeline attack-path validation
 Represent each candidate as a chain of trust transitions: untrusted input → workflow/runner execution → artifact or token exposure → privileged deployment. For each edge record the controlling policy, whether the attacker can influence it, the evidence source, and a negative control. Prioritize pull-request triggers, untrusted artifact reuse, mutable action/dependency references, workflow permission inheritance, secret scope, and cross-environment deployment gates when visible in repository configuration. Do not trigger production deployments, poison shared caches/artifacts, or use real CI credentials as proof; reproduce in a disposable fork or lab. If no path crosses into a privileged resource, record the configuration weakness without claiming compromise.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use zizmor for GitHub Actions, Gitleaks for secret patterns, Trivy for image/dependency checks, and Checkov when Terraform/Kubernetes/cloud IaC files are actually present. These are defensive assessment tools; no CI trigger or deployment should be modified without approval.
+
+### Installation and setup
+- [zizmor](https://github.com/zizmorcore/zizmor) — official project and installation.
+- [Gitleaks](https://github.com/gitleaks/gitleaks) — official releases.
+- [Trivy](https://trivy.dev/latest/docs/getting-started/installation/) — official installer instructions.
+- [Checkov](https://www.checkov.io/2.Basics/Installing%20Checkov.html) — official installation docs.
+Use a fork/sandbox and least-privilege test credentials. Do not trigger release, publish, deployment, secret-exfiltration, or runner-persistence paths in third-party repositories.
+
+### Primary resources
+- [GitHub Actions security hardening](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions) — runner/token boundaries.
+- [OWASP CI/CD Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/CI_CD_Security_Cheat_Sheet.html) — pipeline risks.
+- [SLSA framework](https://slsa.dev/) — build provenance and supply-chain controls.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to validate sanitized test evidence metadata before reporting.
+
+### Result handling
+Record workflow/event trigger, token permissions, trust boundary, expected vs actual effect, and cleanup. Report a misconfiguration only when the reachable path and impact are established.
