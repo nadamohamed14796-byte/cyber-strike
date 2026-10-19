@@ -117,3 +117,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer and jq to compare the same object with different controlled roles/owners; use OpenAPI/JSON Schema if the API publishes a contract. Keep object-level and property-level authorization as separate questions.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- jq on Kali/Debian: sudo apt update && sudo apt install jq.
+- For owned source, use the project's existing schema validator; don't add a dependency solely for a single manual check.
+Use synthetic object fields and two authorized accounts. Avoid altering production roles or exposing private data.
+
+### Primary resources
+- [OWASP API Security Top 10 — API3](https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/) — property authorization concerns.
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — server-side policy.
+- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — controlled validation.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare local, sanitized representations.
+
+### Result handling
+Prove that a controlled unauthorized principal can read/modify a protected field or action. A field present in JSON, even if hidden in the UI, is not by itself a vulnerability.
