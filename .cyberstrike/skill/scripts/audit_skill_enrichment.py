@@ -7,6 +7,7 @@ from pathlib import Path
 DEFAULT_ROOT=Path(".cyberstrike/skill")
 EXCLUDED={"CIS_benchmarks","NIST","WEB","mitre_attack","mitre_attack_ics","mitre_attack_mobile","mitre_attack_test","scripts"}
 TOOL_MARKERS=("## Agent-executable CLI tooling, resources, and helper scripts","## Agent-executable CLI tooling (2026-10-19)","## Tool installation and optional tooling (2026-10-19)","## Practical tooling, references, and helper scripts (2026-10-19)")
+SCAN_MARKERS=TOOL_MARKERS+("## Tools",)
 UI_FIRST=re.compile(r"\b(Burp(?:\s+Suite|\s+(?:Proxy|Repeater|Comparer))?|browser DevTools|Chrome DevTools|DOM Invader|Turbo Intruder|BApp Store)\b",re.I)
 URL=re.compile(r"https?://[^\s)]+")
 CLI=re.compile(r"`(?:[a-zA-Z0-9_.-]+\s+[^`]+|python3\s+[^`]+)`")
@@ -14,7 +15,7 @@ INSTALL=re.compile(r"\b(install|download|go install|pipx|apt install|brew instal
 
 def inspect(path:Path,root:Path)->dict:
     content=path.read_text(encoding="utf-8",errors="replace")
-    starts=sorted({content.find(m) for m in TOOL_MARKERS if content.find(m)>=0})
+    starts=sorted({content.find(m) for m in SCAN_MARKERS if content.find(m)>=0})
     start=starts[0] if starts else -1
     sections=[]
     for section_start in starts:
