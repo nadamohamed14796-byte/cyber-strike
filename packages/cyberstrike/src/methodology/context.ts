@@ -233,35 +233,17 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       severity_boost: item.severity_boost ?? {},
       verified: item.verified,
     }))
-    const selected = rankSkillsForPhase(phaseId, entries, 10, observedTechStack)
+    const selected = rankSkillsForPhase(phaseId, entries, 6, observedTechStack)
     if (selected.length === 0) {
       lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
     } else {
       lines.push("", "Phase-specific candidates (ranked by phase tags and skill metadata):")
       for (const match of selected) {
-        lines.push(`- ${match.name} — ${match.description} (matched: ${match.query}; relevance: ${match.score})`)
+        lines.push(`- ${match.name} — ${match.description.slice(0, 180)}${match.description.length > 180 ? "…" : ""} (matched: ${match.query}; relevance: ${match.score})`)
       }
 
-      const byName = new Map(catalog.map((item) => [item.name, item]))
-      const chosen = selected.slice(0, 3).flatMap((match) => {
-        const item = byName.get(match.name)
-        return item && item.verified !== "tampered" ? [item] : []
-      })
-      // Core recon method skills should be available in-context when the current
-      // phase is recon; avoid requiring an extra model-initiated load call.
-      if (isReconPhase) {
-        for (const name of ["recon-methodology", "community-tool-selection"]) {
-          const item = catalog.find((candidate) => candidate.name.toLowerCase() === name)
-          if (item && item.verified !== "tampered" && !chosen.some((entry) => entry.name === item.name)) chosen.unshift(item)
-        }
-      }
-      lines.push("", "## Skill Content Loaded Into This Phase Context")
-      for (const item of chosen.slice(0, 5)) {
-        const body = item.content.trim()
-        const bounded = body.length > 9000 ? body.slice(0, 9000) + "\\n[Skill content truncated at 9000 characters; use the skill tool to load the complete skill and read relevant companion files.]" : body
-        lines.push("", `### ${item.name} — ${item.description}`, `Canonical skill: ${item.name}`, bounded)
-      }
-      lines.push("", "The skill bodies above are actually present in this context. For additional skills, use the registered skill tool search then load with the exact canonical name; read companion references/scripts when they are relevant. Never claim an additional skill or companion file was read unless its contents were returned.")
+      lines.push("", "## Load Skills On Demand")
+      lines.push("The list above contains candidates only; skill bodies are not injected automatically. Use the registered skill tool action=load with the exact canonical name for the current phase’s general methodology and only specialist skills that materially apply. Verify the tool returned content before claiming it is loaded. Do not load the entire catalog, repeat a load when its content is already in this conversation, or copy long skill bodies into summaries.")
     }
   } catch {
     // Skill catalog failures must not prevent session prompt generation.
