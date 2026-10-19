@@ -80,3 +80,28 @@ Inspect each script's actual help/source and tests before assuming flags or beha
 - [ ] Output, errors, provenance, and redaction status are persisted.
 - [ ] Results were manually validated with controls before being reported as findings.
 - [ ] Missing tools and incomplete coverage are clearly recorded.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use command-line utilities and local Python helpers; interactive browsers and GUI proxy applications are not prerequisites for this skill.
+
+### Preflight and provenance
+- Check whether a command exists before relying on it: `command -v <tool>` on Linux/macOS or `Get-Command <tool> -ErrorAction SilentlyContinue` in PowerShell.
+- Verify a chosen tool's version and syntax using its documented flag, for example `jq --version`, `rg --version`, `python3 --version`, or `tool --help`. For multiple executable names, use `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool-name> [another-tool]`.
+- Prefer first-party installation and release instructions. Verify license, platform support, package provenance, maintenance status, required privileges, default network behavior, and whether the chosen tool can send active traffic before installing or running it.
+- Keep installs explicit and reproducible. Record the package/release version and installation source; do not run one-line remote shell installers or copy commands from untrusted write-ups without review.
+
+### Local helper scripts
+- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool-name>`: checks PATH availability and version output; it does not install tools or contact targets.
+- `python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --self-test`: checks the catalog validator's parser fixtures.
+- `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json`: audits CLI-tooling guidance in direct community skills.
+- `python3 .cyberstrike/skill/scripts/normalize_urls.py --help`, `host_inventory.py --help`, or `js_endpoint_inventory.py --help`: inspect exact supported inputs before use; do not assume options not shown by their help/source.
+
+### Official references
+- Python command-line and standard library docs: https://docs.python.org/3/
+- ripgrep documentation and releases: https://github.com/BurntSushi/ripgrep
+- jq manual and releases: https://jqlang.org/
+- Project-maintained CLI tool candidates: https://github.com/vavkamil/awesome-bugbounty-tools
+
+Only use a command that is actually available and verified in the current runtime. If an appropriate tool is missing, record that limitation and choose a justified alternative. Tool selection never authorizes active probing: target scope, program policy, impact, rate, and evidence requirements remain controlling.
+
