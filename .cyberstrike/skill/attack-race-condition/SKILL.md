@@ -146,3 +146,25 @@ Do not infer a race from two 2xx responses. A finding requires a final state tha
 ### Root-cause handoff
 
 Record whether the likely root cause is check-then-act, missing uniqueness constraint, non-atomic balance/quota update, missing idempotency, stale cache/authorization, or asynchronous job duplication. Keep root-cause labels tentative unless code or approved telemetry confirms them. Chain to business-logic for the violated invariant and triage-validation for the evidence gate.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater to group requests and compare states; Turbo Intruder may be useful for tightly controlled concurrency experiments after the manual baseline is understood. Prefer test credits/orders/invitations created for the assessment.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
+- Turbo Intruder is available through the official Burp BApp Store; read the extension's documentation and review scripts before running them.
+- Test only one disposable workflow with low request volume and a clear reset/cleanup plan. Do not create real charges, transfers, account changes, or resource exhaustion.
+
+### Primary resources
+- [PortSwigger race conditions](https://portswigger.net/web-security/race-conditions) — practical methodology and labs.
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — resource/workflow risk context.
+- [OWASP Transaction Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html) — transaction integrity.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares captured states offline; it does not generate concurrent requests.
+
+### Result handling
+Keep a normal single-request baseline, then compare concurrent outcome and final server-side state. Report only controlled duplicate effects, not just timing variance.
