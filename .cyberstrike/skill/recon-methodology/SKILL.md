@@ -109,12 +109,10 @@ Before handing a lead to a testing skill:
 
 Return normalized asset and endpoint inventories, scope decisions, provenance, delta summary, authentication coverage, deduplicated prioritized hypotheses, blockers, and next-step recommendations. Keep discovery facts separate from security conclusions.
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Delta-driven prioritization and handoff
 Every recon wave should diff hosts, DNS/CNAME/provider changes, TLS/HTTP fingerprints, new API paths, methods/parameters, JavaScript hashes, authentication state, and third-party destinations against the previous snapshot. Reuse observations only while their source freshness/TTL remains credible; revalidate changes and stale evidence rather than repeating a whole scan. Keep asset ownership confidence separate from vulnerability confidence. Each queue item must state the security property, expected policy, prerequisites, baseline needed, exact next observation, and stopping condition. A candidate with missing credentials stays blocked, not safe. Hand off only signal-matched cases to specialist skills and preserve the source/provenance for later audit.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
