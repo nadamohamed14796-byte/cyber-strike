@@ -14,14 +14,15 @@ INSTALL=re.compile(r"\b(install|download|go install|pipx|apt install|brew instal
 
 def inspect(path:Path,root:Path)->dict:
     content=path.read_text(encoding="utf-8",errors="replace")
-    start=min([content.find(m) for m in TOOL_MARKERS if content.find(m)>=0],default=-1)
-    if start >= 0:
-        # Audit only the tooling section itself, not unrelated methodology later in the file.
-        next_heading = re.search(r"^##\s+", content[start + 2 :], re.MULTILINE)
-        section_end = start + 2 + next_heading.start() if next_heading else len(content)
-        section = content[start:section_end]
-    else:
-        section = ""
+    starts=sorted({content.find(m) for m in TOOL_MARKERS if content.find(m)>=0})
+    start=starts[0] if starts else -1
+    sections=[]
+    for section_start in starts:
+        # Inspect every tooling section, but stop each section at the next level-two heading.
+        next_heading=re.search(r"^##\s+",content[section_start+2:],re.MULTILINE)
+        section_end=section_start+2+next_heading.start() if next_heading else len(content)
+        sections.append(content[section_start:section_end])
+    section="\n".join(sections)
     tool_heading=bool(re.search(r"^#{1,4}\s+.*\b(tools?|tooling|dependencies|cli)\b",content,re.I|re.M))
     marker_count=sum(content.count(marker) for marker in TOOL_MARKERS)
     has_ref=bool(URL.search(section)) or bool(re.search(r"^#{1,4}\s+.*\b(references?|resources?)\b",section,re.I|re.M))
