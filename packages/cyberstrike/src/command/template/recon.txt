@@ -276,7 +276,7 @@ If the policy explicitly authorizes a wildcard, record the precise rule and its 
 
 ## 2.4 Persist and enforce scope decisions
 
-Before any active request to a candidate, call the registered scope checker using its actual schema. If supported, use:
+During setup, call the registered scope checker once for each distinct candidate origin using its actual schema. Persist the decision in the run manifest and reuse it for subsequent requests to that unchanged origin. Active-request tools still enforce persisted scope for every concrete request. Recheck manually only when the origin, policy, or saved scope configuration changes, or the prior decision is inconclusive. If supported, use:
 
 `scope_check(target="<exact candidate>", target_url="<canonical root target>")`
 
@@ -442,12 +442,11 @@ Retain provenance when multiple sources discover the same asset.
 For each candidate, record its authorization state and reason.
 
 Before an active operation:
-1. Normalize the exact candidate.
-2. Apply explicit exclusions.
-3. Call the scope checker.
-4. Verify that authorization is confirmed.
-5. Verify that the proposed operation is permitted by the program policy.
-6. Record the decision before execution.
+1. Normalize the candidate and identify its canonical origin/workspace.
+2. Reuse the saved setup decision for that unchanged origin, or perform the single required check if none exists.
+3. Verify the decision is authorized and the proposed operation is permitted by policy.
+4. Confirm the active tool will enforce persisted scope for the exact request.
+5. Record the decision and operation before execution.
 
 Reuse the root workspace for unvalidated and excluded candidates.
 
