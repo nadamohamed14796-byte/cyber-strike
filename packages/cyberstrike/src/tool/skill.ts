@@ -21,6 +21,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     "",
     "Actions:",
     "  load    - Load a skill into context (requires skill name)",
+    "  outline - Preview a skill description and section headings without loading its full content",
     "  unload  - Remove a skill from context to free tokens",
     "  search  - Search skills by keyword, tech stack, CWE, or category",
     "  chain   - Analyze current findings for kill chain opportunities",
@@ -32,7 +33,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
   const parameters = z.object({
     action: z
-      .enum(["load", "unload", "search", "chain", "suggest", "list"])
+      .enum(["load", "outline", "unload", "search", "chain", "suggest", "list"])
       .default("load")
       .describe("Action to perform"),
     name: z.string().optional().describe("Skill name (for load/unload)"),
@@ -228,6 +229,48 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       // Default: load action
       if (!params.name) throw new Error("Skill name required for load action")
+
+      if (params.action === "outline") {
+        if (!params.name) throw new Error("Skill name required for outline action")
+        const canonicalName = SkillIndex.resolveReference(params.name) ?? params.name
+        const skill = await Skill.get(canonicalName)
+        if (!skill) {
+          throw new Error(`Skill "${params.name}" was not found or has an ambiguous metadata reference. Use skill(action="search", query="...") to find an exact name.`)
+        }
+        if (!accessibleSkills.some((entry) => entry.name === canonicalName)) {
+          throw new Error(`Permission denied: skill "${canonicalName}" is not accessible to agent "${ctx.agent ?? "unknown"}".`)
+        }
+        const headings = skill.content
+          .split(/\\r?\\n/)
+          .filter((line) => /^\\s{0,3}#{1,4}\\s+/.test(line))
+          .map((line) => line.trim())
+          .slice(0, 40)
+        const intro = skill.content
+          .split(/\\r?\\n/)
+          .filter((line) => line.trim() && !/^\\s*---\\s*$/.test(line) && !/^\\s*(name|description|metadata|license|version):/.test(line))
+          .slice(0, 8)
+          .join("\\n")
+          .slice(0, 700)
+        return {
+          title: `Skill outline: ${skill.name}`,
+          output: [
+            `## Skill outline: ${skill.name}`,
+            `Description: ${skill.description}`,
+            `Verification: ${skill.verified ?? "unverified"}`,
+            "",
+            "Preview only — full skill content has NOT been loaded into context.",
+            "",
+            "### Introduction",
+            intro,
+            "",
+            "### Sections",
+            ...(headings.length ? headings : ["(No Markdown headings found)"]),
+            "",
+            "Load this skill by exact canonical name only if its detailed procedures are needed.",
+          ].join("\\n").slice(0, 2_400),
+          metadata: { name: skill.name, dir: path.dirname(skill.location), outline: true },
+        }
+      }
 
       // Allow exact technique IDs from skill metadata to resolve to the one
       // canonical catalog entry; ambiguous aliases deliberately do not resolve.
