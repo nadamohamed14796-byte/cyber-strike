@@ -403,6 +403,18 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
     if (flag < 0) return undefined
     return findWrappedScanner(stripOuterShellQuotes(argv[flag + 1] ?? ""))
   }
+  const inspectNestedInvocation = async (argv: string[]): Promise<string | undefined> => {
+    const nestedScannerIndex = scannerExecutableIndex(argv)
+    if (nestedScannerIndex >= 0) return scannerName(argv[nestedScannerIndex])
+    const nestedExecutableIndex = commandExecutableIndex(argv)
+    if (nestedExecutableIndex < 0) return undefined
+    const nestedExecutable = path.basename(stripOuterShellQuotes(argv[nestedExecutableIndex]!)).toLowerCase()
+    if (["xargs", "parallel", "find", "env"].includes(nestedExecutable)) {
+      return scannerLaunchedByWrapper(argv, nestedExecutableIndex)
+    }
+    if (SHELL_WRAPPERS.has(nestedExecutable)) return shellPayload(argv, nestedExecutableIndex)
+    return undefined
+  }
 
   if (executable === "xargs" || executable === "parallel") {
     const withValue = executable === "xargs"
@@ -417,31 +429,34 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
       if (withValue.has(arg)) index++
     }
     const candidate = command[index]
-    const direct = scannerName(candidate)
-    if (direct) return direct
-    return candidate ? shellPayload(command, index) : undefined
+    return candidate ? inspectNestedInvocation(command.slice(index)) : undefined
   }
 
   if (executable === "find") {
     for (let index = executableIndex + 1; index < command.length; index++) {
       if (!["-exec", "-execdir"].includes(stripOuterShellQuotes(command[index]!))) continue
-      const candidate = command[index + 1]
-      const direct = scannerName(candidate)
-      if (direct) return direct
-      if (candidate && SHELL_WRAPPERS.has(path.basename(stripOuterShellQuotes(candidate)).toLowerCase())) {
-        const end = command.findIndex((value, i) => i > index + 1 && [";", "+"].includes(stripOuterShellQuotes(value)))
-        const endIndex = end >= 0 ? end : command.length
-        const wrapped = await shellPayload(command.slice(0, endIndex), index + 1)
-        if (wrapped) return wrapped
-      }
+      const end = command.findIndex((value, i) => i > index + 1 && [";", "+"].includes(stripOuterShellQuotes(value)))
+      const endIndex = end >= 0 ? end : command.length
+      const candidateCommand = command.slice(index + 1, endIndex)
+      const wrapped = await inspectNestedInvocation(candidateCommand)
+      if (wrapped) return wrapped
     }
   }
 
   if (executable === "env") {
     for (let index = executableIndex + 1; index < command.length; index++) {
-      if (!["-S", "--split-string"].includes(stripOuterShellQuotes(command[index]!))) continue
-      const wrapped = await findWrappedScanner(stripOuterShellQuotes(command[index + 1] ?? ""))
-      if (wrapped) return wrapped
+      const arg = stripOuterShellQuotes(command[index]!)
+      if (["-S", "--split-string"].includes(arg)) {
+        const wrapped = await findWrappedScanner(stripOuterShellQuotes(command[index + 1] ?? ""))
+        if (wrapped) return wrapped
+        continue
+      }
+      if (arg.startsWith("-")) {
+        if (["-u", "--unset", "-C", "--chdir"].includes(arg)) index++
+        continue
+      }
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(arg)) continue
+      return inspectNestedInvocation(command.slice(index))
     }
   }
   return undefined
