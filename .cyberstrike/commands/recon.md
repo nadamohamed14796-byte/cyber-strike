@@ -90,13 +90,13 @@ At minimum, use the phase matrix to cover passive asset discovery, DNS/live host
 
 Workspace initialization does not establish authorization.
 
-Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. Perform exactly one explicit `scope_check` for the canonical target/workspace during setup and retain its decision in the run manifest. Do not manually call `scope_check` for each discovered host, endpoint, request, phase, or delegated tester. Active-request tools must enforce the persisted policy internally for every concrete request; this mandatory execution-boundary enforcement is not a reason to repeat the agent-level check.
+Use active reconnaissance only against the actual asset and operations authorized by the applicable policy or explicitly confirmed by the user for that exact asset. Apply explicit exclusions before inclusion rules. During setup, call `scope_check` once for the concrete starting asset with `target_url=<canonical program-root workspace URL>`; the program root is a policy/workspace container and may itself be out of scope. Do not call the model-level checker for every discovered host, endpoint, request, phase, or delegated tester. Active-request tools enforce the persisted policy internally for every concrete request.
 
 Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
 
 Do not bypass authentication, rate limits, access controls, or program restrictions. Respect the target's permitted request methods, automation limits, and operational constraints.
 
-If scope is missing or unconfigured, review the official policy once and configure the canonical root once, then perform the single setup check. If the check is denied, errors, or is inconclusive, stop active work and report the reason without looping or repeatedly retrying. If workspace attachment fails after a successful check, diagnose that failure separately; do not try alternate URL spellings, ports, asset types, or repeated scope rewrites. Never loosen official scope to make attachment succeed.
+If scope is missing or unconfigured, use verified official policy metadata when available. When the user explicitly confirms one exact asset is in scope, do not demand a policy link or repeat proof: initialize the canonical workspace once and configure that single entry with `user_confirmed_scope=true`, recording the confirmation in notes. If scope is already configured, first reuse it; merge only the exact newly confirmed asset if it is not already authorized. Run one setup `scope_check` for the actual starting asset with `target_url` set to the canonical program root. If that asset is denied or explicitly excluded, stop active work on that asset; do not interpret a denial for the workspace-container hostname as a denial for a separate authorized asset. If attachment fails after a successful asset check, diagnose that failure once instead of retrying URL spellings, ports, asset types, or rewriting scope.
 
 ### 0.5 Target data protection
 
@@ -250,7 +250,7 @@ Locate the official program or customer policy and establish:
 
 Prefer the official policy over search snippets, third-party summaries, or assumptions.
 
-If a policy cannot be verified, record that fact. Do not manufacture an authorization reference. Once a scope manifest and official policy reference are saved, ordinary follow-up messages and user-confirmed additions do not require fetching the entire policy or scope file again. Reuse the saved manifest unless the user supplies a replacement scope file or says the policy changed.
+For a full program-scope import or an actual policy change, prefer the official policy and record its provenance. If no policy reference can be verified, do not fabricate one. An explicit user confirmation for one exact asset is a separate valid provenance path: save it as user-confirmed in the manifest and notes without requiring an external reference. Reuse the saved manifest for ordinary follow-ups; do not refetch/re-import the full policy or scope list unless the user supplies a replacement or says the policy changed.
 
 ### Program root versus an in-scope asset
 
@@ -297,9 +297,9 @@ If the policy explicitly authorizes a wildcard, record the precise rule and its 
 
 ## 2.4 Persist and enforce scope decisions
 
-During setup, call the registered scope checker exactly once for the canonical target/workspace using its actual schema. Persist the decision in the run manifest and reuse it throughout the run; do not manually check every candidate origin. Active-request tools must enforce the persisted policy for every concrete request. Only start a new setup check when a new run begins or the canonical target/policy configuration changes. If the single check is inconclusive, stop active work rather than retrying in a loop. If supported, use:
+During setup, call the registered scope checker exactly once for the concrete starting asset, using the canonical program-root workspace only as the scope-manifest selector
 
-`scope_check(target="<canonical root target>", target_url="<canonical root target>")`
+`scope_check(target="<actual starting asset URL>", target_url="<canonical program-root workspace URL>")`
 
 Verify that the result represents an explicit, configured authorization decision.
 
@@ -312,7 +312,7 @@ For every candidate, record one of:
 
 Apply exclusions before inclusions.
 
-If the scope checker errors, times out, returns an ambiguous result, or cannot confirm the manifest is configured, do not treat that result as authorization.
+If the scope checker errors, times out, or returns an ambiguous result for the actual starting asset, do not actively test that asset. If the wrong target was checked (the program-container URL instead of the asset the user identified), correct the target argument once; do not loop or restart policy discovery.
 
 Persist the reason and continue passive work where possible.
 
