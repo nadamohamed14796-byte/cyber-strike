@@ -44,3 +44,26 @@ Before report submission, map every claim to evidence, confirm the target progra
 - https://owasp.org/www-project-api-security/
 - https://docs.hackerone.com/en/articles/8475116-quality-reports
 - https://bugcrowd.com/vulnerability-rating-taxonomy/
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp request/response exports, a screenshot/recording tool when visual state matters, SHA-256 hashes to identify artifacts, and the local evidence-manifest validator. Store raw captures privately and attach only reviewed derivatives.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — export relevant request/response items from authorized sessions.
+- [OBS Studio](https://obsproject.com/download) — optional for recording controlled reproduction steps; make sure the capture excludes credentials, notifications, and unrelated data.
+- sha256sum is available on common Linux distributions; Windows users can use the built-in Get-FileHash command.
+Before sharing any artifact, review URL query strings, cookies, Authorization headers, screenshots, HAR metadata, source maps, filenames, and embedded logs. A hash is an identifier, not proof that the original collection was trustworthy.
+
+### Primary resources
+- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — assessment and evidence practices.
+- [Bugcrowd reporting guidance](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — report evidence and reproduction detail.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — repeatable test documentation.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before sharing a report. It validates metadata and obvious secret-like strings, not complete sanitization.
+
+### Result handling
+Keep one manifest entry per artifact with kind, test context, timestamps, hash, sanitized path, redaction review, and the exact claim supported. Never put a secret itself in the manifest.
