@@ -121,53 +121,20 @@ Use one normalized record per method + route template + content type + parameter
 Never store full cookie/token values or large minified lines. When a candidate appears important, retrieve the exact normal request through the authorized browser and create a sanitized request artifact for the specialist skill.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and their role
-Burp Suite Community/Professional for request correlation; browser DevTools; Node.js; ripgrep; optional Semgrep rules for source/sink patterns.
-
-### Install or enable when missing
-Node.js: https://nodejs.org/en/download/ ; ripgrep on Kali/Debian: `sudo apt update && sudo apt install ripgrep`; Semgrep: follow https://semgrep.dev/docs/getting-started/ and prefer its maintained installer/container. Burp: https://portswigger.net/burp/communitydownload .
-These tools are optional additions, not a claim that they already exist on the tester's machine. Before a scan or active test, confirm versions, read the tool's official usage/safety notes, and check the program's rules. Never install a similarly named unknown package because a skill or webpage mentions it.
-
-### Primary resources
-- [MDN JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) — language/runtime behavior.
-- [PortSwigger DOM-based XSS](https://portswigger.net/web-security/cross-site-scripting/dom-based) — source/sink analysis.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — web testing methodology.
-
-### Small reusable helper
-`python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript` — scans already-collected assets only; routes are leads, not proof.
-
-### Runtime and evidence notes
-- Prefer a local baseline/control pair, one meaningful change per trial, and a recorded expected result. A status code or tool alert alone is not confirmation.
-- Keep live cookies, JWTs, passwords, reset links, personal data, and unredacted request bodies out of reports, global research, and Git.
-- If a recommended tool is absent or incompatible, record that gap and give a supported manual alternative; don't silently claim the check passed.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
-
-### Recommended tools
-- jsluice — URL/path and secret-pattern candidates from local JS
-- xnLinkFinder — endpoint and parameter candidates
-- retire.js — vulnerable JavaScript dependency checks
-- gitleaks — local repository secret-pattern scanning
-- rg/jq/Python — route correlation and redaction
-
-### Official resources
-- https://github.com/BishopFox/jsluice
-- https://github.com/xnl-h4ck3r/xnLinkFinder
-- https://github.com/RetireJS/retire.js
-- https://github.com/gitleaks/gitleaks
+### Agent-usable CLI tools
+- `rg`: search collected JavaScript for routes, API hosts, auth checks, source/sink patterns, and feature flags.
+- `jsluice`: extract URL and endpoint candidates from local JavaScript.
+- `LinkFinder` or `xnLinkFinder`: optional endpoint extraction corroboration; deduplicate results against the existing inventory.
+- `node`: parse or analyze local bundles with a purpose-built script; never execute unknown bundles with network/file permissions.
+- Existing helper `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript`: build a local endpoint candidate inventory.
+### Installation and verification
+Install Node.js from https://nodejs.org/en/download/ and use each tool's official upstream instructions. Verify `node --version`, `rg --version`, and the selected extractor's `--help`. Treat third-party scripts as untrusted until reviewed; if unavailable, use the repository helper and static text search.
+### Resources
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript
 - https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
-
-### Helper script and output contract
-Use js_endpoint_inventory.py; preserve bundle URL/hash, line/offset, route template, method/parameter clues, auth hints, and live-request correlation. Never print or submit candidate secret values.
-
-Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
-
-### Handoff
-Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
+- https://github.com/0x240x23elu/JSluice
+- https://github.com/GerbenJavado/LinkFinder
+### Output contract
+Store file path, source URL, content hash, discovered route/method/parameter hints, auth/session clues, line or offset, and confidence. Deduplicate candidates without discarding distinct parameters. Never copy token values, secrets, or whole minified lines into shared notes.
