@@ -217,3 +217,27 @@ Do not hide processes, intercept credentials, tamper with network traffic, or di
 | bpfmap_sniff | tracepoint | `sys_enter_bpf` (MAP_CREATE/UPDATE/LOOKUP/DELETE) | T1071 — Application Layer Protocol |
 | ldpreload_sniff | tracepoint | `sys_enter_execve` (env scan) + `sys_enter_openat` (ld.so) | T1574.006 — Dynamic Linker Hijacking |
 | futex_sniff | tracepoint | `sys_enter_futex` (WAIT/WAKE/BITSET/PI) | T1029 — Scheduled Transfer |
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Restrict this skill to explicitly authorized Linux lab/kernel research. For defensive observation, consider bpftool/bpftrace plus Falco or Tetragon/Tracee to collect and compare telemetry. Do not deploy experimental kernel programs on production systems.
+
+### Installation and setup
+- bpftool and bpftrace can be installed using the distribution's official package manager; verify kernel compatibility and package versions first.
+- [Falco installation](https://falco.org/docs/getting-started/installation/) — runtime detection.
+- [Tetragon](https://tetragon.io/docs/installation/) — kernel-level observability and policy enforcement.
+- [Tracee](https://aquasecurity.github.io/tracee/latest/install/) — runtime security observability.
+Use a disposable VM with a matching kernel and snapshot/rollback. Run observers as least-privileged as possible, and capture a baseline before loading any experiment.
+
+### Primary resources
+- [Linux kernel BPF documentation](https://docs.kernel.org/bpf/) — kernel behavior and interfaces.
+- [MITRE ATT&CK](https://attack.mitre.org/) — behavior and detection mapping.
+- [Falco rules](https://falco.org/docs/reference/rules/) — defensive telemetry examples.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to maintain a local evidence record for lab experiments.
+
+### Result handling
+Log kernel/version, tool build, event source, expected/observed telemetry, and cleanup. Keep this as controlled lab research; do not apply kernel tampering, stealth, or bypass techniques to third-party systems.
