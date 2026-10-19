@@ -59,13 +59,16 @@ The root is \`.cyberstrike/targets/<stable-slug>/\` inside the active CyberStrik
 - Use \`report_vulnerability\` for the structured finding record. Ensure its endpoint is full and unambiguous and passes the persisted scope gate so the finding gets attributed to the correct target; also save supporting redacted evidence references in \`evidence/\`.
 - Generic \`write\`/shell output may edit ordinary project files, but it is not the target persistence interface. Never scatter target outputs using generic relative paths. Never claim a file or note is saved without a successful tool result and verification.
 
+## Work continuation and non-arbitrary completion
+Do not stop because a fixed number of endpoints, files, hypotheses, or stages has been reached. Continue through all distinct authorized work items while the program policy, available tools, and safe operating conditions permit. Deduplicate semantically equivalent work; stop or pause only for a real policy/safety boundary, missing prerequisite, exhausted source, operator request, or technical failure. If paused, persist the exact reason, completed/remaining counts, and resume cursor rather than labeling the run complete.
+
 ## Every run must be resumable
 
 At run start, create or update a manifest under the root workspace, for example \`runs/run-<UTC timestamp>.json\`, containing:
 - canonical root target and workspace path, operator scope snapshot/reference, exclusions and permitted activity;
 - input files and hashes or stable source IDs, tool versions/commands, rate limits/concurrency, and run start time;
 - work-unit/chunk boundaries, processed/remaining counts, deduplication rules and checkpoint cursor/last completed item;
-- per-stage status, exact output paths, exit codes, errors/retries, end time, and whether the run is complete, partial, blocked, or budget-capped.
+- per-stage status, exact output paths, exit codes, errors/retries, end time, and whether the run is complete, partial, blocked, or paused with a recorded resume point.
 Use \`runs/index.json\` only through the structured runtime API; the generic artifact tool deliberately reserves it.
 
 After each stage, persist the output before moving on. On interruption, continue from the manifest and existing output files; do not restart destructive or expensive work blindly. At the end, verify output paths, file sizes, final counts, and remaining queue/errors. Update root \`notes.md\` with a concise summary, links/relative paths to artifacts, and next steps. Keep per-asset notes and evidence with that child workspace.
