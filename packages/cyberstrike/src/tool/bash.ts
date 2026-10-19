@@ -94,7 +94,13 @@ function commandExecutableIndex(command: string[]): number {
       while (index < command.length) {
         const arg = stripOuterShellQuotes(command[index]!)
         if (arg === "--") { index++; break }
-        if (needsValue.has(arg)) { index += 2; continue }
+        if (needsValue.has(arg)) {
+          // env -S/--split-string embeds a new command string; leave env as the
+          // executable so scannerLaunchedByWrapper can parse that payload as shell.
+          if (["-S", "--split-string"].includes(arg)) return index - 1
+          index += 2
+          continue
+        }
         if (arg.startsWith("-") || /^[A-Za-z_][A-Za-z0-9_]*=/.test(arg)) { index++; continue }
         break
       }
@@ -383,7 +389,7 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   return undefined
 }
 
-async function scannerLaunchedByWrapper(command: string[], executableIndex: number): Promise<string | undefined> {
+export async function scannerLaunchedByWrapper(command: string[], executableIndex: number): Promise<string | undefined> {
   const executable = path.basename(stripOuterShellQuotes(command[executableIndex] ?? "")).toLowerCase()
   const scannerName = (value: string | undefined) => {
     if (!value) return undefined
