@@ -102,7 +102,6 @@ Verify `sqlmap --version`, `curl --version`, and the chosen Python client. Offic
 - A source-code grep hit is only a lead unless attacker-controlled data reaches the query sink.
 - Stop at unexpected state changes, real data exposure, service instability, rate-limit warnings, or scope uncertainty.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent encodings and cosmetic retries. Stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Program rate limits, request timeouts, and production-safety constraints remain mandatory.
@@ -116,7 +115,6 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 3. Only use tightly bounded time-based checks when permitted, with explicit timeouts, a small number of observations, and a non-injection timing control to account for load/network noise.
 4. Confirm the query boundary using synthetic data or a harmless predicate outcome; do not dump tables, extract credentials, modify records, or use destructive statements to demonstrate SQL injection.
 5. Record the exact parameter, DB error or repeatable logical differential, negative control, and confidence. Recommend parameterized queries/ORM-safe binding and regression tests for the affected data type.
-
 
 ### Verdict gates
 
@@ -136,12 +134,10 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [elementalsouls/Claude-BugHunter — hunt-sqli](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-sqli)
 - [OWASP — SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### SQL injection differential discipline
 Build a normal baseline and a known-invalid control for the same parameter/operation. Use harmless syntax/type-boundary probes and compare database-specific behavior, server-side result membership, or a lab trace while keeping identity, transaction state, and other parameters fixed. Timing signals require repeatable controls for jitter and cache/cold-start effects; one delay or error string is not confirmation. Do not dump tables, enumerate real records, alter data, or use destructive stacked statements. Where a controlled lab is available, corroborate the parser boundary with query instrumentation or a synthetic fixture. Keep impact claims to the demonstrated read/write/control capability and recommend parameterized queries with a regression case.
-
 
 ## Input-surface matrix and evidence-driven chaining
 
@@ -166,7 +162,6 @@ Map each input to its actual server-side use before probing. Keep one row per pa
 
 For every result retain baseline_ref, control_ref, exact_parameter_location, predicate_or_type_change, stable_result_difference, synthetic_fixture, query_sink_evidence, cleanup_status, and confidence. If the database dialect or sink is unknown, state it rather than guessing payload families.
 
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 ### Agent-usable CLI tools
@@ -174,11 +169,14 @@ For every result retain baseline_ref, control_ref, exact_parameter_location, pre
 - Python `httpx` or `requests`: reproduce the baseline and compare one controlled input variation.
 - `rg`: inspect authorized local source/query construction and parameter binding.
 - `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved redacted responses offline.
+
 ### Installation and verification
 Use official docs at https://sqlmap.org/ and verify `sqlmap --version`; verify request clients with `python3 -c "import httpx; print(httpx.__version__)"`. If not installed, use manual request comparison or local code review and record the gap.
+
 ### Resources
 - https://portswigger.net/web-security/sql-injection
 - https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
 - https://sqlmap.org/
+
 ### Proof and limits
 Prefer a harmless boolean/time-independent differential or disposable lab. Do not dump databases, access other users' data, or modify/delete records. Errors and reflected input alone are not proof.
