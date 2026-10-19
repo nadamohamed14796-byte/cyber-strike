@@ -81,4 +81,3 @@ These are optional candidates; choose them only when the skill's hypotheses and 
 - Every helper should have a documented CLI, deterministic input/output format, useful exit codes, safe handling of secrets, and a smoke/self-test path.
 - Keep raw output and normalized output separate. Include source, timestamp, tool/version, and errors in structured records.
 - Never claim a tool is installed, a check ran, or a finding is confirmed unless actual command output or evidence supports that claim.
-
