@@ -77,7 +77,7 @@ test("research cycle begin tolerates an empty optional cycle_id from serialized 
         continue_after_save: false,
       }, context)
       const summary = JSON.parse(result.output)
-      expect(summary.cycle_id).toMatch(/^research-/)
+      expect(summary.cycle_id).toMatch(/^[0-9a-f-]{36}$/i)
       expect(summary.source_ids).toEqual(RESEARCH_SOURCES.map((source) => source.id))
       await Instance.dispose()
     },
