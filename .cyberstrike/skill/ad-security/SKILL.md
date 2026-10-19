@@ -238,3 +238,26 @@ Keep an artifact manifest for read-only findings and configuration snapshots; do
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Lab boundary: this skill is for systems you own or an explicitly authorized isolated environment. Do not apply internal post-exploitation workflows to public bug-bounty assets. Record the lab, principal, starting state, and cleanup plan.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Microsoft RSAT/PowerShell and Windows audit logs for defensive directory inspection. For an isolated Active Directory lab, BloodHound CE can visualize directory relationships and Impacket can support protocol analysis; these are not tools for public-web bounty targets.
+
+### Installation and setup
+- [Windows RSAT](https://learn.microsoft.com/en-us/windows-server/remote/remote-server-administration-tools) — Microsoft-supported administration tools.
+- [BloodHound CE](https://bloodhound.specterops.io/get-started/installation) — official lab setup.
+- [Impacket](https://github.com/fortra/impacket) — official source and installation notes; use a dedicated virtual environment.
+Only use synthetic lab identities or written-approved accounts. Do not run credential theft, password spraying, ticket abuse, or lateral movement against an unapproved domain.
+
+### Primary resources
+- [Microsoft Active Directory documentation](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/) — directory design and security.
+- [MITRE ATT&CK Enterprise](https://attack.mitre.org/matrices/enterprise/) — behavior/detection mapping.
+- [Microsoft Kerberos overview](https://learn.microsoft.com/en-us/windows-server/security/kerberos/kerberos-authentication-overview) — protocol semantics.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to preserve sanitized lab evidence.
+
+### Result handling
+Record lab/domain context, role, relevant event/permission, expected vs observed access, and cleanup; never save passwords, ticket blobs, hashes, or user data in shared notes.
