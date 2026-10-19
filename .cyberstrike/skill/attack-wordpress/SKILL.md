@@ -200,3 +200,26 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 
 ### Plugin/core route differential
 Inventory core, theme, plugin, REST/AJAX routes, capabilities, nonce checks, version evidence, and the exact code path where possible. Compare anonymous and two controlled WordPress roles against a synthetic post/media/user fixture, checking read, update, delete, upload, and custom plugin methods independently. A visible plugin version or XML-RPC exposure is not a vulnerability without a specific reachable behavior. Validate CVE applicability against exact version/build and any backport; do not mass-enumerate users or test destructive plugin actions on production. Route custom REST permission callbacks to BFLA/property authorization, upload processing to file-upload, and origin/header issues to CORS/CSRF only when their effects are separately proven.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp/browser DevTools for observed behavior; WPScan for permitted WordPress version/plugin/theme exposure checks; WP-CLI and static source review only where source or admin access is authorized.
+
+### Installation and setup
+- [WPScan documentation](https://wpscan.com/) — official CLI usage and supported installation methods.
+- [WP-CLI installation](https://wp-cli.org/) — official tool for owned instances.
+- [Burp Suite](https://portswigger.net/burp) — request verification.
+Use an in-scope hostname and the program rules for enumeration. If API access or a token is needed, manage it privately and never paste it into notes. Do not exploit or modify plugins/themes in production just because a scanner reports a vulnerable version.
+
+### Primary resources
+- [WordPress security documentation](https://developer.wordpress.org/apis/security/) — nonce/capability and secure API patterns.
+- [WPScan](https://wpscan.com/) — version and component detection.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — confirmation and impact.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate collected WordPress-related URLs locally and strip query values.
+
+### Result handling
+Distinguish fingerprinted version exposure from an exploitable vulnerability; verify the affected component/version, reachable vulnerable feature, and safe proof. Use a disposable site for write tests.
