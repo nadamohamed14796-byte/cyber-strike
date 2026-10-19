@@ -58,3 +58,37 @@ Return per-route header inventory, enforced versus report-only policy, browser b
 
 ### Route-by-route header correlation
 Capture headers for the homepage, authenticated profile, sensitive state-changing page, API response, redirect, error route, and file/download response; normalize duplicate headers and record browser context. Evaluate the policy the client actually enforces, not just whether a header string exists. Missing HSTS is not automatically downgrade impact; CSP Report-Only is not enforcement; SameSite and cookie flags must be interpreted with flow context; CORS must be proven in a browser. Chain only along a demonstrated consequence: frameable sensitive interaction → clickjacking; untrusted-origin read → CORS; cross-site state change → CSRF; host-derived link → host-header; shared response contamination → cache poisoning. One absent header should not be inflated into several findings without distinct impacts.
+
+## Advanced test matrix: policy effectiveness, not header presence
+
+Run this matrix on distinct response classes (anonymous page, authenticated page, JSON API, redirect, error, download, and sensitive workflow). Reuse captured requests and change one variable at a time.
+
+| Control | Test | Evidence required before claiming impact | Common chain |
+|---|---|---|---|
+| CSP | Identify enforced policy, effective script sources, nonce/hash use, and unsafe directives; inspect the exact injection sink if one exists | A reachable execution path that the policy fails to block; a weak policy alone is usually hardening | XSS → CSP bypass analysis; do not claim XSS from CSP alone |
+| HSTS | Compare HTTP/HTTPS behavior and relevant host coverage; note first-visit and preload assumptions | A realistic downgrade path in deployment context | Transport weakness → session exposure only if demonstrated |
+| Framing | Check enforced frame-ancestors/X-Frame-Options on the sensitive page | Controlled proof frame plus a meaningful user action and realistic victim context | Clickjacking → sensitive action abuse, not mere frameability |
+| Cookie flags | Map each cookie to purpose, domain/path, SameSite mode, and rotation behavior | Show how the cookie participates in an actual cross-site or script-accessible attack | CSRF/session weakness → account impact only if the flow supports it |
+| Referrer policy | Inspect outgoing navigation from pages carrying sensitive URL state | Sensitive value is sent to an untrusted destination and is usable | Token/secret exposure → session/account impact only after safe validation |
+| MIME / nosniff | Compare Content-Type, sniffing behavior, and browser handling for a controllable uploaded/served file | Browser interprets attacker-controlled content in a security-relevant origin/context | Upload/content-type issue → stored XSS only with browser proof |
+| Cross-origin isolation/resource policy | Check actual resource loading and isolation requirements | Demonstrated data exposure or security-boundary effect, not header absence | Cross-origin data leak only when independently proven |
+| Cache controls | Compare private, authenticated, and anonymous variants through the actual cache layer | A private response is stored/replayed across the wrong context | Cache deception/poisoning with cache evidence |
+
+### Minimal header inventory with redirect visibility
+
+```bash
+# Use only an authorized endpoint. -L shows the redirect chain; save headers for review.
+curl -sS -L --max-redirs 5 -D header-chain.txt -o /dev/null "$TARGET_URL"
+grep -iE '^(HTTP/|location:|content-security-policy(-report-only)?:|strict-transport-security:|x-frame-options:|x-content-type-options:|referrer-policy:|permissions-policy:|cross-origin-(opener|embedder|resource)-policy:|cache-control:|vary:|set-cookie:)' header-chain.txt
+```
+
+Review every response block separately: a final response can be secure while an intermediate redirect or error response differs. Do not store live cookie values in notes; replace values with [REDACTED].
+
+### Decision record
+
+For each suspected issue, persist:
+- route_class, status, content_type, auth_state, browser, policy_expected, policy_observed, enforced_or_report_only;
+- security_property, controlled_prerequisite, reproduction, negative_control, impact_boundary, chain_parent, chain_child;
+- evidence_ref, confidence, cleanup, and next_decision.
+
+Use confirmed, disproven, inconclusive, or blocked. Keep one parent observation linked to several distinct findings only when each child has its own independently demonstrated impact. A missing header is not itself an exploit chain.
