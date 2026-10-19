@@ -205,3 +205,29 @@ For source review, use a disposable clone and preserve the project's lockfile. D
 
 ### Result handling
 Pair static findings with an appropriate runtime test and a control. Avoid storing cookies, user data, or unredacted server-component output in shared notes.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local test harnesses; browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Verify official installation docs, tool version, license, dependency provenance, and target impact before use.
+
+### Recommended tools
+- Semgrep — Next.js/React source patterns
+- npm audit — dependency advisory checks
+- retire.js — client-side dependency checks
+- Node test runner — local regression tests
+
+### Resources
+- https://semgrep.dev/docs/
+- https://docs.npmjs.com/cli/commands/npm-audit
+- https://nextjs.org/docs/app/building-your-application/configuring/security
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids; official docs and advisories are the source of truth for tool behavior and affected versions.
+
+### Helper-script contract
+Inspect server/client boundary, route handlers, middleware, cache behavior, and dependency lockfiles. Preserve source path, build/runtime version, advisory ID, and controlled evidence; don't infer server-side impact from client code alone.
+
+Preserve native evidence and write normalized results separately. Retain tool/version, timestamps, source, rule/advisory IDs, error state, confidence, and redaction. Use deterministic fixtures and structured output.
+
+### Handoff
+Return actual commands, versions, inputs/outputs, checks passed/failed, limitations, and next skill. Static or version-based signals are not confirmed vulnerabilities without evidence of an affected path.
