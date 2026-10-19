@@ -101,3 +101,26 @@ Persist connection_id, origin, auth_source, principal, tenant, session_age, mess
 - A low role invokes an admin-only message action → BFLA.
 - Message field changes a protected model property → property authorization/mass assignment.
 - Only malformed frames or generic errors are observed → not a finding without a security boundary violation.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use browser DevTools' Network/WebSocket frames and Burp's WebSockets history/Repeater to compare handshake, message, and authorization behavior. For an isolated client test, wscat or OWASP ZAP's WebSocket add-on can help reproduce a protocol flow.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official browser proxy setup.
+- [wscat project](https://github.com/websockets/wscat) — Node.js/npm client; its README documents installation and usage.
+- [OWASP ZAP](https://www.zaproxy.org/) — official installer; add WebSocket support when relevant.
+Connect only to observed/in-scope endpoints. Use a disposable account and avoid messages that trigger real transactions, notifications, or irreversible state changes.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — testing methodology.
+- [MDN WebSocket API](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) — browser semantics.
+- [PortSwigger WebSockets](https://portswigger.net/web-security/websockets) — controlled labs.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved handshake/response artifacts; it does not open a WebSocket connection.
+
+### Result handling
+Check origin/authentication separately from per-message authorization. Record sanitized handshake, a representative message, identity context, and server-side outcome.
