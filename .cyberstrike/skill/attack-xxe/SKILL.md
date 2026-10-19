@@ -75,23 +75,6 @@ Return `xml_surface`, `parser_evidence`, `doctype_behavior`, `external_resolutio
 Identify accepted content types, parser configuration, DTD/entity behavior, and whether XML is handled by the application, gateway, or a downstream service. Establish a normal XML fixture and use a local lab callback or synthetic file controlled by the tester only when the program explicitly permits external-resolution testing. Do not attempt to read operating-system files, cloud metadata, internal endpoints, or environment secrets from production. A parser error that mentions DOCTYPE is not confirmation; verify whether external resolution occurred and what controlled result reached the response/log. Route non-XML serialized formats to deserialization review and outbound URL fetch behavior to SSRF only if a distinct source-to-request path is shown.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Agent-usable tools and purpose
-- `curl` or Python `httpx` — replay an observed, authorized XML request with one harmless change at a time.
-- `xmllint` — validate local XML fixtures and distinguish malformed XML from parser behavior.
-- `interactsh-client` — optional controlled callback correlation only when program rules allow an external OAST provider.
-- `rg` — search collected source/configuration for XML parser and external-entity settings.
-### Install and verify
-Use official OS packages or upstream instructions. Verify with `xmllint --version`, `curl --version`, and `interactsh-client -h` when installed. Go-based Interactsh client docs/install: https://github.com/projectdiscovery/interactsh. If missing, record the dependency and use a local lab or code/config review; do not claim a live test ran.
-### Resources
-- https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/projectdiscovery/interactsh
-### Helper
-Use `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` for saved responses only. It makes no network requests.
-
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
