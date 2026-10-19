@@ -24,13 +24,15 @@ export namespace Tool {
     metadata(input: { title?: string; metadata?: M }): void
     ask(input: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">): Promise<void>
   }
+
+  /** Public initialized tool: callers may omit schema fields that have defaults. */
   export interface Info<Parameters extends z.ZodType = z.ZodType, M extends Metadata = Metadata> {
     id: string
     init: (ctx?: InitContext) => Promise<{
       description: string
       parameters: Parameters
       execute(
-        args: z.output<Parameters>,
+        args: z.input<Parameters>,
         ctx: Context,
       ): Promise<{
         title: string
@@ -42,12 +44,28 @@ export namespace Tool {
     }>
   }
 
-  export type InferParameters<T extends Info> = T extends Info<infer P> ? z.output<P> : never
+  /** Definition implementation receives parsed output, where defaults are present. */
+  export interface Definition<Parameters extends z.ZodType = z.ZodType, M extends Metadata = Metadata> {
+    description: string
+    parameters: Parameters
+    execute(
+      args: z.output<Parameters>,
+      ctx: Context,
+    ): Promise<{
+      title: string
+      metadata: M
+      output: string
+      attachments?: MessageV2.FilePart[]
+    }>
+    formatValidationError?(error: z.ZodError): string
+  }
+
+  export type InferParameters<T extends Info> = T extends Info<infer P> ? z.input<P> : never
   export type InferMetadata<T extends Info> = T extends Info<any, infer M> ? M : never
 
   export function define<Parameters extends z.ZodType, Result extends Metadata>(
     id: string,
-    init: Info<Parameters, Result>["init"] | Awaited<ReturnType<Info<Parameters, Result>["init"]>>,
+    init: ((ctx?: InitContext) => Promise<Definition<Parameters, Result>>) | Definition<Parameters, Result>,
   ): Info<Parameters, Result> {
     return {
       id,
@@ -83,7 +101,9 @@ export namespace Tool {
             },
           }
         }
-        return toolInfo
+        // The runtime wrapper parses inputs before invoking the definition, but
+        // its public call signature remains the schema input so defaults work.
+        return toolInfo as unknown as Awaited<ReturnType<Info<Parameters, Result>["init"]>>
       },
     }
   }
