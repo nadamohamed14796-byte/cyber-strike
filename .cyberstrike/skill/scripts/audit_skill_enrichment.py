@@ -17,7 +17,7 @@ def inspect(path:Path,root:Path)->dict:
     start=min([content.find(m) for m in TOOL_MARKERS if content.find(m)>=0],default=-1)
     if start >= 0:
         # Audit only the tooling section itself, not unrelated methodology later in the file.
-        next_heading = re.search(r"^##\\s+", content[start + 2 :], re.MULTILINE)
+        next_heading = re.search(r"^##\s+", content[start + 2 :], re.MULTILINE)
         section_end = start + 2 + next_heading.start() if next_heading else len(content)
         section = content[start:section_end]
     else:
