@@ -43,14 +43,6 @@ export namespace VerificationLedger {
       outcome: (row.outcome as Policy.Outcome) ?? "inconclusive",
       timeCreated: row.time_created,
     }))
-    // Older versions could persist DISPROVEN after one attempt. Never expose that
-    // stale terminal state to the agent or to VRT coverage consumers.
-    const validDistinctAttempts = Policy.uniqueAttempts(attempts).filter((item) => item.validConditions).length
-    if (validDistinctAttempts < Policy.MAX_ATTEMPTS) {
-      for (const attempt of attempts) {
-        if (attempt.outcome === "disproven") attempt.outcome = "inconclusive"
-      }
-    }
     return attempts
   }
 
@@ -87,8 +79,8 @@ export namespace VerificationLedger {
       throw new Error("A disproven verdict requires valid_conditions=true and evidence_ref")
     }
 
-    // Keep identity checks, attempt-budget enforcement, insertion, and verdict
-    // updates atomic so concurrent sessions/processes cannot bypass ledger invariants.
+    // Keep identity checks, insertion, and verdict updates atomic so concurrent
+    // sessions/processes cannot corrupt the durable hypothesis ledger.
     return Database.transaction(() => {
       let before = list({ sessionID, hypothesisKey })
       // A hypothesis key is the identity boundary for one claim. Mixing assets or
@@ -103,34 +95,11 @@ export namespace VerificationLedger {
         )
       }
       let priorOutcome = before[before.length - 1]?.outcome
-      const priorValidDistinctAttempts = Policy.uniqueAttempts(before).filter((item) => item.validConditions).length
-      // Older ledger rows may have been marked DISPROVEN before the 20-valid-attempt
-      // guard existed. Downgrade those stale verdicts and allow verification to resume.
-      if (priorOutcome === "disproven" && priorValidDistinctAttempts < Policy.MAX_ATTEMPTS) {
-        Database.use((db) => db.update(VerificationAttemptTable).set({
-          outcome: "inconclusive",
-          time_updated: Date.now(),
-        }).where(and(
-          eq(VerificationAttemptTable.session_id, sessionID),
-          eq(VerificationAttemptTable.hypothesis_key, hypothesisKey),
-        )).run())
-        priorOutcome = "inconclusive"
-        before = list({ sessionID, hypothesisKey })
-      }
       if (Policy.isTerminalOutcome(priorOutcome)) {
         throw new Error(`This hypothesis is already ${priorOutcome}; terminal hypotheses cannot accept more attempts. Start a new hypothesis_key only for a genuinely different claim.`)
       }
       const key = Policy.attemptKey(input.attempt)
       const existing = before.find((item) => Policy.attemptKey(item) === key)
-      const validDistinctAttempts = Policy.uniqueAttempts(before).filter((item) => item.validConditions).length
-      const existingWasValid = existing?.validConditions === true
-      if (
-        validDistinctAttempts >= Policy.MAX_ATTEMPTS &&
-        input.attempt.validConditions &&
-        !existingWasValid
-      ) {
-        throw new Error("The 20-valid-distinct-attempt budget is exhausted. Do not create another valid attempt; use action=status and preserve unresolved cases as INCONCLUSIVE / NEEDS REVIEW.")
-      }
       let duplicate = Boolean(existing)
       let recorded: Attempt
       let effectiveAttempt = input.attempt
