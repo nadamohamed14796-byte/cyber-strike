@@ -83,10 +83,12 @@ Tie the defect to a reachable view/serializer/query/configuration and write a re
 
 ## Tools
 
-- **Django URL/source search:** inventory views, routers, middleware and permission classes.
-- **Burp Suite:** compare controlled roles and HTTP methods.
-- **Semgrep / code review:** locate raw SQL and unsafe serializer/query patterns.
-- **Official security releases:** verify affected version ranges and fixes.
+- `rg`: inventory Django views, URL routes, middleware, serializers, and permission checks in an authorized source checkout.
+- `semgrep`: scan local Python source with relevant rules.
+- Python `manage.py check` and the project's test runner: validate configuration and reproduce issues in a disposable environment.
+- Python `httpx` or `curl`: compare controlled roles/methods only when a live request is needed.
+
+Verify with `python3 --version`, `python manage.py check` in the project's test environment, `semgrep --version`, and `curl --version`. Official docs: https://docs.djangoproject.com/en/stable/topics/security/, https://semgrep.dev/docs/getting-started/, https://curl.se/docs/.
 
 ## Django Control and Query Matrix
 
