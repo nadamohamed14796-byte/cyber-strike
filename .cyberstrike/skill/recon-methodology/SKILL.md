@@ -139,3 +139,29 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate
 
 ### Result handling
 Keep source, phase, time, tool/version, live/passive status, confidence, and next action. Use one endpoint record with multiple parameter/source observations instead of duplicate records.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
+
+### Recommended tools
+- jq/Python — machine-readable phase manifests
+- subfinder, dnsx, httpx, katana — only for the corresponding phase and target permissions
+- nuclei — selected templates after reviewing requests and impact
+- git diff — audit artifact changes
+
+### Resources
+- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://owasp.org/API-Security/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
+
+### Helper-script contract
+Create a phase runner manifest mapping each phase to prerequisites, primary tool, optional alternatives, expected artifacts, validation command, failure states, and downstream consumers. Do not treat missing tooling as a clean scan.
+
+Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+
+### Handoff
+Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
