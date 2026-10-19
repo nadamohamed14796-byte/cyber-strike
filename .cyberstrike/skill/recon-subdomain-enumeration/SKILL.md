@@ -92,7 +92,6 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - Treat DNS resolution as discovery evidence, not proof of vulnerability.
 - Keep unresolved candidates quarantined instead of probing them automatically.
 
-
 ## Signal Confidence, Attempt Budget, and Handoff
 
 Treat recon output as a candidate lead, not a finding. there is no fixed hypothesis-count ceiling; continue distinct, decision-relevant hypotheses while authorized, and stop when evidence or a real safety/policy boundary resolves the branch. Prefer passive sources first, deduplicate candidates, and use active checks only when the asset and activity are explicitly in scope.
@@ -111,7 +110,6 @@ Use this scale consistently: **C0** unverified string; **C1** one passive source
 4. Validate live HTTP/TLS hosts with conservative timeouts and stable fingerprints; use random-host and random-path controls to eliminate wildcard responses, parked domains, CDN edges, and soft-404 pages.
 5. Quarantine ambiguous ownership and third-party SaaS until corroborated. Return confidence, evidence, scope decision, deduplication key, and the specific next recon/attack skill trigger; discovered names are not findings.
 
-
 ### Deduplication and stop rules
 
 Normalize case, trailing dots, scheme/port, redirects, canonical names and resolved addresses before deduplication. Detect wildcard DNS, shared hosting, CDN/edge responses, soft-404s and stale records before ranking counts. Stop on exclusions, ownership ambiguity, unexpected sensitive data, throttling, instability or boundaries requiring further permission. Never claim ownership or register dangling resources.
@@ -129,7 +127,6 @@ A candidate list is not yet the target workspace inventory. After attribution, D
 
 Replace both example hosts with the actual authorized program and child. Never attach third-party SaaS tenants, excluded hosts, uncertain candidates, or out-of-scope names. The command uses the persisted scope and refuses ambiguous parent matches. Run `cyberstrike target tree https://example.com` to verify placement. Store source URL, observation time, DNS/HTTP evidence, and attribution confidence in the child target's notes; do not treat an asset registration as a vulnerability finding.
 
-
 ## References
 
 - Source merged: [uphiago/recon-skills — recon/subdomain-enumeration/SKILL.md](https://github.com/uphiago/recon-skills/blob/main/recon/subdomain-enumeration/SKILL.md)
@@ -137,13 +134,10 @@ Replace both example hosts with the actual authorized program and child. Never a
 - [Certificate Transparency](https://certificate.transparency.dev/)
 - [RFC 1034 — Domain Names: Concepts and Facilities](https://www.rfc-editor.org/rfc/rfc1034)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Discovery provenance and wildcard handling
 Keep each candidate with source, timestamp, DNS answers/CNAME chain, wildcard-DNS check, HTTP fingerprint, ownership evidence, and explicit scope decision. Deduplicate normalized hostnames while preserving their discovery sources; never discard method, port, or auth context when later joining URL inventories. Correlate passive findings with current DNS and a second independent ownership signal before active probing. A historical hostname, third-party CNAME, wildcard response, or cert-transparency entry is a lead—not proof of live ownership or permission. Delta newly observed hosts against earlier runs, and route confirmed HTTP hosts to web recon while keeping cloud/CDN/shared-hosting ambiguity passive until resolved.
-
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
