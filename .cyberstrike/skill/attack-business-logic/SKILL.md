@@ -71,10 +71,13 @@ Use a lab or disposable item with a small agreed request budget. Do not issue hi
 
 ## Tools
 
-- **Burp Suite / DevTools:** capture normal workflow requests.
-- **API schema and product rules:** define valid state transitions.
-- **Staging fixtures:** isolate financial and entitlement logic.
-- **Audit logs:** distinguish success-shaped responses from persisted state.
+- Python `httpx` or `curl`: reproduce observed workflow requests using test-owned accounts and reversible state changes.
+- `jq`: compare structured workflow/state responses.
+- `rg`: inspect authorized source/configuration for state transitions, entitlement checks, and server-side invariants.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+- Staging fixtures and audit logs: confirm persisted state, not only a success-shaped response.
+
+Verify the selected client and `jq --version`; official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
 ## Business Invariant Decision Matrix
 
@@ -189,51 +192,6 @@ Before an experiment, list possible side effects: email/webhook, billing provide
 
 A business-logic report should include the expected invariant, normal state transition, altered transition, server-authoritative before/after evidence, the minimum consequence, and cleanup. Route a role-only violation to BFLA; an object ownership violation to BOLA; a duplicate effect caused by request interleaving to race-condition; and a pure abuse-volume control failure to rate-limit analysis. Avoid multiple reports for the same root cause unless each has a distinct, independently evidenced impact.
 
-
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Browser DevTools Network/Application, Burp Proxy/Repeater/Comparer, and curl for replaying one observed request. Use only tool integrations that the current CyberStrike runtime actually exposes; optional CLI programs must be verified with command -v first.
-- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
-- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
-
-### Primary resources
-- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test procedures and evidence criteria.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs and differential testing.
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/) — remediation-oriented guidance.
-
-### Small, reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-This compares local artifacts offline and heuristically redacts common secrets before displaying differences. It sends no requests and does not prove complete sanitization.
-
-### Evidence and hand-off
-- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
-- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
-
-Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/Comparer, browser DevTools, and a short state-transition table to test one business invariant at a time. For multi-step workflows, record expected state before and after each step; do not use load testing to establish logic flaws.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- A local Markdown/spreadsheet editor is sufficient for a state ledger; no separate scanner is required.
-- [Postman](https://www.postman.com/downloads/) is optional where a documented API workflow is easier to reproduce there.
-Use owned disposable resources and transactions. Do not create real charges/refunds, send mass messages, alter user entitlements, or disrupt live inventory unless explicitly authorized.
-
-### Primary resources
-- [OWASP Business Logic Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html) — invariant/control design.
-- [PortSwigger business logic vulnerabilities](https://portswigger.net/web-security/logic-flaws) — lab methodology.
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API workflow context.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
-
-### Result handling
-Keep the normal workflow, tested transition, expected invariant, actual final state, and cleanup. A surprising UI sequence without a security consequence is not a confirmed vulnerability.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
