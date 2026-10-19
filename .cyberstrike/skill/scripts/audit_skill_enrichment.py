@@ -7,7 +7,7 @@ from pathlib import Path
 DEFAULT_ROOT=Path(".cyberstrike/skill")
 EXCLUDED={"CIS_benchmarks","NIST","WEB","mitre_attack","mitre_attack_ics","mitre_attack_mobile","mitre_attack_test","scripts"}
 TOOL_MARKERS=("## Agent-executable CLI tooling, resources, and helper scripts","## Agent-executable CLI tooling (2026-10-19)","## Tool installation and optional tooling (2026-10-19)","## Practical tooling, references, and helper scripts (2026-10-19)")
-UI_FIRST=re.compile(r"\b(Burp Suite|Burp Proxy|Burp Repeater|browser DevTools|DOM Invader)\b",re.I)
+UI_FIRST=re.compile(r"\b(Burp(?:\s+Suite|\s+(?:Proxy|Repeater|Comparer))?|browser DevTools|Chrome DevTools|DOM Invader|Turbo Intruder|BApp Store)\b",re.I)
 URL=re.compile(r"https?://[^\s)]+")
 CLI=re.compile(r"`(?:[a-zA-Z0-9_.-]+\s+[^`]+|python3\s+[^`]+)`")
 INSTALL=re.compile(r"\b(install|download|go install|pipx|apt install|brew install|winget install|official releases)\b",re.I)
@@ -15,7 +15,13 @@ INSTALL=re.compile(r"\b(install|download|go install|pipx|apt install|brew instal
 def inspect(path:Path,root:Path)->dict:
     content=path.read_text(encoding="utf-8",errors="replace")
     start=min([content.find(m) for m in TOOL_MARKERS if content.find(m)>=0],default=-1)
-    section=content[start:] if start>=0 else ""
+    if start >= 0:
+        # Audit only the tooling section itself, not unrelated methodology later in the file.
+        next_heading = re.search(r"^##\\s+", content[start + 2 :], re.MULTILINE)
+        section_end = start + 2 + next_heading.start() if next_heading else len(content)
+        section = content[start:section_end]
+    else:
+        section = ""
     tool_heading=bool(re.search(r"^#{1,4}\s+.*\b(tools?|tooling|dependencies|cli)\b",content,re.I|re.M))
     has_ref=bool(URL.search(section)) or bool(re.search(r"^#{1,4}\s+.*\b(references?|resources?)\b",section,re.I|re.M))
     has_cli=bool(CLI.search(section)) or bool(re.search(r"\b(subfinder|dnsx|httpx|katana|ffuf|nuclei|sqlmap|gitleaks|trivy|jq|python3)\b",section))
