@@ -148,28 +148,6 @@ Inspect every sensitive route, not just the home page. Verify the browser-effect
 Inventory sensitive views and test whether a controlled foreign-origin page can render the exact route while signed in to a disposable account. Preserve screenshots/console policy evidence but do not overlay deceptive UI or trigger a sensitive action. A meaningful chain requires all links: framing is allowed, the intended victim context would be authenticated, a user gesture could trigger a security-relevant state transition, and existing confirmation/CSRF/origin defenses do not prevent it. Chain to CSRF only when a distinct request-forgery weakness is evidenced; missing X-Frame-Options alone is not impact. Record route-specific differences because login/error/public routes may legitimately be frameable.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl for a replay of one observed request. Verify optional CLIs locally and use only tools exposed by the current runtime.
-- Treat CLIs as optional until locally verified; prefer read-only checks. State-changing tests require permission and a disposable fixture.
-
-### Primary resources
-- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
-- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation guidance.
-
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline and heuristically redacts common secrets; it sends no requests and cannot prove complete sanitization.
-
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
-
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 ### Tools
