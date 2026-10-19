@@ -186,3 +186,23 @@ Run dependency checks on a disposable copy and preserve lock/build files. A defa
 
 ### Result handling
 Record exact app/version, route, authentication context, and the sensitive operation/data actually exposed. Redact actuator environment/config output before storing evidence.
+
+
+## Management-plane differential matrix
+
+Compare application and management contexts without assuming that a conventional path or port is enabled.
+
+| Surface | Review | Confirmation |
+|---|---|---|
+| Separate management port/context | Compare bind address, network exposure, filter chain, and active profile | Actual externally reachable management route with policy mismatch |
+| Health/readiness | Check component details and authorization | Sensitive dependency/config data beyond intended public status |
+| Metrics/prometheus | Check endpoint policy, labels, and tenant/user data | Minimum redacted sensitive marker and access boundary |
+| Environment/config properties | Review allow/deny lists and sanitization in source/config first | Do not retrieve secret-bearing production values; use a synthetic lab fixture or approved configuration evidence |
+| Heap/thread/diagnostic endpoints | Determine whether endpoints are enabled and who can call them | Do not trigger expensive dumps/profiles on production; use staging and owner-approved controls |
+| Shutdown/loggers/mappings | Check state-changing/admin endpoints and role enforcement | Read-only configuration proof or isolated staging validation |
+| Security filter chains | Trace order, matchers, dispatcher types, and method-level annotations | Effective request path demonstrates the missing control; annotation absence alone is insufficient |
+| Error/async dispatch | Compare normal, error, and forwarded request paths | Same protected resource is denied on normal path but exposed on the alternate path |
+
+### Regression handoff
+
+Test that management endpoints bind to the intended interface, sensitive endpoints are disabled or explicitly authorized, health output is minimal, metrics labels are sanitized, and error/async dispatches retain the same policy. Record Spring Boot/Security version and effective configuration source; do not assume defaults across major versions.
