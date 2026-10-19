@@ -17,7 +17,7 @@ import { Shell } from "@/shell/shell"
 import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
-import { TargetMemory } from "../target"
+import { TargetMemory, type TargetScope } from "../target"
 import { reconPhaseGate, type ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
@@ -95,6 +95,80 @@ function scannerTargets(command: string[], commandText: string): string[] {
   return [...candidates]
 }
 
+function hostnameMatchesScopeRule(ruleInput: string, hostname: string): boolean {
+  let rule = ruleInput.trim().toLowerCase()
+  rule = rule.replace(/^(?:domain|wildcard)[ \\t]*:[ \\t]*/i, "")
+  if (/^https?:\\/\\//i.test(rule) || rule.includes("/") || rule.includes(":")) return false
+  if (rule.startsWith("*.")) {
+    const suffix = rule.slice(2).replace(/\\.$/, "")
+    return hostname === suffix || hostname.endsWith("." + suffix)
+  }
+  return rule.replace(/\\.$/, "") === hostname
+}
+
+/**
+ * Katana is safe to use from the generic shell only when its crawl is constrained
+ * to the exact FQDN and the saved scope grants host-wide access without path/port
+ * exclusions. Katana cannot consult CyberStrike's persisted scope before every
+ * HTTP request, so narrower manifests must use the scope-aware native request path.
+ */
+export function katanaScopeBlockReason(args: string[], targetURL: string, scope: TargetScope | null): string | undefined {
+  if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
+    return "Katana requires a configured, non-empty persisted scope manifest."
+  }
+
+  const normalizedArgs = args.map((arg) => arg.toLowerCase())
+  if (normalizedArgs.some((arg) => ["-ns", "--no-scope", "-do", "--display-out-scope", "-cs", "--crawl-scope"].includes(arg))) {
+    return "Katana scope overrides that could widen crawl behavior are not allowed here; rely on the persisted scope and FQDN field scope."
+  }
+  const fieldScopeIndex = normalizedArgs.findIndex((arg) => ["-fs", "--field-scope"].includes(arg))
+  if (fieldScopeIndex < 0 || normalizedArgs[fieldScopeIndex + 1] !== "fqdn") {
+    return "Run Katana with '-fs fqdn' so the crawler follows URLs on the exact supplied hostname only."
+  }
+
+  const rateIndex = normalizedArgs.findIndex((arg) => ["-rl", "--rate-limit"].includes(arg))
+  const rate = rateIndex >= 0 ? Number(args[rateIndex + 1]) : NaN
+  if (!Number.isInteger(rate) || rate < 1 || rate > 10) {
+    return "Set Katana's explicit '-rl 5' (allowed range 1-10) to avoid unbounded default request rates."
+  }
+  const depthIndex = normalizedArgs.findIndex((arg) => ["-d", "--depth"].includes(arg))
+  if (depthIndex >= 0) {
+    const depth = Number(args[depthIndex + 1])
+    if (!Number.isInteger(depth) || depth < 1 || depth > 5) {
+      return "Katana depth must be between 1 and 5 for a bounded reconnaissance crawl."
+    }
+  }
+
+  let target: URL
+  try {
+    target = new URL(targetURL)
+  } catch {
+    return "Katana target must be an absolute HTTP(S) URL."
+  }
+  const hostname = target.hostname.toLowerCase().replace(/\\.$/, "")
+  const broadInclude = scope.scopeItems.some((item) => hostnameMatchesScopeRule(item, hostname))
+  if (!broadInclude) {
+    return "Katana requires an exact-host or wildcard-domain scope entry covering " + hostname + "; URL/path/port-only scope entries need a per-request scope-aware crawler."
+  }
+
+  // Any URL-shaped exclusion for this hostname (including wildcard host rules)
+  // may express a path/protocol/port boundary that -fs fqdn cannot preserve.
+  for (const item of scope.excludedItems) {
+    const raw = item.trim().replace(/^(?:url)[ \\t]*:[ \\t]*/i, "")
+    if (!/^https?:\\/\\//i.test(raw)) continue
+    let excluded: URL
+    try { excluded = new URL(raw.replace("*.", "scope-wildcard.")) } catch { continue }
+    const excludedHost = excluded.hostname.toLowerCase().replace(/\\.$/, "")
+    const hostMatches = excludedHost === hostname ||
+      (excludedHost.startsWith("scope-wildcard.") && hostname.endsWith("." + excludedHost.slice("scope-wildcard.".length))) ||
+      hostname === excludedHost.slice("scope-wildcard.".length)
+    if (hostMatches && (excluded.pathname !== "/" || excluded.port || excluded.protocol !== target.protocol)) {
+      return "Katana cannot safely enforce the saved path/protocol/port exclusion '" + item + "' for " + hostname + "; use the scope-aware crawler for this target."
+    }
+  }
+  return undefined
+}
+
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = command.findIndex((value) => SCANNER_PHASES[path.basename(value).toLowerCase()] !== undefined)
   if (scannerIndex < 0) {
@@ -119,8 +193,8 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   const args = command.slice(scannerIndex + 1)
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
       !args.some((value) => /^https?:\/\//i.test(value))) return
-  if (["katana", "hakrawler", "gospider"].includes(scanner)) {
-    throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl can follow off-scope links. Use the scope-aware browser/recon pipeline so every discovered URL is checked before a request.")
+  if (["hakrawler", "gospider"].includes(scanner)) {
+    throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl cannot consult persisted scope before each request. Use the scope-aware browser/recon pipeline.")
   }
   // These flags identify target-list modes for recon scanners. Do not apply this
   // generic check to curl/wget: curl's case-sensitive -L means "follow redirects",
@@ -212,6 +286,13 @@ async function assertScannerReconGate(command: string[], commandText: string): P
       const decision = await TargetMemory.checkURLScope(scopedURL)
       if (!decision.allowed || !decision.workspace) {
         throw new Error("Recon execution gate blocked " + scanner + " for " + scopedURL + ": persisted scope rejected the target/port (" + decision.reason + "). No scanner command was started.")
+      }
+      if (scanner === "katana") {
+        const scope = await TargetMemory.getScope(scopedURL)
+        const reason = katanaScopeBlockReason(args, scopedURL, scope)
+        if (reason) {
+          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, and -d 3. No crawler command was started.")
+        }
       }
       const gate = await reconPhaseGate(decision.workspace, phase)
       if (!gate.allowed) {
