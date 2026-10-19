@@ -83,3 +83,46 @@ Verify the actual evidence-storage API, redaction implementation, retention poli
 
 ### Artifact lifecycle and independent replay
 Every evidence item must have a stable artifact ID, originating request/session, timestamp, target-local path, redaction state, hash where practical, and a short statement of what it proves. Keep raw captures private and target-local; create a redacted derivative for model context and submissions. Scrub cookies, Authorization, query tokens, reset links, private response fields, user identifiers, and secret-bearing JavaScript before output. Verify replay uses tester-owned identities and the same preconditions. When redaction makes a finding impossible to reproduce, preserve a local private raw artifact and refer to its hash; do not copy the raw value into global notes, public research, commits, or reports.
+
+
+## Artifact manifest and redaction validation
+
+Keep one manifest entry per artifact. The manifest itself must not contain the secret it describes.
+
+```json
+{
+  "artifact_id": "EV-LOCAL-0001",
+  "kind": "http-request-response",
+  "target_asset": "in-scope.example",
+  "captured_at": "2026-10-19T10:00:00Z",
+  "test_context": "tester-owned-account-A",
+  "private_original_path": "evidence/private/EV-LOCAL-0001.bin",
+  "shareable_derivative_path": "evidence/redacted/EV-LOCAL-0001.txt",
+  "sha256_private_original": "<locally-calculated-hash>",
+  "sha256_redacted_derivative": "<locally-calculated-hash>",
+  "redaction_review": {
+    "authorization": "reviewed",
+    "cookies": "reviewed",
+    "query_tokens": "reviewed",
+    "personal_data": "reviewed",
+    "unrelated_requests": "reviewed"
+  },
+  "claim_supported": "The controlled test account can read its own synthetic marker",
+  "reviewer": "local-operator",
+  "retention_basis": "authorized assessment"
+}
+```
+
+Example values are illustrative. Use timestamps in the actual capture timezone and retain the original only when authorization and retention policy permit it.
+
+### Redaction review must be semantic
+
+Search for common secret-bearing locations, but do not rely on a single regex as proof of sanitization. Inspect headers, URL query/fragment, form fields, JSON/XML bodies, cookies, JWT-like values, reset links, source maps, screenshots, HAR metadata, filenames, and embedded logs. Redact values while preserving enough structure to reproduce the issue.
+
+### Safe evidence persistence
+
+- Do not put raw request/response bodies into a global research or learning database by default.
+- Store a minimal redacted excerpt plus a local artifact reference and hash.
+- Keep private originals out of Git and cloud-shared folders unless specifically authorized.
+- If a secret is accidentally committed or transmitted, treat it as exposed: revoke/rotate it through the authorized owner and remove the artifact where possible; deleting a later copy does not erase Git history.
+- Do not describe a hash as proof of integrity unless the manifest and collection process are also controlled.
