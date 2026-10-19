@@ -153,7 +153,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       }
 
       if (params.action === "search") {
-        const limit = Math.min(50, Math.max(1, params.limit ?? 25))
+        const limit = Math.max(1, params.limit ?? 25)
         const offset = Math.max(0, params.offset ?? 0)
         const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
         let candidates: SkillIndex.Entry[] = []
