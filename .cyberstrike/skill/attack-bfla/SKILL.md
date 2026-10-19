@@ -151,3 +151,26 @@ A route reachable to a low role is not enough: establish that the protected func
 
 ### Role-to-operation differential
 Build the matrix from observed requests and documented roles, not from hidden buttons alone. For every sensitive operation compare (a) known-allowed action by a high-role test account, (b) the same action by a low-role account, and (c) an operation that should be denied to both as a negative control. Preserve the operation, object, tenant, and content type while changing only the principal. Confirm that server-side state or protected output changed; if only a status differs, investigate gateway behavior first. Route object-specific failures to IDOR/BOLA, sensitive-field-only differences to API property authorization, and workflow invariants to business-logic testing. Never use real customer records or non-reversible actions to prove privilege impact.
+
+
+## Coverage expansion: alternate operation surfaces
+
+After the normal role matrix, add only operation surfaces actually observed in the application or its schema. Keep each row linked to the same role pair and expected policy.
+
+| Surface | Compare | Confirmation requirement |
+|---|---|---|
+| HTTP methods | Supported GET/POST/PATCH/DELETE methods for the same function | A lower role performs a prohibited operation; state change is verified on a disposable object |
+| API versions | Current and legacy routes for the same function | Legacy route bypasses the same documented server-side policy |
+| GraphQL | Query, mutation, nested resolver, bulk operation | Resolver performs a privileged function under the low-role test identity |
+| Async/background | Job creation, job status, job result/download | Low role can enqueue or retrieve a restricted operation/result |
+| Service-to-service | User-controlled request that triggers a backend integration | Downstream action lacks caller authorization; confirm through approved logs or a synthetic fixture |
+| Tenant admin | Cross-tenant configuration/role operation in a disposable tenant | Server grants or exposes a privileged function outside the test principal's tenant |
+| Field update | Role may edit object but not a sensitive property | Route to property-level authorization; do not misclassify as generic BFLA |
+
+### Evidence contract
+
+For every confirmed row, preserve expected_role, observed_role, function_id, route_and_method, tenant, test_fixture, allowed_control, denied_control, server_state_change, evidence_ref, cleanup_verified, and root_cause_confidence. If the route is merely visible but does not execute, classify it as discovery exposure, not BFLA.
+
+### Chain gates
+
+Only chain to object-level authorization if the same function's permission varies by object ownership; to business logic if a permitted function is used in an invalid sequence; to auth bypass if the operation is callable without a valid identity. Keep these as separate hypotheses with independent controls.
