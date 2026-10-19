@@ -125,7 +125,7 @@ State exposed service, verified build confidence, advisory, preconditions, and w
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized read-only checks while evidence can change the conclusion; deduplicate equivalent metadata requests. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Production exploit testing remains out of scope without separate written authorization.
 
 Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
 
@@ -162,3 +162,30 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 
 ### Product-specific advisory verification
 Distinguish vCenter Server from ESXi, Workstation, Horizon, NSX, and proxy appliances; correlate multiple fingerprints with a current vendor build/advisory matrix and account for backports. External-only public bounty testing should remain read-only and should not attempt administrative changes, exploit payloads, or cluster operations. Version evidence and exposed management ports establish posture, not CVE exploitability. Validate suspected exploit behavior in an isolated matching lab or through explicit rules of engagement; retain exact product/build and mitigation assumptions. Route SSO/federation context to SAML/OAuth review only when a distinct identity boundary is involved.
+
+
+## Advisory applicability ledger
+
+For each potential CVE, keep product identity, build evidence, and vendor prerequisites separate.
+
+| Field | Required content |
+|---|---|
+| Product family | Exact component (vCenter, ESXi, Workspace ONE, Aria, etc.) |
+| Build evidence | Source and timestamp for each independent signal |
+| Advisory | Vendor advisory ID, publication/update date, affected range, fixed build |
+| Prerequisites | Feature/plugin, auth role, network position, deployment mode |
+| Exposure | Public route/service actually reachable within scope |
+| Validation level | Read-only, owner configuration, lab reproduction, or not tested |
+| Confidence | Which facts are confirmed vs unknown |
+| Remediation | Fixed build/configuration and safe owner-side retest |
+
+### Read-only header capture
+
+```bash
+curl -sS --max-time 6 -D management.headers -o /dev/null "$IN_SCOPE_MANAGEMENT_URL"
+grep -iE '^(HTTP/|content-type:|location:|server:|www-authenticate:|strict-transport-security:)' management.headers
+```
+
+Do not infer a build from a generic login page. Avoid endpoints that return configuration, inventory, VM listings, or secrets. If the exact build cannot be verified without privileged access, mark it unknown and ask the asset owner for confirmation rather than escalating access.
+
+Record product_family, hostname_scope_ref, build_signal_sources, advisory_id, affected_range, fixed_build, prerequisites_confirmed, public_reachability, validation_level, and unknowns. Do not chain to RCE solely from a version match.
