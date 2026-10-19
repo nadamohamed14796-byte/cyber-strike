@@ -76,3 +76,27 @@ Return repository/workflow path, trigger, permissions, runner type, trust bounda
 
 ### Trust chain from event to release
 Build a graph of trigger source, workflow permissions, token lifetime, dependency/action pinning, runner trust, artifact provenance, environment approval, and deployment authority. Trace the shortest realistic path from an untrusted contribution or artifact to a privileged release step. Confirm the effective permission with configuration and a harmless test fixture; workflow names, available secrets, or a successful CI badge do not prove that an attacker can retrieve or use them. Validate dangerous behavior only in a fork/sandbox or with synthetic credentials, then recommend least-privilege permissions, immutable references, runner isolation, and a regression test for the specific path.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Gitleaks for credential-pattern scanning, Trivy for dependency/container/image risk, Semgrep for code patterns, and zizmor for GitHub Actions workflow hardening. Select only the scanner that matches the repository artifact.
+
+### Installation and setup
+- [Gitleaks](https://github.com/gitleaks/gitleaks) — official releases/install paths.
+- [Trivy](https://trivy.dev/latest/docs/getting-started/installation/) — official installation guidance.
+- [Semgrep](https://semgrep.dev/docs/getting-started/) — maintained installation methods.
+- [zizmor](https://github.com/zizmorcore/zizmor) — GitHub Actions workflow analyzer and installation details.
+Run scanners on a disposable checkout or CI job, keep the lockfile, review output manually, and never upload private source or secrets to an external scanning service without permission.
+
+### Primary resources
+- [GitHub Actions security hardening](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions) — CI trust boundaries.
+- [OWASP Software Assurance Maturity Model](https://owaspsamm.org/) — assessment context.
+- [Trivy docs](https://trivy.dev/latest/docs/) — supported scan targets.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_skill_catalog.py and python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json to check this repository's skill structure and tooling coverage.
+
+### Result handling
+Separate confirmed source/config weaknesses from scanner heuristics. Record tool/version, file/line, applicable workflow/branch, risk, and a targeted regression test.
