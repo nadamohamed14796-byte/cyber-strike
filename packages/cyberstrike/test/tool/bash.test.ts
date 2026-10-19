@@ -44,6 +44,9 @@ describe("Scanner shell-wrapper detection", () => {
   test("finds nested scanner commands without matching quoted argument text", async () => {
     expect(await findWrappedScanner("cd /tmp && katana -u https://example.com")).toBe("katana")
     expect(await findWrappedScanner("sudo bash -lc 'katana -u https://example.com'")).toBe("katana")
+    expect(await findWrappedScanner("xargs -I{} katana -u https://example.com")).toBe("katana")
+    expect(await findWrappedScanner("find /tmp -exec katana -u https://example.com \\;")).toBe("katana")
+    expect(await findWrappedScanner("bash -lc 'xargs -I{} katana -u https://example.com'")).toBe("katana")
     expect(await findWrappedScanner("printf '%s' 'katana -u https://example.com'")).toBeUndefined()
     expect(await findWrappedScanner("grep katana notes.txt")).toBeUndefined()
   })
