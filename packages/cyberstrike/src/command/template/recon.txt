@@ -443,7 +443,7 @@ For each candidate, record its authorization state and reason.
 
 Before an active operation:
 1. Normalize the candidate and identify its canonical origin/workspace.
-2. Reuse the saved setup decision for that unchanged origin, or perform the single required check if none exists.
+2. Reuse the single saved setup decision for the canonical root/workspace; do not perform a separate agent-level check for each candidate origin. If no setup decision exists for this run, perform the one required check for the canonical root.
 3. Verify the decision is authorized and the proposed operation is permitted by policy.
 4. Confirm the active tool will enforce persisted scope for the exact request.
 5. Record the decision and operation before execution.
