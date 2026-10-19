@@ -211,3 +211,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Proxy/Repeater, browser DevTools, and jq to inspect ordinary API requests and compare unauthenticated vs authenticated behavior. An OpenAPI document or local Postman collection can help understand intended auth requirements.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- jq on Kali/Debian: sudo apt update && sudo apt install jq.
+- [Postman downloads](https://www.postman.com/downloads/) — optional API client; keep private collections/environment values local.
+Prefer read-only requests and synthetic resources. Never bulk-enumerate or copy other users' data; a public endpoint may be intended to be public.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — authentication and access-control risks.
+- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — request-level methodology.
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — policy expectations.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare sanitized local responses; it sends no requests.
+
+### Result handling
+Record the endpoint, method, unauthenticated baseline, control with a controlled account, returned data class, and practical impact. Redact all secrets and personal data.
