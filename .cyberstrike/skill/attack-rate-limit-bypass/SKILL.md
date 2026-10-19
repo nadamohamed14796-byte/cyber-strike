@@ -93,48 +93,18 @@ Store action_id, policy_source, identity_key_hypothesis, window_start/end, confi
 - A limit is absent but the action is harmless/public and no meaningful abuse path is demonstrated → document the control observation without claiming high severity.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/Comparer to observe the application's documented rate-limit behavior and a tiny, controlled request set. Burp Intruder or equivalent automation is optional and should only be used where program rules permit the exact test rate.
-
-### Installation and setup
-- [Burp Community](https://portswigger.net/burp/communitydownload) — official installer and browser setup.
-- jq on Kali/Debian: `sudo apt update && sudo apt install jq` for local response metadata.
-Do not use proxy rotation, distributed sources, account farms, CAPTCHA-solving services, or other methods intended to evade the program's protections. The aim is to verify security control behavior using a controlled test account, not to exceed a real user's permitted quota.
-
-### Primary resources
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — resource-consumption risk context.
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — login protection.
-- [PortSwigger rate limiting research/labs](https://portswigger.net/web-security) — controlled test environments.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved response artifacts offline and generates no traffic.
-
-### Result handling
-Record the documented limit, request spacing/count, status/headers, reset behavior, and user-visible impact. Stop as soon as a safe, reproducible control failure is established.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
-
-### Recommended tools
-- curl/Python requests — single-variable rate-limit checks
-- jq — parse rate-limit headers and JSON responses
-- A local request ledger with timestamps and retry-after tracking
-- http_response_diff.py — compare baseline and throttled behavior
-
+### Agent-usable CLI tools
+- Python `httpx`: measure normal response headers and documented throttling behavior using low-rate, authorized requests.
+- `curl`: establish baseline response and retry-after/rate-limit headers.
+- `jq`: summarize timestamps, status codes, and documented quota headers from saved output.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved samples offline.
+### Install and verify
+Verify `python3 -c "import httpx; print(httpx.__version__)"`, `curl --version`, and `jq --version`. Official docs: https://www.python-httpx.org/, https://curl.se/docs/, https://jqlang.org/. Missing tools should be logged; do not claim measurements without observed output.
 ### Resources
-- https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/
-- https://portswigger.net/web-security/race-conditions
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
-
-### Helper-script contract
-Use a conservative explicitly authorized request budget and stop on degradation or server errors. Record identity/key scope, window, retry-after, response codes, and reset behavior; don't bypass controls at scale.
-
-Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
-
-### Handoff
-Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
+- https://owasp.org/www-community/controls/Blocking_Brute_Force_Attacks
+- https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- https://www.rfc-editor.org/rfc/rfc6585
+### Proof and limits
+Do not attempt to evade quotas or trigger account lockouts. Use a low-volume test window and tester-controlled accounts; stop when throttling or instability appears.
