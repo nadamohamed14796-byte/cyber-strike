@@ -129,3 +129,29 @@ Kali/Debian: `sudo apt update && sudo apt install curl`. Burp Community: https:/
 
 ### Result handling
 Tie each missing/misconfigured header to a route-specific impact and realistic threat model. A scanner grade or missing header in isolation is not proof of exploitable impact.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify official install docs, version, license, platform compatibility, and operational impact before use.
+
+### Recommended tools
+- curl — capture response headers and redirect chain
+- testssl.sh — TLS configuration review
+- Mozilla Observatory CLI/API only when acceptable for the target data
+- Python/jq — compare header policy across paths and hosts
+
+### Resources
+- https://github.com/drwetter/testssl.sh
+- https://observatory.mozilla.org/
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids, not a substitute for reviewing source, release provenance, and supported behavior.
+
+### Helper-script contract
+Collect headers from representative paths and authenticated/unauthenticated contexts where permitted. Record missing/misconfigured directives, browser applicability, and concrete impact; avoid treating every missing header as high severity.
+
+Preserve native evidence; normalize to a separate file. Keep source, timestamp, tool/version, error state, confidence, and redaction. Use explicit paths, machine-readable output, and local test fixtures. Never silently treat missing data as a pass.
+
+### Handoff
+Return actual commands/tool versions, input/output paths, records checked, failures, confidence, limitations, and next skill. A detected service or misconfiguration is a lead until impact is confirmed.
