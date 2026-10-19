@@ -4,6 +4,7 @@ description: "Review error, timeout, retry, partial-failure, cancellation, and f
 category: "web-application"
 version: "1.0.0"
 tags: [error-handling, fail-safe, retry, timeout, queues, authorization]
+chains_with: [attack-business-logic, attack-race-condition, attack-triage-validation, attack-evidence-hygiene]
 tech_stack: [web, api, distributed-systems, queues]
 prerequisites: ["Prefer code/config review and controlled test environments", "Avoid causing production instability"]
 ---
