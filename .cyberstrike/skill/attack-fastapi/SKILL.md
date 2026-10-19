@@ -84,10 +84,12 @@ Trace the dependency and handler in source, keep a minimal sanitized request/res
 
 ## Tools
 
-- **OpenAPI / FastAPI docs:** inventory routes and schemas when in scope.
-- **Burp Suite / curl:** compare auth roles and alternate endpoints.
-- **Source review / Semgrep:** trace dependencies, response models, and background jobs.
-- **Test fixtures:** confirm state and tenant binding without production data.
+- OpenAPI/FastAPI documentation: inventory routes and schemas when in scope.
+- Python `httpx` or `curl`: compare authorization roles and alternate endpoints from observed requests.
+- `rg` / `semgrep`: trace dependencies, response models, and background jobs in authorized local source.
+- Test fixtures: confirm state and tenant binding without production data.
+
+Verify `python3 --version`, the chosen request client, and `semgrep --version`. Official docs: https://fastapi.tiangolo.com/, https://www.python-httpx.org/, https://semgrep.dev/docs/getting-started/.
 
 ## FastAPI Route and Dependency Matrix
 
@@ -177,28 +179,6 @@ For each route, trace app-level dependencies → router dependencies → endpoin
 
 Record router_prefix, route_method, dependency_chain, principal, request_model, response_model, object_owner, synthetic_fixture, persisted_change, negative_control, and cleanup_status. Do not fetch environment files or internal URLs to validate a suspected issue.
 
-
-## Practical tooling, references, and helper scripts (2026-10-19)
-
-### Tools that fit this skill
-- Burp Proxy/Repeater/Comparer, observed client requests, OpenAPI/GraphQL schema when available, and jq; use controlled principals and avoid destructive mutations or load tests.
-- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
-
-### Primary resources
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — risk taxonomy.
-- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — practical methodology.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — access control.
-- - [Official platform documentation](https://fastapi.tiangolo.com/tutorial/security/) — verify actual defaults.
-
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
-
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
