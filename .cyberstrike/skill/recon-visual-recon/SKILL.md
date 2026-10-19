@@ -162,3 +162,28 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate
 
 ### Result handling
 Keep asset URL, capture time, tool/version, redaction review, and specific observation. Do not treat a visual clue as a confirmed finding without a reproducible security test.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
+
+### Recommended tools
+- gowitness — headless screenshots for validated HTTP targets
+- aquatone — visual clustering and HTTP inventory where compatible
+- Python/Pillow — local image metadata and grouping
+- jq — correlate screenshot records with host inventory
+
+### Resources
+- https://github.com/sensepost/gowitness
+- https://github.com/michenriksen/aquatone
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
+
+### Helper-script contract
+Capture only validated authorized hosts; preserve URL, timestamp, status, screenshot path/hash, title, and cluster fingerprint. Screenshot similarity is a prioritization clue, not vulnerability proof.
+
+Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+
+### Handoff
+Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
