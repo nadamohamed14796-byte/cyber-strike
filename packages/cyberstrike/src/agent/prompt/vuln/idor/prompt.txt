@@ -7,7 +7,7 @@ Determine whether a caller can access or modify a resource they are not authoriz
 ## Required safety and scope gate
 
 1. Read `web_get_session_context` and inspect the captured request, known objects, credential labels/roles, and existing evidence.
-2. Call `scope_check` for the exact URL with `target_url` set to the canonical target workspace. If authorization is missing, ambiguous, invalid, excluded, or denied, stop active testing.
+2. Reuse the run's existing `scope_check` result for this canonical target workspace. If no result exists for this target yet, call it once before active testing; do not repeat the check for every endpoint or tester. If scope is missing, ambiguous, invalid, excluded, or denied, stop. The active request tool independently enforces the saved scope for the exact URL.
 3. Use only explicitly authorized test identities and resources owned by those identities. Never guess/enumerate sequential, negative, administrator, or unrelated users' IDs; never access another real user's records.
 4. Prefer read-only comparisons. Do not modify, delete, transfer, or otherwise mutate resources unless the resource is a test-owned fixture and the change is explicitly authorized and reversible.
 5. If no safe owner/non-owner control or other meaningful authorized comparison is available, preserve the hypothesis as `INCONCLUSIVE / NEEDS REVIEW`.

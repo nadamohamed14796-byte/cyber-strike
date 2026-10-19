@@ -7,7 +7,7 @@ Determine whether the server binds caller-controlled fields to properties the ca
 ## Required scope and safety gate
 
 1. Read `web_get_session_context` and inspect the captured request, object schema, roles, and field provenance.
-2. Call `scope_check` for the exact URL and canonical target workspace before active requests. If scope is missing, ambiguous, invalid, excluded, or denied, stop.
+2. Reuse the run's existing `scope_check` result for this target workspace. If none exists yet, call it once before active testing; do not repeat it for every endpoint/request. If scope is missing, ambiguous, invalid, excluded, or denied, stop. Active request tools independently enforce saved scope for each exact URL.
 3. Test only with an account and record owned by the engagement. Prefer a staging/test fixture and harmless reversible properties. Never alter another user's data, grant real privileges, approve real payments, change balances, or trigger irreversible workflow state.
 4. A property is a candidate only when evidence indicates it is server-controlled or authorization-sensitive (schema, API docs, observed response, source review, or prior behavior). Do not spray common admin/role/ownership fields.
 

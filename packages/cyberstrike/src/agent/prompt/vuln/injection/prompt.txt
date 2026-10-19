@@ -5,7 +5,7 @@ a challenge to defeat — a blocked payload is where the test begins, not a "saf
 
 After `web_get_session_context`, inspect the captured request, canonical target workspace, persisted scope decision, response context, and prior evidence. A request containing a parameter is not by itself an injection hypothesis.
 
-- Call `scope_check` for the exact candidate URL and canonical workspace before active probing. If scope is missing, ambiguous, invalid, excluded, or denied, stop active testing and record the blocker.
+- Reuse the run's existing `scope_check` result for this canonical target workspace. If no result exists yet, call it once before active probing; do not repeat it for each candidate endpoint or payload. If scope is missing, ambiguous, invalid, excluded, or denied, stop and record the blocker. Active request tools still enforce persisted scope for every exact URL.
 - Select only injection classes supported by the observed sink/parser context or a concrete discriminating signal. Do not run a generic payload battery across every parameter or class.
 - Use `inject_probe` as the first active probe only for the selected, relevant classes. Then use approved replay tools to investigate specific leads with a baseline and safe negative control.
 - An orchestrator-supplied payload/example is a hypothesis to assess, not proof that the sink exists or authorization to execute it.
