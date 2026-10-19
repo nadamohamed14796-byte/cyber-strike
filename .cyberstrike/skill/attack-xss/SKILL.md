@@ -104,7 +104,6 @@ Verify `rg --version`, `semgrep --version`, `dalfox --help`, and the chosen requ
 - Extensions, injected DevTools snippets, stale caches, and service workers can mislead; repeat in a clean browser profile.
 - Do not test real users, bypass CSP by chaining unrelated weaknesses, or access token-bearing storage.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Follow materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic payload variants and exact retries. Stop when execution/impact is resolved, relevant branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. This does not override program rate limits or safe-production constraints.
@@ -118,7 +117,6 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 3. Test stored, reflected, and DOM flows separately, using controlled accounts for storage/visibility boundaries and changing one parser/context dimension per hypothesis.
 4. Do not read cookies/local storage, capture credentials, beacon private data, or create a payload intended to affect third-party users. Keep demonstrations self-contained and non-persistent where possible.
 5. Confirm execution in the relevant browser context and document origin, victim/role preconditions, sanitizer/encoding failure, control behavior, and a context-specific output-encoding regression test.
-
 
 ### Verdict gates
 
@@ -138,12 +136,10 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 - [elementalsouls/Claude-BugHunter — hunt-xss](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-xss)
 - [OWASP — Cross Site Scripting Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Output-context and audience map
 For each input, record source, transformations, output context, persistence, affected viewer, and any sanitizer/contextual encoder. Use inert unique markers first; confirm execution only in a controlled browser/test account with a harmless proof. Check reflected, stored, DOM, and template routes separately, and test only the context actually reached (HTML text, attribute, URL, JS, CSS, or DOM sink). A reflected marker, HTML-looking response, or CSP absence is not itself XSS. Confirm whether another user/admin sees the content before claiming stored-impact amplification. Chain to clickjacking/CSRF only when the distinct browser interaction or state-change preconditions are observed, and to session risk only when cookie/session controls actually change the demonstrated impact.
-
 
 ## Source-to-sink inventory for JavaScript-assisted hunting
 
@@ -173,7 +169,6 @@ Review false matches, templates, sanitizers, framework semantics, and whether th
 ### Evidence and regression fields
 
 Add source_location, sink_location, transformation_chain, sanitizer_name_and_version, output_context, execution_origin, persistence_scope, affected_test_role, csp_effective_policy, browser_version, negative_control, cleanup_verified, and regression_case. If no browser execution is permitted, keep the result as a source-to-sink candidate with an explicit limitation.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
