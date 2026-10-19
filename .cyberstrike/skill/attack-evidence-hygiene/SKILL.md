@@ -147,3 +147,26 @@ Checks metadata only; manually inspect the artifact and redaction.
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Preserve the sanitized request/response, test identity, timestamp, expected/observed behavior, and cleanup result.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp exports, a local redaction review, hashes to identify raw and derivative files, and the evidence-manifest validator. Use video/screenshot tools only when visual state materially improves reproducibility.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — capture/export workflow.
+- [OBS Studio](https://obsproject.com/download) — optional local recording.
+- Linux sha256sum or Windows PowerShell Get-FileHash — identify artifact versions.
+Keep original captures private and target-local; inspect headers, query strings, form/JSON bodies, cookies, HAR files, screenshots, filenames, logs, and source maps. A regex scan cannot certify sanitization.
+
+### Primary resources
+- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — evidence practices.
+- [Bugcrowd report documentation](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — submission evidence.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — reproducibility.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before sharing evidence; then inspect the actual artifacts manually.
+
+### Result handling
+Keep one manifest entry per artifact with sanitized path, time, hash, test context, redaction review, and claim supported. Never store raw secrets or unrelated personal data in Git or global research.
