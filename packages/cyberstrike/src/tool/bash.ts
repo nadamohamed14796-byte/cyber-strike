@@ -416,6 +416,9 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   if (path.dirname(outputPath) !== urlsRoot) {
     return "Katana raw output must be a direct child of " + urlsRoot + "; nested output folders are not accepted."
   }
+  if (!outputPath.toLowerCase().endsWith(".jsonl")) {
+    return "Katana JSON output must use a '.jsonl' extension so later endpoint normalization can parse it deterministically."
+  }
 
   return undefined
 }
