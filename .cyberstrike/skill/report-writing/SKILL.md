@@ -124,26 +124,23 @@ Create a short claim ledger before writing: observed fact, artifact, inference, 
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Markdown editing, a local evidence-manifest validator, sanitized request/response captures, and FIRST's CVSS calculator when severity scoring is needed. Human review is mandatory before submitting.
+### Agent-usable tools and purpose
+- `python3` standard library — validate report structure and redact copied artifacts before inclusion.
+- `jq` — inspect structured evidence manifests and JSON results.
+- `rg` — search drafts for unredacted token-like values, secrets, or accidental personal data before review; matches require human/context review.
+- Existing helper `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py --help` — inspect supported manifest validation arguments before running.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved redacted responses offline.
 
-### Installation and setup
-- [FIRST CVSS v4.0 calculator](https://www.first.org/cvss/calculator/4.0) — web tool, no install required.
-- [Burp Suite](https://portswigger.net/burp) — export only the relevant sanitized evidence.
-- jq is optional for JSON manifests; on Kali/Debian use sudo apt update && sudo apt install jq.
-Do not feed private findings, raw tokens, or program-confidential information into external writing/scoring services. Check disclosure policy before sharing any report outside the submission platform.
+### Installation and verification
+Verify `python3 --version` and `jq --version`. Use official OS package sources and inspect helper `--help` before assuming flags. Helpers are aids, not proof that evidence is complete or fully sanitized. If a validator is unavailable, record the gap and manually check each artifact reference.
 
 ### Primary resources
-- [HackerOne report writing best practices](https://docs.hackerone.com/en/articles/8475116-best-practices-for-submitting-reports) — clear, reproducible reports.
-- [Bugcrowd reporting a bug](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — evidence and reproduction expectations.
-- [FIRST CVSS](https://www.first.org/cvss/) — scoring standard.
+- https://docs.hackerone.com/en/articles/8494552-writing-a-good-report
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before drafting the final evidence links; review real artifacts manually.
-
-### Result handling
-Use exact chronological steps, prerequisites, role/test-account context, expected/actual result, impact evidence, remediation, and explicit unknowns. Keep confirmed facts separate from hypotheses and include score vector/reasoning if you assign CVSS.
-
+### Report quality gate
+State the exact affected asset, preconditions, reproducible steps, expected versus observed behavior, impact grounded in evidence, and remediation. Link sanitized evidence; remove live credentials, session tokens, personal data, and unrelated customer content. Distinguish confirmed facts from hypotheses and do not claim a tool/test was run without inspected output.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
