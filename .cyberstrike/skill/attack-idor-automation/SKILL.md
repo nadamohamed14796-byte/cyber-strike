@@ -409,7 +409,7 @@ Use tools the agent can invoke directly. Browser interfaces, browser extensions,
 - Python requests/httpx libraries — controlled repeatable request comparisons
 - jq — inspect structured API responses
 - http_response_diff.py — compare baseline and controlled-account results
-- A local JSONL matrix generator for test-owned accounts and objects
+- `authorization_matrix.py` to validate an explicit matrix of test-owned principals, objects, actions, and expected permissions; it generates planned JSONL cases only and sends no requests
 
 ### Official resources
 - https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
@@ -419,8 +419,11 @@ Use tools the agent can invoke directly. Browser interfaces, browser extensions,
 
 Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
 
-### Helper script and output contract
-Generate a matrix of tester-owned identities, roles, object owners, and read-only operations. Use http_response_diff.py, record controls and redacted response fingerprints, and verify server-side authorization rather than relying on status code alone.
+### Helper scripts and output contract
+- Prepare a JSON fixture with an explicit `cases` array; every case must specify `principal_id`, `object_id`, `action`, boolean `expected_allowed`, and a `fixture` identifying a test-owned account/object fixture.
+- Run `python3 .cyberstrike/skill/scripts/authorization_matrix.py authz-fixtures.json -o authz-plan.jsonl` to validate/deduplicate the test plan. This helper only generates a plan; it sends no requests and does not infer the expected authorization policy.
+- Run `python3 .cyberstrike/skill/scripts/tool_preflight.py jq --json` (and check the selected Python libraries in the active environment) before depending on optional CLIs.
+- Consult `.cyberstrike/skill/TOOLING_CATALOG.md` for candidate tools and official references. Use `http_response_diff.py` to compare a baseline with a controlled non-owner request, record control results and redacted response fingerprints, and verify server-side authorization rather than relying on status code alone.
 
 Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
 
