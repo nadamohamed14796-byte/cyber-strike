@@ -4,6 +4,7 @@ import path from "node:path"
 import { Instance } from "../../src/project/instance"
 import { SkillIndex } from "../../src/skill/index-engine"
 import { SkillContext } from "../../src/skill/context"
+import { Skill } from "../../src/skill/skill"
 import { tmpdir } from "../fixture/fixture"
 
 test("resolves exact technique aliases and audits kill-chain and prerequisite references", async () => {
@@ -180,6 +181,45 @@ test("full repository skill catalog has no unresolved chain or prerequisite refe
       fn: async () => {
         await SkillIndex.rebuild()
         expect(SkillIndex.validateReferences()).toEqual([])
+      },
+    })
+  } finally {
+    if (previousTestHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousTestHome
+  }
+}, 60000)
+
+
+test("community tool selection skill is discovered, searchable, retrievable, and loadable", async () => {
+  const repoRoot = path.resolve(import.meta.dir, "../../../..")
+  const previousTestHome = process.env.CYBERSTRIKE_TEST_HOME
+  delete process.env.CYBERSTRIKE_TEST_HOME
+
+  try {
+    await Instance.provide({
+      directory: repoRoot,
+      fn: async () => {
+        await SkillIndex.rebuild()
+
+        const skill = await Skill.get("community-tool-selection")
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("community-tool-selection")
+        expect(skill?.content).toContain("COMMUNITY_TOOL_MAP.md")
+        expect(skill?.content).toContain("tool_preflight.py")
+
+        const indexed = SkillIndex.search("community tool selection", Infinity)
+        expect(indexed.some((entry) => entry.name === "community-tool-selection")).toBe(true)
+
+        const loaded = await SkillContext.load("community-tool-selection")
+        expect(loaded).toBeDefined()
+        expect(loaded).toContain("## Procedure")
+        expect(SkillContext.isLoaded("community-tool-selection")).toBe(true)
+
+        const mapPath = path.join(repoRoot, ".cyberstrike", "skill", "COMMUNITY_TOOL_MAP.md")
+        const map = await fs.readFile(mapPath, "utf8")
+        expect(map).toContain("Amass")
+        expect(map).toContain("Autorize")
+        expect(map).toContain("tool_preflight.py")
       },
     })
   } finally {
