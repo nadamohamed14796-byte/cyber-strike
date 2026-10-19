@@ -74,10 +74,13 @@ Determine whether content affects only the submitting account, another tester-ow
 
 ## Tools
 
-- **Burp Suite Repeater/Proxy:** trace input through request and response.
-- **Browser DevTools:** inspect parsed DOM, sources/sinks, CSP, and console behavior.
-- **DOM Invader or equivalent:** identify candidate DOM paths for manual verification.
-- **Static search:** locate unsafe rendering APIs and framework escape hatches.
+- `rg`: locate unsafe rendering APIs and framework escape hatches in collected source.
+- `semgrep`: scan an authorized local checkout for relevant XSS patterns.
+- `dalfox`: optional candidate analysis against explicitly authorized endpoints, with low-impact settings.
+- Python `httpx` or `curl`: reproduce an observed request and compare controlled input/response behavior.
+- `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript`: inventory local route candidates; not proof of XSS.
+
+Verify `rg --version`, `semgrep --version`, `dalfox --help`, and the chosen request client. Official docs: https://semgrep.dev/docs/getting-started/, https://github.com/hahwul/dalfox, https://curl.se/docs/.
 
 ## Rendering Context and Impact Matrix
 
