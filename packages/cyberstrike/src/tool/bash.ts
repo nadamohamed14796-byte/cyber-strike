@@ -70,6 +70,64 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   dalfox: "vulnerability_testing",
   wpscan: "vulnerability_testing",
 }
+function scannerExecutableIndex(command: string[]): number {
+  const optionWithValue: Record<string, Set<string>> = {
+    sudo: new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-R", "--chroot", "-r", "--role", "-t", "--type", "-T", "--command-timeout", "-U", "--other-user"]),
+    env: new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]),
+    nice: new Set(["-n", "--adjustment"]),
+    timeout: new Set(["-k", "--kill-after", "-s", "--signal"]),
+    stdbuf: new Set(),
+    command: new Set(["-a"]),
+    exec: new Set(["-a"]),
+  }
+  const launchers = new Set(["sudo", "env", "nice", "timeout", "stdbuf", "command", "exec"])
+  let index = 0
+
+  while (index < command.length) {
+    const token = stripOuterShellQuotes(command[index]!)
+    const executable = path.basename(token).toLowerCase()
+    if (SCANNER_PHASES[executable] !== undefined) return index
+    if (!launchers.has(executable)) return -1
+    index++
+
+    const needsValue = optionWithValue[executable] ?? new Set<string>()
+    if (executable === "env") {
+      while (index < command.length) {
+        const arg = stripOuterShellQuotes(command[index]!)
+        if (arg === "--") { index++; break }
+        if (needsValue.has(arg)) { index += 2; continue }
+        if (arg.startsWith("-") || /^[A-Za-z_][A-Za-z0-9_]*=/.test(arg)) { index++; continue }
+        break
+      }
+      continue
+    }
+
+    if (executable === "timeout") {
+      while (index < command.length) {
+        const arg = stripOuterShellQuotes(command[index]!)
+        if (arg === "--") { index++; break }
+        if (!arg.startsWith("-")) break
+        index++
+        if (needsValue.has(arg)) index++
+      }
+      // timeout's first positional argument is its duration, not the executable.
+      if (index < command.length && SCANNER_PHASES[path.basename(stripOuterShellQuotes(command[index]!)).toLowerCase()] === undefined) {
+        index++
+      }
+      continue
+    }
+
+    while (index < command.length) {
+      const arg = stripOuterShellQuotes(command[index]!)
+      if (arg === "--") { index++; break }
+      if (!arg.startsWith("-")) break
+      index++
+      if (needsValue.has(arg) && !arg.includes("=")) index++
+    }
+  }
+  return -1
+}
+
 const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-file", "-out"])
 
 /**
@@ -77,12 +135,11 @@ const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-fil
  * Used to catch duplicate scans inside one shell call before any of them run.
  */
 export function reconScannerInvocationKey(command: string[]): string | undefined {
-  if (!command.length) return undefined
-  const executable = path.basename(stripOuterShellQuotes(command[0]!)).toLowerCase()
-  if (SCANNER_PHASES[executable] === undefined) return undefined
-
+  const scannerIndex = scannerExecutableIndex(command)
+  if (scannerIndex < 0) return undefined
+  const executable = path.basename(stripOuterShellQuotes(command[scannerIndex]!)).toLowerCase()
   const normalizedArgs: string[] = []
-  for (let i = 1; i < command.length; i++) {
+  for (let i = scannerIndex + 1; i < command.length; i++) {
     const argument = stripOuterShellQuotes(command[i]!)
     const lower = argument.toLowerCase()
     if (SCANNER_OUTPUT_FLAGS.has(lower)) {
@@ -92,7 +149,7 @@ export function reconScannerInvocationKey(command: string[]): string | undefined
     if (lower.startsWith("--output=")) continue
     normalizedArgs.push(argument)
   }
-  return JSON.stringify([executable, ...normalizedArgs])
+  return JSON.stringify([command.slice(0, scannerIndex).map(stripOuterShellQuotes), executable, ...normalizedArgs])
 }
 
 function scannerTargets(command: string[], commandText: string): string[] {
@@ -323,7 +380,7 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
 }
 
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
-  const scannerIndex = command.findIndex((value) => SCANNER_PHASES[path.basename(value).toLowerCase()] !== undefined)
+  const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
     // Only inspect shell-wrapper payloads for nested scanner commands. Searching the
     // entire command text causes false positives for ordinary file searches such as
