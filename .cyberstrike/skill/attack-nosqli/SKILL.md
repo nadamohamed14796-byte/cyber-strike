@@ -174,22 +174,18 @@ Use a redacted request captured from your own test account. The command inventor
 Persist input_json_path, expected_type, actual_type, known_match_control, known_no_match_control, candidate_result, synthetic_fixture_ids, session_issued, query_sink_evidence, and cleanup_status.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer for controlled request changes, application errors/logs when authorized, and optional NoSQLMap only in a deliberately isolated lab or an explicitly permitted test target. Prefer manual low-impact checks before automation.
-
-### Installation and setup
-- [Burp Community](https://portswigger.net/burp/communitydownload) — install and configure the browser proxy via PortSwigger documentation.
-- [NoSQLMap project README](https://github.com/skyw4ll/NoSQLMap) documents requirements and setup. Review its setup script and dependencies before running; because it can automate intrusive database/web-app tests, use it only with an owned lab or explicit written authorization and synthetic data. Never run automated database-cloning functions against real user data.
-
-### Primary resources
-- [PortSwigger NoSQL injection](https://portswigger.net/web-security/nosql-injection) — request-level reasoning and labs.
-- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) — defensive parsing principles.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — evidence and confirmation.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares local response artifacts offline; it does not generate injection payloads or contact the target.
-
-### Result handling
-A parser error or changed status alone is not proof. Verify the relevant query predicate/authorization consequence using controlled records and keep any database evidence minimal and synthetic.
+### Agent-usable CLI tools
+- Python `httpx` or `requests`: repeat a captured, authorized request with one harmless input variation and preserve a control.
+- `jq` and `rg`: inspect saved JSON responses and authorized local source for query construction and validation.
+- `mongosh`: only for an explicitly authorized local/test database or source/configuration review; do not connect to production databases unless explicitly included in scope.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved samples offline.
+### Installation and verification
+Verify the chosen Python client and `jq --version`; follow official docs at https://www.python-httpx.org/, https://jqlang.org/, and https://www.mongodb.com/docs/mongodb-shell/. If missing, use source review or a local fixture and record the limitation.
+### Resources
+- https://portswigger.net/web-security/nosql-injection
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://www.mongodb.com/docs/manual/core/security/
+### Proof and limits
+Use harmless boolean/differential checks in an approved environment. Never dump collections, enumerate private records, or modify/delete data. A parse error alone is not proof.
