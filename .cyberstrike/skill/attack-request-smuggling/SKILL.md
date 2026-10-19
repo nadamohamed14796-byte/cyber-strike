@@ -72,3 +72,28 @@ Return `front_end`, `back_end`, `protocol_path`, `test_method`, `parser_differen
 
 ### Parser-differential evidence and stop gate
 Map the supported protocol path (client, CDN/WAF, reverse proxy, server) and preserve exact raw request bytes plus connection context in a controlled environment. Establish normal request framing first and use vendor-recommended safe checks or a lab harness; never attempt to desynchronize shared production users or deliver a request to another user's connection. A timeout, 400, or backend error alone does not prove smuggling. Require evidence of inconsistent parsing across layers and a contained downstream consequence. Chain to 401/403 review only where normalization changes the authorization decision; to cache review only after a safe cache differential is independently reproduced. Report ambiguity as inconclusive and stop at the minimum proof.
+
+
+## Protocol-boundary evidence matrix
+
+Treat the proxy chain as a sequence of parsers, not a single server. Fill each row from configuration, approved telemetry, or a dedicated test environment; do not infer a hop from a product banner alone.
+
+| Boundary | What to record | Safe validation |
+|---|---|---|
+| Client → edge | HTTP/1.1 vs HTTP/2, ALPN, connection reuse | Capture normal requests and negotiated protocol |
+| Edge → proxy/origin | Translation behavior, normalization, request buffering | Review config/logs or use a dedicated staging route |
+| Message framing | How each layer handles duplicate/conflicting length metadata | Vetted tool in an isolated test environment; no improvised shared-connection payload |
+| Connection reuse | Whether a single backend connection carries subsequent requests | Controlled canary request ordering with no sensitive endpoints |
+| Cache layer | Whether response assignment is stable for the test connection | Cache analysis only after desynchronization itself is established |
+| Authorization layer | Whether normalized path/method changes the security decision | Use harmless in-scope routes and compare the same principal |
+
+### Evidence package
+
+Record test_id, client_protocol, negotiated_protocol, proxy_chain_source, tool_version, exact test configuration, connection reuse mode, response sequence, parser_differential, repeatability, environment isolation, and cleanup. Store raw request bytes only in a private, access-controlled test artifact; redact cookies, authorization headers, and user traffic.
+
+### Chain discipline
+
+- A parser differential is the primary finding; cache poisoning, auth bypass, and cross-user effects are separate impact claims.
+- If only one layer rejects a malformed request, record a defensive rejection, not a vulnerability.
+- If the proxy chain cannot be established, mark the test inconclusive rather than guessing the backend behavior.
+- Do not attempt to demonstrate impact by capturing, modifying, or exposing another user's request. Use a dedicated canary route and test connection.
