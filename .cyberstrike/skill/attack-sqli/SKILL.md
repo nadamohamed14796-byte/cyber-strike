@@ -163,3 +163,25 @@ Map each input to its actual server-side use before probing. Keep one row per pa
 - File read, command execution, or database-wide extraction is never inferred from SQL syntax behavior. Do not pursue those impacts in production without explicit authorization and an approved safe environment.
 
 For every result retain baseline_ref, control_ref, exact_parameter_location, predicate_or_type_change, stable_result_difference, synthetic_fixture, query_sink_evidence, cleanup_status, and confidence. If the database dialect or sink is unknown, state it rather than guessing payload families.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer for controlled parameter-level validation; use sqlmap only as an optional authorized lab/approved automation tool after manual behavior is understood. Where available, use the application's own logs or a disposable test database to corroborate the query effect.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official installation and browser proxy setup.
+- [sqlmap official project](https://github.com/sqlmapproject/sqlmap) — follow the project documentation; review options before running.
+Automated SQL injection checks can create load and sometimes alter/delete data. Test only on explicitly authorized assets, with a disposable fixture and program-approved request rate; do not use database-dump or destructive options to establish impact.
+
+### Primary resources
+- [PortSwigger SQL injection](https://portswigger.net/web-security/sql-injection) — controlled labs and verification.
+- [OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html) — remediation.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — evidence criteria.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved redacted response artifacts offline; it sends no payloads.
+
+### Result handling
+Require a reproducible query-dependent difference or a safe marker in a controlled environment. Error text and scanner alerts alone are insufficient; never collect unrelated rows or sensitive fields.
