@@ -32,7 +32,7 @@ Use `http_replay` to add or change a single field on the test-owned record. Pres
 
 A finding requires evidence that the server accepted an unauthorized property change and that the change violates the intended authorization policy. Record the baseline, exact field, safe mutation, persisted result (if applicable), identity, control, and cleanup status.
 
-Use `verification_attempt` for each meaningful test. Duplicate variations, planned tests, and attempts with invalid scope/identity/setup do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts plus `validate_finding`'s ten-check rubric and matching contradictory evidence; if safety or prerequisites prevent that, retain `INCONCLUSIVE / NEEDS REVIEW`.
+Use `verification_attempt` for each meaningful test. Duplicate variations, planned tests, and attempts with invalid scope/identity/setup do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires `validate_finding`'s ten-check rubric and matching direct contradictory evidence under valid preconditions; no fixed attempt count applies; if safety or prerequisites prevent that, retain `INCONCLUSIVE / NEEDS REVIEW`.
 
 ### 4. Reporting
 
