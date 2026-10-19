@@ -234,3 +234,29 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Keep the normal workflow, tested transition, expected invariant, actual final state, and cleanup. A surprising UI sequence without a security consequence is not a confirmed vulnerability.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
+
+### Recommended tools
+- Python standard library — deterministic workflow and state-diff checks
+- jq — parse test fixture and audit outputs
+- http_response_diff.py — baseline/variant response comparison
+- A local JSONL test ledger — one invariant and one variable per test
+
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://portswigger.net/web-security/logic-flaws
+- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids. Use official documentation for current flags, supported versions, output formats, and limitations.
+
+### Helper script contract
+Define the business invariant and a disposable test fixture first. Record before/after authoritative state, request sequence, control, idempotency key, and audit evidence. Never manipulate real payments, real customer data, or irreversible entitlements.
+
+Preserve native evidence and normalize a separate copy. Keep source, timestamp, tool/version, errors, confidence, redaction state, and artifact references. Helpers should accept explicit paths, emit JSON/JSONL where practical, handle malformed input, and include local fixtures.
+
+### Handoff
+Return tool/version, command invoked, input/output artifact references, test/control counts, failures, confidence, limitations, and next skill. A missing tool or blocked source must not be reported as a successful empty result.
