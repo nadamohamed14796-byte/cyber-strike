@@ -138,3 +138,26 @@ Stop at scope ambiguity, real-user data, unexpected state changes, service degra
 
 ### Challenge metadata and severity gate
 Capture only the permitted NTLM challenge metadata and redact internal names, domains, workstation IDs, and hashes not needed in the report. Distinguish protocol negotiation disclosure from credential capture, relayability, or authentication bypass; do not induce inbound authentication, collect NetNTLM material from users, or attempt relay. Corroborate which externally reachable product generated the challenge and whether the information is already intentionally disclosed. Report only the demonstrated confidentiality or configuration consequence and its prerequisites. Chain to Exchange/identity configuration review when the product context is confirmed, not merely because a header contains NTLM.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp/curl for observed HTTP authentication negotiation. For an authorized network assessment, Nmap's documented `http-ntlm-info` NSE script can show metadata exposed by an NTLM challenge; it sends active requests and must be permitted by the program.
+
+### Installation and setup
+- Kali/Debian: `sudo apt update && sudo apt install nmap curl`.
+- [Nmap http-ntlm-info script reference](https://nmap.org/nsedoc/scripts/http-ntlm-info.html) documents arguments and example usage.
+- [Nmap NSE guide](https://nmap.org/book/nse.html) explains script behavior.
+Use a narrow, known in-scope host/port and the program-approved scan policy; do not expand into broad network discovery from a single metadata clue.
+
+### Primary resources
+- [Nmap http-ntlm-info](https://nmap.org/nsedoc/scripts/http-ntlm-info.html) — exact script output and requirements.
+- [Microsoft NTLM overview](https://learn.microsoft.com/en-us/windows-server/security/kerberos/ntlm-overview) — protocol context.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — information-disclosure impact.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` checks evidence metadata locally; it does not perform a network scan.
+
+### Result handling
+Record only the disclosed host/domain/build metadata that supports the finding, whether the challenge was unauthenticated, the tested endpoint, and the practical impact. Redact user-specific or unrelated data.
