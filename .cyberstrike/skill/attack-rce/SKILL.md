@@ -176,3 +176,26 @@ Review wrappers, argument arrays, shell flags, environment-variable expansion, t
 - Confirmed command execution does not authorize host discovery, credential access, persistence, or lateral movement. Stop at the agreed harmless proof.
 
 Record source_file_line, input_source, transformations, sink_api, argument_mode, validation, sandbox_context, approved_proof_type, observed_result, negative_control, and cleanup_status.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater for single-request controlled validation, source/configuration inspection when authorized, and an out-of-band interaction client only when program rules explicitly permit it. Do not use destructive shell commands, persistence, or data access as proof.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
+- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) supports out-of-band interaction observation. Its official README documents installation; for Go 1.20+, the documented client command is `go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest`. Use a unique test interaction only against authorized assets, and understand third-party OAST service data-retention/privacy implications.
+- Install Go from https://go.dev/dl/ only if needed.
+Never upload target source files, secrets, or private data to an OAST tool. Use non-destructive proof markers and stop once the behavior is confirmed.
+
+### Primary resources
+- [PortSwigger OS command injection](https://portswigger.net/web-security/os-command-injection) — safe lab methodology.
+- [ProjectDiscovery Interactsh](https://github.com/projectdiscovery/interactsh) — OAST client behavior and configuration.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — input handling and impact.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved, sanitized responses offline; it does not execute commands or test RCE.
+
+### Result handling
+Distinguish an error message from confirmed server-side execution. Record only a benign controlled marker, its timestamp, the affected endpoint, and a plausible remediation; never read files or dump environment variables to raise impact.
