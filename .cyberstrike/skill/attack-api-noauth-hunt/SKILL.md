@@ -99,7 +99,7 @@ Determine whether the root cause is missing authentication middleware, route-spe
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Never count the same request with cosmetic encoding changes as separate attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a compact ledger for every attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve raw evidence locally, redact secrets, and avoid collecting unrelated user data.
 
@@ -134,3 +134,16 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
 - [OWASP API Security — Broken Authentication](https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/)
 - [OWASP API Security — Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)
+
+
+## Hands-on field pattern: anonymous-to-authenticated differential
+Choose a documented/observed endpoint and a synthetic object. First capture the anonymous baseline, then compare the response from an authorized account that should be allowed to access that fixture:
+
+```bash
+: "Use a read-only in-scope endpoint; TOKEN is supplied outside shell history"
+curl -sS -D anon.headers -o anon.body "$API_URL"
+curl -sS -D auth.headers -o auth.body -H "Authorization: Bearer $TOKEN" "$API_URL"
+sha256sum anon.body auth.body
+```
+
+A body-hash difference is only a triage signal; inspect redacted schemas and protected marker fields. Check alternate API versions and methods only when they are observed and authorized. Chain to `attack-shadow-api` for version drift, `attack-idor-automation` for object-boundary signals, or `attack-bfla` for function-level exposure.
