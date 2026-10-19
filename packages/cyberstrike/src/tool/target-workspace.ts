@@ -299,12 +299,11 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         }
       }
       const sourceForConfiguration = authorizationSource || (userConfirmedInitialScope ? USER_CONFIRMED_SCOPE_SOURCE : undefined)
-      const referenceForConfiguration = authorizationReference || (userConfirmedInitialScope ? undefined : undefined)
       const result = await TargetMemory.configureScope(targetURL, {
         include: includeEntries,
         exclude: excludeEntries,
         authorizationSource: required(sourceForConfiguration, "authorization_source"),
-        authorizationReference: referenceForConfiguration ?? authorizationReference,
+        authorizationReference,
         userConfirmed: userConfirmedInitialScope,
       })
 
@@ -349,7 +348,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
               "Existing include entries, exclusions, and authorization provenance were preserved. No wildcard or sibling assets were inferred.",
               "Authorization basis: " + result.scope.authorizationSource + (result.scope.authorizationReference ? " (" + result.scope.authorizationReference + ")" : " (explicit confirmation in the current conversation; no external policy URL was supplied)") + ".",
               "Active request tools still enforce the persisted scope on each concrete URL; explicit exclusions remain authoritative.",
-            ].join("\\n"),
+            ].join("\n"),
             source: "user-confirmed-scope",
             status: "observed",
             tags: ["scope", "user-confirmed", "authorization-provenance"],
