@@ -99,26 +99,6 @@ Record test_id, client_protocol, negotiated_protocol, proxy_chain_source, tool_v
 - Do not attempt to demonstrate impact by capturing, modifying, or exposing another user's request. Use a dedicated canary route and test connection.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/HTTP history and PortSwigger's HTTP Request Smuggler extension for authorized desynchronization testing. Begin with the lab methodology and request/response baselines before any automated probe.
-
-### Installation and setup
-- [Burp Suite Community/Professional](https://portswigger.net/burp) — official installation.
-- [HTTP Request Smuggler BApp](https://portswigger.net/bappstore/aaaa60ef945341e8a450217a54a11646) — can be installed through Burp's BApp Store; its official page documents features and usage.
-Request-smuggling probes can desynchronize shared connections and affect other users. Test only on an explicitly authorized, isolated or specifically approved environment. Do not launch exploit mode or broad scans on a shared production service without explicit permission; follow the program's written testing constraints.
-
-### Primary resources
-- [PortSwigger request smuggling](https://portswigger.net/web-security/request-smuggling) — lab-first methodology and parser discrepancies.
-- [HTTP Request Smuggler source/documentation](https://github.com/PortSwigger/http-request-smuggler) — extension setup and behavior.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — intermediary/server security context.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved artifacts only; it does not issue desynchronization probes.
-
-### Result handling
-Require reproducible differential behavior and an explained impact. Capture one sanitized request sequence, proxy/backend context if known, timestamps, and a stop/cleanup result. A timeout alone is not sufficient proof.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
