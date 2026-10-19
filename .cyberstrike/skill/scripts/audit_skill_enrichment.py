@@ -11,7 +11,7 @@ SCAN_MARKERS=TOOL_MARKERS+("## Tools",)
 UI_FIRST=re.compile(r"\b(Burp(?:\s+Suite|\s+(?:Proxy|Repeater|Comparer))?|browser DevTools|Chrome DevTools|DOM Invader|Turbo Intruder|BApp Store)\b",re.I)
 URL=re.compile(r"https?://[^\s)]+")
 CLI=re.compile(r"`(?:[a-zA-Z0-9_.-]+\s+[^`]+|python3\s+[^`]+)`")
-INSTALL=re.compile(r"\b(install|download|go install|pipx|apt install|brew install|winget install|official releases)\b",re.I)
+INSTALL=re.compile(r"\b(install|download|official releases|verify|version|availability)\b",re.I)
 
 def inspect(path:Path,root:Path)->dict:
     content=path.read_text(encoding="utf-8",errors="replace")
