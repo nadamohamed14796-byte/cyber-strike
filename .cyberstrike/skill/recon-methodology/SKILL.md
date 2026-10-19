@@ -139,3 +139,19 @@ Preserve raw outputs and normalize a separate copy. Helpers should retain proven
 
 ### Handoff
 Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
+
+
+## Mandatory phase tool coverage
+
+Before each unresolved canonical recon phase, read `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` and use its phase-specific capability map. This matrix is a minimum checklist, not an installed-tool list. Search and load relevant specialist skills through the registered skill tool, then verify local CLI availability with `tool_preflight.py` when that helper exists in the active workspace. Inspect the actual tool help/version and official usage before invocation.
+
+For every phase, record:
+- capability needed, selected primary method, and why it fits the evidence;
+- complementary source/alternative considered and whether it adds distinct coverage;
+- actual availability/version, execution result/exit status, and any stderr or partial output;
+- raw and normalized artifact paths, provenance, deduplication counts, and validation performed;
+- missing tools, skipped candidates, failures, and the reason each did not run.
+
+Do not stop after one tool returns partial data if another relevant available source could materially improve coverage. Conversely, do not run every tool in a catalog by default. Never install the entire matrix automatically. Install only for a concrete need after reviewing official instructions, provenance, compatibility, and permission; otherwise use a verified alternative or report the capability gap. “Tool missing,” “tool failed,” “source returned zero results,” and “not applicable” are distinct outcomes.
+
+A phase is complete only when its applicable source coverage has been attempted, its eligible frontier is exhausted, and its persisted artifacts are verified. A successful command or a skill recommendation alone is not completion. Preserve partial results and continue independent work when possible; never loop indefinitely on a repeated failure.
