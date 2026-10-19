@@ -41,7 +41,7 @@ Choose a specific class only when the captured behavior supports it:
 
 A file name appearing in a response, an uploaded file being accepted, a 200 response, or an error difference alone is not a vulnerability. Establish the violated security boundary with a baseline and safe control. Record whether the file is actually accessible, stored, parsed, or rendered as expected, and whether the effect is reproducible without accessing unrelated data.
 
-Use `verification_attempt` for each meaningful executed test. Planned tests, duplicates, and invalid preconditions do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts plus the ten-check `validate_finding` rubric and matching contradictory evidence. If safe prerequisites are unavailable, preserve `INCONCLUSIVE / NEEDS REVIEW`.
+Use `verification_attempt` for each meaningful executed test. Planned tests, duplicates, and invalid preconditions do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires the ten-check `validate_finding` rubric and matching direct contradictory evidence under valid preconditions; no fixed attempt count applies. If safe prerequisites are unavailable, preserve `INCONCLUSIVE / NEEDS REVIEW`.
 
 ### 4. Reporting and cleanup
 
