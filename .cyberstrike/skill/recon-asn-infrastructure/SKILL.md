@@ -86,7 +86,6 @@ Represent relationships as domain → DNS record → IP → ASN/prefix → servi
 - Treat WHOIS organization strings, PTR names, and brand-name matches as weak signals unless corroborated.
 - Prefer targeted service checks over high-rate scans of broad ranges.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful attribution hypotheses. Continue materially distinct, authorized passive checks while evidence can change the conclusion; deduplicate repeated sources and equivalent observations. Stop when attribution is resolved, relevant sources are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. ASN membership alone never authorizes active scanning.
@@ -100,7 +99,6 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 3. Normalize prefixes and hostnames, deduplicate shared CDN/cloud edges, and separate directly registered infrastructure from reseller, SaaS, shared hosting, and third-party service providers.
 4. Promote a prefix to active testing only when written scope clearly covers it; do not sweep every IP in an ASN or infer permission from routing/WHOIS ownership.
 5. Return candidate prefixes with attribution confidence, evidence provenance, explicit exclusions, validation status, and narrow next steps; hand confirmed web assets to the relevant recon/attack skill rather than claiming a vulnerability.
-
 
 ### Verdict gates
 
@@ -121,12 +119,10 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 - [BGP.tools](https://bgp.tools/)
 - [RFC 9082 — RDAP Query Format](https://www.rfc-editor.org/rfc/rfc9082)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Ownership-confidence ladder and scan boundary
 For every IP/prefix/ASN pivot, retain the organization attribution source, relationship type (owned subsidiary, provider, shared cloud/CDN, stale historical link), observation date, and confidence. Corroborate with first-party asset lists, RDAP/RIR records, certificates, DNS, and product branding before assigning ownership; ASN membership alone never authorizes scanning every announced address. Keep passive-only leads separate from active-scan candidates and record why a candidate passes the target's actual program scope. Use new IPs to discover relationships, not to widen scope implicitly. Route confirmed public service exposure to service discovery and cloud-owned resource policy questions to cloud assessment.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
