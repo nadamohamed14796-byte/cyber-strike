@@ -44,3 +44,6 @@ Read-back checks confirmed the fixed wording was removed from attack-information
 
 ## New-skill structural read-back
 The five new skill files were fetched again from main. All five have frontmatter name matching the directory and a non-empty description; every declared chains_with target resolves to a local SKILL.md path. The loader source scans nested SKILL.md files and labels unsigned files as unverified rather than official. This is structural evidence, not a runtime invocation test.
+
+
+Additional file: `attack-database-service-exposure/SKILL.md` was added and read back; its frontmatter and five local handoff targets resolve.
