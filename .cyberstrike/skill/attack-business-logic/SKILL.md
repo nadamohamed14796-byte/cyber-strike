@@ -211,3 +211,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer, browser DevTools, and a short state-transition table to test one business invariant at a time. For multi-step workflows, record expected state before and after each step; do not use load testing to establish logic flaws.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- A local Markdown/spreadsheet editor is sufficient for a state ledger; no separate scanner is required.
+- [Postman](https://www.postman.com/downloads/) is optional where a documented API workflow is easier to reproduce there.
+Use owned disposable resources and transactions. Do not create real charges/refunds, send mass messages, alter user entitlements, or disrupt live inventory unless explicitly authorized.
+
+### Primary resources
+- [OWASP Business Logic Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Business_Logic_Security_Cheat_Sheet.html) — invariant/control design.
+- [PortSwigger business logic vulnerabilities](https://portswigger.net/web-security/logic-flaws) — lab methodology.
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API workflow context.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
+
+### Result handling
+Keep the normal workflow, tested transition, expected invariant, actual final state, and cleanup. A surprising UI sequence without a security consequence is not a confirmed vulnerability.
