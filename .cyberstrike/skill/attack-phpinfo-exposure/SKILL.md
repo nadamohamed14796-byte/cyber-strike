@@ -158,21 +158,14 @@ A 200 or HTML content type is not proof of phpinfo. If content inspection is nee
 Record endpoint, anonymous_or_role_access, phpinfo_signature_observed, minimal_sensitive_field_category, exact_value_redacted, random_path_control, cache_context, owner_remediation, and retest_result. Treat adjacent RCE or credential exposure as a separate hypothesis requiring independent proof.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use curl/browser DevTools and Burp to verify the response, plus ripgrep for local authorized source/artifact review. An HTTP probe tool can help validate discovered paths but should not replace manual impact assessment.
+- `curl`: retrieve a bounded response from an observed, in-scope path and save only minimal sanitized evidence.
+- `rg` or a local HTML parser: detect phpinfo markers in already-collected output.
+- PHP manual and source/configuration review: verify directive semantics and identify the cause of exposure.
+- `python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt`: deduplicate collected URL candidates locally; it makes no HTTP requests.
 
-### Installation and setup
-Kali/Debian: `sudo apt update && sudo apt install curl ripgrep`. Optional ProjectDiscovery httpx installation and flags are documented at https://docs.projectdiscovery.io/tools/httpx/overview ; use only a supplied in-scope URL list and approved rates. Do not run broad wordlists against a production target unless permitted.
-
-### Primary resources
-- [PHP phpinfo documentation](https://www.php.net/manual/en/function.phpinfo.php) — what the page can expose.
-- [OWASP WSTG information leakage](https://owasp.org/www-project-web-security-testing-guide/) — determine impact beyond a banner.
-- [OWASP Information Exposure Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Information_Exposure_Cheat_Sheet.html) — sensitive-data handling.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` deduplicates collected URL candidates locally and strips query values; no HTTP requests are made.
+Verify `curl --version` and the chosen parser. Official docs: https://curl.se/docs/, https://www.php.net/manual/en/, https://cheatsheetseries.owasp.org/cheatsheets/Information_Exposure_Cheat_Sheet.html.
 
 ### Result handling
-Capture a redacted excerpt and explain the specific sensitive configuration/build/path data disclosed. A phpinfo-like page name or header alone is not proof that it is reachable.
+Capture a redacted excerpt and explain the specific sensitive configuration/build/path data disclosed. A page name or header alone is not proof that the endpoint is reachable.
