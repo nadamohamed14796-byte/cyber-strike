@@ -150,3 +150,29 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize r
 
 ### Result handling
 Record public project/path/commit identifier and source URL; redact secret values and report the location/fingerprint. Never test a discovered credential or include it in issue text.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
+
+### Recommended tools
+- gitleaks — scan local checked-out repositories
+- GitHub/GitLab native CLI or API client for public metadata where authorized
+- git — inspect history and repository metadata
+- jq/rg — normalize matches and redact sensitive values
+
+### Resources
+- https://github.com/gitleaks/gitleaks
+- https://docs.gitlab.com/cli/
+- https://git-scm.com/docs
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; verify project maintenance, license, and supported behavior from official sources.
+
+### Helper-script contract
+Collect repository URL, commit/hash, path, detector, and redacted fingerprint. Do not test leaked credentials or access private repositories without explicit permission.
+
+Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+
+### Handoff
+Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
