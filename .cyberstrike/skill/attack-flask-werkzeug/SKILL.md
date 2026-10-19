@@ -146,3 +146,26 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 ### Debugger and deployment confirmation
 Differentiate a generic Flask traceback from the interactive Werkzeug debugger and from a sanitized error page. Record whether the debug console is actually enabled, exposed, and reachable; never attempt to execute code in a live console. Confirm debug configuration through authorized source/config review or a disposable staging environment, and preserve only a redacted excerpt. Check proxy trust, environment separation, and error-handler consistency across routes. A framework fingerprint or stack trace alone should remain an informational lead unless sensitive data or an unsafe interactive console is directly demonstrated. Recommend disabling debug in production and adding a deployment regression check.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Browser DevTools, Burp Proxy/Repeater/Comparer, and curl to replay one observed request; use only runtime-exposed integrations.
+- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — test methodology.
+- [PortSwigger Web Security Academy](https://portswigger.net/web-security) — controlled labs.
+- [OWASP Cheat Sheets](https://cheatsheetseries.owasp.org/cheatsheets/) — mitigation.
+- - [Official platform documentation](https://flask.palletsprojects.com/en/stable/web-security/) — verify actual defaults.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
+Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.

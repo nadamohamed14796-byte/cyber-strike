@@ -166,3 +166,25 @@ Treat extracted routes as documentation leads only. Do not automatically request
 ### Evidence fields
 
 Record device_family, model_signal, firmware_signal_source, vendor_advisory, route_source_asset, route_name_only, auth_policy_expected, read_only_response_ref, sensitive_data_excluded, test_environment, and cleanup_status. Keep physical/operational impact separate from web access-control impact.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Burp Proxy/Repeater/Comparer, observed client requests, OpenAPI/GraphQL schema when available, and jq; use controlled principals and avoid destructive mutations or load tests.
+- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — risk taxonomy.
+- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — practical methodology.
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — access control.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
+Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.

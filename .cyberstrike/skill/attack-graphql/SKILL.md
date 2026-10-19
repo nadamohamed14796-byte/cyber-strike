@@ -119,3 +119,25 @@ Save the GraphQL request as a redacted artifact and record operationName, query 
 - Mutation can invoke a restricted function regardless of object owner → BFLA.
 - Aliases/batches cause excessive server cost → API resource-consumption, with a safe staging cost trace.
 - Subscription continues delivering private events after access is revoked → session/authorization review using synthetic events only.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Burp Proxy/Repeater/Comparer, observed client requests, OpenAPI/GraphQL schema when available, and jq; use controlled principals and avoid destructive mutations or load tests.
+- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — risk taxonomy.
+- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — practical methodology.
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — access control.
+
+### Small reusable helper
+    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
+Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
+
+### Evidence and hand-off
+- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
+- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
+
+Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
