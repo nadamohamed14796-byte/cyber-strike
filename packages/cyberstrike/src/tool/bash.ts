@@ -97,7 +97,13 @@ function scannerTargets(command: string[], commandText: string): string[] {
 
 function hostnameMatchesScopeRule(ruleInput: string, hostname: string): boolean {
   let rule = ruleInput.trim().toLowerCase()
-  rule = rule.replace(/^(?:domain|wildcard)[ \t]*:[ \t]*/i, "")
+  const typed = rule.match(/^(domain|wildcard)[ \t]*:[ \t]*(.+)$/i)
+  if (typed) {
+    rule = typed[2]!.trim()
+    if (typed[1]!.toLowerCase() === "wildcard" && !rule.includes("*") && !/\{[^{}]+\}/.test(rule)) {
+      rule = "*." + rule
+    }
+  }
   if (/^https?:\/\//i.test(rule) || rule.includes("/") || rule.includes(":")) return false
   if (rule.startsWith("*.")) {
     const suffix = rule.slice(2).replace(/\.$/, "")
