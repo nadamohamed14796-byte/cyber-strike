@@ -22,7 +22,7 @@ describe("Phase-critical skill pinning", () => {
     const available = new Set(catalog.map((skill) => skill.name.trim().toLowerCase()))
     for (const [phaseID, required] of Object.entries(PHASE_REQUIRED_SKILLS) as Array<[Phase.Id, string[]]>) {
       for (const name of required) {
-        expect(available, phaseID + " requires loadable skill " + name).toContain(name.toLowerCase())
+        expect(available.has(name.toLowerCase()), phaseID + " requires loadable skill " + name).toBe(true)
       }
     }
   })
