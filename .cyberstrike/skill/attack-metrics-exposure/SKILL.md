@@ -63,3 +63,23 @@ Capture only a small sample of the metrics endpoint and redact label values befo
 Keep a small redacted sample and record the endpoint, expected audience, principal, label names, data classes, access decision, and time of observation. Avoid retaining entire metric dumps. A label name may indicate a possible privacy issue, but report only when the value or access boundary is actually sensitive and the endpoint is exposed contrary to policy.
 
 Separate metrics, health/readiness, tracing, profiling, debug output, and administrative controls because they have different risk and operational impact. Review configuration and read-only evidence first; do not trigger heavy profiles or diagnostic dumps on a live service. Any follow-up must use an approved synthetic fixture and the minimum proof necessary.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use curl/browser DevTools for a single authorized request, jq for local JSON, Burp for authentication-context comparison, and Prometheus `promtool` when Prometheus configuration/rules are part of the authorized assessment.
+
+### Installation and setup
+Kali/Debian: `sudo apt update && sudo apt install curl jq`. Get Prometheus/`promtool` only from https://prometheus.io/download/ and follow the official version-specific setup. Avoid scraping or bulk-downloading production metrics unless the program explicitly permits it. Tool installation does not authorize a test.
+
+### Primary resources
+- [Prometheus documentation](https://prometheus.io/docs/) — metrics formats and access patterns.
+- [OWASP Information Exposure Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Information_Exposure_Cheat_Sheet.html) — impact context.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — disclosure verification.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized responses already saved locally; it sends no request.
+
+### Result handling
+Record the metric names and exposure context without copying secrets or personal data; distinguish public operational metadata from genuinely sensitive data.
