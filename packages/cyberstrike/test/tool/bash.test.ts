@@ -78,6 +78,15 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-rl", "5", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-fs fqdn")
   })
 
+  test("requires explicit bounded crawl depth and a workspace-local output file", () => {
+    const noDepth = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/tmp/katana.txt"]
+    expect(katanaScopeBlockReason(noDepth, "https://example.com", baseScope, "/workspace/example")).toContain("explicit Katana depth")
+    const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3"]
+    expect(katanaScopeBlockReason(noOutput, "https://example.com", baseScope, "/workspace/example")).toContain("raw results")
+    const outsideOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", "/tmp/katana.txt"]
+    expect(katanaScopeBlockReason(outsideOutput, "https://example.com", baseScope, "/workspace/example")).toContain("inside this target workspace")
+  })
+
   test("rejects unbounded rate limits and scope-broadening flags", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
     expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope, workspacePath)).toContain("scope overrides")
