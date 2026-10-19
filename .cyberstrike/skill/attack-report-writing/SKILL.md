@@ -86,3 +86,30 @@ The skill should consume a validated finding and references to redacted artifact
 
 ### Evidence-to-claim traceability
 Create a claim map before drafting: each sentence about access, affected data/action, prerequisites, and scale must point to one sanitized artifact or be labeled as inference. Keep the primary finding focused on one root cause and one end-to-end impact path; mention sibling routes only when independently reproduced, and avoid combining unrelated defects into an inflated severity. Include a direct negative control, setup/reset instructions, observed versus expected behavior, role/tenant context, remediation, and a regression test. If broader impact would require untested assumptions, state that limitation instead of filling it in. Check the target program's duplicate policy and disclosure template before submission.
+
+
+## Evidence-backed report skeleton
+
+Use this as a draft structure, not a replacement for the destination program's template.
+
+- **Finding ID / root-cause key:** stable local identifiers only.
+- **Title:** class + exact feature + demonstrated consequence.
+- **Affected asset and endpoint:** normalized route/method/version; no secrets.
+- **Scope and prerequisites:** authorization basis, controlled role/tenant, required user action.
+- **Expected invariant:** the exact rule that should hold and its source.
+- **Reproduction:** baseline, one changed condition, observed result, independent read-back, negative control.
+- **Evidence map:** claim → sanitized artifact reference → what the artifact proves.
+- **Demonstrated impact:** only the confirmed data/action/permission boundary and scale actually measured.
+- **Not demonstrated:** plausible but untested consequences and unavailable prerequisites.
+- **Root cause:** confirmed code/config defect or explicitly labeled hypothesis.
+- **Remediation:** specific server-side control and regression test.
+- **Cleanup:** restored fixture, revoked test session/token, and any remaining state.
+- **Program formatting:** required severity, duplicate, disclosure, and attachment rules.
+
+### Claim-level review
+
+Before finalizing, label each sentence internally as OBSERVED, INFERRED, or RECOMMENDED. Every OBSERVED claim needs an artifact. Every INFERRED claim must be phrased as a hypothesis with assumptions. RECOMMENDED content should address the root cause without claiming a fix has already been applied.
+
+### Regression handoff
+
+Provide a compact test case with setup, expected result, actual pre-fix result, post-fix expected result, and cleanup. Avoid using live credentials in sample requests; replace them with placeholders and redact cookies, tokens, personal fields, and sensitive response bodies. Do not attach an entire HAR when a minimal sanitized request pair proves the issue.
