@@ -379,7 +379,7 @@ Recommended primary reference points: OWASP Web Security Testing Guide (versione
 This section adds practical authoring rules for every custom/local skill.
 
 ### Tools that fit the skill
-- Name concrete tools and the task each one supports. Separate interactive tools (browser DevTools, Burp Repeater/Comparer, an approved cloud console) from optional command-line tools.
+- Name concrete tools the autonomous agent can invoke and parse directly: CLIs, libraries, local scripts, APIs/connectors that are actually available, and non-interactive system utilities. Do not list browser DevTools, Burp Suite, interactive proxies, or human-operated extensions as agent dependencies. If a workflow normally uses one, replace it with a CLI/API/local-fixture path; mention the human-only option only as context, never as the required path.
 - Treat command-line tools and integrations as optional until availability is confirmed. Run `command -v TOOL` (or the platform equivalent) before calling a command runnable. Never claim that an MCP, CyberStrike runtime tool, extension, or sub-agent exists because an upstream source mentions it.
 - State whether each operation is passive/read-only, an active request, or state-changing. Prefer read-only and low-impact methods first; mutations require an authorized disposable fixture and explicit permission.
 
