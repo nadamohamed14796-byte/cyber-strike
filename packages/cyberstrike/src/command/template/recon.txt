@@ -276,7 +276,7 @@ Record the returned source SHA-256, saved path, configuration result, and any un
 
 ## 2.3 Configure scope without a supplied file
 
-If no scope file is provided, use verified official policy evidence for a full program manifest. If the user explicitly confirms one exact asset instead, configure only that exact entry with `user_confirmed_scope=true`, preserve that provenance in the manifest and notes, and do not fabricate an external policy reference.
+If no scope file is provided, use verified official policy evidence for a full program manifest. If the user explicitly confirms one exact asset instead and no configured manifest exists, call `target_workspace(action="configure_scope", target_url="<canonical root target>", include=["<one exact confirmed asset>"], user_confirmed_scope=true)`; do not pass `merge_existing` for initial configuration. Preserve that provenance in the manifest and notes, verify the saved result, and do not fabricate an external policy reference.
 
 When the registered tool supports the interface below, use:
 
