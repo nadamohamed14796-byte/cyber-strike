@@ -7,7 +7,7 @@ This is a discovery and selection guide for agent-executable CLI tools, local li
 | Task | Primary candidates | Complementary checks | Preserve |
 |---|---|---|---|
 | Passive subdomain discovery | subfinder, amass | certificate transparency, passive DNS | candidate, source, timestamp, attribution confidence |
-| DNS validation | dnsx, dig | puredns/shuffledns only when active discovery is allowed | record type, answer, TTL, wildcard controls, resolver errors |
+| DNS validation | dnsx, dig | puredns/shuffledns only when active discovery is allowed; `host_inventory.py` for provenance-preserving normalization | record type, answer, TTL, wildcard controls, resolver errors |
 | Ports and services | naabu, nmap, tlsx, fingerprintx | httpx for HTTP metadata | host, port, protocol, timestamp, service confidence |
 | URL/history collection | gau, waymore, waybackurls | katana for authorized crawling | normalized URL, source, first-seen, parameters |
 | Content discovery | feroxbuster, ffuf, dirsearch | context-appropriate wordlists | status, length, content fingerprint, errors |
@@ -18,6 +18,7 @@ This is a discovery and selection guide for agent-executable CLI tools, local li
 | Source/config checks | Semgrep, Trivy, Checkov where applicable | vendor advisories | rule/advisory, path/resource, version, remediation |
 | HTTP response comparison | curl, Python requests/httpx | http_response_diff.py | baseline/control, changed variable, status and response fingerprint |
 | Evidence/report validation | Python stdlib, jq | validate_evidence_manifest.py | evidence path, redaction status, finding disposition |
+| IDOR/BOLA and tenant authorization | Python requests, jq, pytest | `authorization_matrix.py` for explicit test-fixture plans; `http_response_diff.py` for controlled comparisons | principal/object/action, expected permission, control result, redacted evidence |
 
 ## Readiness requirements
 
@@ -37,6 +38,8 @@ This is a discovery and selection guide for agent-executable CLI tools, local li
 - `validate_evidence_manifest.py`: evidence manifest validation.
 - `audit_skill_enrichment.py`: audit direct skills for executable tooling guidance.
 - `tool_preflight.py`: check local CLI availability and version output without installing tools or contacting targets.
+- `host_inventory.py`: normalize hostname observations from JSONL while retaining every source record; no network traffic.
+- `authorization_matrix.py`: validate explicit test-owned principal/object/action cases and generate a planned JSONL matrix; no network traffic.
 - `validate_skill_catalog.py`: structural catalog checks.
 
 Inspect each helper's actual CLI and tests before assuming flags or behavior.
