@@ -128,50 +128,18 @@ This compares local artifacts offline and heuristically redacts common secrets b
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/Comparer to compare cacheable response variants; Param Miner may help discover cache-key inputs when authorized. Start with benign unique markers and a test endpoint/resource.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- Param Miner can be installed from Burp's official BApp Store; review its request behavior before use.
-- curl on Kali/Debian: sudo apt update && sudo apt install curl.
-Shared-cache poisoning can affect other users, so automated probes and exploit-mode tests require explicit authorization and preferably an isolated/staging cache. Do not poison a common page or target another user's session.
-
-### Primary resources
-- [PortSwigger Web Cache Poisoning](https://portswigger.net/web-security/web-cache-poisoning) — cache-key and response variation.
-- [RFC 9111 HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111) — standards context.
-- [OWASP HTTP Headers Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html) — relevant response controls.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted response variants offline.
-
-### Result handling
-Record normal baseline, exact request delta, cache indicators, test marker, and affected context. A reflected input or a cache hit is not enough without a reproducible unsafe cached response.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
-
-### Recommended tools
-- curl — capture cache headers and controlled request variants
-- Python requests/httpx — one-variable cache-key comparisons
-- jq — parse Age, Vary, Cache-Control, and provider-specific headers
-- A local cache experiment ledger with unique harmless markers
-
+### Agent-usable CLI tools
+- Python `httpx` or `curl`: compare cacheable responses for one controlled header/query variation using a unique benign marker.
+- `jq` and `rg`: parse saved headers/body metadata and inspect collected source/configuration.
+- `ffuf`: optional small candidate-header/parameter checks only when program rules allow; never use high-volume guessing or shared-cache disruption.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+### Install and verify
+Verify `curl --version`, the selected Python client, and `ffuf -V`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://github.com/ffuf/ffuf. Use a unique marker and disposable/test account; record missing tools and use a saved-response or source-review fallback.
 ### Resources
 - https://portswigger.net/web-security/web-cache-poisoning
-- https://portswigger.net/web-security/web-cache-deception
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
-
-### Helper-script contract
-Use unique harmless markers and controlled cache keys; avoid poisoning shared users' content. Record cache state, request pair, Vary/key behavior, marker persistence, and cleanup/expiry.
-
-Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
-
-### Handoff
-Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+- https://www.rfc-editor.org/rfc/rfc9111
+### Proof and limits
+Show a reproducible cache-key mismatch and controlled marker reaching a later request. Avoid contaminating shared users' cache or storing private responses.
