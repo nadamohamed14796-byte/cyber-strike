@@ -78,10 +78,13 @@ Confirm whether metadata is genuinely non-public and security-relevant. Stop at 
 
 ## Tools
 
-- **curl:** bounded endpoint/header checks.
-- **Microsoft Exchange documentation/security updates:** confirm supported builds and fixed CUs.
-- **NTLM parser:** decode only captured challenge metadata offline.
-- **Browser/OWA test account:** verify login redirects without touching real mail.
+- `curl`: bounded endpoint/header checks with explicit timeouts.
+- Python `httpx`: compare observed login redirects and response headers without downloading mail content.
+- `openssl s_client`: inspect TLS/certificate metadata for the authorized hostname.
+- Local NTLM parser: decode only captured challenge metadata offline.
+- Microsoft Exchange documentation/security updates: confirm supported builds and fixed cumulative updates.
+
+Verify `curl --version`, the selected Python client, and `openssl version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://www.openssl.org/docs/, https://learn.microsoft.com/en-us/exchange/.
 
 ## Exchange Surface and Evidence Matrix
 
@@ -169,24 +172,15 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp/curl for low-impact, in-scope Exchange/OWA route and response verification. Nuclei may support a narrow version/advisory check only when the relevant template is inspected and allowed by the program.
+Use bounded `curl`/`httpx` checks for the observed authorized host and review Microsoft security updates for build-specific applicability. Keep checks read-only; do not access mailboxes, enumerate users, or attempt credential attacks.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- On Kali/Debian: sudo apt update && sudo apt install curl.
-- [Nuclei docs](https://docs.projectdiscovery.io/tools/nuclei/overview) and [official templates](https://github.com/projectdiscovery/nuclei-templates) — inspect exact request behavior before running.
-Do not run exploit scripts, credential attacks, or authenticated state-changing actions against production Exchange/OWA. Confirm product/version using minimum evidence and use a lab for exploitability validation.
+### Resources
+- https://learn.microsoft.com/en-us/exchange/
+- https://learn.microsoft.com/en-us/exchange/new-features/build-numbers-and-release-dates
+- https://learn.microsoft.com/en-us/security-updates/securitybulletins/securitybulletins
+- https://curl.se/docs/
 
-### Primary resources
-- [Microsoft Exchange Server documentation](https://learn.microsoft.com/en-us/exchange/) — product/version context.
-- [Microsoft Security Response Center](https://msrc.microsoft.com/) — official advisories.
-- [Nuclei documentation](https://docs.projectdiscovery.io/tools/nuclei/overview) — scan behavior.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
-
-### Result handling
-Record version evidence, exact endpoint, auth context, relevant advisory and affected version range, and safe reproducible impact. Never collect mailbox contents or credentials as proof.
+### Evidence
+Record hostname, build/version evidence, timestamp, response headers, and source of the version claim. A reachable OWA/ECP endpoint or version banner alone is not a vulnerability.
