@@ -84,26 +84,6 @@ Capture the redacted request, response status, `Location` value, final destinati
 Inventory observed redirect parameters and capture the default destination, then test allowlist boundary cases in a controlled browser without asking real users to follow the link. Record whether validation is based on exact origin, hostname suffix, scheme, path, encoded authority, or nested redirect—not just whether a Location header changes. An external redirect is often low impact by itself; check whether a specific OAuth/OIDC or password-recovery flow trusts it and whether an authorization code/token becomes bound to the wrong destination, using only owned accounts. Chain to ATO only after identity takeover is proven; otherwise report the redirect impact accurately. Compare a canonical safe destination as a negative control.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use browser DevTools and Burp Repeater to compare redirect handling for controlled destinations. Param Miner can help discover candidate parameters, but each active probe must comply with the target program's rules.
-
-### Installation and setup
-- [Burp Suite Community](https://portswigger.net/burp/communitydownload) — install from PortSwigger.
-- Param Miner can be installed from Burp's official BApp Store. Review extension details before enabling.
-- Start with a harmless owned callback or a local receiver; do not send users to a malicious destination or collect third-party cookies.
-
-### Primary resources
-- [PortSwigger open redirection](https://portswigger.net/web-security/ssrf/open-redirection) — test patterns and impact reasoning.
-- [OWASP Unvalidated Redirects and Forwards Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html) — defensive guidance.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — verification and reporting.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved redirect responses offline; it sends no request.
-
-### Result handling
-Record the exact redirect chain and whether the browser/server actually navigates to an untrusted destination. A reflected URL string alone is not a confirmed open redirect.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
