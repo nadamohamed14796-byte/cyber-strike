@@ -118,7 +118,7 @@ Provide a compact test case with setup, expected result, actual pre-fix result, 
 ## Tool installation and optional tooling (2026-10-19)
 
 ### Recommended tools and purpose
-Use a Markdown editor, sanitized Burp request/response exports, a redaction review, and FIRST's CVSS calculator when severity scoring is relevant. Keep the report reproducible and concise.
+Use a Markdown editor, sanitized request/response artifacts in text or JSON, a redaction review, and FIRST's CVSS calculator when severity scoring is relevant. Keep the report reproducible and concise.
 
 ### Installation and setup
 - CVSS calculator is web-based and requires no install: https://www.first.org/cvss/calculator/4.0 .
