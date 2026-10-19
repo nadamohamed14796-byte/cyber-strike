@@ -174,3 +174,23 @@ The regression should assert server-side state, not text or visual challenge pre
 - Valid low-risk public actions remain usable where intended, preventing overbroad regressions.
 
 For each case, include expected assurance, observed assurance, principal, challenge binding, protected operation, relevant negative control, retry/lockout safety, and cleanup. If assurance is supplied by an identity provider, preserve the issuer and the exact claim mapping with sensitive values redacted.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Proxy/Repeater/Comparer, browser DevTools, two controlled test accounts, and a test authenticator owned by the assessor. Keep login attempts small and within program rules.
+
+### Installation and setup
+Burp Community: https://portswigger.net/burp/communitydownload . Configure the browser proxy using PortSwigger's official setup guide. Use the application's test MFA enrolment flow and an authenticator app from its official store; do not use third-party OTP services or real users' recovery factors.
+
+### Primary resources
+- [OWASP Multifactor Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html) — MFA and recovery controls.
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — lifecycle and failure handling.
+- [PortSwigger authentication](https://portswigger.net/web-security/authentication) — controlled testing methodology.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares saved responses offline; it cannot validate an OTP or prove an MFA bypass by itself.
+
+### Result handling
+Use only assessor-controlled accounts and test factors. Record which challenge was expected and how the test account's authenticated state changed; redact cookies, OTPs, and recovery codes.
