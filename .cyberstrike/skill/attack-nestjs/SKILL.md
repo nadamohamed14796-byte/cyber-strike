@@ -80,10 +80,13 @@ Compare anonymous, user, and admin test identities on read-only methods first. U
 
 ## Tools
 
-- **Nest CLI/source search:** inventory controllers, guards, custom decorators, pipes, and resolvers.
-- **Burp Suite:** compare routes with controlled identities.
-- **OpenAPI/GraphQL tooling:** map operations and request schemas.
-- **Test fixture:** verify DTO/write behavior without production data.
+- `rg`: inventory controllers, guards, custom decorators, pipes, and resolvers in an authorized source checkout.
+- `semgrep`: scan local TypeScript source with relevant rules.
+- OpenAPI/GraphQL parser: map operations and request schemas where available.
+- Python `httpx` or `curl`: compare observed routes using controlled identities when a live check is required.
+- Project test runner: validate DTO/write behavior with synthetic fixtures.
+
+Verify `node --version`, `npm --version`, `semgrep --version`, and `curl --version`. Official docs: https://docs.nestjs.com/, https://semgrep.dev/docs/getting-started/, https://curl.se/docs/.
 
 ## NestJS Security Control Matrix
 
