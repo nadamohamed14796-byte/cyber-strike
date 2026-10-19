@@ -2,18 +2,16 @@
 
 This is the operational tool-selection contract for CyberStrike's canonical recon phases. It is a candidate map, not a claim that any executable is installed or that every candidate must be run. For each phase, select a primary method plus a complementary method only when it adds distinct evidence; check availability before invocation, inspect actual help/version, and record all outcomes.
 
-## Required preflight for every phase
+## One-time readiness per run; phase-specific execution
 
-1. Read the current `recon_checkpoint(action="status", target_url=<canonical program-root URL>)` and inspect the canonical target workspace. `target_url` is required by the tool schema. Reuse valid artifacts; do not repeat completed work without new evidence or a documented invalidation.
-2. Read the applicable skill(s) using the registered skill tool: first `recon-methodology` and `community-tool-selection`, then the task-specific skill(s) below. A search result or candidate list is not a loaded skill.
-3. Check local candidates without installing them:
-   `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <candidate names...>`
-   If that path is not present in this runtime, locate the repository's actual helper path and verify it exists before invoking it. Never assume a repo helper is installed globally.
-4. For each available candidate, inspect its actual `--help` and documented version flag. Verify the CLI syntax from local help/official docs; do not copy guessed flags from memory.
-5. Choose based on task, platform, permissions, program policy, input size, and available evidence. Do not install automatically. If installation is justified, explain why, use the official source, inspect install instructions first, then re-run preflight.
-6. Save raw output, stderr/error, exit status, tool/version, redacted command, input artifact, timestamp, normalized output, deduplication counts, and provenance to the canonical target workspace. A command exit code of zero alone does not complete a phase.
-7. If a primary tool is missing or fails, attempt a suitable installed alternative where it adds value. If no suitable method remains, record the precise gap and mark the phase unavailable/blocked/partial according to the checkpoint schema; never claim exhaustive coverage.
-8. Do not run active probes until the phase gate and saved authorization permit them. The agent-level canonical scope setup check is performed once; this does not waive enforcement of the persisted scope at each concrete request boundary.
+1. Read `recon_checkpoint(action="status", target_url=<canonical program-root URL>)` and inspect the workspace once at run start. Reuse valid artifacts; repeat completed work only after new evidence or documented invalidation.
+2. Load `recon-methodology` and `community-tool-selection` once when absent. Load only relevant specialist skills and reuse them across phases.
+3. Discover native tool schemas plus relevant CLI/script candidates. Preflight a CLI only when likely to be used; inspect its executable/help/version once per runtime or version change, not every phase.
+4. There is no fixed tool-count limit or ban on code/scripts. Use alternatives when they add coverage, corroboration, or recovery from missing/partial results; do not repeat equivalent methods merely to fill a list.
+5. Install a dependency only for a concrete need when a verified existing alternative is insufficient and official installation is permitted.
+6. Save useful raw output/errors, tool/version, redacted invocation, input/source, normalized output, deduplication counts, and provenance directly in the canonical workspace. Keep large outputs in artifacts and summarize counts/paths/errors in context.
+7. Distinguish zero results from failed, unavailable, skipped, and unattempted sources. Retry only when the cause changes or a bounded retry is justified; record gaps accurately.
+8. Execute only the current phase's relevant methods after its prerequisite gate. The setup scope check runs once per unchanged setup, while active tools enforce persisted scope for every concrete request.
 
 ## Phase matrix
 
@@ -36,7 +34,7 @@ This is the operational tool-selection contract for CyberStrike's canonical reco
 
 - The phase matrix does not replace actual registered-tool discovery. For native CyberStrike tools, inspect the available tool registry/schema and call the registered tool; do not try to invoke a native tool as a CLI.
 - The CLI name in a row is a candidate only. A tool is usable only after local preflight confirms it is executable and its real CLI behavior is verified.
-- Use one primary source/tool and a second independent source when it adds meaningful coverage. Use additional sources when earlier sources fail, evidence is incomplete, or the target context justifies them; do not stop after the first tool simply because it returned some results.
+- There is no fixed source/tool count. Use a primary method plus independent alternatives when they add coverage, corroboration, or recovery; registered tools, verified CLIs, and useful scripts/code are all valid. Do not run duplicate methods just to increase the count.
 - Tool availability must be checked against this runtime/environment, not inferred from skill text, community maps, or another machine.
 - Preserve partial results even if a source fails. Retry only after changing the cause or when a bounded retry is justified; avoid infinite retry loops.
 - Keep phase completion honest: `complete` means required capabilities were attempted appropriately, eligible work was exhausted, and artifacts were verified. If a tool is missing, disclose the gap; do not imply the unavailable data source returned zero results.
