@@ -104,7 +104,6 @@ Verify the selected client and `jq --version`; official docs: https://curl.se/do
 - Provider subject IDs can differ across tenants; confirm issuer and tenant.
 - Stop after test proof; do not access or modify real users' data or credentials.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
@@ -118,7 +117,6 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 3. Check whether tokens are bound to the correct account, purpose, and time window; inspect replay, reuse, expiry, and session rotation with disposable test state rather than attempting another person's account.
 4. Verify whether changing an identity factor affects existing sessions and linked identities as expected. Use a harmless profile marker to prove account-boundary impact without accessing private data.
 5. Re-test the claimed path from a clean browser/session and a negative control. A weak recovery hint or unusual response alone is not account takeover; report only a reproducible ability to cross account ownership.
-
 
 ### Verdict gates
 
@@ -142,7 +140,6 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [Claude-BugHunter — hunt-ato](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-ato)
 - [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
 
-
 ## Safe request pattern and impact chain
 Use only an account and mailbox/phone controlled by the tester. Capture the normal recovery flow, then test one policy property at a time: token/account binding, expiry, single use, host/scheme binding, session invalidation, and whether changing the recovery contact requires re-authentication. Never request or use a real user's recovery token.
 
@@ -155,12 +152,10 @@ curl -sS -D baseline.headers -o baseline.body "$TARGET_URL"
 
 Impact requires a demonstrated unauthorized account/session transition, not merely an unusual email or response. Chain to `attack-forgot-password`, `attack-session`, `attack-mfa-bypass`, or `attack-oauth` only when the corresponding weakness is independently observed.
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Identity-chain validation
 Map the whole state transition—registration or recovery start, token issuance, verification, credential/factor change, session creation, and post-authentication principal. Use two tester-owned accounts with separate controlled inboxes and record which identity each token is bound to. A reset email arriving, a token parsing, or a page rendering does not prove takeover. Prove the terminal state only by authenticating into the disposable test account and checking a harmless identity endpoint; then revoke sessions and restore factors. Chain to MFA, reset, OAuth/OIDC, or session review only when the observed defect crosses that specific boundary. Treat an isolated weak recovery control as its own finding unless the account-control consequence is reproduced.
-
 
 ## Identity lifecycle evidence matrix
 
@@ -186,7 +181,6 @@ Record entry_point, precondition, test_identity_A, test_identity_B, token_purpos
 - If a result requires user interaction, prior compromise, an already-authorized account, or a specific provider configuration, state that precondition prominently.
 - Do not claim full takeover if only a low-risk profile field or a linking prompt changed.
 - Preserve a clean control flow and a regression test proving the expected account/issuer/tenant binding.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
