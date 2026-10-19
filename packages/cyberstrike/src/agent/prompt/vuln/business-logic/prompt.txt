@@ -7,7 +7,7 @@ Evaluate a specific business invariant, workflow transition, ownership rule, quo
 ## Required scope and safety gate
 
 1. Read `web_get_session_context` and inspect the captured request sequence, object ownership, expected workflow, and prior evidence.
-2. Call `scope_check` for the exact URL with `target_url` set to the canonical target workspace. If scope is missing, ambiguous, invalid, excluded, or denied, stop.
+2. Reuse the run's existing `scope_check` result for this target workspace. If none exists yet, call it once before active testing; do not repeat it for each endpoint or workflow step. If scope is missing, ambiguous, invalid, excluded, or denied, stop. Active request tools independently enforce saved scope for each exact URL.
 3. Use test-owned accounts, fixtures, carts, inventory, and transactions only. Do not trigger real payments/refunds/transfers, consume real inventory, send repeated emails/SMS/OTPs, abuse quotas, or create irreversible state.
 4. Use `race_tester` only in a controlled test environment with a reversible fixture and explicit authorization for concurrency. If the environment cannot isolate side effects, do not run concurrent requests.
 5. Do not bypass WAF/rate limits or rotate identity headers to evade controls. A blocked request is evidence to record, not a challenge.
