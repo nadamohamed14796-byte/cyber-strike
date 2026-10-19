@@ -104,3 +104,28 @@ Use browser DevTools and Burp Repeater to compare redirect handling for controll
 
 ### Result handling
 Record the exact redirect chain and whether the browser/server actually navigates to an untrusted destination. A reflected URL string alone is not a confirmed open redirect.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
+
+### Recommended tools
+- curl — inspect Location and redirect chains
+- Python urllib.parse — normalize candidate redirect destinations
+- A local URL test generator for controlled destination variations
+- jq/rg — parse result inventory
+
+### Resources
+- https://portswigger.net/web-security/ssrf/open-redirect
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids only; consult official docs for supported usage and limitations.
+
+### Helper-script contract
+Normalize destination URLs and record final host/scheme, allowlist behavior, and a control. Distinguish a redirect to an external URL from a security-relevant impact; do not chain into credential theft.
+
+Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
+
+### Handoff
+Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
