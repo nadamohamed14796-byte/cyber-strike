@@ -130,6 +130,10 @@ Use these only when the relevant phase needs them. Validate the current upstream
 | Script | Use | Network behavior |
 |---|---|---|
 | `.cyberstrike/skill/scripts/normalize_urls.py` | Normalize locally collected URLs and remove query values/fragments | No network |
+| `.cyberstrike/skill/scripts/host_inventory.py` | Normalize host observations while preserving source/provenance | No network |
+| `.cyberstrike/skill/scripts/authorization_matrix.py` | Generate/deduplicate an authorization test plan from explicit fixtures | No network; generates a plan only |
+| `.cyberstrike/skill/scripts/tool_preflight.py` | Check whether selected local tools and libraries are available | No network unless the selected package check explicitly requests it |
+| `.cyberstrike/skill/scripts/format_skill_markdown.py` | Format/check skill Markdown structure | Local files only |
 | `.cyberstrike/skill/scripts/js_endpoint_inventory.py` | Find route candidates in already-collected JavaScript | No network; does not execute JS |
 | `.cyberstrike/skill/scripts/http_response_diff.py` | Compare saved redacted responses | No network; redaction is heuristic |
 | `.cyberstrike/skill/scripts/validate_evidence_manifest.py` | Validate evidence metadata | No network; doesn't inspect artifact files |
