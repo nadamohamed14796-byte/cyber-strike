@@ -443,7 +443,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
         }
         const reason = katanaScopeBlockReason(args, scopedURL, scopes, decision.workspace.workspacePath)
         if (reason) {
-          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, -d 3, and a unique absolute -o path under that workspace's scans/ directory. No crawler command was started.")
+          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, -d 3, and a unique absolute -o path under that workspace's urls/ directory. No crawler command was started.")
         }
         const outputFlagIndex = args.findIndex((arg) => ["-o", "-output"].includes(stripOuterShellQuotes(arg).toLowerCase()))
         const outputPath = path.resolve(stripOuterShellQuotes(args[outputFlagIndex + 1]!))
