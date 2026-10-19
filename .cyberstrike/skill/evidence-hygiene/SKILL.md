@@ -118,24 +118,11 @@ Inspect screenshots at full resolution and scan report/attachment copies for tok
 For each artifact, retain a stable reference, target-local path, timestamp, request/response identity, sanitized status, hash when practical, and claim it supports. Keep immutable raw evidence separate from redacted derivatives. Before each handoff, scan for cookies, Authorization headers, reset links, private identifiers, source secrets, and unrelated customer content. Verify that redaction preserves the request semantics needed for reproduction; if not, keep a private raw artifact and refer to its hash rather than exposing its values. Re-open the redacted artifact before submission and confirm cleanup/revocation state is recorded.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp exports for request/response provenance, a local editor for redacted derivatives, a SHA-256 utility to identify files, and the evidence-manifest validator. Use screenshot/video capture only when it materially demonstrates the behavior.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official request/response export workflow.
-- [OBS Studio](https://obsproject.com/download) — optional controlled screen recording.
-- sha256sum is standard on many Linux distributions; Windows provides Get-FileHash in PowerShell.
-Keep raw captures in target-local private storage. Review headers, URL query/fragment, form/JSON bodies, screenshots, HAR metadata, file names, logs, and source maps; a regex scanner cannot prove redaction.
-
-### Primary resources
-- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — assessment evidence handling.
-- [Bugcrowd reporting guidance](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — evidence expectations.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — reproducibility.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json before sharing. It validates required metadata and obvious secret-like strings, not complete sanitization.
-
-### Result handling
-Keep private originals separate from redacted derivatives, retain a manifest and hashes where appropriate, and never store raw tokens, passwords, or unrelated personal data in Git or global research.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` — validate required evidence metadata before sharing.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compare saved redacted response artifacts offline.
+- `jq` and `rg` — inspect local JSON and search artifact metadata.
+- Verify available commands with `command -v TOOL` and `TOOL --help`; use official documentation and record unavailable dependencies.
+- Resources: https://owasp.org/www-project-web-security-testing-guide/ and https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html.
+- Preserve private originals separately from redacted derivatives. Helpers do not guarantee complete sanitization; inspect output before sharing.
