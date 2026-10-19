@@ -101,7 +101,7 @@ Review DTOs, serializer schemas, writable-field lists, nested relation binding, 
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Program limits and production-safety constraints remain mandatory.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -137,3 +137,37 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Writable-property verification contract
 Derive candidate properties from API schemas, normal frontend traffic, source/model definitions, and controlled response differences; classify each as user-editable, server-managed, role/tenant/security-sensitive, or unknown. Add one property to a normal update for a tester-owned object, then verify authoritative state and re-read through the allowed UI/API. Do not treat an echoed field or ignored property as success. Compare nested objects and alternate update endpoints where supported, but avoid any field that triggers money movement, role assignment, or irreversible actions unless explicit program rules permit a disposable fixture. Chain to BFLA or property-level authorization only when the actual principal/property boundary is distinct and demonstrated.
+
+
+## Writable-field discovery and safe differential
+
+Generate candidate field names from observed request schemas and model definitions rather than guessing a huge field list. Keep one test per property and use inert values on a disposable object.
+
+```bash
+# List property paths in a saved synthetic JSON response without printing values.
+jq -r 'paths(scalars) | map(tostring) | join(".")' before.json | sort -u > before.keys
+jq -r 'paths(scalars) | map(tostring) | join(".")' after.json  | sort -u > after.keys
+diff -u before.keys after.keys
+```
+
+A new key in the response only shows a shape difference. For a write-side finding, confirm the value persisted through an independent read and that the caller was not allowed to set it.
+
+### Field-operation coverage
+
+| Operation | Specific check | Required evidence |
+|---|---|---|
+| Create | Is a server-managed property accepted at creation? | Persisted test object violates its expected policy |
+| Update | Does the same field become writable after creation? | Independent read-back and normal-field control |
+| Nested relation | Can caller bind a child object from another owner/tenant? | Relation access violates policy, not just a malformed reference |
+| Bulk update | Is each item/field filtered individually? | Controlled fixture proves one unauthorized field change |
+| GraphQL mutation | Are input object types broader than caller's writable schema? | Resolver persists the prohibited field |
+| Alternate API version | Does a legacy handler skip the current allowlist? | Same test principal and fixture show policy inconsistency |
+
+### Chain routing
+
+- A protected field is readable but not writable → property-level read exposure.
+- A protected field persists but no privilege boundary changes → report the precise data-integrity impact; do not call it privilege escalation.
+- A role/permission property changes a controlled fixture's effective capability → chain to BFLA only after a safe, isolated test confirms the operation.
+- An owner/tenant property crosses object boundary → chain to BOLA only when the cross-owner access is independently confirmed.
+
+Persist allowed_field_control, candidate_property, expected_authority, request_field_present, server_persisted_value, independent_readback, effective_permission_delta, cleanup_verified, and root_cause_confidence. Never commit secrets or raw production records.
