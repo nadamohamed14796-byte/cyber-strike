@@ -152,3 +152,29 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize a
 
 ### Result handling
 Preserve record type/name/value, authoritative source, TTL/time, and policy interpretation. Do not infer mailbox compromise or SPF bypass from a permissive DNS record alone.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
+
+### Recommended tools
+- dig/drill — DNS record checks
+- testssl.sh or tlsx — TLS configuration metadata
+- swaks — controlled SMTP protocol checks where permitted
+- Python/jq — parse DNS, TLS, and mail security records
+
+### Resources
+- https://github.com/drwetter/testssl.sh
+- https://github.com/projectdiscovery/tlsx
+- https://www.rfc-editor.org/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
+
+### Helper-script contract
+Record SPF/DKIM/DMARC observations, DNS provenance, TLS protocol/certificate metadata, and timestamp. Distinguish missing policy from demonstrated exploitability and avoid sending unsolicited mail.
+
+Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+
+### Handoff
+Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
