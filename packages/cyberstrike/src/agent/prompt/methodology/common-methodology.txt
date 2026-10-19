@@ -39,7 +39,7 @@ After testing, update VRT checks via `update_vrt_check` with full evidence:
 
 ### Scope Discipline
 
-Call `scope_check` exactly once for the canonical target/workspace during setup, then reuse the saved decision for the rest of the run. Do not call it for every discovered host, endpoint, request, phase, or delegated tester. Start a new setup check only for a new run or an actual change to the canonical target/policy configuration; if the single check is inconclusive, stop active work instead of retrying in a loop. Active tools still enforce the persisted scope for each concrete request (including exclusions, scheme, port, and path); never bypass a refusal or test outside scope.
+Call `scope_check` exactly once for the canonical target/workspace during setup, then reuse the saved decision for the rest of the run. Do not call it for every discovered host, endpoint, request, phase, or delegated tester. A follow-up user message/turn for the same canonical workspace with unchanged target and policy is a continuation, not a new run. Start a new setup check only for a genuinely new run or an actual change to the canonical target/policy configuration; if the single check is inconclusive, stop active work instead of retrying in a loop. Active tools still enforce the persisted scope for each concrete request (including exclusions, scheme, port, and path); never bypass a refusal or test outside scope.
 
 ### Chain Awareness
 
