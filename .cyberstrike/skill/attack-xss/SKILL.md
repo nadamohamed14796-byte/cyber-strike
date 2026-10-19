@@ -172,28 +172,6 @@ Review false matches, templates, sanitizers, framework semantics, and whether th
 Add source_location, sink_location, transformation_chain, sanitizer_name_and_version, output_context, execution_origin, persistence_scope, affected_test_role, csp_effective_policy, browser_version, negative_control, cleanup_verified, and regression_case. If no browser execution is permitted, keep the result as a source-to-sink candidate with an explicit limitation.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/browser DevTools to validate a harmless marker, then Burp DOM Invader for client-side source/sink investigation where relevant. Use a browser and account you control.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official installation.
-- [DOM Invader docs](https://portswigger.net/burp/documentation/desktop/tools/dom-invader) — supported Burp browser workflows.
-- [OWASP ZAP](https://www.zaproxy.org/) is an optional automated cross-check; tune it to an in-scope target and review findings manually.
-Don't submit private request logs to online payload builders. Keep testing non-destructive and comply with the target's CSP/rate rules.
-
-### Primary resources
-- [PortSwigger XSS](https://portswigger.net/web-security/cross-site-scripting) — reflected, stored, and DOM XSS methodology.
-- [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html) — defenses.
-- [OWASP DOM-based XSS Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html) — client-side controls.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript to extract URL/path metadata from local files; it does not execute bundles or prove a source-to-sink flow.
-
-### Result handling
-Record the controllable input, encoding/context, execution sink, affected origin/user context, and non-destructive proof. Keep payloads/screenshots free of session tokens and real user data.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use command-line tools and local libraries the agent can run and parse directly. Browser UI, extensions, and interactive proxies are not dependencies. Check the installed version and official usage before running commands, and never report a check as completed unless its output was inspected.
