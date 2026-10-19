@@ -8,6 +8,7 @@ import { Phase } from "./phase"
 import { Validation } from "./validation"
 import { categoryInLane } from "../tool/vuln-scope"
 import { SkillIndex } from "../skill/index-engine"
+import { Skill } from "../skill"
 
 // Phase-aware skill discovery is intentionally separate from loading: the agent must
 // use the skill tool to load the selected skill so normal per-agent permissions apply.
@@ -214,7 +215,25 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     const observedTechStack = Intel.get(sessionID)
       .filter((entry) => entry.type === "technology")
       .flatMap((entry) => [entry.title, ...entry.tags])
-    const selected = rankSkillsForPhase(phaseId, SkillIndex.all(), 10, observedTechStack)
+    // Rank against the live Skill catalog and inject selected skill bodies into
+    // phase context. A ranked name alone is not a loaded skill; relying on the model
+    // to remember a second tool call caused methodology guidance to be silently missed.
+    const catalog = await Skill.all()
+    const entries: SkillIndex.Entry[] = catalog.map((item) => ({
+      name: item.name,
+      description: item.description,
+      location: item.location,
+      category: item.category,
+      owasp_id: item.owasp_id,
+      tags: item.tags ?? [],
+      tech_stack: item.tech_stack ?? [],
+      cwe_ids: item.cwe_ids ?? [],
+      chains_with: item.chains_with ?? [],
+      prerequisites: item.prerequisites ?? [],
+      severity_boost: item.severity_boost ?? {},
+      verified: item.verified,
+    }))
+    const selected = rankSkillsForPhase(phaseId, entries, 10, observedTechStack)
     if (selected.length === 0) {
       lines.push("No matching catalog skill was found for this phase. Search the skill catalog using the phase name and required tags, then load an allowed match before testing.")
     } else {
@@ -222,6 +241,26 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
       for (const match of selected) {
         lines.push(`- ${match.name} — ${match.description} (matched: ${match.query}; relevance: ${match.score})`)
       }
+
+      const byName = new Map(catalog.map((item) => [item.name, item]))
+      const chosen = selected.slice(0, 3)
+        .map((match) => byName.get(match.name))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item && item.verified !== "tampered"))
+      // Core recon method skills should be available in-context when the current
+      // phase is recon; avoid requiring an extra model-initiated load call.
+      if (isReconPhase) {
+        for (const name of ["recon-methodology", "community-tool-selection"]) {
+          const item = catalog.find((candidate) => candidate.name.toLowerCase() === name)
+          if (item && item.verified !== "tampered" && !chosen.some((entry) => entry.name === item.name)) chosen.unshift(item)
+        }
+      }
+      lines.push("", "## Skill Content Loaded Into This Phase Context")
+      for (const item of chosen.slice(0, 5)) {
+        const body = item.content.trim()
+        const bounded = body.length > 9000 ? body.slice(0, 9000) + "\\n[Skill content truncated at 9000 characters; use the skill tool to load the complete skill and read relevant companion files.]" : body
+        lines.push("", `### ${item.name} — ${item.description}`, `Canonical skill: ${item.name}`, bounded)
+      }
+      lines.push("", "The skill bodies above are actually present in this context. For additional skills, use the registered skill tool search then load with the exact canonical name; read companion references/scripts when they are relevant. Never claim an additional skill or companion file was read unless its contents were returned.")
     }
   } catch {
     // Skill catalog failures must not prevent session prompt generation.
