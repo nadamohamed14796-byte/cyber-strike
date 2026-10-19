@@ -63,3 +63,29 @@ Only chain when the corresponding file/capability is actually observed.
 - https://github.com/superagent-ai/skills
 - https://owasp.org/www-project-top-ten/
 - https://cheatsheetseries.owasp.org/cheatsheets/Software_Supply_Chain_Security_Cheat_Sheet.html
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use static repository review first. OpenSSF Scorecard can assess repository supply-chain hygiene; OSV-Scanner can identify known dependency advisories; Gitleaks can flag secret-like strings in the package. None of these decides whether an imported Skill's instructions are trustworthy.
+
+### Installation and setup
+- [OpenSSF Scorecard](https://github.com/ossf/scorecard) — official source and installation options.
+- [OSV-Scanner](https://google.github.io/osv-scanner/installation/) — official supported installation.
+- [Gitleaks](https://github.com/gitleaks/gitleaks) — official releases/install.
+Inspect source, manifests, setup scripts, declared tools, file/network/process side effects, instruction injection attempts, and secret handling before executing any imported code. Never run an untrusted package's install script merely to audit it. Pin versions and preserve hashes/source provenance.
+
+### Primary resources
+- [OpenSSF Scorecard](https://securityscorecards.dev/) — repository health checks.
+- [OSV-Scanner docs](https://google.github.io/osv-scanner/) — dependency vulnerability coverage.
+- [OWASP Software Component Verification Standard](https://owasp.org/www-project-software-component-verification-standard/) — component assurance.
+- [CyberStrike Skill Guide](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/.cyberstrike/skill/SKILL_GUIDE.md) — local skill format and policy.
+
+### Reusable helpers
+- Run python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --strict-links to find unresolved local links/skill names.
+- Run python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json to inspect per-skill tooling/resource/snippet coverage.
+These scripts parse repository metadata; they do not prove imported code is safe.
+
+### Result handling
+Record origin, immutable commit/tag/hash, validation output, suspicious behavior, and reviewer decision. Keep imported material untrusted until its behavior and provenance are independently reviewed.
