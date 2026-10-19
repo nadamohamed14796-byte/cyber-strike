@@ -199,50 +199,18 @@ This compares local artifacts offline and heuristically redacts common secrets b
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/Comparer, two controlled roles, and API documentation/OpenAPI when available. Function-level authorization is about whether the principal may invoke an operation; it is distinct from accessing another object's properties.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- jq on Kali/Debian: sudo apt update && sudo apt install jq.
-- [Postman](https://www.postman.com/downloads/) is optional for an authorized API collection; keep environments/secrets local.
-Test only admin-only actions with controlled roles and non-destructive requests. Never change real privileges, send invitations to users, or trigger production transactions as test proof.
-
-### Primary resources
-- [OWASP API Security Top 10 — API5](https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/) — function authorization risk.
-- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — policy enforcement.
-- [PortSwigger access control](https://portswigger.net/web-security/access-control) — controlled methodology.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
-
-### Result handling
-Record the endpoint/action, role/permission matrix, expected denial, observed allowed effect, controlled fixture, and alternative explanations. A hidden UI button is not proof that backend authorization is missing.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Agent-invokable CLI tools and local libraries only. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version, official documentation, license, and target-specific impact before use.
-
-### Recommended tools
-- Python requests/httpx — role/identity test matrix
-- jq — inspect property-level differences
-- http_response_diff.py — paired response comparison
-- OpenAPI schema parser where available
-
+### Agent-usable CLI tools
+- `curl` or Python `httpx`: replay an observed API request with two tester-controlled roles and compare the actual authorization result.
+- `jq`: parse JSON response bodies and compare object/function-level permissions.
+- `rg`: search local source and OpenAPI specifications for route handlers and policy checks.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved redacted samples offline.
+### Installation and verification
+Verify `curl --version`, `jq --version`, and the selected Python client. Official docs: https://curl.se/docs/, https://jqlang.org/, https://www.python-httpx.org/. Use OpenAPI/JSON schemas already provided by the target where available. If a tool is absent, record the gap and use source review or local fixtures.
 ### Resources
-- https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/
 - https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/
-- https://portswigger.net/web-security/access-control
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Use community lists to discover candidates, then verify their current maintenance and CLI behavior from official sources.
-
-### Helper-script contract
-Build controlled role/identity matrices and use test-owned records. Record allowed versus denied action, property, object owner, server-side effect, and response evidence. Avoid modifying real user records.
-
-Keep raw evidence separate from normalized results. Record source, timestamp, tool/version, auth context, control result, errors, confidence, and redaction. Helpers should use explicit input/output paths, structured output, and local fixtures.
-
-### Handoff
-Report commands actually run, tool versions, input/output artifact paths, control/variant outcomes, failures, confidence, limitations, and next skill. Missing tools and blocked tests must be explicit.
+- https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
+- https://spec.openapis.org/oas/latest.html
+### Proof and limits
+Require a controlled lower-privilege principal to perform an operation that policy says it cannot perform. Avoid destructive actions and never use real users' accounts or data.
