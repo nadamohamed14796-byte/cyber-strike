@@ -104,7 +104,6 @@ Verify the accepted test assertion maps to the intended subject and allowed role
 - An assertion can be validly signed but intended for a different issuer/audience/recipient.
 - Do not edit production assertions to impersonate real users, test third-party IdPs, or attempt external entity file/network access.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent assertion mutations and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Use only owned test IdP/SP artifacts.
@@ -118,7 +117,6 @@ Keep an attempt ledger: hypothesis, one variable changed, baseline/control, sign
 3. Check signature validation and account/tenant binding against the service provider's expected configuration; do not modify or replay assertions belonging to real users.
 4. Validate acceptance only by signing into a test account and confirming its identity/privileges, with a fresh valid assertion as the positive control and one invalid assertion as the negative control.
 5. Capture sanitized metadata and the exact violated invariant, discard test assertions after use, and recommend strict signature/canonicalization validation, replay protection, and explicit audience/recipient checks.
-
 
 ### Verdict gates
 
@@ -139,12 +137,10 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 - [Claude-BugHunter — hunt-saml](https://github.com/elementalsouls/Claude-BugHunter/tree/main/skills/hunt-saml)
 - [OWASP — SAML Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SAML_Security_Cheat_Sheet.html)
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Assertion-to-session binding map
 Use an IdP/SP configuration and tester-owned identities. Record issuer, audience, recipient, destination, InResponseTo, signature reference, assertion subject, time conditions, relay state, and final SP principal. Change only one binding dimension at a time in a lab or sanctioned test integration; do not forge assertions for real accounts or bypass an external provider. Signature validity alone is not enough if the application maps the assertion to the wrong tenant or role. Confirm the resulting controlled identity and revoke sessions after testing. Route XML parser defects to XXE review and identity-linking outcomes to ATO only when the terminal account-control state is reproduced.
-
 
 ## Signature and identity-binding review checklist
 
@@ -168,7 +164,6 @@ Record transaction_id, idp_entity_id, sp_entity_id, acs_url, response_issuer, as
 - Unsafe XML parsing is present → XXE review only with separate local/source evidence.
 - Redirect/relay-state destination issue → OAuth/open-redirect review only when a trusted redirect boundary is violated.
 - Signature validation warning with no accepted wrong assertion → configuration lead, not ATO.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
