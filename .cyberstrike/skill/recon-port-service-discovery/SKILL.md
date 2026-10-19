@@ -151,3 +151,31 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize t
 
 ### Result handling
 Record target locator, approved port range, timing/rate, discovered service/version confidence, and whether a result was actively confirmed. A banner alone does not prove a vulnerability.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+
+### Recommended tools
+- naabu — approved TCP port inventory
+- nmap — targeted service/version detection when allowed
+- tlsx — TLS certificate and handshake metadata
+- httpx — HTTP metadata for confirmed web services
+- jq/Python — normalize port and service records
+
+### Official resources
+- https://github.com/projectdiscovery/naabu
+- https://nmap.org/book/man.html
+- https://github.com/projectdiscovery/tlsx
+- https://github.com/projectdiscovery/httpx
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
+
+### Helper script and output contract
+Normalize scanner JSON into host/port/protocol/state/service/timestamp/tool-version fields. Keep scanner errors separate from closed ports; never treat a banner alone as a vulnerability.
+
+Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
+
+### Handoff
+Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
