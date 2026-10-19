@@ -282,8 +282,11 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   const urlsRoot = path.resolve(workspacePath, "urls")
   const outputPath = path.resolve(outputArg)
   const relativeOutput = path.relative(urlsRoot, outputPath)
-  if (!relativeOutput || (relativeOutput === ".." || relativeOutput.startsWith(".." + path.sep)) || path.isAbsolute(relativeOutput)) {
+  if (!relativeOutput || relativeOutput === ".." || relativeOutput.startsWith(".." + path.sep) || path.isAbsolute(relativeOutput)) {
     return "Katana output path must name a file inside " + urlsRoot + "; do not write outside the target workspace."
+  }
+  if (path.dirname(outputPath) !== urlsRoot) {
+    return "Katana raw output must be a direct child of " + urlsRoot + "; nested output folders are not accepted."
   }
 
   return undefined
@@ -447,6 +450,17 @@ async function assertScannerReconGate(command: string[], commandText: string): P
         }
         const outputFlagIndex = args.findIndex((arg) => ["-o", "-output"].includes(stripOuterShellQuotes(arg).toLowerCase()))
         const outputPath = path.resolve(stripOuterShellQuotes(args[outputFlagIndex + 1]!))
+        const urlsRoot = path.resolve(decision.workspace.workspacePath, "urls")
+        try {
+          const workspaceRealPath = await fs.realpath(decision.workspace.workspacePath)
+          const urlsInfo = await fs.lstat(urlsRoot)
+          const urlsRealPath = await fs.realpath(urlsRoot)
+          if (urlsInfo.isSymbolicLink() || !urlsInfo.isDirectory() || urlsRealPath !== path.resolve(workspaceRealPath, "urls")) {
+            throw new Error("the target workspace urls/ directory is missing, unsafe, or resolves outside the canonical workspace")
+          }
+        } catch (error) {
+          throw new Error("Recon execution gate blocked katana because its URL artifact directory is not safe: " + (error instanceof Error ? error.message : String(error)) + ". No crawler command was started.")
+        }
         try {
           await fs.lstat(outputPath)
           throw new Error("output file already exists")
