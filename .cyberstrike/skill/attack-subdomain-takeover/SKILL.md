@@ -65,3 +65,26 @@ Return `hostname`, `scope_evidence`, `dns_chain`, `provider`, `orphan_signal`, `
 
 ### Current ownership, not stale DNS alone
 Record the DNS chain, target provider, record freshness, provider-specific claimability evidence, and the intended scope/ownership decision. A dangling CNAME, NXDOMAIN, generic provider error, or archived screenshot is not proof that an attacker can claim the resource today. Prefer provider documentation and read-only confirmation; never register a target's namespace, publish content, or alter DNS as a proof. Exclude shared CDN/cloud tenancy and domains that the program does not authorize. Chain to source-leak or certificate-transparency recon only as a discovery source; report takeover only when current claimability is demonstrated under permitted conditions, otherwise preserve an inconclusive lead with exact evidence gaps.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use passive DNS/asset sources first, then ProjectDiscovery subfinder and dnsx for discovery/resolution, httpx for limited HTTP verification, and Nuclei only with takeover-related templates reviewed and program-permitted. A dangling DNS record is a lead, not a confirmed takeover.
+
+### Installation and setup
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — official installation and usage for subfinder, dnsx, httpx, and Nuclei.
+- [Nuclei template repository](https://github.com/projectdiscovery/nuclei-templates) — inspect the exact template and its request behavior before use.
+- [Kali/Debian package manager](https://www.kali.org/docs/general-use/using-apt/) can install common base utilities; prefer the upstream docs for maintained ProjectDiscovery releases.
+Use a curated list of program-authorized domains, label passive vs active checks, and do not claim a service or resource that belongs to another party.
+
+### Primary resources
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — asset discovery and verification.
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — tool behavior and options.
+- [Cloud provider DNS docs](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/Welcome.html) — example of provider-specific records and lifecycle.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` deduplicates locally collected URLs and strips query values; it makes no requests.
+
+### Result handling
+Record DNS answer/chain, provider/service signature, time, and non-destructive proof. Do not claim takeover unless ownership/control is demonstrated safely within explicit authorization.
