@@ -237,7 +237,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         const sample = accessibleSkills.slice(0, 12).map((entry) => entry.name)
         const suffix = accessibleSkills.length > sample.length ? ", …" : ""
         throw new Error(
-          `Skill "${params.name}" was not found or its metadata reference is ambiguous. ` +
+          `Skill "${params.name}" was not found or has an ambiguous metadata reference. ` +
           `Accessible skills: ${accessibleSkills.length}. ` +
           `Use skill(action="search", query="...") or paged skill(action="list") to find an exact name. ` +
           (sample.length ? `Examples: ${sample.join(", ")}${suffix}` : "No skills are currently accessible."),
