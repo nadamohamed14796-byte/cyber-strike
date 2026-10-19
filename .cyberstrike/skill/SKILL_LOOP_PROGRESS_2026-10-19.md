@@ -36,3 +36,7 @@ The codebase still contains a hard-coded 20-attempt verification policy in the v
 
 ## Remaining work
 Continue the loop through every direct custom skill and the framework/vendor skill directories. For each, check frontmatter, commands/scripts, source references, local chain targets, positive/negative controls, evidence fields, impact claims, remediation, and runtime tool availability. Do not claim exhaustive review or successful runtime loading until those checks have actually run.
+
+
+## Additional ceiling-wording cleanup
+Read-back checks confirmed the fixed wording was removed from attack-information-disclosure, attack-dom-xss, attack-exchange-owa, attack-ntlm-info, recon-asn-infrastructure, attack-django, attack-deserialization, and attack-flask-werkzeug. attack-wordpress was inspected but its write was blocked; no change is claimed there. This wording cleanup does not alter the separate runtime attempt policy.
