@@ -85,3 +85,29 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local test harnesses; browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Verify official installation docs, tool version, license, dependency provenance, and target impact before use.
+
+### Recommended tools
+- Firebase CLI — inspect a tester-owned project or explicitly authorized configuration
+- Google Cloud CLI read-only commands when access is explicitly granted
+- Semgrep/rg — search local rules/configuration
+- Python/jq — compare security rules and redacted test results
+
+### Resources
+- https://firebase.google.com/docs/cli
+- https://firebase.google.com/docs/rules
+- https://cloud.google.com/sdk/docs
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids; official docs and advisories are the source of truth for tool behavior and affected versions.
+
+### Helper-script contract
+Prefer static review of supplied rules/configuration and test-owned fixtures. Record project context, rule path, expected versus observed authorization, and redacted evidence; do not enumerate other tenants' data.
+
+Preserve native evidence and write normalized results separately. Retain tool/version, timestamps, source, rule/advisory IDs, error state, confidence, and redaction. Use deterministic fixtures and structured output.
+
+### Handoff
+Return actual commands, versions, inputs/outputs, checks passed/failed, limitations, and next skill. Static or version-based signals are not confirmed vulnerabilities without evidence of an affected path.
