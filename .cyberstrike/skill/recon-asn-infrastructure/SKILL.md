@@ -126,3 +126,26 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 
 ### Ownership-confidence ladder and scan boundary
 For every IP/prefix/ASN pivot, retain the organization attribution source, relationship type (owned subsidiary, provider, shared cloud/CDN, stale historical link), observation date, and confidence. Corroborate with first-party asset lists, RDAP/RIR records, certificates, DNS, and product branding before assigning ownership; ASN membership alone never authorizes scanning every announced address. Keep passive-only leads separate from active-scan candidates and record why a candidate passes the target's actual program scope. Use new IPs to discover relationships, not to widen scope implicitly. Route confirmed public service exposure to service discovery and cloud-owned resource policy questions to cloud assessment.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use passive ASN/BGP sources for infrastructure attribution and ProjectDiscovery's asnmap for mapping known organizations/domains to ASN ranges. Use DNS resolution and a small approved HTTP check only after preserving passive provenance.
+
+### Installation and setup
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official install instructions for asnmap and related tools.
+- [RIPEstat](https://stat.ripe.net/docs/) — public ASN/route data and API documentation.
+- Kali/Debian: install DNS utilities with sudo apt update && sudo apt install dnsutils whois.
+Keep discovered CIDRs/IPs as infrastructure leads, not an automatic authorization expansion. Avoid port scanning, origin bypass, or direct access to hosting infrastructure unless the program explicitly includes those actions/assets.
+
+### Primary resources
+- [RIPEstat documentation](https://stat.ripe.net/docs/) — ASN and routing observations.
+- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — tool behavior.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — recon process.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize any collected web URLs locally; it does not query DNS or contact targets.
+
+### Result handling
+Save ASN/prefix, origin source, collection time, provider attribution confidence, corroboration, and a disconfirming explanation. Never present shared hosting ownership as proof of target control.
