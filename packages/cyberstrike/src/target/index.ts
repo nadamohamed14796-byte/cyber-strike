@@ -186,6 +186,32 @@ function currentOwnerKey(): string {
   return targetWorkspaceOwnerKey(Instance.project.id, projectRoot())
 }
 
+function isExactUserConfirmedScopeItem(input: string): boolean {
+  const value = input.trim()
+  if (!value || /^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\\/iot)?|ios|android|other(?: asset)?):/i.test(value)) return false
+  if (/[\\/*{}]/.test(value) && !/^https?:\\/\\//i.test(value)) return false
+  if (!/^https?:\\/\\//i.test(value) && value.includes("/")) return false
+  let candidateValue = value
+  if (!/^https?:\\/\\//i.test(value)) {
+    const rawIPv6 = value.match(/^\\[?([0-9a-f:]+)\\]?$/i)
+    candidateValue = rawIPv6 && value.includes(":") && !/^[^:]+:\\d+$/.test(value)
+      ? "https://[" + rawIPv6[1] + "]"
+      : "https://" + value
+  }
+  try {
+    const candidate = new URL(candidateValue)
+    return (candidate.protocol === "http:" || candidate.protocol === "https:") &&
+      Boolean(candidate.hostname) &&
+      !candidate.hostname.includes("*") &&
+      !candidate.username &&
+      !candidate.password &&
+      !candidate.search &&
+      !candidate.hash
+  } catch {
+    return false
+  }
+}
+
 function normalizeScopeItem(input: string): string {
   const value = input?.trim()
   if (!value) throw new Error("Scope entries cannot be empty.")
@@ -1548,6 +1574,9 @@ export namespace TargetMemory {
     if (!authorizationSource) throw new Error("An authorization source is required (for example, the program name).")
     if ((!reference || !reference.startsWith("https://")) && !userConfirmedWithoutReference) {
       throw new Error("An HTTPS authorization reference is required for policy imports. For a user-confirmed exact asset, set userConfirmed=true and record that conversation-based provenance.")
+    }
+    if (userConfirmedWithoutReference && (include.length !== 1 || !isExactUserConfirmedScopeItem(include[0]))) {
+      throw new Error("User-confirmed scope without an external policy reference must contain exactly one exact hostname, host:port, IP, or HTTP(S) URL; wildcard, CIDR, and typed resource categories require an explicit policy import.")
     }
     const excludeSet = new Set(exclude)
     const overlap = include.filter((item) => excludeSet.has(item))

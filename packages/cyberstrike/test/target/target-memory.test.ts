@@ -680,3 +680,30 @@ test("notes access allows a registered ancestor of an observed asset but not an 
     },
   })
 })
+
+
+test("user-confirmed scope without a policy URL must be exactly one asset, not a wildcard or CIDR", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      await expect(TargetMemory.configureScope("https://program-root.example.test", {
+        include: ["*.example.net"],
+        authorizationSource: "User-confirmed in conversation",
+        userConfirmed: true,
+      })).rejects.toThrow(/exactly one exact hostname/i)
+
+      await expect(TargetMemory.configureScope("https://program-root.example.test", {
+        include: ["app.example.net", "api.example.net"],
+        authorizationSource: "User-confirmed in conversation",
+        userConfirmed: true,
+      })).rejects.toThrow(/exactly one exact hostname/i)
+
+      await expect(TargetMemory.configureScope("https://program-root.example.test", {
+        include: ["192.0.2.0/24"],
+        authorizationSource: "User-confirmed in conversation",
+        userConfirmed: true,
+      })).rejects.toThrow(/exactly one exact hostname/i)
+    },
+  })
+})
