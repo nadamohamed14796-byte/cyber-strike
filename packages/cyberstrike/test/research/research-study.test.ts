@@ -79,6 +79,12 @@ test("research cycle begin tolerates an empty optional cycle_id from serialized 
       const summary = JSON.parse(result.output)
       expect(summary.cycle_id).toMatch(/^[0-9a-f-]{36}$/i)
       expect(summary.source_ids).toEqual(RESEARCH_SOURCES.map((source) => source.id))
+      await expect(tool["execute"]({
+        action: "next",
+        cycle_id: "",
+        pages: 20,
+        continue_after_save: false,
+      }, context)).rejects.toThrow("invalid arguments")
       await Instance.dispose()
     },
   })
