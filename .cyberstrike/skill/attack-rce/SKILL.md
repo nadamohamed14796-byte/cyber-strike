@@ -107,7 +107,7 @@ Record process identity, permission boundary, sandbox/container limits, and remo
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never exceed the explicitly authorized proof boundary or turn validation into post-exploitation.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -143,3 +143,36 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### Execution boundary and proof discipline
 Map the input-to-execution path, process identity, sandbox/container boundary, and downstream effect before testing. Prefer static/source evidence and an isolated lab; use an inert observable proof such as a controlled marker or test harness log, never commands that read secrets, change persistence, fetch payloads, or affect neighboring systems. Separate template evaluation, command construction, deserialization, file processing, and a vulnerable dependency because each requires a different root cause. A delay, error string, or reflected command text alone is not RCE. If only a reachable sink is shown, mark it as a candidate; confirm execution with a safe fixture, then state exactly the demonstrated authority and stop.
+
+
+## Source-to-sink code-review checklist
+
+Run static search only on an authorized source tree. Treat matches as candidates and trace whether user-controlled input reaches the sink, what validation occurs, and which execution context is actually used.
+
+```bash
+rg -n --glob '*.{js,ts,py,php,java,cs,go,rb}' \
+  'child_process|execSync|spawn\(|Runtime\.getRuntime\(\)\.exec|ProcessBuilder|os\.system|subprocess\.(run|Popen|call)|shell=True|eval\(|new Function|Process\.Start' .
+```
+
+Review wrappers, argument arrays, shell flags, environment-variable expansion, template context, sandboxing, and reachability. A sink match without attacker-controlled data flow is not a vulnerability.
+
+### Proof-classification matrix
+
+| Evidence | Classification |
+|---|---|
+| Dangerous API exists in source but input cannot reach it | Not confirmed; document why unreachable |
+| User input reaches a command API with safe argument separation/allowlist | Review the actual argument semantics; do not assume RCE |
+| Inert template expression is evaluated | Template/expression injection candidate, not automatically OS RCE |
+| Approved harmless canary is attributable to the exact input in a lab | Confirm only the demonstrated execution primitive |
+| Error/latency/response reflection without execution proof | Unconfirmed lead |
+| Static analysis flags an unsafe API without data-flow evidence | Candidate for manual tracing |
+
+### Chain discipline
+
+- Template evaluation → SSTI review; OS execution is a separate proof requirement.
+- Deserialization sink → deserialization review; do not attempt gadget execution on production.
+- File upload/processor → upload review; no web shells or active server scripts.
+- URL-consuming input → SSRF review only if server-side fetch is demonstrated.
+- Confirmed command execution does not authorize host discovery, credential access, persistence, or lateral movement. Stop at the agreed harmless proof.
+
+Record source_file_line, input_source, transformations, sink_api, argument_mode, validation, sandbox_context, approved_proof_type, observed_result, negative_control, and cleanup_status.
