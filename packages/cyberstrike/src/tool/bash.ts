@@ -95,6 +95,16 @@ function scannerTargets(command: string[], commandText: string): string[] {
   return [...candidates]
 }
 
+function stripOuterShellQuotes(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.length >= 2 &&
+      ((trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+       (trimmed.startsWith('"') && trimmed.endsWith('"')))) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
 function hostnameMatchesScopeRule(ruleInput: string, hostname: string): boolean {
   let rule = ruleInput.trim().toLowerCase()
   const typed = rule.match(/^(domain|wildcard)[ \t]*:[ \t]*(.+)$/i)
@@ -125,13 +135,13 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
     return "Katana requires a configured, non-empty persisted scope manifest."
   }
 
-  const normalizedArgs = args.map((arg) => arg.toLowerCase())
+  const normalizedArgs = args.map((arg) => stripOuterShellQuotes(arg).toLowerCase())
   const urlFlagIndexes = normalizedArgs.map((arg, index) => ["-u", "--url"].includes(arg) ? index : -1).filter((index) => index >= 0)
   if (urlFlagIndexes.length === 0) {
     return "Pass an explicit '-u https://authorized-host' input for each authorized host; URL-list/file inputs are not accepted by the generic shell crawler gate."
   }
   for (const index of urlFlagIndexes) {
-    const value = args[index + 1]
+    const value = args[index + 1] ? stripOuterShellQuotes(args[index + 1]!) : ""
     if (!value || !/^https?:\/\//i.test(value)) {
       return "Every Katana '-u' input must be an explicit absolute HTTP(S) URL, not a filename, wildcard, or unresolved target list."
     }
@@ -145,13 +155,13 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   }
 
   const rateIndex = normalizedArgs.findIndex((arg) => ["-rl", "--rate-limit"].includes(arg))
-  const rate = rateIndex >= 0 ? Number(args[rateIndex + 1]) : NaN
+  const rate = rateIndex >= 0 ? Number(stripOuterShellQuotes(args[rateIndex + 1] ?? "")) : NaN
   if (!Number.isInteger(rate) || rate < 1 || rate > 10) {
     return "Set Katana's explicit '-rl 5' (allowed range 1-10) to avoid unbounded default request rates."
   }
   const depthIndex = normalizedArgs.findIndex((arg) => ["-d", "--depth"].includes(arg))
   if (depthIndex >= 0) {
-    const depth = Number(args[depthIndex + 1])
+    const depth = Number(stripOuterShellQuotes(args[depthIndex + 1] ?? ""))
     if (!Number.isInteger(depth) || depth < 1 || depth > 5) {
       return "Katana depth must be between 1 and 5 for a bounded reconnaissance crawl."
     }
