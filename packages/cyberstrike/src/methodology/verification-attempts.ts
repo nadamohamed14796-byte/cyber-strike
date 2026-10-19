@@ -95,7 +95,6 @@ export namespace VerificationAttempts {
   export function canRunAttempt(attempts: Attempt[], next: Pick<Attempt, "strategyID" | "variantKey">): boolean {
     const unique = uniqueAttempts(attempts)
     const validAttemptCount = unique.filter(isEvidenceBackedValidAttempt).length
-    const validAttemptCount = unique.filter(isEvidenceBackedValidAttempt).length
     return validAttemptCount < MAX_ATTEMPTS && Boolean(next.strategyID.trim() && next.variantKey.trim()) &&
       !unique.some((attempt) => attemptKey(attempt) === attemptKey(next))
   }
@@ -103,7 +102,7 @@ export namespace VerificationAttempts {
   export function decide(input: DecisionInput): Decision {
     const attempts = uniqueAttempts(input.attempts)
     // Count only unique attempts with valid preconditions and durable evidence.
-    // Counts are informational; they are not an arbitrary ceiling or verdict threshold.
+    // The verification ceiling is a guardrail; it never turns an unresolved case into a false positive.
     const attemptsUsed = attempts.filter(isEvidenceBackedValidAttempt).length
     const remainingAttempts = Math.max(0, MAX_ATTEMPTS - attemptsUsed)
 
