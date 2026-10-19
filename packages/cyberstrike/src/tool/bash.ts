@@ -186,9 +186,24 @@ function scannerTargets(command: string[], commandText: string): string[] {
   }
   // Nmap-style tools accept hosts as positional arguments.
   for (const value of command) {
-    if (value.startsWith("-") || value.includes("/") || value.includes("=") || value.includes(".txt") || value.includes(".list")) continue
-    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?$/i.test(value) ||
-        /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(value)) candidates.add("https://" + value)
+    const unquoted = stripOuterShellQuotes(value)
+    if (unquoted.startsWith("-") || unquoted.includes("/") || unquoted.includes("=") || unquoted.includes(".txt") || unquoted.includes(".list")) continue
+    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?$/i.test(unquoted) ||
+        /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(unquoted)) candidates.add("https://" + unquoted)
+  }
+
+  // waybackurls consumes hosts on stdin instead of argv. Permit only literal
+  // hostnames from its immediately enclosing pipeline; every extracted host
+  // still passes the same persisted scope check before the source request starts.
+  if (path.basename(stripOuterShellQuotes(command[0] ?? "")).toLowerCase() === "waybackurls") {
+    const pipelineIndex = commandText.lastIndexOf("|")
+    const inputText = pipelineIndex >= 0 ? commandText.slice(0, pipelineIndex) : ""
+    const hostPattern = /(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/gi
+    for (const match of inputText.matchAll(hostPattern)) {
+      const hostname = match[0].toLowerCase().replace(/\.$/, "")
+      if (hostname.includes("waybackurls")) continue
+      candidates.add("https://" + hostname)
+    }
   }
   return [...candidates]
 }
@@ -784,7 +799,7 @@ export const BashTool = Tool.define("bash", async () => {
         if (!node) continue
 
         // Get full command text including redirects if present
-        let commandText = node.parent?.type === "redirected_statement" ? node.parent.text : node.text
+        let commandText = ["redirected_statement", "pipeline"].includes(node.parent?.type ?? "") ? node.parent!.text : node.text
 
         const command = []
         for (let i = 0; i < node.childCount; i++) {
