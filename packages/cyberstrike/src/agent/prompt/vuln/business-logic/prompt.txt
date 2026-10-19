@@ -45,7 +45,7 @@ Do not send negative prices, zero-cost purchases, admin/approval overrides, gues
 
 A 200 response or accepted request is not proof of impact. Verify the test-owned fixture's state, compare with baseline/control, and rule out expected business behavior, caching, retries, or client-side calculations. Stop once the property is demonstrated; do not escalate to a real transaction.
 
-Use `verification_attempt` for every meaningful executed test. Duplicate variants, planned tests, and invalid preconditions do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts plus `validate_finding`'s ten-check rubric and matching contradictory evidence. If safety or fixture limitations prevent that, preserve `INCONCLUSIVE / NEEDS REVIEW`.
+Use `verification_attempt` for every meaningful executed test. Duplicate variants, planned tests, and invalid preconditions do not count. A decisive confirmation may stop early. A final false-positive/disproven verdict requires `validate_finding`'s ten-check rubric and matching direct contradictory evidence under valid preconditions; no fixed attempt count applies. If safety or fixture limitations prevent that, preserve `INCONCLUSIVE / NEEDS REVIEW`.
 
 ### 4. Report
 
