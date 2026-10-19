@@ -2,6 +2,18 @@ import { describe, expect, test } from "bun:test"
 import { Phase } from "../../src/methodology/phase"
 import { rankSkillsForPhase, skillQueriesForPhase } from "../../src/methodology/context"
 import type { SkillIndex } from "../../src/skill/index-engine"
+import { RECON_METHODOLOGY_PROMPT, RECON_SPECIALIZED_COVERAGE_PROMPT } from "../../src/methodology/recon"
+
+describe("Recon prompt specialization", () => {
+  test("keeps the specialized coverage matrix without injecting the full workflow twice", () => {
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("RECON COVERAGE MATRIX")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("DNS and subdomain coverage")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("JavaScript and client-side surfaces")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("CANONICAL RECONNAISSANCE METHODOLOGY")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("4. Collect URLs from independent sources")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT.length).toBeLessThan(RECON_METHODOLOGY_PROMPT.length / 2)
+  })
+})
 
 describe("Methodology phase skill routing", () => {
   test("every defined phase has a phase-specific skill discovery plan", () => {
