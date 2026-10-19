@@ -113,3 +113,28 @@ Do not use proxy rotation, distributed sources, account farms, CAPTCHA-solving s
 
 ### Result handling
 Record the documented limit, request spacing/count, status/headers, reset behavior, and user-visible impact. Stop as soon as a safe, reproducible control failure is established.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
+
+### Recommended tools
+- curl/Python requests — single-variable rate-limit checks
+- jq — parse rate-limit headers and JSON responses
+- A local request ledger with timestamps and retry-after tracking
+- http_response_diff.py — compare baseline and throttled behavior
+
+### Resources
+- https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/
+- https://portswigger.net/web-security/race-conditions
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
+
+### Helper-script contract
+Use a conservative explicitly authorized request budget and stop on degradation or server errors. Record identity/key scope, window, retry-after, response codes, and reset behavior; don't bypass controls at scale.
+
+Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
+
+### Handoff
+Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
