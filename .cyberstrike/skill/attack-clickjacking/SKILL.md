@@ -166,3 +166,23 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use curl/Burp to inspect frame-related response headers and browser DevTools to verify actual framing behavior in a local/controlled test page. A minimal HTML fixture is usually enough; no automated exploit kit is needed.
+
+### Installation and setup
+Kali/Debian: sudo apt update && sudo apt install curl. [Burp Suite](https://portswigger.net/burp) is optional for request/response comparison. Use an owned test page or approved lab to test framing and authenticated UI state; do not trick other users into visiting a test page.
+
+### Primary resources
+- [OWASP Clickjacking Defense Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html) — frame restrictions.
+- [MDN X-Frame-Options](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options) — browser behavior.
+- [MDN CSP frame-ancestors](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors) — modern control.
+
+### Reusable helper
+Use curl -sS -D headers.txt -o /dev/null --max-time 15 https://IN-SCOPE-HOST/PATH to save one authorized response's headers; redact cookies before sharing.
+
+### Result handling
+Verify effective browser framing rather than relying only on a header checklist. Explain whether a sensitive authenticated action can be framed and why that matters.
