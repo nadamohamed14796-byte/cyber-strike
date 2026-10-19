@@ -132,26 +132,25 @@ For each host/port, record the exact resolver result, scope basis, service-detec
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Nmap for detailed service discovery and ProjectDiscovery naabu when a scoped port inventory is necessary. Pair results with DNS/HTTP context and manual validation; don't launch a full port scan simply because an asset was discovered.
+### Agent-usable tools and purpose
+- `naabu` — optional port discovery for explicitly authorized targets and approved rate settings.
+- `nmap` — service/version validation where active scanning is permitted; use conservative scripts and avoid intrusive checks by default.
+- `tlsx` — collect TLS metadata from approved hostnames.
+- `httpx` — collect HTTP/TLS response metadata after hosts are resolved.
+- `jq` and Python — normalize tool output while preserving original artifacts and errors.
+- `python3 .cyberstrike/skill/scripts/tool_preflight.py --json naabu nmap tlsx httpx` — check local availability/version without sending target traffic.
 
-### Installation and setup
-- [Nmap downloads](https://nmap.org/download.html) — official installation and platform notes.
-- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official naabu installation/options.
-- [RustScan](https://github.com/RustScan/RustScan) is an optional alternative; read its concurrency settings and use only if compatible with the engagement policy.
-Confirm scope, approved ports/rates, and maintenance windows before scanning. Scan a small approved set first and stop on service instability; no stealth/evasion, proxy rotation, or distributed scanning.
+### Installation and verification
+Use official documentation: https://github.com/projectdiscovery/naabu, https://nmap.org/book/man.html, https://github.com/projectdiscovery/tlsx, and https://github.com/projectdiscovery/httpx. Check local versions before use and inspect each tool's rate, scan-type, and output options. Missing tools must be reported explicitly; do not install an entire suite without a concrete need.
 
-### Primary resources
-- [Nmap Network Scanning](https://nmap.org/book/) — port/service behavior.
-- [Nmap NSE script docs](https://nmap.org/nsedoc/) — inspect scripts before execution.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — service context and verification.
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://docs.projectdiscovery.io/
+- https://nmap.org/book/man.html
+- https://github.com/vavkamil/awesome-bugbounty-tools
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize the resulting web URLs locally; it does not scan ports.
-
-### Result handling
-Record target locator, approved port range, timing/rate, discovered service/version confidence, and whether a result was actively confirmed. A banner alone does not prove a vulnerability.
-
+### Evidence and handoff
+Record target/scope source, tool and version, resolved host, ports/protocols, timestamp, errors, and confidence. Keep passive observations separate from active scan results. Use only the program-permitted intensity; a closed/filtered result or missing response is not proof that a service does not exist.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
