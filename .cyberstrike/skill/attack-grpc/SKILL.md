@@ -101,7 +101,7 @@ Check error disclosure, metadata handling, and TLS validation. Redact credential
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate equivalent requests and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Avoid resource-exhaustion testing and honor the program's transport/request rules.
 
 Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
 
@@ -137,3 +137,28 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 ### RPC method/metadata differential
 Build a service-method inventory from permitted reflection, protobuf descriptors, observed clients, and normal traffic. For each sensitive method compare an allowed test principal, a denied principal, and an invalid/nonexistent request as controls. Preserve message shape and metadata while varying one of authentication, role, object, or tenant context. Status details and reflection exposure alone are not a vulnerability; verify protected output or server-side state. Check alternate transports and gateway mappings where observed. Route object-level failures to IDOR, role/function failures to BFLA, and oversized pagination/expensive methods to resource-consumption review using non-load tests only.
+
+
+## Streaming and metadata lifecycle checks
+
+| RPC shape | Safe check | Evidence required |
+|---|---|---|
+| Unary | Same method under allowed/denied test identities | Protected result or state transition, not only gRPC status |
+| Server streaming | Small synthetic stream and test-only topic/object | Each emitted message respects the caller's access |
+| Client streaming | Minimal valid sequence with a disposable record | Server validates each message and final commit state |
+| Bidirectional streaming | Short controlled exchange with synthetic events | Authorization is rechecked for each action/event where policy requires it |
+| Long-lived stream | Revoke a test session/role and send one harmless follow-up | Stream behavior matches documented revocation semantics |
+| Metadata | Compare valid, absent, expired test credential | Identity source and error trailers without leaking secrets |
+| Gateway translation | Compare normal gRPC client and documented gateway route | Same authorization policy across both entry points |
+
+### Safe grpcurl inventory
+
+Use only a confirmed in-scope host and approved reflection/proto source. Do not call every method discovered; inventory first and select harmless methods whose authorization can be tested with fixtures.
+
+```bash
+grpcurl -connect-timeout 3 -max-time 5 -plaintext "$GRPC_TEST_HOST:$GRPC_TEST_PORT" list
+```
+
+Use the TLS options required by the real service; -plaintext is only appropriate for an explicitly approved plaintext test service. Never disable certificate validation on a production target to make the command succeed.
+
+Record service_name, method_name, rpc_shape, proto_source, tls_validation, principal, metadata_redacted, stream_duration, message_count, authorization_result, state_readback, and cleanup_status. If reflection is disabled, use the allowed proto/client artifacts rather than brute-forcing service names.
