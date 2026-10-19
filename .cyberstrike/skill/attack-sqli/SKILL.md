@@ -74,10 +74,12 @@ Prefer source/configuration review, a program-provided dataset, or a synthetic r
 
 ## Tools
 
-- **Burp Suite Repeater:** controlled one-variable request comparisons.
-- **curl:** reproducible single-request probes with explicit timeouts.
-- **sqlmap:** use in an isolated lab or with explicit program approval; disable data enumeration and extraction for production checks.
-- **Source/log review:** trace input to query construction and parameter binding without accessing production records.
+- `sqlmap`: optional corroboration for a specific observed parameter, with safe low-impact options and no data extraction.
+- Python `httpx` or `curl`: reproduce the baseline and compare one controlled input variation.
+- `rg`: inspect authorized local source/query construction and parameter binding.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved redacted responses offline.
+
+Verify `sqlmap --version`, `curl --version`, and the chosen Python client. Official docs: https://sqlmap.org/, https://curl.se/docs/, https://www.python-httpx.org/. Do not dump tables or modify/delete records.
 
 ## SQL Dialect and Confirmation Matrix
 
