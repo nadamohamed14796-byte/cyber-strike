@@ -57,6 +57,11 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(safeArgs, "https://example.com", baseScope)).toBeUndefined()
   })
 
+  test("accepts ordinary single- or double-quoted shell URL and numeric arguments", () => {
+    const quotedArgs = ["-u", "'https://example.com'", "-fs", "fqdn", "-rl", "'5'", "-d", '"3"']
+    expect(katanaScopeBlockReason(quotedArgs, "https://example.com", baseScope)).toBeUndefined()
+  })
+
   test("rejects a crawler command without explicit URL inputs", () => {
     expect(katanaScopeBlockReason(["-fs", "fqdn", "-rl", "5"], "https://example.com", baseScope)).toContain("explicit '-u")
   })
