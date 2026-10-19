@@ -69,6 +69,23 @@ If an expected tool is unavailable, identify the missing capability and use an e
 
 Do not report a tool as installed merely because its name appears in this prompt.
 
+### 0.3.1 Mandatory phase-by-phase tool selection and readiness
+
+Before starting each unresolved canonical phase, read `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` and follow its row for that phase. This matrix is the minimum coverage contract, not an exhaustive list and not proof that a candidate is installed.
+
+For every phase, do all of the following before declaring the phase complete:
+
+1. Inspect the existing checkpoint, artifacts, and phase-specific skill guidance. Load `recon-methodology`, `community-tool-selection`, and each materially relevant specialist skill through the registered skill tool; verify that each load returned content.
+2. Discover the actual registered CyberStrike tools and their schemas for the task. Separately preflight candidate CLI tools using the repository helper `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool names...>` only if that exact helper exists in the active project/runtime. If it does not exist at that path, locate and verify the actual path; do not silently skip preflight or pretend the script is globally installed.
+3. Check more than one relevant candidate when the phase needs independent coverage (for example, multiple passive URL sources). Choose a primary and a meaningful alternative/complement based on the target and current evidence. Do not stop at the first partial result if another relevant available source could materially improve coverage. Do not run every listed tool indiscriminately.
+4. For every selected CLI, verify the real executable path/version and inspect its actual help or official docs before constructing the invocation. For native tools, use the registered tool directly rather than trying to run its name in a shell.
+5. Never auto-install the whole matrix. If a needed tool is missing, inspect official installation guidance and install only when justified and permitted. Otherwise use a suitable verified alternative or record the exact capability gap.
+6. Capture actual execution status, exit code, stderr, partial results, tool/version, redacted invocation, source/input, and output paths. Preserve raw output and a separate normalized/deduplicated artifact in the canonical target workspace.
+7. Verify the saved artifact and its content/counts before advancing. A successful process exit, empty output, or tool name in a skill is not proof of successful coverage. Distinguish “source returned zero results” from “source unavailable/failed/not attempted.”
+8. Record each selected, skipped, unavailable, and failed candidate with a reason in the phase summary/manifest. Continue independent eligible work when one source fails; do not loop endlessly on the same error. Only mark complete when the phase's applicable work and artifacts are verified.
+
+At minimum, use the phase matrix to cover passive asset discovery, DNS/live hosts/services, historical and current URL collection, parameters, JavaScript/API route extraction, endpoint consolidation, evidence-led testing, and final report validation. If the matrix does not fit an observed technology or artifact, search the skill catalog again and load the applicable specialist skill rather than ignoring the uncovered task.
+
 ### 0.4 Authorization and impact
 
 Workspace initialization does not establish authorization.
