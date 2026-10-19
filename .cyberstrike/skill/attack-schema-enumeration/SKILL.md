@@ -176,3 +176,26 @@ This reports declared metadata only. It does not prove runtime enforcement, and 
 ### Handoff and deduplication
 
 Deduplicate operations by protocol + method/operation + normalized route/schema version. Keep separate findings only when there is a distinct violated control or impact. Record schema_source, schema_version, visibility_policy, operation_id, declared_security, runtime_auth_result, field_sensitivity, object_policy_result, and next_skill_trigger. If schema parsing fails, preserve the parse error and source provenance; do not label the schema absent.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp's request history, Repeater, and the InQL extension for GraphQL query/operation exploration where relevant. Use the published OpenAPI/GraphQL schema first when the application documents it.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
+- InQL is available from the official [PortSwigger BApp Store](https://portswigger.net/bappstore); review the extension listing before enabling.
+- For local schema parsing, use the project's supported parser or a maintained JSON/YAML tool; do not upload private schemas or traffic to untrusted online viewers.
+Use only documented/observed APIs or approved schema endpoints; don't use enumeration to access unrelated tenant data.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API inventory and excessive data exposure.
+- [PortSwigger GraphQL API testing](https://portswigger.net/web-security/graphql) — controlled tests.
+- [GraphQL specification](https://spec.graphql.org/) — schema/introspection semantics.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` normalizes locally collected schema/API URLs without contacting them.
+
+### Result handling
+Record schema source, access context, timestamp, and whether the exposed schema yields a practical security consequence. Public introspection alone may be expected behavior and is not automatically a vulnerability.
