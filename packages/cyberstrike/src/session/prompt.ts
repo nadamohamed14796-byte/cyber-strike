@@ -814,11 +814,14 @@ export namespace SessionPrompt {
         (/\.(?:txt|list|csv)\b/i.test(targetTaskText) && /\b(domain|host|scope|subdomain)\b/i.test(targetTaskText))
       if (targetWorkflowRequested || targetMemoryCtx) system.push(TARGET_WORKSPACE_WORKFLOW_PROMPT)
 
-      // The global research module was imported here but never wired into the actual
-      // model prompt. Only inject it for a target/security workflow, existing target
-      // memory, or an explicit vulnerability signal; regular unrelated chats stay clean.
-      // Pass the most recent bounded text so a long conversation cannot hide the current ask.
-      const researchSignalText = targetTaskText.slice(-4000)
+      // Use only the latest user turn for explicit research intent. Scanning prior
+      // user turns made "continue" repeatedly re-trigger stale vulnerability signals.
+      // Current captured requests and Intel remain available inside ResearchContext.
+      const researchSignalText = lastUser.parts
+        .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
+        .map((part) => part.type === "text" ? part.text : "")
+        .join(" ")
+        .slice(-4000)
       if (targetWorkflowRequested || targetMemoryCtx || promptResearchSignals(researchSignalText).length > 0) {
         try {
           const researchContext = ResearchContext.generate(Session.root(sessionID), researchSignalText)
