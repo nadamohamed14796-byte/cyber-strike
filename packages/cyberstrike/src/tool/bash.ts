@@ -70,6 +70,30 @@ const SCANNER_PHASES: Record<string, ReconPhase> = {
   dalfox: "vulnerability_testing",
   wpscan: "vulnerability_testing",
 }
+const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-file", "-out"])
+
+/**
+ * Identity for a direct scanner invocation, ignoring only the output destination.
+ * Used to catch duplicate scans inside one shell call before any of them run.
+ */
+export function reconScannerInvocationKey(command: string[]): string | undefined {
+  if (!command.length) return undefined
+  const executable = path.basename(stripOuterShellQuotes(command[0]!)).toLowerCase()
+  if (SCANNER_PHASES[executable] === undefined) return undefined
+
+  const normalizedArgs: string[] = []
+  for (let i = 1; i < command.length; i++) {
+    const argument = stripOuterShellQuotes(command[i]!)
+    const lower = argument.toLowerCase()
+    if (SCANNER_OUTPUT_FLAGS.has(lower)) {
+      i++ // Ignore only the output path; source, target and scan options remain part of identity.
+      continue
+    }
+    if (lower.startsWith("--output=")) continue
+    normalizedArgs.push(argument)
+  }
+  return JSON.stringify([executable, ...normalizedArgs])
+}
 
 function scannerTargets(command: string[], commandText: string): string[] {
   const candidates = new Set<string>()
@@ -554,6 +578,7 @@ export const BashTool = Tool.define("bash", async () => {
       if (!Instance.containsPath(cwd)) directories.add(cwd)
       const patterns = new Set<string>()
       const always = new Set<string>()
+      const scannerInvocationKeys = new Map<string, string>()
 
       for (const node of tree.rootNode.descendantsOfType("command")) {
         if (!node) continue
@@ -575,6 +600,17 @@ export const BashTool = Tool.define("bash", async () => {
             continue
           }
           command.push(child.text)
+        }
+
+        // Avoid repeating an identical scanner/source in one shell call, even if the
+        // second command writes to another output path. Run once, then reuse its artifact.
+        const scannerKey = reconScannerInvocationKey(command)
+        if (scannerKey) {
+          const previousCommand = scannerInvocationKeys.get(scannerKey)
+          if (previousCommand) {
+            throw new Error("Duplicate recon scanner invocation in one bash call. This scan has the same tool, target inputs, and options as an earlier command; changing only the output path does not justify repeating it. Reuse the first output or change the inputs/options for a genuinely distinct collection pass. First command: " + previousCommand.slice(0, 240))
+          }
+          scannerInvocationKeys.set(scannerKey, commandText)
         }
 
         // Enforce target scope + durable phase gates before known recon/scanner binaries start.
