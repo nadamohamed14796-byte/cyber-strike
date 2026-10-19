@@ -35,6 +35,16 @@ export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly str
   reporting: ["reports"],
 }
 
+export type ReconBeginDisposition = "start" | "resume_existing" | "already_resolved"
+
+export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhase): ReconBeginDisposition {
+  if (status === "running") return "resume_existing"
+  if (status === "complete" || (status === "unavailable" && phase !== "scope_validation" && phase !== "workspace_setup")) {
+    return "already_resolved"
+  }
+  return "start"
+}
+
 const Parameters = z.object({
   action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
@@ -103,6 +113,21 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       const phaseIndex = PHASES.indexOf(phase)
 
       if (params.action === "begin") {
+        const disposition = reconBeginDisposition(record.status, phase)
+        if (disposition === "resume_existing") {
+          return {
+            title: "Recon phase already running",
+            output: phase + " is already running since " + (record.startedAt ?? "an earlier checkpoint") + ". Do not begin it again. Reconcile existing artifacts and resume only unfinished sources/items; do not repeat successful work. When the phase is genuinely finished, call complete with verified artifacts, or use block/fail with a concrete reason.",
+            metadata: { saved: false, reason: "phase_already_running", phase, status: record.status, started_at: record.startedAt, artifacts: record.artifacts ?? [] },
+          }
+        }
+        if (disposition === "already_resolved") {
+          return {
+            title: "Recon phase already resolved",
+            output: phase + " is already " + record.status + ". Inspect its artifacts; do not repeat expensive work unless new evidence invalidates this checkpoint.",
+            metadata: { saved: false, reason: "phase_already_resolved", phase, status: record.status },
+          }
+        }
         if (phase !== "scope_validation" && phase !== "workspace_setup") {
           // The root workspace can represent a bug-bounty program/policy container,
           // not an in-scope hostname (for example, a program that authorizes unrelated
@@ -121,9 +146,6 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         const unresolved = unresolvedReconPrerequisites(phase, run.phases)
         if (unresolved.length) {
           return { title: "Recon phase blocked by prerequisites", output: "Cannot begin " + phase + ". Resolve earlier phases first: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "prerequisites_unresolved", unresolved } }
-        }
-        if (record.status === "complete" || (record.status === "unavailable" && phase !== "scope_validation" && phase !== "workspace_setup")) {
-          return { title: "Recon phase already resolved", output: phase + " is already " + record.status + ". Inspect its artifacts; do not repeat expensive work unless new evidence invalidates this checkpoint.", metadata: { saved: false, reason: "phase_already_resolved", phase, status: record.status } }
         }
         run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
         run.currentPhase = phase
