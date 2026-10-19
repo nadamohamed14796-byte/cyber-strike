@@ -240,3 +240,28 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Show whether a cross-site attacker-controlled context can trigger a meaningful state change under the victim's credential context. A missing token alone is not enough if another effective control blocks the action.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
+
+### Recommended tools
+- curl — compare state-changing request controls
+- Python requests/httpx — replay only with test-owned accounts and reversible state
+- jq — inspect token/header behavior
+- A local CSRF case matrix for method, content type, token, and origin
+
+### Resources
+- https://portswigger.net/web-security/csrf
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids only; consult official docs for supported usage and limitations.
+
+### Helper-script contract
+Store baseline and modified request metadata, cookie/SameSite context, token validation, Origin/Referer checks, and server-side state outcome. Use disposable records and avoid irreversible actions.
+
+Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
+
+### Handoff
+Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
