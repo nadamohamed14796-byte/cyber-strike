@@ -87,6 +87,11 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(outsideOutput, "https://example.com", baseScope, "/workspace/example")).toContain("inside this target workspace")
   })
 
+  test("rejects duplicate scope-sensitive flags so checked and effective settings cannot diverge", () => {
+    expect(katanaScopeBlockReason([...safeArgs, "-o", path.join(workspacePath, "scans", "other.jsonl")], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
+  })
+
   test("rejects unbounded rate limits and scope-broadening flags", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
     expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope, workspacePath)).toContain("scope overrides")
