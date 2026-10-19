@@ -68,6 +68,7 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - subfinder, amass, dnsx, puredns, httpx, and certificate-transparency search.
 - dig/drill for DNS troubleshooting.
 - Python/jq for normalization, deduplication, provenance, and confidence scoring.
+- `python3 .cyberstrike/skill/scripts/host_inventory.py observations.jsonl -o hosts.jsonl --errors invalid.jsonl` to normalize hostname observations while preserving all source records; this helper makes no network requests.
 - gowitness or browser automation for visual clustering after live-host validation.
 
 ## Enumeration Coverage Matrix
@@ -159,8 +160,11 @@ A discovered hostname is a lead, not automatically an authorized target. Preserv
 - [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — tool behavior and output.
 - [OWASP DNS Security Cheat Sheet](https://cheatsheetseries.owasp.org/) — relevant DNS hygiene context.
 
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize any HTTP URLs discovered; it sends no DNS or HTTP requests.
+### Reusable helpers
+- `python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt` normalizes discovered HTTP URLs; it sends no DNS or HTTP requests.
+- `python3 .cyberstrike/skill/scripts/host_inventory.py observations.jsonl -o hosts.jsonl --errors invalid.jsonl` creates a provenance-preserving hostname inventory without network traffic.
+- `python3 .cyberstrike/skill/scripts/tool_preflight.py subfinder amass dnsx httpx --json` checks local CLI availability and version output before selecting the toolchain.
+- Consult `.cyberstrike/skill/TOOLING_CATALOG.md` for candidate tools, official references, and shared-helper policy. It is a discovery index, not a requirement to install everything.
 
 ### Result handling
 Record source, observation time, record type, resolver, confidence, live status, and next phase. Deduplicate assets without discarding alternate discovery sources.
