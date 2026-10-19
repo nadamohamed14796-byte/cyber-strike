@@ -65,46 +65,19 @@ Keep a small redacted sample and record the endpoint, expected audience, princip
 Separate metrics, health/readiness, tracing, profiling, debug output, and administrative controls because they have different risk and operational impact. Review configuration and read-only evidence first; do not trigger heavy profiles or diagnostic dumps on a live service. Any follow-up must use an approved synthetic fixture and the minimum proof necessary.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use curl/browser DevTools for a single authorized request, jq for local JSON, Burp for authentication-context comparison, and Prometheus `promtool` when Prometheus configuration/rules are part of the authorized assessment.
-
-### Installation and setup
-Kali/Debian: `sudo apt update && sudo apt install curl jq`. Get Prometheus/`promtool` only from https://prometheus.io/download/ and follow the official version-specific setup. Avoid scraping or bulk-downloading production metrics unless the program explicitly permits it. Tool installation does not authorize a test.
-
-### Primary resources
-- [Prometheus documentation](https://prometheus.io/docs/) — metrics formats and access patterns.
-- [OWASP Information Exposure Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Information_Exposure_Cheat_Sheet.html) — impact context.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — disclosure verification.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized responses already saved locally; it sends no request.
-
-### Result handling
-Record the metric names and exposure context without copying secrets or personal data; distinguish public operational metadata from genuinely sensitive data.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use agent-executable CLI tools and local scripts; browser interfaces, extensions, and interactive intercepting proxies are not dependencies. Check tool presence/version and official documentation before running it; only process data the operator is authorized to inspect.
+- `curl` or Python `httpx`: make one authorized request to an observed metrics endpoint and preserve response metadata.
+- `jq`: parse saved metric JSON and inspect label fields after redaction.
+- Prometheus `promtool`: validate local Prometheus configuration/rules when those files are in scope.
+- `rg`: inspect collected source/configuration for metrics endpoint exposure and label construction.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Recommended tools
-- curl — single read-only metadata request
-- jq — parse metrics exposition/JSON
-- rg — locate high-signal metric names in saved output
-- Python — redact labels and summarize cardinality locally
+Verify `curl --version`, the selected Python client, and `promtool --version` when relevant. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://prometheus.io/docs/prometheus/latest/configuration/overview/.
 
 ### Resources
-- https://prometheus.io/docs/prometheus/latest/querying/api/
+- https://prometheus.io/docs/
+- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 - https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
 
-Community lists are discovery aids; verify project maintenance, license, and supported behavior from official sources.
-
-### Helper-script contract
-Capture only minimal sanitized metrics metadata. Check whether sensitive labels, environment names, or internal topology are exposed without enumerating large metric sets or collecting customer-specific labels.
-
-Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
-
-### Handoff
-Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
+Do not enumerate large metric sets or collect customer-specific labels. Keep the evidence limited to the minimum fields needed to demonstrate exposure.
