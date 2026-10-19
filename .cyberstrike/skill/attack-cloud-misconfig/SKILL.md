@@ -116,7 +116,7 @@ Create a minimal policy diff showing the excess permission and a regression test
 
 ## Adaptive Verification Contract (maximum 20 distinct hypotheses)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
 
 Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
 
@@ -147,3 +147,16 @@ Stop at scope boundaries, unexpected real-user data, production side effects, ra
 - [AWS IAM best practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
 - [Azure security best practices](https://learn.microsoft.com/en-us/azure/security/fundamentals/best-practices-and-patterns)
 - [Google Cloud security foundations](https://cloud.google.com/architecture/security-foundations)
+
+
+## Practical cloud validation: read-only first
+Build the provider/resource ownership link from public metadata and the program's scope definition before active API calls. For cloud CLIs, verify the authenticated principal first and use read-only lookups only for explicitly authorized resources.
+
+```bash
+# These commands inspect the tester's configured identity; they do not establish target ownership.
+aws sts get-caller-identity
+az account show --output json
+gcloud auth list --filter=status:ACTIVE --format='value(account)'
+```
+
+Run only the provider-specific query supported by the actual toolchain and approved asset list. Never infer permission from a public bucket/endpoint, a provider fingerprint, or a secret-like string. A reportable chain needs target ownership → reachable misconfiguration → protected resource/action actually exposed. Route confirmed storage/IAM/runtime findings to attack-minio-s3, aws-postexploit, azure-postexploit, gcp-postexploit, or k8s-assessment as applicable.
