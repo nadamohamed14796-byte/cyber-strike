@@ -71,10 +71,12 @@ Determine whether code runs in the application origin, a sandboxed iframe, or a 
 
 ## Tools
 
-- **Browser DevTools debugger:** trace values at runtime without copying sensitive storage.
-- **Burp Suite:** establish controllable URL/query/API inputs.
-- **Semgrep / code search:** locate dangerous sinks and data flows.
-- **DOM Invader or equivalent:** prioritize sources and sinks, then verify manually.
+- `rg`: find candidate DOM sources, sinks, sanitizers, and unsafe HTML APIs in collected JavaScript.
+- `semgrep`: scan an authorized local source checkout for relevant patterns.
+- `node`: reproduce source-to-sink behavior in a minimal local fixture.
+- `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript`: inventory route candidates from local assets.
+
+Verify `rg --version`, `semgrep --version`, and `node --version`. Official docs: https://semgrep.dev/docs/getting-started/, https://nodejs.org/en/download/, https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML.
 
 ## DOM Source-to-Sink Decision Matrix
 
