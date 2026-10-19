@@ -74,24 +74,20 @@ Identify where the value is inserted (HTML escaping, template expression, server
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Repeater with benign template-expression markers and application error/log evidence where authorized. For source review, use the official template-engine documentation and Semgrep if a relevant rule set exists. Avoid jumping directly to command execution.
+### Agent-usable tools and purpose
+- `curl` or Python `httpx` — reproduce an observed, authorized request with inert arithmetic/string markers.
+- `rg` — search already-collected source/configuration for template engine selection, unsafe rendering, and escaping.
+- `semgrep` — run applicable rules against an authorized local source checkout; verify the rule matches the actual template engine.
+- Language-specific test runner — reproduce behavior in a disposable local fixture when source is available.
+### Install and verify
+Install Semgrep using its official guide at https://semgrep.dev/docs/getting-started/ and verify with `semgrep --version`; verify request clients with `curl --version` or `python3 -c "import httpx; print(httpx.__version__)"`. If unavailable, continue with source review and inert test fixtures; record the gap instead of implying execution.
+### Resources
+- https://portswigger.net/web-security/server-side-template-injection
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://semgrep.dev/docs/
+### Helper
+Use `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` to compare saved, redacted output. Do not use OS command execution, file reads, or secret extraction as production proof.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official installation.
-- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — optional static scan on an authorized source checkout.
-- Use template-engine packages only in a disposable local lab, pinned to the app's actual version; do not install unknown payload repositories or run exploit scripts copied from writeups without inspection.
-
-### Primary resources
-- [PortSwigger server-side template injection](https://portswigger.net/web-security/server-side-template-injection) — identification and lab validation.
-- [Jinja security considerations](https://jinja.palletsprojects.com/en/stable/sandbox/) — if the target uses Jinja.
-- [OWASP Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html) — defensive controls.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares locally captured, sanitized responses offline.
-
-### Result handling
-First establish server-side template evaluation using a harmless expression in a controlled input. Do not use OS command execution, file reads, or secret extraction to prove a finding; explain the engine and trust-boundary failure.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
