@@ -126,3 +126,26 @@ This compares local artifacts offline and heuristically redacts common secrets b
 - Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
 
 Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer to compare cacheable response variants; Param Miner may help discover cache-key inputs when authorized. Start with benign unique markers and a test endpoint/resource.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- Param Miner can be installed from Burp's official BApp Store; review its request behavior before use.
+- curl on Kali/Debian: sudo apt update && sudo apt install curl.
+Shared-cache poisoning can affect other users, so automated probes and exploit-mode tests require explicit authorization and preferably an isolated/staging cache. Do not poison a common page or target another user's session.
+
+### Primary resources
+- [PortSwigger Web Cache Poisoning](https://portswigger.net/web-security/web-cache-poisoning) — cache-key and response variation.
+- [RFC 9111 HTTP Caching](https://www.rfc-editor.org/rfc/rfc9111) — standards context.
+- [OWASP HTTP Headers Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html) — relevant response controls.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved redacted response variants offline.
+
+### Result handling
+Record normal baseline, exact request delta, cache indicators, test marker, and affected context. A reflected input or a cache hit is not enough without a reproducible unsafe cached response.
