@@ -124,7 +124,7 @@ export namespace VerificationAttempts {
       attempts[attempts.length - 1] &&
       isEvidenceBackedValidAttempt(attempts[attempts.length - 1]!),
     )
-    if (hasValidDisproof) {
+    if (hasValidDisproof && attemptsUsed >= MAX_ATTEMPTS) {
       return {
         outcome: "disproven",
         attemptsUsed,
