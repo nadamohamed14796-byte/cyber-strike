@@ -12,10 +12,10 @@ tags:
   - har
   - screenshots
 tech_stack:
-  - burp-suite
-  - browser-devtools
-  - har
+  - http-client
   - curl
+  - httpx
+  - har
   - jq
 chains_with:
   - triage-validation
@@ -51,7 +51,7 @@ Before attaching a HAR, redact auth headers and cookie collections in both reque
 
 ### Phase 5: Capture request/response context
 
-Use Burp Repeater or equivalent to show the exact request and minimal response. Preserve status and content type, include a negative control, and label each step. Do not falsify evidence, crop away contradictory results, or treat status code alone as impact proof.
+Use curl/Python httpx or an already-captured request artifact to preserve the exact request and minimal response. Preserve status and content type, include a negative control, and label each step. Do not falsify evidence, crop away contradictory results, or treat status code alone as impact proof.
 
 ### Phase 6: Name and protect artifacts
 
