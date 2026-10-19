@@ -67,3 +67,29 @@ Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/ma
 
 ### Result handling
 Keep one manifest entry per artifact with kind, test context, timestamps, hash, sanitized path, redaction review, and the exact claim supported. Never put a secret itself in the manifest.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
+
+### Recommended tools
+- sha256sum/shasum — hash evidence artifacts
+- jq/Python — validate JSONL manifests
+- git diff — review report/evidence changes
+- http_response_diff.py — compare paired responses
+- validate_evidence_manifest.py — evidence completeness
+
+### Resources
+- https://www.hackerone.com/disclosure-guidelines
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; use official documentation for current behavior and limitations.
+
+### Helper-script contract
+Keep raw sanitized request/response, timestamp, test identity, expected/actual outcome, hash where useful, and redaction status. Never include live credentials or unrelated user data.
+
+Preserve original evidence separately from normalized outputs. Record tool/version, timestamps, source, confidence, errors, redaction, and stable artifact paths. Use structured output and local fixtures; never overwrite evidence silently.
+
+### Handoff
+Return actual commands and versions, evidence paths, passed/failed/inconclusive checks, false-positive reason where applicable, confidence, limitations, and next skill.
