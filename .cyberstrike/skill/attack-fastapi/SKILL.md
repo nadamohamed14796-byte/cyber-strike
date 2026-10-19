@@ -114,7 +114,7 @@ Trace the dependency and handler in source, keep a minimal sanitized request/res
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent requests and retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping.
 
 Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
 
@@ -151,3 +151,28 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 ### Dependency and schema differential
 For each router operation, map path/method, dependency injection chain, authentication and authorization dependencies, Pydantic request/response models, and any background task or URL-fetch feature. Compare a high-role and low-role test account using the same disposable object; do not assume a dependency attached to the router covers every mounted path or transport. Check whether response models filter internal fields, whether nested writable fields alter persisted state, and whether generated OpenAPI security matches actual enforcement. Route object-specific read/write gaps to IDOR/property authorization and URL-consuming features to SSRF only after confirming server-side fetching.
+
+
+## FastAPI dependency and model source tracing
+
+Use an authorized local source tree. Static matches are a route map, not proof that a dependency is missing at runtime.
+
+```bash
+rg -n --glob '*.py' \
+  'FastAPI\(|APIRouter\(|include_router|Depends\(|Security\(|OAuth2PasswordBearer|current_user|response_model|extra=|model_config|BackgroundTasks|add_task|File\(|UploadFile|httpx\.|requests\.' .
+```
+
+For each route, trace app-level dependencies → router dependencies → endpoint dependencies → service authorization → object lookup → response model/state change. Check whether tests override dependencies only in test setup; never assume a test override affects production.
+
+### Decision matrix
+
+| Surface | Gap hypothesis | Evidence required |
+|---|---|---|
+| Router inclusion | A mounted router lacks a global dependency | Actual unauthorized request reaches a protected handler |
+| Dependency override | Runtime/test configuration changes auth behavior | Production-equivalent test shows the weaker dependency is active |
+| Pydantic extra/nested fields | Protected property accepted by input model | Server-side persisted field and policy violation |
+| Response model | Internal fields returned beyond intended schema | Controlled unauthorized response contains a genuinely private field |
+| Background task | Job creation/result ID not owner-bound | Second test identity accesses synthetic job output |
+| URL fetch/upload | Input reaches a server-side network/parser sink | Controlled benign fixture confirms the data flow without internal targets |
+
+Record router_prefix, route_method, dependency_chain, principal, request_model, response_model, object_owner, synthetic_fixture, persisted_change, negative_control, and cleanup_status. Do not fetch environment files or internal URLs to validate a suspected issue.
