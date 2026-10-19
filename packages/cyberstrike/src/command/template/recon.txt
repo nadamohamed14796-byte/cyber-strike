@@ -259,6 +259,7 @@ The canonical root workspace is a durable container for one program's policy, as
 
 ## 2.2 Import a supplied scope file
 If the user supplies a complete program scope file/list, import all entries in one operation; do not ask them to select or confirm hosts individually. Preserve the source file and flag unsupported or conflicting entries without silently dropping them.
+If the user explicitly identifies a supplied complete list/file as the authorized scope, accept the complete set in one operation with `user_confirmed_scope_list=true` (and `merge_existing=true` only when adding entries to the existing manifest). This is distinct from inferring siblings from one exact hostname. Use the flag only when the whole supplied list was explicitly identified as in-scope; do not ask which entries to keep. Existing exclusions always remain authoritative. If an official policy URL is available, prefer it; if not, record the user-confirmed-list provenance instead of fabricating a URL.
 
 
 If the user supplies a scope file:
@@ -279,7 +280,7 @@ Record the returned source SHA-256, saved path, configuration result, and any un
 
 ## 2.3 Configure scope without a supplied file
 
-If no scope file is provided, use verified official policy evidence for a full program manifest. If the user explicitly confirms one exact asset instead and no configured manifest exists, call `target_workspace(action="configure_scope", target_url="<canonical root target>", include=["<one exact confirmed asset>"], user_confirmed_scope=true)`; do not pass `merge_existing` for initial configuration. Preserve that provenance in the manifest and notes, verify the saved result, and do not fabricate an external policy reference.
+If no scope file is provided, use verified official policy evidence for a full program manifest. If the user explicitly confirms one exact asset instead and no configured manifest exists, call `target_workspace(action="configure_scope", target_url="<canonical root target>", include=["<one exact confirmed asset>"], user_confirmed_scope=true)`; do not pass `merge_existing` for initial configuration. For an explicitly confirmed complete list, use `user_confirmed_scope_list=true` and pass the entire supplied list together; use `merge_existing=true` only for an additive update. Preserve that provenance in the manifest and notes, verify the saved result, and do not fabricate an external policy reference.
 
 When the registered tool supports the interface below, use:
 
