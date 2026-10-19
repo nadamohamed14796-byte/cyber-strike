@@ -82,24 +82,19 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer to examine documented boundary/error conditions, plus application logs when authorized. For owned APIs, Schemathesis or the project's existing property-based test framework can explore contract edge cases; use only a safe staging fixture.
+- `curl` or Python `httpx`: compare one documented boundary/error condition against a baseline.
+- `Schemathesis`: generate schema-based API cases against a local/staging service where the schema and test environment are available.
+- `pytest` or the project's test runner: preserve a regression fixture for a reproduced edge case.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Installation and setup
-- [Schemathesis installation](https://schemathesis.readthedocs.io/en/stable/guides/installation/) — contract-driven API testing.
-- [Burp Suite](https://portswigger.net/burp) — manual controlled requests.
-- [pytest](https://docs.pytest.org/en/stable/getting-started.html) — regression checks in a test repository.
-Avoid high-volume fuzzing or state-changing payloads on a live program unless explicitly approved. Prefer schema-driven, bounded cases in a local/staging environment and preserve input seeds for reproduction.
+Verify `curl --version`, the chosen Python client, and the test tool's `--help`. Official docs: https://schemathesis.readthedocs.io/en/stable/guides/installation/, https://docs.pytest.org/en/stable/getting-started.html, https://curl.se/docs/.
 
-### Primary resources
-- [Schemathesis docs](https://schemathesis.readthedocs.io/en/stable/) — supported testing model.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — error conditions and boundary verification.
-- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) — expected parsing behavior.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses after redaction.
+### Resources
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html
+- https://schemathesis.readthedocs.io/en/stable/
 
 ### Result handling
-Record baseline, one changed boundary condition, expected vs actual, error classification, and cleanup. A 500 response, timeout, or stack trace is a signal, not proof of exploitable impact.
+Use schema-driven cases in a local/staging environment. Record baseline, one changed boundary condition, expected vs actual, error classification, and cleanup. A 500 response, timeout, or stack trace is a signal, not proof of exploitable impact.
