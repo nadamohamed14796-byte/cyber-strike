@@ -188,3 +188,26 @@ done
 ### Structured evidence additions
 
 Record route_source, intended_visibility, auth_mode, anonymous_result, invalid_credential_result, low_role_result, authorized_control_result, protected_field_paths, synthetic_marker, cache_status, object_owner, state_changed, and cleanup_verified. Every chain to BOLA, BFLA, property authorization, or shadow API must cite the specific observed condition that triggered it.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Burp Proxy/Repeater/Comparer, the observed client request, an available OpenAPI schema or GraphQL operation document, and jq for local JSON comparison. Prefer two controlled principals and a harmless fixture; do not load-test or send undocumented destructive mutations.
+- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
+- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
+
+### Primary resources
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API risk taxonomy.
+- [PortSwigger API testing](https://portswigger.net/web-security/api-testing) — hands-on test reasoning.
+- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) — authorization design.
+
+### Small, reusable helper
+    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
+This compares local artifacts offline and heuristically redacts common secrets before displaying differences. It sends no requests and does not prove complete sanitization.
+
+### Evidence and hand-off
+- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
+- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
+
+Validation note: use a known-good baseline and a control case, change one meaningful variable at a time, record the alternative explanation, and route a lead onward only when the evidence meets this skill's proof criteria.

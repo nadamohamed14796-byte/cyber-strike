@@ -129,3 +129,26 @@ Every cross-skill edge should store source finding/observation, exact trigger si
 ### Session closeout
 
 Before ending a work session, report completed phases, phases blocked/partial, new and changed observations, confirmed/disproven/inconclusive hypotheses, evidence paths, cleanup, and one concrete next action. Do not say all resources were covered if a source or tool was unavailable. Preserve useful negative results and deduplicate exact retries without suppressing materially new hypotheses.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Browser/proxy history plus optional local CLI tools such as subfinder, dnsx, httpx, katana, gau, jq, and sort/comm. These are not assumed installed: check command -v first. Label each result as passive, DNS-only, or active HTTP crawling; keep program policy and rate rules binding.
+- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
+- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
+
+### Primary resources
+- [OWASP WSTG — Information Gathering](https://owasp.org/www-project-web-security-testing-guide/)
+- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — optional recon tools and their behavior.
+- [UseOSINT skills](https://github.com/useosint/skills) — provenance and confidence practices.
+
+### Small, reusable helper
+    python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt
+The local helper removes query values and fragments, retains sorted query-key names, and never requests a URL.
+
+### Evidence and hand-off
+- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
+- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
+
+Operational note: keep source, observation time, confidence, and corroboration with each asset. A discovered host or route is a lead, not scope authorization or a vulnerability by itself.

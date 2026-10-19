@@ -216,3 +216,25 @@ Reports should include sanitized domain/host context, the exact relationship or 
 
 ## Chaining and impact enrichment
 Treat email-authentication weaknesses as a signal, not standalone impact. Correlate SPF/DKIM/DMARC policy with the actual sending path, From-domain alignment, receiver disposition, and a controlled mailbox you own. Chain only when independently observed: spoofable domain use → receiver accepts a controlled test message → a credible impersonation path in the program's threat model. Do not claim account takeover from a missing DNS record alone. Link the result to `recon-email-security`, `attack-security-headers` where browser delivery context matters, and `attack-triage-validation`.
+
+
+## Practical tooling, references, and helper scripts (2026-10-19)
+
+### Tools that fit this skill
+- Use only the native audit/telemetry tooling of an explicitly authorized lab (for example, Event Viewer/PowerShell on Windows, journalctl/auditd on Linux, klist for Kerberos context, or provider logs where relevant). Check availability before commands; do not use internal post-exploitation techniques against public bug-bounty assets.
+- Before treating an optional CLI command as runnable, verify its presence and version locally. Do not claim integrations or tools that the current runtime has not exposed.
+- Start with passive/read-only observation. Only active tests against authorized assets; state-changing tests require an approved disposable fixture and explicit program permission.
+
+### Primary resources
+- [MITRE ATT&CK](https://attack.mitre.org/) — behavior taxonomy and detection context.
+- [NIST SP 800-115](https://csrc.nist.gov/pubs/sp/800/115/final) — authorized assessment and evidence handling.
+
+### Small, reusable helper
+    python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json
+Keep an artifact manifest for read-only findings and configuration snapshots; do not store credentials or raw personal data in the manifest.
+
+### Evidence and hand-off
+- Save a sanitized artifact reference and the exact claim it supports. Keep credentials, full cookies, reset links, private user data, and raw secrets out of notes, global research storage, and commits.
+- Mark the result confirmed, disproven, or still a hypothesis. If the key check cannot be run safely or the expected control is missing, record the gap rather than inventing a conclusion.
+
+Lab boundary: this skill is for systems you own or an explicitly authorized isolated environment. Do not apply internal post-exploitation workflows to public bug-bounty assets. Record the lab, principal, starting state, and cleanup plan.
