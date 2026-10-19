@@ -65,12 +65,10 @@ Recommend context-appropriate escaping, avoiding dynamic template construction f
 
 Return `input_sink`, `baseline_output`, `expression_test`, `server_side_evaluation`, `engine_confidence`, `reachable_context`, `impact_confirmed`, `environment`, `confidence`, and redacted evidence.
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Template evaluation vs ordinary reflection
 Identify where the value is inserted (HTML escaping, template expression, server-side preview, email/PDF renderer) and establish a normal literal baseline. Use inert arithmetic/string expressions in a disposable fixture to distinguish server-side evaluation from reflection or client-side rendering; do not use file-read, process-execution, or environment-dumping payloads. Repeat with one template context at a time and compare rendered output, not just error codes. A confirmed evaluated expression does not automatically prove RCE; demonstrate only the minimum permitted impact and keep greater capabilities hypothetical until safely proven in an isolated lab. Route parser serialization to deserialization/XXE as appropriate and record the rendering context for remediation.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
