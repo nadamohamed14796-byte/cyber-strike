@@ -119,3 +119,28 @@ Request-smuggling probes can desynchronize shared connections and affect other u
 
 ### Result handling
 Require reproducible differential behavior and an explained impact. Capture one sanitized request sequence, proxy/backend context if known, timestamps, and a stop/cleanup result. A timeout alone is not sufficient proof.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
+
+### Recommended tools
+- A dedicated request-smuggling CLI scanner only after its request behavior is reviewed
+- curl — establish ordinary HTTP baseline
+- Python socket/http client in a lab fixture for parser-differential tests
+- Local timing/log correlation tools
+
+### Resources
+- https://portswigger.net/web-security/request-smuggling
+- https://github.com/vavkamil/awesome-bugbounty-tools
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids only; consult official docs for supported usage and limitations.
+
+### Helper-script contract
+Run desynchronization testing only on explicitly authorized systems with an agreed low-impact test plan; prefer staging. Preserve exact sanitized bytes, front/back-end protocol, connection behavior, timestamps, and server logs. Do not run destructive or high-volume probes.
+
+Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
+
+### Handoff
+Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
