@@ -100,7 +100,7 @@ If a pre-auth ID exists, verify login rotates it and that a test-supplied identi
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Program rate limits and safe-production constraints remain mandatory.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -136,3 +136,33 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### Session lifecycle and privilege transition
 Record session issue, storage, renewal, privilege change, logout, password reset, MFA change, and expiry as a timeline using tester-owned accounts. Reuse the same harmless authenticated endpoint as a control and verify server-side revocation/rotation, not just cookie changes in browser storage. Treat session identifiers as secrets and persist only redacted fingerprints. Consider subdomains, alternate devices, and multiple sessions only when they are part of the intended product behavior. Chain to ATO only when a controlled unauthorized principal is established, to CSRF when ambient cookie authority enables a cross-site action, and to cache deception only when personalized content crosses the cache boundary.
+
+
+## Session transition and multi-client coverage
+
+Use a timeline of events rather than checking a cookie attribute in isolation. Keep all sessions and identities under tester control.
+
+| Event | Test observation | Control / evidence |
+|---|---|---|
+| Pre-auth → login | Session identifier and server principal before/after login | Fresh browser and a normal valid login control |
+| Privilege/role change | Whether old session retains stale permissions | Same harmless endpoint before/after the controlled change |
+| Password/MFA change | Whether old sessions are invalidated as documented | Test-owned account and explicit policy expectation |
+| Logout | Whether prior session still authorizes a protected network action | Reuse only the tester's old session; ignore cached UI |
+| Refresh/rotation | Whether old refresh token remains reusable | Controlled token pair and documented rotation contract |
+| Multiple devices | Whether revoke-one/revoke-all semantics match the product | Two sessions created by the tester, labeled separately |
+| Sibling apps/subdomains | Whether cookie scope shares authority more broadly than intended | Record domain/path and actual browser cookie send behavior |
+| Long-lived socket/API token | Whether authorization is rechecked after session revocation | Harmless test message/action with synthetic data |
+
+### Secret-safe metadata collection
+
+Record cookie names, attributes, expiry, issuer/audience, token type, and a local redacted fingerprint. Never store the raw cookie or bearer token. If an exact token is needed to reproduce a controlled test, keep it only in the local secret mechanism and remove it after the test.
+
+### Chain decision table
+
+- Session remains valid after logout contrary to policy → session revocation issue; verify a protected server action, not cached content.
+- Old session retains a privilege after a role/assurance change → authorization-state invalidation issue; confirm the effective permission.
+- Cookie is sent cross-site and a protected mutation succeeds → CSRF review; keep the read and write properties distinct.
+- Token audience/issuer validation is incorrect → JWT/OAuth review only when a wrong test principal or relying-party boundary is accepted.
+- Token remains in browser storage but is rejected server-side → not session takeover; document storage exposure separately only if an actual access path exists.
+
+Add transition_event, session_fingerprint, issued_at, expires_at, principal_before_after, permission_before_after, revocation_expected, old_session_request_result, fresh_session_control, and cleanup_verified to the private evidence record.
