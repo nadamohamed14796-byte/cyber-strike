@@ -135,7 +135,7 @@ For each phase:
 - Save raw evidence and normalized artifacts to the canonical workspace and verify their exact paths and counts.
 - Call `recon_checkpoint(action="complete", target_url="<root target>", phase="<phase>", summary="<evidence-based summary>", counts={...}, artifacts=["<exact canonical artifact path>", ...])` only after required artifacts are verified.
 - Use `block`, `fail`, or `unavailable` only according to the tool's actual schema and semantics, with a concrete reason. Do not use `unavailable` to bypass mandatory scope validation, workspace setup, or endpoint inventory.
-- If a phase is already complete, do not rerun it unless new evidence or a documented invalidation justifies it. If upstream evidence changes, explicitly identify which downstream phases need re-evaluation.
+- If a phase is already complete, do not rerun it unless new evidence or a documented invalidation justifies it. If the first unresolved phase is already `running`, do not call `begin` again or repeat its completed sources; reconcile existing artifacts and resume only unfinished items. If upstream evidence changes, explicitly identify which downstream phases need re-evaluation.
 - If a previous phase is blocked or failed, resolve or resume it before starting a later phase. Independent passive work may continue only if it does not violate the gate's ordering or scope constraints.
 
 The tool schema defines the exact accepted actions, phase names, count fields, and artifact fields. Inspect its registered schema if uncertain; never guess unsupported fields. The phase gate is separate from the scope checker: a phase being open does not authorize network requests, and scope approval does not permit skipping phases.
