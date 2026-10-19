@@ -121,3 +121,26 @@ Run triage-validation and evidence-hygiene first. Verify exact VRT, clean title,
 
 ### Submission decision record
 Before selecting a VRT node, record the program rule, exact reproduced behavior, actor prerequisites, evidence links, severity criteria, and why nearby VRT categories do not fit. Treat out-of-scope, duplicate, N/A, and severity override states as separate decisions, not reasons to remove relevant evidence. When the finding depends on a chain, explain each independently verified link and label untested links as hypotheses. Validate attachment redaction and the exact submission fields; do not include unredacted HARs, cookies, customer data, or speculative reach estimates. Keep a copy of the submitted evidence set so later triage can reproduce the same request and expected/observed contrast.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use the Bugcrowd report form, a Markdown editor for drafting, sanitized Burp artifacts, and the official FIRST CVSS calculator where appropriate. The final submission should be manually reviewed for accuracy and disclosure policy.
+
+### Installation and setup
+- No local app is required for the submission form; follow the target program's platform workflow.
+- [FIRST CVSS v4.0 calculator](https://www.first.org/cvss/calculator/4.0) — browser-based scoring, no installation required.
+- jq on Kali/Debian: sudo apt update && sudo apt install jq if local JSON evidence metadata must be inspected.
+Do not upload secrets, unrelated user data, or private program information to third-party tools. Check each program's disclosure policy before sharing a report publicly.
+
+### Primary resources
+- [Bugcrowd: Reporting a Bug](https://docs.bugcrowd.com/researchers/reporting-managing-submissions/reporting-a-bug/) — submission fields and evidence expectations.
+- [Bugcrowd Disclosure Policy](https://docs.bugcrowd.com/researchers/disclosure/disclosure/) — non-disclosure/coordinated disclosure boundaries.
+- [FIRST CVSS resources](https://www.first.org/cvss/) — severity scoring and vector transparency.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to confirm evidence metadata is complete before composing the report.
+
+### Result handling
+Write the steps in the exact order needed to reproduce, state prerequisites and expected/actual behavior, provide only safe proof, and keep speculative impact separate from observed impact.
