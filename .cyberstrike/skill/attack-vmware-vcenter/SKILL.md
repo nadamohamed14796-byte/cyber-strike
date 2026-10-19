@@ -93,11 +93,13 @@ State exposed service, verified build confidence, advisory, preconditions, and w
 
 ## Tools
 
-- **curl / OpenSSL s_client:** low-rate endpoint and TLS metadata checks.
-- **Broadcom/VMware security advisories:** authoritative fixed-build and prerequisite guidance.
-- **CISA KEV:** verify whether a CVE is known exploited, not whether this asset is vulnerable.
-- **Version/build comparison:** match exact branch/build using vendor documentation rather than guessed numeric ordering.
-- **Isolated vendor lab:** reproduce only where active validation is separately approved.
+- `curl` / `openssl s_client`: low-rate endpoint and TLS metadata checks.
+- Broadcom/VMware security advisories: authoritative fixed-build and prerequisite guidance.
+- CISA KEV: determine whether a CVE is known exploited, not whether this asset is vulnerable.
+- Version/build comparison: match exact branch/build using vendor documentation rather than guessed numeric ordering.
+- Isolated vendor lab: reproduce only where active testing is necessary and permitted.
+
+Verify `curl --version` and `openssl version`. Official docs: https://curl.se/docs/, https://www.openssl.org/docs/, https://support.broadcom.com/.
 
 ## VMware Product and Exposure Matrix
 
@@ -189,26 +191,3 @@ grep -iE '^(HTTP/|content-type:|location:|server:|www-authenticate:|strict-trans
 Do not infer a build from a generic login page. Avoid endpoints that return configuration, inventory, VM listings, or secrets. If the exact build cannot be verified without privileged access, mark it unknown and ask the asset owner for confirmation rather than escalating access.
 
 Record product_family, hostname_scope_ref, build_signal_sources, advisory_id, affected_range, fixed_build, prerequisites_confirmed, public_reachability, validation_level, and unknowns. Do not chain to RCE solely from a version match.
-
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-For in-scope vCenter web interfaces, use browser DevTools/Burp first. In an explicitly authorized lab or managed assessment, govc or VMware PowerCLI may help inspect known configuration and object permissions; they are not required for a black-box web finding.
-
-### Installation and setup
-- [govmomi/govc official project](https://github.com/vmware/govmomi) — installation and client documentation; Go may be installed from https://go.dev/dl/ .
-- [VMware PowerCLI](https://developer.broadcom.com/powercli) — official docs and supported setup.
-- [Burp Suite](https://portswigger.net/burp) — web request inspection.
-Verify the destination vCenter, organization authorization, and read-only context before connecting. Do not run internal infrastructure tools against a public bounty target unless the program explicitly scopes that interface and testing method.
-
-### Primary resources
-- [Broadcom VMware security advisories](https://support.broadcom.com/) — product version and advisory checks.
-- [govmomi documentation](https://github.com/vmware/govmomi) — API/CLI behavior.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — web verification and evidence.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` checks the local evidence metadata without connecting to vCenter.
-
-### Result handling
-Record exact product/build, exposed route/permission, actor context, and reproducible effect. Do not include credentials, configuration secrets, VM data, or private network details in shared reports.
