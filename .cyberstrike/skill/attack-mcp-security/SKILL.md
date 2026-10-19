@@ -114,3 +114,29 @@ Use the official Inspector project at https://github.com/modelcontextprotocol/in
 
 ### Result handling
 Use a baseline and control, record exact claims and gaps, and keep credentials out of logs, notes, and Git.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local test harnesses; browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Verify official installation docs, tool version, license, dependency provenance, and target impact before use.
+
+### Recommended tools
+- Semgrep — scan local MCP server/client integrations
+- Python test harness — deterministic tool argument and authorization tests
+- jq — inspect sanitized JSON-RPC traces
+- Dependency audit tools appropriate to the runtime lockfile
+
+### Resources
+- https://modelcontextprotocol.io/specification
+- https://owasp.org/www-project-top-10-for-large-language-model-applications/
+- https://semgrep.dev/docs/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids; official docs and advisories are the source of truth for tool behavior and affected versions.
+
+### Helper-script contract
+Use local fixtures to test tool authorization, argument validation, untrusted content boundaries, and tenant/data isolation. Store sanitized request/response, expected/actual result, test ID, and regression outcome; never expose secrets in traces.
+
+Preserve native evidence and write normalized results separately. Retain tool/version, timestamps, source, rule/advisory IDs, error state, confidence, and redaction. Use deterministic fixtures and structured output.
+
+### Handoff
+Return actual commands, versions, inputs/outputs, checks passed/failed, limitations, and next skill. Static or version-based signals are not confirmed vulnerabilities without evidence of an affected path.
