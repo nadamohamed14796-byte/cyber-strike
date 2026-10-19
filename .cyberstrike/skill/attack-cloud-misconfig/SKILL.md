@@ -191,3 +191,28 @@ Checks metadata only; manually inspect the artifact and redaction.
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use the provider's read-only CLI/console for the specific cloud resource; Prowler or ScoutSuite can add posture coverage; Checkov is appropriate when IaC is available. Do not install all scanners if one direct policy query will answer the question.
+
+### Installation and setup
+- [Prowler](https://docs.prowler.com/) — official installation and cloud support matrix.
+- [ScoutSuite](https://github.com/nccgroup/ScoutSuite) — source and setup.
+- [Checkov](https://www.checkov.io/2.Basics/Installing%20Checkov.html) — IaC scanning.
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli), or [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) depending on the provider.
+Verify account/project/tenant and use read-only credentials. No tool install or cloud access authorizes modification/remediation.
+
+### Primary resources
+- [AWS Security](https://docs.aws.amazon.com/security/) — AWS.
+- [Azure security](https://learn.microsoft.com/en-us/azure/security/) — Azure.
+- [Google Cloud security](https://cloud.google.com/security) — GCP.
+- [CIS Benchmarks](https://www.cisecurity.org/cis-benchmarks) — baseline controls.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to track sanitized cloud evidence metadata.
+
+### Result handling
+Record provider/account context, resource/control, effective permission, observed exposure, and remediation state. Never put credentials or unrelated cloud inventory in shared notes.
