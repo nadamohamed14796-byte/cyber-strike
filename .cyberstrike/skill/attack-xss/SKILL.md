@@ -193,3 +193,30 @@ Run python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript to 
 
 ### Result handling
 Record the controllable input, encoding/context, execution sink, affected origin/user context, and non-destructive proof. Keep payloads/screenshots free of session tokens and real user data.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Agent-executable CLI and local libraries only; browser UI, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check installation, version, license, platform support, and official documentation before use. Never claim execution unless output was actually inspected.
+
+### Recommended tools
+- dalfox — focused XSS candidate analysis
+- XSStrike — context-aware XSS testing as a corroborator
+- Semgrep/rg — local source and sink review where source is available
+- Python requests/httpx — controlled baseline and payload response comparison
+
+### Resources
+- https://github.com/hahwul/dalfox
+- https://github.com/s0md3v/XSStrike
+- https://portswigger.net/web-security/cross-site-scripting
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids. Use official documentation for current flags, supported versions, output formats, and limitations.
+
+### Helper script contract
+Create a local payload/result parser that records context, encoding, reflection location, execution evidence if safely observable, control response, and false-positive reason. Do not label reflection alone as exploitable XSS.
+
+Preserve native evidence and normalize a separate copy. Keep source, timestamp, tool/version, errors, confidence, redaction state, and artifact references. Helpers should accept explicit paths, emit JSON/JSONL where practical, handle malformed input, and include local fixtures.
+
+### Handoff
+Return tool/version, command invoked, input/output artifact references, test/control counts, failures, confidence, limitations, and next skill. A missing tool or blocked source must not be reported as a successful empty result.
