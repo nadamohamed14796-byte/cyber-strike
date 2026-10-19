@@ -96,3 +96,26 @@ Prefer APIs that operate relative to a trusted directory handle where supported,
 
 ### Regression checks for agent workspace writes
 For every write/copy/delete path, distinguish the trusted workspace root from user-controlled relative paths, symlinks, archive members, and tool-provided filenames. Test traversal, absolute paths, symlink swaps, overwrite collisions, interrupted writes, and read/write errors in a disposable fixture. Prefer atomic creation or temp-file-plus-rename where supported; validate the resolved destination remains under the intended root immediately before mutation. Ensure failure results are not reported as persisted artifacts, and test binary/large files without loading them into model context. Add a regression test for each discovered boundary bug and keep destructive operations opt-in or constrained to disposable fixtures.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Bun's native file APIs for straightforward reads/writes, node:fs for directory and compatibility operations, and the repository's tests/typecheck to validate behavior. Add a temporary directory/fixture to tests where writes or deletion are involved.
+
+### Installation and setup
+- [Official Bun installation](https://bun.sh/docs/installation) — choose the supported install method for the operating system; verify with bun --version.
+- [Bun file I/O docs](https://bun.sh/docs/runtime/file-io) — Bun.file/Bun.write and node:fs usage.
+- Use the repository's pinned packageManager/lockfile instead of globally upgrading dependencies as part of a small skill task.
+Do not run scripts that delete or overwrite user data outside the temporary fixture. Verify path resolution, errors, encoding, and behavior for existing files.
+
+### Primary resources
+- [Bun File I/O](https://bun.sh/docs/runtime/file-io) — recommended APIs.
+- [Bun API reference](https://bun.com/docs/runtime/bun-apis) — native runtime features.
+- [Node.js fs API](https://nodejs.org/api/fs.html) — compatibility semantics.
+
+### Reusable helper
+The skill-catalog audit is a repository-level check rather than an application file I/O test: run python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py after skill changes. For this skill itself, add Bun tests for the path/error cases described above.
+
+### Result handling
+Document whether an API call reads lazily, overwrites existing data, creates parent directories, and propagates permission/encoding errors. Never claim an API works because a sample compiled; exercise the real path against a temporary fixture.
