@@ -122,28 +122,23 @@ Persist rejected candidates with root-cause fingerprint, tested property, releva
 
 ## Tool installation and optional tooling (2026-10-19)
 
-### Recommended tools and purpose
-Use Burp Repeater/Comparer and browser DevTools for the minimal reproduction; use the evidence manifest, offline response diff, and local false-positive history to prevent repeat reports. CVSS should be applied only after impact is established.
+### Agent-usable tools and purpose
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py --help` — inspect supported options before comparing saved baseline/control responses.
+- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py --help` — inspect supported evidence validation options.
+- `jq` — compare structured observations after redaction.
+- `rg` — search notes/artifacts for evidence references and likely accidental secrets; review matches in context.
+- `pytest` — run local regression tests when the repository provides a test suite.
 
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official install.
-- [FIRST CVSS v4.0 calculator](https://www.first.org/cvss/calculator/4.0) — web-based, no local installation.
-- jq on Kali/Debian: sudo apt update && sudo apt install jq.
-No tool should automatically convert a scanner error, missing dependency, or untested hypothesis into a false-positive record. Use a test account and control case where possible.
+### Installation and verification
+Use Python standard-library helpers first; verify optional utilities with `jq --version` and `pytest --version`. Follow official project docs and inspect `--help` before assuming flags. A helper result is not proof of vulnerability or complete sanitization. If validation cannot run, record the blocker explicitly.
 
 ### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — repeatability and verification.
-- [HackerOne reporting guidance](https://docs.hackerone.com/en/articles/8475116-best-practices-for-submitting-reports) — evidence expectations.
-- [FIRST CVSS](https://www.first.org/cvss/) — scoring method.
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://owasp.org/www-project-top-ten/
+- https://docs.pytest.org/en/stable/
 
-### Reusable helpers
-- Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to verify evidence metadata.
-- Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare local responses offline.
-Both need manual interpretation and do not prove a vulnerability by themselves.
-
-### Result handling
-Report each check as passed, failed, blocked, or not run, with reason and evidence reference. Use confirmed, disproven/false positive, and unresolved states distinctly; explain the disconfirming evidence before saving a false-positive pattern.
-
+### Decision evidence
+For each hypothesis, record the expected behavior, negative control, observed result, alternative explanations, artifact references, confidence, and disposition. Distinguish confirmed, disproven, and unresolved. Do not turn a missing response, scanner alert, or absent dependency into a pass/fail verdict without supporting evidence.
 ## Agent-executable CLI tooling, resources, and helper scripts
 
 Use CLI tools and local scripts the agent can invoke directly. Browser UI, browser extensions, and interactive intercepting proxies are not required dependencies. Check availability/version with tool_preflight.py before depending on an executable; do not install automatically.
