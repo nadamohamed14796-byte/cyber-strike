@@ -237,7 +237,7 @@ The canonical root workspace is a durable container for one program's policy, as
 
 - Configure the reviewed official scope on the canonical program root.
 - Do not reject a valid manifest merely because `scope_check(target="<root hostname>", target_url="<root URL>")` says the root hostname is out of scope.
-- Before any active request, check the exact concrete asset/URL being requested against the root's persisted manifest, including exclusions, protocol, port, and path restrictions.
+- Before an active request, rely on the registered active-request tool's enforcement of the root's persisted manifest for the exact URL, including exclusions, protocol, port, and path restrictions. Do not call `scope_check` again for each URL.
 - Attach an unrelated host only when its exact origin is explicitly authorized by the saved scope. A configured manifest is not blanket permission for every host.
 - If an attach or scope decision fails, inspect the returned reason and relevant matching code once. Do not keep changing URL formatting or retrying the same unchanged policy error. Record the blocker and continue only with independent, permitted work.
 - Use an actual stable program/root URL as the workspace identity where possible; never silently substitute the root URL for the concrete asset under test.
