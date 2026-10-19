@@ -113,7 +113,7 @@ Capture only the response headers, error code, and a short sanitized non-sensiti
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the candidate remains plausible, follow the next signal-led branch up to 20 distinct hypotheses; stop sooner when impact is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic encodings of the same request do not count as separate attempts.
+Do not impose an arbitrary fixed ceiling on meaningful, authorized read-only hypotheses. Continue while a distinct check can change the conclusion; deduplicate equivalent metadata checks and stop when evidence resolves the question, relevant branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. Never access live media or operate physical/OT functions as proof.
 
 Maintain an attempt ledger: hypothesis, single changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer controlled identities, synthetic resources and paired requests. Preserve sanitized evidence and minimize data collected.
 
@@ -151,3 +151,18 @@ Stop on scope ambiguity, unexpected real-user data, unexpected production state 
 
 ### Device-management safety and evidence
 Treat camera/control endpoints as operational technology: verify ownership and written permission first, prefer passive firmware/banner evidence and read-only metadata, and avoid PTZ movement, reboot, account changes, recording deletion, or firmware mutation. Distinguish vendor/version identification from a reachable sensitive action, and redact device identifiers, credentials, image/video content, and network details not needed for reproduction. Confirm whether the path is an intended public live view or an administrative control plane. Only chain an authentication defect to information exposure when controlled evidence demonstrates protected device data; do not collect feeds or access other users' cameras.
+
+
+## Offline route inventory from first-party assets
+
+If the in-scope web UI serves JavaScript, inspect downloaded assets locally to identify route strings without probing each path. Keep the asset source and timestamp with the result.
+
+```bash
+rg -o --no-filename '/ISAPI/[A-Za-z0-9_./{}?-]+' ./authorized-assets/ | sort -u
+```
+
+Treat extracted routes as documentation leads only. Do not automatically request each route or fetch snapshots, video, recordings, user lists, or configuration. Select a documented non-sensitive status route only when the engagement explicitly permits it.
+
+### Evidence fields
+
+Record device_family, model_signal, firmware_signal_source, vendor_advisory, route_source_asset, route_name_only, auth_policy_expected, read_only_response_ref, sensitive_data_excluded, test_environment, and cleanup_status. Keep physical/operational impact separate from web access-control impact.
