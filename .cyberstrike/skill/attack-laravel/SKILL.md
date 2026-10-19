@@ -115,7 +115,7 @@ Compare role/tenant behavior with test accounts, validate authoritative state an
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for independent, evidence-producing hypotheses, not a payload quota. If the signal remains plausible, follow the next relevant branch up to 20 distinct hypotheses; stop earlier when impact is decisive, the branch is irrelevant, or scope/safety limits apply. Cosmetic variations of one request are not independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and equivalent requests. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Never retrieve environment secrets or run destructive production commands.
 
 Track each attempt as: hypothesis, one changed variable, baseline/control, observed signal, interpretation, confidence, and next branch. Use controlled identities or synthetic resources, preserve only minimal evidence, and redact secrets.
 
@@ -152,3 +152,29 @@ Stop at scope uncertainty, unrelated sensitive data, unexpected production chang
 
 ### Route/middleware/model correlation
 Correlate each sensitive named route with its HTTP verbs, middleware stack, controller/policy, FormRequest validation, Eloquent fillable/guarded fields, and final persisted record. Compare a normal update on a disposable object against one added protected property at a time and verify the database-backed state instead of trusting the echoed JSON. Check nested relations, bulk endpoints, signed URLs, queues, and alternate API versions only if present. Route unauthorized records to IDOR, writable protected fields to mass assignment, and unsafe file/URL processing to the relevant specialist; name an exploit chain only when each link is independently observed.
+
+
+## Route-to-policy source tracing
+
+Use owner-provided source or a local authorized checkout. Do not invoke Artisan against a production service merely to enumerate routes.
+
+```bash
+rg -n --glob '*.php' \
+  'Route::|middleware\(|authorize\(|Gate::|Policy|FormRequest|validated\(|request\(\)->all\(|\$fillable|\$guarded|Storage::|temporaryUrl\(' routes app
+```
+
+For each candidate, trace route → middleware → controller/action → FormRequest/validator → policy/gate → model binding → service/job → persisted state. A request()->all() match is a candidate until a protected field reaches a persisted model and violates policy.
+
+### Laravel-specific decision matrix
+
+| Surface | Check | Required evidence |
+|---|---|---|
+| Route group/middleware | Inherited middleware and route-specific overrides | Runtime policy failure on controlled route |
+| Implicit model binding | Binding scope and policy check | Non-owner test identity accesses a synthetic object |
+| FormRequest/DTO | Validation and allowed fields | Protected field persists despite policy |
+| Signed URL | Signature, expiry, resource and tenant binding | Controlled altered/expired URL accesses private fixture |
+| Queue/export | Job owner/tenant and result download authorization | Second test identity accesses only synthetic output |
+| Storage link | Public/private disk and serving origin | Non-public test object is exposed contrary to policy |
+| Debug errors | Active runtime configuration and response | Minimal non-public sensitive detail is actually returned |
+
+Record route_name, method, middleware_chain, policy_or_gate, validation_class, model_fields, job_or_storage_path, test_principal, fixture_state_before_after, negative_control, and cleanup_status. Do not include .env, APP_KEY, raw signed URLs, tokens, or customer records.
