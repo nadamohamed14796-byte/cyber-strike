@@ -84,3 +84,16 @@ sha256sum clean-1.body marker.body clean-2.body
 ```
 
 Record Age, Vary, cache status, response hash and the clean follow-up. A difference without a confirmed shared-cache hit is not cache poisoning. Route host-derived behavior to attack-host-header, personalized-content under static-looking paths to attack-cache-deception, and any final claim to attack-triage-validation.
+
+
+## Enrichment: safe cache differential
+Use a harmless marker on a permitted low-impact endpoint and compare a clean request before and after; never place active script or credential-bearing content into a shared cache.
+
+```bash
+curl -sS -D clean.headers -o clean.body "$TARGET_URL"
+curl -sS -D marker.headers -o marker.body -H 'X-Forwarded-Host: cs-marker.invalid' "$TARGET_URL"
+curl -sS -D follow-up.headers -o follow-up.body "$TARGET_URL"
+sha256sum clean.body marker.body follow-up.body
+```
+
+Inspect cache status, Age/Vary, the clean follow-up, and whether the altered response was truly served from a shared cache. Reflection alone is not cache poisoning. Correlate with host-header and cache-deception testing only when the relevant behavior is independently observed.
