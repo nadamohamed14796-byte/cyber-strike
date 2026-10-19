@@ -185,3 +185,30 @@ Automated SQL injection checks can create load and sometimes alter/delete data. 
 
 ### Result handling
 Require a reproducible query-dependent difference or a safe marker in a controlled environment. Error text and scanner alerts alone are insufficient; never collect unrelated rows or sensitive fields.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+
+### Recommended tools
+- sqlmap — only with explicit authorization and conservative, non-destructive settings
+- ghauri — alternative SQLi detection for controlled tests
+- curl — baseline response capture
+- Python requests/httpx and jq — one-variable comparisons and structured result parsing
+
+### Official resources
+- https://sqlmap.org/
+- https://github.com/r0oth3x49/ghauri
+- https://portswigger.net/web-security/sql-injection
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
+
+### Helper script and output contract
+Use a local request fixture and response-diff helper to retain baseline/control, parameter and context, DB error/timing signal, repeatability, and evidence pointer. Avoid data extraction or destructive statements; scanner output alone is not confirmation.
+
+Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
+
+### Handoff
+Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
