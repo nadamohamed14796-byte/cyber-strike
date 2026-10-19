@@ -267,11 +267,11 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   if (!path.isAbsolute(outputArg)) {
     return "Katana output path must be absolute and remain inside this target workspace's urls/ directory."
   }
-  const scansRoot = path.resolve(workspacePath, "scans")
+  const urlsRoot = path.resolve(workspacePath, "scans")
   const outputPath = path.resolve(outputArg)
-  const relativeOutput = path.relative(scansRoot, outputPath)
+  const relativeOutput = path.relative(urlsRoot, outputPath)
   if (!relativeOutput || relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) {
-    return "Katana output path must name a file inside " + scansRoot + "; do not write outside the target workspace."
+    return "Katana output path must name a file inside " + urlsRoot + "; do not write outside the target workspace."
   }
 
   return undefined
