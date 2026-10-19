@@ -234,7 +234,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         if (!existingScope || existingScope.status !== "configured" || !existingScope.scopeItems.length || !existingScope.authorizationSource || (!existingScope.authorizationReference && !existingScope.authorizationSource.startsWith(USER_CONFIRMED_SCOPE_PREFIX))) {
           return {
             title: "Scope update stopped: no configured scope to extend",
-            output: "The existing scope is missing or unconfigured. Configure the initial official policy scope first; no scope was changed.",
+            output: "No scope was changed because there is no configured manifest to extend. If the operator explicitly confirmed one exact asset, configure that single entry with user_confirmed_scope=true and omit merge_existing; no external policy URL is required. Otherwise, import the official program policy. Do not restart discovery or ask for the same confirmation again.",
             metadata: { saved: false, reason: "scope_not_configured", target_url: existingWorkspace.targetURL } as TargetWorkspaceMetadata,
           }
         }
