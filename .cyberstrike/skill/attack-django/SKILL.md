@@ -196,3 +196,30 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record Django/Python version, relevant middleware/settings, reachable behavior, and a regression test. A source/config suspicion needs a demonstrated effect or must remain an unconfirmed lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Prefer CLI tools, local static analysis, and repeatable test harnesses. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify versions, official installation guidance, license, and dependency provenance before running tools.
+
+### Recommended tools
+- Semgrep — Django-specific source/configuration patterns
+- pip-audit — Python dependency advisory checks
+- Bandit — Python static security checks
+- curl/Python requests — low-impact behavior tests
+
+### Resources
+- https://semgrep.dev/docs/
+- https://github.com/pypa/pip-audit
+- https://bandit.readthedocs.io/
+- https://docs.djangoproject.com/en/stable/topics/security/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are for discovery only; use official framework and tool docs for current behavior.
+
+### Helper-script contract
+If source or dependency files are available, record package versions and advisory IDs. Pair static findings with a minimal safe runtime check; do not infer exposure from framework version alone.
+
+Keep raw evidence separate from normalized output. Preserve package/version, rule/advisory ID, source path, tool/version, timestamps, error state, confidence, and redaction. Use deterministic local fixtures and JSON/JSONL output where useful.
+
+### Handoff
+Return commands actually executed, tool versions, input/output artifacts, checks passed/failed, limitations, and next skill. Do not present a static-analysis warning as a confirmed runtime vulnerability.
