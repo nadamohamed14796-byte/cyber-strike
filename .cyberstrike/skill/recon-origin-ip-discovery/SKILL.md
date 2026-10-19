@@ -57,10 +57,13 @@ A reportable issue requires a control that can be bypassed or an unintended serv
 
 ## Tools
 
-- dig, passive DNS, certificate-transparency search, RDAP/ASN tools.
-- curl with explicit resolve/SNI behavior, openssl s_client, and Burp Repeater.
-- httpx for low-volume fingerprint comparison.
-- CDN/provider documentation to understand intended origin protections.
+- `dig` and `dnsx`: compare current DNS answers and preserve record/source metadata.
+- `httpx`: collect low-volume HTTP metadata for known in-scope hosts.
+- `openssl s_client`: inspect certificate/SNI behavior for an explicitly authorized host.
+- RDAP/ASN CLI/API and approved passive DNS sources: corroborate attribution without probing candidate origin addresses.
+- `python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt`: normalize collected URL observations locally.
+
+Verify `dig -v`, `dnsx -version`, `httpx -version`, and `openssl version` as appropriate. Official docs: https://docs.projectdiscovery.io/, https://www.openssl.org/docs/, https://docs.securitytrails.com/, https://docs.censys.com/.
 
 ## Origin Attribution Matrix
 
@@ -122,24 +125,15 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 Build candidate origins from historical DNS, certificate/deployment metadata, first-party configuration, and observed redirects, but score each by freshness and organization attribution. A CDN/origin relationship does not automatically permit direct-origin requests; verify the candidate is in program scope and that testing the origin is allowed. If permitted, compare one harmless public path through the normal edge and candidate origin, recording TLS, Host/routing, authentication, and applicable controls. Do not bypass a WAF to access protected content or treat an origin IP as a security bug by itself. Confirm a meaningful difference before chaining to host-header, cache, or access-control review.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Prefer passive DNS/certificate history and provider attribution. ProjectDiscovery dnsx and cdncheck can help inspect DNS/CDN signals; public services such as SecurityTrails or Censys may corroborate historical records, subject to their data and disclosure policies.
+Prefer passive DNS/certificate history and provider attribution. `dnsx`, `httpx`, and `openssl s_client` help compare records and certificate/SNI behavior for known, explicitly authorized hosts. Optional passive sources include SecurityTrails and Censys APIs where available.
 
-### Installation and setup
-- [ProjectDiscovery documentation](https://docs.projectdiscovery.io/) — official tool installation and options.
-- [SecurityTrails API docs](https://docs.securitytrails.com/) — optional passive DNS source.
-- [Censys docs](https://docs.censys.com/) — optional public Internet asset data.
-Treat a guessed origin IP as an attribution hypothesis, not authorization to access it. Do not bypass a CDN/WAF to reach an origin or scan the IP unless the program expressly includes that infrastructure and testing method.
+### Resources
+- https://docs.projectdiscovery.io/
+- https://docs.securitytrails.com/
+- https://docs.censys.com/
+- https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/
+- https://owasp.org/www-project-web-security-testing-guide/
 
-### Primary resources
-- [ProjectDiscovery docs](https://docs.projectdiscovery.io/) — DNS/CDN tool behavior.
-- [Cloudflare origin protection](https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/) — example CDN/origin relationship.
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — recon context.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate collected host/URL observations where a URL form is available; it does not resolve names or contact the origin.
-
-### Result handling
-Record DNS source, timestamp, CDN/provider evidence, independent corroboration, and confidence. Keep original target host distinct from any inferred backend address.
+Treat an inferred origin IP as an attribution hypothesis, not authorization to access it. Do not bypass a CDN/WAF or scan a candidate IP unless the program explicitly includes that infrastructure and method. Record source, timestamp, corroboration, and confidence.
