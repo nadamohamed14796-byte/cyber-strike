@@ -80,3 +80,26 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp Repeater/Comparer to examine documented boundary/error conditions, plus application logs when authorized. For owned APIs, Schemathesis or the project's existing property-based test framework can explore contract edge cases; use only a safe staging fixture.
+
+### Installation and setup
+- [Schemathesis installation](https://schemathesis.readthedocs.io/en/stable/guides/installation/) — contract-driven API testing.
+- [Burp Suite](https://portswigger.net/burp) — manual controlled requests.
+- [pytest](https://docs.pytest.org/en/stable/getting-started.html) — regression checks in a test repository.
+Avoid high-volume fuzzing or state-changing payloads on a live program unless explicitly approved. Prefer schema-driven, bounded cases in a local/staging environment and preserve input seeds for reproduction.
+
+### Primary resources
+- [Schemathesis docs](https://schemathesis.readthedocs.io/en/stable/) — supported testing model.
+- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — error conditions and boundary verification.
+- [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html) — expected parsing behavior.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses after redaction.
+
+### Result handling
+Record baseline, one changed boundary condition, expected vs actual, error classification, and cleanup. A 500 response, timeout, or stack trace is a signal, not proof of exploitable impact.
