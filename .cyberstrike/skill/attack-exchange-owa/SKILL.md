@@ -107,7 +107,7 @@ Confirm whether metadata is genuinely non-public and security-relevant. Stop at 
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Treat the attempt budget as a ceiling for evidence-producing hypotheses, not a quota for payload variants. When a candidate remains plausible, branch to the next independent hypothesis up to a maximum of 20; stop earlier when evidence is decisive, the remaining hypotheses are not relevant, or safety/scope limits apply. Cosmetic variants of the same request do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue materially distinct, authorized checks while evidence can change the conclusion; deduplicate cosmetic variants and exact retries. Stop when direct evidence resolves the hypothesis, meaningful branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. Never override program rules or production-safety constraints.
 
 Keep a ledger per attempt: hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired comparisons and controlled test identities. Preserve evidence, redact secrets, and avoid unrelated data.
 
