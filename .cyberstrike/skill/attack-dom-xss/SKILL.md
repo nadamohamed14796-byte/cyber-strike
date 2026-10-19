@@ -157,3 +157,26 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Browser DevTools to trace sources/sinks and Burp DOM Invader to identify client-side flows. Semgrep is an optional source-code cross-check; it cannot prove a sink is attacker-reachable by itself.
+
+### Installation and setup
+- [DOM Invader docs](https://portswigger.net/burp/documentation/desktop/tools/dom-invader) — supported Burp browser workflow.
+- [Burp Suite](https://portswigger.net/burp) — official installation.
+- [Semgrep](https://semgrep.dev/docs/getting-started/) — static analysis on an authorized source checkout.
+Use a test account and harmless marker. Don't capture real user content or send private scripts to online analysis services.
+
+### Primary resources
+- [PortSwigger DOM-based XSS](https://portswigger.net/web-security/cross-site-scripting/dom-based) — source/sink reasoning.
+- [OWASP DOM-based XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html) — defenses.
+- [MDN DOM API](https://developer.mozilla.org/en-US/docs/Web/API/Document_Object_Model) — runtime semantics.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript to extract route candidates from locally collected assets; it does not execute scripts or confirm data flow.
+
+### Result handling
+Record attacker-controllable source, path to sink, required user/browser context, actual execution evidence, and mitigation. A dangerous API call without a reachable input remains a lead.
