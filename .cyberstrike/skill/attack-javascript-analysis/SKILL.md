@@ -72,15 +72,16 @@ PATH_RE = re.compile(r"""(?<![A-Za-z0-9])/(?:api|graphql|rest|v[0-9]+|oauth|auth
 SECRET_RE = re.compile(r"(token|secret|password|api[_-]?key|authorization|cookie)", re.I)
 
 def safe_candidate(value):
-    value = value.strip().strip("\"' ),;")
-    if SECRET_RE.search(value):
-        return None
+    value = value.strip().strip("\\"' ),;")
     if value.startswith("/"):
-        return value.split("?", 1)[0]
+        route = value.split("?", 1)[0]
+        return None if SECRET_RE.search(route) else route
     parts = urlsplit(value)
     if not parts.scheme or not parts.hostname:
         return None
-    return f"{parts.scheme}://{parts.hostname}{parts.path}".rstrip("/")
+    # Drop userinfo, query, and fragment before evaluating or printing the candidate.
+    route = f"{parts.scheme}://{parts.hostname}{parts.path}".rstrip("/")
+    return None if SECRET_RE.search(parts.hostname + parts.path) else route
 
 if not ROOT.exists():
     raise SystemExit(f"Asset directory not found: {ROOT}")
