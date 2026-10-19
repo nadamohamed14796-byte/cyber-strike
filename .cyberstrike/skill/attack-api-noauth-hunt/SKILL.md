@@ -153,3 +153,38 @@ A body-hash difference is only a triage signal; inspect redacted schemas and pro
 
 ### Anonymous-to-authenticated differential
 For every candidate API route, compare the same method, content type, object fixture, and request body as anonymous, invalid/expired, low-privilege, and authorized test identities. First classify whether the operation is intended to be public; OpenAPI documentation, a 200 status, OPTIONS, schema visibility, and a login-free health response are not proof of sensitive exposure. For JSON, compare field-level data and object ownership rather than raw response length. For writes, use a disposable fixture and verify server-side state; do not test irreversible actions. Route object-boundary failures to IDOR/BOLA, role-operation failures to BFLA, property differences to API property authorization, and undocumented/version drift to shadow-API review.
+
+
+## Expanded auth-state matrix and cache controls
+
+Use the same captured read-only request for each identity state. Avoid using a guessed direct origin or changing several headers at once.
+
+```bash
+# All URLs and credentials must belong to an explicitly in-scope test.
+curl -sS -D anonymous.headers -o anonymous.json "$API_URL"
+curl -sS -D invalid.headers -o invalid.json -H 'Authorization: Bearer invalid-test-token' "$API_URL"
+curl -sS -D low.headers -o low.json -H "Authorization: Bearer $LOW_ROLE_TOKEN" "$API_URL"
+curl -sS -D authorized.headers -o authorized.json -H "Authorization: Bearer $AUTHORIZED_TEST_TOKEN" "$API_URL"
+```
+
+Do not compare response hashes alone. Compare field paths and the minimum synthetic marker, and confirm whether the endpoint is meant to be public. Use a test-owned object; never copy production customer responses into the workspace.
+
+```bash
+# Optional shape comparison for redacted/synthetic JSON responses.
+for f in anonymous.json invalid.json low.json authorized.json; do
+  printf '\n### %s\n' "$f"
+  jq -r 'paths(scalars) | map(tostring) | join(".")' "$f" | sort -u
+done
+```
+
+### False-positive branches to rule out
+
+- Cache returns a previously authenticated response to an anonymous request: inspect cache status, Cache-Control, Vary, and repeat with a clean controlled session before assigning root cause.
+- API gateway requires a different observed credential mechanism (cookie, API key, mTLS, or signed request): inspect normal client traffic before concluding no auth.
+- A 200 response contains only public metadata, empty results, or a generic schema: not sensitive exposure.
+- A deprecated/versioned route differs: compare actual policy and output using the same controlled object; route to shadow-API review only when the security control differs.
+- An anonymous write returns success but no state change: not confirmed; do not repeat on non-disposable objects.
+
+### Structured evidence additions
+
+Record route_source, intended_visibility, auth_mode, anonymous_result, invalid_credential_result, low_role_result, authorized_control_result, protected_field_paths, synthetic_marker, cache_status, object_owner, state_changed, and cleanup_verified. Every chain to BOLA, BFLA, property authorization, or shadow API must cite the specific observed condition that triggered it.
