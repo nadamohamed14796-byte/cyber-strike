@@ -94,3 +94,23 @@ Record server_version, transport, auth_mechanism, caller_principal, granted_scop
 - Tool can access files beyond the intended workspace → filesystem/authorization issue; do not read real secrets to prove it.
 - Packaged server/update can run unreviewed code → supply-chain assessment with package provenance and permission evidence.
 - Tool output influences model behavior but no unauthorized action occurs → record a prompt-injection resilience observation, not a confirmed privilege escalation.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use MCP Inspector for interactive protocol inspection, an isolated test MCP server, and structured logs with secrets redacted. Use Semgrep for source review when authorized source is available.
+
+### Installation and setup
+Use the official Inspector project at https://github.com/modelcontextprotocol/inspector (Node.js/npm required); inspect its docs before running `npx @modelcontextprotocol/inspector`. Install Node.js only from https://nodejs.org/en/download/ . Run the inspector against a local or explicitly authorized server and do not forward production credentials. Tool installation does not authorize testing.
+
+### Primary resources
+- [MCP specification](https://modelcontextprotocol.io/specification) — protocol behavior and trust boundaries.
+- [MCP Inspector](https://github.com/modelcontextprotocol/inspector) — supported inspection workflow.
+- [OWASP GenAI Security Project](https://genai.owasp.org/) — agent/tool threat modeling.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares locally exported, sanitized HTTP artifacts offline.
+
+### Result handling
+Use a baseline and control, record exact claims and gaps, and keep credentials out of logs, notes, and Git.
