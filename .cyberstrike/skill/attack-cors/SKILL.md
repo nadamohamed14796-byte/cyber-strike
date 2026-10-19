@@ -185,24 +185,21 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
 
 
-## Tool installation and optional tooling (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Recommended tools and purpose
-Use Burp Repeater or curl to compare a normal response with an Origin header under controlled conditions; browser DevTools verifies whether the browser actually exposes the response to the calling origin.
-
-### Installation and setup
-Kali/Debian: sudo apt update && sudo apt install curl. [Burp Suite](https://portswigger.net/burp) is optional but useful for request comparison. Test only safe GETs first and use an origin you control; do not send credentials or personal data to a third-party origin.
-
-### Primary resources
-- [PortSwigger CORS](https://portswigger.net/web-security/cors) — test methodology.
-- [MDN CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS) — browser enforcement.
-- [OWASP CORS Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Origin_Resource_Sharing_Cheat_Sheet.html) — defensive rules.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare locally captured headers/body; it sends no requests.
-
-### Result handling
-Record Origin, Access-Control-Allow-* headers, credentials mode, browser result, and resource sensitivity. Reflected Origin alone is not enough to prove cross-origin data theft.
+### Agent-usable CLI tools
+- `curl`: compare the same observed endpoint with a controlled Origin value and preserve response headers.
+- Python `httpx`: repeat a small, authorized request matrix and serialize results for comparison.
+- `jq` and `rg`: parse saved JSON/header artifacts and search local source/configuration.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
+### Installation and verification
+Verify `curl --version`, `python3 -c "import httpx; print(httpx.__version__)"`, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/. If unavailable, use a local fixture or source/configuration review and report the gap.
+### Resources
+- https://portswigger.net/web-security/cors
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+- https://owasp.org/www-project-web-security-testing-guide/
+### Proof and limits
+Record the exact Origin, ACAO/ACAC headers, credential context, and whether a browser-enforced cross-origin read is actually possible. A wildcard or reflected Origin alone is not automatically exploitable.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
