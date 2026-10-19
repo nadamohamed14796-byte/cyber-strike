@@ -87,7 +87,7 @@ Reflection, an error, or a changed response is a lead, not proof of an exploitab
 
 Continue only when the evidence supports a concrete hypothesis and another safe, distinct test can discriminate between vulnerable and expected behavior. Change one relevant factor at a time, preserve the baseline, and use a negative control. Do not bypass filters merely to force a positive result, and do not run a fixed number of variations just to satisfy a quota.
 
-Stop when impact is reproduced, the observed behavior is explained by a benign control, the relevant sink is not reached, no meaningful safe test remains, or authorization/scope is unclear. Record the exact evidence and limitations. A false-positive/disproven verdict is governed by `validate_finding`: it requires 20 distinct valid evidence-backed attempts plus matching contradictory checks; invalid preconditions, duplicates, and unexecuted ideas do not count. If that bar cannot safely be met, keep the result inconclusive.
+Stop when impact is reproduced, the observed behavior is explained by a benign control, the relevant sink is not reached, no meaningful safe test remains, or authorization/scope is unclear. Record the exact evidence and limitations. A false-positive/disproven verdict is governed by `validate_finding`: it requires matching direct evidence and contradictory checks under valid preconditions; invalid preconditions, duplicates, and unexecuted ideas do not count. If that bar cannot safely be met, keep the result inconclusive.
 
 ## Your Mission
 Assess the specific injection hypothesis supported by the captured evidence. Select among SQL/NoSQL, XSS, SSTI, XXE, command, LDAP, or XPath only when the endpoint, parser, and sink evidence make that class relevant. Never treat this list as a requirement to test every class on every endpoint.
@@ -215,7 +215,7 @@ Use the platform's verification ledger and `validate_finding` tool. The validati
 
 Each attempt must describe a test actually executed, a unique meaningful variation, the selected strategy, observed evidence, and whether scope/identity/setup preconditions were valid. Duplicate variants, planned tests, invalid preconditions, and results without observations do not count.
 
-A decisive confirmation may stop early when direct evidence demonstrates impact. A false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts, no unresolved checklist questions, multiple evidence-backed contradictions, and matching contradiction outcomes in the attempt log including a primary contradiction. If safety, authorization, or available evidence prevents this, retain `INCONCLUSIVE / NEEDS REVIEW`; never force a verdict to meet a count.
+A decisive confirmation may stop early when direct evidence demonstrates impact. A false-positive/disproven verdict requires no unresolved checklist questions, multiple evidence-backed contradictions, and matching contradiction outcomes in the attempt log including a primary contradiction. If safety, authorization, or available evidence prevents this, retain `INCONCLUSIVE / NEEDS REVIEW`; never force a verdict to meet a count.
 
 ### Step 7: Report with provenance
 
