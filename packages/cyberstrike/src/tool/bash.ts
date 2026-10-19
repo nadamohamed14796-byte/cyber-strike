@@ -306,11 +306,11 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   }
   const depthIndex = normalizedArgs.findIndex((arg) => ["-d", "--depth"].includes(arg))
   if (depthIndex < 0) {
-    return "Set an explicit Katana depth with '-d 3' (allowed range 1-5) so the crawl has a predictable boundary."
+    return "Set an explicit Katana depth (for example '-d 3'); increase it when the observed application has deeper eligible paths. There is no hard-coded maximum depth."
   }
   const depth = Number(stripOuterShellQuotes(args[depthIndex + 1] ?? ""))
-  if (!Number.isInteger(depth) || depth < 1 || depth > 5) {
-    return "Katana depth must be between 1 and 5 for a bounded reconnaissance crawl."
+  if (!Number.isSafeInteger(depth) || depth < 1) {
+    return "Katana depth must be a positive safe integer. Choose enough depth for the target; do not treat the example depth as a discovery cap."
   }
   if (!normalizedArgs.some((arg) => ["-j", "-json", "-jsonl"].includes(arg))) {
     return "Use Katana JSONL output ('-j') so URL source and request metadata remain available for deduplication and triage."
