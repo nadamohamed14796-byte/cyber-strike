@@ -92,3 +92,30 @@ Record the operation, redacted variables, caller role, expected authorization ru
 
 ### GraphQL depth: operation, object, property, and cost
 Keep a canonical inventory of query/mutation/subscription operation, variables, aliases, fragments, nested fields, principal, and object fixture. Compare the same operation under anonymous and test roles, then inspect whether every returned sensitive field and every mutation target has its own authorization decision. Introspection visibility is not proof of exposure; a field may be documented but intentionally public. Use only small, benign queries and measure cost through response/latency metadata rather than load testing production. Route cross-owner object access to IDOR/BOLA, unauthorized property selection to API property authorization, and unbounded query cost to API resource-consumption review.
+
+
+## Operation-shape matrix: aliases, fragments, batching, subscriptions
+
+| Feature | Safe comparison | Security question |
+|---|---|---|
+| Aliases | Two small, independent aliases for the same benign field in a test environment | Does authorization apply per resolver/field, and is cost accounted for consistently? |
+| Fragments | Reuse an observed fragment under two controlled roles | Does field authorization follow the resolved field rather than only the top-level query? |
+| Global IDs / nodes | Query a test-owned ID, then a second controlled fixture's ID as the lower-privilege account | Does the resolver verify object ownership/tenant independently? |
+| Batch operations | Small batch containing only known test fixtures | Is each operation/object authorized independently, or does one permitted item mask a denied one? |
+| Persisted queries | Compare registered/known query with an unregistered harmless query where the client uses persisted operations | Are authorization and cost controls applied after query lookup as well as during registration? |
+| Subscriptions | Use a test-only channel with synthetic events and explicitly approved subscription testing | Are subscribe authorization and per-event authorization both enforced after role/tenant changes? |
+| Nested resolver | Query one allowed parent and one controlled child reference | Can a parent permission accidentally grant access to an unauthorized child? |
+
+Do not infer an exploitable cost bypass from alias support alone. Keep each query small, and stop if the service shows instability or a program threshold is reached.
+
+### Minimal response normalization
+
+Save the GraphQL request as a redacted artifact and record operationName, query hash, variable keys (not sensitive values), errors[].extensions.code, data field paths, and test principal. A GraphQL HTTP 200 often carries application errors; inspect both errors and data. Do not store full returned records if a synthetic marker or field path is sufficient.
+
+### Chain routing
+
+- Node/global-ID resolver crosses ownership boundary → IDOR/BOLA.
+- Query exposes restricted fields on an otherwise permitted object → API property authorization.
+- Mutation can invoke a restricted function regardless of object owner → BFLA.
+- Aliases/batches cause excessive server cost → API resource-consumption, with a safe staging cost trace.
+- Subscription continues delivering private events after access is revoked → session/authorization review using synthetic events only.
