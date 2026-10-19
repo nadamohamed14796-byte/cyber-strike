@@ -120,6 +120,29 @@ describe("Methodology phase skill routing", () => {
     expect(names).toContain("recon-port-service-discovery")
   })
 
+  test("all phase-critical active-recon skills survive a smaller optional shortlist limit", () => {
+    const makeSkill = (name: string): SkillIndex.Entry => ({
+      name,
+      description: "Security reconnaissance workflow",
+      tags: [],
+      tech_stack: [],
+      cwe_ids: [],
+      chains_with: [],
+      prerequisites: [],
+      severity_boost: {},
+    })
+    const ranked = rankSkillsForPhase("active_recon", [
+      makeSkill("generic-recon-tool"),
+      makeSkill("recon-methodology"),
+      makeSkill("attack-javascript-analysis"),
+      makeSkill("community-tool-selection"),
+    ], 1)
+    const names = ranked.map((skill) => skill.name)
+    expect(names).toContain("recon-methodology")
+    expect(names).toContain("attack-javascript-analysis")
+    expect(names).toContain("community-tool-selection")
+  })
+
   test("business logic critical skill remains in a short ranked list", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
       name,
