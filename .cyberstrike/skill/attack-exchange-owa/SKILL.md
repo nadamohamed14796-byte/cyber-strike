@@ -167,3 +167,26 @@ Compares local artifacts offline and heuristically redacts common secrets; it se
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare a known-good baseline with a control, vary one meaningful property, and record alternative explanations before calling a lead confirmed.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use Burp/curl for low-impact, in-scope Exchange/OWA route and response verification. Nuclei may support a narrow version/advisory check only when the relevant template is inspected and allowed by the program.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install.
+- On Kali/Debian: sudo apt update && sudo apt install curl.
+- [Nuclei docs](https://docs.projectdiscovery.io/tools/nuclei/overview) and [official templates](https://github.com/projectdiscovery/nuclei-templates) — inspect exact request behavior before running.
+Do not run exploit scripts, credential attacks, or authenticated state-changing actions against production Exchange/OWA. Confirm product/version using minimum evidence and use a lab for exploitability validation.
+
+### Primary resources
+- [Microsoft Exchange Server documentation](https://learn.microsoft.com/en-us/exchange/) — product/version context.
+- [Microsoft Security Response Center](https://msrc.microsoft.com/) — official advisories.
+- [Nuclei documentation](https://docs.projectdiscovery.io/tools/nuclei/overview) — scan behavior.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt to compare saved responses offline.
+
+### Result handling
+Record version evidence, exact endpoint, auth context, relevant advisory and affected version range, and safe reproducible impact. Never collect mailbox contents or credentials as proof.
