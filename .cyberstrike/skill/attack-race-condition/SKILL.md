@@ -148,48 +148,18 @@ Do not infer a race from two 2xx responses. A finding requires a final state tha
 Record whether the likely root cause is check-then-act, missing uniqueness constraint, non-atomic balance/quota update, missing idempotency, stale cache/authorization, or asynchronous job duplication. Keep root-cause labels tentative unless code or approved telemetry confirms them. Chain to business-logic for the violated invariant and triage-validation for the evidence gate.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater to group requests and compare states; Turbo Intruder may be useful for tightly controlled concurrency experiments after the manual baseline is understood. Prefer test credits/orders/invitations created for the assessment.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — install from PortSwigger.
-- Turbo Intruder is available through the official Burp BApp Store; read the extension's documentation and review scripts before running them.
-- Test only one disposable workflow with low request volume and a clear reset/cleanup plan. Do not create real charges, transfers, account changes, or resource exhaustion.
-
-### Primary resources
-- [PortSwigger race conditions](https://portswigger.net/web-security/race-conditions) — practical methodology and labs.
-- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — resource/workflow risk context.
-- [OWASP Transaction Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html) — transaction integrity.
-
-### Reusable helper
-`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares captured states offline; it does not generate concurrent requests.
-
-### Result handling
-Keep a normal single-request baseline, then compare concurrent outcome and final server-side state. Report only controlled duplicate effects, not just timing variance.
-
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-This section lists command-line tools and local scripts the agent can invoke. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies. Verify availability, version, official documentation, license, and expected request impact before use.
-
-### Recommended tools
-- Python asyncio — controlled low-volume concurrent requests
-- http_response_diff.py — compare response and state evidence
-- jq — parse test ledger
-- A local concurrency harness with a disposable test object and a hard per-run safety stop
-
+### Agent-usable CLI tools
+- Python `httpx` with `asyncio`: send a small, controlled set of concurrent requests to a reversible test operation and record completion order/status.
+- `curl`: establish a single-request baseline before concurrency.
+- `jq`: summarize saved JSON outcomes and state transitions.
+- Existing helper `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved response artifacts.
+### Install and verify
+Verify Python `httpx` with `python3 -c "import httpx; print(httpx.__version__)"` and `curl --version`. Official docs: https://www.python-httpx.org/ and https://docs.python.org/3/library/asyncio.html. If absent, use a local fixture and record the gap.
 ### Resources
 - https://portswigger.net/web-security/race-conditions
-- https://owasp.org/www-project-web-security-testing-guide/
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Community lists are discovery aids only; consult official docs for supported usage and limitations.
-
-### Helper-script contract
-Only use disposable records and a specifically authorized concurrency test. Log intended request count, actual count, timing, idempotency/reference IDs, authoritative state, and cleanup. Never race real purchases, funds, or customer entitlements.
-
-Use explicit inputs and outputs, preserve native evidence separately from normalized data, record tool/version and timestamps, redact sensitive values, handle malformed records, and include local test fixtures. Do not claim a vulnerability from a scanner signal alone.
-
-### Handoff
-Return command/tool/version, baseline and variant references, output path, controls, errors, confidence, limitations, and next skill. Missing tools and blocked tests are explicit statuses.
+- https://github.com/OWASP/www-project-web-security-testing-guide
+- https://docs.python.org/3/library/asyncio.html
+### Proof and limits
+Start with low concurrency, only tester-owned accounts and reversible operations. Record request IDs, timestamps, final state, and a sequential control. Do not repeat purchases, send real messages, or create irreversible transactions.
