@@ -192,3 +192,28 @@ Compares local artifacts offline with heuristic redaction; no requests are sent 
 - Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
 
 Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local test harnesses the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify tool availability/version, official documentation, license, and request impact before use.
+
+### Recommended tools
+- file utility and Python mimetypes — inspect local test files
+- ExifTool — inspect metadata when relevant
+- curl/Python requests — controlled upload of harmless test fixtures
+- ClamAV or YARA only for local sample analysis where relevant
+
+### Resources
+- https://portswigger.net/web-security/file-upload
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Use the upstream community list only to discover candidates. Confirm tool maintenance, provenance, dependencies, and supported usage from official sources.
+
+### Helper-script contract
+Generate harmless, uniquely named fixtures and verify storage location, access controls, content-type handling, and server-side processing. Avoid web shells, executable payloads, malware, or uploads that affect real users.
+
+Helpers must accept explicit paths, preserve native evidence, write normalized output separately, redact sensitive values, record timestamps and tool versions, handle malformed inputs, and include local fixtures.
+
+### Handoff
+Return the tool/version, command, input/output artifact references, control result, failures, confidence, and limitations. A candidate signal is not a confirmed finding.
