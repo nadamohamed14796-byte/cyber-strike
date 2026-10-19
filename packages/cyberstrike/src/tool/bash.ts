@@ -703,6 +703,10 @@ export async function findWrappedScanner(payload: string): Promise<string | unde
 
       const executableIndex = commandExecutableIndex(command)
       if (executableIndex < 0) continue
+      // Also inspect non-shell launchers such as xargs/find/env inside a shell
+      // payload, not only when they are the top-level BashTool command.
+      const indirectlyLaunched = await scannerLaunchedByWrapper(command, executableIndex)
+      if (indirectlyLaunched) return indirectlyLaunched
       const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
       if (!SHELL_WRAPPERS.has(executable)) continue
       const commandFlag = command.findIndex((value, index) =>
