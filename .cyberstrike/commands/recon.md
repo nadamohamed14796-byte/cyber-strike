@@ -73,13 +73,13 @@ Do not report a tool as installed merely because its name appears in this prompt
 
 Workspace initialization does not establish authorization.
 
-Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. For each distinct candidate origin, perform one explicit `scope_check` during setup and retain its decision in the run manifest. Do not repeatedly call `scope_check` for the same unchanged origin, re-fetch the same policy, or reconfigure the same saved scope. Active-request tools still enforce persisted scope internally for every request; this enforcement is mandatory and is not a reason for the agent to manually repeat checks.
+Use active reconnaissance only against assets and operations authorized by the applicable program or customer policy. Apply explicit exclusions before inclusion rules. Perform exactly one explicit `scope_check` for the canonical target/workspace during setup and retain its decision in the run manifest. Do not manually call `scope_check` for each discovered host, endpoint, request, phase, or delegated tester. Active-request tools must enforce the persisted policy internally for every concrete request; this mandatory execution-boundary enforcement is not a reason to repeat the agent-level check.
 
 Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
 
 Do not bypass authentication, rate limits, access controls, or program restrictions. Respect the target's permitted request methods, automation limits, and operational constraints.
 
-If scope is missing, ambiguous, invalid, or unconfigured, review the official policy once and configure the canonical root once. Then run one explicit scope check for the requested origin. If it fails, stop active work and report the exact reason. If workspace attachment fails after a successful scope check, do not try alternate URL spellings, ports, asset types, or repeated scope rewrites. Inspect the single failure once; fix the implementation or report the blocker. Never loosen or rewrite the official scope just to make attachment succeed.
+If scope is missing or unconfigured, review the official policy once and configure the canonical root once, then perform the single setup check. If the check is denied, errors, or is inconclusive, stop active work and report the reason without looping or repeatedly retrying. If workspace attachment fails after a successful check, diagnose that failure separately; do not try alternate URL spellings, ports, asset types, or repeated scope rewrites. Never loosen official scope to make attachment succeed.
 
 ### 0.5 Target data protection
 
@@ -280,7 +280,7 @@ If the policy explicitly authorizes a wildcard, record the precise rule and its 
 
 ## 2.4 Persist and enforce scope decisions
 
-During setup, call the registered scope checker once for each distinct candidate origin using its actual schema. Persist the decision in the run manifest and reuse it for subsequent requests to that unchanged origin. Active-request tools still enforce persisted scope for every concrete request. Recheck manually only when the origin, policy, or saved scope configuration changes, or the prior decision is inconclusive. If supported, use:
+During setup, call the registered scope checker exactly once for the canonical target/workspace using its actual schema. Persist the decision in the run manifest and reuse it throughout the run; do not manually check every candidate origin. Active-request tools must enforce the persisted policy for every concrete request. Only start a new setup check when a new run begins or the canonical target/policy configuration changes. If the single check is inconclusive, stop active work rather than retrying in a loop. If supported, use:
 
 `scope_check(target="<exact candidate>", target_url="<canonical root target>")`
 
@@ -299,7 +299,7 @@ If the scope checker errors, times out, returns an ambiguous result, or cannot c
 
 Persist the reason and continue passive work where possible.
 
-Recheck scope when the policy changes, the asset identity changes, or a queued operation is resumed under a different scope configuration.
+Start a new setup check only for a new run or when the canonical target/policy configuration changes; ordinary discovery of additional assets does not trigger another agent-level scope check. Execution-boundary enforcement remains mandatory for every request.
 
 ---
 
