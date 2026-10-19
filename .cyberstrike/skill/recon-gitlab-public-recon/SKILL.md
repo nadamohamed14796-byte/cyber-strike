@@ -60,11 +60,13 @@ A report should identify the public asset, why it belongs to the organization, w
 
 ## Tools
 
-- GitLab public web UI and documented public API.
-- Git for bounded repository/history inspection.
-- Gitleaks or TruffleHog in local mode on authorized public content.
-- YAML/CI linting and static review tools for pipeline configuration.
-- jq/Python for metadata normalization and inventory export.
+- GitLab documented public API and `glab` CLI where appropriate; do not depend on the web UI.
+- `git`: bounded repository/history inspection for public repositories within the task's permitted scope.
+- `gitleaks` or `trufflehog` in local mode on authorized public content.
+- YAML/CI linters and static review tools for pipeline configuration.
+- `jq` / Python: normalize metadata and export inventory.
+
+Verify `git --version`, `jq --version`, and `glab --version` if installed. Official docs: https://docs.gitlab.com/ee/api/, https://docs.gitlab.com/editor_extensions/gitlab_cli/, https://github.com/gitleaks/gitleaks/.
 
 ## Public GitLab Review Matrix
 
@@ -128,28 +130,6 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 ### Repository attribution and secret-safe handling
 Confirm namespace/organization attribution and public visibility before pivoting through group projects, forks, issue attachments, packages, snippets, build artifacts, and commit history. Preserve repository URL, commit hash, path/line, observed time, and whether the content is current, deleted, forked, or generated. Secret-like matches must be recorded as type plus redacted fingerprint; do not test or reuse credentials or access projects beyond what is public and authorized. Distinguish public code disclosure from an exploitable credential or CI trust boundary. Route workflow/runner problems to CI/CD review, first-party JavaScript to JS analysis, and secret candidates to evidence-safe triage without invoking them.
 
-
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use GitLab's public web/API interface for project and repository discovery, glab for legitimate API interaction, and Gitleaks for local scanning of publicly accessible repositories that are relevant to the authorized assessment. Don't assume all group/project assets are in scope just because they are public.
-
-### Installation and setup
-- [glab CLI](https://gitlab.com/gitlab-org/cli) — official install and command reference.
-- [GitLab REST API](https://docs.gitlab.com/api/rest/) — query semantics and rate limits.
-- [Gitleaks](https://github.com/gitleaks/gitleaks) — official release/install options.
-Use unauthenticated public endpoints where possible; avoid broad username enumeration, access attempts to private projects, or use of discovered credentials. Keep rate limits and disclosure rules in effect.
-
-### Primary resources
-- [GitLab API documentation](https://docs.gitlab.com/api/) — official endpoints and permissions.
-- [GitLab security advisories](https://about.gitlab.com/releases/categories/releases/) — official product advisory context.
-- [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html) — exposed secret handling.
-
-### Reusable helper
-Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to normalize repository-related URLs collected locally.
-
-### Result handling
-Record public project/path/commit identifier and source URL; redact secret values and report the location/fingerprint. Never test a discovered credential or include it in issue text.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
