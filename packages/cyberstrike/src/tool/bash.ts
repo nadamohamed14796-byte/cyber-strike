@@ -137,6 +137,18 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
   }
 
   const normalizedArgs = args.map((arg) => stripOuterShellQuotes(arg).toLowerCase())
+  const optionGroups = [
+    ["-u", "--url"],
+    ["-fs", "--field-scope"],
+    ["-rl", "--rate-limit"],
+    ["-d", "--depth"],
+    ["-o", "-output"],
+  ]
+  for (const group of optionGroups) {
+    if (normalizedArgs.filter((arg) => group.includes(arg)).length > 1) {
+      return "Use each Katana scope/rate/depth/output option once per command. Duplicate flags can make the crawler's effective settings differ from the values checked by the gate."
+    }
+  }
   const urlFlagIndexes = normalizedArgs.map((arg, index) => ["-u", "--url"].includes(arg) ? index : -1).filter((index) => index >= 0)
   if (urlFlagIndexes.length === 0) {
     return "Pass an explicit '-u https://authorized-host' input for each authorized host; URL-list/file inputs are not accepted by the generic shell crawler gate."
