@@ -77,7 +77,7 @@ The canonical recon playbook defines phase order and completion criteria; specia
 
 8. Browser extension request intake runs continuously and independently
 - Every extension-captured request is its own short-lived child analysis task. It must not interrupt, replace, or pollute the parent recon session, prompt transcript, active run, or logs.
-- Resolve the canonical parent/child target workspace and re-check persisted scope. Store request and response safely under requests/ with redacted secrets and stable request IDs; link it to its asset, endpoint, credentials/role context, JS evidence, and existing recon findings.
+- Resolve the canonical parent/child target workspace and reuse its saved scope decision; do not restart scope discovery or re-import the full scope list for each captured request. Active request tools enforce persisted scope for the exact URL at execution time. Store request and response safely under requests/ with redacted secrets and stable request IDs; link it to its asset, endpoint, credentials/role context, JS evidence, and existing recon findings.
 - Update endpoint notes and the evidence graph with what the request confirms or contradicts. Analyze method/body/parameters/auth state/response behavior, identify new endpoints or parameter variants, and queue only the relevant follow-up questions. Do not launch full-target recon for each request.
 - If no authorized workspace, no captured JS, or no matching endpoint exists, analyze the supplied request as far as possible, record the missing prerequisite, and leave tentative relationships tentative. New requests may refresh correlation without repeating full JS analysis.
 
