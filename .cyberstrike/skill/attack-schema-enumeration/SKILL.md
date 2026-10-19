@@ -101,7 +101,7 @@ Review schema/docs publishing policy, GraphQL resolver guards, gRPC method-level
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent, evidence-producing hypotheses—not as a target number of payloads. If the finding remains plausible, follow distinct signal-led branches up to the ceiling; stop earlier when the effect is decisive, no relevant branch remains, or scope/safety limits apply. Cosmetic variants do not count as independent attempts.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Continue with materially distinct, authorized checks while evidence can change the conclusion; deduplicate equivalent queries and retries. Stop when direct evidence resolves the hypothesis, relevant branches are exhausted, a prerequisite is unavailable, or scope/safety requires stopping. Respect program limits and avoid broad enumeration.
 
 Keep an attempt ledger: hypothesis, one variable changed, baseline/control, signal, interpretation, confidence and next branch. Use controlled identities/fixtures, independent corroboration, low-impact requests and minimum sanitized evidence.
 
@@ -138,3 +138,41 @@ Stop on scope ambiguity, unexpected state changes, sensitive data, service degra
 
 ### Schema existence versus operation exposure
 Record where the schema came from (public docs, authenticated route, source bundle, introspection, or client descriptor), which principal could read it, and which operations/fields are executable. Compare the same harmless operation across anonymous and controlled roles, then check object/property permissions separately. A schema or introspection response may be intended for developer tooling and does not prove data access. Prioritize undocumented write operations, privileged mutations, deprecated versions, and fields that cross tenant boundaries. Route object references to IDOR, field-level visibility/mutation to API property authorization, cost controls to API resource consumption, and stale versions to shadow-API/inventory review.
+
+
+## Schema-to-operation trace
+
+Create an inventory row for each discovered operation, but do not call every operation just because it appears in a schema.
+
+| Source | Extract | Validate next |
+|---|---|---|
+| OpenAPI | Path, method, operationId, security requirements, request/response schema | Compare declared security with runtime on a harmless observed route |
+| GraphQL | Query/mutation/subscription names, argument types, field types | Test resolver authorization under controlled roles |
+| gRPC/protobuf | Service, RPC method, input/output types, reflection availability | Verify method-level auth only if reflection/RPC tests are in scope |
+| JavaScript/mobile client | Actually used operations and field names | Compare observed traffic with published schema; do not infer server support from dead code |
+| Error/validation output | Type/field names returned by normal invalid requests | Treat as discovery metadata until actual operation behavior is tested |
+
+### OpenAPI security inventory helper
+
+For a locally saved, authorized OpenAPI JSON file, list paths and declared security without making network requests.
+
+```python
+import json
+from pathlib import Path
+
+spec = json.loads(Path("openapi.json").read_text())
+global_security = spec.get("security", [])
+for path, methods in sorted(spec.get("paths", {}).items()):
+    for method, operation in sorted(methods.items()):
+        if method.lower() not in {"get", "post", "put", "patch", "delete", "head", "options"}:
+            continue
+        effective = operation.get("security", global_security)
+        print(method.upper(), path, "operationId=", operation.get("operationId"),
+              "security_declared=", bool(effective))
+```
+
+This reports declared metadata only. It does not prove runtime enforcement, and OpenAPI permits an operation-level security override (including an empty list) that must be interpreted according to the API's intended public/private contract.
+
+### Handoff and deduplication
+
+Deduplicate operations by protocol + method/operation + normalized route/schema version. Keep separate findings only when there is a distinct violated control or impact. Record schema_source, schema_version, visibility_policy, operation_id, declared_security, runtime_auth_result, field_sensitivity, object_policy_result, and next_skill_trigger. If schema parsing fails, preserve the parse error and source provenance; do not label the schema absent.
