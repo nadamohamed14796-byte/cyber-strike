@@ -155,3 +155,24 @@ Explain the failed control explicitly: authentication, function authorization, o
 
 ### Prove the principal, not the response
 Keep one protected read-only action and one known-public action as controls. Compare absent, malformed, expired, revoked, and valid test credentials while preserving the same route and request semantics; then verify the server-side subject/role through a harmless endpoint. A 200, a public shell, or middleware inconsistency is not authentication bypass unless a protected principal or operation is actually granted. Check alternate API versions and legacy routes only when discovered or documented. If authentication is absent but object policy still blocks access, route to API no-auth/BOLA; if identity exists but role checks fail, route to BFLA. Use only test accounts and never probe another person's account identifier.
+
+
+## Identity-resolution and enforcement matrix
+
+| Observed behavior | Classification to investigate | Confirmation |
+|---|---|---|
+| Anonymous request receives a protected resource | Missing authentication / API no-auth | Protected synthetic marker is returned or protected operation is performed |
+| Valid low-role identity reaches admin operation | BFLA | Backend executes a function the role cannot invoke |
+| Authenticated caller reaches another owner's object | BOLA/IDOR | Controlled foreign object is returned/changed contrary to policy |
+| Correct identity but wrong tenant/audience is accepted | Token/tenant binding | Server resolves the wrong test principal or grants cross-tenant authority |
+| Old session retains access after reset/logout | Session lifecycle | Protected network action succeeds with old test session contrary to policy |
+| MFA challenge omitted but server assurance is low | Not yet a bypass | Confirm whether the exact protected action is still denied |
+| Public endpoint returns 200 without credentials | Expected public behavior unless policy says otherwise | No private data or restricted operation is exposed |
+
+### Minimal request comparison
+
+Capture the same read-only endpoint under anonymous, invalid/expired, least-privilege, and authorized test sessions. Preserve request method, body, content type, and object fixture. Record server-side principal/role from an approved test endpoint or logs; do not infer identity from UI state.
+
+### Chain rules
+
+Do not chain based on a shared word such as “auth.” The observed boundary determines the next skill: session issue → session management; factor bypass → MFA; wrong token issuer/audience → JWT/OAuth; object boundary → BOLA; function privilege → BFLA. A single symptom may reveal several hypotheses, but each reportable finding needs its own evidence and impact.
