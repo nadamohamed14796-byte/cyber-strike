@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { initialReconRun, parseReconRun } from "../../src/target/recon-gate"
 import {
   reconRunID,
+  reconBeginDisposition,
   RECON_PHASE_ARTIFACT_AREAS,
   unresolvedReconPrerequisites,
   type ReconPhase,
@@ -30,6 +31,17 @@ function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPh
 test("recon run identity is stable across session resumes", () => {
   expect(reconRunID("target-root-1")).toBe(reconRunID("target-root-1"))
   expect(reconRunID("target-root-1")).not.toBe(reconRunID("different-target"))
+})
+
+test("begin resumes running phases and does not restart resolved work", () => {
+  expect(reconBeginDisposition("running", "url_collection")).toBe("resume_existing")
+  expect(reconBeginDisposition("complete", "url_collection")).toBe("already_resolved")
+  expect(reconBeginDisposition("unavailable", "url_collection")).toBe("already_resolved")
+  expect(reconBeginDisposition("unavailable", "scope_validation")).toBe("start")
+  expect(reconBeginDisposition("unavailable", "workspace_setup")).toBe("start")
+  expect(reconBeginDisposition("pending", "url_collection")).toBe("start")
+  expect(reconBeginDisposition("failed", "url_collection")).toBe("start")
+  expect(reconBeginDisposition("blocked", "url_collection")).toBe("start")
 })
 
 test("recon phases cannot skip pending prerequisites", () => {
