@@ -94,29 +94,6 @@ Verify the actual finding schema and evidence lifecycle before wiring this skill
 For each finding, maintain distinct fields for observed signal, expected policy, reproduced behavior, confidence, demonstrated impact, alternative explanation, and final disposition. Do not auto-promote because a specialist skill ran or a scanner returned high severity. A false-positive conclusion needs a relevant control or contradictory observation that actually explains the signal; lack of access, unavailable prerequisites, unstable responses, and exhausted-safe testing are blocked/inconclusive, not false positives. Record the exact request/identity/object state tried so the false-positive store can deduplicate the same root cause without suppressing a materially different boundary. Require all chain links to have independent evidence before describing combined impact.
 
 
-## Tool installation and optional tooling (2026-10-19)
-
-### Recommended tools and purpose
-Use Burp Repeater/Comparer, browser DevTools, a local evidence manifest, and a structured false-positive/confirmed/disproven decision log. Re-run the smallest reproducible check and a negative control before assigning a verdict.
-
-### Installation and setup
-- [Burp Suite](https://portswigger.net/burp) — official installation.
-- jq on Kali/Debian: `sudo apt update && sudo apt install jq` for local evidence metadata.
-- No external scanner is required for a triage verdict; install specialist tooling only if a specific missing piece of evidence requires it.
-Keep evidence local and redacted. Do not convert a failed tool run, missing dependency, or untested hypothesis into a false positive.
-
-### Primary resources
-- [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) — repeatability and evidence.
-- [HackerOne disclosure guidance](https://docs.hackerone.com/en/articles/8475116-best-practices-for-submitting-reports) — clear submissions.
-- [FIRST CVSS](https://www.first.org/cvss/) — severity scoring and vector transparency.
-
-### Reusable helpers
-- `python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json` — checks required artifact metadata and obvious secret-like values.
-- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` — compares saved responses offline.
-These helpers are support checks; human review still needs to inspect the actual claim, control, alternatives, and redaction.
-
-### Result handling
-Output the checks attempted, passed, failed, blocked, and not run, plus evidence refs and reasons. Confirmed and false-positive verdicts require evidence; uncertainty stays explicit.
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
