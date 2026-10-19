@@ -46,7 +46,7 @@ Do not send batches of candidate internal destinations. Do not use raw replay to
 
 Use `verification_attempt` for each meaningful executed test and preserve the request ID, unique marker, controlled destination, observed callback/response, and valid preconditions. Do not include callback secrets, tokens, internal addresses, or sensitive response contents in notes.
 
-Use `validate_finding` for the ten-check assessment. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and the required contradictory checks. If that cannot safely be completed, keep the candidate `INCONCLUSIVE / NEEDS REVIEW`.
+Use `validate_finding` for the ten-check assessment. A decisive confirmation may stop early. A final false-positive/disproven verdict requires direct contradictory evidence under valid preconditions and the required contradictory checks; no fixed attempt count applies. If that cannot safely be completed, keep the candidate `INCONCLUSIVE / NEEDS REVIEW`.
 
 Use `report_vulnerability` only when the evidence demonstrates server-side retrieval and impact. Include the minimum redacted reproduction and safe remediation guidance. Never report an attempted URL as a successful SSRF without observed evidence.
 
