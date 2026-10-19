@@ -127,3 +127,28 @@ Run python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.t
 
 ### Result handling
 Record the documented limit, safe request count/spacing, resource ownership, observed control behavior, and stop condition. Don't claim unbounded impact from a single slow response.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts directly. Browser UI, browser extensions, and interactive intercepting proxies are not dependencies. Check availability/version and official documentation before use; active tests require explicit authorization and low-impact settings.
+
+### Recommended tools
+- OpenAPI parser — inventory request and response schemas
+- Python requests/httpx — low-volume controlled usage tests
+- jq — inspect response metadata and server limits
+- A local load-test harness only for staging or explicit agreed test windows
+
+### Resources
+- https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/
+- https://github.com/OAI/OpenAPI-Specification
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Treat community lists as discovery aids and verify current maintenance and behavior from official sources.
+
+### Helper-script contract
+Model normal request cost and rate policy before testing. Use test-owned resources and an agreed low request budget; record limit headers, response behavior, cost signals, and server-side impact. Never stress production systems.
+
+Preserve raw evidence separately from normalized results; record tool/version, timestamps, identity/context, errors, confidence, redaction, and output paths. Use structured output and deterministic local fixtures.
+
+### Handoff
+Return actual command/version, input/output paths, request counts, controls, errors, confidence, limitations, and next skill. Blocked or unexecuted tests must remain inconclusive.
