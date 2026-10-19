@@ -146,3 +146,16 @@ Verify: read the controlled object again and compare persisted state, audit even
 ```
 
 The strongest chain is input/state inconsistency → missing server-side invariant → unauthorized or duplicate transition → measurable business consequence. Chain into attack-race-condition, attack-rate-limit-bypass, attack-bfla, or attack-idor-automation only when the relevant concurrency, abuse-control, function, or object signal is observed.
+
+
+## Enrichment: state transitions and impact
+Build a state model before testing: current state, authorized actor, expected transition, invariant, and postcondition. Test only owned disposable records or staging fixtures; do not run real money movement or destructive operations.
+
+```text
+Fixture: TEST_ORDER_001
+Baseline observation: order is pending and owned by controlled account A
+Test: replay the observed safe transition with one changed variable
+Verify: re-read the same fixture and compare persisted state and audit event
+```
+
+A strong chain is an inconsistent input/state transition causing a violated business invariant and a measurable unauthorized consequence. Link to race-condition, rate-limit, function-level authorization, or object-level authorization skills only when their trigger is observed.
