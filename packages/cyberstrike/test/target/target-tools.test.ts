@@ -63,6 +63,21 @@ test("target workspace tool initializes, configures scope, and nests authorized 
       expect(scope.metadata.saved).toBe(true)
       expect(scope.metadata.scope_configured).toBe(true)
 
+      // An operator-confirmed additional asset must merge into the existing manifest,
+      // preserving prior includes, exclusions, and authorization provenance.
+      const added = await tool.execute({
+        action: "configure_scope",
+        target_url: "https://example.com",
+        include: ["new.example.net"],
+        merge_existing: true,
+      }, {} as never)
+      expect(added.metadata.saved).toBe(true)
+      const mergedScope = JSON.parse(await fs.readFile(path.join(rootPath, "scope", "scope.json"), "utf-8"))
+      expect(mergedScope.scopeItems).toEqual(["example.com", "*.example.com", "new.example.net"])
+      expect(mergedScope.excludedItems).toEqual(["admin.example.com"])
+      expect(mergedScope.authorizationSource).toBe("Example authorized disclosure program")
+      expect(mergedScope.authorizationReference).toBe("https://hackerone.com/example")
+
       const child = await tool.execute({
         action: "attach_asset",
         parent_target_url: "https://example.com",
