@@ -96,7 +96,6 @@ Determine whether the root cause is missing authentication middleware, route-spe
 - Re-test with fresh sessions and inspect cache directives when safe.
 - A schema, stack trace, server version, or endpoint name is supporting context, not proof of impact.
 
-
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
 Continue testing materially distinct, evidence-producing hypotheses while the candidate remains plausible and a meaningful next branch exists. Do not impose a fixed attempt ceiling or count cosmetic retries as new hypotheses. Stop when direct evidence confirms or disproves this hypothesis, no meaningful new branch remains, a valid prerequisite is unavailable, or program/safety rules require stopping; unresolved cases remain inconclusive.
@@ -110,7 +109,6 @@ Keep a compact ledger for every attempt: hypothesis, one variable changed, basel
 3. Test resource ownership and role context separately from authentication: an endpoint may accept anonymous requests yet return only public data, or authenticate correctly while missing object-level authorization.
 4. Check alternate API versions, content types, and documented transport patterns only when evidence shows they reach the same handler; vary one factor and preserve a known-public or known-denied control.
 5. Confirm exposure with a synthetic canary or a test-owned object's non-public field. Redact all secrets and stop before reading unrelated user records or attempting a write.
-
 
 ### Verdict gates
 
@@ -135,7 +133,6 @@ Return: skill, target asset, in-scope evidence, baseline, candidate hypothesis, 
 - [OWASP API Security — Broken Authentication](https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/)
 - [OWASP API Security — Broken Object Level Authorization](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/)
 
-
 ## Hands-on field pattern: anonymous-to-authenticated differential
 Choose a documented/observed endpoint and a synthetic object. First capture the anonymous baseline, then compare the response from an authorized account that should be allowed to access that fixture:
 
@@ -148,12 +145,10 @@ sha256sum anon.body auth.body
 
 A body-hash difference is only a triage signal; inspect redacted schemas and protected marker fields. Check alternate API versions and methods only when they are observed and authorized. Chain to `attack-shadow-api` for version drift, `attack-idor-automation` for object-boundary signals, or `attack-bfla` for function-level exposure.
 
-
 ## Targeted quality-loop enrichment (2026-10-19)
 
 ### Anonymous-to-authenticated differential
 For every candidate API route, compare the same method, content type, object fixture, and request body as anonymous, invalid/expired, low-privilege, and authorized test identities. First classify whether the operation is intended to be public; OpenAPI documentation, a 200 status, OPTIONS, schema visibility, and a login-free health response are not proof of sensitive exposure. For JSON, compare field-level data and object ownership rather than raw response length. For writes, use a disposable fixture and verify server-side state; do not test irreversible actions. Route object-boundary failures to IDOR/BOLA, role-operation failures to BFLA, property differences to API property authorization, and undocumented/version drift to shadow-API review.
-
 
 ## Expanded auth-state matrix and cache controls
 
@@ -188,7 +183,6 @@ done
 ### Structured evidence additions
 
 Record route_source, intended_visibility, auth_mode, anonymous_result, invalid_credential_result, low_role_result, authorized_control_result, protected_field_paths, synthetic_marker, cache_status, object_owner, state_changed, and cleanup_verified. Every chain to BOLA, BFLA, property authorization, or shadow API must cite the specific observed condition that triggered it.
-
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
