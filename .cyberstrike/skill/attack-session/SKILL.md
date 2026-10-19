@@ -206,3 +206,26 @@ Replace example values with observations; do not treat this example as an expect
 - Remembered-device state and recovery flows, only with test accounts and synthetic factors.
 
 Keep each edge case as a separate hypothesis with a baseline and a negative control. If the application intentionally preserves other sessions, assess the documented revoke-one/revoke-all behavior rather than assuming every session must be invalidated.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use browser DevTools' Application/Storage/Network panels, Burp Repeater/Comparer, and isolated browser profiles for controlled account/session comparisons. Use an optional password manager or OS secrets store for test credentials, not shell history.
+
+### Installation and setup
+- [Burp Suite](https://portswigger.net/burp) — official install and proxy setup.
+- [Firefox downloads](https://www.mozilla.org/firefox/new/) — separate profiles help prevent session/cookie crossover.
+- jq on Kali/Debian: `sudo apt update && sudo apt install jq` for local JSON metadata.
+Do not export live cookies into cloud tools or public JWT/session decoders. Test revocation, rotation, and logout only using accounts you control.
+
+### Primary resources
+- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) — identifier lifecycle and invalidation.
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — session/authentication boundaries.
+- [PortSwigger session management](https://portswigger.net/web-security) — controlled practice.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized local responses offline.
+
+### Result handling
+Keep the session cookie value secret. Report lifecycle behavior (creation, rotation, logout, expiry, privilege change) and expected/actual access using test accounts.
