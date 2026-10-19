@@ -104,7 +104,7 @@ Determine whether content affects only the submitting account, another tester-ow
 
 ## Adaptive Verification Contract (evidence-driven; no arbitrary hypothesis ceiling)
 
-Use the 20-attempt budget as a ceiling for independent evidence-producing hypotheses, not as a quota for payload mutations. Follow relevant signal-led branches only while the candidate remains plausible; stop early on decisive evidence, scope/safety limits, or when no meaningful branch remains. Cosmetic variants are not separate hypotheses.
+Do not impose an arbitrary fixed ceiling on meaningful verification hypotheses. Follow materially distinct, authorized branches while evidence can change the conclusion; deduplicate cosmetic payload variants and exact retries. Stop when execution/impact is resolved, relevant branches are exhausted, prerequisites are unavailable, or scope/safety requires stopping. This does not override program rate limits or safe-production constraints.
 
 Track each attempt as hypothesis, one variable changed, baseline/control, observed signal, interpretation, confidence, and next branch. Prefer paired requests and controlled test identities/fixtures; save only minimal sanitized evidence.
 
@@ -140,3 +140,33 @@ Stop on scope ambiguity, unexpected user data, state changes, service degradatio
 
 ### Output-context and audience map
 For each input, record source, transformations, output context, persistence, affected viewer, and any sanitizer/contextual encoder. Use inert unique markers first; confirm execution only in a controlled browser/test account with a harmless proof. Check reflected, stored, DOM, and template routes separately, and test only the context actually reached (HTML text, attribute, URL, JS, CSS, or DOM sink). A reflected marker, HTML-looking response, or CSP absence is not itself XSS. Confirm whether another user/admin sees the content before claiming stored-impact amplification. Chain to clickjacking/CSRF only when the distinct browser interaction or state-change preconditions are observed, and to session risk only when cookie/session controls actually change the demonstrated impact.
+
+
+## Source-to-sink inventory for JavaScript-assisted hunting
+
+Use static search to create candidates, then manually trace each source through transformations to a reachable sink. Commands are discovery aids, not proof.
+
+```bash
+# Run in a downloaded/authorized source tree; avoid dumping minified bundles wholesale.
+rg -n --glob '*.{js,mjs,cjs,ts,tsx,jsx,html,vue,svelte}' \
+  'innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|dangerouslySetInnerHTML|v-html|\$\{.*\}' .
+rg -n --glob '*.{js,mjs,cjs,ts,tsx,jsx,html,vue,svelte}' \
+  'location\.(hash|search|href)|URLSearchParams|postMessage|message\.data|localStorage|sessionStorage' .
+```
+
+Review false matches, templates, sanitizers, framework semantics, and whether the source is attacker-controlled. For every candidate record source, transformations, sink, guard/sanitizer, route/component, execution context, and evidence reference. Never label a grep hit as confirmed XSS.
+
+### Chaining matrix
+
+| Proven observation | Related skill | Required separate evidence |
+|---|---|---|
+| Input executes in a trusted origin | DOM-XSS / JavaScript analysis | Reachable source-to-sink and browser execution context |
+| Executable content is retrieved from an upload | File-upload review | Upload validation and retrieval origin/content behavior |
+| A response with attacker-controlled content is replayed from shared cache | Cache poisoning | Shared-cache storage/replay of the altered response |
+| Sensitive action is frameable | Clickjacking | A realistic controlled interaction that changes protected state |
+| Cross-site request changes state | CSRF | Server-side state change without required intent validation |
+| Session compromise is suggested | Session review | Do not read/export cookies; prove impact through a harmless controlled account flow |
+
+### Evidence and regression fields
+
+Add source_location, sink_location, transformation_chain, sanitizer_name_and_version, output_context, execution_origin, persistence_scope, affected_test_role, csp_effective_policy, browser_version, negative_control, cleanup_verified, and regression_case. If no browser execution is permitted, keep the result as a source-to-sink candidate with an explicit limitation.
