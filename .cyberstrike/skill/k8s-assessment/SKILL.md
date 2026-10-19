@@ -156,3 +156,27 @@ Do not create privileged pods, mount host filesystems, read unrelated secrets, o
 
 ### Kubernetes identity and workload boundary matrix
 For each test cluster, record context/cluster identity, namespace, service account, RBAC verbs/resources, workload security context, mounted secrets, network policies, admission controls, and exposed control-plane routes. Use read-only effective-permission checks and synthetic namespace fixtures; do not list or export real secrets, exec into production workloads, create privileged pods, or alter cluster-wide resources without explicit authorization. A permissive RBAC rule is a posture issue until a controlled principal is shown to access a protected fixture. Route cloud workload identity to cloud assessment and container host-boundary configuration to Docker/container review. Include cleanup status and the precise resource/policy path in the evidence.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use kubectl for authorized read-only cluster context and configuration checks; Kubescape and kube-bench add Kubernetes security posture coverage; Trivy reviews images and dependencies. Choose based on whether the question is cluster, workload, or image-focused.
+
+### Installation and setup
+- [kubectl installation](https://kubernetes.io/docs/tasks/tools/) — official platform instructions.
+- [Kubescape installation](https://kubescape.io/docs/getting-started/) — official setup.
+- [kube-bench](https://github.com/aquasecurity/kube-bench) — official project/readme.
+- [Trivy installation](https://trivy.dev/latest/docs/getting-started/installation/) — official release instructions.
+Check kubeconfig context, namespace, and identity before running scans. Prefer a test cluster or read-only account; do not apply manifests or remediate settings without approval.
+
+### Primary resources
+- [Kubernetes security concepts](https://kubernetes.io/docs/concepts/security/) — workload and control plane model.
+- [Kubernetes Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) — policy levels.
+- [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes) — configuration baseline.
+
+### Reusable helper
+Run python3 .cyberstrike/skill/scripts/validate_evidence_manifest.py evidence/manifest.json to preserve a sanitized record of posture-check output.
+
+### Result handling
+Record cluster/context/version, namespace, control ID, observed state, exception/compensating control, and safe remediation guidance. Do not copy kubeconfigs or service-account tokens into the report.
