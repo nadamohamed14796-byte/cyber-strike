@@ -159,3 +159,30 @@ Run python3 .cyberstrike/skill/scripts/normalize_urls.py urls.txt to deduplicate
 
 ### Result handling
 Keep each fingerprint's source/time/confidence and confirm version clues with headers, assets, or a normal route. Don't collapse uncertainty into an exact version without corroboration.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
+
+### Recommended tools
+- whatweb — technology fingerprints
+- wpscan — WordPress-specific checks only when applicable and authorized
+- retire.js — client-side library version clues
+- Trivy/Semgrep — local dependency/source checks when available
+
+### Resources
+- https://github.com/urbanadventurer/WhatWeb
+- https://wpscan.com/
+- https://github.com/RetireJS/retire.js
+- https://owasp.org/www-project-web-security-testing-guide/
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
+
+### Helper-script contract
+Keep fingerprint evidence, version confidence, vendor advisory ID, affected component, and safe verification result. Do not infer vulnerable status from a guessed banner or outdated fingerprint alone.
+
+Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+
+### Handoff
+Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
