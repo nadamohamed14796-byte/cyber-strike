@@ -36,6 +36,6 @@ Assess whether a captured input reaches an Access/Jet/ACE query unsafely. Databa
 
 Record the request ID, candidate input, why Access is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` for each meaningful executed test and `validate_finding` for the ten-check assessment.
 
-A decisive confirmation may stop early. A false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. Duplicates, unexecuted ideas, and invalid scope/setup do not count. If this cannot safely be completed, keep `INCONCLUSIVE / NEEDS REVIEW`.
+A decisive confirmation may stop early. A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies. Duplicates, unexecuted ideas, and invalid scope/setup do not count. If this cannot safely be completed, keep `INCONCLUSIVE / NEEDS REVIEW`.
 
 Report only demonstrated impact with minimal redacted evidence. Never include tokens, credentials, personal data, or extracted database records.

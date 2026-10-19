@@ -38,6 +38,6 @@ Review OAuth/OIDC configuration and validate a specific authorization hypothesis
 
 Record the request IDs, test client label, intended redirect URI, scope set, baseline/control, observed result, and valid preconditions. Never store secrets or live tokens in notes.
 
-Use `verification_attempt` for meaningful executed tests and `validate_finding` for the ten-check assessment. A decisive confirmation may stop early. A final false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks; if this cannot safely be completed, keep `INCONCLUSIVE / NEEDS REVIEW`.
+Use `verification_attempt` for meaningful executed tests and `validate_finding` for the ten-check assessment. A decisive confirmation may stop early. A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies; if this cannot safely be completed, keep `INCONCLUSIVE / NEEDS REVIEW`.
 
 Use `report_vulnerability` only when a protocol or authorization boundary violation is demonstrated. Include a minimal redacted reproduction and remediation. Do not report unsupported configuration preferences as exploitable findings.

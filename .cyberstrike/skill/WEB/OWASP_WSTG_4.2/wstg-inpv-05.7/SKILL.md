@@ -30,6 +30,6 @@ Assess whether user-controlled input alters an ORM-generated query, filter, or s
 5. If no safe control can distinguish the hypothesis, stop and preserve the candidate as inconclusive.
 
 ## Evidence and reporting
-Record request ID, input point, why an ORM sink is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; a false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. Duplicates and invalid preconditions do not count.
+Record request ID, input point, why an ORM sink is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies. Duplicates and invalid preconditions do not count.
 
 Report only demonstrated impact with minimal redacted evidence. Never include credentials, personal data, database dumps, or destructive query output.

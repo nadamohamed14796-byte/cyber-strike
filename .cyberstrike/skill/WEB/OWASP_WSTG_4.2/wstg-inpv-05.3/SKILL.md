@@ -30,6 +30,6 @@ Assess whether captured input reaches a SQL Server query unsafely. SQL Server er
 5. Do not escalate a query signal to command execution or data extraction. If safe controls are unavailable, mark the result inconclusive.
 
 ## Evidence and reporting
-Record the request ID, candidate input, why MSSQL is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; a false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. Duplicates and invalid preconditions do not count.
+Record the request ID, candidate input, why MSSQL is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies. Duplicates and invalid preconditions do not count.
 
 Report only demonstrated impact with minimal redacted evidence. Never include credentials, personal data, database dumps, or OS command output.

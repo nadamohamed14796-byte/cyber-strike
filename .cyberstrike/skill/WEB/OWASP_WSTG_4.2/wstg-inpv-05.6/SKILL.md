@@ -31,6 +31,6 @@ Determine whether caller-controlled JSON/query values alter a NoSQL query or fil
 5. Treat a changed result count, generic 500, or accepted object as a lead. Confirm that query semantics changed and that access policy was violated; rule out validation, caching, and expected filter behavior.
 
 ## Evidence and reporting
-Record request ID, candidate input, evidence for the NoSQL sink, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; a false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. Duplicates and invalid preconditions do not count.
+Record request ID, candidate input, evidence for the NoSQL sink, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies. Duplicates and invalid preconditions do not count.
 
 Report only demonstrated impact with minimal redacted evidence. Never include tokens, credentials, personal data, or extracted documents.

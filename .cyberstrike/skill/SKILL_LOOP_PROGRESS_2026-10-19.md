@@ -47,3 +47,8 @@ The five new skill files were fetched again from main. All five have frontmatter
 
 
 Additional file: `attack-database-service-exposure/SKILL.md` was added and read back; its frontmatter and five local handoff targets resolve.
+
+
+## Follow-up runtime-policy reconciliation — 2026-10-19
+
+The earlier notes above record the state of the skill-enrichment pass at that time. The follow-up code pass removes the conflicting fixed 20-attempt minimum from runtime prompts and validation descriptions, keeps evidence-backed attempt deduplication, requires resolved validation checks and multiple attempt-linked contradictions including a primary contradiction, and binds false-positive classification to the durable `DISPROVEN` ledger outcome for the same finding. Relevant unit coverage includes a low-count case proving the verdict logic has no arbitrary numeric minimum. Current CI status is tracked on the latest `main` commit; this note is not itself a claim that CI has passed.

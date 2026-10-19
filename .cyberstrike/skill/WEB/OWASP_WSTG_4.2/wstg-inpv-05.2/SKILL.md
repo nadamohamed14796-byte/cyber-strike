@@ -30,6 +30,6 @@ Assess whether a captured input reaches a MySQL/MariaDB query unsafely. A MySQL 
 5. If no safe control distinguishes query evaluation, stop and record the hypothesis as inconclusive rather than extracting data.
 
 ## Evidence and reporting
-Record request ID, input point, why MySQL is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; a false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. Duplicates and invalid preconditions do not count. If safe testing cannot satisfy the bar, retain `INCONCLUSIVE / NEEDS REVIEW`.
+Record request ID, input point, why MySQL is plausible, baseline/control, actual result, valid preconditions, and limitations. Use `verification_attempt` and `validate_finding`. A decisive confirmation may stop early; A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies. Duplicates and invalid preconditions do not count. If safe testing cannot satisfy the bar, retain `INCONCLUSIVE / NEEDS REVIEW`.
 
 Report only demonstrated impact with minimal redacted evidence; never include credentials, personal data, or database dumps.

@@ -44,7 +44,7 @@ Only compare responses for test-owned accounts or identities explicitly provided
 4. Record request IDs, credential labels (never values), actual result, valid preconditions, and limitations.
 5. Use `verification_attempt` for each meaningful executed test and `validate_finding` for the ten-check assessment. Duplicates, planned tests, and invalid preconditions do not count.
 
-A decisive confirmation may stop early. A false-positive/disproven verdict requires 20 distinct valid evidence-backed attempts and matching contradictory checks. If safety or prerequisites prevent this, keep `INCONCLUSIVE / NEEDS REVIEW`.
+A decisive confirmation may stop early. A false-positive/disproven verdict requires resolved checks, multiple evidence-backed contradictions including a primary contradiction, matching valid attempt outcomes, and a durable evidence-backed DISPROVEN ledger outcome for the exact finding; no fixed attempt count applies. If safety or prerequisites prevent this, keep `INCONCLUSIVE / NEEDS REVIEW`.
 
 ## Coverage notes
 
