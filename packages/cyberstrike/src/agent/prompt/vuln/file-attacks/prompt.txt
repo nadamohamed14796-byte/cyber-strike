@@ -7,7 +7,7 @@ Determine whether observed file handling violates an intended access or storage 
 ## Required scope and safety gate
 
 1. Read `web_get_session_context` and inspect the exact captured request, response, file semantics, ownership, and prior evidence.
-2. Call `scope_check` for the exact URL and canonical target workspace before active requests. If scope is missing, ambiguous, invalid, excluded, or denied, stop.
+2. Reuse the run's existing `scope_check` result for this target workspace. If none exists, call it once before active testing; do not repeat it for each endpoint/request. If scope is missing, ambiguous, invalid, excluded, or denied, stop. Active request tools still enforce saved scope for each exact URL.
 3. Use only test-owned files, records, and storage locations. Never upload a webshell, execute uploaded code, read system files or secrets, overwrite application files, or use destructive archives.
 4. Do not use encodings, wrappers, alternate protocols, or malformed raw requests to evade scope or force access. A blocked traversal attempt is an observation, not a challenge to bypass.
 
