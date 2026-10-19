@@ -167,23 +167,15 @@ Store mailbox message ID, request correlation ID, timestamps, token metadata (no
 - Different response wording without a reliable oracle → record as possible enumeration only if policy and repeatable evidence support it; do not overstate takeover.
 
 
-## Practical tooling, references, and helper scripts (2026-10-19)
+## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools that fit this skill
-- Burp Repeater and browser DevTools with controlled accounts; never print cookies, OTPs, reset links, or tokens.
-- Treat CLIs as optional until locally verified. Prefer read-only checks; state-changing tests require permission and a disposable fixture.
+- Python `httpx` or `curl`: compare observed reset/verify/complete requests using tester-owned accounts.
+- Dedicated test mailbox/API: inspect reset links only for accounts controlled by the tester.
+- `jq`: parse redacted reset response metadata.
+- `rg`: review local source/configuration for token generation, account/action binding, expiry, and one-time use.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare saved responses offline.
 
-### Primary resources
-- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html) — auth controls.
-- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) — session lifecycle.
-- [PortSwigger Academy](https://portswigger.net/web-security) — controlled labs.
+Verify `curl --version`, the chosen Python client, and `jq --version`. Official docs: https://curl.se/docs/, https://www.python-httpx.org/, https://jqlang.org/.
 
-### Small reusable helper
-    python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt
-Compares local artifacts offline with heuristic redaction; no requests are sent and sanitization is not guaranteed.
-
-### Evidence and hand-off
-- Keep cookies, tokens, reset links, private user data, and secret values out of notes, global research storage, and Git commits. Keep private originals local; share only reviewed derivatives.
-- Mark outcomes confirmed, disproven, or still hypothetical. Record tool errors and coverage gaps rather than inventing results.
-
-Compare baseline and control, vary one meaningful property, and record alternative explanations before confirming a lead.
+### Evidence and limits
+Use only tester-owned accounts and mailbox. Preserve message ID, request correlation ID, timestamps, token metadata (not token value), state before/after, and cleanup result. Keep raw recovery links and codes out of reports, shell history, shared notes, and commits.
