@@ -2,6 +2,7 @@
 name: ad-security
 description: Active Directory security testing and attack techniques
 tags: [ad, windows, kerberos, ldap, internal-network]
+chains_with: [attack-security-headers, recon-email-security, attack-triage-validation]
 version: "1.0"
 ---
 
@@ -207,3 +208,7 @@ Reports should include sanitized domain/host context, the exact relationship or 
 | Pass-the-Hash | 4624 Type 3 with NTLM | Overpass-the-Hash (Kerberos) |
 | BloodHound    | LDAP queries          | Reduce collection scope      |
 | Mimikatz      | AV signatures         | BOF, custom tools            |
+
+
+## Chaining and impact enrichment
+Treat email-authentication weaknesses as a signal, not standalone impact. Correlate SPF/DKIM/DMARC policy with the actual sending path, From-domain alignment, receiver disposition, and a controlled mailbox you own. Chain only when independently observed: spoofable domain use → receiver accepts a controlled test message → a credible impersonation path in the program's threat model. Do not claim account takeover from a missing DNS record alone. Link the result to `recon-email-security`, `attack-security-headers` where browser delivery context matters, and `attack-triage-validation`.
