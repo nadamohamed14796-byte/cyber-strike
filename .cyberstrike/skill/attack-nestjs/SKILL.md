@@ -167,3 +167,27 @@ Record module_name, controller_or_resolver, route_or_operation, transport, guard
 - Nested object belongs to another test account → BOLA/IDOR if object policy fails.
 - GraphQL/WS path differs from REST → validate each transport independently; do not assume shared middleware.
 - Swagger or error stack visible → information disclosure only if non-public sensitive details are exposed contrary to policy.
+
+
+## Tool installation and optional tooling (2026-10-19)
+
+### Recommended tools and purpose
+Use browser DevTools and Burp for runtime behavior; Node.js/npm and Nest CLI for an owned source project; Semgrep or configured ESLint security rules for source review.
+
+### Installation and setup
+- [Node.js downloads](https://nodejs.org/en/download/) — install a supported release.
+- [NestJS first steps and CLI](https://docs.nestjs.com/first-steps) — use the framework's own setup.
+- [Semgrep getting started](https://semgrep.dev/docs/getting-started/) — follow the maintained installation instructions.
+
+Run on a disposable clone or lab project before enabling autofixes or changing dependencies. Confirm versions and preserve the project's lockfile.
+
+### Primary resources
+- [NestJS security](https://docs.nestjs.com/security) — framework-specific controls.
+- [NestJS guards](https://docs.nestjs.com/guards) — authorization integration points.
+- [OWASP API Security Top 10](https://owasp.org/API-Security/editions/2023/en/0x00-header/) — API risk taxonomy.
+
+### Reusable helper
+`python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt` compares sanitized responses offline.
+
+### Result handling
+Pair every source-level concern with a relevant runtime test where feasible; a finding in code alone may not be reachable or exploitable.
