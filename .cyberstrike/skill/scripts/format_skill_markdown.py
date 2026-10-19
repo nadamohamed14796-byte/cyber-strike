@@ -9,6 +9,7 @@ or touch code-block contents beyond line endings.
 Run from repository root:
   python3 .cyberstrike/skill/scripts/format_skill_markdown.py --check
   python3 .cyberstrike/skill/scripts/format_skill_markdown.py --write
+  python3 .cyberstrike/skill/scripts/format_skill_markdown.py --self-test
 """
 from __future__ import annotations
 
@@ -60,6 +61,17 @@ def format_markdown(raw: str) -> str:
     return "\n".join(out) + "\n"
 
 
+
+def self_test() -> int:
+    sample = "\ufeff# Title  \r\n\r\n\r\ntext  \r\n```bash  \r\n  echo hi  \r\n```  \r\n\r\n## Next\r\n"
+    formatted = format_markdown(sample)
+    assert formatted.startswith("# Title\n\ntext\n")
+    assert "  echo hi  \n" in formatted
+    assert formatted.endswith("## Next\n")
+    assert format_markdown(formatted) == formatted
+    print("self-test: PASS")
+    return 0
+
 def candidates() -> list[Path]:
     if not ROOT.is_dir():
         return []
@@ -77,7 +89,10 @@ def main() -> int:
     mode.add_argument("--write", action="store_true", help="write normalized Markdown")
     mode.add_argument("--check", action="store_true", help="exit nonzero if changes are needed")
     parser.add_argument("--path", type=Path, help="format/check one SKILL.md")
+    parser.add_argument("--self-test", action="store_true", help="run formatter fixture tests")
     args = parser.parse_args()
+    if args.self_test:
+        return self_test()
     paths = [args.path] if args.path else candidates()
     if not paths:
         print(f"ERROR: no SKILL.md files found under {ROOT}", file=sys.stderr)
