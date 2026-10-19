@@ -395,9 +395,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     if (shellWrappers.has(executable)) {
       const commandFlag = command.findIndex((value, index) => index > executableIndex && ["-c", "-lc", "-ec"].includes(stripOuterShellQuotes(value)))
       const payload = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
-      const wrappedScanner = Object.keys(SCANNER_PHASES).find((name) =>
-        new RegExp("^\\s*(?:(?:env|sudo)\\s+)*(?:[^\\s;&|]+/)*" + name + "(?:\\s|$)", "i").test(payload.trim()),
-      )
+      const wrappedScanner = payload ? await findWrappedScanner(payload) : undefined
       if (wrappedScanner) {
         throw new Error("Recon execution gate blocked an indirect/wrapped " + wrappedScanner + " invocation. Run the scanner as a direct command so target scope and phase prerequisites can be checked.")
       }
@@ -601,6 +599,50 @@ const parser = lazy(async () => {
   p.setLanguage(bashLanguage)
   return p
 })
+
+const SHELL_WRAPPERS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish"])
+
+function commandTokens(node: NonNullable<ReturnType<NonNullable<Awaited<ReturnType<typeof parser>>["parse"]>["rootNode"]["child"]>>): string[] {
+  const command: string[] = []
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i)
+    if (!child) continue
+    if (["command_name", "word", "string", "raw_string", "concatenation"].includes(child.type)) command.push(child.text)
+  }
+  return command
+}
+
+/** Parse shell payloads as shell code, not regex text, so quoted arguments don't trigger false positives. */
+export async function findWrappedScanner(payload: string): Promise<string | undefined> {
+  const pending = [payload]
+  const seen = new Set<string>()
+  const parserInstance = await parser()
+
+  while (pending.length > 0) {
+    const script = pending.pop()!
+    if (!script.trim() || seen.has(script)) continue
+    seen.add(script)
+    const tree = parserInstance.parse(script)
+    if (!tree) continue
+
+    for (const node of tree.rootNode.descendantsOfType("command")) {
+      const command = commandTokens(node)
+      const scannerIndex = scannerExecutableIndex(command)
+      if (scannerIndex >= 0) return path.basename(stripOuterShellQuotes(command[scannerIndex]!)).toLowerCase()
+
+      const executableIndex = commandExecutableIndex(command)
+      if (executableIndex < 0) continue
+      const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
+      if (!SHELL_WRAPPERS.has(executable)) continue
+      const commandFlag = command.findIndex((value, index) =>
+        index > executableIndex && ["-c", "-lc", "-ec"].includes(stripOuterShellQuotes(value)),
+      )
+      const nested = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
+      if (nested) pending.push(nested)
+    }
+  }
+  return undefined
+}
 
 // TODO: we may wanna rename this tool so it works better on other shells
 export const BashTool = Tool.define("bash", async () => {
