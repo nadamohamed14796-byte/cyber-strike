@@ -259,7 +259,7 @@ test("specialized proxy tools stay limited to their intended tester agents", asy
       expect(injection?.prompt).toContain("Evidence-Grounded First Move")
       expect(injection?.prompt).toContain("scope_check")
       expect(injection?.prompt).toContain("A request containing a parameter is not by itself an injection hypothesis")
-      expect(injection?.prompt).toContain("20 distinct valid evidence-backed attempts")
+      expect(injection?.prompt).toContain("no fixed attempt count applies")
       expect(injection?.prompt).toContain("Step 6: Record attempts and validate the finding")
       expect(injection?.prompt).toContain("A WAF, filter, or validation response is an observation")
       expect(injection?.prompt).not.toContain("On ANY request carrying a parameter")
