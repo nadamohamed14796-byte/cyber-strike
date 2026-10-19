@@ -194,3 +194,29 @@ Confirm the active alias, account, and bucket before reading or changing resourc
 
 ### Result handling
 Start with read-only policy and object metadata checks. Use synthetic objects for mutation tests and preserve a sanitized record of the active principal/context.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and local scripts the agent can invoke directly; browser UI, extensions, and interactive intercepting proxies are not dependencies. Verify official install docs, version, license, platform compatibility, and operational impact before use.
+
+### Recommended tools
+- AWS CLI read-only commands for authorized S3-compatible configuration where applicable
+- mc (MinIO Client) for explicitly authorized MinIO test environments
+- Prowler or ScoutSuite for supported cloud posture inventory
+- Python/jq to compare bucket/object policy metadata
+
+### Resources
+- https://min.io/docs/minio/linux/reference/minio-mc.html
+- https://docs.aws.amazon.com/cli/latest/reference/s3api/
+- https://github.com/prowler-cloud/prowler
+- https://github.com/vavkamil/awesome-bugbounty-tools
+
+Community lists are discovery aids, not a substitute for reviewing source, release provenance, and supported behavior.
+
+### Helper-script contract
+Test only known target-owned buckets or explicitly listed storage. Capture anonymous access policy and harmless canary object behavior; never list/download unrelated customer data or upload executable content.
+
+Preserve native evidence; normalize to a separate file. Keep source, timestamp, tool/version, error state, confidence, and redaction. Use explicit paths, machine-readable output, and local test fixtures. Never silently treat missing data as a pass.
+
+### Handoff
+Return actual commands/tool versions, input/output paths, records checked, failures, confidence, limitations, and next skill. A detected service or misconfiguration is a lead until impact is confirmed.
