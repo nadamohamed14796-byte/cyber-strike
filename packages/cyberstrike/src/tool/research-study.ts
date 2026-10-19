@@ -106,7 +106,7 @@ const StudyItem = z.object({
 const ResearchStudyParameters = z.object({
   action: z.enum(["backfill", "begin", "complete", "discover", "next", "read", "reset", "save", "stats"]),
   source: z.string().trim().min(1).max(100).optional(),
-  cycle_id: z.string().trim().min(8).max(100).optional().or(z.literal("")).describe("Exact durable run ID returned by action=begin; pass it on every discover/next/read/save/complete call to prevent stale-cycle writes. Omit this field on action=begin; an empty string is accepted for compatibility with callers that serialize unset optional fields."),
+  cycle_id: z.string().trim().min(8).max(100).optional().or(z.literal("")).describe("Exact durable run ID returned by action=begin; pass it on every discover/next/read/save/complete call to prevent stale-cycle writes. Omit this field on action=begin. Empty string is tolerated only for begin compatibility; omit unset optional fields on all other actions."),
   // Per-call discovery window only; /update must expand pages until exhaustion.
   pages: z.number().int().min(1).default(20),
   continue_after_save: z.boolean().default(false),
@@ -115,6 +115,10 @@ const ResearchStudyParameters = z.object({
   lease_owner: z.string().min(8).max(200).optional(),
   offset: z.number().int().min(0).optional().describe("JavaScript string offset (UTF-16 code units) from the previous next_offset, not a UTF-8 byte offset; defaults to zero."),
   items: z.array(StudyItem).optional(),
+}).superRefine((params, ctx) => {
+  if (params.cycle_id === "" && params.action !== "begin") {
+    ctx.addIssue({ code: "custom", path: ["cycle_id"], message: "Omit cycle_id on begin; every other cycle action requires the exact non-empty cycle_id returned by begin." })
+  }
 })
 
 const KNOWN_CLASSES = new Set([
