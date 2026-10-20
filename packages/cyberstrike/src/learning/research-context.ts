@@ -256,7 +256,7 @@ export namespace ResearchContext {
       "Adapt only the root-cause pattern to endpoints and test objects already observed in this authorized target. Verify independently, preserve controls and negative results, and never copy source-program identifiers or secrets into target notes.",
       "Keep target-specific evidence in its workspace and public methodology in global research. Use research_reference_ids only when a surfaced reference materially changes test design or finding interpretation.",
     ].join("\n")
-    if (signalPool.length === 0) return null
+    if (signalPool.length === 0) return baseline + "\nNo target-specific signals are available yet; use normal methodology and wait for observed evidence before selecting public research."
 
     // Avoid building one noisy query from every Intel title (credentials,
     // generic subdomains, and unrelated technologies otherwise drown out a real
