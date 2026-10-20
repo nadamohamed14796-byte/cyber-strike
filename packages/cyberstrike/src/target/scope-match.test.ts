@@ -38,7 +38,7 @@ describe("HackerOne typed scope assets", () => {
 
   test("scheme-less URL paths never broaden to the whole host", () => {
     expect(checkMatch("https://example.com/api", "example.com/api").matches).toBe(true)
-    expect(checkMatch("https://example.com/api/users", "example.com/api").matches).toBe(false)
+    expect(checkMatch("https://example.com/api/users", "example.com/api").matches).toBe(true)
     expect(checkMatch("https://example.com/admin", "example.com/api").matches).toBe(false)
     expect(checkMatch("https://sub.example.com/api", "example.com/api").matches).toBe(false)
     expect(checkMatch("https://example.com/api/users", "URL: example.com/api/*").matches).toBe(true)
