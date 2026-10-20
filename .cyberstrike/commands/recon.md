@@ -192,7 +192,7 @@ Resolve the intended program or target without silently substituting a different
 
 If no usable target identifier can be determined, ask one concise question and stop before initializing a workspace or starting discovery.
 
-If several targets are mentioned and their relationship is unclear, ask which target should be the root. Do not arbitrarily merge unrelated programs.
+If several domains are supplied as one complete program scope, keep them in one program workspace even when they are unrelated domains. Ask which target is the root only when the input does not identify a program or scope set at all; do not force the user to reformat a valid list.
 
 ## 1.2 Resolve the canonical workspace
 
@@ -540,7 +540,7 @@ Do not convert a failure into a negative security conclusion.
 
 Combine URLs from passive sources, authorized application navigation, existing captures, public documentation, and other verified sources.
 
-For live URL crawling, prefer Katana when the preflight confirms the binary is installed and every applicable saved scope layer grants host-wide access without path/protocol/port restrictions. Run one Katana command per already-authorized host with exactly one `-u` input: `katana -u <authorized URL> -fs fqdn -rl 5 -d 3 -jc -j -ncb -silent -o <absolute path under the canonical workspace>/urls/katana-urls-<run-id>-<host-slug>.jsonl`; use a unique output path for every run. The runtime gate checks each target and inherited scope layers. Never use `-ns`, `-do`, custom `-cs`, or file/list input to get around scope. If the saved manifest has URL/path/port boundaries or the gate refuses the crawl, use `hackbrowser` rather than weakening authorization. Katana's FQDN mode is host-specific; do not treat it as permission to crawl sibling hosts. Use `gau <authorized hostname>` for complementary historical URLs when useful. Use `waybackurls` only as `printf '%s\\n' '<authorized hostname>' | waybackurls`; the runtime extracts the literal input host and checks it against saved scope. Do not pipe files or dynamic target lists through generic shell without a validated input adapter. Reuse a saved source output when its target inputs and tool version are unchanged; rerun it only for new inputs, a version/configuration change, or a documented artifact failure.
+For live URL crawling, choose the best available registered crawler for the actual saved scope and runtime. Use Katana, hackbrowser, or another suitable registered tool according to coverage, constraints, and tool readiness; do not impose a prompt-level allowlist or reject a useful tool solely because its command options differ from this example. Run against the complete set of authorized hosts, preserve per-host/source status and outputs, and let the registered runtime/request-level scope enforcement decide whether a specific invocation is allowed. Never weaken or bypass that enforcement, and never broaden the saved scope to make a tool work. Prefer the tool that supports the actual protocol/path/port boundaries; use alternatives when they add distinct coverage or recover a failure. Reuse successful outputs when inputs and tool versions are unchanged; rerun only for new inputs, a version/configuration change, or a documented artifact failure.
 
 Normalize URLs while preserving meaningful distinctions.
 
