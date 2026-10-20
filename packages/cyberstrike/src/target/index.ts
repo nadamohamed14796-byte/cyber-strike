@@ -270,6 +270,22 @@ function normalizeScopeItem(input: string): string {
     return hostname + ":" + port
   }
 
+  // Preserve path-limited URL scope entries. Without this branch,
+  // new URL("https://example.com/api") succeeds but later code saves only the
+  // hostname, silently broadening a path-only scope to the whole domain.
+  if (!/^https?:\\/\\//i.test(value) && value.includes("/") && !value.startsWith("/")) {
+    let parsed: URL
+    try {
+      parsed = new URL("https://" + value)
+    } catch {
+      throw new Error("Invalid scheme-less URL scope entry: " + value)
+    }
+    if (parsed.search || parsed.hash) {
+      throw new Error("Scope URL entries must not contain queries or fragments: " + value)
+    }
+    if (parsed.pathname !== "/") return "URL: " + value
+  }
+
   const wildcard = value.startsWith("*.")
   const hostInput = wildcard ? value.slice(2) : value
   let hostname: string
