@@ -149,6 +149,15 @@ test("legacy manifests migrate to require parameter discovery and revalidate dow
 })
 
 
+test("JavaScript correlation artifacts can be checkpointed in their canonical areas", () => {
+  const areas = RECON_PHASE_ARTIFACT_AREAS.javascript_analysis
+  expect(areas).toEqual(["javascript", "endpoints", "testing"])
+  expect(areas?.some((area) => "javascript/example-graph.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "endpoints/example-candidates.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "testing/tester-survey-example.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "reports/example.md".startsWith(area + "/"))).toBe(false)
+})
+
 test("vulnerability testing artifacts must be saved in a testing, findings, or evidence area", () => {
   const areas = RECON_PHASE_ARTIFACT_AREAS.vulnerability_testing
   expect(areas).toEqual(["testing", "findings", "evidence"])
