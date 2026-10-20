@@ -229,25 +229,10 @@ export const WebReconTool = Tool.define("web_recon", {
           "Configure the official scope first with: cyberstrike target scope <url> --include <domain> --source <program> --reference <official-https-url>",
         ].join("\n"))
       }
-      // A host covered by a root wildcard gets its own nested workspace before outputs
-      // are produced; exact-host target workspaces keep their path-scoped identity.
-      try {
-        const requestedURL = new URL(params.target)
-        if (targetWorkspace &&
-            requestedURL.hostname !== targetWorkspace.hostname &&
-            requestedURL.hostname.toLowerCase().endsWith("." + targetWorkspace.hostname.toLowerCase())) {
-          const child = await TargetMemory.registerObservedAsset(requestedURL.origin, "subdomain")
-          if (!child) {
-            return fail("[-] Scope matched but this subdomain could not be attached under its authorized parent. No network probes were sent and no artifact was written.")
-          }
-          targetWorkspace = child
-        }
-        // A program may list an additional non-subdomain host as an explicit scope item.
-        // Keep those results under the authorizing program workspace rather than falsely
-        // nesting the unrelated hostname or manufacturing a second authorization manifest.
-      } catch (error) {
-        return fail("[-] Could not prepare the canonical target workspace before reconnaissance: " + (error instanceof Error ? error.message : String(error)) + ". No network probes were sent.")
-      }
+      // Keep recon artifacts in the canonical program/root workspace. Discovered
+      // origins belong in the root inventory; do not create a full child workspace
+      // for each host just because it matches a wildcard. The scope decision above
+      // remains authoritative for the requested URL and active tools enforce scope.
 
       const requiredPhases = requiredPhasesForWebRecon(program)
       let requiredPhase = requiredPhases[0]
