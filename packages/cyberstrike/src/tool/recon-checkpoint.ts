@@ -171,7 +171,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           return { title: "Recon checkpoint rejected", output: "Phase " + phase + " is " + record.status + ", not running. Call begin first; the manifest was not changed.", metadata: { saved: false, reason: "phase_not_running", phase, status: record.status } }
         }
         if ((params.action === "block" || params.action === "fail" || params.action === "unavailable" || params.action === "defer") && !params.reason?.trim()) {
-          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, or unavailable.", metadata: { saved: false, reason: "reason_required" } }
+          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, unavailable, or deferred.", metadata: { saved: false, reason: "reason_required" } }
         }
         const status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : params.action === "defer" ? "deferred" : "unavailable"
         if (status === "complete" && !params.summary?.trim()) {
