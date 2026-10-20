@@ -22,8 +22,30 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       return { matches: false, reason: `HackerOne asset type "${assetType}" is not an HTTP target scope; use its appropriate assessment workflow` }
     }
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
+    if (assetType === "domain") {
+      const normalizedHost = parseHostname(identifier)
+      if (
+        !normalizedHost ||
+        normalizedHost !== identifier.toLowerCase().replace(/\.$/, "") ||
+        /[/:*{}@]/.test(identifier)
+      ) {
+        return { matches: false, reason: "HackerOne Domain assets must be a bare hostname without a path, port, or wildcard" }
+      }
+    }
+    if (assetType === "ip address" && ipv4ToNumber(identifier) === null && ipv6ToBigInt(identifier) === null) {
+      return { matches: false, reason: "HackerOne IP Address assets must be a single valid IPv4 or IPv6 address" }
+    }
+    if (assetType === "cidr") {
+      const v4 = identifier.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
+      const v6 = identifier.match(/^\[?([0-9a-f:.]+)\]?\/(\d{1,3})$/i)
+      const validV4 = Boolean(v4 && ipv4ToNumber(v4[1]) !== null && Number(v4[2]) <= 32)
+      const validV6 = Boolean(v6 && v6[1].includes(":") && ipv6ToBigInt(v6[1]) !== null && Number(v6[2]) <= 128)
+      if (!validV4 && !validV6) {
+        return { matches: false, reason: "HackerOne CIDR assets must be a valid IPv4 or IPv6 CIDR range" }
+      }
+    }
     if (assetType === "wildcard") allowed = identifier.includes("*") || /\{[^{}]+\}/.test(identifier) ? identifier : "*." + identifier
-    else if (assetType === "url") {
+    else if (assetType === "url" || (assetType === "api" && (identifier.includes("/") || /^https?:\/\//i.test(identifier)))) {
       return matchURLScope(rawTarget, identifier, !/^https?:\/\//i.test(identifier))
     } else {
       rawAllowed = rawScope.replace(/^[^:]+:\s*/, "").trim()
