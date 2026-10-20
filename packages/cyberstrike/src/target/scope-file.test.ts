@@ -108,6 +108,25 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
+  test("maps legacy HackerOne asset enum names without losing asset types", () => {
+    expect(parseScopeFileContents([
+      "identifier,asset_type",
+      "com.example.app,APPLE_STORE_APP_ID",
+      "com.example.beta,TESTFLIGHT",
+      "builds/app.apk,OTHER_APK",
+      "builds/app.ipa,OTHER_IPA",
+      "app-id,WINDOWS_APP_STORE_APP_ID",
+      "app-executable,DOWNLOADABLE_EXECUTABLES",
+    ].join("\\n"))).toEqual([
+      "iOS: App Store: com.example.app",
+      "iOS: Testflight: com.example.beta",
+      "Android: .apk: builds/app.apk",
+      "iOS: .ipa: builds/app.ipa",
+      "Windows: Microsoft Store: app-id",
+      "Executable: app-executable",
+    ])
+  })
+
   test("preserves Google Play app IDs as non-web typed scope entries", () => {
     expect(parseScopeFileContents([
       "identifier,asset_type,instruction,eligible_for_bounty",
