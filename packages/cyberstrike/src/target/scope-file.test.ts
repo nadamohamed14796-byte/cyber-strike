@@ -212,6 +212,11 @@ describe("parseScopeFileContents", () => {
     })
   })
 
+  test("rejects unsupported JSON instead of treating the whole document as one target", () => {
+    expect(() => parseScopeFileContents(JSON.stringify({ scope: ["example.com"] })))
+      .toThrow(/Unsupported JSON scope format/)
+  })
+
   test("accepts pasted Markdown tables from a scope export", () => {
     expect(parseScopeFileContents([
       "| identifier | asset_type |",
