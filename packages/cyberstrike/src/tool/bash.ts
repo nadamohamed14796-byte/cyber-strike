@@ -507,7 +507,6 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     // Inspect only payloads of an actual shell executable, including simple
     // launcher-prefixed forms such as "sudo bash -lc ...". Never search arbitrary
     // arguments of commands like grep/find for scanner names.
-    const executableIndex = commandExecutableIndex(command)
     const executable = executableIndex >= 0 ? path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase() : ""
     const shellWrappers = SHELL_WRAPPERS
     if (shellWrappers.has(executable)) {
@@ -746,6 +745,7 @@ export async function findWrappedScanner(payload: string): Promise<string | unde
     if (!tree) continue
 
     for (const node of tree.rootNode.descendantsOfType("command")) {
+      if (!node) continue
       const command = commandTokens(node)
       const scannerIndex = scannerExecutableIndex(command)
       if (scannerIndex >= 0) return path.basename(stripOuterShellQuotes(command[scannerIndex]!)).toLowerCase()
