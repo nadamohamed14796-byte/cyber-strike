@@ -242,12 +242,12 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         }
         const headings = skill.content
           .split(/\r?\n/)
-          .filter((line) => /^\\s{0,3}#{1,4}\\s+/.test(line))
+          .filter((line) => /^\s{0,3}#{1,4}\s+/.test(line))
           .map((line) => line.trim())
           .slice(0, 40)
         const intro = skill.content
           .split(/\r?\n/)
-          .filter((line) => line.trim() && !/^\\s*---\\s*$/.test(line) && !/^\\s*(name|description|metadata|license|version):/.test(line))
+          .filter((line) => line.trim() && !/^\s*---\s*$/.test(line) && !/^\s*(name|description|metadata|license|version):/.test(line))
           .slice(0, 8)
           .join("\n")
           .slice(0, 700)
