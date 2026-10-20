@@ -1217,31 +1217,9 @@ export const SessionRoutes = lazy(() =>
           log.info("credential registered", { sessionID, credentialID, label: body.credential.label })
         }
 
-        // Passive discovery only: attach observed origins when a persisted scope authorizes them.
-        // This branch never probes the host and must not block request ingestion on hierarchy errors.
-        if (normalized?.origin) {
-          const assetType = /^\/(?:api|graphql|v\d+)(?:\/|$)/i.test(normalized.normalizedPath) ||
-            /^(api|graphql|gateway)([.-]|$)/i.test(new URL(normalized.origin).hostname)
-            ? "api"
-            : "subdomain"
-          try {
-            await TargetMemory.registerObservedAsset(normalized.origin, assetType)
-          } catch (error) {
-            log.warn("unable to update target hierarchy from captured request", {
-              origin: normalized.origin,
-              error: error instanceof Error ? error.message : String(error),
-            })
-          }
-        }
-        if (body.page_url) {
-          try {
-            await TargetMemory.registerObservedAsset(body.page_url, "application")
-          } catch (error) {
-            log.warn("unable to register captured page asset", {
-              error: error instanceof Error ? error.message : String(error),
-            })
-          }
-        }
+        // Request capture must not create a full workspace per observed origin/page.
+        // Recon inventories and request references are kept with the canonical target;
+        // the observed origin is already represented by the captured request metadata.
 
         if (normalized) {
           const isDuplicate = Request.exists({
