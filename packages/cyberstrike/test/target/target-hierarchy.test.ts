@@ -72,6 +72,40 @@ describe("target asset hierarchy", () => {
     })
   })
 
+  test("keeps an existing program root out of a descendant wildcard's parent chain", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const root = await TargetMemory.ensure("https://www.mercadolibre.com")
+        const domain = await TargetMemory.ensure("https://mercadolibre.com")
+        expect(root.parentTargetID).toBeNull()
+        expect(domain.parentTargetID).toBeNull()
+
+        await TargetMemory.configureScope("https://mercadolibre.com", {
+          include: ["mercadolibre.com", "*.mercadolibre.com"],
+          authorizationSource: "Mercado Libre scope hierarchy regression fixture",
+          authorizationReference: "https://example.test/policy",
+        })
+
+        // The child wildcard now matches www.mercadolibre.com, but must not
+        // cause the existing root workspace to be reparented beneath that child.
+        const configuredRoot = await TargetMemory.configureScope("https://www.mercadolibre.com", {
+          include: ["www.mercadolibre.com", "*.mercadolibre.com"],
+          authorizationSource: "Mercado Libre root scope regression fixture",
+          authorizationReference: "https://example.test/policy",
+        })
+        const persistedRoot = await TargetMemory.get("https://www.mercadolibre.com")
+        const persistedDomain = await TargetMemory.get("https://mercadolibre.com")
+
+        expect(configuredRoot.workspace.id).toBe(root.id)
+        expect(persistedRoot?.parentTargetID).toBeNull()
+        expect(persistedDomain?.parentTargetID).toBeNull()
+        expect(() => TargetMemory.list()).not.toThrow()
+      },
+    })
+  })
+
   test("attaches explicitly scoped domains unrelated to the program workspace hostname", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
