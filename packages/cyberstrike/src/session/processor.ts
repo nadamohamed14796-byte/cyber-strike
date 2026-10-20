@@ -362,6 +362,21 @@ export namespace SessionProcessor {
               }
               if (needsCompaction) break
             }
+
+            // Some provider/proxy failures can end a stream normally while
+            // yielding neither user-facing text nor a tool call. Treat that as
+            // a failed turn instead of marking the session complete with no reply.
+            if (!needsCompaction && !input.assistantMessage.error) {
+              const completedParts = await MessageV2.parts(input.assistantMessage.id)
+              const producedOutput = completedParts.some(
+                (part) =>
+                  part.type === "tool" ||
+                  (part.type === "text" && part.text.trim().length > 0),
+              )
+              if (!producedOutput) {
+                throw new Error("The model returned an empty response (no text or tool calls).")
+              }
+            }
           } catch (e: any) {
             if (input.abort.aborted) {
               log.info("process aborted by user", { sessionID: input.sessionID })
