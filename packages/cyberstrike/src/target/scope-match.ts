@@ -23,37 +23,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     }
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
     if (assetType === "wildcard") allowed = identifier.includes("*") || /\{[^{}]+\}/.test(identifier) ? identifier : "*." + identifier
-    else if (assetType === "url" && !/^https?:\/\//i.test(identifier)) {
-      // HackerOne commonly exports URL identifiers without a scheme. Preserve
-      // host/path boundaries, accept HTTP or HTTPS, and support terminal /*
-      // path wildcards without admitting sibling paths such as /APIx.
-      let candidateURL: URL
-      let scopeURL: URL
-      try {
-        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
-        scopeURL = new URL("https://" + identifier)
-      } catch {
-        return { matches: false, reason: "invalid HackerOne URL asset identifier or target" }
-      }
-      if ((candidateURL.protocol !== "http:" && candidateURL.protocol !== "https:") ||
-          candidateURL.username || candidateURL.password || scopeURL.username || scopeURL.password) {
-        return { matches: false, reason: "HackerOne URL asset and target must be credential-free HTTP(S) URLs" }
-      }
-      const scopeHost = scopeURL.hostname.toLowerCase().replace(/\.$/, "")
-      const targetHost = candidateURL.hostname.toLowerCase().replace(/\.$/, "")
-      if (targetHost !== scopeHost || candidateURL.port !== scopeURL.port) {
-        return { matches: false, reason: "target does not match HackerOne URL asset host and port" }
-      }
-      const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
-      const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
-      const pathWildcard = scopePath.endsWith("/*")
-      const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
-      const pathMatches = pathWildcard
-        ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
-        : targetPath === pathPrefix
-      return pathMatches
-        ? { matches: true, reason: "matches HackerOne URL asset host, port, and path" }
-        : { matches: false, reason: "target does not match HackerOne URL asset host, port, and path" }
+    else if (assetType === "url") {
+      return matchURLScope(rawTarget, identifier, !/^https?:\\/\\//i.test(identifier))
     } else {
       rawAllowed = rawScope.replace(/^[^:]+:\s*/, "").trim()
       allowed = identifier
@@ -173,6 +144,14 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       : { matches: false, reason: "hostname or port does not match scope entry" }
   }
 
+  // Bare host/path scope entries are URL constraints, not a hostname shorthand.
+  // Do not silently drop the path and broaden authorization to the entire origin.
+  if (!typed && !allowed.includes("://") && allowed.includes("/") &&
+      !/^\\d+(?:\\.\\d+){3}\\/\\d{1,2}$/.test(allowed) &&
+      !/^\\[?[0-9a-f:.]+\\]?\\/\\d{1,3}$/i.test(allowed)) {
+    return matchURLScope(rawTarget, allowed, true)
+  }
+
   const hostname = parseHostname(value)
   if (!hostname) return { matches: false, reason: "target is not a valid domain, IP address, or HTTP(S) URL" }
 
@@ -215,6 +194,47 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // include subdomains must express that permission with an explicit wildcard.
   if (hostname === scopeHost) return { matches: true, reason: "exact domain/IP match (ignoring protocol, port, and path)" }
   return { matches: false, reason: "no exact domain/IP match; add an explicit wildcard if subdomains are in scope" }
+}
+
+/** Match URL assets without discarding the path, port, or an explicit scheme. */
+function matchURLScope(rawTarget: string, identifier: string, allowEitherScheme: boolean): ScopeMatch {
+  let targetURL: URL
+  let scopeURL: URL
+  const explicitScheme = /^https?:\\/\\//i.test(identifier)
+  try {
+    targetURL = /^[a-z][a-z\\d+.-]*:\\/\\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
+    scopeURL = explicitScheme ? new URL(identifier) : new URL("https://" + identifier)
+  } catch {
+    return { matches: false, reason: "invalid URL asset identifier or target" }
+  }
+  if (
+    (targetURL.protocol !== "http:" && targetURL.protocol !== "https:") ||
+    (scopeURL.protocol !== "http:" && scopeURL.protocol !== "https:") ||
+    targetURL.username || targetURL.password || scopeURL.username || scopeURL.password ||
+    scopeURL.search || scopeURL.hash
+  ) {
+    return { matches: false, reason: "URL asset and target must be credential-free HTTP(S) URLs; scope URL cannot contain a query or fragment" }
+  }
+  if (explicitScheme && !allowEitherScheme && targetURL.protocol !== scopeURL.protocol) {
+    return { matches: false, reason: "protocol does not match explicit URL asset" }
+  }
+  const scopeHost = scopeURL.hostname.toLowerCase().replace(/\\.$/, "")
+  const targetHost = targetURL.hostname.toLowerCase().replace(/\\.$/, "")
+  const hostMatches = scopeHost.startsWith("*.")
+    ? targetHost === scopeHost.slice(2) || targetHost.endsWith("." + scopeHost.slice(2))
+    : targetHost === scopeHost
+  if (!hostMatches) return { matches: false, reason: "target does not match URL asset host" }
+  if (targetURL.port !== scopeURL.port) return { matches: false, reason: "target does not match URL asset port" }
+  const scopePath = scopeURL.pathname.replace(/\\/+$/, "") || "/"
+  const targetPath = targetURL.pathname.replace(/\\/+$/, "") || "/"
+  const pathWildcard = scopePath.endsWith("/*")
+  const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\\/+$/, "") : scopePath
+  const pathMatches = pathWildcard
+    ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
+    : targetPath === pathPrefix
+  return pathMatches
+    ? { matches: true, reason: "matches URL asset host, port, and path" }
+    : { matches: false, reason: "target does not match URL asset path" }
 }
 
 /** Parse the actual HTTP(S) hostname. Bare hostnames and IPv4 literals are allowed. */
