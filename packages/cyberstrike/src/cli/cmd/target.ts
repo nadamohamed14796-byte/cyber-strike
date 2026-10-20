@@ -2,7 +2,7 @@ import type { Argv } from "yargs"
 import fs from "node:fs/promises"
 import { createHash } from "node:crypto"
 import path from "node:path"
-import { parseScopeFileContents, resolveScopeFilePath } from "../../target/scope-file"
+import { parseScopeFileContentsDetailed, resolveScopeFilePath } from "../../target/scope-file"
 import { cmd } from "./cmd"
 import { Instance } from "../../project/instance"
 import { TargetMemory, type TargetAssetType, type TargetNoteKind, type TargetNoteStatus } from "../../target"
@@ -106,6 +106,7 @@ const TargetScopeCommand = cmd({
         const requestedChange = Boolean(args.include?.length || args.exclude?.length || args.source || args.reference || args.file)
         if (requestedChange) {
           let fileEntries: string[] = []
+          let fileExcludedEntries: string[] = []
           let sourceContents: string | undefined
           let sourceFilePath: string | undefined
           let sourceHash: string | undefined
@@ -131,7 +132,9 @@ const TargetScopeCommand = cmd({
               throw new Error("Cannot read scope file " + sourceFilePath + ": " + (error instanceof Error ? error.message : String(error)))
             }
             try {
-              fileEntries = parseScopeFileContents(sourceContents!)
+              const parsedScope = parseScopeFileContentsDetailed(sourceContents!)
+              fileEntries = parsedScope.include
+              fileExcludedEntries = parsedScope.exclude
             } catch (error) {
               throw new Error((error instanceof Error ? error.message : String(error)) + " File: " + sourceFilePath)
             }
@@ -143,7 +146,7 @@ const TargetScopeCommand = cmd({
           const includeEntries = [...(args.include ?? []), ...fileEntries]
           const result = await TargetMemory.configureScope(args.url, {
             include: includeEntries,
-            exclude: args.exclude ?? [],
+            exclude: [...(args.exclude ?? []), ...fileExcludedEntries],
             authorizationSource: args.source ?? "",
             authorizationReference: args.reference ?? "",
           })
@@ -158,7 +161,8 @@ const TargetScopeCommand = cmd({
               title: "Scope file import checkpoint",
               content: [
                 "Imported an explicit scope list from " + path.basename(sourceFilePath ?? "scope file") + ".",
-                "Usable file entries: " + fileEntries.length + ".",
+                "In-scope file entries: " + fileEntries.length + ".",
+                "Explicit out-of-scope file entries: " + fileExcludedEntries.length + ".",
                 "Configured unique include entries: " + result.scope.scopeItems.length + ".",
                 "Source copy: scope/" + sourceFilename + ".",
                 "Source SHA-256: " + sourceHash + ".",
