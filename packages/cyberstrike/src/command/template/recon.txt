@@ -471,17 +471,11 @@ Before an active operation:
 4. Confirm the active tool will enforce persisted scope for the exact request.
 5. Record the decision and operation before execution.
 
-Reuse the root workspace for unvalidated and excluded candidates.
+Use one canonical root workspace for the entire recon run. Every discovered hostname, live host, URL, endpoint, and technology observation belongs in the root inventory files; do not create a child workspace per hostname, per URL, or per browser-captured origin. Do not call `attach_asset` or `registerObservedAsset` during ordinary discovery or request capture.
 
-Only attach an authorized child asset when it genuinely requires independent artifact organization and the registered tool confirms that the child remains associated with the root.
+A child workspace is an explicit exception only when the operator asks for independent investigation storage for a particular asset. A wildcard match or a successful scope check alone is not a reason to create one.
 
-If supported, use:
-
-`target_workspace(action="attach_asset", parent_target_url="<root target>", asset_url="<validated authorized child host>", asset_type="<verified asset type>")`
-
-Record the returned identity and path. Do not infer the child path from naming conventions.
-
-**Completion condition:** Each candidate has a recorded disposition, and each eligible child asset has a verified relationship to the root workspace.
+**Completion condition:** Every candidate has a recorded disposition in the root inventory, with source/provenance and authorization status where relevant.
 
 ## Stage C — DNS, HTTP, service, and technology reconnaissance
 
