@@ -36,6 +36,15 @@ describe("HackerOne typed scope assets", () => {
     expect(checkMatch("https://[2001:db8::2]/", "IP Address: 2001:db8::1").matches).toBe(false)
   })
 
+  test("scheme-less URL paths never broaden to the whole host", () => {
+    expect(checkMatch("https://example.com/api", "example.com/api").matches).toBe(true)
+    expect(checkMatch("https://example.com/api/users", "example.com/api").matches).toBe(false)
+    expect(checkMatch("https://example.com/admin", "example.com/api").matches).toBe(false)
+    expect(checkMatch("https://sub.example.com/api", "example.com/api").matches).toBe(false)
+    expect(checkMatch("https://example.com/api/users", "URL: example.com/api/*").matches).toBe(true)
+    expect(checkMatch("https://example.com/api?token=secret", "URL: example.com/api?token=secret").matches).toBe(false)
+  })
+
   test("URL assets retain host and path boundaries", () => {
     expect(checkMatch("https://example.com/app1/users", "URL: example.com/app1").matches).toBe(true)
     expect(checkMatch("https://example.com/app10", "URL: example.com/app1").matches).toBe(false)
