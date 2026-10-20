@@ -113,40 +113,10 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     }
   }
 
-  // Explicit URL scope entries can constrain scheme, port, and path. They must
-  // never be reduced to a hostname because that would silently broaden permission.
+  // Use the same boundary-aware matcher for explicit and typed URL entries.
+  // This keeps scheme, port, query/fragment, and directory semantics consistent.
   if (/^https?:\/\//i.test(allowed)) {
-    let candidateURL: URL
-    let scopeURL: URL
-    try {
-        candidateURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
-        scopeURL = new URL(rawAllowed)
-    } catch {
-      return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
-    }
-    if ((candidateURL.protocol !== "http:" && candidateURL.protocol !== "https:") ||
-      (scopeURL.protocol !== "http:" && scopeURL.protocol !== "https:") ||
-      candidateURL.username || candidateURL.password || scopeURL.username || scopeURL.password) {
-      return { matches: false, reason: "invalid HTTP(S) URL scope or target" }
-    }
-    const scopeHost = scopeURL.hostname.toLowerCase().replace(/\.$/, "")
-    const targetHost = candidateURL.hostname.toLowerCase().replace(/\.$/, "")
-    const hostMatches = scopeHost.startsWith("*.")
-      ? targetHost === scopeHost.slice(2) || targetHost.endsWith("." + scopeHost.slice(2))
-      : targetHost === scopeHost
-    if (!hostMatches) return { matches: false, reason: "hostname does not match explicit URL scope" }
-    if (candidateURL.protocol !== scopeURL.protocol) return { matches: false, reason: "protocol does not match explicit URL scope" }
-    if (candidateURL.port !== scopeURL.port) return { matches: false, reason: "port does not match explicit URL scope" }
-      const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
-      const targetPath = candidateURL.pathname.replace(/\/+$/, "") || "/"
-    const pathWildcard = scopePath.endsWith("/*")
-    const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
-    const pathMatches = pathWildcard
-      ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
-      : targetPath === pathPrefix
-    return pathMatches
-      ? { matches: true, reason: "matches explicit URL scope including scheme, port, and path" }
-      : { matches: false, reason: "path does not match explicit URL scope" }
+    return matchURLScope(rawTarget, rawAllowed, false)
   }
 
   // A host:port entry constrains the network service while accepting either scheme.
