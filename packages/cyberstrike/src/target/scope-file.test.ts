@@ -150,27 +150,25 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
-  test("routes HackerOne rows with eligible_for_submission=false to exclusions", () => {
+  test("does not mistake submission or bounty eligibility for scope", () => {
     const csv = [
       "identifier,asset_type,eligible_for_submission,eligible_for_bounty",
       "api.example.com,API,true,false",
       "admin.example.com,Domain,false,true",
     ].join("\n")
     expect(parseScopeFileContentsDetailed(csv)).toEqual({
-      include: ["API: api.example.com"],
-      exclude: ["Domain: admin.example.com"],
+      include: ["API: api.example.com", "Domain: admin.example.com"],
+      exclude: [],
     })
-    // Bounty ineligibility does not mean out of scope when submissions are allowed.
-    expect(parseScopeFileContentsDetailed(csv).include).toContain("API: api.example.com")
   })
 
   test("include-only parser refuses to silently discard explicit exclusions", () => {
     const csv = [
-      "identifier,asset_type,eligible_for_submission",
+      "identifier,asset_type,in_scope",
       "example.com,Domain,true",
       "admin.example.com,Domain,false",
     ].join("\n")
-    expect(() => parseScopeFileContents(csv)).toThrow(/eligible_for_submission=false.*exclusions are preserved/i)
+    expect(() => parseScopeFileContents(csv)).toThrow(/explicitly out-of-scope.*exclusions are preserved/i)
   })
 
   test("preserves unfamiliar typed scope entries instead of aborting the entire import", () => {
@@ -203,14 +201,14 @@ describe("parseScopeFileContents", () => {
       .toEqual(["example.com", "*.example.com", "https://api.example.com"])
   })
 
-  test("accepts JSON HackerOne rows and preserves submission exclusions", () => {
+  test("accepts JSON HackerOne rows without treating submission eligibility as scope", () => {
     const json = JSON.stringify([
       { identifier: "api.example.com", asset_type: "API", eligible_for_submission: true },
       { identifier: "admin.example.com", asset_type: "Domain", eligible_for_submission: false },
     ])
     expect(parseScopeFileContentsDetailed(json)).toEqual({
-      include: ["API: api.example.com"],
-      exclude: ["Domain: admin.example.com"],
+      include: ["API: api.example.com", "Domain: admin.example.com"],
+      exclude: [],
     })
   })
 
