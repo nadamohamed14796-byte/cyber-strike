@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parseScopeFileContents, resolveScopeFilePath } from "./scope-file"
+import { parseScopeFileContents, parseScopeFileContentsDetailed, resolveScopeFilePath } from "./scope-file"
 
 describe("parseScopeFileContents", () => {
   test("preserves valid wildcard suffix entries exactly as supplied", () => {
@@ -136,6 +136,29 @@ describe("parseScopeFileContents", () => {
       "Google Play App ID: com.mercadopago.wallet",
       "API: api.mercadopago.com",
     ])
+  })
+
+  test("routes HackerOne rows with eligible_for_submission=false to exclusions", () => {
+    const csv = [
+      "identifier,asset_type,eligible_for_submission,eligible_for_bounty",
+      "api.example.com,API,true,false",
+      "admin.example.com,Domain,false,true",
+    ].join("\\n")
+    expect(parseScopeFileContentsDetailed(csv)).toEqual({
+      include: ["API: api.example.com"],
+      exclude: ["Domain: admin.example.com"],
+    })
+    // Bounty ineligibility does not mean out of scope when submissions are allowed.
+    expect(parseScopeFileContentsDetailed(csv).include).toContain("API: api.example.com")
+  })
+
+  test("include-only parser refuses to silently discard explicit exclusions", () => {
+    const csv = [
+      "identifier,asset_type,eligible_for_submission",
+      "example.com,Domain,true",
+      "admin.example.com,Domain,false",
+    ].join("\\n")
+    expect(() => parseScopeFileContents(csv)).toThrow(/eligible_for_submission=false.*exclusions are preserved/i)
   })
 
   test("preserves unfamiliar typed scope entries instead of aborting the entire import", () => {
