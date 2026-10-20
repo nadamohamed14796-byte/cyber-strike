@@ -276,15 +276,15 @@ function createGlobalSync() {
     children.mark(directory)
     const [store, setStore] = existing
 
-    // Async prompts return before model execution finishes. Surface their
-    // session.error events to the user instead of silently leaving an optimistic
-    // user message in the timeline with no explanation.
+    // Async prompts return before model execution finishes. Surface the actual
+    // provider/server error instead of leaving an optimistic message unexplained.
     if (event.type === "session.error") {
       const properties = event.properties as {
         sessionID?: string
-        error?: { message?: string; name?: string }
+        error?: { name?: string; message?: string; data?: { message?: string } }
       }
-      const message = properties.error?.message || properties.error?.name
+      const message =
+        properties.error?.data?.message || properties.error?.message || properties.error?.name
       showToast({
         title: language.t("common.requestFailed"),
         description: message || language.t("common.requestFailed"),
