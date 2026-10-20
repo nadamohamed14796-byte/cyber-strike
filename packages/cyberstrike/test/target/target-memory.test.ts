@@ -188,20 +188,24 @@ test("persists an explicit target scope with authorization provenance and exclus
     directory: tmp.path,
     async fn() {
       const configured = await TargetMemory.configureScope("https://example.com", {
-        include: ["*.Example.com", "example.com"],
+        include: ["*.Example.com", "example.com", "mercadolibreexperience.com.*"],
         exclude: ["admin.example.com"],
         authorizationSource: "Example disclosure program",
         authorizationReference: "https://hackerone.com/example?secret=must-not-persist",
       })
       expect(configured.scope.status).toBe("configured")
-      expect(configured.scope.scopeItems).toEqual(["*.example.com", "example.com"])
+      expect(configured.scope.scopeItems).toEqual(["*.example.com", "example.com", "mercadolibreexperience.com.*"])
       expect(configured.scope.excludedItems).toEqual(["admin.example.com"])
       expect(configured.scope.authorizationReference).toBe("https://hackerone.com/example")
       const saved = await TargetMemory.getScope("https://example.com")
-      expect(saved?.scopeItems).toEqual(["*.example.com", "example.com"])
+      expect(saved?.scopeItems).toEqual(["*.example.com", "example.com", "mercadolibreexperience.com.*"])
       expect(saved?.authorizationSource).toBe("Example disclosure program")
       // An unrelated workspace on the same protocol/port must not make a wildcard target ambiguous.
       await TargetMemory.ensure("https://unrelated.example.test")
+      const suffixWildcardAllowed = await TargetMemory.checkURLScope("https://mercadolibreexperience.com.ar/")
+      expect(suffixWildcardAllowed.allowed).toBe(true)
+      const suffixWildcardLookalike = await TargetMemory.checkURLScope("https://mercadolibreexperience.com.attacker.test/")
+      expect(suffixWildcardLookalike.allowed).toBe(false)
       const allowed = await TargetMemory.checkURLScope("https://api.example.com/v1/users")
       expect(allowed.allowed).toBe(true)
       expect(allowed.workspace?.id).toBe(configured.workspace.id)
