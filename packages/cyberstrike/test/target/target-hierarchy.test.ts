@@ -77,10 +77,15 @@ describe("target asset hierarchy", () => {
     await Instance.provide({
       directory: tmp.path,
       async fn() {
-        const root = await TargetMemory.ensure("https://www.mercadolibre.com")
+        const initialRoot = await TargetMemory.configureScope("https://www.mercadolibre.com", {
+          include: ["www.mercadolibre.com", "*.mercadolibre.com"],
+          authorizationSource: "Mercado Libre root scope regression fixture",
+          authorizationReference: "https://example.test/policy",
+        })
+        const root = initialRoot.workspace
         const domain = await TargetMemory.ensure("https://mercadolibre.com")
         expect(root.parentTargetID).toBeNull()
-        expect(domain.parentTargetID).toBeNull()
+        expect(domain.parentTargetID).toBe(root.id)
 
         await TargetMemory.configureScope("https://mercadolibre.com", {
           include: ["mercadolibre.com", "*.mercadolibre.com"],
@@ -88,8 +93,8 @@ describe("target asset hierarchy", () => {
           authorizationReference: "https://example.test/policy",
         })
 
-        // The child wildcard now matches www.mercadolibre.com, but must not
-        // cause the existing root workspace to be reparented beneath that child.
+        // The child wildcard matches www.mercadolibre.com, but must not cause
+        // the existing program root to be reparented beneath that child.
         const configuredRoot = await TargetMemory.configureScope("https://www.mercadolibre.com", {
           include: ["www.mercadolibre.com", "*.mercadolibre.com"],
           authorizationSource: "Mercado Libre root scope regression fixture",
