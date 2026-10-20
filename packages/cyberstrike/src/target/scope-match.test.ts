@@ -18,6 +18,13 @@ describe("HackerOne typed scope assets", () => {
     expect(checkMatch("https://notamazon.com/", "Wildcard: www.amazon.*").matches).toBe(false)
   })
 
+  test("supports wildcard labels after the registered domain suffix", () => {
+    expect(checkMatch("https://mercadolibreexperience.com.ar/", "mercadolibreexperience.com.*").matches).toBe(true)
+    expect(checkMatch("https://mercadolibreexperience.com.br/", "mercadolibreexperience.com.*").matches).toBe(true)
+    expect(checkMatch("https://mercadolibreexperience.com.attacker.test/", "mercadolibreexperience.com.*").matches).toBe(false)
+    expect(checkMatch("https://mercadolibreexperience.com/", "mercadolibreexperience.com.*").matches).toBe(false)
+  })
+
   test("matches HackerOne Domain, IP Address, and CIDR identifiers", () => {
     expect(checkMatch("https://example.com/", "Domain: example.com").matches).toBe(true)
     expect(checkMatch("https://sub.example.com/", "Domain: example.com").matches).toBe(false)
