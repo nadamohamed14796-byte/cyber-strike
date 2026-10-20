@@ -107,6 +107,11 @@ const TargetScopeCommand = cmd({
         if (requestedChange) {
           let fileEntries: string[] = []
           let fileExcludedEntries: string[] = []
+          let preservedExistingExclusions: string[] = []
+          if (args.exclude === undefined) {
+            const currentScope = await TargetMemory.getScope(args.url)
+            if (currentScope?.status === "configured") preservedExistingExclusions = [...currentScope.excludedItems]
+          }
           let sourceContents: string | undefined
           let sourceFilePath: string | undefined
           let sourceHash: string | undefined
@@ -146,7 +151,7 @@ const TargetScopeCommand = cmd({
           const includeEntries = [...(args.include ?? []), ...fileEntries]
           const result = await TargetMemory.configureScope(args.url, {
             include: includeEntries,
-            exclude: [...(args.exclude ?? []), ...fileExcludedEntries],
+            exclude: [...(args.exclude ?? preservedExistingExclusions), ...fileExcludedEntries],
             authorizationSource: args.source ?? "",
             authorizationReference: args.reference ?? "",
           })
