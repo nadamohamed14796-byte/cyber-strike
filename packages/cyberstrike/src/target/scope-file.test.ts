@@ -2,6 +2,13 @@ import { describe, expect, test } from "bun:test"
 import { parseScopeFileContents, resolveScopeFilePath } from "./scope-file"
 
 describe("parseScopeFileContents", () => {
+  test("preserves valid wildcard suffix entries exactly as supplied", () => {
+    expect(parseScopeFileContents("mercadolibreexperience.com.*\n*.mercadolibre.com\n")).toEqual([
+      "mercadolibreexperience.com.*",
+      "*.mercadolibre.com",
+    ])
+  })
+
   test("parses exact entries and explicit wildcards without broadening", () => {
     expect(parseScopeFileContents("# program scope\r\natt.com\n*.att.com\n192.0.2.0/24\n")).toEqual([
       "att.com",
