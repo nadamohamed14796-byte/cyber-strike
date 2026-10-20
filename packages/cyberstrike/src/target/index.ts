@@ -285,6 +285,19 @@ function normalizeScopeItem(input: string): string {
     throw new Error("Invalid domain, IP, or scope identifier: " + value)
   }
   hostname = hostname.replace(/\.$/, "")
+  // HackerOne-style wildcard labels can appear outside the leading "*.domain"
+  // form, e.g. "www.example.*" and "{tenant}.example.com". Validate the fixed
+  // labels as DNS names and accept only a whole "*" or "{label}" token; do not
+  // reject a valid policy entry merely because URL parsing accepts its wildcard.
+  if (!wildcard && (hostInput.includes("*") || /\{[^{}]+\}/.test(hostInput))) {
+    const labels = hostInput.split(".")
+    const validLabels = labels.length >= 2 && labels.every((label) =>
+      label === "*" ||
+      /^\{[a-z][a-z0-9_-]{0,62}\}$/i.test(label) ||
+      /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/i.test(label)
+    )
+    if (validLabels) return hostInput.toLowerCase()
+  }
   if (!hostname || hostname.includes(":") || hostname.startsWith(".") || hostname.endsWith(".") ||
     !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(hostname)) {
     throw new Error("Invalid domain or IP scope entry: " + value)
