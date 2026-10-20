@@ -68,7 +68,7 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
     const markdownLink = line.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i)
     if (markdownLink) line = markdownLink[1]!
     return { line, index }
-  }).filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//") && !/^\\|?\\s*:?-{3,}/.test(row.line))
+  }).filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//") && !/^\|?\s*:?-{3,}(?:\s*\|\s*:?-{3,})*\s*\|?$/.test(row.line))
   if (nonEmpty.length === 0) throw new Error("Scope file contains no usable entries.")
 
   // HackerOne exports may be CSV/TSV; Markdown tables are also accepted when pasted directly.
