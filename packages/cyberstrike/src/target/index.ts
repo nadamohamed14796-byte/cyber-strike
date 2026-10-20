@@ -1176,6 +1176,30 @@ export namespace TargetMemory {
       if (!row) throw new Error("Target workspace could not be persisted.")
       return row
     })
+    // A configured wildcard can make an existing program root look like a
+    // candidate's DNS parent (for example, root www.example.com includes *.example.com).
+    // Never move an existing ancestor underneath its own descendant: that would create
+    // a cycle and make otherwise valid scope configuration fail. Keep the existing
+    // hierarchy in this case; scope matching still decides authorization.
+    let parentWouldCreateCycle = false
+    if (parent && row.parent_target_id !== parent.id) {
+      let ancestorID: string | null = parent.id
+      const visited = new Set<string>()
+      while (ancestorID) {
+        if (ancestorID === row.id) {
+          parentWouldCreateCycle = true
+          parent = null
+          break
+        }
+        if (visited.has(ancestorID)) break
+        visited.add(ancestorID)
+        const ancestorRow = Database.use((db) =>
+          db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, ancestorID!)).get(),
+        )
+        if (!ancestorRow || ancestorRow.project_id !== projectID || ancestorRow.owner_key !== ownerKey) break
+        ancestorID = ancestorRow.parent_target_id ?? null
+      }
+    }
     if (parent && row.parent_target_id !== parent.id) return await reparentWorkspace(row, parent, requestedAssetType)
 
     // Repeated passive observations may refine a child's classification. Apply an
@@ -1202,7 +1226,7 @@ export namespace TargetMemory {
       }
     }
 
-    if (!options.parentTargetURL && !parent && row.parent_target_id) {
+    if (!options.parentTargetURL && !parent && !parentWouldCreateCycle && row.parent_target_id) {
       const oldParentRow = Database.use((db) =>
         db.select().from(TargetWorkspaceTable).where(eq(TargetWorkspaceTable.id, row.parent_target_id!)).get(),
       )
