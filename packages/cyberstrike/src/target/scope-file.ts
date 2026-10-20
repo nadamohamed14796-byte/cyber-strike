@@ -46,7 +46,7 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
       Array.isArray(parsed) &&
       parsed.length > 0 &&
       parsed.every((item) => item !== null && typeof item === "object" && !Array.isArray(item)) &&
-      parsed.some((item) => "identifier" in item && "asset_type" in item)
+      parsed.some((item) => item !== null && typeof item === "object" && "identifier" in item && "asset_type" in item)
     ) {
       const headers = [...new Set(parsed.flatMap((item) => Object.keys(item as Record<string, unknown>)))]
       const csvCell = (value: unknown) => {
@@ -68,7 +68,7 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
     const markdownLink = line.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i)
     if (markdownLink) line = markdownLink[1]!
     return { line, index }
-  }).filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//"))
+  }).filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//") && !/^\\|?\\s*:?-{3,}/.test(row.line))
   if (nonEmpty.length === 0) throw new Error("Scope file contains no usable entries.")
 
   // HackerOne exports may be CSV/TSV; Markdown tables are also accepted when pasted directly.
