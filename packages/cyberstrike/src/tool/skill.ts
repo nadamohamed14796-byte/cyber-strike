@@ -245,10 +245,17 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           .filter((line) => /^\s{0,3}#{1,4}\s+/.test(line))
           .map((line) => "## " + line.trim().replace(/^#{1,4}\s+/, ""))
           .slice(0, 40)
-        const intro = skill.content
-          .split(/\r?\n/)
-          .filter((line) => line.trim() && !/^\s*---\s*$/.test(line) && !/^\s*(name|description|metadata|license|version):/.test(line))
-          .slice(0, 8)
+        const skillLines = skill.content.split(/\r?\n/)
+        const bodyStart = skillLines[0]?.trim() === "---"
+          ? skillLines.findIndex((line, index) => index > 0 && /^\s*---\s*$/.test(line)) + 1
+          : 0
+        const body = skillLines.slice(Math.max(0, bodyStart))
+        const intro = body
+          .slice(0, body.findIndex((line) => /^\s{0,3}#{1,6}\s+/.test(line)) < 0
+            ? body.length
+            : body.findIndex((line) => /^\s{0,3}#{1,6}\s+/.test(line)))
+          .filter((line) => line.trim())
+          .slice(0, 4)
           .join("\n")
           .slice(0, 700)
         return {
