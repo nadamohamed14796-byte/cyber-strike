@@ -34,6 +34,27 @@ Apply these rules throughout the entire workflow.
 - Never fabricate tool results, response data, source references, counts, hashes, timestamps, scope decisions, or artifact paths.
 - Distinguish observed facts, externally sourced facts, inferred relationships, unverified candidates, and unresolved questions.
 
+### 0.2.1 Preserve complete discovery results and expose a flat inventory
+
+The target workspace's user-facing outputs must be a small set of canonical files directly in the target workspace root. Do not create additional nested folders for presentation or split one inventory into numbered/chunk files. Existing internal directories may be used only where a registered tool requires them; merge their results into the root-level canonical files below.
+
+Canonical root-level outputs:
+- `scope.txt` — confirmed scope entries and exclusions.
+- `subdomains.txt` — every unique hostname discovered from every attempted root/source.
+- `subdomain-sources.json` — per-root/per-source status, raw record count, normalized valid count, unique count, duplicate count, invalid/rejected count, and output path.
+- `live-hosts.txt` — all validated live hosts, not just HTTP 200 responses.
+- `ports.txt` — observed ports/services where authorized and actually scanned.
+- `urls.txt` — deduplicated collected URLs; preserve meaningful query/parameter variants.
+- `parameters.txt` — observed parameter names with endpoint/method/source.
+- `endpoints.txt` — deduplicated endpoint inventory.
+- `javascript-analysis.md` — actionable JS routes, request shapes, parameter/header/auth clues, and source references.
+- `findings.md` — evidence-backed findings or an explicit empty status.
+- `recon-summary.md` — phases, tools, coverage, counts, errors, skipped/unattempted work, and exact artifact paths.
+
+Do not mark discovery complete merely because one tool ran or a merged file exists. For subdomain enumeration, create an explicit worklist from all in-scope roots; record a terminal status for each root and each source (success, zero-results, failed, unavailable, or skipped with reason). Preserve each source's raw output before normalization. Reconcile per source: raw records = valid records + invalid records; valid records = unique hosts + duplicate observations. Compare per-root coverage against the original worklist. Never describe a run as complete across N roots unless N roots have terminal statuses backed by saved output/logs. If a tool returns 30,000 records and the final inventory contains 2,000 hosts, report both counts and exact normalization/filter reasons; do not silently discard results or assume deduplication explains the difference without verification. No fixed output cap, top-N selection, truncation, or premature reuse of an old partial inventory is allowed as the final result. Old artifacts can be merged as additional observations but must not replace unfinished current inputs.
+
+If output validation/checkpointing rejects an artifact path, do not bypass the error or claim success. Save the verified result to an allowed canonical path, retry the checkpoint, and report any remaining mismatch as a blocker. The `url_collection` phase is separate and must actually run; live-host discovery does not imply URL collection is complete.
+
 ### 0.2 Persistent progress without arbitrary global ceilings
 
 Do not impose arbitrary total limits on eligible hosts, URLs, endpoints, JavaScript assets, parameters, sources, or findings.
