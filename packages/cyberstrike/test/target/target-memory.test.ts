@@ -182,6 +182,29 @@ test("does not associate an existing target workspace with a session that has no
 })
 
 
+test("scheme-less URL scope preserves its path and does not authorize sibling paths", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://example.com", {
+        include: ["example.com/api"],
+        authorizationSource: "URL path scope regression fixture",
+        authorizationReference: "https://example.com/security",
+      })
+      expect(configured.scope.scopeItems).toEqual(["URL: example.com/api"])
+      expect((await TargetMemory.checkURLScope("https://example.com/api")).allowed).toBe(true)
+      expect((await TargetMemory.checkURLScope("https://example.com/admin")).allowed).toBe(false)
+      await expect(TargetMemory.configureScope("https://example.com", {
+        include: ["example.com/api?token=secret"],
+        authorizationSource: "URL path scope regression fixture",
+        authorizationReference: "https://example.com/security",
+      })).rejects.toThrow(/queries or fragments/i)
+      await Instance.dispose()
+    },
+  })
+})
+
 test("persists an explicit target scope with authorization provenance and exclusions", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
