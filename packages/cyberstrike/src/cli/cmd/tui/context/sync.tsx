@@ -28,6 +28,7 @@ import { useExit } from "./exit"
 import { useArgs } from "./args"
 import { batch, onMount } from "solid-js"
 import { Log } from "@/util/log"
+import { useToast } from "@tui/ui/toast"
 import { singleflight } from "@/util/singleflight"
 import type { Path } from "@cyberstrike-io/sdk"
 
@@ -236,6 +237,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     })
 
     const sdk = useSDK()
+    const toast = useToast()
 
     // Refetch the methodology digest for a session and merge into the store.
     // Driven by the "intel.updated" SSE event (published on every add_intel).
@@ -297,6 +299,16 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     sdk.event.listen((e) => {
       const event = e.details
       switch (event.type) {
+        case "session.error": {
+          const error = event.properties.error
+          const detail = error?.data && "message" in error.data ? error.data.message : undefined
+          toast.show({
+            variant: "error",
+            title: "Session error",
+            message: typeof detail === "string" && detail ? detail : error?.name ?? "Session prompt failed",
+          })
+          break
+        }
         case "server.instance.disposed":
           bootstrap()
           break
