@@ -127,6 +127,18 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
+  test("parses quoted TSV fields without shifting submission eligibility", () => {
+    const tsv = [
+      "identifier\\tasset_type\\tinstruction\\teligible_for_submission\\teligible_for_bounty",
+      "api.example.com\\tAPI\\\"Requires\\tconsent\\\"\\ttrue\\tfalse",
+      "admin.example.com\\tDomain\\\"Do not test\\tthis\\\"\\tfalse\\ttrue",
+    ].join("\\n")
+    expect(parseScopeFileContentsDetailed(tsv)).toEqual({
+      include: ["API: api.example.com"],
+      exclude: ["Domain: admin.example.com"],
+    })
+  })
+
   test("preserves Google Play app IDs as non-web typed scope entries", () => {
     expect(parseScopeFileContents([
       "identifier,asset_type,instruction,eligible_for_bounty",
