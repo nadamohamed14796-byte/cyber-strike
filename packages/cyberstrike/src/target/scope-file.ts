@@ -14,6 +14,7 @@ const HACKERONE_ASSET_TYPES: Record<string, string> = {
   executable: "Executable",
   hardware: "Hardware",
   hardwareiot: "Hardware",
+  googleplayappid: "Google Play App ID",
   iosappstore: "iOS: App Store",
   iosipa: "iOS: .ipa",
   iostestflight: "iOS: Testflight",
