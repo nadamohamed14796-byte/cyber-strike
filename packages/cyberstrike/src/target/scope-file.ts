@@ -96,7 +96,7 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
   const header = parseRow(nonEmpty[0].line).map(normalizeTypeKey)
   const identifierColumn = header.indexOf("identifier")
   const typeColumn = header.indexOf("assettype")
-  const submissionEligibilityColumn = header.indexOf("eligibleforsubmission")
+  // Submission/bounty eligibility is not a scope decision. Only explicit scope columns may exclude assets.\n  const scopeColumn = header.findIndex((name) => ["inscope", "isinscope", "scope"].includes(name))
   if (identifierColumn >= 0 && typeColumn >= 0) {
     const entries: string[] = []
     const excludedEntries: string[] = []
@@ -109,17 +109,19 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
       const key = normalizeTypeKey(rawType)
       const type = HACKERONE_ASSET_TYPES[key] ?? rawType
       const entry = type + ": " + identifier
-      if (submissionEligibilityColumn >= 0) {
-        const rawEligibility = columns[submissionEligibilityColumn]?.trim().toLowerCase()
-        if (["true", "1", "yes"].includes(rawEligibility ?? "")) entries.push(entry)
-        else if (["false", "0", "no"].includes(rawEligibility ?? "")) excludedEntries.push(entry)
+      if (scopeColumn >= 0) {
+        const rawScope = columns[scopeColumn]?.trim().toLowerCase().replace(/[_-]+/g, " ")
+        if (["true", "1", "yes", "in scope", "inscope", "included"].includes(rawScope ?? "")) entries.push(entry)
+        else if (["false", "0", "no", "out of scope", "outofscope", "excluded"].includes(rawScope ?? "")) excludedEntries.push(entry)
         else {
           throw new Error(
-            "HackerOne scope row at line " + (row.index + 1) +
-            " has an empty or unrecognized eligible_for_submission value; refusing to treat it as authorized."
+            "Scope row at line " + (row.index + 1) +
+            " has an empty or unrecognized explicit scope value; refusing to guess whether the asset is in scope."
           )
         }
       } else {
+        // Fields such as eligible_for_submission and eligible_for_bounty describe reporting/reward eligibility,
+        // not authorization to test the asset.
         entries.push(entry)
       }
     }
@@ -144,7 +146,7 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
 export function parseScopeFileContents(contents: string): string[] {
   const parsed = parseScopeFileContentsDetailed(contents)
   if (parsed.exclude.length) {
-    throw new Error("Scope file contains eligible_for_submission=false rows; use parseScopeFileContentsDetailed so exclusions are preserved.")
+    throw new Error("Scope file contains explicitly out-of-scope rows; use parseScopeFileContentsDetailed so exclusions are preserved.")
   }
   return parsed.include
 }
