@@ -117,7 +117,7 @@ describe("parseScopeFileContents", () => {
       "builds/app.ipa,OTHER_IPA",
       "app-id,WINDOWS_APP_STORE_APP_ID",
       "app-executable,DOWNLOADABLE_EXECUTABLES",
-    ].join("\\n"))).toEqual([
+    ].join("\n"))).toEqual([
       "iOS: App Store: com.example.app",
       "iOS: Testflight: com.example.beta",
       "Android: .apk: builds/app.apk",
@@ -155,7 +155,7 @@ describe("parseScopeFileContents", () => {
       "identifier,asset_type,eligible_for_submission,eligible_for_bounty",
       "api.example.com,API,true,false",
       "admin.example.com,Domain,false,true",
-    ].join("\\n")
+    ].join("\n")
     expect(parseScopeFileContentsDetailed(csv)).toEqual({
       include: ["API: api.example.com"],
       exclude: ["Domain: admin.example.com"],
@@ -169,7 +169,7 @@ describe("parseScopeFileContents", () => {
       "identifier,asset_type,eligible_for_submission",
       "example.com,Domain,true",
       "admin.example.com,Domain,false",
-    ].join("\\n")
+    ].join("\n")
     expect(() => parseScopeFileContents(csv)).toThrow(/eligible_for_submission=false.*exclusions are preserved/i)
   })
 
