@@ -316,7 +316,7 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
     return "Use Katana JSONL output ('-j') so URL source and request metadata remain available for deduplication and triage."
   }
   if (!normalizedArgs.some((arg) => ["-ncb", "-no-clobber"].includes(arg))) {
-    return "Use '-ncb' to prevent a concurrent or retried crawl from overwriting an existing evidence artifact."
+    return "Use the no-clobber flag '-ncb' to prevent a concurrent or retried crawl from overwriting an existing evidence artifact."
   }
 
   let target: URL
