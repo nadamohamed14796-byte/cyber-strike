@@ -49,17 +49,17 @@ Combine in-scope crawl results, archives, app navigation, API specifications, pe
 #### JavaScript code review and request correlation
 After `hackbrowser` has finished capturing relevant responses, invoke `correlate_javascript` with the already-authorized `target_url` before detailed endpoint testing. It reads captured JavaScript response bodies and existing files in the target workspace's `javascript/` directory; it does not download or execute scripts. Review its persisted attack-surface JSON and target notes for function candidates, URL templates, path/query/body parameters, header names, auth/cookie signals, secret-like candidates (fingerprint only), and role/feature hints.
 
-Treat source-derived relationships as hypotheses. An absent token/cookie signal does not prove an endpoint is public, a role name does not prove server-side authorization, and a secret-like candidate does not authorize use. Prefer a captured baseline request; test one controlled mutation at a time with `http_replay` inside scope, then review the saved redacted observation and its manual-review flag. A response difference is a lead, not a vulnerability verdict.
+Treat source-derived relationships as hypotheses. An absent token/cookie signal does not prove an endpoint is public, a role name does not prove server-side authorization, and a secret-like candidate does not authorize use. During recon, correlate static candidates with existing captured requests and persist the evidence; do not mutate requests or start vulnerability checks automatically. Only after the user explicitly asks for targeted testing, prefer a captured baseline request and test one controlled mutation at a time with `http_replay` inside scope, then review the saved redacted observation and its manual-review flag. A response difference is a lead, not a vulnerability verdict.
 
 ### Step 6 — Focused enumeration
-Only after validating scope and policy, use bounded directory or parameter discovery. Start with a small justified wordlist and increase coverage only when results warrant it.
+Only after validating scope and policy, use bounded directory/content and parameter discovery in the assigned recon phases. Start with a relevant wordlist, save its source/hash and request settings, and increase coverage only when results warrant it. Classify discovered paths by their evidence and likely function (admin/login/internal/management/debug/API docs/config/backup/sensitive-file candidates); a path name or status code alone does not prove that data is exposed. Keep GET-based discovery bounded and non-destructive.
 
 ### Step 7 — Prioritize
 Rank routes by authentication context, identifiers/tenant references, sensitive workflows, input sinks, undocumented API versions, and file/state handling. Route only signal-matched candidates to specialist skills: object IDs to IDOR/BOLA, URL fetches to SSRF, user-controlled markup to XSS, OAuth flow anomalies to OAuth, and multi-step transactions to business-logic review.
 
 ## 4. Output contract
 
-Record asset/URL, method, scope decision and source, discovery timestamp, response hints, auth context, parameters/object identifiers, confidence, deduplication key, and next check. Never persist cookies, bearer tokens, API keys, or unredacted personal data.
+Record asset/URL, method, scope decision and source, discovery timestamp, response hints, auth context, parameters/object identifiers, confidence, deduplication key, and next check. Summarize admin/internal/debug/API-doc/config/backup/sensitive-file path candidates with observed status/source and clearly label candidates vs verified exposure. Never persist cookies, bearer tokens, API keys, or unredacted personal data in summaries or reports.
 
 ## 5. Verification
 
