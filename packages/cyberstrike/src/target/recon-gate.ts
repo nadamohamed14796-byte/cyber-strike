@@ -19,7 +19,7 @@ export const RECON_PHASES = [
 ] as const
 
 export type ReconPhase = typeof RECON_PHASES[number]
-export type ReconPhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable"
+export type ReconPhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable" | "deferred"
 
 export type ReconPhaseRecord = {
   status: ReconPhaseStatus
@@ -56,7 +56,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   const parsed = JSON.parse(raw) as ReconRunManifest
   const phases = parsed?.phases as Partial<Record<ReconPhase, ReconPhaseRecord>> | undefined
   const validStatus = (record: ReconPhaseRecord | undefined) =>
-    !!record && ["pending", "running", "complete", "blocked", "failed", "unavailable"].includes(record.status)
+    !!record && ["pending", "running", "complete", "blocked", "failed", "unavailable", "deferred"].includes(record.status)
   // Three phases were added as explicit checkpoints. Older manifests are migrated
   // in memory, and downstream completion is invalidated from the earliest missing phase.
   const introducedPhases = ["directory_fuzzing", "parameter_discovery", "parameter_fuzzing"] as const
@@ -101,7 +101,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
 }
 
 function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "unavailable"
+  return status === "complete" || status === "unavailable" || status === "deferred"
 }
 
 /** Pure prerequisite check shared by the runtime gate and unit tests. */
@@ -157,6 +157,13 @@ export async function reconPhaseGate(
     return {
       allowed: false,
       reason: "Target scope validation must be completed before recon tools can run.",
+      manifestPath,
+    }
+  }
+  if (requiredPhase === "vulnerability_testing" && run.phases.vulnerability_testing.status !== "running") {
+    return {
+      allowed: false,
+      reason: "Vulnerability testing is opt-in. The recon handoff leaves this phase deferred; explicitly begin vulnerability_testing only after the user requests targeted testing.",
       manifestPath,
     }
   }
