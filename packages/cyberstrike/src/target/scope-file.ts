@@ -127,7 +127,7 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
       }
     }
     if (entries.length + excludedEntries.length === 0) throw new Error("HackerOne scope export contains no usable asset rows.")
-    if (entries.length === 0) throw new Error("HackerOne scope export has no rows with eligible_for_submission=true; refusing to configure an empty in-scope manifest.")
+    if (entries.length === 0) throw new Error("HackerOne scope export has no explicitly in-scope rows; refusing to configure an empty in-scope manifest.")
     return { include: entries, exclude: excludedEntries }
   }
 
