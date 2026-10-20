@@ -45,7 +45,6 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
   // Convert rows to typed expressions, retaining unsupported asset kinds as evidence.
   const delimiter = nonEmpty[0].line.includes("\t") ? "\t" : nonEmpty[0].line.includes(";") ? ";" : ","
   const parseRow = (line: string): string[] => {
-    if (delimiter === "\t") return line.split("\t")
     const fields: string[] = []
     let field = ""
     let quoted = false
