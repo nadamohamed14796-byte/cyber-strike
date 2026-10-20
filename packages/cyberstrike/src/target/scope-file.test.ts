@@ -180,6 +180,52 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
+  test("accepts pasted Markdown bullets, numbered lists, and links", () => {
+    expect(parseScopeFileContents([
+      "- example.com",
+      "* *.example.com",
+      "1. https://api.example.com/v1",
+      "[dashboard](https://app.example.com)",
+      "```text",
+      "docs.example.com",
+      "```",
+    ].join("\n"))).toEqual([
+      "example.com",
+      "*.example.com",
+      "https://api.example.com/v1",
+      "https://app.example.com",
+      "docs.example.com",
+    ])
+  })
+
+  test("accepts a JSON array of scope strings", () => {
+    expect(parseScopeFileContents(JSON.stringify(["example.com", "*.example.com", "https://api.example.com"])))
+      .toEqual(["example.com", "*.example.com", "https://api.example.com"])
+  })
+
+  test("accepts JSON HackerOne rows and preserves submission exclusions", () => {
+    const json = JSON.stringify([
+      { identifier: "api.example.com", asset_type: "API", eligible_for_submission: true },
+      { identifier: "admin.example.com", asset_type: "Domain", eligible_for_submission: false },
+    ])
+    expect(parseScopeFileContentsDetailed(json)).toEqual({
+      include: ["API: api.example.com"],
+      exclude: ["Domain: admin.example.com"],
+    })
+  })
+
+  test("accepts pasted Markdown tables from a scope export", () => {
+    expect(parseScopeFileContents([
+      "| identifier | asset_type |",
+      "| --- | --- |",
+      "| *.example.com | Wildcard |",
+      "| api.example.com | API |",
+    ].join("\n"))).toEqual([
+      "Wildcard: *.example.com",
+      "API: api.example.com",
+    ])
+  })
+
   test("rejects files with no usable entries", () => {
     expect(() => parseScopeFileContents("# only comments\n\n// and blanks")).toThrow("no usable entries")
   })
