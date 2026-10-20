@@ -822,7 +822,8 @@ export namespace SessionPrompt {
       // Use only the latest user turn for explicit research intent. Scanning prior
       // user turns made "continue" repeatedly re-trigger stale vulnerability signals.
       // Current captured requests and Intel remain available inside ResearchContext.
-      const researchSignalText = lastUser.parts
+      const latestUserMessage = msgs.findLast((msg) => msg.info.role === "user")
+      const researchSignalText = (latestUserMessage?.parts ?? [])
         .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
         .map((part) => part.type === "text" ? part.text : "")
         .join(" ")
