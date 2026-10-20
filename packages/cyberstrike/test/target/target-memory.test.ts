@@ -691,25 +691,25 @@ test("user-confirmed scope without a policy URL must be exactly one asset, not a
         include: ["*.example.net"],
         authorizationSource: "User-confirmed in conversation",
         userConfirmed: true,
-      })).rejects.toThrow(/exactly one exact hostname/i)
+      })).rejects.toThrow(/exact hostname/i)
 
       await expect(TargetMemory.configureScope("https://program-root.example.test", {
         include: ["app.example.net", "api.example.net"],
         authorizationSource: "User-confirmed in conversation",
         userConfirmed: true,
-      })).rejects.toThrow(/exactly one exact hostname/i)
+      })).rejects.toThrow(/exact hostname/i)
 
       await expect(TargetMemory.configureScope("https://program-root.example.test", {
         include: ["192.0.2.0/24"],
         authorizationSource: "User-confirmed in conversation",
         userConfirmed: true,
-      })).rejects.toThrow(/exactly one exact hostname/i)
+      })).rejects.toThrow(/exact hostname/i)
 
       await expect(TargetMemory.configureScope("https://program-root.example.test", {
         include: ["https://app.example.net/*"],
         authorizationSource: "User-confirmed in conversation",
         userConfirmed: true,
-      })).rejects.toThrow(/exactly one exact hostname/i)
+      })).rejects.toThrow(/exact hostname/i)
     },
   })
 })
