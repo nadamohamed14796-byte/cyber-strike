@@ -83,7 +83,7 @@ The canonical recon playbook defines phase order and completion criteria; specia
 
 7. Build the endpoint inventory
 - Consolidate URLs, captured requests, JS-derived candidates, and API-spec routes into a normalized endpoint record. Preserve method, origin, path/template, parameter locations, content type, authentication/role context, source IDs, response status/shape, and links to the relevant asset and JS source.
-- Distinguish observed endpoints from inferred candidates. Deduplicate identical evidence while preserving multiple sources. Store machine-readable inventory under endpoints/ and readable endpoint notes linked to request IDs/evidence paths.
+- Distinguish observed endpoints from inferred candidates. Deduplicate identical evidence while preserving multiple sources. Classify discovered admin/login/internal/management/debug/API-doc/config/backup/sensitive-file paths with source, status, and observed/inferred state; a path name or status code alone does not prove sensitive data is exposed. Store machine-readable inventory under endpoints/ and readable endpoint notes linked to request IDs/evidence paths.
 - Endpoint inventory is the handoff contract for later testing. Before marking the phase complete, verify that artifacts exist, counts are grounded, and the links point to real saved records.
 
 8. Browser extension request intake runs continuously and independently
