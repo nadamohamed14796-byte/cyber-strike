@@ -104,6 +104,18 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable" || status === "deferred"
 }
 
+/** Reset downstream checkpoints when a previously deferred phase is explicitly reopened. */
+export function invalidateReconDownstreamPhases(
+  phase: ReconPhase,
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+  reason: string,
+): ReconPhase[] {
+  const index = RECON_PHASES.indexOf(phase)
+  const downstream = RECON_PHASES.slice(index + 1)
+  for (const item of downstream) phases[item] = { status: "pending", reason }
+  return downstream
+}
+
 /** Pure prerequisite check shared by the runtime gate and unit tests. */
 export function unresolvedReconPrerequisites(
   phase: ReconPhase,
