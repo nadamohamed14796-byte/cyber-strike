@@ -5,6 +5,7 @@ import { Session } from "../session"
 import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE } from "../target"
 import {
   RECON_PHASES as PHASES,
+  invalidateReconDownstreamPhases,
   initialReconRun as initialRun,
   parseReconRun as parseRun,
   reconRunID,
@@ -111,7 +112,6 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       if (!params.phase) return { title: "Recon checkpoint rejected", output: "phase is required for this action.", metadata: { saved: false, reason: "phase_required" } }
       const phase = params.phase
       const record = run.phases[phase]
-      const phaseIndex = PHASES.indexOf(phase)
       if (params.action === "defer" && phase !== "vulnerability_testing") {
         return { title: "Recon checkpoint rejected", output: "Only the optional vulnerability_testing phase may be deferred. Scope validation, workspace setup, discovery, JavaScript analysis, endpoint inventory, and reporting must not be deferred.", metadata: { saved: false, reason: "phase_not_deferable", phase } }
       }
@@ -153,17 +153,11 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         }
         run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
         if (phase === "vulnerability_testing" && record.status === "deferred") {
-          for (const downstreamPhase of PHASES.slice(phaseIndex + 1)) {
-            const downstream = run.phases[downstreamPhase]
-            if (downstream.status !== "pending") {
-              run.phases[downstreamPhase] = {
-                ...downstream,
-                status: "pending",
-                finishedAt: undefined,
-                reason: "Regenerate this downstream checkpoint after vulnerability_testing was explicitly reopened.",
-              }
-            }
-          }
+          invalidateReconDownstreamPhases(
+            phase,
+            run.phases,
+            "Regenerate this downstream checkpoint after vulnerability_testing was explicitly reopened.",
+          )
         }
         run.currentPhase = phase
       } else {
