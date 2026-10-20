@@ -34,8 +34,8 @@ const HACKERONE_ASSET_TYPES: Record<string, string> = {
   windowsmicrosoftstore: "Windows: Microsoft Store",
 }
 
-/** Parse plain-text lists and HackerOne tabular exports without broadening authorization. */
-export function parseScopeFileContents(contents: string): string[] {
+/** Parse plain-text lists and HackerOne tabular exports, separating explicit out-of-scope rows. */
+export function parseScopeFileContentsDetailed(contents: string): { include: string[]; exclude: string[] } {
   const lines = contents.replace(/^\uFEFF/, "").split(/\r?\n/)
   const nonEmpty = lines.map((line, index) => ({ line: line.trim(), index }))
     .filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//"))
@@ -66,8 +66,10 @@ export function parseScopeFileContents(contents: string): string[] {
   const header = parseRow(nonEmpty[0].line).map(normalizeTypeKey)
   const identifierColumn = header.indexOf("identifier")
   const typeColumn = header.indexOf("assettype")
+  const submissionEligibilityColumn = header.indexOf("eligibleforsubmission")
   if (identifierColumn >= 0 && typeColumn >= 0) {
     const entries: string[] = []
+    const excludedEntries: string[] = []
     for (const row of nonEmpty.slice(1)) {
       if (row.line.length > 1000) throw new Error("Scope file entry at line " + (row.index + 1) + " exceeds the 1000-character entry limit.")
       const columns = parseRow(row.line)
@@ -76,10 +78,24 @@ export function parseScopeFileContents(contents: string): string[] {
       if (!identifier || !rawType) continue
       const key = normalizeTypeKey(rawType)
       const type = HACKERONE_ASSET_TYPES[key] ?? rawType
-      entries.push(type + ": " + identifier)
+      const entry = type + ": " + identifier
+      if (submissionEligibilityColumn >= 0) {
+        const rawEligibility = columns[submissionEligibilityColumn]?.trim().toLowerCase()
+        if (["true", "1", "yes"].includes(rawEligibility ?? "")) entries.push(entry)
+        else if (["false", "0", "no"].includes(rawEligibility ?? "")) excludedEntries.push(entry)
+        else {
+          throw new Error(
+            "HackerOne scope row at line " + (row.index + 1) +
+            " has an empty or unrecognized eligible_for_submission value; refusing to treat it as authorized."
+          )
+        }
+      } else {
+        entries.push(entry)
+      }
     }
-    if (entries.length === 0) throw new Error("HackerOne scope export contains no usable asset rows.")
-    return entries
+    if (entries.length + excludedEntries.length === 0) throw new Error("HackerOne scope export contains no usable asset rows.")
+    if (entries.length === 0) throw new Error("HackerOne scope export has no rows with eligible_for_submission=true; refusing to configure an empty in-scope manifest.")
+    return { include: entries, exclude: excludedEntries }
   }
 
   const entries: string[] = []
@@ -87,7 +103,20 @@ export function parseScopeFileContents(contents: string): string[] {
     if (row.line.length > 1000) throw new Error("Scope file entry at line " + (row.index + 1) + " exceeds the 1000-character entry limit.")
     entries.push(row.line)
   }
-  return entries
+  return { include: entries, exclude: [] }
+}
+
+/**
+ * Compatibility wrapper for callers that expect an include-only list. If a
+ * HackerOne export contains explicit out-of-scope rows, require the caller to
+ * use the detailed parser so exclusions can never be silently discarded.
+ */
+export function parseScopeFileContents(contents: string): string[] {
+  const parsed = parseScopeFileContentsDetailed(contents)
+  if (parsed.exclude.length) {
+    throw new Error("Scope file contains eligible_for_submission=false rows; use parseScopeFileContentsDetailed so exclusions are preserved.")
+  }
+  return parsed.include
 }
 
 /** Resolve Windows Explorer paths to their Linux-side WSL path when running inside WSL/Linux. */
