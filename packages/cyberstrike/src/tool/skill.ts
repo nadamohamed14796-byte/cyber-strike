@@ -243,7 +243,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         const headings = skill.content
           .split(/\r?\n/)
           .filter((line) => /^\s{0,3}#{1,4}\s+/.test(line))
-          .map((line) => line.trim())
+          .map((line) => "## " + line.trim().replace(/^#{1,4}\s+/, ""))
           .slice(0, 40)
         const intro = skill.content
           .split(/\r?\n/)
