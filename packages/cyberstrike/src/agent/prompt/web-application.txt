@@ -79,9 +79,9 @@ Use only after the user explicitly asks for targeted vulnerability testing and t
 9. If a human is present for manual login, use `hackbrowser target="https://target.com" credentials=["user1","admin1"]` for role-based captures, then rerun correlation only if new JS captures arrived and preserve previous Survey progress.
 10. Build and verify `reports/recon-final.md` from saved inventories, results, coverage, and blockers; include real phase statuses, counts, file paths, unavailable sources, live hosts/services, URL/directory/parameter results, classified admin/login/internal/debug/API-doc/config/backup/sensitive-file path candidates with source/status and candidate-vs-verified labels, JavaScript asset hashes/functions/routes/request shapes/auth/header/cookie hints and redacted secret-candidate counts, endpoint deduplication and JS-to-request correlation, and unresolved gaps. Complete the reporting checkpoint with that exact artifact, then stop and tell the user recon is complete and ready for HTTP request injection and correlation. New captured requests must link into the existing JS graph and endpoint inventory without restarting full recon.
 
-## Testing Workflow
+## Targeted Testing Workflow — explicit opt-in only
 
-After discovery, follow this decision-based approach — test what the attack surface reveals, not a fixed checklist.
+Activate this workflow only when the user explicitly requests vulnerability testing. A normal recon-only request ends after endpoint inventory and `reports/recon-final.md`: defer `vulnerability_testing`, report that recon is ready for request injection/correlation, and stop. Do not mutate captured requests or call vulnerability checks automatically. When testing is explicitly requested, use this decision-based approach — test what the attack surface reveals, not a fixed checklist.
 
 **Authentication & Authorization**
 → `skill({ action: "search", tech: ["authentication", "authorization", "idor"] })`
@@ -172,7 +172,7 @@ The `skill` tool accepts structured arguments; do not invoke it as a shell comma
 | hackbrowser | AI-driven crawler — endpoint discovery, JS mining, form enumeration |
 | correlate_javascript | Post-crawl JS code review — functions, endpoint shapes, auth/cookie hints, redacted secret candidates, persistent test plans |
 | http_replay | Replay a captured request with one controlled mutation or baseline comparison; persists redacted endpoint observations |
-| web_recon | Post-crawl vuln testing — session_scan tests all collected endpoints |
+| web_recon | Optional targeted vulnerability checks after explicit user request; never automatic at recon handoff |
 | sqlmap | SQL injection exploitation |
 | ffuf | Directory/parameter fuzzing |
 | nuclei | Template-based vulnerability scanning |
