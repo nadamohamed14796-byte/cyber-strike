@@ -42,6 +42,7 @@ test("begin resumes running phases and does not restart resolved work", () => {
   expect(reconBeginDisposition("pending", "url_collection")).toBe("start")
   expect(reconBeginDisposition("failed", "url_collection")).toBe("start")
   expect(reconBeginDisposition("blocked", "url_collection")).toBe("start")
+  expect(reconBeginDisposition("deferred", "vulnerability_testing")).toBe("start")
 })
 
 test("recon phases cannot skip pending prerequisites", () => {
@@ -109,6 +110,20 @@ test("endpoint inventory cannot be bypassed with unavailable status", () => {
 test("a fully resolved inventory allows the vulnerability phase", () => {
   const state = records("complete")
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
+})
+
+test("recon can reach reporting while vulnerability testing is explicitly deferred", () => {
+  const state = records("complete")
+  state.vulnerability_testing = { status: "deferred", reason: "Awaiting user request" }
+  expect(unresolvedReconPrerequisites("reporting", state)).toEqual([])
+  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
+})
+
+test("deferred is accepted as a persisted checkpoint status", () => {
+  const run = initialReconRun("https://example.com", "target-root-1", "session-1")
+  run.phases.vulnerability_testing = { status: "deferred", reason: "Recon-only handoff" }
+  const parsed = parseReconRun(JSON.stringify(run), "target-root-1", "https://example.com")
+  expect(parsed.phases.vulnerability_testing.status).toBe("deferred")
 })
 
 test("legacy manifests migrate to require parameter discovery and revalidate downstream phases", () => {
