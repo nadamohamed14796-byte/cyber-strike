@@ -29,7 +29,8 @@ export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly str
   directory_fuzzing: ["directories"],
   parameter_discovery: ["parameters"],
   parameter_fuzzing: ["parameters"],
-  javascript_analysis: ["javascript"],
+  // correlate_javascript atomically writes a source graph, endpoint candidates, and a Tester Survey.
+  javascript_analysis: ["javascript", "endpoints", "testing"],
   endpoint_inventory: ["endpoints"],
   vulnerability_testing: ["testing", "findings", "evidence"],
   reporting: ["reports"],
