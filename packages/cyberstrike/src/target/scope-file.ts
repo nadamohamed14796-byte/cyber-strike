@@ -36,22 +36,53 @@ const HACKERONE_ASSET_TYPES: Record<string, string> = {
 
 /** Parse plain-text lists and HackerOne tabular exports, separating explicit out-of-scope rows. */
 export function parseScopeFileContentsDetailed(contents: string): { include: string[]; exclude: string[] } {
-  const lines = contents.replace(/^\uFEFF/, "").split(/\r?\n/)
-  const nonEmpty = lines.map((line, index) => ({ line: line.trim(), index }))
-    .filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//"))
+  let source = contents.replace(/^\uFEFF/, "").trim()
+  // Accept a pasted JSON list as naturally as a plain text list.
+  try {
+    const parsed: unknown = JSON.parse(source)
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+      source = parsed.join("\n")
+    } else if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed.every((item) => item !== null && typeof item === "object" && !Array.isArray(item)) &&
+      parsed.some((item) => "identifier" in item && "asset_type" in item)
+    ) {
+      const headers = [...new Set(parsed.flatMap((item) => Object.keys(item as Record<string, unknown>)))]
+      const csvCell = (value: unknown) => {
+        const text = value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value)
+        return '"' + text.replace(/"/g, '""') + '"'
+      }
+      source = [headers.map(csvCell).join(","), ...parsed.map((item) => headers.map((header) => csvCell((item as Record<string, unknown>)[header])).join(","))].join("\n")
+    }
+  } catch {
+    // Plain text, CSV/TSV, and Markdown inputs are handled below.
+  }
+
+  const lines = source.split(/\r?\n/)
+  const nonEmpty = lines.map((rawLine, index) => {
+    let line = rawLine.trim()
+    // Markdown code-fence-only lines are presentation, not scope data.
+    if (line.startsWith(String.fromCharCode(96).repeat(3))) line = ""
+    line = line.replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, "")
+    const markdownLink = line.match(/^\[[^\]]*\]\((https?:\/\/[^)]+)\)$/i)
+    if (markdownLink) line = markdownLink[1]!
+    return { line, index }
+  }).filter((row) => row.line && !row.line.startsWith("#") && !row.line.startsWith("//"))
   if (nonEmpty.length === 0) throw new Error("Scope file contains no usable entries.")
 
-  // HackerOne asset exports are tab-separated and include identifier + asset_type.
-  // Convert rows to typed expressions, retaining unsupported asset kinds as evidence.
-  const delimiter = nonEmpty[0].line.includes("\t") ? "\t" : nonEmpty[0].line.includes(";") ? ";" : ","
+  // HackerOne exports may be CSV/TSV; Markdown tables are also accepted when pasted directly.
+  const firstLine = nonEmpty[0].line
+  const delimiter = firstLine.includes("\t") ? "\t" : firstLine.includes("|") ? "|" : firstLine.includes(";") ? ";" : ","
   const parseRow = (line: string): string[] => {
     const fields: string[] = []
     let field = ""
     let quoted = false
-    for (let index = 0; index < line.length; index++) {
-      const char = line[index]!
+    const rowText = delimiter === "|" ? line.replace(/^\s*\|/, "").replace(/\|\s*$/, "") : line
+    for (let index = 0; index < rowText.length; index++) {
+      const char = rowText[index]!
       if (char === '"') {
-        if (quoted && line[index + 1] === '"') { field += '"'; index++ }
+        if (quoted && rowText[index + 1] === '"') { field += '"'; index++ }
         else quoted = !quoted
       } else if (char === delimiter && !quoted) {
         fields.push(field.trim())
