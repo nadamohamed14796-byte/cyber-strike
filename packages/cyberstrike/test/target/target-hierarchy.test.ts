@@ -105,7 +105,10 @@ describe("target asset hierarchy", () => {
 
         expect(configuredRoot.workspace.id).toBe(root.id)
         expect(persistedRoot?.parentTargetID).toBeNull()
-        expect(persistedDomain?.parentTargetID).toBeNull()
+        // The apex is still an authorized asset of the program root. The
+        // cycle guard prevents moving the root beneath the apex; it does not
+        // detach a valid existing child from the root.
+        expect(persistedDomain?.parentTargetID).toBe(root.id)
         expect(() => TargetMemory.list()).not.toThrow()
       },
     })
