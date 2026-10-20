@@ -19,7 +19,7 @@ export { reconRunID, unresolvedReconPrerequisites } from "../target/recon-gate"
 export type { ReconPhase, ReconPhaseRecord, ReconPhaseStatus } from "../target/recon-gate"
 
 function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "unavailable"
+  return status === "complete" || status === "unavailable" || status === "deferred"
 }
 
 export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly string[]>> = {
@@ -46,7 +46,7 @@ export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhas
 }
 
 const Parameters = z.object({
-  action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable"]),
+  action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable", "defer"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
   phase: z.enum(PHASES).optional(),
   summary: z.string().max(4000).optional(),
@@ -58,8 +58,8 @@ const Parameters = z.object({
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
   description: [
     "Persist and enforce the ordered reconnaissance run state in the target workspace. This is a workflow control, not a scanner.",
-    "Call status before deciding what to do. Call begin before each phase and complete/unavailable/block/fail after it, with real counts, artifact paths, and a concise evidence-based summary or reason.",
-    "Phases are strictly ordered: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting. Every completed phase must supply an artifact under its designated workspace area. Directory/parameter fuzzing must save the wordlist, mode, request settings, and normalized results; JavaScript analysis must link source assets and extracted request shapes. The reporting phase must save the consolidated final Recon document to reports/recon-final.md and include that exact path in its checkpoint. Scope validation, workspace setup, and endpoint inventory must be complete, never unavailable. Other data-collection phases may be explicitly unavailable with a reason, but blocked/failed phases must be retried or explicitly resolved. Do not rerun a completed phase without new evidence or an explicit reason. If a phase is already running, resume its unfinished work without calling begin again; begin returns phase_already_running and makes no manifest change. Vulnerability testing cannot begin until endpoint inventory is complete.",
+    "Call status before deciding what to do. Call begin before each phase and complete/unavailable/block/fail after it, with real counts, artifact paths, and a concise evidence-based summary or reason. During the default recon-only run, defer vulnerability_testing with a reason so reporting can finish without running vulnerability checks automatically. Only begin that phase after the user explicitly requests targeted testing. Deferred means intentionally postponed, not completed or unavailable.",
+    "Phases are ordered: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting. The handoff is deliberate: after endpoint_inventory, defer vulnerability_testing during a normal recon run, then continue to reporting. Do not run vulnerability scanners or session_scan automatically. Only a later explicit user request may begin vulnerability_testing; reopening it invalidates downstream reporting, which must be regenerated afterward. Every completed phase must supply an artifact under its designated workspace area. Directory/parameter fuzzing must save the wordlist, mode, request settings, and normalized results; JavaScript analysis must link source assets, extracted request shapes, and request-correlation evidence. The reporting phase must save reports/recon-final.md and include that exact path in its checkpoint. Scope validation, workspace setup, and endpoint inventory must be complete, never unavailable. Other discovery phases may be explicitly unavailable with a reason, but blocked/failed phases must be resolved before progressing. Do not rerun completed work without new evidence or an explicit reason. If a phase is already running, resume it without calling begin again. Vulnerability testing cannot begin until endpoint inventory is complete and the user explicitly asks for it.",
     "Do not mark a phase complete just because a command ran. Confirm its output and save artifacts first. Expensive vulnerability scanning must not start before the inventory phases are resolved. Existing run manifests resume across turns for the same target and root session.",
     "Every saved artifact path must be inside this target's canonical workspace. This tool does not authorize requests. Run one explicit scope_check during setup for the canonical target/workspace and reuse that decision; active request tools must enforce persisted scope internally for each concrete request.",
   ].join("\n"),
@@ -111,6 +111,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       const phase = params.phase
       const record = run.phases[phase]
       const phaseIndex = PHASES.indexOf(phase)
+      if (params.action === "defer" && phase !== "vulnerability_testing") {
+        return { title: "Recon checkpoint rejected", output: "Only the optional vulnerability_testing phase may be deferred. Scope validation, workspace setup, discovery, JavaScript analysis, endpoint inventory, and reporting must not be deferred.", metadata: { saved: false, reason: "phase_not_deferable", phase } }
+      }
 
       if (params.action === "begin") {
         const disposition = reconBeginDisposition(record.status, phase)
@@ -148,15 +151,28 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           }
         }
         run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
+        if (phase === "vulnerability_testing" && record.status === "deferred") {
+          for (const downstreamPhase of PHASES.slice(phaseIndex + 1)) {
+            const downstream = run.phases[downstreamPhase]
+            if (downstream.status !== "pending") {
+              run.phases[downstreamPhase] = {
+                ...downstream,
+                status: "pending",
+                finishedAt: undefined,
+                reason: "Regenerate this downstream checkpoint after vulnerability_testing was explicitly reopened.",
+              }
+            }
+          }
+        }
         run.currentPhase = phase
       } else {
         if (record.status !== "running") {
           return { title: "Recon checkpoint rejected", output: "Phase " + phase + " is " + record.status + ", not running. Call begin first; the manifest was not changed.", metadata: { saved: false, reason: "phase_not_running", phase, status: record.status } }
         }
-        if ((params.action === "block" || params.action === "fail" || params.action === "unavailable") && !params.reason?.trim()) {
+        if ((params.action === "block" || params.action === "fail" || params.action === "unavailable" || params.action === "defer") && !params.reason?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, or unavailable.", metadata: { saved: false, reason: "reason_required" } }
         }
-        const status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : "unavailable"
+        const status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : params.action === "defer" ? "deferred" : "unavailable"
         if (status === "complete" && !params.summary?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
         }
@@ -264,7 +280,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
         index = { schemaVersion: 1, targetURL: workspace.targetURL, runs: [] }
       }
-      const entry = { runID, sessionID, manifest: relativePath, currentPhase: run.currentPhase, updatedAt: run.updatedAt, completedPhases: PHASES.filter((item) => terminal(run.phases[item].status)).length, totalPhases: PHASES.length }
+      const entry = { runID, sessionID, manifest: relativePath, currentPhase: run.currentPhase, updatedAt: run.updatedAt, completedPhases: PHASES.filter((item) => run.phases[item].status === "complete").length, resolvedPhases: PHASES.filter((item) => terminal(run.phases[item].status)).length, totalPhases: PHASES.length }
       const existing = index.runs.findIndex((item) => item.runID === runID)
       if (existing >= 0) index.runs[existing] = entry
       else index.runs.push(entry)
