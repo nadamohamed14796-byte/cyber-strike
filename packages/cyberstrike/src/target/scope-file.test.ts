@@ -108,6 +108,17 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
+  test("preserves Google Play app IDs as non-web typed scope entries", () => {
+    expect(parseScopeFileContents([
+      "identifier,asset_type,instruction,eligible_for_bounty",
+      "com.mercadopago.wallet,GOOGLE_PLAY_APP_ID,,true",
+      "api.mercadopago.com,API,,true",
+    ].join("\n"))).toEqual([
+      "Google Play App ID: com.mercadopago.wallet",
+      "API: api.mercadopago.com",
+    ])
+  })
+
   test("preserves unfamiliar typed scope entries instead of aborting the entire import", () => {
     expect(parseScopeFileContents("att.com\nAndroid application: com.example.mobile\n")).toEqual([
       "att.com",
