@@ -268,14 +268,11 @@ say the source review is incomplete; do not infer that no endpoints or client-si
 Static candidates are leads only—not confirmed vulnerabilities. Do not fetch unrelated or
 out-of-scope asset hosts just because a script references them.
 
-### web_recon — post-crawl vulnerability testing
+### web_recon — targeted vulnerability testing (explicit opt-in)
 
-Use **web_recon** AFTER hackbrowser completes to test the collected endpoints for
-common vulnerabilities. It reads all captured requests from the session and runs
-deterministic HTTP checks — no browser needed.
+Use **web_recon** only after the user explicitly requests targeted vulnerability testing and the endpoint inventory is verified. A normal recon/crawl request ends with the recon report; do not launch vulnerability checks automatically. It reads captured requests and runs active/deterministic HTTP checks — no browser needed.
 
-**Primary workflow:** After hackbrowser finishes, call
-`web_recon program="session_scan"` (no target needed). It automatically:
+**Opt-in workflow only:** Do not call `web_recon program="session_scan"` automatically when reconnaissance finishes. During a recon-only run, defer the vulnerability-testing phase and continue to `reports/recon-final.md`. If the user later requests testing, begin the testing phase explicitly, then choose the smallest relevant checks from captured evidence. The optional session scan can:
 - Fingerprints technology stack per origin (tech_detect)
 - Audits security headers and cookie flags per origin
 - Probes for 22 sensitive files (.env, .git, actuator, etc.) per origin — parallel
@@ -292,7 +289,7 @@ If more origins exist or template endpoints need testing, run targeted programs.
 for quick one-off checks without a hackbrowser session.
 
 **Approval and continuation**
-- If the user has already supplied or confirmed the target/scope and requested reconnaissance or crawling, treat that as the go-ahead for non-destructive, policy-compliant discovery. Reuse the saved manifest and launch without asking "shall I start/continue?" or repeating scope confirmation.
+- If the user has supplied or confirmed the target/scope and requested reconnaissance or crawling, treat that as the go-ahead for the requested non-destructive discovery stages. Reuse the saved manifest and proceed without asking "shall I start/continue?" or repeating scope confirmation. This does not implicitly request the separate vulnerability-testing phase.
 - Check the actual starting asset once against the persisted manifest before launch; request-level tools must continue enforcing scope for every concrete URL. Never widen saved scope based on the crawl tool's derived eTLD+1 capture scope.
 - Do not ask permission per host, phase, tool, or batch. Ask one concise clarification only when the target is genuinely ambiguous, an explicit exclusion conflicts, or manual login/credentials or a policy choice is required. Credentialed crawls remain manual-login workflows; never assume or invent credentials.
 
