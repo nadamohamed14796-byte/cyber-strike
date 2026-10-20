@@ -3,6 +3,8 @@ import { stream } from "hono/streaming"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 import { Session } from "../../session"
+import { Bus } from "../../bus"
+import { NamedError } from "@cyberstrike-io/util/error"
 import { MessageV2 } from "../../session/message-v2"
 import { SessionPrompt } from "../../session/prompt"
 import { SessionCompaction } from "../../session/compaction"
@@ -2297,7 +2299,20 @@ export const SessionRoutes = lazy(() =>
         return stream(c, async () => {
           const sessionID = c.req.valid("param").sessionID
           const body = c.req.valid("json")
-          SessionPrompt.prompt({ ...body, sessionID }).catch(() => {})
+          SessionPrompt.prompt({ ...body, sessionID }).catch((error) => {
+            // prompt_async deliberately returns before the model finishes. Never
+            // discard a later failure: the client otherwise sees an accepted
+            // message with no assistant response and no diagnostic.
+            if (error instanceof Error && error.message === "session prompt cancelled") return
+            const message = error instanceof Error ? error.message : String(error)
+            log.error("async session prompt failed", { sessionID, error })
+            Bus.publish(Session.Event.Error, {
+              sessionID,
+              error: new NamedError.Unknown({
+                message: `Session prompt failed: ${message}`,
+              }).toObject(),
+            })
+          })
         })
       },
     )
