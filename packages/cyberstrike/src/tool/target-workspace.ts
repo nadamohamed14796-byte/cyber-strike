@@ -5,7 +5,7 @@ import path from "node:path"
 import { createHash } from "node:crypto"
 import { TargetMemory, type TargetAssetType, USER_CONFIRMED_SCOPE_SOURCE } from "../target"
 import { matchingScopeItems } from "../target/scope-index"
-import { parseScopeFileContents, resolveScopeFilePath } from "../target/scope-file"
+import { parseScopeFileContentsDetailed, resolveScopeFilePath } from "../target/scope-file"
 import { Tool } from "./tool"
 import { assertExternalDirectory } from "./external-directory"
 
@@ -150,6 +150,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     if (params.action === "configure_scope") {
       const targetURL = required(params.target_url, "target_url")
       let fileEntries: string[] = []
+      let fileExcludedEntries: string[] = []
       let sourceContents: string | undefined
       let sourcePath: string | undefined
       let sourceHash: string | undefined
@@ -206,7 +207,9 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           throw new Error("Could not read scope file " + sourcePath + ": " + (error instanceof Error ? error.message : String(error)))
         }
         sourceContents = bytes.toString("utf-8")
-        fileEntries = parseScopeFileContents(sourceContents!)
+        const parsedScope = parseScopeFileContentsDetailed(sourceContents!)
+        fileEntries = parsedScope.include
+        fileExcludedEntries = parsedScope.exclude
         sourceHash = createHash("sha256").update(bytes).digest("hex")
         sourceFilename = "source-scope-" + sourceHash.slice(0, 16) + ".txt"
         sourceArtifactPath = path.join(existingWorkspace.workspacePath, "scope", sourceFilename)
@@ -216,7 +219,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       }
 
       let includeEntries = [...(params.include ?? []), ...fileEntries]
-      let excludeEntries = params.exclude ?? []
+      let excludeEntries = [...(params.exclude ?? []), ...fileExcludedEntries]
       let authorizationSource = params.authorization_source?.trim()
       let authorizationReference = params.authorization_reference?.trim()
       let previousScopeItems: string[] | undefined
@@ -229,7 +232,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
         const existingWorkspace = await TargetMemory.get(targetURL)
         const existingScope = existingWorkspace ? await TargetMemory.getScope(existingWorkspace.targetURL) : undefined
         if (existingScope?.status === "configured") {
-          excludeEntries = [...existingScope.excludedItems]
+          excludeEntries = [...existingScope.excludedItems, ...fileExcludedEntries]
         }
       }
 
@@ -356,7 +359,8 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
           title: "Scope file import checkpoint",
           content: [
             "Imported an explicit scope list from " + path.basename(sourcePath ?? "scope file") + ".",
-            "Usable file entries: " + fileEntries.length + ".",
+            "In-scope file entries: " + fileEntries.length + ".",
+            "Explicit out-of-scope file entries: " + fileExcludedEntries.length + ".",
             "Configured unique include entries: " + result.scope.scopeItems.length + ".",
             "Source copy: scope/" + sourceFilename + ".",
             "Source SHA-256: " + sourceHash + ".",
@@ -380,7 +384,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
             title: "User-confirmed complete scope list",
             content: [
               "The operator explicitly identified the supplied complete scope list as authorized. The manifest was configured from entries supplied; no sibling assets were inferred.",
-              "Input entries supplied: " + ((params.include ?? []).length + fileEntries.length) + ".",
+              "Input entries supplied: " + ((params.include ?? []).length + fileEntries.length + fileExcludedEntries.length) + ".",
               "Configured unique include entries: " + result.scope.scopeItems.length + ".",
               "Configured exclusions: " + result.scope.excludedItems.length + ".",
               "Mode: " + (params.merge_existing ? "merged supplied list into saved scope" : "configured supplied list as current scope") + ".",
