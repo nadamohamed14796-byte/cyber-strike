@@ -169,8 +169,8 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // Bare host/path scope entries are URL constraints, not a hostname shorthand.
   // Do not silently drop the path and broaden authorization to the entire origin.
   if (!typed && !allowed.includes("://") && allowed.includes("/") &&
-      !/^\\d+(?:\\.\\d+){3}\\/\\d{1,2}$/.test(allowed) &&
-      !/^\\[?[0-9a-f:.]+\\]?\\/\\d{1,3}$/i.test(allowed)) {
+      !/^\d+(?:\.\d+){3}\/\d{1,2}$/.test(allowed) &&
+      !/^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(allowed)) {
     return matchURLScope(rawTarget, allowed, true)
   }
 
