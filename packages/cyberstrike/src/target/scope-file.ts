@@ -96,7 +96,8 @@ export function parseScopeFileContentsDetailed(contents: string): { include: str
   const header = parseRow(nonEmpty[0].line).map(normalizeTypeKey)
   const identifierColumn = header.indexOf("identifier")
   const typeColumn = header.indexOf("assettype")
-  // Submission/bounty eligibility is not a scope decision. Only explicit scope columns may exclude assets.\n  const scopeColumn = header.findIndex((name) => ["inscope", "isinscope", "scope"].includes(name))
+  // Submission/bounty eligibility is not a scope decision. Only explicit scope columns may exclude assets.
+  const scopeColumn = header.findIndex((name) => ["inscope", "isinscope", "scope"].includes(name))
   if (identifierColumn >= 0 && typeColumn >= 0) {
     const entries: string[] = []
     const excludedEntries: string[] = []
