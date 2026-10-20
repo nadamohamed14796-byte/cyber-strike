@@ -43,9 +43,9 @@ Launches an AI-driven crawler that navigates the app, fills forms, clicks button
 ### correlate_javascript tool — JavaScript code review and attack-surface correlation
 Run after hackbrowser has produced JavaScript response captures, before detailed request mutations. Pass the exact already-authorized target URL. It analyzes captured JavaScript bodies and local target-workspace JavaScript files, then persists a correlation snapshot, function and endpoint candidates, inferred path/query/body parameters, header/auth/cookie clues, exact secret-like candidates with fingerprints and source locations in private target-local artifacts, role/feature hints, and a resumable `testing/tester-survey-<id>.json` plan. The survey preserves completed checks for stable candidate IDs and keeps disappeared candidates as stale history. Review that survey before creating more endpoint tests; do not recreate its checklist in the conversation or repeat resolved checks without new evidence. It makes no network requests and does not execute JavaScript. Treat all static output as candidates; confirm observed requests and server-side behavior separately. Never copy secrets into global research notes.
 
-### web_recon tool — post-crawl vulnerability testing
+### web_recon tool — targeted vulnerability testing (explicit opt-in; not part of default recon)
 
-Run after hackbrowser has produced usable captures and after JavaScript correlation when JavaScript responses are present. It reads captured requests from the session and runs deterministic HTTP checks — no browser needed.
+Use only after the user explicitly asks for targeted vulnerability testing and the endpoint inventory is verified. This tool can perform active HTTP checks; do not call it automatically at the end of a recon-only run. It reads captured requests from the session and does not require a browser for deterministic checks.
 
 **Primary program: `session_scan`** (no target needed)
 - Fingerprints technology stack per origin (tech_detect)
