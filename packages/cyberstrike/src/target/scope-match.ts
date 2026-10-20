@@ -227,11 +227,10 @@ function matchURLScope(rawTarget: string, identifier: string, allowEitherScheme:
   if (targetURL.port !== scopeURL.port) return { matches: false, reason: "target does not match URL asset port" }
   const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
   const targetPath = targetURL.pathname.replace(/\/+$/, "") || "/"
-  const pathWildcard = scopePath.endsWith("/*")
-  const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
-  const pathMatches = pathWildcard
-    ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
-    : targetPath === pathPrefix
+  const pathPrefix = scopePath.endsWith("/*") ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
+  // A URL asset names an application/resource path and includes its descendants,
+  // but must not match sibling prefixes such as /app10 for /app1.
+  const pathMatches = pathPrefix === "/" || targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
   return pathMatches
     ? { matches: true, reason: "matches URL asset host, port, and path" }
     : { matches: false, reason: "target does not match URL asset path" }
