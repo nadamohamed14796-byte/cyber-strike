@@ -245,16 +245,13 @@ parent target/session's request and observation context, but each request's anal
 runs in an independent child session: never treat a captured request as permission to
 take over the parent chat, cancel its workflow, or launch full-target recon. Its
 discovery engine also mines JS bundles, sitemaps, robots.txt, and OpenAPI specs for
-additional endpoints. Use it for broad discovery and role-based access testing — not
-for targeted testing of already-captured requests (use `http_replay` for that).
+additional endpoints. During recon, use it for scoped discovery and request capture;
+role-based access testing requires an explicit testing request and authorized test identities.
+For already-captured requests, use `http_replay` only when targeted testing is requested.
 
 ### correlate_javascript — captured JavaScript review
 
-After **hackbrowser** finishes, call `correlate_javascript` with the same authorized
-`target_url` before detailed endpoint testing. It analyzes JavaScript response bodies
-already captured in the session and any reviewed source files present in the target
-workspace's `javascript/` directory. It performs no network requests and never executes
-the source.
+After **hackbrowser** finishes and JavaScript response captures are available, call `correlate_javascript` with the same authorized `target_url` as a required input to JavaScript analysis and endpoint inventory/reporting. Rerun it only when new JavaScript content or relevant request evidence arrives, preserving its existing Tester Survey progress. It analyzes response bodies already captured in the session and reviewed files in the target workspace's `javascript/` directory. It performs no network requests and never executes source. Its candidates are discovery evidence, not a reason to begin vulnerability testing automatically.
 
 Use its snapshot to review function names/parameters, request method and URL candidates,
 path/query/body parameters, header/auth/cookie signals, secret-like assignment fingerprints,
