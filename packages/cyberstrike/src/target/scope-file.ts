@@ -1,6 +1,12 @@
 import path from "node:path"
 
 const HACKERONE_ASSET_TYPES: Record<string, string> = {
+  applestoreappid: "iOS: App Store",
+  downloadableexecutables: "Executable",
+  otherapk: "Android: .apk",
+  otheripa: "iOS: .ipa",
+  testflight: "iOS: Testflight",
+  windowsappstoreappid: "Windows: Microsoft Store",
   aimodel: "AI Model",
   androidapk: "Android: .apk",
   androidplaystore: "Android Play Store",
