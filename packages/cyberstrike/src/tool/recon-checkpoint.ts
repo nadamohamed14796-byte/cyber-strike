@@ -229,8 +229,20 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             }
             const resolvedArtifactPath = relative.split(path.sep).join("/")
             const requiredAreas = RECON_PHASE_ARTIFACT_AREAS[phase]
-            if (requiredAreas && !requiredAreas.some((area) => resolvedArtifactPath.startsWith(area + "/"))) {
-              return { title: "Recon checkpoint rejected", output: "Phase " + phase + " must save its verified output under one of " + requiredAreas.map((area) => area + "/").join(", ") + "; got " + artifact, metadata: { saved: false, reason: "artifact_in_wrong_area", required_areas: requiredAreas } }
+            const flatArtifacts: Partial<Record<ReconPhase, readonly string[]>> = {
+              asset_discovery: ["scope.txt", "subdomains.txt", "subdomain-sources.json", "recon-summary.md"],
+              live_hosts_ports: ["live-hosts.txt", "ports.txt", "recon-summary.md"],
+              url_collection: ["urls.txt", "recon-summary.md"],
+              parameter_discovery: ["parameters.txt", "recon-summary.md"],
+              parameter_fuzzing: ["parameter-tests.md", "recon-summary.md"],
+              javascript_analysis: ["javascript-analysis.md", "endpoints.txt", "recon-summary.md"],
+              endpoint_inventory: ["endpoints.txt", "recon-summary.md"],
+              vulnerability_testing: ["findings.md", "recon-summary.md"],
+            }
+            const isFlatArtifact = !resolvedArtifactPath.includes("/") &&
+              Boolean(flatArtifacts[phase]?.includes(resolvedArtifactPath))
+            if (requiredAreas && !isFlatArtifact && !requiredAreas.some((area) => resolvedArtifactPath.startsWith(area + "/"))) {
+              return { title: "Recon checkpoint rejected", output: "Phase " + phase + " must save its verified output as a top-level canonical file (" + (flatArtifacts[phase]?.join(", ") ?? "none") + ") or under " + requiredAreas.map((area) => area + "/").join(", ") + "; got " + artifact, metadata: { saved: false, reason: "artifact_in_wrong_area", required_areas: requiredAreas, allowed_flat_artifacts: flatArtifacts[phase] ?? [] } }
             }
             let info
             let realArtifact: string
