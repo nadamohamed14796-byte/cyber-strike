@@ -24,7 +24,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     if (!identifier) return { matches: false, reason: `empty identifier for HackerOne asset type "${assetType}"` }
     if (assetType === "wildcard") allowed = identifier.includes("*") || /\{[^{}]+\}/.test(identifier) ? identifier : "*." + identifier
     else if (assetType === "url") {
-      return matchURLScope(rawTarget, identifier, !/^https?:\\/\\//i.test(identifier))
+      return matchURLScope(rawTarget, identifier, !/^https?:\/\//i.test(identifier))
     } else {
       rawAllowed = rawScope.replace(/^[^:]+:\s*/, "").trim()
       allowed = identifier
@@ -200,9 +200,9 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
 function matchURLScope(rawTarget: string, identifier: string, allowEitherScheme: boolean): ScopeMatch {
   let targetURL: URL
   let scopeURL: URL
-  const explicitScheme = /^https?:\\/\\//i.test(identifier)
+  const explicitScheme = /^https?:\/\//i.test(identifier)
   try {
-    targetURL = /^[a-z][a-z\\d+.-]*:\\/\\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
+    targetURL = /^[a-z][a-z\d+.-]*:\/\//i.test(rawTarget) ? new URL(rawTarget) : new URL("https://" + rawTarget)
     scopeURL = explicitScheme ? new URL(identifier) : new URL("https://" + identifier)
   } catch {
     return { matches: false, reason: "invalid URL asset identifier or target" }
@@ -218,17 +218,17 @@ function matchURLScope(rawTarget: string, identifier: string, allowEitherScheme:
   if (explicitScheme && !allowEitherScheme && targetURL.protocol !== scopeURL.protocol) {
     return { matches: false, reason: "protocol does not match explicit URL asset" }
   }
-  const scopeHost = scopeURL.hostname.toLowerCase().replace(/\\.$/, "")
-  const targetHost = targetURL.hostname.toLowerCase().replace(/\\.$/, "")
+  const scopeHost = scopeURL.hostname.toLowerCase().replace(/\.$/, "")
+  const targetHost = targetURL.hostname.toLowerCase().replace(/\.$/, "")
   const hostMatches = scopeHost.startsWith("*.")
     ? targetHost === scopeHost.slice(2) || targetHost.endsWith("." + scopeHost.slice(2))
     : targetHost === scopeHost
   if (!hostMatches) return { matches: false, reason: "target does not match URL asset host" }
   if (targetURL.port !== scopeURL.port) return { matches: false, reason: "target does not match URL asset port" }
-  const scopePath = scopeURL.pathname.replace(/\\/+$/, "") || "/"
-  const targetPath = targetURL.pathname.replace(/\\/+$/, "") || "/"
+  const scopePath = scopeURL.pathname.replace(/\/+$/, "") || "/"
+  const targetPath = targetURL.pathname.replace(/\/+$/, "") || "/"
   const pathWildcard = scopePath.endsWith("/*")
-  const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\\/+$/, "") : scopePath
+  const pathPrefix = pathWildcard ? scopePath.slice(0, -2).replace(/\/+$/, "") : scopePath
   const pathMatches = pathWildcard
     ? targetPath === pathPrefix || targetPath.startsWith(pathPrefix + "/")
     : targetPath === pathPrefix
