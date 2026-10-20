@@ -47,6 +47,13 @@ describe("HackerOne typed scope assets", () => {
     expect(checkMatch("https://example.com/api?token=secret", "URL: example.com/api?token=secret").matches).toBe(false)
   })
 
+  test("explicit HTTP(S) scope URLs preserve application directory boundaries", () => {
+    expect(checkMatch("https://example.com/app1/users", "https://example.com/app1").matches).toBe(true)
+    expect(checkMatch("https://example.com/app10", "https://example.com/app1").matches).toBe(false)
+    expect(checkMatch("http://example.com/app1", "https://example.com/app1").matches).toBe(false)
+    expect(checkMatch("https://example.com/app1", "https://example.com/app1?token=secret").matches).toBe(false)
+  })
+
   test("URL assets retain host and path boundaries", () => {
     expect(checkMatch("https://example.com/app1/users", "URL: example.com/app1").matches).toBe(true)
     expect(checkMatch("https://example.com/app10", "URL: example.com/app1").matches).toBe(false)
