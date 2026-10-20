@@ -18,6 +18,16 @@ Treat the substituted command arguments, current conversation, existing target w
 
 Do not merely describe the work you intend to do. Execute each eligible operation through tools that actually exist in the current runtime, persist the results, verify persistence, and report the real outcome.
 
+## Scope intake: accept the input and start
+
+Treat scope pasted into the current message or supplied in command arguments as the actual input—not as a request for instructions. Accept common forms directly: a domain, wildcard, URL, multiple lines, Markdown bullets, copied HackerOne/Bugcrowd tables, CSV/TSV exports, and JSON-like lists. Use the existing parser/importer; do not ask the user to convert a file or explain its columns.
+
+Parse the complete set, preserve explicit exclusions and eligibility fields, and retain unsupported non-web asset types as recorded evidence rather than silently dropping them. For pasted content, parse it directly. For a file, use the registered file and scope tools. Never claim import success until the saved manifest and usable-entry count are verified.
+
+For initial setup, treat the supplied complete list as the full scope set. On an existing workspace, replace the saved set only when the user says it is a replacement; otherwise add entries only when the user says they are additional. Choose the canonical workspace root from a named program URL or the first usable web asset. If multiple unrelated domains are supplied, keep them together under one stable program workspace instead of asking the user to reformat them. Ask one concise question only if there is genuinely no identifiable target or scope input.
+
+After parsing, initialize or reuse one canonical workspace, save the complete scope and provenance, verify it, and immediately resume/start reconnaissance at the first unfinished phase. Do not stop after explaining the scope, creating a workspace, or telling the user to run another command. Do not repeat setup checks for unchanged scope. Keep saved exclusions and request-level authorization checks; simplifying intake must never bypass them.
+
 ## 0. Mandatory execution principles
 
 Apply these rules throughout the entire workflow.
@@ -472,36 +482,14 @@ Save inventories in the canonical workspace. Do not create child workspaces for 
 
 **Completion condition:** All currently available passive sources relevant to the target have either been processed, recorded as unavailable, or assigned an explicit unresolved status. No claim of exhaustive internet-wide discovery is permitted.
 
-## Stage B — Candidate normalization and asset hierarchy
+## Stage B — Candidate normalization and flat inventory
 
-Build a canonical candidate inventory.
+Normalize all discovered candidates into the canonical root-level inventories. Preserve each candidate's source, original value, normalized hostname/URL, validation status, scope decision, and reason for rejection or exclusion. Deduplicate observations without dropping source attribution or parameter variants.
 
-Use stable identifiers and documented normalization rules for:
-- Hostnames.
-- URLs and paths.
-- Ports and services.
-- JavaScript assets.
-- Endpoints and parameter sets.
-- Repository references.
-- DNS and certificate observations.
+Use one canonical workspace for the supplied program scope. Do not create a child workspace for every discovered hostname, URL, API, or subdomain. Do not create nested per-host folders. The root inventory is the source of truth; keep host/origin as a field in records. Use `assets/` only when the user explicitly requests a separately managed asset workspace. Keep all raw outputs and logs in existing standard folders when a tool requires them, then merge the normalized user-facing results into the root-level canonical files listed in §0.2.1.
 
-Retain provenance when multiple sources discover the same asset.
-
-For each candidate, record its authorization state and reason.
-
-Before an active operation:
-1. Normalize the candidate and identify its canonical origin/workspace.
-2. Reuse the single saved setup decision for the canonical root/workspace; do not perform a separate agent-level check for each candidate origin. If no setup decision exists for this run, perform the one required check for the canonical root.
-3. Verify the decision is authorized and the proposed operation is permitted by policy.
-4. Confirm the active tool will enforce persisted scope for the exact request.
-5. Record the decision and operation before execution.
-
-Use one canonical root workspace for the entire recon run. Every discovered hostname, live host, URL, endpoint, and technology observation belongs in the root inventory files; do not create a child workspace per hostname, per URL, or per browser-captured origin. Do not call `attach_asset` or `registerObservedAsset` during ordinary discovery or request capture.
-
-A child workspace is an explicit exception only when the operator asks for independent investigation storage for a particular asset. A wildcard match or a successful scope check alone is not a reason to create one.
-
-**Completion condition:** Every candidate has a recorded disposition in the root inventory, with source/provenance and authorization status where relevant.
-
+Do not discard a candidate only because a preferred tool cannot process its type. Use another suitable registered tool or record the exact limitation. Preserve all original input rows and report the counts of parsed, eligible, excluded, unsupported, invalid, and duplicate entries.
+ 
 ## Stage C — DNS, HTTP, service, and technology reconnaissance
 
 Use available registered DNS, HTTP, browser, reconnaissance, and code-search tools. Discover their real schemas and capabilities before invoking them.
