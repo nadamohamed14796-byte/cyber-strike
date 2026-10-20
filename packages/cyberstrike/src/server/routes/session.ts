@@ -1472,6 +1472,9 @@ export const SessionRoutes = lazy(() =>
               title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)}` ,
             })
             const childSessionID = childSession.id
+            // Keep proxy work in its own child session, but inherit the parent session's
+            // pause/resume controls and queue accounting. Omitting the third argument lets
+            // captured requests continue while the user has paused the active recon session.
             IngestQueue.enqueue(childSessionID, async () => {
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
