@@ -27,6 +27,7 @@ describe("HackerOne typed scope assets", () => {
 
   test("matches HackerOne Domain, IP Address, and CIDR identifiers", () => {
     expect(checkMatch("https://example.com/", "Domain: example.com").matches).toBe(true)
+    expect(checkMatch("https://api.example.com/v1/", "API: api.example.com").matches).toBe(true)
     expect(checkMatch("https://sub.example.com/", "Domain: example.com").matches).toBe(false)
     expect(checkMatch("https://192.0.2.17/", "IP Address: 192.0.2.17").matches).toBe(true)
     expect(checkMatch("https://192.0.2.17/", "CIDR: 192.0.2.0/24").matches).toBe(true)
@@ -44,6 +45,9 @@ describe("HackerOne typed scope assets", () => {
   test("non-web HackerOne assets never authorize arbitrary HTTP targets", () => {
     for (const scope of [
       "Source Code: https://github.com/acme/app",
+      "Google Play App ID: com.mercadopago.wallet",
+      "AI Model: https://example.com",
+      "Smart Contract: https://example.com",
       "Executable: app.apk",
       "Hardware: router-01",
       "Android: .apk: com.example.app",
