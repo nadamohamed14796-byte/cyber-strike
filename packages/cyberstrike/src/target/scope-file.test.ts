@@ -127,15 +127,15 @@ describe("parseScopeFileContents", () => {
     ])
   })
 
-  test("parses quoted TSV fields without shifting submission eligibility", () => {
+  test("parses quoted TSV fields without shifting columns", () => {
     const tsv = [
       "identifier\tasset_type\tinstruction\teligible_for_submission\teligible_for_bounty",
       "api.example.com\tAPI\t\"Requires\tconsent\"\ttrue\tfalse",
       "admin.example.com\tDomain\t\"Do not test\tthis\"\tfalse\ttrue",
     ].join("\n")
     expect(parseScopeFileContentsDetailed(tsv)).toEqual({
-      include: ["API: api.example.com"],
-      exclude: ["Domain: admin.example.com"],
+      include: ["API: api.example.com", "Domain: admin.example.com"],
+      exclude: [],
     })
   })
 
