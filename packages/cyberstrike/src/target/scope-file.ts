@@ -37,26 +37,33 @@ const HACKERONE_ASSET_TYPES: Record<string, string> = {
 /** Parse plain-text lists and HackerOne tabular exports, separating explicit out-of-scope rows. */
 export function parseScopeFileContentsDetailed(contents: string): { include: string[]; exclude: string[] } {
   let source = contents.replace(/^\uFEFF/, "").trim()
-  // Accept a pasted JSON list as naturally as a plain text list.
+  // Accept common JSON scope lists, but never silently treat an unsupported JSON document as a single target.
+  let parsedJson: unknown
+  let isJson = false
   try {
-    const parsed: unknown = JSON.parse(source)
-    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
-      source = parsed.join("\n")
+    parsedJson = JSON.parse(source)
+    isJson = true
+  } catch {
+    // Plain text, CSV/TSV, and Markdown inputs are handled below.
+  }
+  if (isJson) {
+    if (Array.isArray(parsedJson) && parsedJson.every((item) => typeof item === "string")) {
+      source = parsedJson.join("\n")
     } else if (
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      parsed.every((item) => item !== null && typeof item === "object" && !Array.isArray(item)) &&
-      parsed.some((item) => item !== null && typeof item === "object" && "identifier" in item && "asset_type" in item)
+      Array.isArray(parsedJson) &&
+      parsedJson.length > 0 &&
+      parsedJson.every((item) => item !== null && typeof item === "object" && !Array.isArray(item)) &&
+      parsedJson.some((item) => item !== null && typeof item === "object" && "identifier" in item && "asset_type" in item)
     ) {
-      const headers = [...new Set(parsed.flatMap((item) => Object.keys(item as Record<string, unknown>)))]
+      const headers = [...new Set(parsedJson.flatMap((item) => Object.keys(item as Record<string, unknown>)))]
       const csvCell = (value: unknown) => {
         const text = value === null || value === undefined ? "" : typeof value === "object" ? JSON.stringify(value) : String(value)
         return '"' + text.replace(/"/g, '""') + '"'
       }
-      source = [headers.map(csvCell).join(","), ...parsed.map((item) => headers.map((header) => csvCell((item as Record<string, unknown>)[header])).join(","))].join("\n")
+      source = [headers.map(csvCell).join(","), ...parsedJson.map((item) => headers.map((header) => csvCell((item as Record<string, unknown>)[header])).join(","))].join("\n")
+    } else {
+      throw new Error("Unsupported JSON scope format. Use an array of scope strings or an array of asset objects containing identifier and asset_type.")
     }
-  } catch {
-    // Plain text, CSV/TSV, and Markdown inputs are handled below.
   }
 
   const lines = source.split(/\r?\n/)
