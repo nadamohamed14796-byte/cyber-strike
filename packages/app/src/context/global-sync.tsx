@@ -275,6 +275,23 @@ function createGlobalSync() {
     if (!existing) return
     children.mark(directory)
     const [store, setStore] = existing
+
+    // Async prompts return before model execution finishes. Surface their
+    // session.error events to the user instead of silently leaving an optimistic
+    // user message in the timeline with no explanation.
+    if (event.type === "session.error") {
+      const properties = event.properties as {
+        sessionID?: string
+        error?: { message?: string; name?: string }
+      }
+      const message = properties.error?.message || properties.error?.name
+      showToast({
+        title: language.t("common.requestFailed"),
+        description: message || language.t("common.requestFailed"),
+      })
+      return
+    }
+
     applyDirectoryEvent({
       event,
       directory,
