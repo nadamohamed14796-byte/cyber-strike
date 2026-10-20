@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { initialReconRun, parseReconRun } from "../../src/target/recon-gate"
+import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun } from "../../src/target/recon-gate"
 import {
   reconRunID,
   reconBeginDisposition,
@@ -117,6 +117,21 @@ test("recon can reach reporting while vulnerability testing is explicitly deferr
   state.vulnerability_testing = { status: "deferred", reason: "Awaiting user request" }
   expect(unresolvedReconPrerequisites("reporting", state)).toEqual([])
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
+})
+
+test("reopening deferred vulnerability testing clears stale downstream reports", () => {
+  const state = records("complete")
+  state.reporting = {
+    status: "complete",
+    startedAt: "2026-10-20T09:00:00.000Z",
+    finishedAt: "2026-10-20T09:01:00.000Z",
+    summary: "Old pre-testing report",
+    counts: { endpoints: 12 },
+    artifacts: ["reports/recon-final.md"],
+  }
+  const reason = "Regenerate this downstream checkpoint after vulnerability_testing was explicitly reopened."
+  expect(invalidateReconDownstreamPhases("vulnerability_testing", state, reason)).toEqual(["reporting"])
+  expect(state.reporting).toEqual({ status: "pending", reason })
 })
 
 test("deferred is accepted as a persisted checkpoint status", () => {
