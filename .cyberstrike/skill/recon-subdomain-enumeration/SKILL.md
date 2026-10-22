@@ -177,7 +177,7 @@ Return the command/tool and version, input/output artifact references, accepted/
 When working inside this repository/runtime, prefer the shared passive source runner instead of creating one script/output per source:
 
 ```bash
-python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py example.com --output <canonical-workspace>/assets/passive-subdomain-sources.json
+python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py example.com --output <canonical-workspace>/subdomain-sources.json --hosts-output <canonical-workspace>/subdomains.txt
 python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py --self-test
 ```
 
