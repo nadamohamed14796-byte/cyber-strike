@@ -172,3 +172,13 @@ Preserve native output; write normalized output separately. Keep provenance, tim
 
 ### Handoff
 Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
+### CyberStrike source orchestration
+
+When working inside this repository/runtime, prefer the shared passive source runner instead of creating one script/output per source:
+
+```bash
+python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py example.com --output <canonical-workspace>/assets/passive-subdomain-sources.json
+python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py --self-test
+```
+
+The JSON output records each root/source pair as success, zero-results, failed, blocked, or unavailable, with counts/errors and source attribution on each normalized hostname. It queries crt.sh and installed supported CLIs only; it does not resolve or probe discovered hosts. Verify the saved JSON and counts before moving to DNS/live-host checks. Replace `example.com` and the output path with the actual root and path returned by the canonical workspace tool. If the helper is absent in an installed build, use available registered APIs/CLIs and record the missing-helper limitation rather than claiming source coverage.
