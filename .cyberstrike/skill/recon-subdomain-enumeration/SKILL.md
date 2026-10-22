@@ -177,7 +177,9 @@ Return the command/tool and version, input/output artifact references, accepted/
 When working inside this repository/runtime, prefer the shared passive source runner instead of creating one script/output per source:
 
 ```bash
-python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py example.com --output <canonical-workspace>/subdomain-sources.json --hosts-output <canonical-workspace>/subdomains.txt
+PASSIVE_RUNNER="$(dirname "$(readlink -f "$(command -v cyberstrike)")")/data/scripts/passive_subdomain_sources.py"
+if [ ! -f "$PASSIVE_RUNNER" ]; then PASSIVE_RUNNER="packages/cyberstrike/data/scripts/passive_subdomain_sources.py"; fi
+python3 "$PASSIVE_RUNNER" example.com --output <canonical-workspace>/subdomain-sources.json --hosts-output <canonical-workspace>/subdomains.txt
 python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py --self-test
 ```
 
