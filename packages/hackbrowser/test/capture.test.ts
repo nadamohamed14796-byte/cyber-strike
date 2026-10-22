@@ -16,7 +16,7 @@ afterAll(async () => {
 async function loadFixture(name: string): Promise<Page> {
   const html = readFileSync(`${import.meta.dir}/fixtures/${name}`, "utf-8")
   const p = await browser.newPage()
-  await p.setContent(html, { waitUntil: "networkidle" })
+  await p.setContent(html, { waitUntil: "domcontentloaded" })
   // SPA fixtures render after DOMContentLoaded — wait for a real form field to appear
   await p
     .waitForFunction(
