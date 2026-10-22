@@ -20,6 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 CLI_SOURCES = ("subfinder", "amass", "assetfinder", "findomain", "sublist3r")
+API_SOURCES = ("crt.sh", "certspotter", "otx_passive_dns")
+ALL_SOURCES = (*API_SOURCES, *CLI_SOURCES)
 HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$", re.I)
 
 def normalize_host(value: str, root: str) -> str | None:
@@ -60,6 +62,24 @@ def parse_crtsh(payload: str, root: str) -> tuple[int, list[str], int]:
 def run_source(source: str, root: str, timeout: int) -> dict:
     started = datetime.now(timezone.utc).isoformat()
     result = {"source": source, "status": "unavailable", "started_at": started, "raw_records": 0, "valid_observations": 0, "unique_hosts": 0, "rejected_records": 0, "duplicate_observations": 0, "hosts": [], "error": None, "finished_at": None}
+    hosts: list[str] = []
+    raw = 0
+    rejected = 0
+
+    def save_partial(status: str, error: str) -> dict:
+        unique = sorted(set(hosts))
+        result.update(
+            status=status,
+            raw_records=raw,
+            valid_observations=len(hosts),
+            unique_hosts=len(unique),
+            duplicate_observations=max(0, len(hosts) - len(unique)),
+            rejected_records=rejected,
+            hosts=unique,
+            error=error[:2000],
+        )
+        return result
+
     try:
         if source == "crt.sh":
             url = "https://crt.sh/?" + urllib.parse.urlencode({"q": "%." + root, "output": "json"})
@@ -69,6 +89,78 @@ def run_source(source: str, root: str, timeout: int) -> dict:
             if len(payload) > 20_000_000:
                 raise ValueError("response exceeded 20 MB safety limit")
             raw, hosts, rejected = parse_crtsh(payload.decode("utf-8", errors="replace"), root)
+
+        elif source == "certspotter":
+            # CertSpotter exposes unauthenticated CT search with a small rate budget.
+            # Follow the documented after=issuance-id cursor until exhaustion,
+            # a repeated cursor, a parser error, or a service/rate-limit response.
+            cursor: str | None = None
+            seen_cursors: set[str] = set()
+            while True:
+                pairs: list[tuple[str, str]] = [
+                    ("domain", root),
+                    ("include_subdomains", "true"),
+                    ("expand", "dns_names"),
+                ]
+                if cursor:
+                    pairs.append(("after", cursor))
+                url = "https://api.certspotter.com/v1/issuances?" + urllib.parse.urlencode(pairs)
+                headers = {"User-Agent": "CyberStrike-passive-recon/1.0", "Accept": "application/json"}
+                token = os.environ.get("CERTSPOTTER_API_KEY")
+                if token:
+                    headers["Authorization"] = "Bearer " + token
+                request = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    payload = response.read(20_000_001)
+                if len(payload) > 20_000_000:
+                    raise ValueError("CertSpotter response page exceeded 20 MB safety limit")
+                records = json.loads(payload.decode("utf-8", errors="replace"))
+                if not isinstance(records, list):
+                    raise ValueError("CertSpotter JSON response was not a list")
+                if not records:
+                    break
+                for record in records:
+                    if not isinstance(record, dict) or not isinstance(record.get("dns_names"), list):
+                        raise ValueError("CertSpotter issuance record is missing dns_names")
+                    for candidate in record["dns_names"]:
+                        raw += 1
+                        host = normalize_host(str(candidate), root)
+                        if host:
+                            hosts.append(host)
+                        else:
+                            rejected += 1
+                next_cursor = records[-1].get("id")
+                if not isinstance(next_cursor, (str, int)) or not str(next_cursor):
+                    raise ValueError("CertSpotter page has no issuance id; cannot safely continue pagination")
+                cursor = str(next_cursor)
+                if cursor in seen_cursors:
+                    raise ValueError("CertSpotter repeated a pagination cursor")
+                seen_cursors.add(cursor)
+
+        elif source == "otx_passive_dns":
+            url = "https://otx.alienvault.com/api/v1/indicators/domain/" + urllib.parse.quote(root, safe="") + "/passive_dns"
+            headers = {"User-Agent": "CyberStrike-passive-recon/1.0", "Accept": "application/json"}
+            token = os.environ.get("OTX_API_KEY")
+            if token:
+                headers["X-OTX-API-KEY"] = token
+            request = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = response.read(20_000_001)
+            if len(payload) > 20_000_000:
+                raise ValueError("OTX response exceeded 20 MB safety limit")
+            data = json.loads(payload.decode("utf-8", errors="replace"))
+            records = data.get("passive_dns") if isinstance(data, dict) else None
+            if not isinstance(records, list):
+                raise ValueError("OTX JSON response was missing passive_dns records")
+            raw = len(records)
+            for record in records:
+                candidate = record.get("hostname", "") if isinstance(record, dict) else ""
+                host = normalize_host(str(candidate), root)
+                if host:
+                    hosts.append(host)
+                else:
+                    rejected += 1
+
         else:
             executable = shutil.which(source)
             if not executable:
@@ -91,35 +183,38 @@ def run_source(source: str, root: str, timeout: int) -> dict:
                 completed = subprocess.run(commands[source], capture_output=True, text=True, timeout=timeout, check=False)
                 output = completed.stdout or ""
             lines = [line.strip() for line in output.splitlines() if line.strip()]
-            hosts = []
-            rejected = 0
             for line in lines:
+                raw += 1
                 host = normalize_host(line, root)
                 if host:
                     hosts.append(host)
                 else:
                     rejected += 1
-            raw = len(lines)
             if completed.returncode != 0:
-                result["status"] = "failed"
-                result["error"] = (completed.stderr or f"exit status {completed.returncode}").strip()[-2000:]
-                result["raw_records"] = raw
-                result["valid_observations"] = len(hosts)
-                result["unique_hosts"] = len(set(hosts))
-                result["duplicate_observations"] = max(0, len(hosts) - len(set(hosts)))
-                result["rejected_records"] = rejected
-                result["hosts"] = sorted(set(hosts))
-                return result
+                return save_partial("failed", (completed.stderr or f"exit status {completed.returncode}").strip())
+
         unique = sorted(set(hosts))
         result.update(status="success" if unique else "zero-results", raw_records=raw, valid_observations=len(hosts), unique_hosts=len(unique), duplicate_observations=max(0, len(hosts) - len(unique)), rejected_records=rejected, hosts=unique)
-    except subprocess.TimeoutExpired:
-        result.update(status="failed", error=f"timed out after {timeout}s")
+    except subprocess.TimeoutExpired as exc:
+        partial = exc.stdout or ""
+        if isinstance(partial, bytes):
+            partial = partial.decode("utf-8", errors="replace")
+        for line in str(partial).splitlines():
+            if not line.strip():
+                continue
+            raw += 1
+            host = normalize_host(line, root)
+            if host:
+                hosts.append(host)
+            else:
+                rejected += 1
+        return save_partial("failed", f"timed out after {timeout}s")
     except urllib.error.HTTPError as exc:
-        result.update(status="blocked" if exc.code in (401, 403, 429) else "failed", error=f"HTTP {exc.code}")
+        return save_partial("blocked" if exc.code in (401, 403, 429) else "failed", f"HTTP {exc.code}")
     except (urllib.error.URLError, TimeoutError) as exc:
-        result.update(status="failed", error=str(exc)[:2000])
+        return save_partial("failed", str(exc))
     except Exception as exc:
-        result.update(status="failed", error=f"{type(exc).__name__}: {exc}"[:2000])
+        return save_partial("failed", f"{type(exc).__name__}: {exc}")
     return result
 
 def self_test() -> int:
@@ -206,7 +301,7 @@ def self_test() -> int:
                 os.environ.pop("CYBERSTRIKE_TEST_CALLS", None)
             else:
                 os.environ["CYBERSTRIKE_TEST_CALLS"] = original_calls
-    print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, 5 CLI adapters, atomic outputs, resume, and retry)")
+    print("passive_subdomain_sources self-test: PASS (normalization, 3 HTTP APIs, 5 CLI adapters, atomic outputs, resume, and retry)")
     return 0
 
 def atomic_write_text(destination: Path, content: str) -> None:
@@ -287,8 +382,8 @@ def main() -> int:
     parser.add_argument("roots", nargs="*", help="root domains to query (without scheme or path)")
     parser.add_argument("--output", "-o", help="canonical JSON ledger; pass the same path to resume")
     parser.add_argument("--hosts-output", help="canonical deduplicated host-only inventory text path")
-    parser.add_argument("--source", action="append", choices=("crt.sh",) + CLI_SOURCES, help="run/ensure only these sources; repeat to select multiple")
-    parser.add_argument("--retry-source", action="append", choices=("crt.sh",) + CLI_SOURCES, help="explicitly retry completed/failed records for a source; repeatable")
+    parser.add_argument("--source", action="append", choices=ALL_SOURCES, help="run/ensure only these sources; repeat to select multiple")
+    parser.add_argument("--retry-source", action="append", choices=ALL_SOURCES, help="explicitly retry completed/failed records for a source; repeatable")
     parser.add_argument("--timeout", type=int, default=90, help="timeout per source in seconds (default: 90)")
     parser.add_argument("--fresh", action="store_true", help="start a new ledger in the same canonical paths instead of resuming an existing one")
     parser.add_argument("--self-test", action="store_true", help="run offline parser, adapter, persistence, and resume checks")
@@ -314,7 +409,7 @@ def main() -> int:
 
     output_path = Path(args.output).expanduser().resolve() if args.output else None
     hosts_path = Path(args.hosts_output).expanduser().resolve() if args.hosts_output else None
-    default_sources = ["crt.sh", *CLI_SOURCES]
+    default_sources = list(ALL_SOURCES)
     selected_sources = list(dict.fromkeys(args.source or default_sources))
     retry_sources = set(args.retry_source or [])
     selected_sources = list(dict.fromkeys([*selected_sources, *retry_sources]))
