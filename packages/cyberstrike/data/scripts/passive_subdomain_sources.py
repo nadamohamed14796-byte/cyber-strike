@@ -166,6 +166,8 @@ def self_test() -> int:
                 assert result["duplicate_observations"] == 1, (source, result)
                 assert result["rejected_records"] == 2, (source, result)
 
+            # Exclude the five adapter preflight invocations from resume assertions below.
+            calls_path.write_text("", encoding="utf-8")
             original_argv = sys.argv[:]
             json_path = Path(tmpdir) / "subdomain-sources.json"
             hosts_path = Path(tmpdir) / "subdomains.txt"
