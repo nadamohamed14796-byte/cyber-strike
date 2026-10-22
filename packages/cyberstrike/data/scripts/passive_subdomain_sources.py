@@ -2,7 +2,7 @@
 """Collect passive subdomain observations and write one auditable JSON result.
 
 This helper does not resolve hosts or send requests to discovered targets. It queries
-crt.sh and installed passive discovery CLIs only; active recon remains a later phase.
+crt.sh, CertSpotter, AlienVault OTX passive DNS, and installed passive discovery CLIs; active recon remains a later phase.
 """
 from __future__ import annotations
 import argparse
