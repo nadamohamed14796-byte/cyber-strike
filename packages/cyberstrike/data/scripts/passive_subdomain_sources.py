@@ -204,7 +204,8 @@ def main() -> int:
         "sources_failed": sum(x["status"] == "failed" for x in document["sources"]),
         "sources_blocked": sum(x["status"] == "blocked" for x in document["sources"]),
         "sources_unavailable": sum(x["status"] == "unavailable" for x in document["sources"]),
-        "unique_hosts": len(document["hosts"]),\n        "duplicate_observations": sum(x["duplicate_observations"] for x in document["sources"]),
+        "unique_hosts": len(document["hosts"]),
+        "duplicate_observations": sum(x["duplicate_observations"] for x in document["sources"]),
     }
     serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
     if args.hosts_output:
