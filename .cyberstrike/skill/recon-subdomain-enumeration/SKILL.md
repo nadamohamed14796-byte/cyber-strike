@@ -177,10 +177,12 @@ Return the command/tool and version, input/output artifact references, accepted/
 When working inside this repository/runtime, prefer the shared passive source runner instead of creating one script/output per source:
 
 ```bash
-PASSIVE_RUNNER="$(dirname "$(readlink -f "$(command -v cyberstrike)")")/data/scripts/passive_subdomain_sources.py"
-if [ ! -f "$PASSIVE_RUNNER" ]; then PASSIVE_RUNNER="packages/cyberstrike/data/scripts/passive_subdomain_sources.py"; fi
-python3 "$PASSIVE_RUNNER" example.com --output <canonical-workspace>/subdomain-sources.json --hosts-output <canonical-workspace>/subdomains.txt
-python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py --self-test
+# CyberStrike tool call (conceptual args; substitute actual workspace path):
+attack_script(script="passive_subdomain_sources", args=[
+  "example.com",
+  "--output", "<canonical-workspace-root>/subdomain-sources.json",
+  "--hosts-output", "<canonical-workspace-root>/subdomains.txt",
+], timeout_seconds=<adequate aggregate timeout>)
 ```
 
 The JSON output records each root/source pair as success, zero-results, failed, blocked, or unavailable, with counts/errors and source attribution on each normalized hostname. It queries crt.sh and installed supported CLIs only; it does not resolve or probe discovered hosts. Verify the saved JSON and counts before moving to DNS/live-host checks. Replace `example.com` and the output path with the actual root and path returned by the canonical workspace tool. If the helper is absent in an installed build, use available registered APIs/CLIs and record the missing-helper limitation rather than claiming source coverage.
