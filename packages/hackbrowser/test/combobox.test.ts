@@ -25,7 +25,7 @@ afterAll(async () => {
 async function load(): Promise<Page> {
   const html = readFileSync(`${import.meta.dir}/fixtures/combobox-search-dialog.html`, "utf-8")
   const p = await browser.newPage()
-  await p.setContent(html, { waitUntil: "networkidle" })
+  await p.setContent(html, { waitUntil: "domcontentloaded" })
   await p.waitForTimeout(100)
   return p
 }
