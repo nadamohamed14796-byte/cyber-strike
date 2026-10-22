@@ -160,9 +160,22 @@ def self_test() -> int:
                 assert result["unique_hosts"] == 2, (source, result)
                 assert result["duplicate_observations"] == 1, (source, result)
                 assert result["rejected_records"] == 2, (source, result)
+            original_argv = sys.argv[:]
+            json_path = Path(tmpdir) / "subdomain-sources.json"
+            hosts_path = Path(tmpdir) / "subdomains.txt"
+            sys.argv = [sys.argv[0], "example.com", "--source", "subfinder", "--output", str(json_path), "--hosts-output", str(hosts_path)]
+            try:
+                assert main() == 0
+            finally:
+                sys.argv = original_argv
+            saved = json.loads(json_path.read_text(encoding="utf-8"))
+            saved_hosts = hosts_path.read_text(encoding="utf-8").splitlines()
+            assert [item["host"] for item in saved["hosts"]] == saved_hosts
+            assert saved_hosts == ["api.example.com", "www.example.com"]
+            assert saved["counts"]["sources_attempted"] == 1
         finally:
             os.environ["PATH"] = original_path
-    print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, and 5 CLI adapters)")
+    print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, 5 CLI adapters, and canonical JSON/text outputs)")
     return 0
 
 def main() -> int:
