@@ -261,7 +261,61 @@ def self_test() -> int:
                 assert result["duplicate_observations"] == 1, (source, result)
                 assert result["rejected_records"] == 2, (source, result)
 
-            # Exclude the five adapter preflight invocations from resume assertions below.
+            # Test the CertSpotter and OTX HTTP adapters without making network requests.
+            original_urlopen = urllib.request.urlopen
+            api_requests: list[str] = []
+
+            class FakeResponse:
+                def __init__(self, value):
+                    self.payload = json.dumps(value).encode("utf-8")
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *_args):
+                    return False
+
+                def read(self, size=-1):
+                    return self.payload if size < 0 else self.payload[:size]
+
+            def fake_urlopen(request, timeout):
+                url = request.full_url
+                api_requests.append(url)
+                parsed = urllib.parse.urlparse(url)
+                query = urllib.parse.parse_qs(parsed.query)
+                if parsed.netloc == "api.certspotter.com":
+                    if "after" in query:
+                        return FakeResponse([])
+                    return FakeResponse([{
+                        "id": "issuer-1",
+                        "dns_names": ["api.example.com", "*.www.example.com", "example.net"],
+                    }])
+                if parsed.netloc == "otx.alienvault.com":
+                    return FakeResponse({
+                        "count": 2,
+                        "passive_dns": [
+                            {"hostname": "api.example.com", "record_type": "A"},
+                            {"hostname": "outside.test", "record_type": "A"},
+                        ],
+                    })
+                raise AssertionError("unexpected test URL: " + url)
+
+            urllib.request.urlopen = fake_urlopen
+            try:
+                certspotter = run_source("certspotter", "example.com", 5)
+                otx = run_source("otx_passive_dns", "example.com", 5)
+            finally:
+                urllib.request.urlopen = original_urlopen
+            assert len(api_requests) == 3, api_requests  # two CertSpotter pages plus OTX
+            assert certspotter["status"] == "success", certspotter
+            assert certspotter["raw_records"] == 3 and certspotter["unique_hosts"] == 2, certspotter
+            assert certspotter["rejected_records"] == 1, certspotter
+            assert certspotter["hosts"] == ["api.example.com", "www.example.com"], certspotter
+            assert otx["status"] == "success", otx
+            assert otx["raw_records"] == 2 and otx["unique_hosts"] == 1, otx
+            assert otx["rejected_records"] == 1 and otx["hosts"] == ["api.example.com"], otx
+
+            # Exclude adapter preflight invocations from resume assertions below.
             calls_path.write_text("", encoding="utf-8")
             original_argv = sys.argv[:]
             json_path = Path(tmpdir) / "subdomain-sources.json"
@@ -286,7 +340,7 @@ def self_test() -> int:
             assert [item["host"] for item in saved["hosts"]] == saved_hosts
             assert saved_hosts == ["api.example.com", "www.example.com"]
             assert saved["counts"]["sources_attempted"] == 1
-            assert saved["counts"]["sources_pending"] == len(CLI_SOURCES)  # all five CLIs plus crt.sh are on the ledger
+            assert saved["counts"]["sources_pending"] == len(ALL_SOURCES) - 1  # all default sources except the selected subfinder are pending
             assert saved["run_status"] == "running"
             source_record = next(item for item in saved["sources"] if item["root"] == "example.com" and item["source"] == "subfinder")
             assert source_record["attempt_count"] == 2
