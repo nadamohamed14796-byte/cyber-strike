@@ -7,6 +7,7 @@ crt.sh and installed passive discovery CLIs only; active recon remains a later p
 from __future__ import annotations
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -136,6 +137,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("roots", nargs="*", help="root domains to query (without scheme or path)")
     parser.add_argument("--output", "-o", help="write the combined JSON result to this path (default: stdout)")
+    parser.add_argument("--hosts-output", help="write the deduplicated host-only inventory to this canonical text path")
     parser.add_argument("--source", action="append", choices=("crt.sh",) + CLI_SOURCES, help="limit to a source; repeat to select multiple (default: all sources)")
     parser.add_argument("--timeout", type=int, default=90, help="timeout per source in seconds (default: 90)")
     parser.add_argument("--self-test", action="store_true", help="run offline parser/normalization checks")
