@@ -189,8 +189,8 @@ def self_test() -> int:
             assert [item["host"] for item in saved["hosts"]] == saved_hosts
             assert saved_hosts == ["api.example.com", "www.example.com"]
             assert saved["counts"]["sources_attempted"] == 1
-            assert saved["counts"]["sources_pending"] == 0
-            assert saved["run_status"] == "complete"
+            assert saved["counts"]["sources_pending"] == len(CLI_SOURCES)  # all five CLIs plus crt.sh are on the ledger
+            assert saved["run_status"] == "running"
             api_record = next(item for item in saved["hosts"] if item["host"] == "api.example.com")
             assert api_record["roots"] == ["example.com"]
             assert api_record["observations"] == [{"root": "example.com", "source": "subfinder"}]
@@ -301,6 +301,8 @@ def main() -> int:
         parser.error("no valid root domains")
     if args.output and not args.hosts_output:
         parser.error("--hosts-output is required with --output so the two canonical inventories stay in sync")
+    if args.hosts_output and not args.output:
+        parser.error("--output is required with --hosts-output so source status remains resumable")
 
     output_path = Path(args.output).expanduser().resolve() if args.output else None
     hosts_path = Path(args.hosts_output).expanduser().resolve() if args.hosts_output else None
@@ -342,7 +344,9 @@ def main() -> int:
     # earlier records; normal full runs add all five CLI sources and crt.sh.
     indexed = {(item["root"], item["source"]): item for item in document["sources"]}
     for root in roots:
-        for source in selected_sources:
+        # Always record the full default worklist; --source selects what this invocation
+        # executes, not what the run is allowed to claim it covered.
+        for source in default_sources:
             key = (root, source)
             if key not in indexed:
                 item = {
