@@ -173,6 +173,9 @@ def self_test() -> int:
             assert [item["host"] for item in saved["hosts"]] == saved_hosts
             assert saved_hosts == ["api.example.com", "www.example.com"]
             assert saved["counts"]["sources_attempted"] == 1
+            api_record = next(item for item in saved["hosts"] if item["host"] == "api.example.com")
+            assert api_record["roots"] == ["example.com"]
+            assert api_record["observations"] == [{"root": "example.com", "source": "subfinder"}]
         finally:
             os.environ["PATH"] = original_path
     print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, 5 CLI adapters, and canonical JSON/text outputs)")
@@ -200,7 +203,7 @@ def main() -> int:
     roots = list(dict.fromkeys(roots))
     sources = args.source or ["crt.sh", *CLI_SOURCES]
     document = {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(), "mode": "passive-only", "roots": roots, "sources": [], "hosts": [], "counts": {}}
-    observations: dict[str, list[str]] = {}
+    observations: dict[str, list[dict[str, str]]] = {}
     for root in roots:
         for source in sources:
             item = run_source(source, root, max(1, args.timeout))
@@ -208,8 +211,17 @@ def main() -> int:
             item["finished_at"] = datetime.now(timezone.utc).isoformat()
             document["sources"].append(item)
             for host in item["hosts"]:
-                observations.setdefault(host, []).append(source)
-    document["hosts"] = [{"host": host, "sources": sorted(set(source_list)), "observation_count": len(source_list)} for host, source_list in sorted(observations.items())]
+                observations.setdefault(host, []).append({"root": root, "source": source})
+    document["hosts"] = [
+        {
+            "host": host,
+            "roots": sorted({item["root"] for item in source_observations}),
+            "sources": sorted({item["source"] for item in source_observations}),
+            "observations": sorted(source_observations, key=lambda item: (item["root"], item["source"])),
+            "observation_count": len(source_observations),
+        }
+        for host, source_observations in sorted(observations.items())
+    ]
     document["counts"] = {
         "roots": len(roots), "sources_attempted": len(document["sources"]),
         "sources_success": sum(x["status"] == "success" for x in document["sources"]),
