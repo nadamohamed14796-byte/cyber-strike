@@ -58,7 +58,7 @@ def parse_crtsh(payload: str, root: str) -> tuple[int, list[str], int]:
 
 def run_source(source: str, root: str, timeout: int) -> dict:
     started = datetime.now(timezone.utc).isoformat()
-    result = {"source": source, "status": "unavailable", "started_at": started, "raw_records": 0, "valid_observations": 0, "unique_hosts": 0, "rejected_records": 0, "hosts": [], "error": None}
+    result = {"source": source, "status": "unavailable", "started_at": started, "raw_records": 0, "valid_observations": 0, "unique_hosts": 0, "rejected_records": 0, "duplicate_observations": 0, "hosts": [], "error": None, "finished_at": None}
     try:
         if source == "crt.sh":
             url = "https://crt.sh/?" + urllib.parse.urlencode({"q": "%." + root, "output": "json"})
@@ -71,6 +71,7 @@ def run_source(source: str, root: str, timeout: int) -> dict:
         else:
             executable = shutil.which(source)
             if not executable:
+                result["error"] = "executable not found on PATH"
                 return result
             commands = {
                 "subfinder": [executable, "-d", root, "-silent"],
@@ -104,11 +105,12 @@ def run_source(source: str, root: str, timeout: int) -> dict:
                 result["raw_records"] = raw
                 result["valid_observations"] = len(hosts)
                 result["unique_hosts"] = len(set(hosts))
+                result["duplicate_observations"] = max(0, len(hosts) - len(set(hosts)))
                 result["rejected_records"] = rejected
                 result["hosts"] = sorted(set(hosts))
                 return result
         unique = sorted(set(hosts))
-        result.update(status="success" if unique else "zero-results", raw_records=raw, valid_observations=len(hosts), unique_hosts=len(unique), rejected_records=rejected, hosts=unique)
+        result.update(status="success" if unique else "zero-results", raw_records=raw, valid_observations=len(hosts), unique_hosts=len(unique), duplicate_observations=max(0, len(hosts) - len(unique)), rejected_records=rejected, hosts=unique)
     except subprocess.TimeoutExpired:
         result.update(status="failed", error=f"timed out after {timeout}s")
     except urllib.error.HTTPError as exc:
@@ -156,6 +158,7 @@ def main() -> int:
         for source in sources:
             item = run_source(source, root, max(1, args.timeout))
             item["root"] = root
+            item["finished_at"] = datetime.now(timezone.utc).isoformat()
             document["sources"].append(item)
             for host in item["hosts"]:
                 observations.setdefault(host, []).append(source)
@@ -167,7 +170,7 @@ def main() -> int:
         "sources_failed": sum(x["status"] == "failed" for x in document["sources"]),
         "sources_blocked": sum(x["status"] == "blocked" for x in document["sources"]),
         "sources_unavailable": sum(x["status"] == "unavailable" for x in document["sources"]),
-        "unique_hosts": len(document["hosts"]),
+        "unique_hosts": len(document["hosts"]),\n        "duplicate_observations": sum(x["duplicate_observations"] for x in document["sources"]),
     }
     serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
     if args.output:
