@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -76,10 +77,17 @@ def run_source(source: str, root: str, timeout: int) -> dict:
                 "amass": [executable, "enum", "-passive", "-d", root],
                 "assetfinder": [executable, "--subs-only", root],
                 "findomain": [executable, "-t", root, "-q"],
-                "sublist3r": [executable, "-d", root, "-o", "-"],
             }
-            completed = subprocess.run(commands[source], capture_output=True, text=True, timeout=timeout, check=False)
-            output = completed.stdout or ""
+            if source == "sublist3r":
+                # Sublist3r requires an output filename; use a temporary path so the
+                # collector still produces only its single canonical JSON artifact.
+                with tempfile.TemporaryDirectory(prefix="cyberstrike-subdomains-") as tmpdir:
+                    output_path = str(Path(tmpdir) / "sublist3r.txt")
+                    completed = subprocess.run([executable, "-d", root, "-o", output_path], capture_output=True, text=True, timeout=timeout, check=False)
+                    output = Path(output_path).read_text(encoding="utf-8", errors="replace") if Path(output_path).exists() else (completed.stdout or "")
+            else:
+                completed = subprocess.run(commands[source], capture_output=True, text=True, timeout=timeout, check=False)
+                output = completed.stdout or ""
             lines = [line.strip() for line in output.splitlines() if line.strip()]
             hosts = []
             rejected = 0
