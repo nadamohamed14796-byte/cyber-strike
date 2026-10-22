@@ -23,6 +23,20 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     check: "amass",
     install: "go install -v github.com/owasp-amass/amass/v4/...@master",
     description: "Attack surface mapping",
+  },  assetfinder: {
+    check: "assetfinder",
+    install: "go install github.com/tomnomnom/assetfinder@latest",
+    description: "Passive subdomain discovery",
+  },
+  sublist3r: {
+    check: "sublist3r",
+    install: "python3 -m pip install --user sublist3r",
+    description: "Subdomain discovery using search engines",
+  },
+  findomain: {
+    check: "findomain",
+    install: "cargo install findomain",
+    description: "Subdomain discovery",
   },
   waybackurls: {
     check: "waybackurls",
