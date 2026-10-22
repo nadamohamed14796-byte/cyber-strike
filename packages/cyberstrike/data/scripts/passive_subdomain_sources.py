@@ -123,14 +123,46 @@ def run_source(source: str, root: str, timeout: int) -> dict:
     return result
 
 def self_test() -> int:
+    raw, hosts, rejected = parse_crtsh(json.dumps([{"name_value": "api.example.com\n*.www.example.com\nexample.net"}]), "example.com")
+    assert (raw, sorted(set(hosts)), rejected) == (3, ["api.example.com", "www.example.com"], 1)
     assert normalize_host("API.Example.com.", "example.com") == "api.example.com"
     assert normalize_host("*.api.example.com", "example.com") == "api.example.com"
     assert normalize_host("example.com", "example.com") == "example.com"
     assert normalize_host("example.com.evil.test", "example.com") is None
     assert normalize_host("https://example.com", "example.com") is None
-    raw, hosts, rejected = parse_crtsh(json.dumps([{"name_value": "api.example.com\n*.www.example.com\nexample.net"}]), "example.com")
-    assert (raw, sorted(set(hosts)), rejected) == (3, ["api.example.com", "www.example.com"], 1)
-    print("passive_subdomain_sources self-test: PASS")
+
+    # Exercise every CLI adapter offline with stub executables; no remote target is contacted.
+    original_path = os.environ.get("PATH", "")
+    with tempfile.TemporaryDirectory(prefix="cyberstrike-source-test-") as tmpdir:
+        bin_dir = Path(tmpdir) / "bin"
+        bin_dir.mkdir()
+        stub = [
+            "#!/usr/bin/env python3",
+            "import pathlib, sys",
+            "args = sys.argv[1:]",
+            "rows = ['api.example.com', 'API.example.com.', '*.www.example.com', 'outside.test', 'invalid host']",
+            "if '-o' in args:",
+            "    pathlib.Path(args[args.index('-o') + 1]).write_text('\\n'.join(rows) + '\\n', encoding='utf-8')",
+            "else:",
+            "    print('\\n'.join(rows))",
+        ]
+        for source in CLI_SOURCES:
+            executable = bin_dir / source
+            executable.write_text("\n".join(stub) + "\n", encoding="utf-8")
+            executable.chmod(0o755)
+        os.environ["PATH"] = str(bin_dir) + os.pathsep + original_path
+        try:
+            for source in CLI_SOURCES:
+                result = run_source(source, "example.com", 5)
+                assert result["status"] == "success", (source, result)
+                assert result["raw_records"] == 5, (source, result)
+                assert result["valid_observations"] == 3, (source, result)
+                assert result["unique_hosts"] == 2, (source, result)
+                assert result["duplicate_observations"] == 1, (source, result)
+                assert result["rejected_records"] == 2, (source, result)
+        finally:
+            os.environ["PATH"] = original_path
+    print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, and 5 CLI adapters)")
     return 0
 
 def main() -> int:
