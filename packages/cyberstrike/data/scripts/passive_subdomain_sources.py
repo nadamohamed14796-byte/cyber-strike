@@ -131,15 +131,20 @@ def self_test() -> int:
     assert normalize_host("example.com.evil.test", "example.com") is None
     assert normalize_host("https://example.com", "example.com") is None
 
-    # Exercise every CLI adapter offline with stub executables; no remote target is contacted.
+    # Exercise adapters, resumable persistence, and output integrity offline.
     original_path = os.environ.get("PATH", "")
+    original_calls = os.environ.get("CYBERSTRIKE_TEST_CALLS")
     with tempfile.TemporaryDirectory(prefix="cyberstrike-source-test-") as tmpdir:
         bin_dir = Path(tmpdir) / "bin"
         bin_dir.mkdir()
+        calls_path = Path(tmpdir) / "source-calls.txt"
+        os.environ["CYBERSTRIKE_TEST_CALLS"] = str(calls_path)
         stub = [
             "#!/usr/bin/env python3",
-            "import pathlib, sys",
+            "import pathlib, sys, os",
             "args = sys.argv[1:]",
+            "calls = pathlib.Path(os.environ['CYBERSTRIKE_TEST_CALLS'])",
+            "calls.write_text((calls.read_text() if calls.exists() else '') + 'x', encoding='utf-8')",
             "rows = ['api.example.com', 'API.example.com.', '*.www.example.com', 'outside.test', 'invalid host']",
             "if '-o' in args:",
             "    pathlib.Path(args[args.index('-o') + 1]).write_text('\\n'.join(rows) + '\\n', encoding='utf-8')",
@@ -160,58 +165,72 @@ def self_test() -> int:
                 assert result["unique_hosts"] == 2, (source, result)
                 assert result["duplicate_observations"] == 1, (source, result)
                 assert result["rejected_records"] == 2, (source, result)
+
             original_argv = sys.argv[:]
             json_path = Path(tmpdir) / "subdomain-sources.json"
             hosts_path = Path(tmpdir) / "subdomains.txt"
-            sys.argv = [sys.argv[0], "example.com", "--source", "subfinder", "--output", str(json_path), "--hosts-output", str(hosts_path)]
+            args = [sys.argv[0], "example.com", "--source", "subfinder", "--output", str(json_path), "--hosts-output", str(hosts_path)]
             try:
+                sys.argv = args[:]
                 assert main() == 0
+                # A normal resume preserves a successful source and does not invoke it again.
+                sys.argv = args[:]
+                assert main() == 0
+                assert calls_path.read_text(encoding="utf-8") == "x"
+                # Explicit retry is the only way to rerun a terminal source result.
+                sys.argv = args[:] + ["--retry-source", "subfinder"]
+                assert main() == 0
+                assert calls_path.read_text(encoding="utf-8") == "xx"
             finally:
                 sys.argv = original_argv
+
             saved = json.loads(json_path.read_text(encoding="utf-8"))
             saved_hosts = hosts_path.read_text(encoding="utf-8").splitlines()
             assert [item["host"] for item in saved["hosts"]] == saved_hosts
             assert saved_hosts == ["api.example.com", "www.example.com"]
             assert saved["counts"]["sources_attempted"] == 1
+            assert saved["counts"]["sources_pending"] == 0
+            assert saved["run_status"] == "complete"
             api_record = next(item for item in saved["hosts"] if item["host"] == "api.example.com")
             assert api_record["roots"] == ["example.com"]
             assert api_record["observations"] == [{"root": "example.com", "source": "subfinder"}]
         finally:
             os.environ["PATH"] = original_path
-    print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, 5 CLI adapters, and canonical JSON/text outputs)")
+            if original_calls is None:
+                os.environ.pop("CYBERSTRIKE_TEST_CALLS", None)
+            else:
+                os.environ["CYBERSTRIKE_TEST_CALLS"] = original_calls
+    print("passive_subdomain_sources self-test: PASS (normalization, crt.sh parser, 5 CLI adapters, atomic outputs, resume, and retry)")
     return 0
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("roots", nargs="*", help="root domains to query (without scheme or path)")
-    parser.add_argument("--output", "-o", help="write the combined JSON result to this path (default: stdout)")
-    parser.add_argument("--hosts-output", help="write the deduplicated host-only inventory to this canonical text path")
-    parser.add_argument("--source", action="append", choices=("crt.sh",) + CLI_SOURCES, help="limit to a source; repeat to select multiple (default: all sources)")
-    parser.add_argument("--timeout", type=int, default=90, help="timeout per source in seconds (default: 90)")
-    parser.add_argument("--self-test", action="store_true", help="run offline parser/normalization checks")
-    args = parser.parse_args()
-    if args.self_test:
-        return self_test()
-    if not args.roots:
-        parser.error("provide at least one root domain or use --self-test")
-    roots = []
-    for value in args.roots:
-        root = normalize_host(value, value.lower().rstrip("."))
-        if not root or root != value.lower().rstrip("."):
-            parser.error(f"invalid root domain: {value!r}")
-        roots.append(root)
-    roots = list(dict.fromkeys(roots))
-    sources = args.source or ["crt.sh", *CLI_SOURCES]
-    document = {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(), "mode": "passive-only", "roots": roots, "sources": [], "hosts": [], "counts": {}}
+def atomic_write_text(destination: Path, content: str) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=destination.parent, prefix="." + destination.name + ".", suffix=".tmp", delete=False) as handle:
+            temp_name = handle.name
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, destination)
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
+def refresh_inventory(document: dict) -> None:
+    source_records = document["sources"]
+    document["hosts"] = []
     observations: dict[str, list[dict[str, str]]] = {}
-    for root in roots:
-        for source in sources:
-            item = run_source(source, root, max(1, args.timeout))
-            item["root"] = root
-            item["finished_at"] = datetime.now(timezone.utc).isoformat()
-            document["sources"].append(item)
-            for host in item["hosts"]:
-                observations.setdefault(host, []).append({"root": root, "source": source})
+    for item in source_records:
+        root = item.get("root")
+        source = item.get("source")
+        if not isinstance(root, str) or not isinstance(source, str):
+            continue
+        for host in item.get("hosts", []):
+            if not isinstance(host, str):
+                continue
+            observations.setdefault(host, []).append({"root": root, "source": source})
     document["hosts"] = [
         {
             "host": host,
@@ -222,26 +241,169 @@ def main() -> int:
         }
         for host, source_observations in sorted(observations.items())
     ]
-    document["counts"] = {
-        "roots": len(roots), "sources_attempted": len(document["sources"]),
-        "sources_success": sum(x["status"] == "success" for x in document["sources"]),
-        "sources_zero_results": sum(x["status"] == "zero-results" for x in document["sources"]),
-        "sources_failed": sum(x["status"] == "failed" for x in document["sources"]),
-        "sources_blocked": sum(x["status"] == "blocked" for x in document["sources"]),
-        "sources_unavailable": sum(x["status"] == "unavailable" for x in document["sources"]),
+    counts = {
+        "roots": len(document["roots"]),
+        "sources_attempted": sum(item.get("status") != "pending" for item in source_records),
+        "sources_pending": sum(item.get("status") == "pending" for item in source_records),
+        "sources_success": sum(item.get("status") == "success" for item in source_records),
+        "sources_zero_results": sum(item.get("status") == "zero-results" for item in source_records),
+        "sources_failed": sum(item.get("status") == "failed" for item in source_records),
+        "sources_blocked": sum(item.get("status") == "blocked" for item in source_records),
+        "sources_unavailable": sum(item.get("status") == "unavailable" for item in source_records),
+        "sources_skipped": sum(item.get("status") == "skipped" for item in source_records),
         "unique_hosts": len(document["hosts"]),
-        "duplicate_observations": sum(x["duplicate_observations"] for x in document["sources"]),
+        "duplicate_observations": sum(int(item.get("duplicate_observations", 0)) for item in source_records),
     }
-    serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
-    if args.hosts_output:
-        hosts_path = Path(args.hosts_output)
-        hosts_path.parent.mkdir(parents=True, exist_ok=True)
-        hosts_path.write_text("".join(item["host"] + "\n" for item in document["hosts"]), encoding="utf-8")
-    if args.output:
-        destination = Path(args.output)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(serialized, encoding="utf-8")
+    document["counts"] = counts
+    if counts["sources_pending"]:
+        document["run_status"] = "running"
+    elif any(counts[key] for key in ("sources_failed", "sources_blocked", "sources_unavailable", "sources_skipped")):
+        document["run_status"] = "finished_with_gaps"
     else:
+        document["run_status"] = "complete"
+    document["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def persist_snapshot(document: dict, output_path: Path | None, hosts_path: Path | None) -> None:
+    refresh_inventory(document)
+    # JSON is the resume ledger and is written last. On startup, rebuild TXT from
+    # that ledger so a crash between the two atomic replacements self-heals.
+    if hosts_path is not None:
+        atomic_write_text(hosts_path, "".join(item["host"] + "\n" for item in document["hosts"]))
+    if output_path is not None:
+        atomic_write_text(output_path, json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("roots", nargs="*", help="root domains to query (without scheme or path)")
+    parser.add_argument("--output", "-o", help="canonical JSON ledger; pass the same path to resume")
+    parser.add_argument("--hosts-output", help="canonical deduplicated host-only inventory text path")
+    parser.add_argument("--source", action="append", choices=("crt.sh",) + CLI_SOURCES, help="run/ensure only these sources; repeat to select multiple")
+    parser.add_argument("--retry-source", action="append", choices=("crt.sh",) + CLI_SOURCES, help="explicitly retry completed/failed records for a source; repeatable")
+    parser.add_argument("--timeout", type=int, default=90, help="timeout per source in seconds (default: 90)")
+    parser.add_argument("--fresh", action="store_true", help="start a new ledger in the same canonical paths instead of resuming an existing one")
+    parser.add_argument("--self-test", action="store_true", help="run offline parser, adapter, persistence, and resume checks")
+    args = parser.parse_args()
+    if args.self_test:
+        return self_test()
+    if not args.roots:
+        parser.error("provide at least one root domain or use --self-test")
+
+    roots: list[str] = []
+    for value in args.roots:
+        root = normalize_host(value, value.lower().rstrip("."))
+        if not root or root != value.lower().rstrip("."):
+            parser.error(f"invalid root domain: {value!r}")
+        roots.append(root)
+    roots = list(dict.fromkeys(roots))
+    if not roots:
+        parser.error("no valid root domains")
+    if args.output and not args.hosts_output:
+        parser.error("--hosts-output is required with --output so the two canonical inventories stay in sync")
+
+    output_path = Path(args.output).expanduser().resolve() if args.output else None
+    hosts_path = Path(args.hosts_output).expanduser().resolve() if args.hosts_output else None
+    default_sources = ["crt.sh", *CLI_SOURCES]
+    selected_sources = list(dict.fromkeys(args.source or default_sources))
+    retry_sources = set(args.retry_source or [])
+    selected_sources = list(dict.fromkeys([*selected_sources, *retry_sources]))
+
+    document: dict
+    if output_path is not None and output_path.exists() and not args.fresh:
+        try:
+            loaded = json.loads(output_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            parser.error(f"existing resume ledger is unreadable; refusing to overwrite it ({type(exc).__name__}: {exc})")
+        if not isinstance(loaded, dict) or loaded.get("schema_version") != 1 or not isinstance(loaded.get("roots"), list) or not isinstance(loaded.get("sources"), list):
+            parser.error("existing resume ledger has an unsupported schema; use --fresh to replace it")
+        existing_roots = loaded["roots"]
+        if set(existing_roots) != set(roots) or len(existing_roots) != len(roots):
+            parser.error("provided roots differ from the saved ledger; preserve one canonical scope per output path or pass --fresh intentionally")
+        if not all(isinstance(item, dict) and isinstance(item.get("root"), str) and isinstance(item.get("source"), str) and item.get("status") in {"pending", "success", "zero-results", "failed", "unavailable", "blocked", "skipped"} for item in loaded["sources"]):
+            parser.error("existing resume ledger contains invalid source records; refusing to overwrite it")
+        document = loaded
+        # Preserve the original root ordering from the ledger to keep stable artifacts.
+        roots = document["roots"]
+    else:
+        document = {
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "mode": "passive-only",
+            "roots": roots,
+            "sources": [],
+            "hosts": [],
+            "counts": {},
+            "run_status": "running",
+        }
+
+    # Merge an explicit source subset into the existing worklist without discarding
+    # earlier records; normal full runs add all five CLI sources and crt.sh.
+    indexed = {(item["root"], item["source"]): item for item in document["sources"]}
+    for root in roots:
+        for source in selected_sources:
+            key = (root, source)
+            if key not in indexed:
+                item = {
+                    "root": root,
+                    "source": source,
+                    "status": "pending",
+                    "started_at": None,
+                    "finished_at": None,
+                    "raw_records": 0,
+                    "valid_observations": 0,
+                    "unique_hosts": 0,
+                    "duplicate_observations": 0,
+                    "rejected_records": 0,
+                    "hosts": [],
+                    "error": None,
+                }
+                document["sources"].append(item)
+                indexed[key] = item
+            elif source in retry_sources:
+                item = indexed[key]
+                item.update({
+                    "status": "pending",
+                    "started_at": None,
+                    "finished_at": None,
+                    "raw_records": 0,
+                    "valid_observations": 0,
+                    "unique_hosts": 0,
+                    "duplicate_observations": 0,
+                    "rejected_records": 0,
+                    "hosts": [],
+                    "error": None,
+                })
+
+    if not args.fresh and retry_sources:
+        # A retry should not mark a source in a root as complete if it was omitted
+        # from the current explicit selected list; selected_sources already contains
+        # every explicitly requested retry source.
+        pass
+
+    persist_snapshot(document, output_path, hosts_path)
+    # Only pending records for the selected source set run. Prior terminal records
+    # remain available as evidence and are never rerun implicitly.
+    for item in document["sources"]:
+        if item.get("root") not in roots or item.get("source") not in selected_sources or item.get("status") != "pending":
+            continue
+        item["started_at"] = datetime.now(timezone.utc).isoformat()
+        # Persist that an attempt is in progress before launching its process.
+        persist_snapshot(document, output_path, hosts_path)
+        completed = run_source(item["source"], item["root"], max(1, args.timeout))
+        completed["root"] = item["root"]
+        completed["source"] = item["source"]
+        completed["finished_at"] = datetime.now(timezone.utc).isoformat()
+        item.clear()
+        item.update(completed)
+        persist_snapshot(document, output_path, hosts_path)
+
+    # A subset run leaves other known source pairs as saved evidence and reports its
+    # coverage honestly. The run is complete only when every entry is terminal.
+    persist_snapshot(document, output_path, hosts_path)
+    serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
+    if output_path is None:
         sys.stdout.write(serialized)
     print("passive sources: " + json.dumps(document["counts"], sort_keys=True), file=sys.stderr)
     return 0
