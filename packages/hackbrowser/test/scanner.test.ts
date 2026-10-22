@@ -16,7 +16,7 @@ afterAll(async () => {
 async function loadFixture(name: string): Promise<Page> {
   const html = readFileSync(`${import.meta.dir}/fixtures/${name}`, "utf-8")
   const p = await browser.newPage()
-  await p.setContent(html, { waitUntil: "networkidle" })
+  await p.setContent(html, { waitUntil: "domcontentloaded" })
   await p
     .waitForFunction(
       () => document.querySelectorAll("input, textarea, select, [role=radiogroup], [role=combobox]").length > 0,
@@ -152,7 +152,7 @@ test("BUG-12: product card innerText differentiation unaffected (regression guar
       <a href="/p/3" aria-label="Click for product info"><span>Orange Juice — 2.99</span></a>
     </body></html>`
   const p = await browser.newPage()
-  await p.setContent(html, { waitUntil: "networkidle" })
+  await p.setContent(html, { waitUntil: "domcontentloaded" })
   const elements = await collectElements(p)
   const linkLabels = elements.filter((e) => e.role === "link").map((e) => e.label)
   // innerText enrichment differentiates — NO numeric suffix on any
