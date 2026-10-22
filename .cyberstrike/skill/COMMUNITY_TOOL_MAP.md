@@ -118,6 +118,34 @@ Purpose: make the source's useful CLI tools and reference datasets discoverable 
 | ARS3NAL | Offline payload/reference/checklist collection | Treat downloaded content as untrusted data; use as a reference only after source and license review. |
 | awesome-vulnerable-apps, Android Security Awesome, awesome-mobile-security | Lab/reference datasets | Prefer isolated lab targets, not production programs. |
 
+### Additional candidates from the upstream list
+
+These entries extend coverage for tools present in the upstream index but not already represented above. They remain discovery candidates, not installed dependencies.
+
+| Candidate | Use when | Canonical phase / skill search terms |
+|---|---|---|
+| EyeWitness, gowitness, aquatone, httpScreenshot | Capture visual snapshots of an authorized web-asset inventory | HTTP inventory / visual triage; check browser/runtime requirements and store screenshots in the target workspace |
+| param-miner | Burp-based discovery of unlinked parameters | Parameter discovery; interactive Burp extension, not a CLI dependency |
+| fuzzapi | REST API fuzzing against a testable API | API testing; inspect request volume and mutation behavior before use |
+| qsfuzz | Query-string mutation for a specific hypothesis | Parameter fuzzing; preserve baseline and use controlled request rates |
+| dotdotpwn, off-by-slash | Traversal and path-normalization hypothesis testing | Path traversal; use harmless canaries and validate proxy/server normalization |
+| commix | Command-injection hypothesis testing | Command injection; only use on explicitly authorized targets and prefer non-destructive detection options |
+| SSRFmap, Gopherus, ground-control | SSRF research and controlled callback testing | SSRF; use controlled endpoints and do not target internal services or metadata without explicit authorization |
+| JSONBee, CSPBypass | Reference material for JSONP/CSP-related XSS hypotheses | XSS/CSP skill; treat payloads as test references, not proof or a default bypass attempt |
+| sleepy-puppy, ezXSS, xsshunter, bXSS | Blind-XSS payload correlation and callback infrastructure | XSS / out-of-band validation; use only a tester-controlled callback and avoid submitting sensitive data |
+| LFI-Enum, LFISuite, Burp-LFI-tests | Local file inclusion research and payload references | File inclusion; prefer local fixtures or harmless file markers; avoid destructive post-exploitation features |
+| S3Scanner, s3viewer, dirlstr, s3_objects_check, s3dns | Cloud bucket/object exposure triage | Cloud/storage assessment; only inspect in-scope resources and avoid bulk downloading |
+| WPScan, WPSpider, wprecon, CMSmap, JoomScan, pyfiscan, AEMscan | CMS-specific fingerprinting and candidate checks | Technology profiling; confirm the CMS is present before choosing a scanner |
+| jwt_tool, jwtear, jwt-heartbreaker | JWT parsing and token-validation hypotheses | Authentication/session testing; never store live tokens in notes or logs |
+| subjack, SubOver, tko-subs, subHijack, takeover | Subdomain-takeover candidate triage | Subdomain takeover; verify provider-specific claimability and never claim the asset |
+| nuclei, nuclei-templates, jaeles, Nikto, BlackWidow | Template/scanner-based candidate discovery | Vulnerability testing; inspect selected templates and request behavior; manually validate results |
+| GitTools, git-dumper, gitjacker, dvcs-ripper | Check for publicly exposed version-control metadata | Source exposure; retrieve only when program rules allow, then analyze artifacts locally |
+| Nosey Parker, GitHound, SecretFinder, js-snitch, keyFinder | Secret-like string and source-code triage | Source exposure / secret triage; redact values and never use discovered credentials absent explicit authorization |
+| alterx, gotator, ripgen, dnsgen, goaltdns | Generate subdomain permutations from observed names | Asset discovery; deduplicate and resolve candidates only where active discovery is permitted |
+| bountyplz | Generate a structured report draft from validated findings | Reporting; independently verify every claim against the evidence manifest |
+| PayloadsAllTheThings | Reference material for vulnerability classes and test ideas | Relevant specialist skill; review provenance/license and select only relevant payloads |
+| bounty-targets-data, bbscope | External bug-bounty scope data aggregation | Scope analysis; verify current official program rules and preserve raw source/freshness |
+
 ## Coverage and limitations
 
 - The upstream list is a discovery index and changes over time. This map intentionally groups near-duplicates and omits some narrowly specialized, outdated, interactive-only, or high-risk utilities rather than implying every entry is a suitable agent dependency.
