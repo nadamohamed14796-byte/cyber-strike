@@ -175,6 +175,10 @@ def main() -> int:
         "unique_hosts": len(document["hosts"]),\n        "duplicate_observations": sum(x["duplicate_observations"] for x in document["sources"]),
     }
     serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
+    if args.hosts_output:
+        hosts_path = Path(args.hosts_output)
+        hosts_path.parent.mkdir(parents=True, exist_ok=True)
+        hosts_path.write_text("".join(item["host"] + "\n" for item in document["hosts"]), encoding="utf-8")
     if args.output:
         destination = Path(args.output)
         destination.parent.mkdir(parents=True, exist_ok=True)
