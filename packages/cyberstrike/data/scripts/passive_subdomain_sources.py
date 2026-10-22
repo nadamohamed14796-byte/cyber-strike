@@ -229,6 +229,7 @@ def self_test() -> int:
     # Exercise adapters, resumable persistence, and output integrity offline.
     original_path = os.environ.get("PATH", "")
     original_calls = os.environ.get("CYBERSTRIKE_TEST_CALLS")
+    original_empty = os.environ.get("CYBERSTRIKE_TEST_EMPTY")
     with tempfile.TemporaryDirectory(prefix="cyberstrike-source-test-") as tmpdir:
         bin_dir = Path(tmpdir) / "bin"
         bin_dir.mkdir()
@@ -240,7 +241,7 @@ def self_test() -> int:
             "args = sys.argv[1:]",
             "calls = pathlib.Path(os.environ['CYBERSTRIKE_TEST_CALLS'])",
             "calls.write_text((calls.read_text() if calls.exists() else '') + 'x', encoding='utf-8')",
-            "rows = ['api.example.com', 'API.example.com.', '*.www.example.com', 'outside.test', 'invalid host']",
+            "rows = [] if os.environ.get(\'CYBERSTRIKE_TEST_EMPTY\') == \'1\' else [\'api.example.com\', \'API.example.com.\', \'*.www.example.com\', \'outside.test\', \'invalid host\']",
             "if '-o' in args:",
             "    pathlib.Path(args[args.index('-o') + 1]).write_text('\\n'.join(rows) + '\\n', encoding='utf-8')",
             "else:",
@@ -330,6 +331,7 @@ def self_test() -> int:
                 assert calls_path.read_text(encoding="utf-8") == "x"
                 # Explicit retry is the only way to rerun a terminal source result.
                 sys.argv = args[:] + ["--retry-source", "subfinder"]
+                os.environ["CYBERSTRIKE_TEST_EMPTY"] = "1"
                 assert main() == 0
                 assert calls_path.read_text(encoding="utf-8") == "xx"
             finally:
@@ -345,7 +347,9 @@ def self_test() -> int:
             source_record = next(item for item in saved["sources"] if item["root"] == "example.com" and item["source"] == "subfinder")
             assert source_record["attempt_count"] == 2
             assert len(source_record["attempt_history"]) == 2
-            assert [attempt["status"] for attempt in source_record["attempt_history"]] == ["success", "success"]
+            assert [attempt["status"] for attempt in source_record["attempt_history"]] == ["success", "zero-results"]
+            assert source_record["hosts"] == []
+            assert source_record["attempt_history"][0]["hosts"] == ["api.example.com", "www.example.com"]
             api_record = next(item for item in saved["hosts"] if item["host"] == "api.example.com")
             assert api_record["roots"] == ["example.com"]
             assert api_record["observations"] == [{"root": "example.com", "source": "subfinder"}]
@@ -355,6 +359,10 @@ def self_test() -> int:
                 os.environ.pop("CYBERSTRIKE_TEST_CALLS", None)
             else:
                 os.environ["CYBERSTRIKE_TEST_CALLS"] = original_calls
+            if original_empty is None:
+                os.environ.pop("CYBERSTRIKE_TEST_EMPTY", None)
+            else:
+                os.environ["CYBERSTRIKE_TEST_EMPTY"] = original_empty
     print("passive_subdomain_sources self-test: PASS (normalization, 3 HTTP APIs, 5 CLI adapters, atomic outputs, resume, and retry)")
     return 0
 
@@ -382,9 +390,13 @@ def refresh_inventory(document: dict) -> None:
         source = item.get("source")
         if not isinstance(root, str) or not isinstance(source, str):
             continue
-        for host in item.get("hosts", []):
-            if not isinstance(host, str):
-                continue
+        host_observations = {host for host in item.get("hosts", []) if isinstance(host, str)}
+        # A retry may return fewer names or zero results. Preserve hostnames from
+        # earlier saved attempts as historical observations instead of erasing them.
+        for attempt in item.get("attempt_history", []):
+            if isinstance(attempt, dict):
+                host_observations.update(host for host in attempt.get("hosts", []) if isinstance(host, str))
+        for host in host_observations:
             observations.setdefault(host, []).append({"root": root, "source": source})
     document["hosts"] = [
         {
@@ -409,7 +421,7 @@ def refresh_inventory(document: dict) -> None:
         "sources_unavailable": sum(item.get("status") == "unavailable" for item in source_records),
         "sources_skipped": sum(item.get("status") == "skipped" for item in source_records),
         "unique_hosts": len(document["hosts"]),
-        "duplicate_observations": sum(int(item.get("duplicate_observations", 0)) for item in source_records),
+        "duplicate_observations": sum(sum(int(attempt.get("duplicate_observations", 0)) for attempt in item.get("attempt_history", []) if isinstance(attempt, dict)) if item.get("attempt_history") else int(item.get("duplicate_observations", 0)) for item in source_records),
     }
     document["counts"] = counts
     if counts["sources_pending"]:
@@ -564,6 +576,7 @@ def main() -> int:
                 "duplicate_observations": int(item.get("duplicate_observations", 0)),
                 "rejected_records": int(item.get("rejected_records", 0)),
                 "error": "Previous invocation ended before a terminal source result was persisted",
+                "hosts": sorted(set(item.get("hosts", []))),
             })
         attempt_number = int(item.get("attempt_count", 0)) + 1
         started_at = datetime.now(timezone.utc).isoformat()
@@ -591,6 +604,7 @@ def main() -> int:
             "duplicate_observations": int(completed.get("duplicate_observations", 0)),
             "rejected_records": int(completed.get("rejected_records", 0)),
             "error": completed.get("error"),
+            "hosts": sorted(set(completed.get("hosts", []))),
         }]
         item.clear()
         item.update(completed)
