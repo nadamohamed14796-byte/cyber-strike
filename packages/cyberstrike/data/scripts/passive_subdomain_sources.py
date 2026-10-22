@@ -191,6 +191,10 @@ def self_test() -> int:
             assert saved["counts"]["sources_attempted"] == 1
             assert saved["counts"]["sources_pending"] == len(CLI_SOURCES)  # all five CLIs plus crt.sh are on the ledger
             assert saved["run_status"] == "running"
+            source_record = next(item for item in saved["sources"] if item["root"] == "example.com" and item["source"] == "subfinder")
+            assert source_record["attempt_count"] == 2
+            assert len(source_record["attempt_history"]) == 2
+            assert [attempt["status"] for attempt in source_record["attempt_history"]] == ["success", "success"]
             api_record = next(item for item in saved["hosts"] if item["host"] == "api.example.com")
             assert api_record["roots"] == ["example.com"]
             assert api_record["observations"] == [{"root": "example.com", "source": "subfinder"}]
@@ -243,8 +247,10 @@ def refresh_inventory(document: dict) -> None:
     ]
     counts = {
         "roots": len(document["roots"]),
-        "sources_attempted": sum(item.get("status") != "pending" for item in source_records),
+        "sources_attempted": sum(int(item.get("attempt_count", 0)) > 0 or item.get("status") != "pending" for item in source_records),
         "sources_pending": sum(item.get("status") == "pending" for item in source_records),
+        "sources_not_started": sum(item.get("status") == "pending" and int(item.get("attempt_count", 0)) == 0 for item in source_records),
+        "sources_running_or_interrupted": sum(item.get("status") == "pending" and int(item.get("attempt_count", 0)) > len(item.get("attempt_history", [])) for item in source_records),
         "sources_success": sum(item.get("status") == "success" for item in source_records),
         "sources_zero_results": sum(item.get("status") == "zero-results" for item in source_records),
         "sources_failed": sum(item.get("status") == "failed" for item in source_records),
@@ -392,13 +398,49 @@ def main() -> int:
     for item in document["sources"]:
         if item.get("root") not in roots or item.get("source") not in selected_sources or item.get("status") != "pending":
             continue
-        item["started_at"] = datetime.now(timezone.utc).isoformat()
+        history = list(item.get("attempt_history", []))
+        # A prior pending record with a start timestamp means the process ended or
+        # was interrupted before a terminal result reached the ledger.
+        if item.get("status") == "pending" and item.get("started_at") and not item.get("finished_at"):
+            history.append({
+                "attempt": int(item.get("attempt_count", len(history) + 1)),
+                "started_at": item["started_at"],
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "status": "interrupted",
+                "raw_records": int(item.get("raw_records", 0)),
+                "valid_observations": int(item.get("valid_observations", 0)),
+                "unique_hosts": int(item.get("unique_hosts", 0)),
+                "duplicate_observations": int(item.get("duplicate_observations", 0)),
+                "rejected_records": int(item.get("rejected_records", 0)),
+                "error": "Previous invocation ended before a terminal source result was persisted",
+            })
+        attempt_number = int(item.get("attempt_count", 0)) + 1
+        started_at = datetime.now(timezone.utc).isoformat()
+        item["attempt_history"] = history
+        item["attempt_count"] = attempt_number
+        item["started_at"] = started_at
+        item["finished_at"] = None
         # Persist that an attempt is in progress before launching its process.
         persist_snapshot(document, output_path, hosts_path)
         completed = run_source(item["source"], item["root"], max(1, args.timeout))
+        finished_at = datetime.now(timezone.utc).isoformat()
         completed["root"] = item["root"]
         completed["source"] = item["source"]
-        completed["finished_at"] = datetime.now(timezone.utc).isoformat()
+        completed["started_at"] = started_at
+        completed["finished_at"] = finished_at
+        completed["attempt_count"] = attempt_number
+        completed["attempt_history"] = history + [{
+            "attempt": attempt_number,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "status": completed["status"],
+            "raw_records": int(completed.get("raw_records", 0)),
+            "valid_observations": int(completed.get("valid_observations", 0)),
+            "unique_hosts": int(completed.get("unique_hosts", 0)),
+            "duplicate_observations": int(completed.get("duplicate_observations", 0)),
+            "rejected_records": int(completed.get("rejected_records", 0)),
+            "error": completed.get("error"),
+        }]
         item.clear()
         item.update(completed)
         persist_snapshot(document, output_path, hosts_path)
