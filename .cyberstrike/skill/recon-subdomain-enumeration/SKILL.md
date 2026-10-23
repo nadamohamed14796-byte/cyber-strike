@@ -165,8 +165,8 @@ Use tools the agent can invoke directly. Browser interfaces, browser extensions,
 
 Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
 
-### Helper script and output contract
-Create a JSONL host normalizer that retains every source observation, timestamps, DNS answers/TTL, wildcard-control results, and attribution confidence. Do not collapse provenance when deduplicating hostnames.
+### Normalization and output contract
+Use the existing agent/runtime normalization path; do not create another helper script for this phase. Keep one canonical deduplicated `subdomains.txt` plus `subdomain-sources.json` for per-source provenance and statuses. Preserve timestamps, DNS answers/TTL, wildcard-control results, attribution confidence, and every source attribution when deduplicating hostnames.
 
 Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
 
