@@ -15,7 +15,7 @@ describe("Recon prompt specialization", () => {
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("JavaScript and client-side surfaces")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Specialized asset types")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Coverage accounting")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("canonical /recon orchestrator")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("orchestrator remains the single source of truth")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("0. Read and validate the scope")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("recon_checkpoint(action=")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("4. Collect URLs from independent sources")
