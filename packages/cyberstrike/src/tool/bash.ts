@@ -509,33 +509,33 @@ export function passiveResearchLookup(
 ): { targetURL: string; phase: ReconPhase } | undefined {
   if (requestURL.username || requestURL.password) return undefined
 
-  const valueAfter = (flag: string): string | undefined => {
-    const index = args.findIndex((item) => item.toLowerCase() === flag)
-    if (index >= 0) return args[index + 1]
-    const inline = args.find((item) => item.toLowerCase().startsWith(flag + "="))
-    return inline?.slice(flag.length + 1)
-  }
-
-  const method = valueAfter("-x") ?? valueAfter("--request") ?? valueAfter("--method")
-  const inlineMethod = args.find((item) => /^-x(?:get|head|post|put|patch|delete|options|trace|connect)$/i.test(item))
+  // curl's method flag is case-sensitive: -X sets the method, while -x selects a proxy.
+  if (args.some((item) => item === "-x" || item.startsWith("-x") && item.length > 2)) return undefined
+  const methodIndex = args.findIndex((item) =>
+    item === "-X" || ["--request", "--method"].includes(item.toLowerCase()),
+  )
+  const inlineMethod = args.find((item) => /^-X(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)$/i.test(item))
     ?? args.find((item) => /^(?:--request|--method)=/i.test(item))
-  const effectiveMethod = inlineMethod
-    ? inlineMethod.replace(/^(?:--request|--method)=/i, "").replace(/^-x/i, "").toUpperCase()
-    : method?.toUpperCase()
+  const method = methodIndex >= 0
+    ? args[methodIndex + 1]
+    : inlineMethod?.replace(/^(?:--request|--method)=/i, "").replace(/^-X/i, "")
+  const effectiveMethod = (inlineMethod ?? method)?.toUpperCase()
   if (effectiveMethod && !["GET", "HEAD"].includes(effectiveMethod)) return undefined
 
-  const longBodyOrAuthFlags = new Set([
+  const longBodyAuthOrRouteFlags = new Set([
     "--data", "--data-raw", "--data-urlencode", "--data-binary", "--json",
     "--form", "--form-string", "--post-data", "--post-file",
     "--location", "--location-trusted",
-    "--user", "--proxy-user", "--cookie", "--cookie-jar",
-    "--netrc", "--netrc-file", "--oauth2-bearer", "--aws-sigv4",
+    "--user", "--proxy-user", "--proxy", "--preproxy", "--proxy-header",
+    "--cookie", "--cookie-jar", "--netrc", "--netrc-file",
+    "--oauth2-bearer", "--aws-sigv4", "--config", "--resolve", "--connect-to",
+    "--unix-socket", "--abstract-unix-socket", "--interface", "--insecure",
   ])
   if (args.some((item) => {
     const lower = item.toLowerCase()
-    return ["-d", "-F", "-u", "-b", "-L"].includes(item) ||
-      /^-[^-]*[dFubL]/.test(item) ||
-      [...longBodyOrAuthFlags].some((flag) => lower === flag || lower.startsWith(flag + "="))
+    return ["-d", "-F", "-u", "-b", "-L", "-K", "-k"].includes(item) ||
+      /^-[^-]*[dFubLK]/.test(item) ||
+      [...longBodyAuthOrRouteFlags].some((flag) => lower === flag || lower.startsWith(flag + "="))
   })) return undefined
 
   for (let i = 0; i < args.length; i++) {
