@@ -63,7 +63,7 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - Clear reason for ownership attribution and scope classification.
 - A vulnerability report must include separate proof of impact; subdomain discovery alone is not a finding.
 
-## Tools
+## Agent-executable CLI tooling, resources, and helper scripts
 
 Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Select sources adaptively; inspect registered schemas and preflight only external commands that may actually be used. The catalog defines `host_inventory.py` and the canonical source-ledger/output contract. A listed candidate is not proof of installation, suitability, or authorization.
 
