@@ -64,6 +64,16 @@ describe("Phase-critical skill pinning", () => {
     expect(skillQueriesForPhase("mobile_application_testing")).not.toContain("mitre_attack_mobile")
     expect(skillQueriesForPhase("mobile_application_testing")).toContain("OWASP MASVS")
   })
+
+  test("recon phases pin specialist skills and keep generic guidance optional", () => {
+    expect(PHASE_REQUIRED_SKILLS.scope_analysis).toEqual(expect.arrayContaining(["target-workspace-workflow", "attack-bb-methodology"]))
+    expect(PHASE_REQUIRED_SKILLS.passive_recon).toEqual(expect.arrayContaining(["recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"]))
+    expect(PHASE_REQUIRED_SKILLS.active_recon).toEqual(expect.arrayContaining(["attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"]))
+    for (const phase of ["scope_analysis", "passive_recon", "active_recon"] as const) {
+      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("recon-methodology")
+      expect(PHASE_REQUIRED_SKILLS[phase]).not.toContain("community-tool-selection")
+    }
+  })
 })
 
 describe("Methodology phase skill routing", () => {

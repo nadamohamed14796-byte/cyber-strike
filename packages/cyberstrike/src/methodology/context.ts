@@ -94,9 +94,9 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
 // metadata matches score higher. This is discovery guidance only: the agent still
 // loads them through SkillTool so per-agent skill permissions remain authoritative.
 export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
-  scope_analysis: ["target-workspace-workflow", "attack-bb-methodology", "recon-methodology"],
-  passive_recon: ["recon-methodology", "community-tool-selection", "attack-javascript-analysis"],
-  active_recon: ["recon-methodology", "community-tool-selection", "attack-web-recon", "attack-javascript-analysis"],
+  scope_analysis: ["target-workspace-workflow", "attack-bb-methodology"],
+  passive_recon: ["recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"],
+  active_recon: ["attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"],
   authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass"],
   session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],

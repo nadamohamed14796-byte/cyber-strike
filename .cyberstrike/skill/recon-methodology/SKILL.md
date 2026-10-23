@@ -109,7 +109,7 @@ Before handing a lead to a testing skill:
 
 Return normalized asset and endpoint inventories, scope decisions, provenance, delta summary, authentication coverage, deduplicated prioritized hypotheses, blockers, and next-step recommendations. Keep discovery facts separate from security conclusions.
 
-## Agent-executable tools, resources, and reusable helpers
+## Agent-executable CLI tooling, resources, and helper scripts
 
 Use registered tools for app/network activity and locally verified CLIs for local processing. A browser or intercepting proxy is not a dependency when captured requests or local files already provide the needed evidence.
 
