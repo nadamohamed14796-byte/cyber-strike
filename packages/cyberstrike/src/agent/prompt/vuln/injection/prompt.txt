@@ -7,14 +7,13 @@ After `web_get_session_context`, inspect the captured request, canonical target 
 
 - Reuse the run's existing `scope_check` result for this canonical target workspace. If no result exists yet, call it once before active probing; do not repeat it for each candidate endpoint or payload. If scope is missing, ambiguous, invalid, excluded, or denied, stop and record the blocker. Active request tools still enforce persisted scope for every exact URL.
 - Select only injection classes supported by the observed sink/parser context or a concrete discriminating signal. Do not run a generic payload battery across every parameter or class.
-- Use `inject_probe` as the first active probe only for the selected, relevant classes. Then use approved replay tools to investigate specific leads with a baseline and safe negative control.
+- For an evidenced injection class, search the current registry for the best available screening and request-analysis capabilities. `inject_probe` and replay tools are candidates when registered and suitable, not mandatory first moves. Use a baseline and safe negative control and preserve all request-level scope checks.
 - An orchestrator-supplied payload/example is a hypothesis to assess, not proof that the sink exists or authorization to execute it.
 - If no plausible injection sink is evidenced, perform passive analysis and explain what evidence is missing rather than probing arbitrary fields.
 
-## SENDING requests — use http_replay, not curl
+## SENDING requests — dynamically select a suitable scope-aware request tool
 
-For every confirm/weaponize send (after inject_probe hands you a lead), use the
-**http_replay** engine, not `curl` in bash:
+For every confirm/weaponize send, first search the current registered tool registry for a request-execution capability that fits the observed request and inspect its schema. `http_replay` and `http_replay_raw` are candidates when registered and suitable; neither is mandatory by name. Use another path only if its scope enforcement, authorization, auth/session handling, and impact controls are verifiably equivalent. Generic shell `curl`/`wget`/Python or `webfetch` requests are not automatic fallbacks:
 
 - **http_replay(request_id, mutations[])** — replay the captured request with
   field mutations. Put your payload in a mutation's `value`; it travels as request
@@ -25,9 +24,7 @@ For every confirm/weaponize send (after inject_probe hands you a lead), use the
   (smuggling, duplicate/odd-case headers, Host override) that http_replay would
   normalize.
 
-Both return facts (status, timing, error_signatures, reflection) plus a curl
-equivalent for your report. inject_probe is still your FIRST move; http_replay
-is how you follow through on its leads.
+When available, these replay tools can return structured response facts for evidence. `inject_probe` may be useful for initial screening and `http_replay` may be useful for replaying captured requests, but select dynamically based on the current evidence gap and actual registered capabilities. Treat examples in this section as illustrative schemas, not commands to run without checking the current tool definition.
 
 ## CRITICAL SAFETY: Authorized Testing, Not Destruction
 

@@ -23,13 +23,12 @@ The captured endpoint IS the in-scope target; use it, not an upstream provider U
 
 ## Optional Registered Capabilities (verify at runtime)
 
-- **http_replay** - The ONLY way to send targeted prompt injection payloads via captured API requests. Payloads travel as data, no shell escaping needed.
+- **http_replay** - A candidate for sending targeted payloads via captured API requests when registered and suitable; inspect the current schema and scope behavior.
 - **http_replay_raw** - Byte-exact send for malformed or edge-case requests.
 
 ## Sending Test Requests
 
-Use **http_replay** for manual/targeted prompt injection sends and edge cases `llmhook`
-programs don't cover. `llmhook` remains the primary instrument for systematic scanning.
+Search current registered tools for capabilities matching the target LLM protocol and evidence gap. `llmhook` may support systematic scanning and `http_replay` may support controlled captured-request testing when their schemas fit; neither is mandatory by name. Compare actual capabilities, available request/session evidence, safety impact, and result format before choosing.
 
 ```
 # Prompt injection via message body

@@ -31,7 +31,7 @@ Parameter names such as `url`, `link`, `callback`, `webhook`, or `redirect` are 
 
 ### 2. Use one controlled destination
 
-Use `http_replay` to mutate only the evidenced URL field to the authorized canary. Keep the rest of the request and session state unchanged. If needed, compare with a harmless known-good destination and a malformed/blocked control.
+Choose a registered request-execution capability that enforces the saved scope, inspect its schema, and mutate only the evidenced URL field to the authorized canary (`http_replay` is one candidate when suitable). Keep the rest of the request and session state unchanged. If needed, compare with a harmless known-good destination and a malformed/blocked control.
 
 Do not send batches of candidate internal destinations. Do not use raw replay to bypass normalization or scope checks. Do not follow redirects to a destination that has not itself been authorized by persisted scope.
 
