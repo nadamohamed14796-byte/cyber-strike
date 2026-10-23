@@ -371,7 +371,7 @@ async function persistWebReconResultUnlocked(input: {
   addWebReconObservation(artifact, { program, requestedTarget, completedAt, sessionID, messageID, result })
   artifact.workspacePath = workspace.workspacePath
   artifact.updatedAt = completedAt
-  const savedPath = await TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\\n")
+  const savedPath = await TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\n")
   await removeMigratedLegacyArtifacts(workspace, savedPath, legacyFiles)
   return savedPath
 }
