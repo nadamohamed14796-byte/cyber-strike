@@ -325,6 +325,7 @@ Potential sources, subject to actual tool availability, include:
 - Existing target inventories and prior run artifacts.
 
 Prefer registered, reputable sources and official documentation.
+For passive subdomain collection, reuse the registered `attack_script(script="passive_subdomain_sources")` helper. Pass the complete eligible root list and write to the canonical `subdomain-sources.json` and `subdomains.txt` paths. Inspect the per-root/source ledger after the run; if a selected source failed or a material coverage gap remains, resume the same helper and ledger with one suitable `--source` alternative at a time. Do not run all equivalent tools or create another collector. Verify the JSON ledger, host inventory, reconciled counts, and pending/skip reasons before completing `asset_discovery`. Load `recon-subdomain-enumeration` only when its detailed source/normalization procedure is needed.
 
 For each observation, preserve:
 - Exact observed value.
