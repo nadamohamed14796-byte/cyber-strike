@@ -40,8 +40,8 @@ const AVAILABLE_SCRIPTS: Record<string, { description: string; args: string }> =
     args: "URL [--field NAME] [-H key:value] [--data JSON] [--json-output]",
   },
   cloud_storage_enum: {
-    description: "Cloud storage enumeration — S3/Azure/GCP bucket discovery with permission checks",
-    args: "TARGET [--names BUCKET_NAME...] [--json-output]",
+    description: "Read-only cloud storage enumeration by default; S3 write-probe is explicit opt-in",
+    args: "TARGET [--names BUCKET_NAME...] [--check-writes] [--json-output]",
   },
   subdomain_takeover: {
     description: "Subdomain takeover checker — CNAME detection + cloud service fingerprint matching (20 services)",
