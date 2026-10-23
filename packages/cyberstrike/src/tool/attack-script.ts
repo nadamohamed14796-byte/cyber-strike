@@ -55,10 +55,6 @@ const AVAILABLE_SCRIPTS: Record<string, { description: string; args: string }> =
     description: "Wayback Machine endpoint discovery — find historical/hidden endpoints via CDX API",
     args: "DOMAIN [--probe] [--limit N] [--json-output]",
   },
-  passive_subdomain_sources: {
-    description: "Resumable passive subdomain collection; default uses crt.sh, OTX passive DNS, and at most one installed primary CLI, while CertSpotter and alternative CLIs can be selected when useful; writes a source ledger and deduplicated host inventory",
-    args: "ROOT [ROOT ...] --output PATH --hosts-output PATH [--source SOURCE] [--retry-source SOURCE] [--timeout SECONDS] [--fresh]",
-  },
 }
 
 export const AttackScriptTool = Tool.define("attack_script", {
