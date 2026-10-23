@@ -420,7 +420,7 @@ CyberStrike skills are read and acted on by an autonomous agent. The primary Too
 - Select a small toolset relevant to each skill, not the entire catalog. If a script adds no value, explain why and link to a reusable helper.
 - Treat third-party binaries, templates, wordlists, plugins, and scripts as untrusted until provenance and behavior are reviewed. Never use discovered credentials or copy secret values into global research storage.
 
-Canonical catalog: `.cyberstrike/skill/CLI_TOOLING_CATALOG.md`. Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json` and manually inspect each flagged section.
+Canonical catalog: `.cyberstrike/skill/TOOLING_CATALOG.md`. Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json` and manually inspect each flagged section.
 
 ## Markdown formatting and structure
 
