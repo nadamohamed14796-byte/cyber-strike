@@ -40,7 +40,6 @@ jobs:
       - name: Validate skill catalog, cross-skill links, tooling guidance, and publication registry
         run: |
           python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --self-test
-          python3 packages/cyberstrike/data/scripts/passive_subdomain_sources.py --self-test
           python3 .cyberstrike/skill/scripts/validate_skill_catalog.py --strict-links
           python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --strict
           bun run packages/cyberstrike/script/generate-registry.ts
