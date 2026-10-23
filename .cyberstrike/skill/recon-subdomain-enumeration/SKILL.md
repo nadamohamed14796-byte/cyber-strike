@@ -172,17 +172,8 @@ Preserve native output; write normalized output separately. Keep provenance, tim
 
 ### Handoff
 Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
-### CyberStrike source orchestration
+### CyberStrike tool selection
 
-When working inside this repository/runtime, prefer the shared passive source runner instead of creating one script/output per source:
+Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the single source for tool/API selection and runtime checks. There is no dedicated passive-source collector script. Select only suitable registered tools, installed CLIs, or reachable APIs; start with certificate-transparency data (such as crt.sh), passive DNS (such as OTX), and one useful primary CLI (such as subfinder or Amass) when available. Add CertSpotter, other CLIs, first-party links, or public indexes only when they close a real coverage gap.
 
-```bash
-# CyberStrike tool call (conceptual args; substitute actual workspace path):
-attack_script(script="passive_subdomain_sources", args=[
-  "example.com",
-  "--output", "<canonical-workspace-root>/subdomain-sources.json",
-  "--hosts-output", "<canonical-workspace-root>/subdomains.txt",
-], timeout_seconds=<adequate aggregate timeout>)
-```
-
-The JSON ledger records a terminal status, counts, errors, attempts, and attributed hosts for each root/source pair. By default, it runs crt.sh, AlienVault OTX passive DNS, and at most one installed primary CLI (subfinder, Amass, assetfinder, Findomain, Sublist3r, in that order). CertSpotter and other CLI adapters are alternatives—not automatic duplicate runs—and can be selected with `--source` when the selected sources leave a material gap or need independent confirmation. API keys are read from environment variables without logging values. This helper does not resolve or actively probe discovered hosts. Every root/source pair is saved atomically; a started pair without a terminal result remains pending and is resumed, successful results are not rerun implicitly, and an intentionally unselected alternative is recorded as skipped-by-selection with a reason. Verify both canonical files, every root's source status, pending count, run status, and reconciled counts before moving to DNS/live-host checks. Replace `example.com` and the output paths with the root and workspace path returned by the canonical workspace tool. If the helper is absent from an installed build, use suitable registered tools/APIs/CLIs and preserve the real result statuses—do not invent a source entry or claim coverage that was not run.
+Write the deduplicated candidate inventory to the canonical `subdomains.txt` and source ledger to `subdomain-sources.json`. Preserve per-source status, timestamps, errors, raw/accepted/rejected/duplicate counts, provenance, and explicit reasons for unavailable or unselected sources. Do not mark blocked, unavailable, or unrun sources as successful; do not create a new collector or one file per source. Verify both canonical artifacts and reconciled counts before moving to DNS/live-host checks.
