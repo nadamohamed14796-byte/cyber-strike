@@ -34,6 +34,19 @@ def default_source_selection() -> list[str]:
     return selected
 
 
+def normalize_root(value: str) -> str | None:
+    """Normalize an enumeration root; a wildcard scope entry maps to its DNS base."""
+    candidate = value.strip().lower().rstrip(".")
+    if candidate.startswith("*."):
+        candidate = candidate[2:]
+    try:
+        root_hint = candidate.encode("idna").decode("ascii").lower()
+    except UnicodeError:
+        return None
+    root = normalize_host(candidate, root_hint)
+    return root if root == root_hint else None
+
+
 def normalize_host(value: str, root: str) -> str | None:
     host = value.strip().lower().rstrip(".")
     if host.startswith("*."):
@@ -232,6 +245,10 @@ def self_test() -> int:
     assert (raw, sorted(set(hosts)), rejected) == (3, ["api.example.com", "www.example.com"], 1)
     assert normalize_host("API.Example.com.", "example.com") == "api.example.com"
     assert normalize_host("*.api.example.com", "example.com") == "api.example.com"
+    assert normalize_root("example.com") == "example.com"
+    assert normalize_root("*.example.com") == "example.com"
+    assert normalize_root("*.BÜCHER.example") == "xn--bcher-kva.example"
+    assert normalize_root("https://example.com") is None
     assert normalize_host("example.com", "example.com") == "example.com"
     assert normalize_host("example.com.evil.test", "example.com") is None
     assert normalize_host("https://example.com", "example.com") is None
@@ -510,8 +527,8 @@ def main() -> int:
 
     roots: list[str] = []
     for value in args.roots:
-        root = normalize_host(value, value.lower().rstrip("."))
-        if not root or root != value.lower().rstrip("."):
+        root = normalize_root(value)
+        if not root:
             parser.error(f"invalid root domain: {value!r}")
         roots.append(root)
     roots = list(dict.fromkeys(roots))
