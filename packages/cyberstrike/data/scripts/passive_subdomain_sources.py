@@ -543,7 +543,6 @@ def main() -> int:
         roots = normalize_roots(args.roots)
     except ValueError as error:
         parser.error(str(error))
-    roots = list(dict.fromkeys(roots))
     if not roots:
         parser.error("no valid root domains")
     if args.output and not args.hosts_output:
