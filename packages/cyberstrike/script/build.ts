@@ -291,7 +291,7 @@ for (const key of Object.keys(binaries)) {
   await fs.promises.rm(scriptsDestination, { recursive: true, force: true })
   await fs.promises.mkdir(path.dirname(scriptsDestination), { recursive: true })
   await fs.promises.cp(scriptsSource, scriptsDestination, { recursive: true, errorOnExist: true, force: false })
-  const requiredScripts = ["wayback_endpoints.py", "passive_subdomain_sources.py"]
+  const requiredScripts = ["wayback_endpoints.py"]
   for (const script of requiredScripts) {
     if (!fs.existsSync(path.join(scriptsDestination, script))) {
       throw new Error(`Required script was not bundled for ${key}: ${script}`)
