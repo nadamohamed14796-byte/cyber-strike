@@ -1723,9 +1723,28 @@ export namespace TargetMemory {
         }
         continue
       }
+      const matchedIncludeItems = scope && scope.status === "configured"
+        ? matchingScopeItems(candidate, scope.scopeItems)
+        : []
       const hasScopeMatch = Boolean(scope && scope.status === "configured" &&
-        (matchingScopeItems(candidate, scope.scopeItems).length > 0 ||
+        (matchedIncludeItems.length > 0 ||
           matchingScopeItems(candidate, scope.excludedItems).length > 0))
+      // A root policy container may authorize unrelated domains, but a broad
+      // hostname/wildcard entry does not silently authorize arbitrary non-default
+      // ports. Require an explicit host:port or URL-with-port scope entry.
+      if (isRootScopeContainer && candidate.port) {
+        const explicitPortScope = matchedIncludeItems.some((item) => {
+          const raw = item.replace(/^(?:url|domain|wildcard)[ \t]*:[ \t]*/i, "").trim()
+          if (/^[^/:]+:\\d{1,5}$/.test(raw)) return true
+          try {
+            const parsed = new URL(/^https?:\\/\\//i.test(raw) ? raw : "https://" + raw)
+            return Boolean(parsed.port)
+          } catch {
+            return false
+          }
+        })
+        if (!explicitPortScope) continue
+      }
       // Exact-host workspaces always take precedence, including when unconfigured:
       // a different workspace must not authorize around a missing exact-host scope.
       if (!exactHost && !hasScopeMatch) continue
