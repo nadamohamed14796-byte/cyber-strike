@@ -120,12 +120,9 @@ Return candidates with scope/provenance, confidence level, evidence path, dedupl
 
 ### CyberStrike workspace handoff
 
-A candidate list is not yet the target workspace inventory. After attribution, DNS/HTTP checks, and the saved program-scope review, register each corroborated authorized child host so future runs can find its notes and evidence:
+A candidate host belongs in the existing program workspace inventory by default. Merge corroborated hosts and their source, observation time, DNS/HTTP evidence, and attribution confidence into the canonical parent files; do not create a child workspace for every subdomain.
 
-- `cyberstrike target attach https://example.com https://api.example.com --kind api`
-- `cyberstrike target attach https://example.com https://app.example.com --kind application`
-
-Replace both example hosts with the actual authorized program and child. Never attach third-party SaaS tenants, excluded hosts, uncertain candidates, or out-of-scope names. The command uses the persisted scope and refuses ambiguous parent matches. Run `cyberstrike target tree https://example.com` to verify placement. Store source URL, observation time, DNS/HTTP evidence, and attribution confidence in the child target's notes; do not treat an asset registration as a vulnerability finding.
+Use `cyberstrike target attach <program-root> <asset-url> --kind <api|application|...>` only when the operator explicitly requests an independent investigation workspace for that specific in-scope asset and separate notes/evidence are genuinely needed. The command must use the persisted scope and reject excluded, third-party, ambiguous, or out-of-scope assets. Verify placement with `cyberstrike target tree <program-root>` only after an attachment is actually requested and created. Asset registration is not a vulnerability finding.
 
 ## References
 
