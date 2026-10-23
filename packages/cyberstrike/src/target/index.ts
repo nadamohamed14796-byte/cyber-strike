@@ -1696,7 +1696,14 @@ export namespace TargetMemory {
       const basePath = base.pathname.replace(/\/+$/, "") || "/"
       const candidatePath = candidate.pathname.replace(/\/+$/, "") || "/"
       const pathMatches = basePath === "/" || candidatePath === basePath || candidatePath.startsWith(basePath + "/")
-      if (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port) continue
+      // A root workspace may be a program/policy container (for example a
+      // HackerOne program URL) whose persisted scope lists unrelated domains.
+      // In that case the saved scope entries, not the container URL's host,
+      // scheme, port, or path, define the candidate boundary. URL/path/port
+      // constraints remain enforced by matchingScopeItems against those entries.
+      // Child workspaces remain bound to their own origin/path boundary.
+      const isRootScopeContainer = workspace.parentTargetID === null
+      if (!isRootScopeContainer && (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port)) continue
 
       const exactHost = base.hostname === candidate.hostname
       const isDNSDescendant = !exactHost && basePath === "/" &&
