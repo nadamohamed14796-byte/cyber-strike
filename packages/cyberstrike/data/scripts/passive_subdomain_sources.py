@@ -610,12 +610,6 @@ def main() -> int:
                 })
                 item.pop("skipped_by_selection", None)
 
-    if not args.fresh and retry_sources:
-        # A retry should not mark a source in a root as complete if it was omitted
-        # from the current explicit selected list; selected_sources already contains
-        # every explicitly requested retry source.
-        pass
-
     # Unselected sources must not look like unfinished jobs. Save an explicit
     # skipped-by-selection outcome; a later explicit selection reactivates that source.
     for item in document["sources"]:
