@@ -496,6 +496,90 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
   return undefined
 }
 
+/**
+ * Resolve a public passive-research API request to the in-scope subject it queries.
+ * This is not a scanner/tool allowlist: external-provider requests are accepted only
+ * for known read-only lookup routes whose queried domain can be checked against the
+ * persisted target scope. Active requests to any provider still fail the normal scope gate.
+ */
+export function passiveResearchLookup(
+  requestURL: URL,
+  args: string[],
+): { targetURL: string; phase: ReconPhase } | undefined {
+  if (requestURL.username || requestURL.password) return undefined
+
+  const valueAfter = (flag: string): string | undefined => {
+    const index = args.findIndex((item) => item.toLowerCase() === flag)
+    if (index >= 0) return args[index + 1]
+    const inline = args.find((item) => item.toLowerCase().startsWith(flag + "="))
+    return inline?.slice(flag.length + 1)
+  }
+
+  const method = valueAfter("-x") ?? valueAfter("--request") ?? valueAfter("--method")
+  const inlineMethod = args.find((item) => /^-x(?:get|head|post|put|patch|delete|options|trace|connect)$/i.test(item))
+    ?? args.find((item) => /^(?:--request|--method)=/i.test(item))
+  const effectiveMethod = inlineMethod
+    ? inlineMethod.replace(/^(?:--request|--method)=/i, "").replace(/^-x/i, "").toUpperCase()
+    : method?.toUpperCase()
+  if (effectiveMethod && !["GET", "HEAD"].includes(effectiveMethod)) return undefined
+
+  const forbiddenFlags = new Set([
+    "-d", "--data", "--data-raw", "--data-urlencode", "--data-binary", "--json",
+    "-f", "--form", "--form-string", "--post-data", "--post-file",
+    "-l", "--location", "--location-trusted",
+    "-u", "--user", "--proxy-user", "--cookie", "-b", "--cookie-jar",
+    "--netrc", "--netrc-file", "--oauth2-bearer", "--aws-sigv4",
+  ])
+  if (args.some((item) => forbiddenFlags.has(item.toLowerCase()) ||
+      [...forbiddenFlags].some((flag) => item.toLowerCase().startsWith(flag + "=")))) return undefined
+
+  for (let i = 0; i < args.length; i++) {
+    const item = args[i]!
+    const header = item === "-H" || item.toLowerCase() === "--header"
+      ? args[i + 1]
+      : item.toLowerCase().startsWith("--header=")
+        ? item.slice(item.indexOf("=") + 1)
+        : item.startsWith("-H") && item.length > 2
+          ? item.slice(2)
+          : undefined
+    if (header && /^\s*(?:authorization|proxy-authorization|cookie|set-cookie|api-key|x-[^:]*api-key|[^:]*token|[^:]*secret)\s*:/i.test(header)) return undefined
+  }
+
+  const hostname = requestURL.hostname.toLowerCase()
+  const pathname = requestURL.pathname
+  let subject: string | null = null
+  let phase: ReconPhase = "asset_discovery"
+
+  if (hostname === "crt.sh" && pathname === "/") {
+    subject = requestURL.searchParams.get("q")
+  } else if (hostname === "api.certspotter.com" && pathname === "/v1/issuances") {
+    subject = requestURL.searchParams.get("domain")
+  } else if (hostname === "otx.alienvault.com") {
+    const match = /^\/api\/v1\/indicators\/domain\/([^/]+)\/passive_dns\/?$/i.exec(pathname)
+    if (match) {
+      try {
+        subject = decodeURIComponent(match[1]!)
+      } catch {
+        return undefined
+      }
+    }
+  } else if (hostname === "web.archive.org" && pathname === "/cdx/search/cdx") {
+    subject = requestURL.searchParams.get("url")
+    phase = "url_collection"
+  }
+
+  if (!subject) return undefined
+  const domain = subject.trim().toLowerCase()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^[*%.]+/, "")
+    .split(/[/?#]/, 1)[0]!
+    .replace(/:\d+$/, "")
+    .replace(/\.$/, "")
+  if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain)) return undefined
+
+  return { targetURL: "https://" + domain + "/", phase }
+}
+
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
   const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
@@ -568,24 +652,18 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   }
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
 
-  // Passive Wayback CDX lookups are requests to a research provider, not scans of
-  // that provider. Authorize the domain being queried against the persisted target
-  // scope and URL-collection checkpoint, while only allowing the read-only CDX API.
+  // Public read-only research APIs are contacted as providers, but authorization
+  // is checked against the domain being queried, not the provider hostname.
+  // The helper rejects writes, redirects, credentials, and unrecognized API routes.
   if (["curl", "wget"].includes(scanner) && targets.length === 1) {
-    const requestURL = new URL(targets[0]!)
-    if (requestURL.hostname === "web.archive.org" && requestURL.pathname === "/cdx/search/cdx") {
-      const methodIndex = args.findIndex((value) => ["-x", "--request", "--method"].includes(value.toLowerCase()))
-      const explicitMethod = methodIndex >= 0 ? args[methodIndex + 1]?.toUpperCase() : undefined
-      const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form", "--post-data", "--post-file"].includes(value))
-      if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) {
-        throw new Error("Recon execution gate blocked archive lookup: only read-only GET/HEAD CDX requests are permitted.")
+    let requestURL: URL | undefined
+    try { requestURL = new URL(targets[0]!) } catch {}
+    if (requestURL) {
+      const lookup = passiveResearchLookup(requestURL, args)
+      if (lookup) {
+        targets = [lookup.targetURL]
+        phase = lookup.phase
       }
-      const archivedPattern = requestURL.searchParams.get("url")
-      const domain = archivedPattern?.replace(/^\\*\\./, "").split(/[/*?]/, 1)[0]?.toLowerCase()
-      if (!domain || !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$/.test(domain)) {
-        throw new Error("Recon execution gate blocked archive lookup: CDX query must identify a concrete target domain.")
-      }
-      targets = ["https://" + domain + "/"]
     }
   }
   if (!targets.length) {
