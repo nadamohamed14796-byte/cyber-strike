@@ -4,6 +4,7 @@ import {
   reconRunID,
   reconBeginDisposition,
   RECON_PHASE_ARTIFACT_AREAS,
+  validateAssetDiscoveryLedger,
   unresolvedReconPrerequisites,
   type ReconPhase,
   type ReconPhaseRecord,
@@ -27,6 +28,99 @@ const phases: ReconPhase[] = [
 function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPhase, ReconPhaseRecord> {
   return Object.fromEntries(phases.map((phase) => [phase, { status }])) as Record<ReconPhase, ReconPhaseRecord>
 }
+
+function discoveryLedger(
+  roots: string[],
+  sourceNames: string[],
+  pendingPair?: { root: string; source: string },
+): { ledger: Record<string, unknown>; hostsText: string } {
+  const host = "api." + roots[0]
+  const sources = roots.flatMap((root) => sourceNames.map((source) => {
+    const pending = pendingPair?.root === root && pendingPair.source === source
+    const hasHost = root === roots[0] && source === sourceNames[0]
+    return {
+      root,
+      source,
+      status: pending ? "pending" : "success",
+      started_at: "2026-10-23T06:00:00.000Z",
+      finished_at: pending ? null : "2026-10-23T06:01:00.000Z",
+      attempt_count: 1,
+      raw_records: hasHost ? 1 : 0,
+      valid_observations: hasHost ? 1 : 0,
+      unique_hosts: hasHost ? 1 : 0,
+      duplicate_observations: 0,
+      rejected_records: 0,
+      hosts: hasHost && !pending ? [host] : [],
+      error: null,
+      attempt_history: [],
+    }
+  }))
+  const pendingCount = sources.filter((item) => item.status === "pending").length
+  return {
+    ledger: {
+      schema_version: 1,
+      roots,
+      sources,
+      hosts: [{
+        host,
+        roots: [roots[0]],
+        sources: [sourceNames[0]],
+        observations: [{ root: roots[0], source: sourceNames[0] }],
+        observation_count: 1,
+      }],
+      counts: {
+        roots: roots.length,
+        sources_attempted: sources.length - pendingCount,
+        sources_pending: pendingCount,
+        sources_not_started: 0,
+        sources_running_or_interrupted: pendingCount,
+        sources_success: sources.length - pendingCount,
+        sources_zero_results: 0,
+        sources_failed: 0,
+        sources_blocked: 0,
+        sources_unavailable: 0,
+        sources_skipped: 0,
+        unique_hosts: 1,
+        duplicate_observations: 0,
+      },
+      run_status: pendingCount ? "running" : "complete",
+    },
+    hostsText: pendingCount && pendingPair?.root === roots[0] && pendingPair.source === sourceNames[0] ? "" : host + "\n",
+  }
+}
+
+test("asset discovery cannot be marked complete with a mid-run domain/source still pending", () => {
+  const roots = Array.from({ length: 50 }, (_, index) => "domain" + String(index + 1).padStart(2, "0") + ".example.com")
+  const pendingRoot = roots[29]
+  const { ledger, hostsText } = discoveryLedger(roots, ["crt.sh", "subfinder"], { root: pendingRoot, source: "crt.sh" })
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText)
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain(pendingRoot)
+  expect(result.reason).toContain("crt.sh")
+  expect(result.reason).toContain("Resume this saved ledger")
+})
+
+test("asset discovery accepts terminal root/source coverage when the host inventory matches", () => {
+  const { ledger, hostsText } = discoveryLedger(["example.com", "example.net"], ["crt.sh", "subfinder"])
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText)
+  expect(result).toMatchObject({ valid: true, roots: 2, sourcePairs: 4, uniqueHosts: 1, gaps: 0 })
+})
+
+test("asset discovery rejects a host list that differs from the durable source ledger", () => {
+  const { ledger, hostsText } = discoveryLedger(["example.com"], ["crt.sh"])
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText + "stale.example.com\n")
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain("does not exactly match")
+})
+
+test("asset discovery rejects a missing root/source pair instead of treating it as exhausted", () => {
+  const { ledger, hostsText } = discoveryLedger(["example.com", "example.net"], ["crt.sh", "subfinder"])
+  const sourceRows = ledger.sources as Array<{ root: string; source: string }>
+  ledger.sources = sourceRows.filter((item) => !(item.root === "example.net" && item.source === "subfinder"))
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText)
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain("missing root/source coverage")
+})
 
 test("recon run identity is stable across session resumes", () => {
   expect(reconRunID("target-root-1")).toBe(reconRunID("target-root-1"))
