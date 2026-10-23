@@ -203,7 +203,6 @@ export function scannerTargets(command: string[], commandText: string): string[]
       }
     }
   }
-  const scannerName = path.basename(stripOuterShellQuotes(command[0] ?? "")).toLowerCase()
   const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r"].includes(scannerName)
   for (let i = 0; i < command.length; i++) {
     const flag = stripOuterShellQuotes(command[i]!).toLowerCase()
