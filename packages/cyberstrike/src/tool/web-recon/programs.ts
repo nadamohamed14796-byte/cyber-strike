@@ -1,6 +1,11 @@
 import { safeFetch, extractLocs, type ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
 
+/** Detect credentials from cookie names, not incidental words in cookie values. */
+export function hasSessionLikeCookieHeader(value: string): boolean {
+  return /(?:^|[;,]\s*)(?:__Host-|__Secure-)?(?:session(?:[_-]?id)?|sid|connect\.sid|phpsessid|jsessionid|access[_-]?token|refresh[_-]?token|id[_-]?token|auth(?:entication)?(?:[_-]?token)?|xsrf[_-]?token|csrf[_-]?token|jwt|token)(?:[_-][a-z0-9.-]+)?\s*=/i.test(value)
+}
+
 type FetchOptions = NonNullable<Parameters<typeof safeFetch>[1]>
 
 // ---------------------------------------------------------------------------
@@ -594,7 +599,7 @@ export async function headerAudit(target: string, _args: string[], timeout: numb
 
   const setCookie = resp.headers.get("set-cookie")
   if (setCookie) {
-    const sessionLike = /session|token|auth|sid|connect\.sid|PHPSESSID|JSESSIONID/i.test(setCookie)
+    const sessionLike = hasSessionLikeCookieHeader(setCookie)
     if (sessionLike) {
       const cookieIssues: string[] = []
       if (!/;\s*secure/i.test(setCookie)) cookieIssues.push("missing Secure flag")

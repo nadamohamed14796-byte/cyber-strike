@@ -92,6 +92,11 @@ type Finding = {
 }
 type HookResult = { output: string; findings: Finding[] }
 
+/** Match public-ingress tokens without treating "any" inside "company" as an open rule. */
+export function hasOpenIngressIndicator(value: string): boolean {
+  return /(?:0\.0\.0\.0\/0|::\/?0|\bany\b|(?<![A-Za-z0-9])\*(?![A-Za-z0-9]))/i.test(value)
+}
+
 // ── CLI helpers ──
 
 async function run(
@@ -372,7 +377,7 @@ async function sgAudit(args: string[], timeout: number): Promise<HookResult> {
   const files = tfFiles.stdout.trim().split("\n")
   output.push(`[+] Scanning ${files.length} Terraform files`)
 
-  const openCidrPatterns = /(?:0\.0\.0\.0\/0|::\/?0|\*|any)/
+  // Use the shared token-aware matcher below for each resource block.
   const sgResourcePatterns: Record<string, RegExp> = {
     aws: /resource\s+"(?:aws_security_group(?:_rule)?|aws_vpc_security_group_ingress_rule)"/,
     azure: /resource\s+"azurerm_network_security_rule"/,
@@ -397,7 +402,7 @@ async function sgAudit(args: string[], timeout: number): Promise<HookResult> {
           depth -= (lines[j].match(/}/g) || []).length
           if (depth <= 0 && j > i) break
         }
-        if (openCidrPatterns.test(block)) {
+        if (hasOpenIngressIndicator(block)) {
           const resName = lines[blockStart].match(/"([^"]+)"\s*"([^"]+)"/)?.[2] || "unknown"
           output.push(`  [!] ${file}:${blockStart + 1} — open ingress in ${resName}`)
           findings.push({
