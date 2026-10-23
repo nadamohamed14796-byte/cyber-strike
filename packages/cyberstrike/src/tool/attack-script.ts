@@ -58,7 +58,7 @@ const AVAILABLE_SCRIPTS: Record<string, { description: string; args: string }> =
 }
 
 export const AttackScriptTool = Tool.define("attack_script", {
-  description: `Execute a bundled attack script for specialized capabilities beyond http_replay (crypto ops, async concurrency, binary file generation, recon). Available scripts: ${Object.keys(AVAILABLE_SCRIPTS).join(", ")}. Each script outputs structured results. Use --json-output for machine-readable output.`,
+  description: `Execute one registered bundled Python script for a specialized task beyond http_replay. Available scripts: ${Object.keys(AVAILABLE_SCRIPTS).join(", ")}. Consult .cyberstrike/skill/TOOLING_CATALOG.md for script input, phase, and impact rules before calling it. This runner does not apply the generic Bash target/scope gate: independently verify persisted scope and phase before any network operation. Some scripts make state-changing requests or upload active payloads; never use them during default reconnaissance, and never run write/concurrency/upload modes without explicit program authorization. Use --json-output for machine-readable output.`,
   parameters: z.object({
     script: z.enum(Object.keys(AVAILABLE_SCRIPTS) as [string, ...string[]]).describe(
       "Script to execute. Options: " +
