@@ -1696,18 +1696,18 @@ export namespace TargetMemory {
       const basePath = base.pathname.replace(/\/+$/, "") || "/"
       const candidatePath = candidate.pathname.replace(/\/+$/, "") || "/"
       const pathMatches = basePath === "/" || candidatePath === basePath || candidatePath.startsWith(basePath + "/")
-      // A root workspace may be a program/policy container (for example a
-      // HackerOne program URL) whose persisted scope lists unrelated domains.
-      // In that case the saved scope entries, not the container URL's host,
-      // scheme, port, or path, define the candidate boundary. URL/path/port
-      // constraints remain enforced by matchingScopeItems against those entries.
-      // Child workspaces remain bound to their own origin/path boundary.
-      const isRootScopeContainer = workspace.parentTargetID === null
-      if (!isRootScopeContainer && (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port)) continue
-
       const exactHost = base.hostname === candidate.hostname
       const isDNSDescendant = !exactHost && basePath === "/" &&
         candidate.hostname.endsWith("." + base.hostname)
+      // A root workspace may be a program/policy container (for example a
+      // HackerOne program URL) whose persisted scope lists unrelated domains.
+      // Only for those unrelated entries do the saved scope rules replace the
+      // container URL's host/scheme/port/path boundary. Assets in the root
+      // workspace's own DNS family retain the original origin/path restrictions.
+      const isRootScopeContainer = workspace.parentTargetID === null
+      const sameWorkspaceDNSFamily = exactHost || isDNSDescendant
+      if ((!isRootScopeContainer || sameWorkspaceDNSFamily) &&
+          (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port)) continue
       // A child workspace is a boundary for its own host/subtree, not a second
       // program-wide policy container. Do not let an unrelated explicit entry in
       // a child manifest compete with the canonical root workspace and create a
