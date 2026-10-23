@@ -29,6 +29,8 @@ export type ReconPhaseRecord = {
   reason?: string
   counts?: Record<string, number>
   artifacts?: string[]
+  /** Exact starting asset whose persisted scope check justified this checkpoint. */
+  scopeValidationTarget?: string
 }
 
 export type ReconRunManifest = {

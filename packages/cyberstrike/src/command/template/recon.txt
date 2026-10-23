@@ -86,6 +86,7 @@ At run start, inspect the canonical workspace and `recon_checkpoint` state once.
 4. Load specialist skills only when the observed asset, technology, or hypothesis makes their detailed procedure useful. Do not load general methodology/tool-selection skills solely to restate this prompt; reuse any skill already loaded.
 5. Save source/input, status/error, tool/version, useful raw evidence, normalized results, counts, and provenance in the existing workspace. Preserve the difference between zero results, failure, blocked, unavailable, intentionally unselected, and pending. Retry terminal attempts only when explicitly justified by changed conditions.
 6. Reuse canonical inventories and resumable helpers. Do not create per-host/per-tool scripts, duplicate normalized outputs, or folders just to mirror a checklist. Verify saved outputs before completing the checkpoint phase.
+7. For `asset_discovery`, perform at least one real passive source attempt for each eligible in-scope root. Preflight `subfinder` once per runtime/version and run it directly via the available CLI when installed and suitable; do not silently skip it. If it is absent, fails, or is deliberately not selected because it adds no distinct coverage, record the exact status and reason in `subdomain-sources.json` and use a suitable independent source such as certificate transparency when available. Delegating a task is not execution evidence: wait for the actual source result and verify the canonical ledger and host inventory before completing the phase.
 
 ### 0.4 Authorization and impact
 

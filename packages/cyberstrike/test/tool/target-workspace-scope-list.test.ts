@@ -42,6 +42,24 @@ describe("target_workspace explicitly confirmed complete scope lists", () => {
         expect((await TargetMemory.checkURLScope("https://api.example.com/")).allowed).toBe(true)
         expect((await TargetMemory.checkURLScope("https://admin.example.com/")).allowed).toBe(false)
 
+        // A child asset workspace must not compete with the program root for an
+        // explicitly included, unrelated domain. The root owns program-wide scope;
+        // child workspaces only own their exact host and DNS subtree.
+        const program = await TargetMemory.configureScope("https://program-root.example.test", {
+          include: ["api.mercadopago.com", "*.program-root.example.test"],
+          authorizationSource: "Program root scope fixture",
+          authorizationReference: "https://program.example.test/policy",
+        })
+        const child = await TargetMemory.attachAsset(program.workspace.targetURL, "https://app.program-root.example.test")
+        await TargetMemory.configureScope(child.asset.targetURL, {
+          include: ["api.mercadopago.com", "*.program-root.example.test"],
+          authorizationSource: "Child scope fixture",
+          authorizationReference: "https://program.example.test/policy",
+        })
+        const unrelatedDecision = await TargetMemory.checkURLScope("https://api.mercadopago.com/")
+        expect(unrelatedDecision.allowed).toBe(true)
+        expect(unrelatedDecision.workspace?.id).toBe(program.workspace.id)
+
         // Replacing the include list must not silently erase saved exclusions.
         const replaced = await info.execute({
           action: "configure_scope",

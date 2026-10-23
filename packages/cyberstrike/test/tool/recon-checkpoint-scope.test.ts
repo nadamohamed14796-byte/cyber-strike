@@ -30,11 +30,14 @@ test("program-root scope can authorize a separate domain without requiring the r
         metadata: () => undefined,
         ask: async () => {},
       } as never
-      const execute = (action: "begin" | "complete", phase: "scope_validation" | "workspace_setup" | "asset_discovery", summary?: string) =>
-        tool.execute({ action, target_url: root.workspace.targetURL, phase, summary }, ctx)
+      const execute = (action: "begin" | "complete", phase: "scope_validation" | "workspace_setup" | "asset_discovery", summary?: string, scopeValidationTarget?: string) =>
+        tool.execute({ action, target_url: root.workspace.targetURL, phase, summary, scope_validation_target: scopeValidationTarget }, ctx)
 
       expect((await execute("begin", "scope_validation")).metadata.saved).toBe(true)
-      expect((await execute("complete", "scope_validation", "Reviewed and persisted the program policy scope.")).metadata.saved).toBe(true)
+      const rejected = await execute("complete", "scope_validation", "Reviewed and persisted the program policy scope.", "https://not-authorized.example.net/")
+      expect(rejected.metadata.saved).toBe(false)
+      expect(rejected.metadata.reason).toBe("scope_validation_target_out_of_scope")
+      expect((await execute("complete", "scope_validation", "Reviewed and persisted the program policy scope.", "https://fullbarhomologa.modoblackfullbar.com.br/")).metadata.saved).toBe(true)
       expect((await execute("begin", "workspace_setup")).metadata.saved).toBe(true)
       expect((await execute("complete", "workspace_setup", "Canonical workspace files and directories verified.")).metadata.saved).toBe(true)
 
@@ -83,6 +86,7 @@ test("user-confirmed exact scope without an external policy URL passes the recon
           target_url: root.workspace.targetURL,
           phase: "scope_validation",
           summary: "The operator explicitly confirmed the exact application and the confirmation provenance is persisted.",
+          scope_validation_target: "https://authorized-app.example.net/",
         }, ctx)
         expect(complete.metadata.saved).toBe(true)
       } finally {

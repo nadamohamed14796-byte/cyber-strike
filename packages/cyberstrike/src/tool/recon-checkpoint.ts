@@ -269,6 +269,7 @@ export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhas
 const Parameters = z.object({
   action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable", "defer"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
+  scope_validation_target: z.string().min(1).optional().describe("Absolute HTTP(S) URL of the actual starting asset that passed scope_check; required when completing scope_validation. The program-root workspace URL may be only a policy container."),
   phase: z.enum(PHASES).optional(),
   summary: z.string().max(4000).optional(),
   reason: z.string().max(2000).optional(),
@@ -282,7 +283,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
     "Phase order: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting.",
     "A normal recon run defers vulnerability_testing and proceeds to reporting; only an explicit user request may begin testing after endpoint_inventory. Reopening testing invalidates reporting, which must be regenerated. Never launch scanners/session_scan automatically. Save wordlists/settings/results for directory and parameter phases; link JavaScript sources, request shapes, and correlation evidence for JavaScript analysis. Reporting requires the exact verified artifact reports/recon-final.md.",
     "scope_validation, workspace_setup, javascript_analysis, and endpoint_inventory are mandatory and cannot be bypassed as unavailable. Other discovery phases may be unavailable only with a real reason; resolve blocked/failed prerequisites before progressing. Complete a phase only after its required artifacts are verified under the canonical workspace. Do not rerun completed work without new evidence or a justified reason.",
-    "This tool enforces phase order, not request authorization. Verify the saved scope; when it is new/changed or unresolved, call scope_check once for the actual starting asset with target_url selecting the canonical program-root workspace. Do not check the root container merely because it identifies the workspace. Active-request tools still enforce persisted scope for every concrete request.",
+    "This tool enforces phase order, not request authorization. Verify the saved scope; when it is new/changed or unresolved, call scope_check once for the actual starting asset with target_url selecting the canonical program-root workspace. Complete scope_validation only by supplying scope_validation_target with that exact absolute HTTP(S) asset URL; runtime rechecks and persists it, then revalidates it on resume. Do not check the root container merely because it identifies the workspace. Active-request tools still enforce persisted scope for every concrete request.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
@@ -316,6 +317,40 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       // The active root session can change after a stop/resume. Keep the manifest's
       // current owner up to date without creating a duplicate run for this target.
       run.sessionID = sessionID
+
+      // A prior "complete" flag is not authorization evidence by itself. Older
+      // checkpoints did not persist the actual asset checked, and saved scope can
+      // change between runs. Revalidate the recorded starting asset before trusting
+      // this checkpoint or allowing any later phase to proceed.
+      if (run.phases.scope_validation.status === "complete") {
+        const validatedTarget = run.phases.scope_validation.scopeValidationTarget
+        let invalidationReason: string | undefined
+        if (!validatedTarget) {
+          invalidationReason = "The saved scope_validation checkpoint has no recorded starting asset; scope must be checked again."
+        } else {
+          try {
+            const decision = await TargetMemory.checkURLScope(validatedTarget)
+            if (!decision.allowed || !decision.workspace) {
+              invalidationReason = "The previously validated starting asset no longer passes persisted scope: " + decision.reason
+            }
+          } catch (error) {
+            invalidationReason = "The previously validated starting asset could not be revalidated: " +
+              (error instanceof Error ? error.message : String(error))
+          }
+        }
+        if (invalidationReason) {
+          run.phases.scope_validation = {
+            ...run.phases.scope_validation,
+            status: "pending",
+            finishedAt: undefined,
+            reason: invalidationReason,
+          }
+          invalidateReconDownstreamPhases("scope_validation", run.phases, invalidationReason)
+          run.currentPhase = "scope_validation"
+          run.updatedAt = new Date().toISOString()
+          await TargetMemory.writeWorkspaceFile(workspace, relativePath, JSON.stringify(run, null, 2) + "\n")
+        }
+      }
 
       if (params.action === "status") {
         const lines = PHASES.map((phase) => {
@@ -409,6 +444,27 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             !scope.authorizationSource?.trim() ||
             (!scope.authorizationReference?.startsWith("https://") && !userConfirmedScope)) {
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation: configure a non-empty scope manifest with saved authorization provenance. An explicit user-confirmed exact asset is a valid provenance source and does not require a separate policy URL. The root workspace URL itself does not have to be in scope.", metadata: { saved: false, reason: "scope_manifest_unconfigured" } }
+          }
+          const validationTarget = params.scope_validation_target?.trim()
+          if (!validationTarget) {
+            return { title: "Scope validation rejected", output: "Cannot complete scope_validation without scope_validation_target: provide the exact absolute HTTP(S) URL that passed scope_check. The program-root workspace URL may be only a policy container.", metadata: { saved: false, reason: "scope_validation_target_required" } }
+          }
+          let parsedValidationTarget: URL
+          try {
+            parsedValidationTarget = new URL(validationTarget)
+            if ((parsedValidationTarget.protocol !== "http:" && parsedValidationTarget.protocol !== "https:") ||
+                parsedValidationTarget.username || parsedValidationTarget.password) throw new Error("target must be a credential-free absolute HTTP(S) URL")
+          } catch (error) {
+            return { title: "Scope validation rejected", output: "scope_validation_target is invalid: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_validation_target_invalid" } }
+          }
+          let targetDecision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>>
+          try {
+            targetDecision = await TargetMemory.checkURLScope(parsedValidationTarget.href)
+          } catch (error) {
+            return { title: "Scope validation rejected", output: "The starting asset scope check failed: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_validation_check_failed" } }
+          }
+          if (!targetDecision.allowed || !targetDecision.workspace) {
+            return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the starting asset is not authorized by the persisted manifest: " + targetDecision.reason, metadata: { saved: false, reason: "scope_validation_target_out_of_scope", target: parsedValidationTarget.href } }
           }
         }
         if (status === "complete" && phase === "workspace_setup") {
@@ -556,6 +612,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           reason: params.reason?.trim(),
           counts: params.counts ?? record.counts,
           artifacts: params.artifacts ?? record.artifacts,
+          scopeValidationTarget: phase === "scope_validation" && status === "complete"
+            ? params.scope_validation_target?.trim()
+            : record.scopeValidationTarget,
         }
         run.currentPhase = null
       }

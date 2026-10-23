@@ -1699,6 +1699,14 @@ export namespace TargetMemory {
       if (!pathMatches || base.protocol !== candidate.protocol || base.port !== candidate.port) continue
 
       const exactHost = base.hostname === candidate.hostname
+      const isDNSDescendant = !exactHost && basePath === "/" &&
+        candidate.hostname.endsWith("." + base.hostname)
+      // A child workspace is a boundary for its own host/subtree, not a second
+      // program-wide policy container. Do not let an unrelated explicit entry in
+      // a child manifest compete with the canonical root workspace and create a
+      // false "equally specific" denial for valid program assets.
+      if (!exactHost && workspace.parentTargetID !== null && !isDNSDescendant) continue
+
       let scope: TargetScope | null = null
       try {
         scope = await getScope(workspace.targetURL)
