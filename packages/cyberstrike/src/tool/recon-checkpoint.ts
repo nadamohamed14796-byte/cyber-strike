@@ -438,14 +438,14 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             const resolvedArtifactPath = relative.split(path.sep).join("/")
             const requiredAreas = RECON_PHASE_ARTIFACT_AREAS[phase]
             const flatArtifacts: Partial<Record<ReconPhase, readonly string[]>> = {
-              asset_discovery: ["scope.txt", "subdomains.txt", "subdomain-sources.json", "recon-summary.md"],
-              live_hosts_ports: ["live-hosts.txt", "ports.txt", "recon-summary.md"],
-              url_collection: ["urls.txt", "recon-summary.md"],
-              parameter_discovery: ["parameters.txt", "recon-summary.md"],
-              parameter_fuzzing: ["parameter-tests.md", "recon-summary.md"],
-              javascript_analysis: ["javascript-analysis.md", "endpoints.txt", "recon-summary.md"],
-              endpoint_inventory: ["endpoints.txt", "recon-summary.md"],
-              vulnerability_testing: ["findings.md", "recon-summary.md"],
+              asset_discovery: ["scope.txt", "subdomains.txt", "subdomain-sources.json"],
+              live_hosts_ports: ["live-hosts.txt", "ports.txt"],
+              url_collection: ["urls.txt"],
+              parameter_discovery: ["parameters.txt"],
+              parameter_fuzzing: ["parameter-tests.md"],
+              javascript_analysis: ["javascript-analysis.md", "endpoints.txt"],
+              endpoint_inventory: ["endpoints.txt"],
+              vulnerability_testing: ["findings.md"],
             }
             const isFlatArtifact = !resolvedArtifactPath.includes("/") &&
               Boolean(flatArtifacts[phase]?.includes(resolvedArtifactPath))
