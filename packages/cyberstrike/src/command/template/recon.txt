@@ -319,7 +319,7 @@ Potential sources, subject to actual tool availability, include:
 - Existing target inventories and prior run artifacts.
 
 Prefer registered, reputable sources and official documentation.
-Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the single tool/source selection reference. Choose suitable passive sources that are actually available (for example crt.sh, OTX passive DNS, and one useful installed CLI such as subfinder or Amass); do not assume a dedicated collector script exists, run equivalent collectors without a coverage reason, or create a new helper per source. Save source status, errors, provenance, and reconciled counts into canonical `subdomain-sources.json` and `subdomains.txt`. Load `recon-subdomain-enumeration` only when its detailed source/normalization procedure is needed.
+Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/source catalog and follow its **Canonical asset-discovery artifacts and ledger schema** exactly. Choose suitable registered tools, reachable APIs, and available CLIs adaptively (crt.sh, OTX passive DNS, subfinder, and Amass are examples, not an allowlist); do not create a per-source collector or duplicate outputs. Persist the canonical `subdomain-sources.json` ledger plus matching `subdomains.txt`, reconcile every per-root/source status and count, and verify both files before completing the phase. Load `recon-subdomain-enumeration` only when its distinct technical procedure is needed.
 
 For each observation, preserve:
 - Exact observed value.
