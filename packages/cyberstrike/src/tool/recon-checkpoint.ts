@@ -23,6 +23,151 @@ function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable" || status === "deferred"
 }
 
+const DISCOVERY_TERMINAL_STATUSES = new Set([
+  "success",
+  "zero-results",
+  "failed",
+  "unavailable",
+  "blocked",
+  "skipped",
+])
+
+export type AssetDiscoveryLedgerValidation = {
+  valid: boolean
+  reason?: string
+  roots?: number
+  sourcePairs?: number
+  uniqueHosts?: number
+  gaps?: number
+}
+
+/**
+ * Verify the existing passive-discovery ledger before allowing asset_discovery
+ * to be marked complete. The source names are intentionally not allowlisted:
+ * any useful source can be recorded, but every root/source pair must be terminal.
+ */
+export function validateAssetDiscoveryLedger(
+  rawLedger: string,
+  rawHosts: string,
+): AssetDiscoveryLedgerValidation {
+  let ledger: Record<string, unknown>
+  try {
+    const parsed: unknown = JSON.parse(rawLedger)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { valid: false, reason: "The source ledger must contain a JSON object." }
+    }
+    ledger = parsed as Record<string, unknown>
+  } catch (error) {
+    return { valid: false, reason: "The source ledger is not valid JSON: " + (error instanceof Error ? error.message : String(error)) }
+  }
+
+  if (ledger.schema_version !== 1 || !Array.isArray(ledger.roots) || !Array.isArray(ledger.sources) || !Array.isArray(ledger.hosts)) {
+    return { valid: false, reason: "The source ledger has an unsupported or incomplete schema; preserve it and repair/rebuild the ledger before completing asset_discovery." }
+  }
+  const roots = ledger.roots
+  if (!roots.length || roots.some((root) => typeof root !== "string" || !root.trim()) || new Set(roots).size !== roots.length) {
+    return { valid: false, reason: "The source ledger must contain a non-empty, duplicate-free root list." }
+  }
+  const rootSet = new Set(roots as string[])
+  const sourceNames = new Set<string>()
+  const pairs = new Map<string, Record<string, unknown>>()
+  let gaps = 0
+
+  for (const rawRecord of ledger.sources) {
+    if (!rawRecord || typeof rawRecord !== "object" || Array.isArray(rawRecord)) {
+      return { valid: false, reason: "The source ledger contains a malformed root/source record." }
+    }
+    const record = rawRecord as Record<string, unknown>
+    const root = record.root
+    const source = record.source
+    const status = record.status
+    if (typeof root !== "string" || !rootSet.has(root) || typeof source !== "string" || !source.trim()) {
+      return { valid: false, reason: "The source ledger contains a source record with an unknown root or empty source name." }
+    }
+    const key = JSON.stringify([root, source])
+    if (pairs.has(key)) return { valid: false, reason: "The source ledger contains a duplicate record for root " + root + " and source " + source + "." }
+    pairs.set(key, record)
+    sourceNames.add(source)
+
+    if (status === "pending") {
+      return {
+        valid: false,
+        reason: "Subdomain discovery is unfinished: root " + root + " / source " + source + " is still pending" +
+          (typeof record.started_at === "string" && !record.finished_at ? " after an interrupted/in-progress attempt" : "") +
+          ". Resume this saved ledger before completing asset_discovery.",
+        roots: roots.length,
+        sourcePairs: ledger.sources.length,
+      }
+    }
+    if (typeof status !== "string" || !DISCOVERY_TERMINAL_STATUSES.has(status)) {
+      return { valid: false, reason: "The source ledger has a non-terminal or unknown status for root " + root + " / source " + source + "." }
+    }
+    if (typeof record.finished_at !== "string" || !record.finished_at.trim()) {
+      return { valid: false, reason: "The source ledger has no terminal timestamp for root " + root + " / source " + source + "." }
+    }
+    if (status !== "skipped" && (!Number.isInteger(record.attempt_count) || Number(record.attempt_count) < 1)) {
+      return { valid: false, reason: "The source ledger has no recorded attempt for root " + root + " / source " + source + "." }
+    }
+    if (["failed", "unavailable", "blocked", "skipped"].includes(status)) {
+      gaps++
+      const explanation = record.error ?? record.reason
+      if (typeof explanation !== "string" || !explanation.trim()) {
+        return { valid: false, reason: "The " + status + " source " + source + " for root " + root + " has no recorded reason." }
+      }
+    }
+  }
+
+  if (!sourceNames.size) return { valid: false, reason: "The source ledger contains no source attempts." }
+  for (const root of roots as string[]) {
+    for (const source of sourceNames) {
+      if (!pairs.has(JSON.stringify([root, source]))) {
+        return { valid: false, reason: "The source ledger is missing root/source coverage for " + root + " / " + source + "." }
+      }
+    }
+  }
+
+  const counts = ledger.counts
+  if (!counts || typeof counts !== "object" || Array.isArray(counts)) {
+    return { valid: false, reason: "The source ledger has no reconciled counts." }
+  }
+  const savedCounts = counts as Record<string, unknown>
+  if (savedCounts.roots !== roots.length || savedCounts.sources_pending !== 0) {
+    return { valid: false, reason: "The saved source counters do not reconcile with the root list or still report pending work." }
+  }
+
+  const hostRecords = ledger.hosts as unknown[]
+  const uniqueHosts: string[] = []
+  for (const value of hostRecords) {
+    if (!value || typeof value !== "object" || Array.isArray(value) || typeof (value as Record<string, unknown>).host !== "string") {
+      return { valid: false, reason: "The source ledger contains a malformed normalized host record." }
+    }
+    uniqueHosts.push((value as Record<string, unknown>).host as string)
+  }
+  if (new Set(uniqueHosts).size !== uniqueHosts.length || savedCounts.unique_hosts !== uniqueHosts.length) {
+    return { valid: false, reason: "The normalized host inventory contains duplicates or its saved unique-host count does not reconcile." }
+  }
+
+  const expectedStatus = gaps ? "finished_with_gaps" : "complete"
+  if (ledger.run_status !== expectedStatus) {
+    return { valid: false, reason: "The source ledger run_status is " + String(ledger.run_status) + ", but terminal source outcomes require " + expectedStatus + "." }
+  }
+
+  const expectedHosts = [...uniqueHosts].sort()
+  const inventoryLines = rawHosts.split(/\\r?\\n/).map((host) => host.trim()).filter(Boolean)
+  if (new Set(inventoryLines).size !== inventoryLines.length ||
+      JSON.stringify([...inventoryLines].sort()) !== JSON.stringify(expectedHosts)) {
+    return { valid: false, reason: "subdomains.txt does not exactly match the deduplicated hosts in the source ledger; regenerate the TXT inventory from the saved ledger." }
+  }
+
+  return {
+    valid: true,
+    roots: roots.length,
+    sourcePairs: ledger.sources.length,
+    uniqueHosts: uniqueHosts.length,
+    gaps,
+  }
+}
+
 export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly string[]>> = {
   asset_discovery: ["assets"],
   live_hosts_ports: ["recon"],
@@ -261,6 +406,46 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           }
           if (phase === "reporting" && !finalReconReportVerified) {
             return { title: "Recon report rejected", output: "The reporting phase requires a verified reports/recon-final.md artifact. Include that exact path and complete report before marking Recon finished.", metadata: { saved: false, reason: "final_recon_report_required" } }
+          }
+          if (phase === "asset_discovery") {
+            const reportedPaths = new Set(params.artifacts.map((artifact) => {
+              const candidate = path.isAbsolute(artifact) ? path.resolve(artifact) : path.resolve(realWorkspace, artifact)
+              return path.relative(realWorkspace, candidate).split(path.sep).join("/")
+            }))
+            for (const required of ["subdomain-sources.json", "subdomains.txt"]) {
+              if (!reportedPaths.has(required)) {
+                return {
+                  title: "Asset discovery checkpoint rejected",
+                  output: "Cannot complete asset_discovery without both canonical artifacts: subdomain-sources.json and subdomains.txt. A host list alone cannot prove that every root/source task finished; resume the existing source ledger and include both verified paths.",
+                  metadata: { saved: false, reason: "discovery_ledger_required", missing_artifact: required },
+                }
+              }
+            }
+            try {
+              const ledgerPath = path.join(realWorkspace, "subdomain-sources.json")
+              const hostsPath = path.join(realWorkspace, "subdomains.txt")
+              for (const candidate of [ledgerPath, hostsPath]) {
+                const info = await fs.lstat(candidate)
+                if (!info.isFile() || info.isSymbolicLink()) throw new Error(path.basename(candidate) + " is not a regular file")
+              }
+              const validation = validateAssetDiscoveryLedger(
+                await fs.readFile(ledgerPath, "utf-8"),
+                await fs.readFile(hostsPath, "utf-8"),
+              )
+              if (!validation.valid) {
+                return {
+                  title: "Asset discovery checkpoint rejected",
+                  output: "Cannot mark asset_discovery complete: " + validation.reason,
+                  metadata: { saved: false, reason: "discovery_ledger_incomplete", ...validation },
+                }
+              }
+            } catch (error) {
+              return {
+                title: "Asset discovery checkpoint rejected",
+                output: "Cannot verify the canonical subdomain source ledger and host inventory: " + (error instanceof Error ? error.message : String(error)),
+                metadata: { saved: false, reason: "discovery_ledger_verification_failed" },
+              }
+            }
           }
         }
         run.phases[phase] = {
