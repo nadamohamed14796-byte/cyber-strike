@@ -355,7 +355,7 @@ def self_test() -> int:
             saved_hosts = hosts_path.read_text(encoding="utf-8").splitlines()
             assert [item["host"] for item in saved["hosts"]] == saved_hosts
             assert saved_hosts == ["api.example.com", "www.example.com"]
-            assert saved["counts"]["sources_attempted"] == 1
+            assert saved["counts"]["sources_attempted"] == 2
             assert saved["counts"]["sources_pending"] == 0
             assert saved["counts"]["sources_skipped"] == 0
             assert saved["counts"]["sources_not_selected"] == len(ALL_SOURCES) - 2
