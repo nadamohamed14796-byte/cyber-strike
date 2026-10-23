@@ -108,8 +108,11 @@ export function validateAssetDiscoveryLedger(
     if (status !== "skipped" && (!Number.isInteger(record.attempt_count) || Number(record.attempt_count) < 1)) {
       return { valid: false, reason: "The source ledger has no recorded attempt for root " + root + " / source " + source + "." }
     }
-    if (["failed", "unavailable", "blocked", "skipped"].includes(status)) {
+    const intentionallyNotSelected = status === "skipped" && record.skipped_by_selection === true
+    if (["failed", "unavailable", "blocked"].includes(status) || (status === "skipped" && !intentionallyNotSelected)) {
       gaps++
+    }
+    if (["failed", "unavailable", "blocked", "skipped"].includes(status)) {
       const explanation = record.error ?? record.reason
       if (typeof explanation !== "string" || !explanation.trim()) {
         return { valid: false, reason: "The " + status + " source " + source + " for root " + root + " has no recorded reason." }
