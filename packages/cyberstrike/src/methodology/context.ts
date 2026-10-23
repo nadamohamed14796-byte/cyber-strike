@@ -234,7 +234,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     ] : []),
     "## Required Skill Preflight",
     `Phase-critical skills for ${phaseId}: ${(PHASE_REQUIRED_SKILLS[phaseId] ?? []).join(", ") || "none pinned"}. Load each relevant required skill by exact canonical name with the skill tool action=load, and verify returned content. Load only additional specialists justified by current evidence; reuse skills already loaded in this task.`,
-    "The ranked list is a shortlist, not proof a skill is loaded. If a required skill is missing or denied, search once for an allowed canonical alternative and record the exact gap; never claim a failed load succeeded. Search/load again only when new evidence changes the phase's needs. Do not begin active testing if scope validation failed.",
+    "The ranked list contains candidates, not loaded content. If a required skill applies, load it with skill(action="load") using its exact canonical name and verify the returned content. If a required skill is missing or denied, search once for an allowed canonical alternative and record the exact gap; never claim a failed load succeeded. Search/load again only when new evidence changes the phase's needs. Do not begin active testing if scope validation failed.",
   ]
 
   try {
@@ -242,9 +242,8 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     const observedTechStack = Intel.get(sessionID)
       .filter((entry) => entry.type === "technology")
       .flatMap((entry) => [entry.title, ...entry.tags])
-    // Rank against the live Skill catalog and inject selected skill bodies into
-    // phase context. A ranked name alone is not a loaded skill; relying on the model
-    // to remember a second tool call caused methodology guidance to be silently missed.
+    // Rank the live Skill catalog and inject phase-specific candidates into the prompt.
+    // Skill bodies are loaded by the permission-aware skill tool; a candidate is not loaded content.
     const catalog = await Skill.all()
     const entries: SkillIndex.Entry[] = catalog.map((item) => ({
       name: item.name,
@@ -276,8 +275,6 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
         lines.push(`- ${match.name} — ${match.description.slice(0, 180)}${match.description.length > 180 ? "…" : ""} (matched: ${match.query}; relevance: ${match.score})`)
       }
 
-      lines.push("", "## Load Skills On Demand")
-      lines.push("The list above contains candidates only; skill bodies are not injected automatically. Use the registered skill tool action=load with the exact canonical name for the current phase’s general methodology and only specialist skills that materially apply. Verify the tool returned content before claiming it is loaded. Do not load the entire catalog, repeat a load when its content is already in this conversation, or copy long skill bodies into summaries.")
     }
   } catch {
     // Skill catalog failures must not prevent session prompt generation.

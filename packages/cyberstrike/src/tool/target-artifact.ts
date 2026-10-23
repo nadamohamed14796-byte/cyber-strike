@@ -75,7 +75,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       }
     }
 
-    const relativePath = params.area === "root" ? filename : path.join(params.area, filename)
+    const relativePath = params.area === "root" ? filename : params.area + "/" + filename
     const filePath = path.join(workspace.workspacePath, relativePath)
     const exists = await Bun.file(filePath).exists()
     if (exists && !params.overwrite) {
