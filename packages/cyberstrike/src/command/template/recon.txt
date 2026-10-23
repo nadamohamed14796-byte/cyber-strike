@@ -87,33 +87,20 @@ Do not report a tool as installed merely because its name appears in this prompt
 
 ### 0.3.1 Adaptive tool and skill readiness — once per run
 
-At run start, inspect the saved checkpoint and canonical workspace once. Discover tools from the live registered-tool schemas and executables actually present on PATH. The tool matrix is an optional lookup, never an allowlist or mandatory extra setup step.
+At run start, inspect the canonical workspace and `recon_checkpoint` state once. The canonical prompt and checkpoint define the workflow; the tool matrix is an optional capability reference, not an allowlist.
 
-1. Load `recon-methodology` and `community-tool-selection` once when absent from context. Load a specialist skill only when observed technology, request shape, or a concrete hypothesis makes it useful; reuse loaded content across phases and reload only if evidence/context changes or a load failed.
-2. Inspect registered tool schemas before first use. Verify a CLI's executable and help/version once per runtime or version change, not before every phase.
-3. Choose one suitable primary method. Use another only for distinct coverage, independent confirmation, or recovery from a concrete failure. Do not run equivalent tools to inflate counts, and do not reject a useful registered tool or local script merely because it is not listed in a matrix.
-4. Install a missing CLI only when existing methods leave a material gap. Use an official upstream or trusted package manager, verify the executable/help/version, then run only that source. Do not install a catalog or create a wrapper for every tool.
-5. Follow phase dependencies and reuse verified artifacts. Unselected alternatives must be marked skipped-by-selection with a reason, not left pending. A later explicit selection should run that source; terminal attempted outcomes require an explicit retry or a changed failure cause.
-6. Save actual results in the canonical workspace: source/input, tool/version, status/errors, useful raw evidence, normalized/deduplicated output, counts, and provenance. Process large results in files/scripts; report counts and paths rather than pasting entire inventories into model context. Verify saved artifacts before completing a phase.
-For passive subdomain enumeration, follow the collector, source-selection, resume, fallback, and count-reconciliation rules in the canonical reconnaissance methodology included with this command. Reuse `passive_subdomain_sources`; do not create a second runner or a per-tool wrapper. Verify `subdomain-sources.json`, `subdomains.txt`, and the checkpoint before completing `asset_discovery`.
-
-7. Distinguish zero results from failed, unavailable, skipped, or unattempted sources. Retry only when the cause changes or a bounded retry is justified; continue independent eligible work without looping on the same error.
-8. Keep checkpoint ordering and actual request-level persisted-scope enforcement. Efficiency removes duplicate preflight and narration, not evidence requirements or enforcement at the request boundary.
+1. Inspect a registered tool's schema before first use. Check a CLI's executable/help/version only when it is a candidate to run and only once per runtime or version change.
+2. Choose one suitable primary method. Add a source or tool only for independent coverage, a concrete gap, or recovery from a real failure. Do not run equivalent tools merely to increase counts or install a catalog of tools.
+3. Install a missing CLI only when no adequate available alternative closes a material gap. Use an official upstream or trusted package manager, verify the executable, and select it explicitly.
+4. Load specialist skills only when the observed asset, technology, or hypothesis makes their detailed procedure useful. Do not load general methodology/tool-selection skills solely to restate this prompt; reuse any skill already loaded.
+5. Save source/input, status/error, tool/version, useful raw evidence, normalized results, counts, and provenance in the existing workspace. Preserve the difference between zero results, failure, blocked, unavailable, intentionally unselected, and pending. Retry terminal attempts only when explicitly justified by changed conditions.
+6. Reuse canonical inventories and resumable helpers. Do not create per-host/per-tool scripts, duplicate normalized outputs, or folders just to mirror a checklist. Verify saved outputs before completing the checkpoint phase.
 
 ### 0.4 Authorization and impact
 
-Workspace initialization does not establish authorization.
+A workspace is not proof of authorization. Follow the full scope-import, scope-update, and request-enforcement procedure in §2. Reuse an unchanged saved manifest; preserve exclusions; and let registered active-request tools enforce the exact persisted scope for every concrete request. Never bypass a scope refusal by switching tools.
 
-Use active reconnaissance only against the actual asset and operations allowed by policy or explicitly confirmed by the user for that exact asset. Apply saved exclusions before inclusions. First reuse the manifest or save the user's exact confirmation. If the configured manifest already allows the asset, reuse it unchanged. If a configured manifest does not include the exact asset, call `target_workspace(action="configure_scope", target_url=<canonical program-root URL>, include=[<one exact confirmed asset>], merge_existing=true)`. If no configured manifest exists, call `target_workspace(action="configure_scope", target_url=<canonical program-root URL>, include=[<one exact confirmed asset>], user_confirmed_scope=true)`; do not pass `merge_existing` in this initial case. The tool requires `target_url` and `include`. Verify the returned `saved`/`scope_configured` result and saved manifest before continuing. Do not ask for a policy link or repeat proof. If the persisted `scope_validation` checkpoint is already complete and the saved manifest has not changed, reuse it and do not call `scope_check` again. Only for a new/changed manifest or an unresolved scope checkpoint, call `scope_check` once for the concrete starting asset with `target=<actual asset URL>` and `target_url=<canonical program-root workspace URL>`; the root may itself be out of scope. Never call the model-level checker for every discovered host, endpoint, request, phase, or delegated tester. Active-request tools enforce persisted scope internally for every concrete request.
-
-Do not perform exploitation, destructive actions, state-changing requests, brute force, credential attacks, or intrusive testing as an automatic consequence of reconnaissance. Such activities are outside this command's default behavior.
-
-Do not bypass authentication, rate limits, access controls, or program restrictions. Respect the target's permitted request methods, automation limits, and operational constraints.
-
-### 0.4.1 Scope reuse and updates at any point
-
-Use §0.4 as the single setup/configuration procedure. Reuse the saved decision for unchanged setup; add only an exact user-confirmed asset to an existing manifest with `merge_existing=true`; replace the full list only when the user explicitly supplies a replacement or says scope changed. Preserve exclusions, provenance, and unsupported entries. Never repeat the model-level setup check for each host, URL, parameter, or phase; the persisted request-level gate remains mandatory. If an asset is denied, record the concrete reason once and continue independent eligible work. Retry only when the input or failure cause changes.
-
+Normal reconnaissance remains non-destructive. Do not automatically run vulnerability scanners, exploit PoCs, credential attacks, state-changing requests, or intrusive checks. Respect policy, authentication boundaries, rate limits, and operational constraints.
 
 ### 0.5 Target data protection
 
@@ -252,93 +239,35 @@ Do not rerun every stage from the beginning merely because a new command invocat
 
 # 2. Establish authorization and scope
 
-## 2.1 Identify the authoritative policy
+## 2.1 Review the authoritative policy
 
-Locate the official program or customer policy and establish:
-- Program/customer identity.
-- Official HTTPS policy URL.
-- Authorized assets and permitted testing categories.
-- Explicit exclusions.
-- Required request limits and restrictions.
-- Relevant authentication and account requirements.
-- Policy retrieval time and version or fingerprint, when available.
+For a full program or policy change, prefer the official policy. Record program identity, included assets, explicit exclusions, permitted activities, account requirements, rate limits, retrieval time, and a source fingerprint/hash when available. Never fabricate a policy URL or infer authorization from DNS, certificates, redirects, shared IPs, or a parent domain.
 
-Prefer the official policy over search snippets, third-party summaries, or assumptions.
+The canonical workspace root is a policy/evidence container, not necessarily a target. It may be out of scope while other explicitly listed assets are authorized. Keep distinct programs in separate workspaces; keep all domains in one user-supplied program scope together in the same workspace.
 
-For a full program-scope import or an actual policy change, prefer the official policy and record its provenance. If no policy reference can be verified, do not fabricate one. An explicit user confirmation for one exact asset is a separate valid provenance path: save it as user-confirmed in the manifest and notes without requiring an external reference. Reuse the saved manifest for ordinary follow-ups; do not refetch/re-import the full policy or scope list unless the user supplies a replacement or says the policy changed.
+## 2.2 Import a supplied scope file or complete list
 
-### Program root versus an in-scope asset
+Read a supplied file safely without executing it. Preserve the original input, provenance, hash, exclusions, eligibility fields, unsupported rows, and parse/import counts. Do not ask the user to reformat valid input or approve entries one by one.
 
-The canonical root workspace is a durable container for one program's policy, asset inventory, notes, and artifacts. It is not necessarily a network target. A program may explicitly authorize unrelated hostnames, so the root workspace hostname itself does **not** have to appear in the program's include list.
+- **Official-policy-backed file import:** use `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`.
+- **Explicitly user-confirmed complete list without a verified policy URL:** use `user_confirmed_scope_list=true` with the whole list/file; do not invent an external reference. For an existing workspace, pass `merge_existing=true` only when the user says the list is additive. Omit it for a new setup or an explicitly intended full replacement.
+- **Explicit complete list in the message, without a file:** pass all entries together in `include=[...]` with `user_confirmed_scope_list=true`; do not reduce the list to the first domain.
 
-- Configure the reviewed official scope on the canonical program root.
-- Do not reject a valid manifest merely because `scope_check(target="<root hostname>", target_url="<root URL>")` says the root hostname is out of scope.
-- Before an active request, rely on the registered active-request tool's enforcement of the root's persisted manifest for the exact URL, including exclusions, protocol, port, and path restrictions. Do not call `scope_check` again for each URL.
-- Attach an unrelated host only when its exact origin is explicitly authorized by the saved scope. A configured manifest is not blanket permission for every host.
-- If an attach or scope decision fails, inspect the returned reason and relevant matching code once. Do not keep changing URL formatting or retrying the same unchanged policy error. Record the blocker and continue only with independent, permitted work.
-- Use an actual stable program/root URL as the workspace identity where possible; never silently substitute the root URL for the concrete asset under test.
+Preserve unsupported entries as evidence, but do not let them authorize requests until the runtime can enforce them. Verify the saved manifest, returned status, usable-entry count, and source hash/path when available.
 
-## 2.2 Import a supplied scope file
-If the user supplies a complete program scope file/list, import all entries in one operation; do not ask them to select or confirm hosts individually. Preserve the source file and flag unsupported or conflicting entries without silently dropping them.
-If the user explicitly identifies a supplied complete list/file as the authorized scope, accept the complete set in one operation with `user_confirmed_scope_list=true` (and `merge_existing=true` only when adding entries to the existing manifest). This is distinct from inferring siblings from one exact hostname. Use the flag only when the whole supplied list was explicitly identified as in-scope; do not ask which entries to keep. Existing exclusions always remain authoritative. If an official policy URL is available, prefer it; if not, record the user-confirmed-list provenance instead of fabricating a URL.
+## 2.3 Configure a single exact asset or policy scope
 
+When using a verified policy, import its actual inclusions and exclusions together. When the user confirms one exact asset, accept that as provenance for that asset without demanding a policy link or repeated proof:
+- For an unconfigured manifest, use `target_workspace(action="configure_scope", target_url="<root target>", include=["<exact confirmed asset>"], user_confirmed_scope=true)`.
+- For an existing configured manifest, add only that exact asset with `include=["<exact confirmed asset>"], merge_existing=true`.
 
-If the user supplies a scope file:
+Never turn an exact hostname into a wildcard or add guessed siblings/CIDRs. Exclusions always take precedence over inclusions.
 
-1. Inspect the file safely without executing its contents.
-2. Identify its format, source, integrity, and include/exclude rules.
-3. If a verified official policy reference is available, compare the supplied entries against it. If the user explicitly confirms the complete list as the authorized scope and no policy reference is available, record that provenance without inventing a reference or asking for per-entry confirmation.
-4. Resolve known conflicts conservatively; preserve unsupported entries as evidence and do not treat them as authorizing HTTP requests.
-5. Import it using the registered `target_workspace` scope-configuration operation.
+## 2.4 Reuse and enforce the saved decision
 
-Prefer an official policy reference when one is supplied or can be verified. If the user explicitly confirms the entire supplied file/list as the authorized scope and no policy reference is available, use `user_confirmed_scope_list=true` and record that provenance rather than fabricating a URL. Never ask the user to confirm each row. If a file/list contains unsupported entries, preserve them as evidence and clearly state that they cannot authorize HTTP requests until supported. Use the appropriate registered-tool call:
+Call `scope_check(target="<actual starting asset URL>", target_url="<canonical program-root workspace URL>")` once when the manifest is new, changed, or its scope checkpoint is unresolved. Reuse the saved decision on ordinary resumes; do not check each host, URL, request, phase, or delegated task manually.
 
-Policy import: Policy-backed import: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>", exclude=[...])`
-
-User-confirmed complete list without a verified policy URL: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", user_confirmed_scope_list=true)`. The same flag applies to a complete explicit `include=[...]` list when no file is provided.
-
-User-confirmed complete list without a verified policy URL: `target_workspace(action="configure_scope", target_url="<root target>", scope_file_path="<absolute scope file path>", user_confirmed_scope_list=true)`. The same flag applies to an explicit complete `include=[...]` list when no file is provided.
-
-Do not paste a large scope file into the model context unnecessarily.
-
-Record the returned source SHA-256, saved path, configuration result, and any unresolved discrepancy.
-
-## 2.3 Configure scope without a supplied file
-
-If no scope file is provided, prefer verified official policy evidence for a full program manifest. If the user explicitly identifies a complete supplied include list as the authorized scope, pass the whole list together with `user_confirmed_scope_list=true`; do not ask them to choose entries one by one or fabricate a policy reference. For a single exact asset confirmation, use `user_confirmed_scope=true` only for initial setup or `merge_existing=true` for an additive update.
-
-When the registered tool supports the interface below, use:
-
-`target_workspace(action="configure_scope", target_url="<root target>", include=["<verified authorized asset>", ...], exclude=["<verified exclusion>", ...], authorization_source="<verified program/customer>", authorization_reference="<official HTTPS policy URL>")`
-
-Do not add guessed wildcard entries, assumed CIDR ranges, or assets merely because they resolve to the same infrastructure. If the user explicitly confirms one additional asset is authorized under the same unchanged program policy, add only that asset with `target_workspace(action="configure_scope", target_url="<same root>", include=["<single confirmed asset>"], merge_existing=true)`. Do not re-fetch/re-import the full list. This merges with existing entries and preserves exclusions/provenance; never add an entry that conflicts with a saved exclusion.
-
-Wildcard semantics must match the program's actual policy and the scope checker's documented behavior. Do not silently interpret a wildcard as unrestricted access to an organization's entire infrastructure.
-
-If the policy explicitly authorizes a wildcard, record the precise rule and its verified interpretation.
-
-## 2.4 Persist and enforce scope decisions
-
-During setup, call the registered scope checker exactly once for the concrete starting asset, using the canonical program-root workspace only as the scope-manifest selector
-
-`scope_check(target="<actual starting asset URL>", target_url="<canonical program-root workspace URL>")`
-
-Verify that the result represents an explicit, configured authorization decision.
-
-For every candidate, record one of:
-- `authorized`
-- `excluded`
-- `out_of_scope`
-- `unverified`
-- `blocked_by_scope_error`
-
-Apply exclusions before inclusions.
-
-If the scope checker errors, times out, or returns an ambiguous result for the actual starting asset, do not actively test that asset. If the wrong target was checked (the program-container URL instead of the asset the user identified), correct the target argument once; do not loop or restart policy discovery.
-
-Persist the reason and continue passive work where possible.
-
-Start a new setup check only for a new run or when the canonical target/policy configuration changes; ordinary discovery of additional assets does not trigger another agent-level scope check. Execution-boundary enforcement remains mandatory for every request.
+Registered active-request tools must enforce the persisted manifest for every concrete URL, including scheme, port, path, and exclusions. Do not bypass a refusal. Record each candidate as `authorized`, `excluded`, `out_of_scope`, `unverified`, or `blocked_by_scope_error`. If the scope check is ambiguous or fails, do not actively test that asset; preserve the reason and continue only with independent permitted work.
 
 ---
 
