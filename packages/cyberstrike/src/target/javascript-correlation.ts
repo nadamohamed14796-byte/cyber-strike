@@ -330,6 +330,29 @@ export function extractJavaScriptSourceMapReferences(source: string, sourceURL: 
   return [...references]
 }
 
+/**
+ * In explicit-asset mode, include maps referenced by that exact observed bundle.
+ * This accepts both versioned capture rows and legacy RequestTable snapshots.
+ */
+export function collectExplicitJavaScriptSourceMapURLs(
+  explicitAssetURL: string | URL,
+  inputs: Array<{ url?: string | null; responseBody?: string | null }>,
+): string[] {
+  const selected = safeURL(explicitAssetURL instanceof URL ? explicitAssetURL.href : explicitAssetURL)
+  if (!selected) return []
+  const references = new Set<string>()
+  for (const input of inputs) {
+    if (!input.responseBody) continue
+    const observedURL = safeURL(input.url)
+    if (!observedURL || observedURL.origin !== selected.origin || observedURL.pathname !== selected.pathname) continue
+    const body = unwrapProcessedResponseBody(input.responseBody).body
+    for (const mapURL of extractJavaScriptSourceMapReferences(body, observedURL.origin + observedURL.pathname)) {
+      references.add(mapURL)
+    }
+  }
+  return [...references]
+}
+
 function emptyJavaScriptSourceAnalysis(notes: string[]): JavaScriptSourceAnalysis {
   return { functions: [], requests: [], secretCandidates: [], roleHints: [], riskSignals: [], notes }
 }
@@ -1371,28 +1394,28 @@ export namespace JavaScriptCorrelation {
           ),
         )
       : []
-    // Narrow explicit-asset runs to the selected bundle plus only its directly
-    // referenced external maps. Canonicalization drops query/fragment secrets.
-    const explicitSourceMapURLs = new Set<string>()
-    if (explicitJS) {
-      for (const capture of sourceCaptureRows) {
-        const capturedURL = safeURL(capture.source_url)
-        if (!capturedURL || capturedURL.origin !== explicitJS.origin || capturedURL.pathname !== explicitJS.pathname) continue
-        const capturedBody = unwrapProcessedResponseBody(capture.source_content).body
-        for (const mapURL of extractJavaScriptSourceMapReferences(capturedBody, capturedURL.origin + capturedURL.pathname)) {
-          explicitSourceMapURLs.add(mapURL)
-        }
-      }
-    }
-    const isExplicitAssetOrLinkedMap = (url: URL | undefined): boolean => {
-      if (!url || !explicitJS) return false
-      const key = url.origin + url.pathname
-      return key === explicitJS.origin + explicitJS.pathname || explicitSourceMapURLs.has(key)
-    }
     const requestURL = (request: typeof requests[number]): URL | undefined => {
       const base = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
       if (!base) return undefined
       try { return new URL(request.normalized_path, base) } catch { return undefined }
+    }
+    // Include direct links from both versioned captures and older RequestTable snapshots.
+    const explicitSourceMapURLs = new Set<string>(
+      explicitJS ? collectExplicitJavaScriptSourceMapURLs(explicitJS, [
+        ...sourceCaptureRows.map((capture) => ({
+          url: capture.source_url,
+          responseBody: capture.source_content,
+        })),
+        ...relevantRequests.map((request) => ({
+          url: requestURL(request)?.href,
+          responseBody: request.javascript_source ?? request.processed_response,
+        })),
+      ]) : [],
+    )
+    const isExplicitAssetOrLinkedMap = (url: URL | undefined): boolean => {
+      if (!url || !explicitJS) return false
+      const key = url.origin + url.pathname
+      return key === explicitJS.origin + explicitJS.pathname || explicitSourceMapURLs.has(key)
     }
     const versionedSourceInputs = sourceCaptureRows.flatMap((capture) => {
       const request = relevantRequestByID.get(capture.request_id)

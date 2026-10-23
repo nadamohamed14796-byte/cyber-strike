@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
+import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -581,6 +581,32 @@ test("discovers external sourceMappingURL references, resolves relative paths, s
     "https://app.example.com/maps/shared.js.map",
   ])
   expect(extractStaticJavaScriptEndpoints(source)).not.toContain("https://app.example.com/assets/app.js.map")
+})
+
+test("explicit-asset mode follows linked maps from legacy and versioned captures", () => {
+  const assetURL = "https://app.example.com/assets/app.js"
+  const mapRefs = collectExplicitJavaScriptSourceMapURLs(assetURL, [
+    {
+      // Legacy RequestTable bodies may include a response-processor metadata prefix.
+      url: assetURL + "?cache=1",
+      responseBody: "[Status: 200, Type: application/javascript, Size: 2 KB]\n//# sourceMappingURL=../maps/app.js.map?token=hidden",
+    },
+    {
+      // A versioned capture of the same bundle is deduplicated with the legacy row.
+      url: assetURL + "#fragment",
+      responseBody: "//# sourceMappingURL=https://app.example.com/maps/app.js.map#other",
+    },
+    {
+      url: "https://app.example.com/assets/other.js",
+      responseBody: "//# sourceMappingURL=other.js.map",
+    },
+    {
+      url: "https://unrelated.example.net/assets/app.js",
+      responseBody: "//# sourceMappingURL=other.js.map",
+    },
+  ])
+
+  expect(mapRefs).toEqual(["https://app.example.com/maps/app.js.map"])
 })
 
 test("parses captured version-3 source maps and analyzes embedded source contents without retaining source text", async () => {

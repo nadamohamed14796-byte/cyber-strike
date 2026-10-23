@@ -327,8 +327,9 @@ function splitTopLevelArguments(value: string): string[] {
 }
 
 /**
- * Bounded static heuristics only: never evaluates source. Exact candidate values are retained so the
- * private target workspace can record reproducible evidence. Results remain candidates until verified.
+ * Bounded static heuristics only: never evaluates source. Secret-like matches retain only a
+ * fingerprint and source line; values are never emitted in analysis output. Results remain candidates
+ * until independently verified.
  */
 export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis {
   const source = input
