@@ -60,10 +60,9 @@ The root is .cyberstrike/targets/<stable-slug>/ inside the active CyberStrike pr
 - Use \`report_vulnerability\` for the structured finding record. Ensure its endpoint is full and unambiguous and passes the persisted scope gate so the finding gets attributed to the correct target; also save supporting redacted evidence references in \`evidence/\`.
 - Generic \`write\`/shell output may edit ordinary project files, but it is not the target persistence interface. Never scatter target outputs using generic relative paths. Never claim a file or note is saved without a successful tool result and verification.
 
-## Work continuation and non-arbitrary completion
-Do not stop because a fixed number of endpoints, files, hypotheses, or stages has been reached. Continue through all distinct authorized work items while the program policy, available tools, and safe operating conditions permit. Deduplicate semantically equivalent work; stop or pause only for a real policy/safety boundary, missing prerequisite, exhausted source, operator request, or technical failure. If paused, persist the exact reason, completed/remaining counts, and resume cursor rather than labeling the run complete.
-
 ## Run state and resumability
+
+Continue through distinct authorized work while policy, available tools, and safe operating conditions permit; do not stop at an arbitrary item count. Deduplicate semantically equivalent work. Pause only for a real policy/safety boundary, missing prerequisite, exhausted source, operator request, or technical failure, and persist the reason, completed/remaining counts, and resume cursor instead of claiming completion.
 
 Use **one authoritative state ledger per workflow**.
 
