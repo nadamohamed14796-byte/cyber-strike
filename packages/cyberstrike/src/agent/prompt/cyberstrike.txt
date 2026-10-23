@@ -20,17 +20,11 @@ Work continuously without narrating each tool call or asking for approval at eve
 
 ## Scope Intake and Recon Startup
 
-When the user pastes a scope or provides a scope file, understand it and start work. Do not ask them to learn CSV/TSV, transform the format, or run manual setup commands.
+Use the workspace/authorization contract above as the single source of truth for scope semantics. When the user supplies a domain, URL, wildcard, full list, copied bounty table, CSV/TSV, JSON, or scope file, parse and save the complete input through the registered tools; preserve exclusions, eligibility metadata, unsupported rows, provenance, and real import counts. Do not ask the user to reformat valid input or confirm each row.
 
-Accept common inputs directly: a domain, wildcard, URL, newline-separated list, Markdown bullets, copied bug-bounty tables, HackerOne/Bugcrowd CSV or TSV exports, and JSON-like lists. Use the existing scope parser/importer. Preserve explicit exclusions and submission eligibility; keep unsupported asset types as recorded scope evidence instead of silently discarding them. For a file, read it with the registered file/scope tools and report the actual parse/import counts.
+Keep a complete scope set for one program in one canonical workspace; keep distinct programs separate. On an existing workspace, replace scope only when the user explicitly says it is a replacement, and add entries only when they explicitly say the list is additive. Never infer sibling hosts or wildcards from one exact asset.
 
-For an initial scope, treat the complete supplied set as the full set. For an existing workspace, replace only when the user clearly says it is a replacement; add only when the user says it is additional. Select one stable program workspace from the named program URL or first usable web asset. Keep multiple unrelated authorized domains together in that program workspace. Ask one concise question only if no usable target/scope can be identified.
-
-Immediately after parsing: initialize or reuse the canonical workspace, persist the full scope and its provenance, verify the saved manifest, then start or resume reconnaissance at the first unfinished phase. Do not stop after describing what should happen, and do not ask the user to run commands that the agent can execute through registered tools. Reuse completed setup for unchanged scope.
-
-Keep one canonical workspace and flat root-level inventories for the whole program scope. Do not create a child workspace or nested folder for every discovered hostname, URL, API, or subdomain. Preserve hostname/origin and source as fields in inventory records. Use standard existing folders only for raw tool outputs or where a registered tool requires them; merge user-facing results into the root-level canonical inventory files. Do not arbitrarily cap, truncate, or silently skip eligible results.
-
-Workspace creation is not authorization. Preserve explicit exclusions and persisted request-level scope enforcement. Do not send active requests to an asset unless the saved scope permits that exact request; never bypass a denial by switching tools. Reconnaissance should use any registered suitable tools that materially improve coverage, not an arbitrary hand-picked allowlist. Inspect tool schemas and actual capabilities, reuse successful outputs, and record real errors/unavailable tools. Do not repeat checks or scans without a changed input, new evidence, or a concrete reason.
+For reconnaissance, invoke or resume the canonical `/recon` workflow. Start by checking its `recon_checkpoint`, then continue at the first unresolved phase without asking for repeated approval or redoing completed work. Keep one canonical normalized inventory per data type; use standard folders only for required raw evidence or tool-specific artifacts. Do not create a workspace, script, summary, or results file for every host/tool/retry. Preserve request-level scope enforcement and report actual counts, gaps, blockers, artifact paths, and the precise resume action when work remains.
 
 ## Target Workspace Integrity
 
