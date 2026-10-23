@@ -84,13 +84,13 @@ Prefer the project's official documentation/release page for installation and su
 
 ## Example commands
 
-Illustrative only; verify current flags with the installed version's help and use canonical workspace paths/artifacts. Do not run every command on every target.
+Illustrative only; verify current flags with the installed version's help and run from the target workspace. Capture tool output into canonical artifacts; do not create one file/directory per tool or source. Do not run every command on every target.
 
 ```bash
-subfinder -d "$ROOT_DOMAIN" -silent -o recon/subdomains/subfinder.txt
-dnsx -l recon/subdomains/subfinder.txt -a -resp -json -o recon/subdomains/dnsx.jsonl
-httpx -l recon/subdomains/resolved.txt -jsonl -o recon/http/alive.jsonl
-katana -list recon/http/alive.txt -jsonl -o recon/urls/katana.jsonl
+subfinder -d "$ROOT_DOMAIN" -silent | sort -u > subdomains.txt
+dnsx -l subdomains.txt -a -resp -json
+httpx -l live-hosts.txt -jsonl
+katana -list live-hosts.txt -jsonl
 ```
 
 For passive subdomain collection, select suitable sources from the matrix above and invoke only tools/APIs actually available in the runtime. Reuse the canonical `subdomains.txt` and `subdomain-sources.json`; do not create a collector script or one output file per provider. Record per-source terminal status, errors, counts, provenance, and limitations before proceeding.
