@@ -93,6 +93,17 @@ describe("Read-only passive-research API scope routing", () => {
   test("does not treat writes, redirects, credentials, secrets, or unknown routes as passive lookups", () => {
     const url = new URL("https://crt.sh/?q=%25.example.com&output=json")
     expect(passiveResearchLookup(url, ["-X", "POST"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-X", "GET"])).toEqual({
+      targetURL: "https://example.com/",
+      phase: "asset_discovery",
+    })
+    expect(passiveResearchLookup(url, ["--request=HEAD"])).toEqual({
+      targetURL: "https://example.com/",
+      phase: "asset_discovery",
+    })
+    expect(passiveResearchLookup(url, ["-x", "http://127.0.0.1:8080"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["--config", "~/.curlrc"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["--resolve", "crt.sh:443:127.0.0.1"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["--data", "domain=example.com"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-L"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-H", "Authorization: Bearer $TOKEN"])).toBeUndefined()
