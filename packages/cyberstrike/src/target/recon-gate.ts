@@ -136,28 +136,52 @@ export function unresolvedReconPrerequisites(
   return unresolved
 }
 
-/** Pure execution decision used by the runtime gate and unit tests. */
+/** Pure execution decision used by the runtime gate and unit tests.
+ *
+ * The checkpoint owns workflow order and prerequisites, not a phase-to-tool
+ * allowlist. The phase inferred from a CLI name or tool wrapper is advisory.
+ * Normal recon/support tools may contribute to the single active checkpoint;
+ * actions classified as vulnerability testing still require that explicit
+ * checkpoint to be active after endpoint inventory is complete.
+ */
 export function reconPhaseExecutionDecision(
   requiredPhase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
 ): { allowed: boolean; reason: string } {
-  const phaseStatus = phases[requiredPhase].status
-  if (phaseStatus !== "running") {
+  const activePhases = RECON_PHASES.filter((phase) => phases[phase].status === "running")
+  if (activePhases.length !== 1) {
     return {
       allowed: false,
-      reason: "Recon tool blocked: phase " + requiredPhase + " is " + phaseStatus + ". Begin or resume this phase through recon_checkpoint before running its tools.",
+      reason: "Recon tool blocked: expected exactly one active recon checkpoint, found " + activePhases.length +
+        (activePhases.length ? " (" + activePhases.join(", ") + ")" : "") +
+        ". Resume or begin the correct checkpoint through recon_checkpoint before running tools.",
     }
   }
 
-  const unresolved = unresolvedReconPrerequisites(requiredPhase, phases)
+  const activePhase = activePhases[0]!
+  if (requiredPhase === "vulnerability_testing" && activePhase !== "vulnerability_testing") {
+    return {
+      allowed: false,
+      reason: "Vulnerability testing is opt-in. The active checkpoint is " + activePhase +
+        "; explicitly begin vulnerability_testing only after endpoint_inventory is complete and the user has requested targeted testing.",
+    }
+  }
+
+  const unresolved = unresolvedReconPrerequisites(activePhase, phases)
   if (unresolved.length) {
     return {
       allowed: false,
-      reason: "Recon tool blocked: earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + phases[phase].status).join(", ") + ". Resume the first unfinished phase before continuing.",
+      reason: "Recon tool blocked by the active checkpoint " + activePhase +
+        ": earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + phases[phase].status).join(", ") +
+        ". Resume the first unfinished phase before continuing.",
     }
   }
 
-  return { allowed: true, reason: "scope and phase checks passed" }
+  return {
+    allowed: true,
+    reason: "scope and active checkpoint " + activePhase + " checks passed; nominal tool phase " +
+      requiredPhase + " is advisory, not a tool allowlist",
+  }
 }
 
 /** Fail-closed runtime gate for active scanner and web-recon tools. */
