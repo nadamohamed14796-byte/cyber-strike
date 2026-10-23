@@ -639,15 +639,17 @@ test("marks maps without embedded sources and malformed or truncated maps as inc
     responseContentType: "application/json",
     responseBody: JSON.stringify({
       version: 3,
-      sources: ["src/available.ts", "src/missing.ts"],
-      sourcesContent: ['fetch("/api/available")', null],
+      sources: ["src/missing.ts", "src/available.ts"],
+      sourcesContent: [null, 'fetch("/api/available")', 'orphan source content must not count as a matched entry'],
       names: [],
       mappings: "",
     }),
   }])
   expect(partial[0]?.sourceMapStatus).toBe("partial-sources-content")
+  expect(partial[0]?.sourceMapEmbeddedSourceCount).toBe(1)
   expect(partial).toHaveLength(2)
   expect(partial[1]?.sourceMapSource).toBe("src/available.ts")
+  expect(JSON.stringify(partial)).not.toContain("orphan source content must not count as a matched entry")
 
   const malformed = extractCapturedJavaScriptSources([{
     id: "map-invalid",

@@ -366,7 +366,10 @@ function sourceMapFilesFromContent(input: {
   }
   const sources = Array.isArray(parsed?.sources) ? parsed!.sources as unknown[] : []
   const embedded = Array.isArray(parsed?.sourcesContent) ? parsed!.sourcesContent as unknown[] : []
-  const embeddedCount = embedded.filter((value): value is string => typeof value === "string" && value.length > 0).length
+  // Count only content aligned to an actual sources[] entry; stray extra array items
+  // must not make an incomplete source map look fully analyzed.
+  const embeddedCount = sources.reduce((count, _source, index) =>
+    count + (typeof embedded[index] === "string" && (embedded[index] as string).length > 0 ? 1 : 0), 0)
   let status: NonNullable<JavaScriptSourceFile["sourceMapStatus"]>
   const notes: string[] = []
   if (input.truncated) {
