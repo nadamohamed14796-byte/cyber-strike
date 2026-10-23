@@ -62,16 +62,24 @@ The root is .cyberstrike/targets/<stable-slug>/ inside the active CyberStrike pr
 ## Work continuation and non-arbitrary completion
 Do not stop because a fixed number of endpoints, files, hypotheses, or stages has been reached. Continue through all distinct authorized work items while the program policy, available tools, and safe operating conditions permit. Deduplicate semantically equivalent work; stop or pause only for a real policy/safety boundary, missing prerequisite, exhausted source, operator request, or technical failure. If paused, persist the exact reason, completed/remaining counts, and resume cursor rather than labeling the run complete.
 
-## Every run must be resumable
+## Run state and resumability
 
-At run start, create or update a manifest under the root workspace, for example \`runs/run-<UTC timestamp>.json\`, containing:
-- canonical root target and workspace path, operator scope snapshot/reference, exclusions and permitted activity;
-- input files and hashes or stable source IDs, tool versions/commands, rate limits/concurrency, and run start time;
-- work-unit/chunk boundaries, processed/remaining counts, deduplication rules and checkpoint cursor/last completed item;
-- per-stage status, exact output paths, exit codes, errors/retries, end time, and whether the run is complete, partial, blocked, or paused with a recorded resume point.
-Use \`runs/index.json\` only through the structured runtime API; the generic artifact tool deliberately reserves it.
+Use **one authoritative state ledger per workflow**.
 
-After each stage, persist the output before moving on. On interruption, continue from the manifest and existing output files; do not restart destructive or expensive work blindly. At the end, verify output paths, file sizes, final counts, and remaining queue/errors. Update root \`notes.md\` with a concise summary, links/relative paths to artifacts, and next steps. Keep per-asset observations linked to the root inventory; create child-local notes only for explicitly requested independent investigations.
+- If the workflow has a dedicated durable checkpoint (for example, `recon_checkpoint`), that checkpoint is the only source of truth for phase order/status and workflow completion. Do not create a second manifest that mirrors its phase states or invent alternative phase names/status enums.
+- Add a run manifest under `runs/` only when it provides distinct data that the authoritative checkpoint does not store, such as input hashes, tool/version/settings, source/item cursors, artifact hashes, exit codes, or detailed failure/retry evidence. Reference the existing checkpoint/run ID; do not shadow its phase state.
+- For a task with no dedicated checkpoint, use one `runs/run-<UTC timestamp>.json` manifest as its state ledger. Do not also create another overlapping status file.
+
+At the start of a run, reuse the canonical workspace and current authoritative ledger. Supplementary run metadata, when required, should identify:
+- canonical target/workspace and authorization source/fingerprint;
+- relevant input files/hashes and selected tool versions/settings;
+- item/batch boundaries, deduplication keys, and per-item resume cursors;
+- output paths, exit codes, errors/retries, and integrity/freshness notes;
+- the exact checkpoint/run reference and next actionable resume point.
+
+After each meaningful work unit, persist its evidence and cursor before moving on where the tools allow it. On interruption, resume only unfinished work; never reset an existing ledger or rerun completed work just to make the state appear clean. At completion, reconcile planned versus processed items, artifact paths/counts, errors, and the remaining frontier. Update `notes.md` with a concise human-readable summary, but do not use notes as a replacement for the structured state ledger.
+
+Use `runs/index.json` only through its structured runtime API; the generic artifact tool reserves it.
 
 ## Prevent cross-target contamination
 
