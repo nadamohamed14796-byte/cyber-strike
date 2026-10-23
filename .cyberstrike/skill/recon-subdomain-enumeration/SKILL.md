@@ -63,9 +63,13 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - Clear reason for ownership attribution and scope classification.
 - A vulnerability report must include separate proof of impact; subdomain discovery alone is not a finding.
 
-## Tool selection
+## Tools
 
-Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Select available sources adaptively; inspect registered schemas and preflight only the external commands that may actually be used. The catalog documents `host_inventory.py` and the canonical source-ledger/output contract. A listed candidate is not proof of installation, suitability, or authorization.
+Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Select sources adaptively; inspect registered schemas and preflight only external commands that may actually be used. The catalog defines `host_inventory.py` and the canonical source-ledger/output contract. A listed candidate is not proof of installation, suitability, or authorization.
+
+For a candidate CLI, use `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool-name>` once per runtime/version before depending on it. Review official docs and flags before use; apply program scope and rate limits independently of tool availability.
+
+Official references: [ProjectDiscovery subfinder](https://github.com/projectdiscovery/subfinder), [OWASP Amass](https://github.com/owasp-amass/amass), [ProjectDiscovery dnsx](https://github.com/projectdiscovery/dnsx), and [Certificate Transparency](https://certificate.transparency.dev/).
 
 ## Enumeration Coverage Matrix
 
