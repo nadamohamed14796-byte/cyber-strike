@@ -207,14 +207,17 @@ test("normalizes static numeric and UUID path values to placeholders", () => {
   const source = [
     'fetch("/api/users/12345")',
     'fetch("/api/invoices/550e8400-e29b-41d4-a716-446655440000")',
+    'fetch("/api/items/00000000-0000-0000-0000-000000000000")',
   ].join("\n")
   const result = analyzeJavaScriptSource(source)
   expect(result.requests.find((item) => item.path.includes("/api/users/"))?.path).toBe("/api/users/{id}")
   expect(result.requests.find((item) => item.path.includes("/api/invoices/"))?.path).toBe("/api/invoices/{uuid}")
+  expect(result.requests.find((item) => item.path.includes("/api/items/"))?.path).toBe("/api/items/{uuid}")
   expect(result.requests.some((item) => item.pathParameters.includes("id"))).toBe(true)
   expect(result.requests.some((item) => item.pathParameters.includes("uuid"))).toBe(true)
   expect(JSON.stringify(result)).not.toContain("12345")
   expect(JSON.stringify(result)).not.toContain("550e8400-e29b-41d4-a716-446655440000")
+  expect(JSON.stringify(result)).not.toContain("00000000-0000-0000-0000-000000000000")
 })
 
 test("extracts fetch body keys without misclassifying request options", () => {

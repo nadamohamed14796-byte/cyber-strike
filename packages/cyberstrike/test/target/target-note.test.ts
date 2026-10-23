@@ -4,6 +4,7 @@ import { redactTargetNoteLine, redactTargetNoteSecrets } from "../../src/target/
 test("redacts common secrets when target-note text is explicitly sanitized", () => {
   const source = [
     "Authorization: Bearer abc.def.ghi",
+    "Authorization: Bearer abc%def.ghi",
     "Proxy-Authorization: Basic Zm9vOmJhcg==",
     "Cookie: session=secret-session; refresh=secret-refresh",
     "api_key=secret-api-key",
@@ -16,7 +17,7 @@ test("redacts common secrets when target-note text is explicitly sanitized", () 
     "eyJabcdefgh.abcdefgh.abcdefgh",
   ].join("\n")
   const redacted = redactTargetNoteSecrets(source)
-  for (const secret of ["abc.def.ghi", "Zm9vOmJhcg==", "secret-session", "secret-refresh", "secret-api-key", "secret-password", "secret-client", "super secret password", "a multi word secret", "hidden-auth-token-value", "hidden-session-value", "hidden-private-key", "hidden-webhook-secret", "eyJabcdefgh.abcdefgh.abcdefgh"]) {
+  for (const secret of ["abc.def.ghi", "abc%def.ghi", "Zm9vOmJhcg==", "secret-session", "secret-refresh", "secret-api-key", "secret-password", "secret-client", "super secret password", "a multi word secret", "hidden-auth-token-value", "hidden-session-value", "hidden-private-key", "hidden-webhook-secret", "eyJabcdefgh.abcdefgh.abcdefgh"]) {
     expect(redacted).not.toContain(secret)
   }
   expect(redacted).toContain("[REDACTED]")

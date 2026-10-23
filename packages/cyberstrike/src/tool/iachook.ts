@@ -1110,7 +1110,8 @@ async function loggingAudit(args: string[], timeout: number): Promise<HookResult
         : "azure"
     if (!hasProvider[providerPrefix]) continue
 
-    const regex = new RegExp(`resource\\s+"${check.resource}"`)
+    const escapedResource = check.resource.replace(/[.*+?^\x24\x7B\x7D()|[\]\\]/g, "\\$&")
+    const regex = new RegExp("\\bresource\\s+\"" + escapedResource + "\"")
     if (!regex.test(allContent)) {
       output.push(`  [!] Missing: ${check.label} (${check.resource})`)
       findings.push({

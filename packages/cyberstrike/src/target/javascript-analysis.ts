@@ -73,7 +73,7 @@ export function normalizeJavaScriptEndpointPath(inputPath: string): { path: stri
       pathParameters.push(placeholder[1]!)
       return "{" + placeholder[1]! + "}"
     }
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded)) {
+    if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(decoded)) {
       pathParameters.push("uuid")
       return "{uuid}"
     }

@@ -7,7 +7,7 @@
  */
 export function redactTargetNoteSecrets(value: string): string {
   return value
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/%=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
     .replace(/(^|\n)(\s*(?:proxy-authorization|authorization|cookie|set-cookie)\s*:\s*)[^\r\n]*/gi, "$1$2[REDACTED]")
     // Consume complete quoted values (including spaces), otherwise a value such
