@@ -1735,9 +1735,9 @@ export namespace TargetMemory {
       if (isRootScopeContainer && candidate.port) {
         const explicitPortScope = matchedIncludeItems.some((item) => {
           const raw = item.replace(/^(?:url|domain|wildcard)[ \t]*:[ \t]*/i, "").trim()
-          if (/^[^/:]+:\\d{1,5}$/.test(raw)) return true
+          if (/^[^/:]+:\d{1,5}$/.test(raw)) return true
           try {
-            const parsed = new URL(/^https?:\\/\\//i.test(raw) ? raw : "https://" + raw)
+            const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw)
             return Boolean(parsed.port)
           } catch {
             return false
