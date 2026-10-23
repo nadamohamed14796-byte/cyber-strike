@@ -447,7 +447,7 @@ Separate:
 
 Save inventories in the canonical workspace. Do not create child workspaces for every unvalidated input.
 
-**Completion condition:** All currently available passive sources relevant to the target have either been processed, recorded as unavailable, or assigned an explicit unresolved status. No claim of exhaustive internet-wide discovery is permitted.
+**Completion condition:** Every source selected for the run has a persisted terminal outcome for every in-scope root. Alternatives excluded by the adaptive selection must be recorded as skipped-by-selection with a reason, not left pending; count them separately from attempted sources. A run is not exhaustive just because its selected work is complete—report actual source coverage and unresolved gaps.
 
 ## Stage B — Candidate normalization and asset hierarchy
 
