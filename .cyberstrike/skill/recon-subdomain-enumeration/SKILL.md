@@ -63,13 +63,9 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 - Clear reason for ownership attribution and scope classification.
 - A vulnerability report must include separate proof of impact; subdomain discovery alone is not a finding.
 
-## Tools
+## Tool selection
 
-- subfinder, amass, dnsx, puredns, httpx, and certificate-transparency search.
-- dig/drill for DNS troubleshooting.
-- Python/jq for normalization, deduplication, provenance, and confidence scoring.
-- `python3 .cyberstrike/skill/scripts/host_inventory.py observations.jsonl -o hosts.jsonl --errors invalid.jsonl` to normalize hostname observations while preserving all source records; this helper makes no network requests.
-- gowitness or browser automation for visual clustering after live-host validation.
+Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Select available sources adaptively; inspect registered schemas and preflight only the external commands that may actually be used. The catalog documents `host_inventory.py` and the canonical source-ledger/output contract. A listed candidate is not proof of installation, suitability, or authorization.
 
 ## Enumeration Coverage Matrix
 
@@ -139,41 +135,8 @@ Replace both example hosts with the actual authorized program and child. Never a
 ### Discovery provenance and wildcard handling
 Keep each candidate with source, timestamp, DNS answers/CNAME chain, wildcard-DNS check, HTTP fingerprint, ownership evidence, and explicit scope decision. Deduplicate normalized hostnames while preserving their discovery sources; never discard method, port, or auth context when later joining URL inventories. Correlate passive findings with current DNS and a second independent ownership signal before active probing. A historical hostname, third-party CNAME, wildcard response, or cert-transparency entry is a lead—not proof of live ownership or permission. Delta newly observed hosts against earlier runs, and route confirmed HTTP hosts to web recon while keeping cloud/CDN/shared-hosting ambiguity passive until resolved.
 
-## Agent-executable CLI tooling, resources, and helper scripts
+## CyberStrike output and completion
 
-Use tools the agent can invoke directly. Browser interfaces, browser extensions, and interactive intercepting proxies are not dependencies for this skill. Check availability/version before use; if missing, verify official installation instructions, license, dependencies, and platform compatibility before proposing installation. Never claim a tool ran unless its command completed and output was inspected.
+Use the canonical output contract in `.cyberstrike/skill/TOOLING_CATALOG.md`. Persist `subdomains.txt` and `subdomain-sources.json` in the existing target workspace; retain per-root/source provenance, timestamps, terminal status, errors, reconciled counts, and reasons for unselected or unavailable sources. Normalize once and preserve all source attribution when hostnames deduplicate.
 
-### Recommended tools
-- subfinder — passive subdomain discovery
-- amass — asset relationship mapping
-- dnsx — DNS resolution and record checks
-- puredns — wildcard-aware resolution when active discovery is authorized
-- httpx — HTTP/TLS metadata
-- jq and Python — normalization and provenance-preserving deduplication
-
-### Installation and verification
-- Follow official installation instructions for [subfinder](https://github.com/projectdiscovery/subfinder), [Amass](https://github.com/owasp-amass/amass), [dnsx](https://github.com/projectdiscovery/dnsx), [puredns](https://github.com/d3mondev/puredns), and [httpx](https://github.com/projectdiscovery/httpx); do not copy installation commands from untrusted write-ups.
-- Verify each installed binary with its documented version/help option (for example, `subfinder -version`, `dnsx -h`, and `httpx -version`; flags can vary by release, so check upstream docs).
-- Start with passive sources and existing DNS observations. Run active resolution only when allowed. If a dependency is unavailable, retain passive findings and record the limitation rather than reporting an empty successful run.
-
-### Official resources
-- https://github.com/projectdiscovery/subfinder
-- https://github.com/owasp-amass/amass
-- https://github.com/projectdiscovery/dnsx
-- https://github.com/projectdiscovery/httpx
-- https://github.com/vavkamil/awesome-bugbounty-tools
-
-Treat community lists as discovery aids, not proof that a project is maintained or safe. Prefer official docs for installation, flags, output formats, and limitations.
-
-### Normalization and output contract
-Use the existing agent/runtime normalization path; do not create another helper script for this phase. Keep one canonical deduplicated `subdomains.txt` plus `subdomain-sources.json` for per-source provenance and statuses. Preserve timestamps, DNS answers/TTL, wildcard-control results, attribution confidence, and every source attribution when deduplicating hostnames.
-
-Preserve native output; write normalized output separately. Keep provenance, timestamp, tool/version, errors, confidence, and evidence references. Redact secrets and avoid silently overwriting source evidence. Emit machine-readable JSON/JSONL where practical and test helpers against local fixtures.
-
-### Handoff
-Return the command/tool and version, input/output artifact references, accepted/deduplicated/rejected/failed counts where applicable, limitations, confidence, and next skill. A missing tool or blocked source is an explicit status, not a successful empty result.
-### CyberStrike tool selection
-
-Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the single source for tool/API selection and runtime checks. There is no dedicated passive-source collector script. Select only suitable registered tools, installed CLIs, or reachable APIs; start with certificate-transparency data (such as crt.sh), passive DNS (such as OTX), and one useful primary CLI (such as subfinder or Amass) when available. Add CertSpotter, other CLIs, first-party links, or public indexes only when they close a real coverage gap.
-
-Write the deduplicated candidate inventory to the canonical `subdomains.txt` and source ledger to `subdomain-sources.json`. Preserve per-source status, timestamps, errors, raw/accepted/rejected/duplicate counts, provenance, and explicit reasons for unavailable or unselected sources. Do not mark blocked, unavailable, or unrun sources as successful; do not create a new collector or one file per source. Verify both canonical artifacts and reconciled counts before moving to DNS/live-host checks.
+Do not create a second collector, a second tool inventory, or one file per provider. The agent selects and invokes suitable registered tools, reachable APIs, and available CLIs directly; `host_inventory.py` is an offline normalizer, not a source collector. Verify both canonical files and their matching counts before moving to DNS/live-host work. Distinguish a true zero-result source from a failed, blocked, unavailable, skipped, or pending source.
