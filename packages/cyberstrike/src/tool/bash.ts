@@ -498,9 +498,10 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
 
 /**
  * Resolve a public passive-research API request to the in-scope subject it queries.
- * This is not a scanner/tool allowlist: external-provider requests are accepted only
- * for known read-only lookup routes whose queried domain can be checked against the
- * persisted target scope. Active requests to any provider still fail the normal scope gate.
+ * This is not a tool allowlist: the provider can be any external host, but the
+ * lookup must be read-only, credential-free, have one clear domain query, and then
+ * pass the persisted scope check for that domain. Known provider routes also set
+ * the appropriate recon phase; generic domain lookups default to asset discovery.
  */
 export function passiveResearchLookup(
   requestURL: URL,
@@ -523,15 +524,19 @@ export function passiveResearchLookup(
     : method?.toUpperCase()
   if (effectiveMethod && !["GET", "HEAD"].includes(effectiveMethod)) return undefined
 
-  const forbiddenFlags = new Set([
-    "-d", "--data", "--data-raw", "--data-urlencode", "--data-binary", "--json",
-    "-f", "--form", "--form-string", "--post-data", "--post-file",
-    "-l", "--location", "--location-trusted",
-    "-u", "--user", "--proxy-user", "--cookie", "-b", "--cookie-jar",
+  const longBodyOrAuthFlags = new Set([
+    "--data", "--data-raw", "--data-urlencode", "--data-binary", "--json",
+    "--form", "--form-string", "--post-data", "--post-file",
+    "--location", "--location-trusted",
+    "--user", "--proxy-user", "--cookie", "--cookie-jar",
     "--netrc", "--netrc-file", "--oauth2-bearer", "--aws-sigv4",
   ])
-  if (args.some((item) => forbiddenFlags.has(item.toLowerCase()) ||
-      [...forbiddenFlags].some((flag) => item.toLowerCase().startsWith(flag + "=")))) return undefined
+  if (args.some((item) => {
+    const lower = item.toLowerCase()
+    return ["-d", "-F", "-u", "-b", "-L"].includes(item) ||
+      /^-[^-]*[dFubL]/.test(item) ||
+      [...longBodyOrAuthFlags].some((flag) => lower === flag || lower.startsWith(flag + "="))
+  })) return undefined
 
   for (let i = 0; i < args.length; i++) {
     const item = args[i]!
@@ -542,42 +547,71 @@ export function passiveResearchLookup(
         : item.startsWith("-H") && item.length > 2
           ? item.slice(2)
           : undefined
-    if (header && /^\s*(?:authorization|proxy-authorization|cookie|set-cookie|api-key|x-[^:]*api-key|[^:]*token|[^:]*secret)\s*:/i.test(header)) return undefined
+    if (header) {
+      const name = header.split(":", 1)[0]!.trim()
+      if (/(?:authorization|proxy-authorization|cookie|set-cookie|api[-_]key|token|secret|credential)/i.test(name) ||
+          /\b(?:bearer|basic)\s+\S+/i.test(header)) return undefined
+    }
   }
 
   const hostname = requestURL.hostname.toLowerCase()
   const pathname = requestURL.pathname
   let subject: string | null = null
   let phase: ReconPhase = "asset_discovery"
+  let subjectKey = ""
 
   if (hostname === "crt.sh" && pathname === "/") {
-    subject = requestURL.searchParams.get("q")
+    subjectKey = "q"
+    subject = requestURL.searchParams.get(subjectKey)
   } else if (hostname === "api.certspotter.com" && pathname === "/v1/issuances") {
-    subject = requestURL.searchParams.get("domain")
+    subjectKey = "domain"
+    subject = requestURL.searchParams.get(subjectKey)
   } else if (hostname === "otx.alienvault.com") {
     const match = /^\/api\/v1\/indicators\/domain\/([^/]+)\/passive_dns\/?$/i.exec(pathname)
     if (match) {
       try {
         subject = decodeURIComponent(match[1]!)
+        subjectKey = "domain"
       } catch {
         return undefined
       }
     }
   } else if (hostname === "web.archive.org" && pathname === "/cdx/search/cdx") {
-    subject = requestURL.searchParams.get("url")
+    subjectKey = "url"
+    subject = requestURL.searchParams.get(subjectKey)
     phase = "url_collection"
   }
 
-  if (!subject) return undefined
-  const domain = subject.trim().toLowerCase()
+  if (!subject) {
+    // New public sources do not need to be added to a scanner/tool allowlist.
+    // For generic passive APIs, require one unambiguous domain in a conventional
+    // lookup query parameter. The provider itself must be outside target scope.
+    const queryKeys = new Set(["domain", "domain_name", "hostname", "hostname_or_ip", "host", "target", "q", "query", "url", "search"])
+    const candidates = [...requestURL.searchParams.entries()]
+      .filter(([key]) => queryKeys.has(key.toLowerCase()))
+      .map(([key, value]) => ({ key: key.toLowerCase(), value: normalizePassiveLookupDomain(value) }))
+      .filter((item): item is { key: string; value: string } => Boolean(item.value))
+    const domains = [...new Set(candidates.map((item) => item.value))]
+    if (domains.length !== 1) return undefined
+    subject = domains[0]!
+    subjectKey = candidates.find((item) => item.value === subject)?.key ?? ""
+    if (subjectKey === "url") phase = "url_collection"
+  }
+
+  const domain = normalizePassiveLookupDomain(subject)
+  if (!domain) return undefined
+  return { targetURL: "https://" + domain + "/", phase }
+}
+
+function normalizePassiveLookupDomain(value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  const domain = value.trim().toLowerCase()
     .replace(/^https?:\/\//i, "")
     .replace(/^[*%.]+/, "")
     .split(/[/?#]/, 1)[0]!
     .replace(/:\d+$/, "")
     .replace(/\.$/, "")
-  if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain)) return undefined
-
-  return { targetURL: "https://" + domain + "/", phase }
+  return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain) ? domain : undefined
 }
 
 async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
@@ -661,8 +695,15 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     if (requestURL) {
       const lookup = passiveResearchLookup(requestURL, args)
       if (lookup) {
-        targets = [lookup.targetURL]
-        phase = lookup.phase
+        // Do not reinterpret an in-scope URL as a third-party source query.
+        const providerScope = await TargetMemory.checkURLScope(requestURL.toString())
+        if (!providerScope.allowed) {
+          const subjectScope = await TargetMemory.checkURLScope(lookup.targetURL)
+          if (subjectScope.allowed && subjectScope.workspace) {
+            targets = [lookup.targetURL]
+            phase = lookup.phase
+          }
+        }
       }
     }
   }
