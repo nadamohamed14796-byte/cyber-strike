@@ -111,12 +111,10 @@ Return normalized asset and endpoint inventories, scope decisions, provenance, d
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use registered tools for app/network activity and locally verified CLIs for local processing. A browser or intercepting proxy is not a dependency when captured requests or local files already provide the needed evidence.
+Use registered tools for app/network activity and locally verified CLIs for local processing. A browser or intercepting proxy is not a dependency when captured requests or local files already provide the needed evidence. Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper inventory instead of repeating candidate lists here.
 
-- Python/jq: validate and normalize manifests/inventories.
-- subfinder, dnsx, httpx, and Katana: candidates for their matching recon phase only after runtime preflight and scope/policy checks.
-- Nuclei: not part of default reconnaissance. Use only in a separate, explicitly requested testing phase with reviewed templates and required authorization.
-- git diff: review changes to persisted artifacts.
+- Nuclei is not part of default reconnaissance. Use it only in a separate, explicitly requested testing phase with reviewed templates and required authorization.
+- Use local `git diff` only when reviewing saved artifact changes; it does not replace evidence validation.
 
 References:
 - https://owasp.org/www-project-web-security-testing-guide/
