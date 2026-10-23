@@ -20,7 +20,7 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 | Phase / task | Primary method | Alternatives / supporting tools | Required output / notes |
 |---|---|---|---|
-| Passive subdomain collection | Use the source methods in this catalog: query crt.sh certificate-transparency data and OTX passive DNS where reachable; use one available primary CLI such as `subfinder` or `amass` when useful | CertSpotter, assetfinder, Findomain, Sublist3r, public indexes, first-party links, and other reputable passive datasets only when they add distinct coverage | Write results into canonical `subdomains.txt` and `subdomain-sources.json`; record each source, timestamp, status, errors, raw/accepted/rejected/duplicate counts, and provenance. Normalize wildcard, IDN, case, trailing dots, and root boundaries; do not claim an unrun source succeeded. |
+| Passive subdomain collection | Choose reachable reputable public APIs/indexes, registered native tools, or installed CLIs based on the target and evidence gap. crt.sh, OTX passive DNS, subfinder, and Amass are examples, not a fixed allowlist. | CertSpotter, assetfinder, Findomain, Sublist3r, first-party links, and other sources only when they add distinct coverage | Write the canonical `subdomains.txt` and `subdomain-sources.json` using the schema below; preserve per-root/source status, timestamps, errors, counts, and provenance. |
 | DNS validation / wildcard handling | dnsx, dig/drill; existing `host_inventory.py` for normalization | puredns/shuffledns only when active discovery is permitted | DNS records, CNAME chain, TTL, resolver status, wildcard controls, source attribution |
 | Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
 | HTTP liveness / tech fingerprinting | httpx, WhatWeb | curl; TLS metadata | status, redirect chain, title, content type, technology clues, stable fingerprint |
@@ -42,6 +42,29 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 | Cloud / CI / platform review | Prowler, ScoutSuite, provider CLIs where authorized | Checkov, Trivy, Semgrep | identity/resource, least-privilege finding, source/config evidence; read-only first |
 | Subdomain takeover triage | subzy plus provider conditions from can-i-take-over-xyz | DNS/CNAME and provider documentation | dangling record and provider-specific evidence; never attempt to claim a real target |
 | Evidence / normalization / reporting | Python stdlib, jq | shared helpers below | reproducible evidence references, redaction, disposition, validation errors |
+
+## Canonical asset-discovery artifacts and ledger schema
+
+The recon command and registered `recon_checkpoint` enforce this contract. This is the only place that defines the source-ledger format; recon skills and phase references must link here rather than invent a second schema.
+
+### Required files
+
+- `subdomains.txt`: one normalized hostname per line, sorted and globally unique across the approved root set. It must exactly match the `host` values in the JSON ledger. It may be empty only when the ledger also has zero hosts and the source results support that outcome.
+- `subdomain-sources.json`: one JSON object with `schema_version: 1`, `roots`, `sources`, `hosts`, `counts`, and `run_status`. Preserve provenance per source/root pair; do not create one file per source.
+
+### Source-ledger rules
+
+1. `roots` is a non-empty, duplicate-free array of normalized root hostnames drawn from the saved scope. Do not put URLs, paths, wildcard prefixes, or unvalidated candidates in this array.
+2. `sources` contains exactly one record for every `root` × `source` pair represented in the run. Every root must have a record for each source name used anywhere in the ledger. Source names are discovered dynamically; the examples in the tool matrix are not an allowlist.
+3. Every source record contains `root`, `source`, `status`, `started_at`, `finished_at`, `attempt_count`, `raw_records`, `valid_observations`, `unique_hosts`, `duplicate_observations`, `rejected_records`, `hosts`, and `attempt_history`. Use the terminal statuses `success`, `zero-results`, `failed`, `unavailable`, `blocked`, or `skipped`. Never leave a `pending` record when completing the phase.
+4. A completed attempt has a real start/finish timestamp and `attempt_count >= 1`. A deliberately unselected alternative uses `status: "skipped"`, `skipped_by_selection: true`, `attempt_count: 0`, a finish timestamp, zero counts, and a plain-language `error` or `reason`. The same source names must be represented for every root; use a per-root skipped/failed/unavailable record when appropriate.
+5. Counts must reconcile for each record: `raw_records = valid_observations + rejected_records`; `valid_observations = unique_hosts + duplicate_observations`. `hosts` is the duplicate-free list of normalized hostnames produced by that source for that root, and its length must equal `unique_hosts`. For an attempted source with no valid results, use `zero-results` only when the source actually completed successfully; otherwise record the true failure/blocked/unavailable state and reason.
+6. `hosts` at the ledger root is the globally deduplicated array of objects with at least a `host` field. Preserve useful `roots`, `sources`, `observations`, and `observation_count` fields so merging duplicates does not discard source attribution. Do not store live credentials or secrets in evidence summaries.
+7. `counts` must contain reconciled integer values for `roots`, `sources_attempted`, `sources_pending`, `sources_not_started`, `sources_running_or_interrupted`, `sources_success`, `sources_zero_results`, `sources_failed`, `sources_blocked`, `sources_unavailable`, `sources_skipped`, `sources_not_selected`, `unique_hosts`, and `duplicate_observations`. These are derived from the saved records, not estimates. Terminal ledgers have all three pending/not-started/interrupted counters at zero.
+8. Set `run_status: "complete"` only when every root/source record is terminal and there are no failed, unavailable, blocked, or non-selection-skipped records. Use `"finished_with_gaps"` when any such gap exists. Intentional `skipped_by_selection` records are reported separately and are not falsely counted as attempted.
+9. Write both files through the canonical target workspace, read them back, recompute all counts, compare the host list with ledger hosts, and only then complete `asset_discovery`. A source being omitted from the tool selection is not proof that it returned zero results.
+
+The existing helper `host_inventory.py` is an offline observation normalizer, not a network collector or source ledger writer. Use it for hostname normalization when its JSONL input/output fits the task; do not claim it queried a source. Do not restore or create a dedicated collector merely to duplicate the catalog: the agent selects and invokes suitable registered tools, reachable APIs, and available CLIs directly, then persists the validated ledger above.
 
 ## Built-in CyberStrike scripts and helpers
 
