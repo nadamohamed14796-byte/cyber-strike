@@ -8,7 +8,7 @@ This is a discovery and selection guide for agent-executable CLI tools, local li
 
 | Task | Primary candidates | Complementary checks | Preserve |
 |---|---|---|---|
-| Passive subdomain discovery | subfinder, amass | certificate transparency, passive DNS | candidate, source, timestamp, attribution confidence |
+| Passive subdomain discovery | Registered `attack_script(script="passive_subdomain_sources")` (canonical collector: crt.sh + OTX + at most one installed CLI by default) | CertSpotter or one alternative CLI only when it closes a real coverage gap | source ledger, deduplicated host inventory, timestamps, errors, attribution confidence; do not run equivalent collectors in parallel |
 | DNS validation | dnsx, dig | puredns/shuffledns only when active discovery is allowed; `host_inventory.py` for provenance-preserving normalization | record type, answer, TTL, wildcard controls, resolver errors |
 | Ports and services | naabu, nmap, tlsx, fingerprintx | httpx for HTTP metadata | host, port, protocol, timestamp, service confidence |
 | URL/history collection | gau, waymore, waybackurls | katana for authorized crawling | normalized URL, source, first-seen, parameters |
