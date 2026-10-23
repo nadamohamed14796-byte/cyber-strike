@@ -46,7 +46,7 @@ Use `.cyberstrike/skill/TOOLING_CATALOG.md` for tool candidates by task, helper 
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use the canonical `.cyberstrike/skill/TOOLING_CATALOG.md` for the current tool candidates and output contracts. Before using a relevant external CLI, run `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool-name>` once for the active runtime/version; review official docs, flags, license, dependencies, permissions, and network behavior before installation or use. Do not install or run every catalog entry.
+Use the canonical `.cyberstrike/skill/TOOLING_CATALOG.md` for the current tool candidates and output contracts. If tool_preflight.py is available under the installed skill/catalog root, resolve its absolute path and run it once per active runtime/version; never assume `.cyberstrike/skill/scripts/` is relative to the target workspace. If it is unavailable, use `command -v` plus the tool's documented version/help check. Review official docs, flags, license, dependencies, permissions, and network behavior before installation or use. Do not install or run every catalog entry.
 
 Official general references: [Python CLI documentation](https://docs.python.org/3/), [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/), and the [bug bounty tool discovery index](https://github.com/vavkamil/awesome-bugbounty-tools). Prefer each tool's own official project documentation for exact flags and installation details.
 
