@@ -709,6 +709,33 @@ test("notes access allows a registered ancestor of an observed asset but not an 
 })
 
 
+test("program-root policy workspaces authorize unrelated explicitly scoped domains", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://hackerone.com/programs/example-program", {
+        include: ["example.com", "*.example.net"],
+        exclude: ["admin.example.com"],
+        authorizationSource: "Program policy scope regression fixture",
+        authorizationReference: "https://hackerone.com/programs/example-program",
+      })
+      const apex = await TargetMemory.checkURLScope("https://example.com/")
+      const subdomain = await TargetMemory.checkURLScope("https://api.example.net/")
+      const excluded = await TargetMemory.checkURLScope("https://admin.example.com/")
+      const unrelated = await TargetMemory.checkURLScope("https://not-listed.example.org/")
+
+      expect(apex.allowed).toBe(true)
+      expect(apex.workspace?.id).toBe(configured.workspace.id)
+      expect(subdomain.allowed).toBe(true)
+      expect(subdomain.workspace?.id).toBe(configured.workspace.id)
+      expect(excluded.allowed).toBe(false)
+      expect(excluded.reason).toContain("exclusion")
+      expect(unrelated.allowed).toBe(false)
+    },
+  })
+})
+
 test("user-confirmed scope without a policy URL must be exactly one asset, not a wildcard or CIDR", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
