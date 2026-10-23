@@ -102,7 +102,7 @@ type WebReconArtifact = {
  * Identical snapshots are represented once with observation timestamps; distinct
  * outputs are retained as separate records. Unknown/corrupt files are never replaced.
  */
-async function persistWebReconResult(input: {
+async function persistWebReconResultUnlocked(input: {
   workspace: Workspace
   filename: string
   program: Program
@@ -190,6 +190,37 @@ async function persistWebReconResult(input: {
   artifact.workspacePath = workspace.workspacePath
   artifact.updatedAt = completedAt
   return TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\n")
+}
+
+const webReconArtifactLocks = new Map<string, Promise<void>>()
+
+async function withWebReconArtifactLock<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const previous = webReconArtifactLocks.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  webReconArtifactLocks.set(key, current)
+  await previous.catch(() => undefined)
+  try {
+    return await task()
+  } finally {
+    release()
+    if (webReconArtifactLocks.get(key) === current) webReconArtifactLocks.delete(key)
+  }
+}
+
+async function persistWebReconResult(input: {
+  workspace: Workspace
+  filename: string
+  program: Program
+  requestedTarget: string
+  completedAt: string
+  sessionID: string
+  result: WebReconResult
+}): Promise<string> {
+  const artifactPath = path.join(input.workspace.workspacePath, input.filename)
+  return withWebReconArtifactLock(artifactPath, () => persistWebReconResultUnlocked(input))
 }
 
 const dispatch: Record<

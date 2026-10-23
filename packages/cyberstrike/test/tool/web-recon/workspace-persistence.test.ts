@@ -109,6 +109,25 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         expect(afterRepeat.observations).toHaveLength(1)
         expect(afterRepeat.observations[0].occurrences).toBe(2)
         expect(afterRepeat.observations[0].attempts).toHaveLength(2)
+
+        await Promise.all([1, 2].map((n) => tool.execute({
+          program: "robots_scan",
+          target,
+          args: [],
+          timeout_seconds: 2,
+        }, {
+          sessionID: "ses_web_recon_workspace_persistence",
+          messageID: "msg_web_recon_workspace_concurrent_" + n,
+          agent: "test",
+          abort: new AbortController().signal,
+          messages: [],
+          ask: async () => {},
+          metadata: () => {},
+        } as never)))
+        const afterConcurrent = JSON.parse(await fs.readFile(artifactPath, "utf-8"))
+        expect(afterConcurrent.observations).toHaveLength(1)
+        expect(afterConcurrent.observations[0].occurrences).toBe(4)
+        expect(afterConcurrent.observations[0].attempts).toHaveLength(4)
         expect(await fs.readdir(path.join(workspace.workspacePath, "recon"))).toEqual(["web-recon-results.json"])
 
         const notes = await fs.readFile(path.join(workspace.workspacePath, "notes.md"), "utf-8")
