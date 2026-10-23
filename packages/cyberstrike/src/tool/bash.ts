@@ -40,7 +40,12 @@ function isBinaryBuffer(buf: Buffer): boolean {
   return nonPrintable / buf.length > 0.3
 }
 
-const SCANNER_PHASES: Record<string, ReconPhase> = {
+/**
+ * Nominal task classification used to identify agent-executable scanner commands.
+ * Values are advisory routing hints, not a per-checkpoint tool allowlist; the
+ * active recon checkpoint and persisted scope are enforced separately below.
+ */
+const SCANNER_NOMINAL_PHASES: Record<string, ReconPhase> = {
   subfinder: "asset_discovery",
   amass: "asset_discovery",
   assetfinder: "asset_discovery",
@@ -141,7 +146,7 @@ function scannerExecutableIndex(command: string[]): number {
   const executableIndex = commandExecutableIndex(command)
   if (executableIndex < 0) return -1
   const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
-  return SCANNER_PHASES[executable] === undefined ? -1 : executableIndex
+  return SCANNER_NOMINAL_PHASES[executable] === undefined ? -1 : executableIndex
 }
 
 const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-file", "-out"])
@@ -446,7 +451,7 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
   const scannerName = (value: string | undefined) => {
     if (!value) return undefined
     const name = path.basename(stripOuterShellQuotes(value)).toLowerCase()
-    return SCANNER_PHASES[name] === undefined ? undefined : name
+    return SCANNER_NOMINAL_PHASES[name] === undefined ? undefined : name
   }
   const shellPayload = async (argv: string[], start: number) => {
     const wrapperName = path.basename(stripOuterShellQuotes(argv[start] ?? "")).toLowerCase()
@@ -703,7 +708,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
       throw new Error("Recon execution gate blocked " + scanner + ": port list must contain valid ports from 1 to 65535.")
     }
   }
-  let phase = SCANNER_PHASES[scanner]!
+  let phase = SCANNER_NOMINAL_PHASES[scanner]!
   // Route ffuf into the correct recon checkpoint based on its URL placeholder.
   // Body/mutating ffuf requests remain active testing, not discovery.
   if (scanner === "ffuf") {
