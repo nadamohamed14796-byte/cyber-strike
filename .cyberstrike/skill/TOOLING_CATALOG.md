@@ -20,7 +20,7 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 | Phase / task | Primary method | Alternatives / supporting tools | Required output / notes |
 |---|---|---|---|
-| Passive subdomain collection | Registered `attack_script(script="passive_subdomain_sources")` — canonical collector | Its defaults include crt.sh, OTX passive DNS, and at most one available primary CLI; select CertSpotter or an alternative CLI only to fill a real gap | One source ledger plus deduplicated host inventory; status/errors/counts/provenance per source. Do not create a parallel source-list file or run equivalent collectors independently. |
+| Passive subdomain collection | Use the source methods in this catalog: query crt.sh certificate-transparency data and OTX passive DNS where reachable; use one available primary CLI such as `subfinder` or `amass` when useful | CertSpotter, assetfinder, Findomain, Sublist3r, public indexes, first-party links, and other reputable passive datasets only when they add distinct coverage | Write results into canonical `subdomains.txt` and `subdomain-sources.json`; record each source, timestamp, status, errors, raw/accepted/rejected/duplicate counts, and provenance. Normalize wildcard, IDN, case, trailing dots, and root boundaries; do not claim an unrun source succeeded. |
 | DNS validation / wildcard handling | dnsx, dig/drill; existing `host_inventory.py` for normalization | puredns/shuffledns only when active discovery is permitted | DNS records, CNAME chain, TTL, resolver status, wildcard controls, source attribution |
 | Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
 | HTTP liveness / tech fingerprinting | httpx, WhatWeb | curl; TLS metadata | status, redirect chain, title, content type, technology clues, stable fingerprint |
@@ -47,7 +47,6 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 Inspect each helper's actual `--help`, source, and tests before assuming flags or behavior. Reuse these instead of creating near-duplicates.
 
-- `passive_subdomain_sources.py`: canonical resumable passive subdomain source collector; writes a source ledger and deduplicated hostname artifact. It is executable implementation, not a second tool catalog.
 - `host_inventory.py`: normalize hostname observations while retaining each source record; no network traffic.
 - `normalize_urls.py`: normalize and deduplicate collected URLs.
 - `js_endpoint_inventory.py`: local JavaScript endpoint candidate inventory.
@@ -94,7 +93,7 @@ httpx -l recon/subdomains/resolved.txt -jsonl -o recon/http/alive.jsonl
 katana -list recon/http/alive.txt -jsonl -o recon/urls/katana.jsonl
 ```
 
-For the canonical passive source collector, call the registered `attack_script` tool with script `passive_subdomain_sources` and pass the canonical workspace output paths. Do not create a separate source catalog or one output file per provider. Verify the ledger's per-source terminal status, pending count, errors, and reconciled host count before proceeding.
+For passive subdomain collection, select suitable sources from the matrix above and invoke only tools/APIs actually available in the runtime. Reuse the canonical `subdomains.txt` and `subdomain-sources.json`; do not create a collector script or one output file per provider. Record per-source terminal status, errors, counts, provenance, and limitations before proceeding.
 
 ## Completion and truthful status
 
