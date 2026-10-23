@@ -153,7 +153,7 @@ export function validateAssetDiscoveryLedger(
   }
 
   const expectedHosts = [...uniqueHosts].sort()
-  const inventoryLines = rawHosts.split(/\\r?\\n/).map((host) => host.trim()).filter(Boolean)
+  const inventoryLines = rawHosts.split(/\r?\n/).map((host) => host.trim()).filter(Boolean)
   if (new Set(inventoryLines).size !== inventoryLines.length ||
       JSON.stringify([...inventoryLines].sort()) !== JSON.stringify(expectedHosts)) {
     return { valid: false, reason: "subdomains.txt does not exactly match the deduplicated hosts in the source ledger; regenerate the TXT inventory from the saved ledger." }
