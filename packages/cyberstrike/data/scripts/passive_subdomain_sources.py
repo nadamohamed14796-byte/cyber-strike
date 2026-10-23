@@ -239,6 +239,7 @@ def self_test() -> int:
     original_path = os.environ.get("PATH", "")
     original_calls = os.environ.get("CYBERSTRIKE_TEST_CALLS")
     original_empty = os.environ.get("CYBERSTRIKE_TEST_EMPTY")
+    os.environ.pop("CYBERSTRIKE_TEST_EMPTY", None)
     with tempfile.TemporaryDirectory(prefix="cyberstrike-source-test-") as tmpdir:
         bin_dir = Path(tmpdir) / "bin"
         bin_dir.mkdir()
