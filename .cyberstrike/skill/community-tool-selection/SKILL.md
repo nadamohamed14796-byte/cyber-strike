@@ -27,7 +27,7 @@ Use this skill when a task may benefit from an external CLI utility, local libra
 
 ## Procedure
 
-1. **Identify the actual subtask.** Search the skill catalog for the specific phase, technology, and vulnerability class. Use the community map only to discover candidates that fill a real gap.
+1. **Identify the actual subtask.** Search the skill catalog for the specific phase, technology, and vulnerability class. Use the canonical `TOOLING_CATALOG.md` to discover candidates that fill a real gap; do not expect a separate community map.
 2. **Choose adaptively, not by a fixed count.** Start with a strong primary method and add as many independent complementary methods as needed when they provide distinct coverage, corroborate evidence, or recover a failed/missing source. There is no arbitrary tool-count ceiling, and useful scripts/code are valid methods. Do not run every listed tool indiscriminately or repeat equivalent work merely to increase counts.
 3. **Preflight local availability once per runtime/version.** Before first use of a relevant CLI candidate, run:
    ```bash
