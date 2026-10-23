@@ -111,4 +111,4 @@ Python is sufficient for the core workspace workflow. Verify optional tools with
 - https://docs.python.org/3/library/json.html
 
 ### Artifact integrity
-Create the target workspace once and resume from its manifest; do not silently create a second root. Preserve raw artifacts, store normalized derivatives separately, and record relative path, source, timestamp, tool/version, hash, redaction status, and processing errors. Never put live credentials or private customer data in shared notes or Git.
+Create the target workspace once and resume from its manifest; do not silently create a second root. Retain raw artifacts only when they add unique evidence, reproducibility, or diagnostic value; when retained, store normalized derivatives separately and record relative path, source, timestamp, tool/version, hash, redaction status, and processing errors. Never put live credentials or private customer data in shared notes or Git.
