@@ -1318,10 +1318,15 @@ export namespace JavaScriptCorrelation {
       if (!hostURL) return false
       const host = hostURL.hostname.toLowerCase()
       const isTargetHost = host === targetURL.hostname || host.endsWith("." + targetURL.hostname)
+      // Keep already-captured script/map responses in the candidate set even on a
+      // different host or path. The authoritative persisted scope gate below decides
+      // whether each exact response URL is eligible; a hostname match alone never does.
+      const capturedScriptOrMap = isJavaScriptOrSourceMapResponse(
+        request.response_content_type,
+        request.normalized_path,
+      )
       if (isTargetHost) {
-        // Keep the quick path boundary check, then apply the authoritative scope
-        // engine below so a sibling application cannot pass this hostname check alone.
-        if (host === targetURL.hostname && targetPath !== "/") {
+        if (host === targetURL.hostname && targetPath !== "/" && !capturedScriptOrMap) {
           const pageURL = safeURL(request.page_url)
           const requestPathMatches = pathWithinScope(request.normalized_path, targetPath)
           const pagePathMatches = pageURL?.hostname === targetURL.hostname && pathWithinScope(pageURL.pathname, targetPath)
@@ -1329,7 +1334,7 @@ export namespace JavaScriptCorrelation {
         }
         return true
       }
-      return assets.some((asset) => asset.url.hostname.toLowerCase() === host)
+      return capturedScriptOrMap || assets.some((asset) => asset.url.hostname.toLowerCase() === host)
     })
     const relevantRequests: typeof candidateRequests = []
     const requestTargetWorkspaceIDs = new Map<string, string>()
@@ -1359,23 +1364,35 @@ export namespace JavaScriptCorrelation {
           ),
         )
       : []
+    // Narrow explicit-asset runs to the selected bundle plus only its directly
+    // referenced external maps. Canonicalization drops query/fragment secrets.
+    const explicitSourceMapURLs = new Set<string>()
+    if (explicitJS) {
+      for (const capture of sourceCaptureRows) {
+        const capturedURL = safeURL(capture.source_url)
+        if (!capturedURL || capturedURL.origin !== explicitJS.origin || capturedURL.pathname !== explicitJS.pathname) continue
+        const capturedBody = unwrapProcessedResponseBody(capture.source_content).body
+        for (const mapURL of extractJavaScriptSourceMapReferences(capturedBody, capturedURL.origin + capturedURL.pathname)) {
+          explicitSourceMapURLs.add(mapURL)
+        }
+      }
+    }
+    const isExplicitAssetOrLinkedMap = (url: URL | undefined): boolean => {
+      if (!url || !explicitJS) return false
+      const key = url.origin + url.pathname
+      return key === explicitJS.origin + explicitJS.pathname || explicitSourceMapURLs.has(key)
+    }
+    const requestURL = (request: typeof requests[number]): URL | undefined => {
+      const base = safeURL(request.origin) ?? safeURL(request.page_url) ?? safeURL(request.host)
+      if (!base) return undefined
+      try { return new URL(request.normalized_path, base) } catch { return undefined }
+    }
     const versionedSourceInputs = sourceCaptureRows.flatMap((capture) => {
       const request = relevantRequestByID.get(capture.request_id)
       if (!request) return []
       if (explicitJS) {
-        const capturedURL = safeURL(capture.source_url)
-        if (capturedURL) {
-          if (capturedURL.origin !== explicitJS.origin || capturedURL.pathname !== explicitJS.pathname) return []
-        } else if (!matchesCapturedJavaScriptAsset({
-          origin: request.origin,
-          pageURL: request.page_url,
-          host: request.host,
-          scheme: request.scheme,
-          port: request.port,
-          normalizedPath: request.normalized_path,
-        }, explicitJS)) {
-          return []
-        }
+        const capturedURL = safeURL(capture.source_url) ?? requestURL(request)
+        if (!isExplicitAssetOrLinkedMap(capturedURL)) return []
       }
       return [{
         id: capture.id,
@@ -1396,14 +1413,10 @@ export namespace JavaScriptCorrelation {
     // newer version rows exist so migration-era first captures are not lost. Content
     // URL/hash dedup merges identical rows and analyzes their bytes only once.
     const legacySourceRequests = explicitJS
-      ? relevantRequests.filter((request) => matchesCapturedJavaScriptAsset({
-          origin: request.origin,
-          pageURL: request.page_url,
-          host: request.host,
-          scheme: request.scheme,
-          port: request.port,
-          normalizedPath: request.normalized_path,
-        }, explicitJS))
+      ? relevantRequests.filter((request) => {
+          const observedURL = requestURL(request)
+          return Boolean(observedURL && isExplicitAssetOrLinkedMap(observedURL))
+        })
       : relevantRequests
     const legacySourceInputs = legacySourceRequests.map((request) => ({
       id: request.id,
