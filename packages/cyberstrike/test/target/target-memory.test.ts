@@ -724,6 +724,7 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
       const subdomain = await TargetMemory.checkURLScope("https://api.example.net/")
       const excluded = await TargetMemory.checkURLScope("https://admin.example.com/")
       const unrelated = await TargetMemory.checkURLScope("https://not-listed.example.org/")
+      const unlistedPort = await TargetMemory.checkURLScope("https://example.com:8443/")
 
       expect(apex.allowed).toBe(true)
       expect(apex.workspace?.id).toBe(configured.workspace.id)
@@ -732,6 +733,7 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
       expect(excluded.allowed).toBe(false)
       expect(excluded.reason).toContain("exclusion")
       expect(unrelated.allowed).toBe(false)
+      expect(unlistedPort.allowed).toBe(false)
     },
   })
 })
