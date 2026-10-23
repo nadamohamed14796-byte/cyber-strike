@@ -343,6 +343,11 @@ def self_test() -> int:
                 os.environ["CYBERSTRIKE_TEST_EMPTY"] = "1"
                 assert main() == 0
                 assert calls_path.read_text(encoding="utf-8") == "xx"
+                # Selecting a previously skipped alternative makes only that source
+                # eligible; no successful or failed peer is rerun by implication.
+                sys.argv = [sys.argv[0], "example.com", "--source", "amass", "--output", str(json_path), "--hosts-output", str(hosts_path)]
+                assert main() == 0
+                assert calls_path.read_text(encoding="utf-8") == "xxx"
             finally:
                 sys.argv = original_argv
 
@@ -351,8 +356,14 @@ def self_test() -> int:
             assert [item["host"] for item in saved["hosts"]] == saved_hosts
             assert saved_hosts == ["api.example.com", "www.example.com"]
             assert saved["counts"]["sources_attempted"] == 1
-            assert saved["counts"]["sources_pending"] == len(ALL_SOURCES) - 1  # all default sources except the selected subfinder are pending
-            assert saved["run_status"] == "running"
+            assert saved["counts"]["sources_pending"] == 0
+            assert saved["counts"]["sources_skipped"] == len(ALL_SOURCES) - 2
+            assert saved["counts"]["sources_zero_results"] == 2
+            assert saved["run_status"] == "finished_with_gaps"
+            amass_record = next(item for item in saved["sources"] if item["root"] == "example.com" and item["source"] == "amass")
+            assert amass_record["status"] == "zero-results"
+            assert amass_record["attempt_count"] == 1
+            assert amass_record.get("skipped_by_selection") is None
             source_record = next(item for item in saved["sources"] if item["root"] == "example.com" and item["source"] == "subfinder")
             assert source_record["attempt_count"] == 2
             assert len(source_record["attempt_history"]) == 2
