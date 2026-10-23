@@ -573,7 +573,7 @@ export function passiveResearchLookup(
     }
   }
 
-  const sensitiveQueryKey = /(?:authorization|(?:^|[-_])auth(?:$|[-_])|cookie|api[-_]?key|(?:^|[-_])key(?:$|[-_])|access[-_]?token|token|secret|credential|password|signature|(?:^|[-_])sig(?:$|[-_])/i
+  const sensitiveQueryKey = /(?:authorization|(?:^|[-_])auth(?:$|[-_])|cookie|api[-_]?key|(?:^|[-_])key(?:$|[-_])|access[-_]?token|token|secret|credential|password|signature|(?:^|[-_])sig(?:$|[-_]))/i
   if ([...requestURL.searchParams.keys()].some((key) => sensitiveQueryKey.test(key))) return undefined
 
   const hostname = requestURL.hostname.toLowerCase()
