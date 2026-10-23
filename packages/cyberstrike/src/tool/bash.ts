@@ -180,23 +180,42 @@ export function scannerTargets(command: string[], commandText: string): string[]
     }
   }
   const targetFlags = new Set(["-u", "--url", "-target", "--target", "-host", "--host", "-d", "--domain", "-h"])
-  for (let i = 0; i < command.length; i++) {
-    if (!targetFlags.has(command[i]!.toLowerCase())) continue
-    const value = command[i + 1]
-    if (!value || value.startsWith("-")) continue
-    if (/^https?:\/\//i.test(value)) candidates.add(value)
-    else if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(value)) {
-      candidates.add("https://" + value)
+  const addTargetValue = (rawValue: string, allowDomainList: boolean) => {
+    const value = stripOuterShellQuotes(rawValue).trim()
+    if (!value || value.startsWith("-")) return
+    // Subdomain enumerators commonly accept comma-separated roots and inline
+    // domain flags. Authorize each root separately rather than treating the
+    // entire list as one invalid hostname or blocking the tool unnecessarily.
+    const values = allowDomainList ? value.split(",").map((item) => item.trim()).filter(Boolean) : [value]
+    for (let candidate of values) {
+      if (!candidate) continue
+      if (/^https?:\/\//i.test(candidate)) {
+        candidates.add(candidate)
+        continue
+      }
+      // A wildcard in the saved program scope means enumerate its DNS root;
+      // the runtime still checks that concrete root against the persisted scope.
+      candidate = candidate.replace(/^\*\./, "")
+      if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(candidate)) {
+        candidates.add("https://" + candidate)
+      } else if (/^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(candidate)) {
+        candidates.add("https://" + candidate)
+      }
     }
   }
-  // Nmap-style tools accept hosts as positional arguments.
-  for (const value of command) {
-    const unquoted = stripOuterShellQuotes(value)
-    if (unquoted.startsWith("-") || unquoted.includes("/") || unquoted.includes("=") || unquoted.includes(".txt") || unquoted.includes(".list")) continue
-    if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?$/i.test(unquoted) ||
-        /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(unquoted)) candidates.add("https://" + unquoted)
+  const scannerName = path.basename(stripOuterShellQuotes(command[0] ?? "")).toLowerCase()
+  const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r"].includes(scannerName)
+  for (let i = 0; i < command.length; i++) {
+    const flag = stripOuterShellQuotes(command[i]!).toLowerCase()
+    if (targetFlags.has(flag)) {
+      const value = command[i + 1]
+      if (!value) continue
+      addTargetValue(value, allowDomainList && ["-d", "--domain"].includes(flag))
+      continue
+    }
+    const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h)=(.+)$/)
+    if (inline) addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
   }
-
   // waybackurls consumes hosts on stdin instead of argv. Permit only literal
   // hostnames from its immediately enclosing pipeline; every extracted host
   // still passes the same persisted scope check before the source request starts.
