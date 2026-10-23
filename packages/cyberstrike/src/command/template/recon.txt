@@ -271,77 +271,32 @@ Registered active-request tools must enforce the persisted manifest for every co
 
 ---
 
-# 3. Create the run checkpoint
+# 3. Resume the authoritative checkpoint
 
-After resolving the canonical workspace and determining scope status, generate a unique run identifier.
+Use `recon_checkpoint` as the single phase-state ledger:
 
-Use a stable, collision-resistant identifier supported by the runtime. Record the actual start time and timezone when available.
+1. Call `recon_checkpoint(action="status", target_url="<canonical program-root URL>")`.
+2. Resume the first unresolved phase in the returned order. If it is already `running`, continue its unfinished work without calling `begin` again.
+3. Use the tool's actual returned run/phase IDs and accepted fields. Do not invent a second phase ledger or create a duplicate “Recon checkpoint” through `target_workspace(action="record_summary")`.
+4. Store per-source/item cursors in the relevant source ledger and run/tool metadata in existing artifacts only when needed. These support resumption but do not replace the authoritative phase status.
+5. Record a human-readable target summary only after its contents are verified; never use a summary write as proof that a checkpoint or artifact was persisted.
 
-Create a durable checkpoint through the registered `target_workspace` tool. If the following interface is supported, use:
-
-`target_workspace(action="record_summary", target_url="<root target>", summary_title="Recon checkpoint <run ID>", summary_content="<checkpoint>", summary_kind="manual", summary_status="unverified", summary_source="recon command")`
-
-The initial checkpoint must contain:
-- Run ID and root target.
-- Canonical workspace path.
-- Workspace initialization or reuse status.
-- Authorization source and official policy reference.
-- Scope manifest status and fingerprint, if available.
-- Explicit exclusions and unresolved scope questions.
-- Available tools and unavailable dependencies.
-- Stages planned for this run.
-- Existing progress reused from previous runs.
-- Current frontier and exact next action.
-- Known blockers and relevant retry conditions.
-
-Do not mark the checkpoint verified merely because it was written. Inspect the tool result and verify persistence.
-
-Update the checkpoint as execution progresses. If the tool supports versioning or append-only summaries, preserve the previous evidence rather than silently overwriting meaningful history.
-
-Use `target_note` only after the relevant target host or path has been observed in the current session, respecting the tool's validation requirements.
+The accepted phases, statuses, prerequisites, and actions in the registered `recon_checkpoint` schema are authoritative. Do not create alternate phase names or phase-status enums.
 
 ---
 
-# 4. Prepare the reconnaissance workspace
+# 4. Use the existing canonical workspace
 
-Use the canonical workspace path returned by the workspace tool.
+Use the exact absolute path returned by `target_workspace`. Reuse the initialized directory structure; do not create another target root or add folders just to match this prompt.
 
-Ensure the existing `recon/` directory contains:
+- Write current normalized inventories to the canonical files in §0.2.1.
+- Use existing `runs/` for reusable scripts and run-specific metadata when needed, `logs/` for sanitized execution logs, and `scans/` or the relevant standard area for raw outputs.
+- Use existing `urls/`, `parameters/`, `javascript/`, `endpoints/`, `requests/`, `testing/`, `findings/`, `evidence/`, and `reports/` where registered tools require them. Do not create nested `recon/results`, `recon/scripts`, `recon/checkpoints`, or per-source/per-host folders solely to mirror a workflow checklist.
+- Use `target_artifact` for substantial artifacts when its schema supports the desired content and location. Inspect the schema, write directly to the intended canonical path, and verify the returned path and actual file.
+- Create a helper script only when a reusable capability is missing; keep one script per reusable stage/source family, not one per target, source result, or retry.
+- Do not overwrite the only useful raw evidence or manual notes. Prefer supported atomic updates; keep previous evidence only when it adds audit value.
 
-- `scripts/`
-- `results/`
-- `logs/`
-- `checkpoints/`
-- `README.md`
-- `manifest.json`
-
-Create only missing items inside the canonical workspace. Do not initialize another target root or write output to the current shell directory.
-
-If using Bash, assign the exact returned path to `WORKSPACE`, quote it in every command, verify `test -d "$WORKSPACE"`, create only the required missing directories, and verify the resulting structure.
-
-Use `target_artifact` for substantial outputs whenever its registered interface supports the required artifact type and destination. Inspect the actual schema before use.
-
-Save:
-- `recon/README.md`: purpose, workflow, prerequisites, safe execution instructions, and resume instructions.
-- `recon/manifest.json`: run metadata, stage status, scripts, inputs, outputs, hashes, provenance, and outstanding work.
-
-For each script, document:
-- Purpose and implementation.
-- Verified executable/dependency requirements.
-- Required inputs.
-- Exact command and working directory.
-- Scope preconditions.
-- Dry-run behavior.
-- Request methods and rate limits, if applicable.
-- Expected output paths.
-- Integrity hash when available.
-- Last verification result.
-
-Create scripts only for tools whose availability and actual behavior have been verified.
-
-Scripts must default to passive or dry-run behavior, rely on registered active-request tools to enforce the persisted scope for each outbound URL, use persisted allowlists, enforce applicable rate limits, redact sensitive values, and write only to the canonical workspace. Do not repeat the model-level `scope_check` for every request.
-
-Do not execute active scripts until the scope manifest, candidate authorization, and script preconditions have been checked.
+Before active execution, verify the saved scope and any required phase prerequisite. All outbound requests must pass the registered runtime's persisted-scope enforcement.
 
 ---
 
