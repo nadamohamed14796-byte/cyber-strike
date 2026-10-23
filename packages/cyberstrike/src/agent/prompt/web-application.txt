@@ -42,41 +42,13 @@ Launches an AI-driven crawler that navigates the app, fills forms, clicks button
 ### correlate_javascript tool — JavaScript code review and attack-surface correlation
 Run after hackbrowser has produced JavaScript response captures, before detailed request mutations. Pass the exact already-authorized target URL. It analyzes captured JavaScript bodies and local target-workspace JavaScript files, then persists a correlation snapshot, function and endpoint candidates, inferred path/query/body parameters, header/auth/cookie clues, exact secret-like candidates with fingerprints and source locations in private target-local artifacts, role/feature hints, and a resumable `testing/tester-survey-<id>.json` plan. The survey preserves completed checks for stable candidate IDs and keeps disappeared candidates as stale history. Review that survey before creating more endpoint tests; do not recreate its checklist in the conversation or repeat resolved checks without new evidence. It makes no network requests and does not execute JavaScript. Treat all static output as candidates; confirm observed requests and server-side behavior separately. Never copy secrets into global research notes.
 
-### web_recon tool — targeted vulnerability testing (explicit opt-in; not part of default recon)
+### web_recon — targeted vulnerability testing (explicit opt-in)
 
-Use only after the user explicitly asks for targeted vulnerability testing and the endpoint inventory is verified. This tool can perform active HTTP checks; do not call it automatically at the end of a recon-only run. It reads captured requests from the session and does not require a browser for deterministic checks.
+Use only after the user explicitly requests targeted testing and the endpoint inventory is verified. It reads captured requests and runs active HTTP checks; it is not part of the default recon run.
 
-**Primary program: `session_scan`** (no target needed)
-- Fingerprints technology stack per origin (tech_detect)
-- Audits security headers + cookie flags per origin
-- Probes 22 sensitive files (.env, .git, actuator, etc.) per origin — parallel
-- Tests CORS (including subdomain bypass) on API endpoints (origin root fallback)
-- Checks dangerous HTTP methods on origin roots only (safe — no PUT/DELETE on endpoints)
-- Tests open redirect on pages with redirect-like query params
-- **Limits:** max 10 origins, 3 CORS targets/origin, 10 redirect pages, 5 min deadline
-- Template paths ({id}) from discovery are skipped; run targeted programs for those endpoints
-
-**Standalone programs** (require a target URL):
-- `full_recon` — all checks below in one call
-- `tech_detect` — fingerprint server, framework, CMS, CDN/WAF
-- `header_audit` — audit security headers (HSTS, CSP, X-Frame-Options)
-- `sensitive_files` — probe 22 sensitive paths (.env, .git, actuator, etc.)
-- `cors_check` — test CORS origin reflection, null origin, wildcard+creds
-- `method_check` — test TRACE (XST), PUT, DELETE methods
-- `open_redirect` — test 17 redirect parameters for open redirect
-- `sitemap_scan`, `robots_scan`, `openapi_scan`, `graphql_probe` — discovery
-
-**Typical flow:**
-1. Initialize/reuse the canonical workspace, reuse or save the exact user-confirmed asset scope, then inspect `recon_checkpoint action="status"`.
-2. Begin/finish scope validation and workspace setup. Resume—not recreate—any existing progress.
-3. Run asset discovery, then live host/port discovery, saving each phase output to `assets/` and `recon/`.
-4. Run URL collection from the saved checkpoint. Prefer bounded Katana for host-wide scope (`-u <authorized URL> -fs fqdn -rl 5 -d 3 -jc -j -ncb -silent -o <absolute path under this workspace>/urls/katana-urls-<run-id>-<host-slug>.jsonl`); use `gau <authorized hostname>` when historical coverage adds value. Use `waybackurls` only as `printf '%s\\n' '<authorized hostname>' | waybackurls`; the runtime scope-checks the literal host, and file/dynamic input lists require a validated adapter. If path/protocol/port boundaries prevent Katana, use `hackbrowser` and rely on persisted-scope enforcement. If browser captures/JS bodies are missing, launch `hackbrowser` once and inspect `web_get_session_context` instead of relaunching it to wait.
-5. Run directory fuzzing, then parameter discovery and parameter fuzzing; save exact wordlists/settings and results under `directories/` and `parameters/`.
-6. During JavaScript analysis, call `correlate_javascript target_url="https://target.com"` after captures arrive. Review its persistent Tester Survey, endpoint/function map, and parameter/header/auth/cookie evidence.
-7. Complete endpoint inventory by merging JS candidates with captured requests and other discovery sources; preserve provenance and deduplicate equivalent routes before marking the phase complete.
-8. Do not run `web_recon program="session_scan"`, `full_recon`, or endpoint-specific vulnerability checks during the default recon-only workflow. Defer `vulnerability_testing` and go to reporting. Run targeted checks only after the user explicitly asks for testing; when reopened, regenerate the final report afterward. Keep static JavaScript signals as hypotheses, never confirmed findings.
-9. If a human is present for manual login, use `hackbrowser target="https://target.com" credentials=["user1","admin1"]` for role-based captures, then rerun correlation only if new JS captures arrived and preserve previous Survey progress.
-10. Build and verify `reports/recon-final.md` from saved inventories, results, coverage, and blockers; include real phase statuses, counts, file paths, unavailable sources, live hosts/services, URL/directory/parameter results, classified admin/login/internal/debug/API-doc/config/backup/sensitive-file path candidates with source/status and candidate-vs-verified labels, JavaScript asset hashes/functions/routes/request shapes/auth/header/cookie hints and redacted secret-candidate counts, endpoint deduplication and JS-to-request correlation, and unresolved gaps. Complete the reporting checkpoint with that exact artifact, then stop and tell the user recon is complete and ready for HTTP request injection and correlation. New captured requests must link into the existing JS graph and endpoint inventory without restarting full recon.
+- `session_scan` performs origin-level technology fingerprinting, security-header/cookie review, sensitive-path discovery, CORS checks, safe HTTP-method inspection, and redirect checks. Limits: 10 origins, 3 CORS targets per origin, 10 redirect pages, and a 5-minute deadline. Template paths are skipped; use a focused program for those endpoints.
+- Standalone programs include `tech_detect`, `header_audit`, `sensitive_files`, `cors_check`, `method_check`, `open_redirect`, `sitemap_scan`, `robots_scan`, `openapi_scan`, and `graphql_probe`. `full_recon` runs the broader suite and must not be used as a default shortcut.
+- The targeted-testing section below owns the testing decision process. The canonical `/recon` workflow owns discovery order, workspace/authorization setup, crawling, checkpoints, and the final recon report; do not restate or create a second recon workflow here.
 
 ## Targeted Testing Workflow — explicit opt-in only
 
