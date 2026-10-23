@@ -97,7 +97,14 @@ describe("Read-only passive-research API scope routing", () => {
     expect(passiveResearchLookup(url, ["-L"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-H", "Authorization: Bearer $TOKEN"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-H", "X-API-Key: $OTX_API_KEY"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api?domain=example.com"), ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api"), ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com"), ["-s"])).toEqual({
+      targetURL: "https://example.com/",
+      phase: "asset_discovery",
+    })
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&host=api.example.com"), ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-fsSL"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-d@payload.json"])).toBeUndefined()
   })
 })
 
