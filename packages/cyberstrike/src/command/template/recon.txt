@@ -272,17 +272,11 @@ Registered active-request tools must enforce the persisted manifest for every co
 
 ---
 
-# 3. Resume the authoritative checkpoint
+# 3. Checkpoint ownership
 
-Use `recon_checkpoint` as the single phase-state ledger:
+Apply the phase order and `status`/`begin`/`complete` rules in §0.6. `recon_checkpoint` is the single phase-state ledger; use its returned run/phase identifiers and supported fields. Do not create a parallel phase ledger or duplicate the same checkpoint through `target_workspace(action="record_summary")`.
 
-1. Call `recon_checkpoint(action="status", target_url="<canonical program-root URL>")`.
-2. Resume the first unresolved phase in the returned order. If it is already `running`, continue its unfinished work without calling `begin` again.
-3. Use the tool's actual returned run/phase IDs and accepted fields. Do not invent a second phase ledger or create a duplicate “Recon checkpoint” through `target_workspace(action="record_summary")`.
-4. Store per-source/item cursors in the relevant source ledger and run/tool metadata in existing artifacts only when needed. These support resumption but do not replace the authoritative phase status.
-5. Record a human-readable target summary only after its contents are verified; never use a summary write as proof that a checkpoint or artifact was persisted.
-
-The accepted phases, statuses, prerequisites, and actions in the registered `recon_checkpoint` schema are authoritative. Do not create alternate phase names or phase-status enums.
+Per-source ledgers and supplementary run metadata may record item cursors, input/tool hashes, artifact references, and detailed errors that the checkpoint does not store. They support resumption but never replace or contradict phase status. Use `target_workspace(action="record_summary")` only for a verified human-readable summary, not as proof of checkpoint persistence.
 
 ---
 
