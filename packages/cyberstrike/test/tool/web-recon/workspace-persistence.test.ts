@@ -50,10 +50,17 @@ test("web_recon persists results and synchronizes target notes in the canonical 
           phase: "scope_validation" | "workspace_setup" | "asset_discovery" | "live_hosts_ports" | "url_collection",
           summary?: string,
           reason?: string,
-        ) => checkpointTool.execute({ action, target_url: target, phase, summary, reason }, checkpointContext)
+          scopeValidationTarget?: string,
+        ) => checkpointTool.execute({ action, target_url: target, phase, summary, reason, scope_validation_target: scopeValidationTarget }, checkpointContext)
         for (const phase of ["scope_validation", "workspace_setup"] as const) {
           expect((await checkpoint("begin", phase)).metadata.saved).toBe(true)
-          expect((await checkpoint("complete", phase, phase + " verified for local fixture")).metadata.saved).toBe(true)
+          expect((await checkpoint(
+            "complete",
+            phase,
+            phase + " verified for local fixture",
+            undefined,
+            phase === "scope_validation" ? target : undefined,
+          )).metadata.saved).toBe(true)
         }
         for (const phase of ["asset_discovery", "live_hosts_ports"] as const) {
           expect((await checkpoint("begin", phase)).metadata.saved).toBe(true)
