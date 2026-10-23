@@ -1,6 +1,6 @@
 # CyberStrike Tool Catalog
 
-The single canonical reference for agent-executable tools, local helpers, APIs, datasets, installation/preflight, and phase routing. Skills define **how to test**; this file defines **which tool to choose and how to invoke/check it**. Do not create a second tool/source inventory. Add a tool here once, then link to this catalog from skills.
+The single canonical reference for agent-executable tools, local helpers, APIs, datasets, and installation/preflight. Skills define **how to test**; this file records non-exhaustive capability examples and how to verify/invoke candidates. It is not a phase-to-tool allowlist. Do not create a second tool/source inventory. Add a tool here once, then link to this catalog from skills.
 
 This is a candidate catalog, not proof that a binary is installed, maintained, compatible, enabled, or authorized. Prefer native registered CyberStrike tools and existing helpers when they cover the need. Browser UI, browser extensions, and interactive proxy GUIs are not agent-executable CLI dependencies.
 
@@ -14,8 +14,8 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 ## Selection rules
 
-1. Identify the phase and exact evidence gap before selecting a tool.
-2. Check native CyberStrike registered tools and existing helpers first; extend a helper instead of adding a duplicate.
+1. Identify the active checkpoint's objective and the exact evidence gap; the checkpoint does not assign a fixed tool to that objective.
+2. Search the available registered tools and existing helpers, then consider suitable reachable APIs and installed CLIs. Do not exclude a candidate because its nominal category differs from the active checkpoint; extend an existing helper instead of adding a duplicate.
 3. Preflight external CLIs with `command -v TOOL` and the documented version/help flag. Use tool_preflight.py only after resolving its real path from the installed skill/catalog root, and invoke it by absolute path; do not assume `.cyberstrike/skill/scripts/` exists relative to the target workspace. If the helper is unavailable, use direct local checks—do not copy the helper or fail a phase solely because its path is unavailable. Reuse successful checks only while the same runtime/binary version remains.
 4. Prefer official docs/releases; review maintenance, license, platform/dependencies, package provenance, permissions, network behavior, flags, output format, and rate behavior before install/use.
 5. Select the smallest useful set by default; add independent alternatives when they close a real coverage gap, corroborate evidence, or recover a failed source. Do not run equivalent collectors in parallel or use a fixed arbitrary tool count.
@@ -25,9 +25,11 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 9. Installation is not authorization. Apply program scope, rate limits, privacy, non-destructive defaults, and explicit permission for state-changing tests. Never send secrets or production customer data to third-party services.
 10. Public passive-research APIs queried through `curl` must use `curl -q -sS` (where `-q` is the first option to disable user config) with a read-only GET/HEAD route and one clear domain in a conventional lookup query. Do not add a request body, credentials/cookies/API keys in headers or query parameters, redirects, proxy/routing overrides, or TLS overrides. Do not use `wget` for this scope-aware routing because it follows redirects by default. The runtime checks the queried domain against persisted target scope rather than treating the external research provider as the target. An unlisted provider can be used when it follows this contract; if its API requires credentials or a nonstandard request shape, use a suitable registered capability or add a narrowly tested route rather than bypassing the gate.
 
-## Phase-to-tool matrix
+## Capability examples (non-exhaustive; not a phase-to-tool allowlist)
 
-| Phase / task | Primary method | Alternatives / supporting tools | Required output / notes |
+The connected/registered tools remain discoverable at every active checkpoint through `tool_search` and `load_tools`; the checkpoint governs workflow state, prerequisites, and artifact validation—not which ordinary tool IDs the agent may consider. Choose tools dynamically from the actual runtime, the current evidence gap, tool capability, existing artifacts, rate/impact constraints, and persisted scope. The rows below group illustrative candidates by capability for convenience only; they are not mandatory assignments, required binaries, or an execution checklist. A tool does not become unavailable because its example row differs from the active checkpoint. The vulnerability-testing gate remains explicit and cannot be bypassed by choosing another tool.
+
+| Evidence gap / capability | Example candidates (optional, unranked) | Other examples / supporting methods | Output / evidence contract |
 |---|---|---|---|
 | Passive subdomain collection | Choose reachable reputable public APIs/indexes, registered native tools, or installed CLIs based on the evidence gap. crt.sh, OTX passive DNS, subfinder, and Amass are examples, not a fixed allowlist. | CertSpotter, assetfinder, Findomain, Sublist3r, first-party links, and other independent sources only when they add distinct coverage | Write the canonical `subdomains.txt` and `subdomain-sources.json` using the schema below; preserve per-root/source status, timestamps, errors, counts, and provenance. |
 | DNS validation / wildcard handling | dnsx, dig/drill; existing `host_inventory.py` for normalization | puredns/shuffledns only when active discovery is permitted | DNS records, CNAME chain, TTL, resolver status, wildcard controls, source attribution |
