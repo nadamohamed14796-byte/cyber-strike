@@ -242,6 +242,10 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory(prefix="cyberstrike-source-test-") as tmpdir:
         bin_dir = Path(tmpdir) / "bin"
         bin_dir.mkdir()
+        empty_bin_dir = Path(tmpdir) / "empty-bin"
+        empty_bin_dir.mkdir()
+        os.environ["PATH"] = str(empty_bin_dir)
+        assert default_source_selection() == ["crt.sh", "otx_passive_dns"]
         calls_path = Path(tmpdir) / "source-calls.txt"
         os.environ["CYBERSTRIKE_TEST_CALLS"] = str(calls_path)
         stub = [
@@ -261,6 +265,7 @@ def self_test() -> int:
             executable.write_text("\n".join(stub) + "\n", encoding="utf-8")
             executable.chmod(0o755)
         os.environ["PATH"] = str(bin_dir) + os.pathsep + original_path
+        assert default_source_selection() == ["crt.sh", "otx_passive_dns", "subfinder"]
         try:
             for source in CLI_SOURCES:
                 result = run_source(source, "example.com", 5)
@@ -384,7 +389,7 @@ def self_test() -> int:
                 os.environ.pop("CYBERSTRIKE_TEST_EMPTY", None)
             else:
                 os.environ["CYBERSTRIKE_TEST_EMPTY"] = original_empty
-    print("passive_subdomain_sources self-test: PASS (normalization, 3 HTTP APIs, 5 CLI adapters, atomic outputs, resume, and retry)")
+    print("passive_subdomain_sources self-test: PASS (normalization, adaptive source selection, 3 HTTP APIs, 5 CLI adapters, atomic outputs, resume, and retry)")
     return 0
 
 def atomic_write_text(destination: Path, content: str) -> None:
