@@ -242,6 +242,7 @@ Do not rerun every stage from the beginning merely because a new command invocat
 ## 2.1 Review the authoritative policy
 
 For a full program or policy change, prefer the official policy. Record program identity, included assets, explicit exclusions, permitted activities, account requirements, rate limits, retrieval time, and a source fingerprint/hash when available. Never fabricate a policy URL or infer authorization from DNS, certificates, redirects, shared IPs, or a parent domain.
+If an existing workspace is present and the user has not made clear whether a new full list replaces the saved scope or is additive, leave the manifest unchanged and ask one concise question before importing.
 
 The canonical workspace root is a policy/evidence container, not necessarily a target. It may be out of scope while other explicitly listed assets are authorized. Keep distinct programs in separate workspaces; keep all domains in one user-supplied program scope together in the same workspace.
 
