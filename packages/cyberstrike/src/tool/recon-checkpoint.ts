@@ -77,7 +77,8 @@ export function validateAssetDiscoveryLedger(
         ". Repair the existing JSON using .cyberstrike/skill/TOOLING_CATALOG.md; do not guess a new schema or rerun successful collectors.",
     }
   }
-  const roots = ledger.roots
+  const roots = ledger.roots as unknown[]
+  const sources = ledger.sources as unknown[]
   if (!roots.length || roots.some((root) => typeof root !== "string" || !root.trim()) || new Set(roots).size !== roots.length) {
     return { valid: false, reason: "The source ledger must contain a non-empty, duplicate-free root list." }
   }
@@ -86,7 +87,7 @@ export function validateAssetDiscoveryLedger(
   const pairs = new Map<string, Record<string, unknown>>()
   let gaps = 0
 
-  for (const rawRecord of ledger.sources) {
+  for (const rawRecord of sources) {
     if (!rawRecord || typeof rawRecord !== "object" || Array.isArray(rawRecord)) {
       return { valid: false, reason: "The source ledger contains a malformed root/source record." }
     }
@@ -109,7 +110,7 @@ export function validateAssetDiscoveryLedger(
           (typeof record.started_at === "string" && !record.finished_at ? " after an interrupted/in-progress attempt" : "") +
           ". Resume this saved ledger before completing asset_discovery.",
         roots: roots.length,
-        sourcePairs: ledger.sources.length,
+        sourcePairs: sources.length,
       }
     }
     if (typeof status !== "string" || !DISCOVERY_TERMINAL_STATUSES.has(status)) {
@@ -185,7 +186,7 @@ export function validateAssetDiscoveryLedger(
     return { valid: false, reason: "The normalized host inventory contains duplicates or its saved unique-host count does not reconcile." }
   }
 
-  const sourceRows = ledger.sources as Array<Record<string, unknown>>
+  const sourceRows = sources as Array<Record<string, unknown>>
   const expectedCounts: Record<string, number> = {
     sources_attempted: sourceRows.filter((item) => Number.isInteger(item.attempt_count) && Number(item.attempt_count) > 0).length,
     sources_pending: sourceRows.filter((item) => item.status === "pending").length,
