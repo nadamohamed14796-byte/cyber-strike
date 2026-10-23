@@ -108,6 +108,28 @@ export function validateAssetDiscoveryLedger(
     if (status !== "skipped" && (!Number.isInteger(record.attempt_count) || Number(record.attempt_count) < 1)) {
       return { valid: false, reason: "The source ledger has no recorded attempt for root " + root + " / source " + source + "." }
     }
+    const metricNames = ["raw_records", "valid_observations", "unique_hosts", "duplicate_observations", "rejected_records"]
+    for (const name of metricNames) {
+      const value = record[name]
+      if (!Number.isSafeInteger(value) || Number(value) < 0) {
+        return { valid: false, reason: "The source ledger has an invalid " + name + " count for root " + root + " / source " + source + "." }
+      }
+    }
+    const rawRecords = Number(record.raw_records)
+    const validObservations = Number(record.valid_observations)
+    const uniqueSourceHosts = Number(record.unique_hosts)
+    const duplicateObservations = Number(record.duplicate_observations)
+    const rejectedRecords = Number(record.rejected_records)
+    if (rawRecords !== validObservations + rejectedRecords) {
+      return { valid: false, reason: "The source ledger counts do not reconcile for root " + root + " / source " + source + ": raw_records must equal valid_observations + rejected_records." }
+    }
+    if (validObservations !== uniqueSourceHosts + duplicateObservations) {
+      return { valid: false, reason: "The source ledger counts do not reconcile for root " + root + " / source " + source + ": valid_observations must equal unique_hosts + duplicate_observations." }
+    }
+    if (!Array.isArray(record.hosts) || record.hosts.some((host) => typeof host !== "string") ||
+        new Set(record.hosts).size !== record.hosts.length || record.hosts.length !== uniqueSourceHosts) {
+      return { valid: false, reason: "The source host list does not match its unique_hosts count for root " + root + " / source " + source + "." }
+    }
     const intentionallyNotSelected = status === "skipped" && record.skipped_by_selection === true
     if (["failed", "unavailable", "blocked"].includes(status) || (status === "skipped" && !intentionallyNotSelected)) {
       gaps++
