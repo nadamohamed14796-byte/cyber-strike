@@ -228,7 +228,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
   const lines = [
     ...(isReconPhase ? [
       "## Canonical Recon Workflow",
-      "Follow the ordered phases and checkpoint rules in methodology/recon.ts. Read .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md once per run. Discover registered native tools separately from CLI candidates; preflight a CLI only once per runtime/version change. Choose a primary method and use alternatives only when they add coverage or recover a failure.",
+      "Follow methodology/recon.ts and the registered recon_checkpoint for phase order and state. Read .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md for phase artifacts/completion only; use .cyberstrike/skill/TOOLING_CATALOG.md as the sole tool/API/CLI/helper catalog and asset-discovery ledger schema. Discover native tool schemas separately from CLI candidates; preflight a CLI once per runtime/version change. Use alternatives only for distinct coverage or recovery.",
       "Persist useful raw and normalized artifacts with provenance, counts, and errors. Distinguish zero results from failed/unavailable/blocked sources, and complete a phase only after its artifacts are verified. Reuse completed outputs; do not repeat equivalent work without new evidence or a changed failure cause.",
       "",
     ] : []),
