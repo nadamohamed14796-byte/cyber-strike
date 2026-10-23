@@ -225,7 +225,7 @@ test("community tool selection skill is discovered, searchable, retrievable, and
         const skill = await Skill.get("community-tool-selection")
         expect(skill).toBeDefined()
         expect(skill?.name).toBe("community-tool-selection")
-        expect(skill?.content).toContain("COMMUNITY_TOOL_MAP.md")
+        expect(skill?.content).toContain("TOOLING_CATALOG.md")
         expect(skill?.content).toContain("tool_preflight.py")
 
         const indexed = SkillIndex.search("community-tool-selection", Infinity)
@@ -236,10 +236,10 @@ test("community tool selection skill is discovered, searchable, retrievable, and
         expect(loaded).toContain("## Procedure")
         expect(SkillContext.isLoaded("community-tool-selection")).toBe(true)
 
-        const mapPath = path.join(repoRoot, ".cyberstrike", "skill", "COMMUNITY_TOOL_MAP.md")
+        const mapPath = path.join(repoRoot, ".cyberstrike", "skill", "TOOLING_CATALOG.md")
         const map = await fs.readFile(mapPath, "utf8")
         expect(map).toContain("Amass")
-        expect(map).toContain("Autorize")
+        expect(map).toContain("subfinder")
         expect(map).toContain("tool_preflight.py")
       },
     })
