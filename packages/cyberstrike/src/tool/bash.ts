@@ -519,7 +519,7 @@ export function passiveResearchLookup(
   const method = methodIndex >= 0
     ? args[methodIndex + 1]
     : inlineMethod?.replace(/^(?:--request|--method)=/i, "").replace(/^-X/i, "")
-  const effectiveMethod = (inlineMethod ?? method)?.toUpperCase()
+  const effectiveMethod = method?.toUpperCase()
   if (effectiveMethod && !["GET", "HEAD"].includes(effectiveMethod)) return undefined
 
   const longBodyAuthOrRouteFlags = new Set([
@@ -534,7 +534,7 @@ export function passiveResearchLookup(
   if (args.some((item) => {
     const lower = item.toLowerCase()
     return ["-d", "-F", "-u", "-b", "-L", "-K", "-k"].includes(item) ||
-      /^-[^-]*[dFubLK]/.test(item) ||
+      /^-[^-]*[dFubLKk]/.test(item) ||
       [...longBodyAuthOrRouteFlags].some((flag) => lower === flag || lower.startsWith(flag + "="))
   })) return undefined
 
