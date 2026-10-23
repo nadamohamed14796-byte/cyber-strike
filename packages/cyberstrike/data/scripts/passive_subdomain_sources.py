@@ -594,7 +594,8 @@ def main() -> int:
         # adapters actually run. An unselected adapter is recorded as not selected.
         for source in known_sources:
             key = (root, source)
-            if key not in indexed:
+            item = indexed.get(key)
+            if item is None:
                 item = {
                     "root": root,
                     "source": source,
@@ -612,7 +613,6 @@ def main() -> int:
                 document["sources"].append(item)
                 indexed[key] = item
             elif source in retry_sources:
-                item = indexed[key]
                 item.update({
                     "status": "pending",
                     "started_at": None,
@@ -627,9 +627,8 @@ def main() -> int:
                 })
                 item.pop("skipped_by_selection", None)
             elif source in selected_sources and item.get("skipped_by_selection") is True:
-                # A source intentionally skipped in an earlier run becomes eligible
-                # automatically if later selected; successful/failed attempts remain
-                # terminal until an explicit --retry-source is supplied.
+                # Re-select only an explicitly skipped source; completed and failed
+                # attempts remain terminal unless --retry-source is supplied.
                 item.update({
                     "status": "pending",
                     "started_at": None,
