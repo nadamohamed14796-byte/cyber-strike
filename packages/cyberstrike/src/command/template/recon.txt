@@ -47,6 +47,25 @@ For every unfinished batch, persist:
 - Failed, deferred, and unprocessed items.
 - The reason each item remains unfinished.
 - The exact next operation required to resume.
+ 
+### 0.2.1 One canonical inventory per data type
+
+Keep current, user-facing inventories as a small set of canonical files directly in the target workspace root. Do not create numbered/chunk files, nested folders solely for presentation, per-host workspaces, one result file per tool, or duplicate copies of the same normalized data. Use existing workspace subdirectories only where a registered tool requires them for raw evidence, requests, logs, or internal artifacts; merge the normalized result into the canonical inventory below.
+
+- `scope.txt` — complete confirmed scope and exclusions.
+- `subdomains.txt` — deduplicated candidate hostnames.
+- `subdomain-sources.json` — durable per-root/source state, attempt history, counts, errors, provenance, and host observations.
+- `live-hosts.txt` — validated live hosts, not only HTTP 200 responses.
+- `ports.txt` — observed ports/services, only where authorized and actually checked.
+- `urls.txt` — deduplicated collected URLs, retaining meaningful variants as attributes.
+- `parameters.txt` — observed parameter names linked to endpoint, method, location, and source.
+- `endpoints.txt` — one record per normalized origin + method + path template; merge parameter and source evidence.
+- `javascript-analysis.md` — actionable routes, request shapes, parameter/header/auth clues, and source references.
+- `findings.md` — evidence-backed findings or an explicit empty status.
+- `reports/recon-final.md` — the final run report with truthful phase states, counts, sources, artifact paths, gaps, and the exact resume point when incomplete.
+
+Reuse and update these files instead of creating alternative names for the same inventory. A phase is not complete until its canonical artifacts match the saved ledger. Keep raw observations only when they add provenance, debugging, or audit value; never overwrite the only useful evidence copy.
+
 
 ### 0.3 Tool integrity
 
@@ -145,21 +164,19 @@ The reporting phase must persist `reports/recon-final.md` and include that verif
 
 # 1. Resolve the target identity
 
-## 1.1 Parse the request
+## 1.1 Parse the complete input
 
-Extract the target identifier from `$ARGUMENTS` and the current conversation.
+Treat `$ARGUMENTS` and the current user message as real input to process, not as a request for instructions.
 
-Recognize, where supported:
-- An exact root domain or URL.
-- An explicitly identified bug bounty program.
-- An authorized application or API root.
-- A continuation request referring to an existing target workspace.
+Accept an exact domain, wildcard, URL, multi-line list, Markdown bullets, copied HackerOne/Bugcrowd scope tables, CSV/TSV, JSON-like lists, or a continuation referring to an existing target. Parse the content using the registered scope/file tools; do not ask the user to reformat valid input or manually copy a long list into separate arguments.
 
-Resolve the intended program or target without silently substituting a different host.
+Preserve all original rows, exclusions, eligibility fields, asset types, and provenance. Keep unsupported or invalid entries visible with a reason rather than silently dropping them. Verify the imported manifest and usable-entry counts before claiming success. Input is not automatic authorization: apply the authorization procedure in §2 and enforce the saved scope on each concrete request.
 
-If no usable target identifier can be determined, ask one concise question and stop before initializing a workspace or starting discovery.
+When the user supplies a complete multi-domain scope for one bounty program, keep the entire set in one canonical program workspace even if its domains are unrelated. On a new workspace, treat that supplied list as the initial full scope. On an existing workspace, replace it only when the user explicitly says it is a replacement; otherwise add entries only when they explicitly identify them as additional. Choose the workspace root from the named program URL or the first usable web asset. Do not combine distinct programs or silently substitute another host.
 
-If several targets are mentioned and their relationship is unclear, ask which target should be the root. Do not arbitrarily merge unrelated programs.
+If no usable target or scope set can be identified, ask one concise question and stop before workspace creation or discovery. If several targets are mentioned without a clear relationship and the input is not identified as one program scope, ask which should be the root.
+
+After parsing, initialize or reuse the canonical workspace, save and verify the full scope and provenance, then immediately resume at the first unfinished phase. Do not stop after explaining scope or creating a workspace, and do not repeat setup checks for unchanged scope.
 
 ## 1.2 Resolve the canonical workspace
 
@@ -175,7 +192,7 @@ If the target has no existing workspace, initialize it:
 
 If a workspace already represents the same target, reuse it.
 
-Normalize target identity consistently, accounting for equivalent URL spellings, trailing slashes, default ports, hostname case, and other identity differences supported by the workspace implementation. Do not collapse genuinely distinct applications or programs into one workspace.
+Normalize target identity consistently, accounting for equivalent URL spellings, trailing slashes, default ports, hostname case, and other identity differences supported by the workspace implementation. Keep distinct programs in separate workspaces, but keep every domain in a user-supplied complete scope for one program in that program's single workspace.
 
 The canonical workspace returned by the tool is authoritative. Never invent a path or substitute the shell's current directory.
 
@@ -449,35 +466,13 @@ Save inventories in the canonical workspace. Do not create child workspaces for 
 
 **Completion condition:** Every source selected for the run has a persisted terminal outcome for every in-scope root. Alternatives excluded by the adaptive selection must be recorded as skipped-by-selection with a reason, not left pending; count them separately from attempted sources. A run is not exhaustive just because its selected work is complete—report actual source coverage and unresolved gaps.
 
-## Stage B — Candidate normalization and asset hierarchy
+## Stage B — Candidate normalization and flat inventory
 
-Build a canonical candidate inventory.
+Normalize all discovered candidates into the root-level canonical inventories. Preserve the original value, normalized identity, source, timestamp when available, validation state, scope decision, and reason for rejection/exclusion. Deduplicate observations without losing source attribution, parameter variants, or relationships among assets.
 
-Use stable identifiers and documented normalization rules for:
-- Hostnames.
-- URLs and paths.
-- Ports and services.
-- JavaScript assets.
-- Endpoints and parameter sets.
-- Repository references.
-- DNS and certificate observations.
+Use one workspace for the supplied program scope. Do not create a child workspace for every hostname, URL, API, or subdomain, and do not make a new script or output file just because another tool or source was used. Keep the host/origin as a field in the record. When a tool requires internal output paths, reuse existing workspace folders and merge its verified output into the canonical files in §0.2.1.
 
-Retain provenance when multiple sources discover the same asset.
-
-For each candidate, record its authorization state and reason.
-
-Before an active operation:
-1. Normalize the candidate and identify its canonical origin/workspace.
-2. Reuse the single saved setup decision for the canonical root/workspace; do not perform a separate agent-level check for each candidate origin. If no setup decision exists for this run, perform the one required check for the canonical root.
-3. Verify the decision is authorized and the proposed operation is permitted by policy.
-4. Confirm the active tool will enforce persisted scope for the exact request.
-5. Record the decision and operation before execution.
-
-Use one canonical root workspace for the entire recon run. Every discovered hostname, live host, URL, endpoint, and technology observation belongs in the root inventory files; do not create a child workspace per hostname, per URL, or per browser-captured origin. Do not call `attach_asset` or `registerObservedAsset` during ordinary discovery or request capture.
-
-A child workspace is an explicit exception only when the operator asks for independent investigation storage for a particular asset. A wildcard match or a successful scope check alone is not a reason to create one.
-
-**Completion condition:** Every candidate has a recorded disposition in the root inventory, with source/provenance and authorization status where relevant.
+Do not discard an asset merely because the preferred method cannot process its type. Use a suitable available registered tool or record the precise limitation. Preserve input rows and report parsed, eligible, excluded, unsupported, invalid, and duplicate counts when applicable.
 
 ## Stage C — DNS, HTTP, service, and technology reconnaissance
 
@@ -529,7 +524,7 @@ Do not convert a failure into a negative security conclusion.
 
 Combine URLs from passive sources, authorized application navigation, existing captures, public documentation, and other verified sources.
 
-For live URL crawling, prefer Katana when the preflight confirms the binary is installed and every applicable saved scope layer grants host-wide access without path/protocol/port restrictions. Run one Katana command per already-authorized host with exactly one `-u` input: `katana -u <authorized URL> -fs fqdn -rl 5 -d 3 -jc -j -ncb -silent -o <absolute path under the canonical workspace>/urls/katana-urls-<run-id>-<host-slug>.jsonl`; use a unique output path for every run. The runtime gate checks each target and inherited scope layers. Never use `-ns`, `-do`, custom `-cs`, or file/list input to get around scope. If the saved manifest has URL/path/port boundaries or the gate refuses the crawl, use `hackbrowser` rather than weakening authorization. Katana's FQDN mode is host-specific; do not treat it as permission to crawl sibling hosts. Use `gau <authorized hostname>` for complementary historical URLs when useful. Use `waybackurls` only as `printf '%s\\n' '<authorized hostname>' | waybackurls`; the runtime extracts the literal input host and checks it against saved scope. Do not pipe files or dynamic target lists through generic shell without a validated input adapter. Reuse a saved source output when its target inputs and tool version are unchanged; rerun it only for new inputs, a version/configuration change, or a documented artifact failure.
+For live URL crawling, choose the best available registered crawler/API for the saved scope and current runtime. Use Katana, hackbrowser, another registered crawler, or a suitable public historical-URL source according to actual coverage, path/protocol/port constraints, and verified availability; this is not a prompt-level allowlist. Process every eligible authorized host, record per-input/source status, and save useful raw output plus one deduplicated `urls.txt`. The runtime/request-level scope enforcement is authoritative; never weaken or bypass it, never broaden saved scope to make a tool work, and never send a multi-host list through a command that expects one URL. Use alternatives only when they add distinct coverage or recover from a real failure. Reuse successful outputs when inputs and tool versions are unchanged; rerun only for new inputs, a version/configuration change, or a documented artifact failure.
 
 Normalize URLs while preserving meaningful distinctions.
 
