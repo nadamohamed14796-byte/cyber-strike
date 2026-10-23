@@ -21,12 +21,9 @@ prerequisites:
 
 Use this skill when a task may benefit from an external CLI utility, local library, wordlist/dataset, scanner, or helper script. It makes community-listed tools discoverable without pretending that a catalog entry is installed or registered as a native CyberStrike tool.
 
-## Canonical references
+## Canonical reference
 
-- `COMMUNITY_TOOL_MAP.md`: grouped community tool candidates and canonical skill search terms.
-- `CLI_TOOLING_CATALOG.md`: installation, availability checks, representative commands, and CLI handling.
-- `TOOLING_CATALOG.md`: phase-to-tool mapping and existing CyberStrike helper scripts.
-- Upstream index: https://github.com/vavkamil/awesome-bugbounty-tools
+- `TOOLING_CATALOG.md`: the single source of truth for phase routing, tool candidates, official links, preflight/install guidance, and reusable helpers. Do not maintain separate tool/source inventories.
 
 ## Procedure
 
@@ -53,7 +50,7 @@ Use this skill when a task may benefit from an external CLI utility, local libra
 - Cloud storage/IAM, CMS, containers, CI workflows, mobile, identity/platform testing: load the relevant platform-specific assessment skill.
 - Evidence manifests and reports: use evidence-hygiene, triage-validation, and report-writing skills plus the local evidence validators.
 
-The full map is a candidate index. Use skill-specific procedures and the current program policy to determine whether any tool should run.
+The catalog is a candidate index. Use skill-specific procedures and current program policy to determine whether any tool should run.
 
 ## Existing local helpers
 
