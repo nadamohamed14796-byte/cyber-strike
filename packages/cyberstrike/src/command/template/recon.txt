@@ -508,145 +508,67 @@ If the registered false-positive or findings mechanisms exist, use them only whe
 
 ---
 
-# 6. Artifact persistence and integrity
+# 6. Persist evidence once, with provenance
 
-Persist meaningful results continuously rather than waiting until the end of the run.
+Persist useful results as soon as they are produced. Use the canonical inventories in §0.2.1 as the current normalized source of truth; do not keep a second “current” inventory in another directory. Store raw outputs only when they add provenance, troubleshooting, or reproducibility value.
 
-Use stable filenames for current inventories and run-specific filenames for historical outputs.
+For each significant artifact, retain the fields that actually apply:
+- Canonical path and artifact type.
+- Related phase/run and input/source.
+- Tool/version and retrieval time.
+- Hash/fingerprint when actually calculated.
+- Normalization/deduplication method and verified counts.
+- Known omissions, failures, or limitations.
 
-Recommended logical organization:
+Use the exact path returned by the artifact tool. Do not claim a hash or persistence result that was not returned or independently verified. Preserve the only useful raw evidence and manual notes; update canonical outputs through supported atomic/replacement operations where possible. Keep target-specific facts separate from global methodology and public research.
 
-- `recon/results/`: normalized inventories and stage results.
-- `recon/logs/`: sanitized operation logs and error records.
-- `recon/checkpoints/`: resumable stage and batch checkpoints.
-- `recon/scripts/`: verified scripts and their supporting files.
-- `recon/manifest.json`: artifact index, hashes, provenance, and run state.
-- `notes.md`: concise, evidence-backed target observations.
-- `runs/`: run-level metadata and summaries.
-- `evidence/`: relevant captured evidence, subject to available storage tools.
-
-Use the registered `target_artifact` tool where supported. Inspect its schema and confirm the destination, content type, and returned artifact path.
-
-For each persisted artifact, record:
-- Exact canonical path.
-- Artifact type and associated stage.
-- Run and batch IDs.
-- Source and retrieval time.
-- Creation or update time.
-- Content fingerprint or cryptographic hash, when available.
-- Deduplication method.
-- Persistence verification status.
-- Known omissions or limitations.
-
-If a hash is unavailable, state that it was not computed. Never invent a hash.
-
-If an artifact write fails, retain the operation as pending, retry only under a justified recovery strategy, and avoid marking the associated stage complete.
-
-Prefer atomic replacement or versioned writes when the available filesystem or artifact interface supports them. Do not overwrite the only recoverable copy of a previous result.
-
-Keep target-specific facts separate from global methodology and research knowledge.
+If a write fails, keep that output incomplete, preserve any partial result, and do not complete the phase until the artifact is repaired or the limitation is recorded through the checkpoint.
 
 ---
 
-# 7. Resume, retry, and recovery protocol
+# 7. Resume and retry only the unfinished work
 
-At the beginning of every run:
+Read `recon_checkpoint` and the existing source/item ledgers; continue from their saved cursors. Do not re-run a completed phase or successful source unless inputs, tool version/settings, freshness, evidence, or the failure cause changed.
 
-1. Resolve the canonical root workspace.
-2. Read the latest checkpoint and manifest.
-3. Verify the scope state and authorization reference.
-4. Identify completed, partial, blocked, and pending stages.
-5. Reconcile the saved inventories with the latest available artifact metadata.
-6. Determine the exact next eligible operation.
-7. Continue from that operation without repeating completed work unnecessarily.
+For a failed operation, preserve the input, error category, attempt time, partial output, and the condition required for a meaningful retry. Retry transient failures conservatively and honor rate limits/backoff. Do not repeatedly retry scope refusals, authentication failures, unsupported input, or persistent policy blocks without a material change.
 
-For each failed operation, record:
-- Input and stage.
-- Failure category.
-- Attempt timestamp.
-- Relevant error details.
-- Whether the failure appears transient.
-- Retry decision and reason.
-- Next safe action.
+For long source lists, persist progress at the smallest practical work-unit boundary (for example, root/source pair, host, URL batch, or JS content hash). On interruption, distinguish:
+- completed and verified work;
+- partial output that needs reconciliation;
+- selected work still pending;
+- intentionally unselected alternatives;
+- blocked/unavailable work with a reason.
 
-Retry transient network or service failures conservatively. Respect rate limits and backoff guidance. Do not repeatedly retry authentication failures, scope rejections, or persistent policy blocks without a material change in conditions.
-
-When a tool call returns partial data, preserve the valid portion and mark the remainder incomplete.
-
-When the runtime stops, the context becomes insufficient, or a batch boundary is reached, persist a checkpoint before yielding whenever the required tools remain available.
-
-A resume operation must be deterministic enough that a later run can identify:
-- What was attempted.
-- What actually succeeded.
-- What was persisted.
-- What changed since the previous run.
-- What remains eligible.
-- What should happen next.
-
-Do not reset the run ledger merely to make the workflow appear clean.
+Resume interrupted work without discarding prior valid results. Use the same canonical output paths and helper; do not create a new ledger/script per retry. If the runtime ends before persistence/verification, return the precise saved resume point rather than claiming completion.
 
 ---
 
-# 8. Stage ledger and completion criteria
+# 8. Completion and status ownership
 
-Maintain a machine-readable ledger in the manifest or the closest supported persisted representation.
+The registered `recon_checkpoint` is the only phase-state machine. Do not maintain a second phase list, duplicate per-phase status fields in another manifest, or invent extra phase statuses. Source ledgers and run manifests may store item-level progress, artifact hashes, tool details, and cursors, but they must not contradict or replace the checkpoint.
 
-Track at least:
+A phase may be marked complete only when its required artifacts are verified and its eligible work is either exhausted or has a documented, valid terminal disposition. A missing tool, failed request, auth block, interrupted source, or unverified write is not a zero-result success. An alternative excluded by selection is not pending work; record its skip reason separately from attempted-source counts.
 
-- `workspace`
-- `authorization`
-- `passive_discovery`
-- `candidate_normalization`
-- `scope_validation`
-- `dns_http_recon`
-- `url_inventory`
-- `javascript_analysis`
-- `endpoint_correlation`
-- `artifact_verification`
-- `final_report`
-
-Each stage must have an explicit status:
-- `pending`
-- `running`
-- `complete`
-- `partial`
-- `blocked`
-- `not_applicable`
-
-Record its start/end times when available, processed item counts, persisted artifact references, unresolved frontier, and errors.
-
-Never use `complete` when eligible work remains, persistence is unverified, or a mandatory precondition has failed.
-
-A stage can be complete while individual candidates are excluded or unreachable, provided every item has a justified terminal disposition and the eligible frontier is exhausted.
-
-The overall run status is:
-- `complete`: all applicable stages finished, required artifacts verified, and no eligible work remains in the current run.
-- `partial`: meaningful progress was persisted, but eligible work remains or some results are incomplete.
-- `blocked`: a mandatory prerequisite prevents meaningful execution of the requested workflow.
-- `not_applicable`: only when the requested workflow genuinely does not apply and the reason is recorded.
-
-If passive research succeeds while active recon is blocked by missing scope, report the run as `partial` when useful eligible work remains, and identify active recon as blocked. Do not mislabel the entire workflow complete.
+The final report's aggregate status is derived from the actual checkpoint and evidence:
+- `complete`: all required phases and artifacts are verified and no eligible work remains.
+- `partial`: useful results are saved, but work or evidence remains incomplete.
+- `blocked`: a mandatory prerequisite prevents meaningful progress.
+  
+Do not mark reconnaissance complete merely because the process or a batch ended. A recon-only run defers `vulnerability_testing` through the checkpoint and continues to `reporting`; it does not launch vulnerability scanners by default.
 
 ---
 
 # 9. Final verification
 
-Before reporting completion:
+Before reporting, verify the persisted state rather than relying on the conversation history:
 
-1. Re-read the latest run checkpoint and manifest.
-2. Verify the canonical workspace identity.
-3. Verify that the scope status matches the actual persisted manifest.
-4. Verify the existence and paths of all artifacts claimed as saved.
-5. Verify hashes only when actually calculated and available.
-6. Reconcile reported counts against persisted inventories.
-7. Distinguish unique entities from observations and duplicate records.
-8. Identify any unfinished frontier or failed operation.
-9. Confirm that every active operation was protected by the registered tool's persisted-scope enforcement.
-10. Ensure no secret values have leaked into general notes or the final report.
-11. Confirm that the resume point identifies a concrete next action.
-12. Ensure that no endpoint or technology indicator has been mislabeled as a vulnerability.
-
-If any verification fails, correct it where possible. Otherwise report the specific limitation and preserve the incomplete status.
+1. Confirm the canonical workspace and saved authorization manifest; do not treat the workspace root itself as necessarily in scope.
+2. Read the latest `recon_checkpoint` state and identify any running, pending, blocked, failed, unavailable, or deferred phase.
+3. Verify every claimed artifact at its exact saved path; reconcile its counts with the canonical inventory and source ledger.
+4. Distinguish unique assets/endpoints from observations and duplicates; preserve source attribution and meaningful parameter variants.
+5. Confirm active requests were protected by registered request-level scope enforcement and that exclusions were preserved.
+6. Check that secrets are redacted from notes/reports and that candidates, hypotheses, negative results, and confirmed findings are clearly separated.
+7. If any check fails, repair it where possible. Otherwise preserve the partial/blocked status and name the exact resume action.
 
 ---
 
