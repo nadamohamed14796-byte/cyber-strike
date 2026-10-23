@@ -357,9 +357,10 @@ def self_test() -> int:
             assert saved_hosts == ["api.example.com", "www.example.com"]
             assert saved["counts"]["sources_attempted"] == 1
             assert saved["counts"]["sources_pending"] == 0
-            assert saved["counts"]["sources_skipped"] == len(ALL_SOURCES) - 2
+            assert saved["counts"]["sources_skipped"] == 0
+            assert saved["counts"]["sources_not_selected"] == len(ALL_SOURCES) - 2
             assert saved["counts"]["sources_zero_results"] == 2
-            assert saved["run_status"] == "finished_with_gaps"
+            assert saved["run_status"] == "complete"
             amass_record = next(item for item in saved["sources"] if item["root"] == "example.com" and item["source"] == "amass")
             assert amass_record["status"] == "zero-results"
             assert amass_record["attempt_count"] == 1
@@ -439,7 +440,8 @@ def refresh_inventory(document: dict) -> None:
         "sources_failed": sum(item.get("status") == "failed" for item in source_records),
         "sources_blocked": sum(item.get("status") == "blocked" for item in source_records),
         "sources_unavailable": sum(item.get("status") == "unavailable" for item in source_records),
-        "sources_skipped": sum(item.get("status") == "skipped" for item in source_records),
+        "sources_skipped": sum(item.get("status") == "skipped" and item.get("skipped_by_selection") is not True for item in source_records),
+        "sources_not_selected": sum(item.get("status") == "skipped" and item.get("skipped_by_selection") is True for item in source_records),
         "unique_hosts": len(document["hosts"]),
         "duplicate_observations": sum(sum(int(attempt.get("duplicate_observations", 0)) for attempt in item.get("attempt_history", []) if isinstance(attempt, dict)) if item.get("attempt_history") else int(item.get("duplicate_observations", 0)) for item in source_records),
     }
