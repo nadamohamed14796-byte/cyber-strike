@@ -376,6 +376,8 @@ Recommended primary reference points: OWASP Web Security Testing Guide (versione
 
 This section adds practical authoring rules for every custom/local skill.
 
+**Runtime tool choice is dynamic across all phases.** Tool names, commands, tables, links, and examples inside a skill explain possible methods; they are not a required tool list or phase-to-tool assignment. At runtime, identify the missing evidence, search the currently registered/connected tools for that task, inspect the exact schema, and consider verified local CLIs, suitable APIs, datasets, and helpers. Choose the best available permitted capability based on coverage, side effects, saved evidence, and policy. Never force or install a named tool merely because a skill mentions it. Preserve explicitly required workflow/state/persistence contracts and all authorization, scope, rate, and impact gates.
+
 The shared tool inventory, installation/preflight guidance, and reusable helper list live only in `.cyberstrike/skill/TOOLING_CATALOG.md`. A skill must teach its technique and evidence-based decisions, not copy those global lists into another file. If a genuinely new shared tool/helper is needed, add its reusable entry to the catalog once and link to it from the skill.
 
 ### Tools that fit the skill

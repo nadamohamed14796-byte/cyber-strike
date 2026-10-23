@@ -72,7 +72,7 @@ Before invoking an unfamiliar tool:
 
 Never invent a tool name, argument, response field, shell executable, API, or capability.
 
-If an expected tool is unavailable, identify the missing capability and use an equivalent registered tool only if its actual functionality is suitable. Otherwise record the blocker and continue with independent stages where possible.
+If a candidate tool or capability is unavailable, identify the missing evidence and search for an equivalent registered/connected capability. Use it only after verifying its actual function, schema, side effects, and suitability; otherwise record the blocker and continue independent eligible work. Otherwise record the blocker and continue with independent stages where possible.
 
 Do not report a tool as installed merely because its name appears in this prompt.
 

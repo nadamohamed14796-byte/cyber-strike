@@ -128,9 +128,9 @@ For each host/port, record the exact resolver result, scope basis, service-detec
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use only command-line tools that produce inspectable output. Port/service checks are active network activity: confirm the target and allowed port ranges before running them, respect program rate limits, and stop if instability appears.
+Use capabilities that produce inspectable output. Port/service checks are active network activity: confirm the target and allowed port ranges before running them, respect program rate limits, and stop if instability appears. The tool names and commands below are optional, non-exhaustive examples—not phase requirements. Search the current registry for the evidence gap and use any suitable available tool/API/CLI whose real capability and side effects fit the authorized task; do not install or require a listed candidate merely because it appears here.
 
-### Tools and purpose
+### Optional capability examples (non-exhaustive)
 - `naabu` — TCP port inventory for authorized hosts; preserve scanner errors and retain raw output only when it adds unique evidence, reproducibility, or diagnostic value.
 - `nmap` — targeted service/version detection for explicitly permitted hosts and ports; avoid intrusive scripts unless separately authorized.
 - `tlsx` — TLS certificate and handshake metadata for discovered services.
@@ -138,9 +138,9 @@ Use only command-line tools that produce inspectable output. Port/service checks
 - `jq` and Python — normalize JSON output while retaining source, timestamp, tool version, and errors.
 
 ### Install and verify
-- ProjectDiscovery tools: use the official installation/release instructions at https://github.com/projectdiscovery/naabu, https://github.com/projectdiscovery/tlsx, and https://github.com/projectdiscovery/httpx. Verify each with its documented `-version` or `-h` option before use.
-- Nmap: install from https://nmap.org/download.html and verify with `nmap --version`.
-- Verify JSON processing with `jq --version`. If a tool is absent or unsupported on the current OS, record the gap and use a compatible alternative; do not claim the phase completed.
+For each selected external candidate, consult official installation/release guidance and verify its documented version/help output before use. Candidate references include https://github.com/projectdiscovery/naabu, https://github.com/projectdiscovery/tlsx, and https://github.com/projectdiscovery/httpx; none is required by name.
+- Nmap documentation is available at https://nmap.org/download.html; select it only when it is suitable and available, and prefer an adequate existing alternative over installing it by default.
+- If `jq` is selected for JSON processing, verify it with `jq --version`; otherwise use a suitable available parser. If a candidate is absent or unsupported, compare alternatives before considering installation; do not claim the phase completed without verified evidence.
 - Keep scanner concurrency/rate settings aligned with the program rules and observed target stability. Do not use scanning to evade rate limits or expand beyond the approved asset set.
 
 ### Resources

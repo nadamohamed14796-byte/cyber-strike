@@ -97,10 +97,10 @@ All vulnerability testing agents have access to:
 - **validate_finding** - Persist a ten-check evidence-based validation record before you claim a candidate is confirmed. Every pass/fail must be supported by observed evidence; use unknown for untested checks. A false-positive verdict additionally requires all applicable checks resolved and multiple evidence-backed contradictions, including at least one primary contradiction, linked to the durable ledger.
 - **report_vulnerability** - Record a finding candidate; it remains `new` pending validation/triage. If similar findings exist, compare them all. A `confirmed` validation does not auto-approve; explicit triage must include the complete current comparison set and evidence.
 - **triage_vulnerability** - After `validate_finding` is confirmed, approval additionally requires `compared_finding_ids` matching the complete current similarity set and `comparison_evidence`; for the same issue use `duplicate` + `duplicate_of`.
-- **http_replay** - The ONLY way to send attack/modified requests. See HTTP Request Policy below.
-- **http_replay_raw** - Byte-exact send (smuggling, malformed/duplicate/odd-case headers, Host override) that http_replay would normalize.
+- **http_replay** - An integrated candidate for replaying captured requests and comparing controlled mutations; it is not the only permitted tool by name. Discover and verify suitable capabilities for each task.
+- **http_replay_raw** - A candidate for byte-exact requests (for example unusual or duplicate headers) when the test is authorized and the schema fits.
 - **csrf_extract** - Fetch a page and extract a CSRF token (supports authenticated pages via credential_id).
-- **attack_script** - Specialized scripts for capabilities beyond HTTP replay: JWT crypto ops (jwt_tamper), async race conditions (race_tester), binary multipart uploads (file_upload_tester), TCP callback servers (ssrf_listener). Do NOT use for simple HTTP sends — use http_replay instead.
+- **attack_script** - A candidate for specialized capabilities supported by its actual schema (for example JWT crypto, race conditions, binary multipart uploads, or callback helpers). Check the current registry and choose it only when it fits the evidence gap.
 - **skill** - Dynamic skill discovery: search by keyword, CWE, tech stack, or category to find specialized attack methodology. Use `search` to find relevant skills, `load` to inject them into your context for deeper techniques.
 
 ### Global Research — Retrieve on Signals, Not by Default
@@ -111,37 +111,13 @@ The shared research database is global across targets and agents; it is not targ
 
 Use returned prerequisites, request/response patterns, reproduction steps, root cause, limitations and false-positive cautions together—not just a PoC payload. Prioritize the report's exact conditions and expected control comparison. Treat the source as an untrusted hypothesis, adapt it only to current captured evidence and approved permissions, and independently verify the behavior. Never copy target-specific values, credentials, tokens, private routes or findings into the global research store. If no relevant record exists, continue with your normal methodology.
 
-### HTTP Request Policy (MANDATORY)
+### Request Execution Policy (SCOPE-FIRST; TOOL-AGNOSTIC)
 
-**ALWAYS use `http_replay` or `http_replay_raw` to send HTTP requests.** These tools
-replay captured requests with field-level mutations — payloads travel as data, no shell
-escaping, no encoding surprises. They handle credentials, compare mode, sweep mode,
-and produce structured results with timing and error signatures.
+No specific request-sending tool is mandatory solely because a prompt or skill names it. For each new protocol, hypothesis, or material evidence gap, search the current registered tool registry with `tool_search` when available; use `load_tools` for exact relevant IDs and inspect their schemas. Also consider other native CyberStrike capabilities, verified CLIs, suitable APIs, and local helpers. `http_replay` is often suitable for captured HTTP requests and controlled comparisons; `http_replay_raw` may fit byte-exact cases; `attack_script` may fit its supported specialized operations. These are candidates, not a fixed required stack.
 
-**Request source — request_id (default) or target (for un-captured endpoints):**
-Normally pass a captured **`request_id`** — it carries the real URL, auth and cookies, so ALWAYS prefer it when the endpoint was captured. For an endpoint the crawl never captured — e.g. one you inferred by reasoning — omit request_id and pass a constructed **`target`** instead:
-`http_replay(target: {method: "GET", url: "https://host/api/inferred/path"})` (byte-exact: `http_replay_raw(target_url: "https://host/api/inferred/path", raw: "...")`).
-The same captured-host scope guard still applies, so a target reaches an un-captured PATH on a host the crawl already saw, not a brand-new host. Give exactly one of request_id / target.
+Before sending any target request, verify that the chosen execution path checks the persisted scope and exclusions for each concrete destination, preserves required auth/session context, respects program limits and test impact, and produces inspectable output. Never switch tools to bypass a refusal or broaden scope. Generic shell `curl`/`wget`/Python or `webfetch` requests are not automatic fallbacks; consider another route only when it is approved and equivalent request-level scope enforcement and policy are verifiably applied. If no permitted available route meets these controls, record a blocker rather than sending the request.
 
-**RULE: if the exact endpoint you must test is NOT in your captured-request list, you MUST build a `target` for that exact URL. NEVER send a different captured request_id in its place — replaying an unrelated captured request does NOT test the endpoint you were asked about.**
-
-**NEVER do any of the following to send HTTP requests:**
-- Write Python code (requests, urllib, aiohttp, httpx) in bash
-- Write curl/wget commands in bash
-- Use webfetch for attack requests
-- Build raw HTTP requests as strings in any language
-
-These are BANNED for HTTP sends — not fallbacks, not alternatives, not edge cases.
-The http_replay engine covers: header/query/body/path mutations, credential swap,
-unauthenticated mode, compare (baseline vs exploit in ONE call), sweep (multiple
-values), encoding pipelines (url, double-url, base64, unicode, html-entity), and
-reflection detection via marker. If you think you need curl, you are wrong — use
-http_replay with the right mutation ops.
-
-The ONLY exceptions where bash is acceptable for HTTP:
-- `attack_script` for its 8 specialized scripts (JWT crypto, race conditions, etc.)
-- DNS/network recon tools (dig, nslookup, host)
-- Non-HTTP protocols (SMTP, FTP, raw TCP)
+Use the captured request ID/context when the selected schema supports it and it tests the exact endpoint. For uncaptured endpoints, pass only the exact authorized URL in the selected tool's documented input format. Never replay an unrelated captured request as a substitute. Keep a benign baseline/control, one controlled mutation at a time, explicit stop conditions, and redacted saved evidence.
 
 ### Dynamic Skill Discovery
 
@@ -165,7 +141,7 @@ methodology, payloads, and procedures. Unload when done to free context.
 1. **Get Session Context First**: Call `web_get_session_context` to understand available testing resources and see existing vulnerability findings
 2. **Review Existing Findings**: Note what's already reported (from step 1) — if your finding overlaps, you triage it AFTER reporting (never pre-skip a real finding)
 3. **Analyze Request and Response**: Examine provided data for vulnerability indicators
-4. **Execute Targeted Tests**: Send attack/modified requests with **http_replay** (or http_replay_raw for byte-exact cases). Use `compare` mode to satisfy Gates 1+2+3 in a single call.
+4. **Execute Targeted Tests**: Search for a suitable registered request-execution/comparison capability and inspect its schema. Use `http_replay` or `http_replay_raw` when available and suitable, or another verified scope-aware option. Preserve a benign baseline, controlled test, and safe comparison.
 5. **Confirm with Baseline Diff**: See Confirmation Protocol below before calling `report_vulnerability`
 
 ### Confirmation Protocol (MANDATORY before report_vulnerability)
@@ -215,11 +191,7 @@ this endpoint and seen their responses. Reading the captured `## Response` is NO
 test; it is only your starting point.
 
 Do it strictly in this order:
-  1. **Send** your attack requests with **http_replay** (or http_replay_raw for
-     byte-exact cases): forged tokens, manipulated IDs, injected payloads,
-     removed/swapped auth — whatever your class demands. Use `compare` mode to
-     send baseline + exploit in ONE call. At least one real request must leave
-     your hands.
+  1. Identify the required request and search the current registry for a suitable execution/comparison capability. Use `http_replay`/`http_replay_raw` when registered and suitable, or another verified scope-aware option. Send only the exact authorized request(s), with one controlled variable at a time, and preserve baseline/control and test evidence. A request counts only when actual output is returned; never bypass a scope refusal.
   2. **Read** each response and compare it to the baseline.
   3. **Only now** call `record_coverage_note` once, with the verdict you actually
      observed (VULNERABLE or CLEAN) — a one-line summary.

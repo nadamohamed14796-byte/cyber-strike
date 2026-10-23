@@ -29,6 +29,10 @@ Produce a prioritized inventory of in-scope hosts, web apps, URLs, APIs, technol
 4. Set request timeouts, concurrency, and rate limits. Never run broad scans against an unverified asset list.
 5. Store outputs in the designated workspace. Do not commit target-specific data or credentials.
 
+## Runtime tool selection
+
+The pipeline defines evidence objectives and completion conditions, not a required tool stack. At each new phase or evidence gap, search the live registry for suitable capabilities, inspect schemas, and compare registered tools with available CLIs, read-only APIs, datasets, and helpers. The names below are optional candidates; no crawler, scanner, JavaScript analyzer, or request tool is mandatory merely because a skill mentions it. Select the smallest safe combination that closes the gap, preserve persisted scope and request-level enforcement, and record blocked/unavailable gaps rather than claiming completion.
+
 ## 3. Pipeline
 
 ### Step 1 — Normalize scope
@@ -47,9 +51,9 @@ For eligible hosts, record status, title, redirects, content type, technology hi
 Combine in-scope crawl results, archives, app navigation, API specifications, permitted GraphQL schema information, JavaScript bundles, source maps, and mobile/API observations. Preserve method and content-type distinctions during deduplication.
 
 #### JavaScript code review and request correlation
-After `hackbrowser` has finished capturing relevant responses, invoke `correlate_javascript` with the already-authorized `target_url` before detailed endpoint testing. It reads captured JavaScript and source-map bodies plus reviewed files in the target workspace's `javascript/` directory; it does not download or execute scripts. Check its explicit `sourceMapReferences` status for each external map. Retrieve an in-scope `referenced-not-captured` map only through the normal scope-enforced browser/recon path, then rerun correlation; never count a pending, malformed, truncated, `sourcesContent`-less, or partially embedded map as fully analyzed. Review the persisted graph/notes for function candidates, URL templates, parameters, auth/header/cookie clues, redacted secret fingerprints, role/feature hints, and remaining blockers.
+After relevant responses have been captured, search the current tool registry for JavaScript/source-map correlation capabilities and inspect their schemas. Use `correlate_javascript` when it is registered and fits the gap; otherwise choose the best verified alternative that can inspect captured/local evidence without fetching or executing untrusted scripts. The JavaScript-analysis objective remains required when such evidence is relevant, but this particular helper is not a mandatory tool. It reads captured JavaScript and source-map bodies plus reviewed files in the target workspace's `javascript/` directory; it does not download or execute scripts. Check its explicit `sourceMapReferences` status for each external map. Retrieve an in-scope `referenced-not-captured` map only through the normal scope-enforced browser/recon path, then rerun correlation; never count a pending, malformed, truncated, `sourcesContent`-less, or partially embedded map as fully analyzed. Review the persisted graph/notes for function candidates, URL templates, parameters, auth/header/cookie clues, redacted secret fingerprints, role/feature hints, and remaining blockers.
 
-Treat source-derived relationships as hypotheses. An absent token/cookie signal does not prove an endpoint is public, a role name does not prove server-side authorization, and a secret-like candidate does not authorize use. During recon, correlate static candidates with existing captured requests and persist the evidence; do not mutate requests or start vulnerability checks automatically. Only after the user explicitly asks for targeted testing, prefer a captured baseline request and test one controlled mutation at a time with `http_replay` inside scope, then review the saved redacted observation and its manual-review flag. A response difference is a lead, not a vulnerability verdict.
+Treat source-derived relationships as hypotheses. An absent token/cookie signal does not prove an endpoint is public, a role name does not prove server-side authorization, and a secret-like candidate does not authorize use. During recon, correlate static candidates with existing captured requests and persist the evidence; do not mutate requests or start vulnerability checks automatically. Only after the user explicitly asks for targeted testing, search for a suitable request-execution/comparison capability, prefer a captured baseline, and test one controlled mutation at a time. `http_replay` is one candidate when its registered schema fits; the selected path must preserve request-level scope enforcement. Then review and persist the redacted observation and manual-review flag. A response difference is a lead, not a vulnerability verdict.
 
 ### Step 6 — Focused enumeration
 Only after validating scope and policy, use bounded directory/content and parameter discovery in the assigned recon phases. Start with a relevant wordlist, save its source/hash and request settings, and increase coverage only when results warrant it. Classify discovered paths by their evidence and likely function (admin/login/internal/management/debug/API docs/config/backup/sensitive-file candidates); a path name or status code alone does not prove that data is exposed. Keep GET-based discovery bounded and non-destructive.
@@ -135,7 +139,7 @@ Each queued item should include canonical_asset, scope_evidence, attribution_con
 
 Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
 
-### Recommended tools
+### Optional capability examples (non-exhaustive)
 - katana — authorized crawling and endpoint discovery
 - gau/waymore — passive historical URL sources
 - httpx — service metadata and response status

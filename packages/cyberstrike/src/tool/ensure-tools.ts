@@ -83,11 +83,11 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
 
 export const EnsureToolsTool = Tool.define("ensure_tools", {
   description:
-    "Check if required security tools are installed and install missing ones. ONLY call this when the user has explicitly requested a pentest, vulnerability scan, or active security testing. NEVER call this for passive questions, code review, tech stack inquiries, or informational requests.",
+    "Check only the explicitly selected security-tool candidates and install selected missing binaries when necessary. This tool does not define required tools for any phase: choose candidates dynamically from the current evidence gap and verified available alternatives, and pass only the candidates that are genuinely needed. ONLY call this when the user has explicitly requested a pentest, vulnerability scan, or active security testing. NEVER call this for passive questions, code review, tech stack inquiries, or informational requests.",
   parameters: z.object({
     tools: z
       .array(z.string())
-      .describe(`Tools to check/install. Available: ${Object.keys(TOOL_INSTALL_MAP).join(", ")}`),
+      .describe(`Optional candidates to check/install; names supported by this installer only. This is not a list of required tools. Available: ${Object.keys(TOOL_INSTALL_MAP).join(", ")}`),
   }),
   async execute(params) {
     const results: Array<{ tool: string; installed: boolean; action: string }> = []

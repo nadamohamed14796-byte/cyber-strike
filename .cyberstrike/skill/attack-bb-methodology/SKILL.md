@@ -129,7 +129,9 @@ Before ending a work session, report completed phases, phases blocked/partial, n
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-### Tools and purpose
+Runtime selection is dynamic: the names and commands below are optional, non-exhaustive capability examples, not a fixed toolkit or phase-to-tool assignment. For each phase or new evidence gap, search the current registered/connected tools, inspect schemas, and consider verified CLIs, suitable APIs, datasets, and local helpers. Use only candidates that add useful coverage and satisfy the actual scope, policy, and output contract; do not require or install a named candidate just because it is listed.
+
+### Optional capability examples (non-exhaustive)
 - `subfinder`, `dnsx`, `httpx`, `katana`, and `gau` — select phase-appropriate passive discovery, DNS validation, HTTP metadata, crawling, and historical URL collection.
 - `jq`, `sort`, `comm`, and Python — normalize/deduplicate results while preserving provenance.
 - Shared helpers under `.cyberstrike/skill/scripts/` — normalize URLs, inventory JavaScript endpoints, compare saved responses, and validate evidence manifests.
