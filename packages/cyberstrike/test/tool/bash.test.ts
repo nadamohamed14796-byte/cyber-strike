@@ -72,53 +72,54 @@ describe("Scope-aware URL source input extraction", () => {
 
 describe("Read-only passive-research API scope routing", () => {
   test("routes recognized CT, passive-DNS, and archive lookups to the queried target domain", () => {
-    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%25.example.com&output=json"), ["-s"])).toEqual({
+    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%25.example.com&output=json"), ["-q", "-s"])).toEqual({
       targetURL: "https://example.com/",
       phase: "asset_discovery",
     })
-    expect(passiveResearchLookup(new URL("https://api.certspotter.com/v1/issuances?domain=api.example.com"), ["--silent"])).toEqual({
+    expect(passiveResearchLookup(new URL("https://api.certspotter.com/v1/issuances?domain=api.example.com"), ["-q", "--silent"])).toEqual({
       targetURL: "https://api.example.com/",
       phase: "asset_discovery",
     })
-    expect(passiveResearchLookup(new URL("https://otx.alienvault.com/api/v1/indicators/domain/example.com/passive_dns"), ["-s"])).toEqual({
+    expect(passiveResearchLookup(new URL("https://otx.alienvault.com/api/v1/indicators/domain/example.com/passive_dns"), ["-q", "-s"])).toEqual({
       targetURL: "https://example.com/",
       phase: "asset_discovery",
     })
-    expect(passiveResearchLookup(new URL("https://web.archive.org/cdx/search/cdx?url=*.example.com/*&output=json"), ["-s"])).toEqual({
+    expect(passiveResearchLookup(new URL("https://web.archive.org/cdx/search/cdx?url=*.example.com/*&output=json"), ["-q", "-s"])).toEqual({
       targetURL: "https://example.com/",
       phase: "url_collection",
     })
   })
 
-  test("does not treat writes, redirects, credentials, secrets, or unknown routes as passive lookups", () => {
+  test("rejects implicit curl config, writes, redirects, credentials, secrets, and ambiguous lookups", () => {
     const url = new URL("https://crt.sh/?q=%25.example.com&output=json")
-    expect(passiveResearchLookup(url, ["-X", "POST"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["-X", "GET"])).toEqual({
+    expect(passiveResearchLookup(url, ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-X", "POST"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-X", "GET"])).toEqual({
       targetURL: "https://example.com/",
       phase: "asset_discovery",
     })
-    expect(passiveResearchLookup(url, ["--request=HEAD"])).toEqual({
+    expect(passiveResearchLookup(url, ["-q", "--request=HEAD"])).toEqual({
       targetURL: "https://example.com/",
       phase: "asset_discovery",
     })
-    expect(passiveResearchLookup(url, ["-x", "http://127.0.0.1:8080"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["--config", "~/.curlrc"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["--resolve", "crt.sh:443:127.0.0.1"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["--data", "domain=example.com"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["-L"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["-H", "Authorization: Bearer $TOKEN"])).toBeUndefined()
-    expect(passiveResearchLookup(url, ["-H", "X-API-Key: $OTX_API_KEY"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api"), ["-s"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com"), ["-s"])).toEqual({
+    expect(passiveResearchLookup(url, ["-q", "-x", "http://127.0.0.1:8080"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "--config", "~/.curlrc"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "--resolve", "crt.sh:443:127.0.0.1"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "--data", "domain=example.com"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-L"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-H", "Authorization: Bearer $TOKEN"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-H", "X-API-Key: $OTX_API_KEY"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api"), ["-q", "-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com"), ["-q", "-s"])).toEqual({
       targetURL: "https://example.com/",
       phase: "asset_discovery",
     })
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&host=api.example.com"), ["-s"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&api_key=hidden"), ["-s"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&access_token=hidden"), ["-s"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&key=hidden"), ["-s"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-fsSL"])).toBeUndefined()
-    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-d@payload.json"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&host=api.example.com"), ["-q", "-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&api_key=hidden"), ["-q", "-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&access_token=hidden"), ["-q", "-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&key=hidden"), ["-q", "-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-q", "-fsSL"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-q", "-d@payload.json"])).toBeUndefined()
   })
 })
 
