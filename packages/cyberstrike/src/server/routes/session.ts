@@ -1262,7 +1262,7 @@ export const SessionRoutes = lazy(() =>
               if (!scopeDecision.allowed || !scopeDecision.workspace) {
                 log.info("JavaScript/source-map correlation skipped by persisted scope", {
                   sessionID,
-                  requestID: capture?.requestID ?? req.id,
+                  requestID: capture?.requestID ?? req?.id,
                   reason: scopeDecision.reason,
                 })
                 return
@@ -1273,7 +1273,7 @@ export const SessionRoutes = lazy(() =>
               })
               log.info("JavaScript source version correlated after request dedup", {
                 sessionID,
-                requestID: capture?.requestID ?? req.id,
+                requestID: capture?.requestID ?? req?.id,
                 contentHash: capture?.contentHash ?? null,
                 targetID: scopeDecision.workspace.id,
                 sourceFiles: correlation.graph.sourceFiles.length,
@@ -1283,7 +1283,7 @@ export const SessionRoutes = lazy(() =>
             } catch (error) {
               log.warn("automatic correlation of a changed JavaScript source version failed", {
                 sessionID,
-                requestID: capture?.requestID ?? req.id,
+                requestID: capture?.requestID ?? req?.id,
                 error: error instanceof Error ? error.message : String(error),
               })
             }
