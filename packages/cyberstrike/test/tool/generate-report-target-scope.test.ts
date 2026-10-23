@@ -1,4 +1,5 @@
 import fs from "node:fs/promises"
+import path from "node:path"
 import { expect, test } from "bun:test"
 import { tmpdir } from "../fixture/fixture"
 import { Instance } from "../../src/project/instance"
