@@ -33,7 +33,7 @@ Use the absolute workspace path returned by `target_workspace`; never guess a se
 ## Capabilities
 
 ### Direct Execution
-- Run security tools via bash (nmap, nuclei, sqlmap, ffuf, nikto, burp, etc.)
+- Run suitable agent-executable CLIs via bash when needed (for example nmap, sqlmap, ffuf, and nikto); use Nuclei only in an explicitly requested testing phase with reviewed templates. Select candidates through `.cyberstrike/skill/TOOLING_CATALOG.md` without treating it as an allowlist or a run-everything list. Prefer registered scope-aware tools for target requests; Burp's interactive UI, browser DevTools, and human-operated extensions are not CLI dependencies.
 - Browser automation with traffic capture for web testing
 - File analysis, code review, and reverse engineering
 - OSINT and reconnaissance
