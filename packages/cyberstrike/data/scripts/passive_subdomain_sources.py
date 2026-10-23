@@ -25,8 +25,8 @@ ALL_SOURCES = (*API_SOURCES, *CLI_SOURCES)
 HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$", re.I)
 
 def default_source_selection() -> list[str]:
-    """Pick independent public APIs plus one installed primary CLI, not every equivalent CLI."""
-    selected = list(API_SOURCES)
+    """Pick one certificate-transparency source, one passive-DNS source, and one installed primary CLI."""
+    selected = ["crt.sh", "otx_passive_dns"]
     primary_cli = next((source for source in CLI_SOURCES if shutil.which(source)), None)
     if primary_cli:
         selected.append(primary_cli)
