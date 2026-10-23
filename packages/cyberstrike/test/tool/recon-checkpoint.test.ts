@@ -106,6 +106,24 @@ test("asset discovery accepts terminal root/source coverage when the host invent
   expect(result).toMatchObject({ valid: true, roots: 2, sourcePairs: 4, uniqueHosts: 1, gaps: 0 })
 })
 
+test("asset discovery rejects unreconciled raw and normalized source records", () => {
+  const { ledger, hostsText } = discoveryLedger(["example.com"], ["crt.sh"])
+  const rows = ledger.sources as Array<Record<string, unknown>>
+  rows[0].raw_records = 2
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText)
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain("raw_records must equal valid_observations + rejected_records")
+})
+
+test("asset discovery rejects host arrays that disagree with per-source unique counts", () => {
+  const { ledger, hostsText } = discoveryLedger(["example.com"], ["crt.sh"])
+  const rows = ledger.sources as Array<Record<string, unknown>>
+  rows[0].hosts = []
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText)
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain("source host list does not match")
+})
+
 test("asset discovery rejects stale source counters even when every pair is terminal", () => {
   const { ledger, hostsText } = discoveryLedger(["example.com"], ["crt.sh"])
   const counts = ledger.counts as Record<string, unknown>
