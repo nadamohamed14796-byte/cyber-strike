@@ -100,7 +100,7 @@ Treat recon output as a candidate lead, not a finding. there is no fixed hypothe
 
 ### Evidence record and confidence
 
-For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, corroborating source, raw-evidence location when retained, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
 
 Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
 
@@ -155,7 +155,7 @@ Community lists are discovery aids; verify project maintenance, license, and sup
 ### Helper-script contract
 Process only logs the user is authorized to inspect. Redact tokens, cookies, personal data, and internal secrets before storing output; preserve source file/line and a stable redacted fingerprint.
 
-Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+Normalize routine results into concise, redacted findings and keep provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and artifact path. Retain source excerpts or raw artifacts only when they add unique evidence, reproducibility, or diagnostic value; preserve a minimal redacted proof and do not duplicate entire logs.
 
 ### Handoff
 Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
