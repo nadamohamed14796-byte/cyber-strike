@@ -150,6 +150,44 @@ export function validateAssetDiscoveryLedger(
     return { valid: false, reason: "The normalized host inventory contains duplicates or its saved unique-host count does not reconcile." }
   }
 
+  const sourceRows = ledger.sources as Array<Record<string, unknown>>
+  const expectedCounts: Record<string, number> = {
+    sources_attempted: sourceRows.filter((item) => Number.isInteger(item.attempt_count) && Number(item.attempt_count) > 0).length,
+    sources_pending: sourceRows.filter((item) => item.status === "pending").length,
+    sources_not_started: sourceRows.filter((item) => item.status === "pending" && Number(item.attempt_count ?? 0) === 0).length,
+    sources_running_or_interrupted: sourceRows.filter((item) =>
+      item.status === "pending" && Number(item.attempt_count ?? 0) > (Array.isArray(item.attempt_history) ? item.attempt_history.length : 0),
+    ).length,
+    sources_success: sourceRows.filter((item) => item.status === "success").length,
+    sources_zero_results: sourceRows.filter((item) => item.status === "zero-results").length,
+    sources_failed: sourceRows.filter((item) => item.status === "failed").length,
+    sources_blocked: sourceRows.filter((item) => item.status === "blocked").length,
+    sources_unavailable: sourceRows.filter((item) => item.status === "unavailable").length,
+    sources_skipped: sourceRows.filter((item) => item.status === "skipped" && item.skipped_by_selection !== true).length,
+    sources_not_selected: sourceRows.filter((item) => item.status === "skipped" && item.skipped_by_selection === true).length,
+    unique_hosts: uniqueHosts.length,
+    duplicate_observations: sourceRows.reduce((total, item) => {
+      const history = Array.isArray(item.attempt_history) ? item.attempt_history : []
+      const duplicateCount = history.length
+        ? history.reduce((sum: number, attempt: unknown) => {
+            if (!attempt || typeof attempt !== "object" || Array.isArray(attempt)) return sum
+            const value = (attempt as Record<string, unknown>).duplicate_observations
+            return sum + (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0)
+          }, 0)
+        : (typeof item.duplicate_observations === "number" && Number.isFinite(item.duplicate_observations) && item.duplicate_observations >= 0 ? item.duplicate_observations : 0)
+      return total + duplicateCount
+    }, 0),
+  }
+  for (const [name, expected] of Object.entries(expectedCounts)) {
+    const actual = savedCounts[name]
+    // Older complete schema-v1 ledgers predate sources_not_selected; that count
+    // is backward-compatible only when the rows themselves show none.
+    if (name === "sources_not_selected" && actual === undefined && expected === 0) continue
+    if (actual !== expected) {
+      return { valid: false, reason: "The saved source counter " + name + " is " + String(actual) + ", but the ledger records " + expected + "." }
+    }
+  }
+
   const expectedStatus = gaps ? "finished_with_gaps" : "complete"
   if (ledger.run_status !== expectedStatus) {
     return { valid: false, reason: "The source ledger run_status is " + String(ledger.run_status) + ", but terminal source outcomes require " + expectedStatus + "." }
