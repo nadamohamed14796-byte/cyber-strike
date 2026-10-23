@@ -551,8 +551,25 @@ export function passiveResearchLookup(
           : undefined
     if (header) {
       const name = header.split(":", 1)[0]!.trim()
-      if (/(?:authorization|proxy-authorization|(?:^|[-_])auth(?:$|[-_])|cookie|set-cookie|api[-_]?key|token|secret|credential|password|signature)/i.test(name) ||
-          /\b(?:bearer|basic)\s+\S+/i.test(header)) return undefined
+      const normalizedName = name.toLowerCase()
+      const nameTokens = normalizedName.replaceAll("-", "_").split("_").filter(Boolean)
+      const hasSensitiveName = [
+        "authorization", "proxy-authorization", "cookie", "set-cookie",
+        "token", "secret", "credential", "password", "signature",
+      ].some((token) => normalizedName.includes(token)) ||
+        nameTokens.includes("auth") ||
+        normalizedName.includes("api-key") ||
+        normalizedName.includes("api_key") ||
+        normalizedName.includes("apikey")
+      const normalizedHeader = header.toLowerCase()
+        .replaceAll("\t", " ")
+        .replaceAll("\r", " ")
+        .replaceAll("\n", " ")
+      const headerTokens = normalizedHeader.split(" ").filter(Boolean)
+      const hasInlineCredentials = headerTokens.some((token, index) =>
+        (token === "bearer" || token === "basic") && Boolean(headerTokens[index + 1]),
+      )
+      if (hasSensitiveName || hasInlineCredentials) return undefined
     }
   }
 
