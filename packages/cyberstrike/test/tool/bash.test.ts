@@ -65,6 +65,12 @@ describe("Scope-aware URL source input extraction", () => {
     )).toEqual(expect.arrayContaining(["https://example.com", "https://api.example.com"]))
   })
 
+  test("extracts subfinder targets from standard, inline, wildcard, and comma-separated domain flags", () => {
+    expect(scannerTargets(["subfinder", "-d", "example.com", "-silent"], "subfinder -d example.com -silent")).toContain("https://example.com")
+    expect(scannerTargets(["subfinder", "--domain=example.com", "-silent"], "subfinder --domain=example.com -silent")).toContain("https://example.com")
+    expect(scannerTargets(["subfinder", "-d", "*.example.com,example.net", "-silent"], "subfinder -d '*.example.com,example.net' -silent")).toEqual(expect.arrayContaining(["https://example.com", "https://example.net"]))
+  })
+
   test("does not infer a target from a file name when a source reads a list from disk", () => {
     expect(scannerTargets(["waybackurls"], "cat domains.txt | waybackurls")).toEqual([])
   })
