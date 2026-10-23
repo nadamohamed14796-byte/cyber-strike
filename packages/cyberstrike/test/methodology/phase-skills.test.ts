@@ -193,7 +193,7 @@ describe("Methodology phase skill routing", () => {
     expect(names).toContain("recon-port-service-discovery")
   })
 
-  test("all phase-critical active-recon skills survive a smaller optional shortlist limit", () => {
+  test("phase-critical active-recon skills survive a smaller optional shortlist limit", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
       name,
       description: "Security reconnaissance workflow",
@@ -207,13 +207,15 @@ describe("Methodology phase skill routing", () => {
     const ranked = rankSkillsForPhase("active_recon", [
       makeSkill("generic-recon-tool"),
       makeSkill("recon-methodology"),
+      makeSkill("attack-web-recon"),
+      makeSkill("recon-port-service-discovery"),
       makeSkill("attack-javascript-analysis"),
       makeSkill("community-tool-selection"),
     ], 1)
     const names = ranked.map((skill) => skill.name)
-    expect(names).toContain("recon-methodology")
-    expect(names).toContain("attack-javascript-analysis")
-    expect(names).toContain("community-tool-selection")
+    for (const requiredName of PHASE_REQUIRED_SKILLS.active_recon ?? []) {
+      expect(names, "active_recon must retain " + requiredName).toContain(requiredName)
+    }
   })
 
   test("business logic critical skill remains in a short ranked list", () => {
