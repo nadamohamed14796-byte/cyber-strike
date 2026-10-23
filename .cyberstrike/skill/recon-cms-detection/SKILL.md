@@ -163,7 +163,7 @@ Community lists are discovery aids; confirm maintenance, license, provenance, an
 ### Helper-script contract
 Keep fingerprint evidence, version confidence, vendor advisory ID, affected component, and safe verification result. Do not infer vulnerable status from a guessed banner or outdated fingerprint alone.
 
-Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+Normalize routine outputs into the canonical inventory and keep provenance, timestamps, tool/version, errors, confidence, and artifact paths with each observation. Retain raw output only when it adds unique evidence, reproducibility, or diagnostic value; do not create a raw copy for every tool/run. Redact secrets, support JSON/JSONL where useful, and include local fixtures.
 
 ### Handoff
 Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
