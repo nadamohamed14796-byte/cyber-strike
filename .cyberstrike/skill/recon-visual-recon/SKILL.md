@@ -161,7 +161,7 @@ Community lists are discovery aids; confirm maintenance, license, provenance, an
 ### Helper-script contract
 Capture only validated authorized hosts; preserve URL, timestamp, status, screenshot path/hash, title, and cluster fingerprint. Screenshot similarity is a prioritization clue, not vulnerability proof.
 
-Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+Normalize routine outputs into the canonical inventory and keep provenance, timestamps, tool/version, errors, confidence, and artifact paths with each observation. Retain raw output only when it adds unique evidence, reproducibility, or diagnostic value; do not create a raw copy for every tool/run. Redact secrets, support JSON/JSONL where useful, and include local fixtures.
 
 ### Handoff
 Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
