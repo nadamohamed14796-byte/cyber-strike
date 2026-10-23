@@ -97,6 +97,189 @@ type WebReconArtifact = {
   observations: WebReconObservation[]
 }
 
+type LegacyWebReconRecord = {
+  schemaVersion: 1
+  recordType: "web-recon-result"
+  program: Program
+  requestedTarget: string
+  canonicalTarget: string
+  workspaceID: string
+  workspacePath: string
+  sessionID: string
+  completedAt: string
+  result: WebReconResult
+}
+
+type LegacyWebReconArtifact = {
+  filename: string
+  filepath: string
+  rawContent: string
+  record: LegacyWebReconRecord
+}
+
+function webReconFingerprint(program: Program, requestedTarget: string, result: WebReconResult): string {
+  return createHash("sha256").update(JSON.stringify({ program, requestedTarget, result })).digest("hex")
+}
+
+/**
+ * Read only timestamped result files produced by the old web_recon implementation.
+ * Unknown, malformed, symlinked, or other-workspace files are ignored and untouched.
+ */
+async function loadLegacyWebReconArtifacts(
+  workspace: Workspace,
+  directory: string,
+): Promise<LegacyWebReconArtifact[]> {
+  if (directory !== "recon" && directory !== "scans") return []
+  const knownPrograms = directory === "scans"
+    ? ["session_scan"]
+    : Object.keys(PROGRAMS).filter((program) => program !== "session_scan")
+  const filenamePattern = new RegExp("^(" + knownPrograms.join("|") + ")-(\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z)\\.json$")
+  const output: LegacyWebReconArtifact[] = []
+  let rootPath: string
+  try {
+    rootPath = await fs.realpath(workspace.workspacePath)
+  } catch {
+    return output
+  }
+  const directoryPath = path.join(rootPath, directory)
+  let directoryInfo
+  try {
+    directoryInfo = await fs.lstat(directoryPath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return output
+    throw error
+  }
+  if (directoryInfo.isSymbolicLink() || !directoryInfo.isDirectory()) return output
+  const realDirectory = await fs.realpath(directoryPath)
+  const relativeDirectory = path.relative(rootPath, realDirectory)
+  if (relativeDirectory !== directory || path.isAbsolute(relativeDirectory)) return output
+
+  const filenames = (await fs.readdir(realDirectory)).filter((filename) => filenamePattern.test(filename)).sort()
+  for (const filename of filenames) {
+    const filepath = path.join(realDirectory, filename)
+    let info
+    try {
+      info = await fs.lstat(filepath)
+    } catch {
+      continue
+    }
+    if (info.isSymbolicLink() || !info.isFile()) continue
+    const rawContent = await fs.readFile(filepath, "utf-8")
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(rawContent)
+    } catch {
+      continue
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue
+    const record = parsed as Partial<LegacyWebReconRecord>
+    const match = filenamePattern.exec(filename)
+    if (
+      !match ||
+      record.schemaVersion !== 1 ||
+      record.recordType !== "web-recon-result" ||
+      typeof record.program !== "string" ||
+      record.program !== match[1] ||
+      !knownPrograms.includes(record.program) ||
+      record.canonicalTarget !== workspace.targetURL ||
+      record.workspaceID !== workspace.id ||
+      typeof record.requestedTarget !== "string" ||
+      typeof record.workspacePath !== "string" ||
+      typeof record.sessionID !== "string" ||
+      typeof record.completedAt !== "string" ||
+      !Number.isFinite(Date.parse(record.completedAt)) ||
+      !record.result ||
+      typeof record.result !== "object" ||
+      typeof record.result.output !== "string" ||
+      !Array.isArray(record.result.findings)
+    ) continue
+    output.push({
+      filename,
+      filepath,
+      rawContent,
+      record: record as LegacyWebReconRecord,
+    })
+  }
+  return output.sort((a, b) => Date.parse(a.record.completedAt) - Date.parse(b.record.completedAt))
+}
+
+function addWebReconObservation(
+  artifact: WebReconArtifact,
+  input: {
+    program: Program
+    requestedTarget: string
+    completedAt: string
+    sessionID: string
+    result: WebReconResult
+  },
+): void {
+  const fingerprint = webReconFingerprint(input.program, input.requestedTarget, input.result)
+  const attempt = { completedAt: input.completedAt, sessionID: input.sessionID }
+  const existing = artifact.observations.find((item) => item.fingerprint === fingerprint)
+  if (!existing) {
+    artifact.observations.push({
+      fingerprint,
+      program: input.program,
+      requestedTarget: input.requestedTarget,
+      firstSeenAt: input.completedAt,
+      lastSeenAt: input.completedAt,
+      occurrences: 1,
+      attempts: [attempt],
+      result: input.result,
+    })
+    return
+  }
+  if (!existing.attempts.some((item) => item.completedAt === attempt.completedAt && item.sessionID === attempt.sessionID)) {
+    existing.attempts.push(attempt)
+    existing.attempts.sort((a, b) => Date.parse(a.completedAt) - Date.parse(b.completedAt))
+  }
+  existing.occurrences = existing.attempts.length
+  if (Date.parse(input.completedAt) < Date.parse(existing.firstSeenAt)) existing.firstSeenAt = input.completedAt
+  if (Date.parse(input.completedAt) > Date.parse(existing.lastSeenAt)) existing.lastSeenAt = input.completedAt
+}
+
+/**
+ * Delete old files only when their full result and attempt metadata are verified
+ * in the stable aggregate. Re-read and byte-compare each source before removing it.
+ */
+async function removeMigratedLegacyArtifacts(
+  workspace: Workspace,
+  stablePath: string,
+  legacyFiles: LegacyWebReconArtifact[],
+): Promise<void> {
+  if (legacyFiles.length === 0) return
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await fs.readFile(stablePath, "utf-8"))
+  } catch {
+    return
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return
+  const aggregate = parsed as Partial<WebReconArtifact>
+  if (
+    aggregate.schemaVersion !== 1 ||
+    aggregate.recordType !== "web-recon-results" ||
+    aggregate.workspaceID !== workspace.id ||
+    aggregate.canonicalTarget !== workspace.targetURL ||
+    !Array.isArray(aggregate.observations)
+  ) return
+
+  for (const legacy of legacyFiles) {
+    const old = legacy.record
+    const fingerprint = webReconFingerprint(old.program, old.requestedTarget, old.result)
+    const observation = aggregate.observations.find((item) => item.fingerprint === fingerprint)
+    if (!observation?.attempts.some((attempt) => attempt.completedAt === old.completedAt && attempt.sessionID === old.sessionID)) continue
+    try {
+      const info = await fs.lstat(legacy.filepath)
+      if (info.isSymbolicLink() || !info.isFile()) continue
+      if (await fs.readFile(legacy.filepath, "utf-8") !== legacy.rawContent) continue
+      await fs.unlink(legacy.filepath)
+    } catch {
+      // Cleanup failure leaves the old copy in place; the verified aggregate remains valid.
+    }
+  }
+}
+
 /**
  * Save web_recon history into one stable workspace artifact per workflow family.
  * Identical snapshots are represented once with observation timestamps; distinct
@@ -112,9 +295,8 @@ async function persistWebReconResultUnlocked(input: {
   result: WebReconResult
 }): Promise<string> {
   const { workspace, filename, program, requestedTarget, completedAt, sessionID, result } = input
-  const identity = JSON.stringify({ program, requestedTarget, result })
-  const fingerprint = createHash("sha256").update(identity).digest("hex")
   const absolutePath = path.join(workspace.workspacePath, filename)
+  const legacyFiles = await loadLegacyWebReconArtifacts(workspace, path.posix.dirname(filename))
   let artifact: WebReconArtifact | undefined
 
   try {
@@ -147,6 +329,8 @@ async function persistWebReconResultUnlocked(input: {
         typeof item.lastSeenAt !== "string" ||
         !Number.isSafeInteger(item.occurrences) || Number(item.occurrences) < 1 ||
         !Array.isArray(item.attempts) ||
+        item.attempts.some((attempt) => !attempt || typeof attempt !== "object" || typeof attempt.completedAt !== "string" || typeof attempt.sessionID !== "string") ||
+        item.occurrences !== item.attempts.length ||
         !item.result || typeof item.result !== "object"
       )
     ) {
@@ -169,27 +353,21 @@ async function persistWebReconResultUnlocked(input: {
     }
   }
 
-  const attempt = { completedAt, sessionID }
-  const existing = artifact.observations.find((item) => item.fingerprint === fingerprint)
-  if (existing) {
-    existing.lastSeenAt = completedAt
-    existing.occurrences += 1
-    existing.attempts.push(attempt)
-  } else {
-    artifact.observations.push({
-      fingerprint,
-      program,
-      requestedTarget,
-      firstSeenAt: completedAt,
-      lastSeenAt: completedAt,
-      occurrences: 1,
-      attempts: [attempt],
-      result,
+  for (const legacy of legacyFiles) {
+    addWebReconObservation(artifact, {
+      program: legacy.record.program,
+      requestedTarget: legacy.record.requestedTarget,
+      completedAt: legacy.record.completedAt,
+      sessionID: legacy.record.sessionID,
+      result: legacy.record.result,
     })
   }
+  addWebReconObservation(artifact, { program, requestedTarget, completedAt, sessionID, result })
   artifact.workspacePath = workspace.workspacePath
   artifact.updatedAt = completedAt
-  return TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\n")
+  const savedPath = await TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\\n")
+  await removeMigratedLegacyArtifacts(workspace, savedPath, legacyFiles)
+  return savedPath
 }
 
 const webReconArtifactLocks = new Map<string, Promise<void>>()

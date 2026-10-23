@@ -60,6 +60,20 @@ test("web_recon persists results and synchronizes target notes in the canonical 
           expect((await checkpoint("unavailable", phase, undefined, "Not applicable to the localhost fixture")).metadata.saved).toBe(true)
         }
         expect((await checkpoint("begin", "url_collection")).metadata.saved).toBe(true)
+        const legacyCompletedAt = "2026-10-22T17:00:00.000Z"
+        const legacyPath = path.join(workspace.workspacePath, "recon", "header_audit-2026-10-22T17-00-00-000Z.json")
+        await fs.writeFile(legacyPath, JSON.stringify({
+          schemaVersion: 1,
+          recordType: "web-recon-result",
+          program: "header_audit",
+          requestedTarget: target,
+          canonicalTarget: workspace.targetURL,
+          workspaceID: workspace.id,
+          workspacePath: workspace.workspacePath,
+          sessionID: "ses_legacy_recon",
+          completedAt: legacyCompletedAt,
+          result: { output: "Legacy redacted header finding snapshot", findings: [] },
+        }, null, 2) + "\\n")
         const tool = await WebReconTool.init()
         const result = await tool.execute({
           program: "robots_scan",
@@ -85,9 +99,13 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         const saved = JSON.parse(await fs.readFile(artifactPath, "utf-8"))
         expect(saved.recordType).toBe("web-recon-results")
         expect(saved.workspaceID).toBe(workspace.id)
-        expect(saved.observations).toHaveLength(1)
-        expect(saved.observations[0].program).toBe("robots_scan")
-        expect(saved.observations[0].result.output).toContain("robots.txt found")
+        expect(saved.observations).toHaveLength(2)
+        const currentObservation = saved.observations.find((item: { program: string }) => item.program === "robots_scan")
+        const migratedObservation = saved.observations.find((item: { program: string }) => item.program === "header_audit")
+        expect(currentObservation.result.output).toContain("robots.txt found")
+        expect(migratedObservation.result.output).toBe("Legacy redacted header finding snapshot")
+        expect(migratedObservation.attempts).toEqual([{ completedAt: legacyCompletedAt, sessionID: "ses_legacy_recon" }])
+        expect(await fs.readdir(path.join(workspace.workspacePath, "recon"))).toEqual(["web-recon-results.json"])
 
         const repeated = await tool.execute({
           program: "robots_scan",
@@ -106,9 +124,10 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         expect(requests).toEqual(["/robots.txt", "/robots.txt"])
         expect(repeated.metadata.artifact_path).toBe(artifactPath)
         const afterRepeat = JSON.parse(await fs.readFile(artifactPath, "utf-8"))
-        expect(afterRepeat.observations).toHaveLength(1)
-        expect(afterRepeat.observations[0].occurrences).toBe(2)
-        expect(afterRepeat.observations[0].attempts).toHaveLength(2)
+        expect(afterRepeat.observations).toHaveLength(2)
+        const repeatedObservation = afterRepeat.observations.find((item: { program: string }) => item.program === "robots_scan")
+        expect(repeatedObservation.occurrences).toBe(2)
+        expect(repeatedObservation.attempts).toHaveLength(2)
 
         await Promise.all([1, 2].map((n) => tool.execute({
           program: "robots_scan",
@@ -125,9 +144,10 @@ test("web_recon persists results and synchronizes target notes in the canonical 
           metadata: () => {},
         } as never)))
         const afterConcurrent = JSON.parse(await fs.readFile(artifactPath, "utf-8"))
-        expect(afterConcurrent.observations).toHaveLength(1)
-        expect(afterConcurrent.observations[0].occurrences).toBe(4)
-        expect(afterConcurrent.observations[0].attempts).toHaveLength(4)
+        expect(afterConcurrent.observations).toHaveLength(2)
+        const concurrentObservation = afterConcurrent.observations.find((item: { program: string }) => item.program === "robots_scan")
+        expect(concurrentObservation.occurrences).toBe(4)
+        expect(concurrentObservation.attempts).toHaveLength(4)
         expect(await fs.readdir(path.join(workspace.workspacePath, "recon"))).toEqual(["web-recon-results.json"])
 
         const notes = await fs.readFile(path.join(workspace.workspacePath, "notes.md"), "utf-8")
