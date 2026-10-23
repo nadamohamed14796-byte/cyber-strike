@@ -1,34 +1,19 @@
 # Recon Phase Tool Matrix
 
-This is the operational tool-selection contract for CyberStrike's canonical recon phases. It is a candidate map, not a claim that any executable is installed or that every candidate must be run. For each phase, select a primary method plus a complementary method only when it adds distinct evidence; check availability before invocation, inspect actual help/version, and record all outcomes.
+Reference only. The canonical `/recon` prompt owns authorization, phase order, checkpoints, retry/resume, canonical output paths, and completion claims. This matrix only maps phases to capability candidates and the evidence expected from each phase.
 
-## One-time readiness per run; phase-specific execution
+Tool names are candidates, not proof of installation or an allowlist. Inspect the actual registered schema or executable before use. Select one suitable primary method and add another only when it closes a concrete gap or provides independent evidence. Persist all outcomes and keep request-level scope enforcement enabled.
 
-1. Read `recon_checkpoint(action="status", target_url=<canonical program-root URL>)` and inspect the workspace once at run start. Reuse valid artifacts; repeat completed work only after new evidence or documented invalidation.
-2. Load `recon-methodology` and `community-tool-selection` once when absent. Load only relevant specialist skills and reuse them across phases.
-3. Discover native tool schemas plus relevant CLI/script candidates. Preflight a CLI only when likely to be used; inspect its executable/help/version once per runtime or version change, not every phase.
-4. There is no fixed tool-count limit or ban on code/scripts. Use alternatives when they add coverage, corroboration, or recovery from missing/partial results; do not repeat equivalent methods merely to fill a list.
-5. Install a dependency only for a concrete need when a verified existing alternative is insufficient and official installation is permitted.
-6. Save useful raw output/errors, tool/version, redacted invocation, input/source, normalized output, deduplication counts, and provenance directly in the canonical workspace. Keep large outputs in artifacts and summarize counts/paths/errors in context.
-7. Distinguish zero results from failed, unavailable, skipped, and unattempted sources. Retry only when the cause changes or a bounded retry is justified; record gaps accurately.
-8. Execute only the current phase's relevant methods after its prerequisite gate. The setup scope check runs once per unchanged setup, while active tools enforce persisted scope for every concrete request.
+## Per-source status meanings
 
-## Extensible discovery and artifact policy
+- `success`: results were returned and saved.
+- `zero-results`: the source completed successfully and returned no valid records.
+- `failed`, `blocked`, or `unavailable`: an attempted source did not complete; record its reason and preserve partial results.
+- `skipped-by-selection`: an available or known alternative was intentionally not selected; not an attempted source and not pending work.
+- `pending`: a selected work item still needs execution or recovery.
 
-### Source orchestration
-- Treat every relevant discovery source as a candidate capability, not as a closed allowlist. The matrix names examples; it does not prohibit other installed tools, public web services, APIs, or a small local script.
-- For subdomains, the built-in collector's default is one certificate-transparency source (crt.sh), one passive-DNS source (OTX), and at most one installed primary CLI (subfinder, Amass, Assetfinder, Findomain, Sublist3r, in that order). CertSpotter and alternative CLIs are optional fallbacks, not default duplicate runs. Select them explicitly only for a documented coverage gap, blocked source, or independent confirmation. Official program asset exports or other registered public-data/API methods may be added when they provide useful distinct evidence.
-- Prefer existing registered tools and the bundled collector. A dedicated CLI is optional for public APIs; do not create a wrapper if an existing HTTP/API capability already handles the request. Install a missing CLI only when the selected methods leave a material gap, using the trusted package manager or official upstream and verifying help/version. Do not bypass runtime/network controls. Keep API keys out of prompts, logs, artifacts, and reports.
-- Build the worklist for every eligible root and record a terminal state for each root/source pair. Distinguish success with results, successful zero results, unavailable credentials/tool, HTTP/API failure, parser failure, intentionally skipped-by-selection, and interrupted/pending work. Unselected alternatives are recorded with a reason as skipped-by-selection, not pending. Resume only actual pending pairs and continue independent selected sources after one fails.
-- Preserve provenance per hostname and reconcile raw/valid/rejected/duplicate counts. A failed source is not a zero-result source; one successful tool is not proof of exhaustive coverage.
-- Avoid redundant source calls when they provide no independent coverage. Prefer cached results only when source, input root, time/freshness policy, and tool version meet the reuse criteria.
+The detailed source ledger and the `recon_checkpoint` phase ledger are different: never infer phase completion from a source status alone.
 
-### Minimal artifacts and reusable scripts
-- Keep one canonical normalized inventory per type (subdomains.txt, live-hosts.txt, ports.txt, urls.txt, parameters.txt, endpoints.txt) plus a source manifest and final summary. Use the existing workspace layout; do not create a second root or directories solely because another instruction lists them.
-- Keep stable stage scripts under the existing runs/ area: one reusable script per stage or source adapter, not one script per host, source result, or retry. Scripts consume the previous canonical inventory and write to the next stage's canonical output.
-- Keep one run manifest/checkpoint and existing run logs. Store raw outputs only when needed for provenance, debugging, or audit; do not duplicate the same normalized data into multiple files.
-- On rerun, compare input hashes, source/tool version, and stage settings. Reuse valid outputs; otherwise update canonical inventories through supported artifact operations and retain only the raw evidence needed to explain changes. Do not overwrite manual notes or evidence.
-- Completion requires verified output paths, counts, source coverage, and a clear list of failed/unavailable/skipped/not-attempted work. Never report exhaustive discovery if source coverage remains unresolved.
 ## Phase matrix
 
 | Canonical phase | Required capability and candidates | Alternatives / complementary evidence | Required saved artifacts and completion check |
@@ -46,12 +31,6 @@ This is the operational tool-selection contract for CyberStrike's canonical reco
 | `vulnerability_testing` | Specific skill-selected CLI or registered native tool based on evidence and hypothesis; never run all scanners by default | Local response-diff helper, controlled request comparisons, manual test plan | Hypothesis, preconditions, baseline/control, exact low-impact test, request/response evidence, status and stop condition. Must not begin until endpoint inventory is complete. |
 | `reporting` | `validate_evidence_manifest.py`, report-writing and triage skills | `jq`/Python local schema checks | Verify evidence paths, redaction, reproduction steps, impact, limitations, and save the final report to `reports/recon-final.md`. |
 
-## Tool selection rules
+## Apply the matrix
 
-- The phase matrix does not replace actual registered-tool discovery. For native CyberStrike tools, inspect the available tool registry/schema and call the registered tool; do not try to invoke a native tool as a CLI.
-- The CLI name in a row is a candidate only. A tool is usable only after local preflight confirms it is executable and its real CLI behavior is verified.
-- There is no fixed source/tool count. Use a primary method plus independent alternatives when they add coverage, corroboration, or recovery; registered tools, verified CLIs, and useful scripts/code are all valid. Do not run duplicate methods just to increase the count.
-- Tool availability must be checked against this runtime/environment, not inferred from skill text, community maps, or another machine.
-- Preserve partial results even if a source fails. Retry only after changing the cause or when a bounded retry is justified; avoid infinite retry loops.
-- Keep phase completion honest: `complete` means required capabilities were attempted appropriately, eligible work was exhausted, and artifacts were verified. If a tool is missing, disclose the gap; do not imply the unavailable data source returned zero results.
-- Never install every tool in the matrix as a batch. Install only when a concrete phase need exists, after checking official instructions, source integrity, platform compatibility, and permission.
+Use the row matching the current checkpoint phase. Reuse verified outputs when inputs and tool versions are unchanged. Do not create a new script, directory, or normalized inventory per host/tool/retry; use the canonical workspace outputs and preserve raw evidence only where it supports provenance or debugging. If a candidate is absent, use a suitable registered alternative or record the real gap. Never bypass authorization or mark unresolved work complete.
