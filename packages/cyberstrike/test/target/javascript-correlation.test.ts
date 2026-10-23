@@ -2,6 +2,12 @@ import { expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { Instance } from "../../src/project/instance"
+import { Session } from "../../src/session"
+import { Request } from "../../src/session/request"
+import { TargetMemory } from "../../src/target"
+import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
+import { tmpdir } from "../fixture/fixture"
 import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
@@ -803,4 +809,116 @@ test("retains separately hosted JavaScript as a scope-check candidate, while exp
   ]
   expect(selectJavaScriptAssetsForCorrelation(candidates).map((item) => item.tag)).toEqual(["app", "cdn", "api"])
   expect(selectJavaScriptAssetsForCorrelation(candidates, new URL("https://static.cdn-example.net/chunks/vendor.js?cache=2")).map((item) => item.tag)).toEqual(["cdn"])
+})
+
+
+test("end-to-end correlation persists map-derived endpoints and links them to captured request evidence", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const targetURL = "https://app.example.test"
+        await TargetMemory.configureScope(targetURL, {
+          include: ["app.example.test"],
+          authorizationSource: "JavaScript correlation integration fixture",
+          authorizationReference: "https://example.test/security",
+        })
+        const session = await Session.create({})
+        const addCapturedResponse = (input: {
+          keyHash: string
+          urlPath: string
+          contentType: string
+          body: string
+        }) => Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: input.urlPath,
+          keyHash: input.keyHash,
+          origin: targetURL,
+          scheme: "https",
+          host: "app.example.test",
+          pageUrl: targetURL + "/",
+          response: {
+            status: 200,
+            headers: { "content-type": input.contentType },
+            body: input.body,
+          },
+        })
+
+        const bundleURL = targetURL + "/assets/app.js"
+        const sourceMapURL = targetURL + "/assets/app.js.map"
+        const rawSecret = "map-derived-secret-must-not-persist"
+        const mapBody = JSON.stringify({
+          version: 3,
+          file: "app.js",
+          sources: ["src/profile.ts", "src/render.ts"],
+          sourcesContent: [
+            'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }',
+            'export function renderProfile(value) { document.body.innerHTML = value }\nconst api_key = "' + rawSecret + '";',
+          ],
+          names: [],
+          mappings: "",
+        })
+
+        expect(addCapturedResponse({
+          keyHash: "js-bundle",
+          urlPath: "/assets/app.js",
+          contentType: "application/javascript",
+          body: "//# sourceMappingURL=app.js.map",
+        })).toBeDefined()
+        expect(addCapturedResponse({
+          keyHash: "js-source-map",
+          urlPath: "/assets/app.js.map",
+          contentType: "application/json",
+          body: mapBody,
+        })).toBeDefined()
+        const apiRequest = addCapturedResponse({
+          keyHash: "api-profile",
+          urlPath: "/api/profiles/42",
+          contentType: "application/json",
+          body: JSON.stringify({ id: 42, name: "test-profile" }),
+        })
+        expect(apiRequest).toBeDefined()
+
+        const result = await JavaScriptCorrelation.build({
+          sessionID: session.id,
+          targetURL,
+          javascriptURL: bundleURL,
+        })
+
+        const diskGraph = JSON.parse(await fs.readFile(result.graphPath, "utf-8"))
+        const endpointInventory = JSON.parse(await fs.readFile(result.endpointPath, "utf-8"))
+        const testerSurvey = JSON.parse(await fs.readFile(result.testerSurveyPath, "utf-8"))
+        const mapReference = result.graph.sourceMapReferences?.find((item) => item.url === sourceMapURL)
+        const mappedProfile = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/profile.ts")
+        const mappedRender = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/render.ts")
+        const profileCandidate = result.graph.javascriptAnalysis.requestCandidates.find((item) =>
+          item.path.startsWith("/api/profiles/") && item.pathParameters.length > 0,
+        )
+        const observedEndpoint = result.graph.endpointCandidates.find((item) =>
+          item.path.startsWith("/api/profiles/") && item.observedRequestIDs.includes(apiRequest!.id),
+        )
+
+        expect(result.graph.javascriptAssets.map((asset) => asset.url)).toContain(bundleURL)
+        expect(mapReference).toMatchObject({ status: "analyzed", url: sourceMapURL })
+        expect(mappedProfile?.analysis?.functions.some((fn) => fn.name === "loadProfile")).toBe(true)
+        expect(mappedProfile?.analysis?.requests.some((request) => request.path.startsWith("/api/profiles/") && request.pathParameters.length > 0)).toBe(true)
+        expect(mappedRender?.analysis?.riskSignals.some((signal) => signal.kind === "dom-html-sink")).toBe(true)
+        expect(profileCandidate?.observedRequestIDs).toContain(apiRequest!.id)
+        expect(observedEndpoint?.observedInTraffic).toBe(true)
+        expect(result.graph.edges.some((edge) => edge.to === "request:" + apiRequest!.id && edge.relation === "static-endpoint-path-overlap")).toBe(true)
+        expect(result.graph.evidence.some((item) => item.requestID === apiRequest!.id)).toBe(true)
+        expect(diskGraph.sourceMapReferences.find((item: { url: string }) => item.url === sourceMapURL).status).toBe("analyzed")
+        expect(endpointInventory.endpoints.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
+        expect(testerSurvey.cases.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
+        for (const artifact of [JSON.stringify(diskGraph), JSON.stringify(endpointInventory), JSON.stringify(testerSurvey)]) {
+          expect(artifact).not.toContain(rawSecret)
+          expect(artifact).not.toContain("document.body.innerHTML = value")
+        }
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
 })
