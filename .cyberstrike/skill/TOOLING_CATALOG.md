@@ -15,6 +15,7 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 7. Use machine-readable output where supported and store artifacts in the canonical target workspace. Do not create one output file per tool if a shared phase ledger/artifact can retain provenance.
 8. Tool output is a lead, not a finding. Use a baseline, a relevant negative control, and minimal controlled validation. Never claim a tool ran or succeeded without its actual result.
 9. Installation is not authorization. Apply program scope, rate limits, privacy, non-destructive defaults, and explicit permission for state-changing tests. Never send secrets or production customer data to third-party services.
+10. Public passive-research APIs queried through `curl`/`wget` must use a read-only GET/HEAD route with one clear domain in a conventional lookup query, no request body, no credentials/cookie/API-key headers, and no automatic redirects. The runtime checks the queried domain against persisted target scope rather than treating the external research provider as the target. An unlisted provider can be used when it follows this contract; if its API requires credentials or a nonstandard request shape, use a suitable registered capability or add a narrowly tested route rather than bypassing the gate.
 
 ## Phase-to-tool matrix
 
