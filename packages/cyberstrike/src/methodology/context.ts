@@ -234,7 +234,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     ] : []),
     "## Required Skill Preflight",
     `Phase-critical skills for ${phaseId}: ${(PHASE_REQUIRED_SKILLS[phaseId] ?? []).join(", ") || "none pinned"}. Load each relevant required skill by exact canonical name with the skill tool action=load, and verify returned content. Load only additional specialists justified by current evidence; reuse skills already loaded in this task.`,
-    "The ranked list contains candidates, not loaded content. If a required skill applies, load it with skill(action="load") using its exact canonical name and verify the returned content. If a required skill is missing or denied, search once for an allowed canonical alternative and record the exact gap; never claim a failed load succeeded. Search/load again only when new evidence changes the phase's needs. Do not begin active testing if scope validation failed.",
+    "The ranked list contains candidates, not loaded content. When a required skill applies, load it with the skill tool action=load using its exact canonical name and verify the returned content. If a required skill is missing or denied, search once for an allowed canonical alternative and record the exact gap; never claim a failed load succeeded. Search/load again only when new evidence changes the phase's needs. Do not begin active testing if scope validation failed.",
   ]
 
   try {
