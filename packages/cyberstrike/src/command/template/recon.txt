@@ -48,25 +48,16 @@ For every unfinished batch, persist:
 - The reason each item remains unfinished.
 - The exact next operation required to resume.
  
-### 0.2.1 One canonical inventory per data type
+### 0.2.1 Canonical artifact ownership
 
-Keep the main user-facing inventories as a small set of canonical files directly in the target workspace root. The single final report remains at `reports/recon-final.md` because the reporting checkpoint requires that exact artifact. Do not create numbered/chunk files, nested folders solely for presentation, per-host workspaces, one result file per tool, or duplicate copies of the same normalized data. Use existing workspace subdirectories only where a registered tool requires them for raw evidence, requests, logs, or internal artifacts; merge normalized results into the canonical inventories below.
+Do not maintain a second artifact list in this prompt. Before execution, use these existing authorities:
 
-- `scope.txt` — complete confirmed scope and exclusions.
-- `subdomains.txt` — deduplicated candidate hostnames.
-- `subdomain-sources.json` — durable per-root/source state, attempt history, counts, errors, provenance, and host observations.
-- `live-hosts.txt` — validated live hosts, not only HTTP 200 responses.
-- `ports.txt` — observed ports/services, only where authorized and actually checked.
-- `urls.txt` — deduplicated collected URLs, retaining meaningful variants as attributes.
-- `parameters.txt` — observed parameter names linked to endpoint, method, location, and source.
-- `endpoints.txt` — one record per normalized origin + method + path template; merge parameter and source evidence.
-- `javascript-analysis.md` — actionable routes, request shapes, parameter/header/auth clues, and source references.
-- `findings.md` — evidence-backed findings or an explicit empty status.
-- `reports/recon-final.md` — the final run report with truthful phase states, counts, sources, artifact paths, gaps, and the exact resume point when incomplete.
+- `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` defines the canonical artifact(s), output areas, and completion checks for each reconnaissance phase.
+- `.cyberstrike/skill/TOOLING_CATALOG.md` defines tool/API/CLI/helper selection and preflight, and is the sole definition of the `subdomain-sources.json` ledger schema.
+- The registered `recon_checkpoint` schema and runtime enforce phase order, status transitions, and valid artifact paths. Runtime validation wins if descriptive prose conflicts; never bypass it. If a mismatch is found, correct the canonical documentation rather than adding another competing list.
+- The exact absolute target workspace returned by `target_workspace` is the destination for target-specific outputs.
 
-Use target_artifact(area="root", filename="<name>") for these top-level inventories; root writes directly into the existing workspace root. Use the matching named area for other artifacts and area="reports" with filename="recon-final.md" for the required final report. Reuse and update these files instead of creating alternative names for the same inventory. A phase is not complete until its canonical artifacts match the saved ledger. Keep raw observations only when they add provenance, debugging, or audit value; never overwrite the only useful evidence copy.
-If checkpoint validation rejects an artifact path, do not bypass the error or claim success: save the verified result to an allowed canonical path and retry. Live-host discovery and URL collection are separate phases; one never implies the other is complete.
-
+Use `target_artifact` for supported writes and update canonical inventories in place. The final recon report must be `reports/recon-final.md`. Keep normalized inventories at the paths specified by the phase matrix. Do not create a file per tool, source, host, retry, or arbitrary batch; do not create a parallel source/phase ledger or helper script just to satisfy a checklist. Store raw output only when it preserves distinct provenance, reproducibility, or debugging value, and use an existing standard workspace area appropriate to its content. Never overwrite the only useful raw evidence or manual notes. If an artifact path is rejected, use an allowed canonical path; never bypass checkpoint validation. Live-host discovery and URL collection are separate phases.
 
 ### 0.3 Tool integrity
 
@@ -297,7 +288,7 @@ Before active execution, verify the saved scope and any required phase prerequis
 
 # 5. Execute the reconnaissance stages
 
-Run the stages in dependency order. Maintain a stage ledger and persist each meaningful batch before proceeding.
+Run the stages in dependency order. Persist per-source/item progress in the canonical source ledger or existing run metadata, as appropriate, and persist meaningful batch outputs before proceeding. `recon_checkpoint` remains the sole phase-state ledger; do not create a second stage/phase ledger.
 
 A stage is complete only when its eligible frontier is exhausted and its outputs have been verified, or when every remaining item has an explicit, documented terminal disposition.
 

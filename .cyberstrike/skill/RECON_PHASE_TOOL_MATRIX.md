@@ -1,6 +1,7 @@
 # Recon Phase Matrix: State, Artifacts, and Completion
 
-This file defines phase-specific outputs and completion checks only. It is **not** a tool catalog or a second source inventory.
+This file defines phase-specific outputs and completion checks only. It is **not** a tool catalog, a second source inventory, or a separate runtime state ledger. The recon orchestrator uses this matrix to choose canonical outputs; registered `recon_checkpoint` code/schema enforces actual transitions and valid paths. If the runtime contract and this prose ever differ, do not bypass the runtime: reconcile this matrix with the enforced contract.
+
 
 - **Workflow authority:** the canonical recon command and registered `recon_checkpoint` gate own phase order, scope, begin/complete state, retry/resume, and phase completion.
 - **Tool authority:** `.cyberstrike/skill/TOOLING_CATALOG.md` is the single source for candidate tools, APIs, CLIs, preflight, helper scripts, and the asset-discovery ledger schema.

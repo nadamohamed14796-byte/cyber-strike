@@ -376,6 +376,8 @@ Recommended primary reference points: OWASP Web Security Testing Guide (versione
 
 This section adds practical authoring rules for every custom/local skill.
 
+The shared tool inventory, installation/preflight guidance, and reusable helper list live only in `.cyberstrike/skill/TOOLING_CATALOG.md`. A skill must teach its technique and evidence-based decisions, not copy those global lists into another file. If a genuinely new shared tool/helper is needed, add its reusable entry to the catalog once and link to it from the skill.
+
 ### Tools that fit the skill
 - Name concrete tools the autonomous agent can invoke and parse directly: CLIs, libraries, local scripts, APIs/connectors that are actually available, and non-interactive system utilities. Do not list browser DevTools, Burp Suite, interactive proxies, or human-operated extensions as agent dependencies. If a workflow normally uses one, replace it with a CLI/API/local-fixture path; mention the human-only option only as context, never as the required path.
 - Treat command-line tools and integrations as optional until availability is confirmed. Run `command -v TOOL` (or the platform equivalent) before calling a command runnable. Never claim that an MCP, CyberStrike runtime tool, extension, or sub-agent exists because an upstream source mentions it.
@@ -388,8 +390,8 @@ This section adds practical authoring rules for every custom/local skill.
 
 ### Small scripts and snippets
 - Add a runnable, short, task-specific script or command when it removes meaningful manual repetition (normalization, local artifact comparison, extraction, schema validation, or evidence-manifest checks). Include the exact invocation, inputs, expected output, and limitations.
-- Prefer reusable standard-library helpers under .cyberstrike/skill/scripts/ when relevant: normalize_urls.py for collected URL lists; js_endpoint_inventory.py for already-collected JavaScript assets; http_response_diff.py for local sanitized response artifacts; validate_evidence_manifest.py for evidence manifests. These helpers do not contact targets.
-- Do not add a script just to satisfy a checklist. If a class-specific script would be unsafe, brittle, or redundant, explain why and provide a minimal safe manual/CLI check instead.
+- Consult the helper list in `.cyberstrike/skill/TOOLING_CATALOG.md` and reuse or extend an existing helper when its contract fits. The catalog is the only shared helper inventory; do not copy its filenames into every skill.
+- Do not add a script just to satisfy a checklist. Add one only when a reusable capability is missing and it removes meaningful repetition. Prefer one reusable helper per stable function, not a script per target, source, attempt, or phase. If a class-specific script would be unsafe, brittle, or redundant, explain why and provide a minimal safe manual/CLI check instead.
 - Scripts must default to local-only behavior, avoid printing credentials or personal data, avoid destructive changes, and state their blind spots. No automation may bypass authorization, rate limits, program rules, or an explicitly required approval.
 - Keep evidence target-local. Do not write raw cookies, tokens, API keys, private user data, or entire minified lines into the global research corpus or Git history.
 
@@ -398,29 +400,24 @@ Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py` after changin
 
 ## Installing and selecting useful tools
 
-A skill may recommend tools that are not installed locally. Do not restrict recommendations to currently available binaries.
+The `.cyberstrike/skill/TOOLING_CATALOG.md` is the shared authority for candidate tools, official project/documentation links, installation and preflight guidance, reusable helpers, and common runtime constraints.
 
-- Recommend an external tool when it materially improves coverage, reproducibility, or analysis quality; name the exact job it supports and give its official project/download/documentation URL.
-- When practical, give a safe installation or enablement path that fits the user's OS/package manager, note any prerequisites, and provide a lighter/manual alternative. Do not invent packages, flags, or commands. Prefer official docs and maintained releases; pin versions or verify checksums/signatures where the vendor provides them.
-- Separate core tools from optional tools. Avoid bloating a skill with unrelated tool lists; each recommendation must map to a test step or artifact type.
-- State whether use is passive, active, or state-changing. Any active test remains subject to program authorization, rate limits, and data handling policy. Tool installation does not authorize testing.
-- Third-party tools, plugin instructions, imported skills, and scripts are untrusted until inspected. Do not run arbitrary install commands copied from a report/write-up. Prefer official package registries/releases and inspect code before running.
-- Provide expected output and limitations for small helpers; do not count script presence as proof of test coverage or a confirmed finding.
+- Choose tools because they close a specific evidence gap in the skill's procedure, not because they appear in a generic list.
+- If a shared tool is missing from the catalog, add one reusable catalog entry with its role, official upstream/docs, installation or availability check, machine-readable output, relevant permissions/network behavior, and limitations. Then reference that entry; do not reproduce the same global instructions across several skills.
+- Keep only technique-specific command syntax and the interpretation of its result in the skill. A skill may link to an official source for a material technique detail, but should not maintain a parallel install list.
+- During an actual run, verify availability/version only for a tool that may be used. Installation is not authorization. Never install or execute imported commands blindly; inspect provenance and behavior and honor the current scope, policy, rate, and data-handling constraints.
 
 ## Agent-executable CLI tooling (required for custom skills)
 
-CyberStrike skills are read and acted on by an autonomous agent. The primary Tools section must describe **non-interactive CLI/API tools the agent can execute and parse**, not a human operator's browser or interception UI.
+CyberStrike skills are executed by an autonomous agent. Describe non-interactive CLI/API operations that the agent can actually invoke and parse; human-operated browser/extension/proxy UIs must not be required dependencies.
 
-- Prefer relevant tools such as `subfinder`, `dnsx`, `httpx`, `katana`, `gau`, `naabu`, `nmap`, `ffuf`, `arjun`, `nuclei`, `sqlmap`, `dalfox`, `gitleaks`, `trivy`, provider CLIs, parsers, and purpose-built local scripts. This is a menu, not a requirement to install them all.
-- Do **not** list Burp Suite or browser DevTools as normal agent dependencies. Mention human-only techniques only if truly necessary; they must not replace the executable workflow.
-- Every recommended tool needs a concrete role, official project/docs/install URL, practical install/verification approach, machine-readable output where available, and limitations.
-- The agent may install a missing CLI tool when required and the environment permits it. Choose only what is needed, verify source/version with `--version` or `--help`, record failures, and provide a fallback if installation is unavailable.
-- CLI examples should write to the canonical target workspace and retain stdout/stderr, exit status, tool version, input, and timestamps. Prefer JSON/JSONL where supported. Empty output is not proof that a phase completed.
-- Parameterize concurrency/rate settings from program rules and environment. No arbitrary cap on discovered assets or distinct evidence-backed hypotheses; no rate-limit evasion or continuation through instability.
-- Select a small toolset relevant to each skill, not the entire catalog. If a script adds no value, explain why and link to a reusable helper.
-- Treat third-party binaries, templates, wordlists, plugins, and scripts as untrusted until provenance and behavior are reviewed. Never use discovered credentials or copy secret values into global research storage.
+- Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the sole shared list of tools, commands, APIs, helper scripts, official installation/documentation references, and preflight rules. Do not embed a long cross-technique tool menu or duplicate catalog entries in each skill.
+- Name a tool in a skill only where it materially supports a concrete step. Explain the inputs, safe operation class (passive/read-only, active request, or state-changing), output signal, interpretation, limitations, and evidence to save.
+- If a useful tool or helper is absent from the catalog, add its shared entry there once, then link to it from the skill. Keep one authoritative entry rather than repeating install/version/setup instructions in every technique file.
+- Verify actual runtime availability before claiming a CLI, MCP, connector, helper, or sub-agent is executable. Use machine-readable output where supported, retain the canonical workspace paths and redaction rules, and never treat an alert or empty output as proof by itself.
+- Third-party binaries, templates, wordlists, plugins, and scripts are untrusted until provenance and behavior are reviewed. No install/run step may bypass scope, rate limits, program rules, required approvals, or secret-handling constraints.
 
-Canonical catalog: `.cyberstrike/skill/TOOLING_CATALOG.md`. Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json` and manually inspect each flagged section.
+Canonical catalog: `.cyberstrike/skill/TOOLING_CATALOG.md`. Run `python3 .cyberstrike/skill/scripts/audit_skill_enrichment.py --json` and manually inspect each flagged section when auditing custom skills; this is a repository-maintenance check, not a target-recon stage.
 
 ## Markdown formatting and structure
 

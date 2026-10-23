@@ -4,6 +4,15 @@ The single canonical reference for agent-executable tools, local helpers, APIs, 
 
 This is a candidate catalog, not proof that a binary is installed, maintained, compatible, enabled, or authorized. Prefer native registered CyberStrike tools and existing helpers when they cover the need. Browser UI, browser extensions, and interactive proxy GUIs are not agent-executable CLI dependencies.
 
+## Source-of-truth boundaries
+
+- This file owns the shared tool/API/CLI/helper catalog and the asset-discovery source-ledger schema. It does not own recon phase state or define a second phase-to-artifact list.
+- `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` owns the documented phase-to-artifact mapping and phase completion criteria. The recon orchestrator defines execution policy; the registered `recon_checkpoint` schema/runtime enforces actual phase state and accepted artifact paths.
+- Specialist skills own technique-specific decision steps and evidence criteria. They may include a minimal command example needed to explain a technique, but must not repeat the general tool inventory, helper inventory, installation/preflight guide, or source-ledger schema. Add a shared tool/helper here once, then reference it from skills.
+- `packages/cyberstrike/src/research/sources.ts` is the executable source-adapter registry for global public-research ingestion via `/update`. It is separate from target reconnaissance and is not a duplicate of the per-root `subdomain-sources.json` run ledger. Do not delete or merge the two merely because both represent sources.
+- If instructions disagree, actual registered tool schemas and runtime validation determine what can execute. Reconcile the single authoritative documentation location instead of adding another list, manifest, collector, or helper.
+
+
 ## Selection rules
 
 1. Identify the phase and exact evidence gap before selecting a tool.

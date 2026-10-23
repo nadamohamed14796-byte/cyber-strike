@@ -123,3 +123,15 @@ When a request contains a target, program scope, scope file, domain/subdomain li
 4. For large scope files, persist the original input beneath the root workspace, process bounded chunks, write checkpoints/run manifests, and make child workspaces nested below the root assets folder only as assets are validated/processed. Never create one workspace per unvalidated candidate.
 5. Never write target outputs to an invented folder such as /root/targets or the current shell directory by default. A failed/missing workspace or failed save is not success; report the exact failure and do not claim the artifact exists.
 6. Keep the root notes.md as a concise parent summary and each child asset's notes.md/evidence inside its own workspace. Validate final artifact paths, sizes, counts, and run status before saying work is complete.
+
+## CyberStrike agent instruction ownership
+
+Keep one authority per responsibility; do not add another inventory, source list, phase ledger, or helper merely to restate an existing contract.
+
+- Recon execution policy and phase order: `packages/cyberstrike/src/command/template/recon.txt`; enforced phase state and accepted artifacts: registered `recon_checkpoint` runtime/schema in `packages/cyberstrike/src/tool/recon-checkpoint.ts`.
+- Recon phase outputs and completion criteria: `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md`.
+- Shared tools, APIs, CLIs, helper scripts, preflight, and the per-root subdomain source-ledger format: `.cyberstrike/skill/TOOLING_CATALOG.md`.
+- Technique-specific procedures: load the relevant specialist `SKILL.md`; do not copy global tool/helper lists into skills.
+- Global public-research ingestion: `.cyberstrike/commands/update.md` and `packages/cyberstrike/src/research/sources.ts`. This is separate from target recon and its `subdomain-sources.json` ledger.
+- Target-specific observations and normalized inventories belong in the existing target workspace via the registered target tools. Preserve the one-workspace, canonical-artifact, resume, and verification rules above.
+

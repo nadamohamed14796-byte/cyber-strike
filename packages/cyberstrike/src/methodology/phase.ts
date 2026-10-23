@@ -1,6 +1,9 @@
 // ============================================================
-// PHASE DEFINITIONS — 14-phase testing methodology
-// CyberStrike methodology engine — phase lifecycle management
+// PHASE DEFINITIONS — 14-phase pentest methodology and skill-routing IDs.
+// This is distinct from the 12-phase reconnaissance checkpoint state machine in
+// src/tool/recon-checkpoint.ts. Keep their responsibilities separate: these IDs
+// route methodology skills and track broader testing; recon_checkpoint owns recon
+// execution order, persistent phase status, and artifact validation.
 // ============================================================
 
 export namespace Phase {
