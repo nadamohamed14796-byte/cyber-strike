@@ -10,14 +10,6 @@ CANONICAL RECONNAISSANCE METHODOLOGY — FOLLOW AS ONE CONNECTED WORKFLOW
 
 
 
-ADAPTIVE TOOL READINESS — ONCE PER RUN
-- Inspect the saved recon checkpoint and canonical workspace once. Treat registered tool schemas and executables actually present on PATH as the runtime truth; the tool matrix is an optional lookup, never an allowlist or mandatory extra setup step.
-- Load the general recon methodology once when absent. Load a specialist skill only when current evidence makes it useful, then reuse the loaded content.
-- Inspect a relevant tool's schema/help/version once per runtime or version change. Choose one suitable primary method; use another only for distinct coverage, corroboration, or recovery from a concrete failure. Do not run equivalent tools just to increase tool counts.
-- Install a missing CLI only when existing methods leave a material gap. Use the official upstream or trusted package manager, verify the installed executable/help/version, and then run only the missing source. Do not install a whole catalog or create per-tool wrapper scripts.
-- Save outputs, statuses, counts, errors, and provenance to the existing canonical workspace and source ledger. Keep one normalized inventory per data type; create no duplicate folders, result files, scripts, or summaries for the same data.
-- Distinguish success, zero results, failure, unavailable, blocked, intentionally unselected, and interrupted work. Only retry when useful; preserve scope enforcement and resume from saved per-item progress.
-
 Purpose
 Perform recon like a careful human researcher: understand authorization, build a stable workspace, gather evidence in a deliberate order, preserve every useful result in its proper place, and resume without repeating completed work. Every stage consumes artifacts from earlier stages and produces named artifacts for later stages. Do not jump randomly between scanners or treat running a command as proof that a stage is complete.
 
@@ -29,7 +21,7 @@ Perform recon like a careful human researcher: understand authorization, build a
 - Write a clear scope summary in scope/ and notes.md: included entries, exclusions, policy/source, supported entry types, rejected/unsupported entries, and any ambiguity.
 
 1. Create and verify the target workspace before recon
-- Use target_workspace to initialize one canonical parent workspace for the program/domain, not one unrelated root per URL or subdomain.
+- Use one canonical parent workspace for each program scope. Keep every root domain included in one supplied program scope together even if the domains are unrelated; keep genuinely distinct programs separate. Never create a workspace for every URL or subdomain.
 - Verify the returned path and reuse the workspace layout already created by CyberStrike. Do not create a second target root or add directories just to satisfy a duplicate prompt; create a missing directory only when a registered tool requires it and record why.
 - Save workspace metadata and notes.md. Child asset workspaces belong beneath the parent's assets/ hierarchy only after an asset is validated; keep a stable parent/child identity and preserve provenance.
 - Create or resume the persisted recon checkpoint manifest. Inspect existing files and manifest before any work. Reuse valid outputs and record source/time/hash; do not overwrite manual notes or make duplicate snapshots.
