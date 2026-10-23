@@ -112,9 +112,11 @@ test("intentional source-selection skips are terminal but do not count as covera
   const unused = rows.find((item) => item.source === "subfinder")
   expect(unused).toBeDefined()
   unused!.status = "skipped"
+  unused!.attempt_count = 0
   unused!.skipped_by_selection = true
   unused!.error = "not selected by adaptive default"
   const counts = ledger.counts as Record<string, unknown>
+  counts.sources_attempted = 1
   counts.sources_success = 1
   counts.sources_skipped = 0
   counts.sources_not_selected = 1
