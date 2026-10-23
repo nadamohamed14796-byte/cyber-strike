@@ -152,7 +152,7 @@ Community lists are discovery aids; verify project maintenance, license, and sup
 ### Helper-script contract
 Collect repository URL, commit/hash, path, detector, and redacted fingerprint. Do not test leaked credentials or access private repositories without explicit permission.
 
-Keep raw artifacts separate from normalized output. Preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and evidence path. Use JSON/JSONL when useful and test redaction on local fixtures.
+Normalize routine results into the canonical inventory and preserve provenance, timestamp, tool/version, detector/rule, error state, confidence, redaction, and artifact path. Keep raw artifacts only when they add unique evidence, reproducibility, or diagnostic value; otherwise do not create a duplicate copy. Use JSON/JSONL when useful and test redaction on local fixtures.
 
 ### Handoff
 Return actual commands and versions, inputs/outputs, records processed, redaction status, errors, confidence, limitations, and next skill. Never include live secrets in notes or reports.
