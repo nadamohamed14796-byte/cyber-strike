@@ -90,6 +90,20 @@ function discoveryLedger(
   }
 }
 
+test("asset discovery reports the exact required ledger fields when schema keys are wrong", () => {
+  const result = validateAssetDiscoveryLedger(JSON.stringify({
+    schemaVersion: 1,
+    target: "example.com",
+    sources: [],
+  }), "")
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain("schema_version: 1")
+  expect(result.reason).toContain("roots: string[]")
+  expect(result.reason).toContain("hosts: normalized host records[]")
+  expect(result.reason).toContain("Observed top-level fields: schemaVersion, sources, target")
+  expect(result.reason).toContain("do not guess a new schema or rerun successful collectors")
+})
+
 test("asset discovery cannot be marked complete with a mid-run domain/source still pending", () => {
   const roots = Array.from({ length: 50 }, (_, index) => "domain" + String(index + 1).padStart(2, "0") + ".example.com")
   const pendingRoot = roots[29]
