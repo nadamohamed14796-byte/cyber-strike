@@ -23,9 +23,9 @@ After receiving the report output:
 2. Write all three AI sections based on the actual findings data
 3. Replace each `<!-- AI: ... -->` placeholder with your written content
 4. Resolve the canonical workspace with `cyberstrike target tree <parent-url>` and save the final report using the `write` tool:
-   - A report containing only one child asset's findings belongs in that child's `reports/report-<timestamp>.md`.
-   - A program-wide or multi-asset report belongs in the parent workspace's `reports/report-<timestamp>.md`; keep each finding's affected host/endpoint explicit.
-   - Use `.cyberstrike/reports/report-<timestamp>.md` only when no canonical target workspace exists.
+   - Use the exact `metadata.recommendedReportPath` returned by `generate_report`; it is the stable `reports/security-final.md` in the selected child or parent workspace.
+   - Complete the three AI sections and replace the same file at that path. Do not create a new timestamped copy on each generation.
+   - Use `.cyberstrike/reports/security-final.md` only when no canonical target workspace exists.
    Do not put a child-only report in the parent folder or mix several assets into one child report. The generated data is session-level unless the included content has been explicitly scoped to a single asset.
 
 Do NOT skip the AI sections. They are the most valuable part of the report — the deterministic data is compiled automatically, but the executive analysis requires your reasoning.
@@ -36,8 +36,8 @@ The `include_sections` parameter allows generating partial reports. Default incl
 - For one program or target tree, pass `target_url` as the saved parent URL. Descendant assets are included by default.
 - For one asset only, pass its `target_url` with `include_children: false`.
 - Target-limited reports filter findings by their persisted target workspace IDs, filter intelligence/coverage/requests to the selected workspace host/path boundaries, and explicitly count findings excluded because they belong to another workspace or were never attributed. Do not re-add excluded findings manually.
-- The report metadata includes `recommendedReportPath`. Fill the three AI placeholders, then write the completed report to that exact path so the parent report goes in the parent `reports/` directory and child reports stay under the child workspace.
+- The report metadata includes `recommendedReportPath`. Fill the three AI placeholders, then update that exact stable path so the parent report stays in the parent `reports/` directory and child reports stay under the child workspace. Repeated generation for the same workspace replaces this current report rather than creating another timestamped file.
 - Methodology and agent-performance values remain session-wide; the target report labels them accordingly. The target-limited validation section intentionally does not claim a session-wide gate result is asset-specific.
 
 ### Automatic target report persistence
-When a target workspace is selected, `generate_report` writes the generated report draft to `metadata.recommendedReportPath` inside that workspace's `reports/` directory. Complete the three AI placeholders and overwrite that same file with the finished report. If `target_url` is omitted and exactly one observed root program matches the session, the root and descendants are selected automatically. If multiple root programs are observed, choose `target_url` explicitly; the tool refuses to mix programs.
+When a target workspace is selected, `generate_report` writes the generated report draft to the stable `reports/security-final.md` path and returns it as `metadata.recommendedReportPath`. Complete the three AI placeholders and overwrite that same file with the finished report; do not create one new report file per call. If `target_url` is omitted and exactly one observed root program matches the session, the root and descendants are selected automatically. If multiple root programs are observed, choose `target_url` explicitly; the tool refuses to mix programs.

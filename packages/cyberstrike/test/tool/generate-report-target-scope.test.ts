@@ -115,11 +115,19 @@ test("target-scoped reports include authorized descendants but not unrelated wor
         expect(apiReport.output).toContain("Total Intel Entries: 1")
         expect(apiReport.metadata.findingCount).toBe(1)
         expect(apiReport.metadata.includedWorkspaceIDs).toEqual([api!.id])
-        expect(apiReport.metadata.recommendedReportPath).toContain(api!.relativePath + "/reports/report-")
+        expect(apiReport.metadata.recommendedReportPath).toContain(api!.relativePath + "/reports/security-final.md")
         expect(apiReport.metadata.automaticallySaved).toBe(true)
         const savedChildReport = await fs.readFile(apiReport.metadata.recommendedReportPath as string, "utf-8")
         expect(savedChildReport).toContain("API-only finding")
         expect(savedChildReport).not.toContain("Root-only finding")
+
+        const repeatedApiReport = await tool.execute({
+          target_url: api!.targetURL,
+          include_children: false,
+          include_sections: ["findings", "coverage", "attack_surface"],
+        }, toolContext(session.id))
+        expect(repeatedApiReport.metadata.recommendedReportPath).toBe(apiReport.metadata.recommendedReportPath)
+        expect(await fs.readdir(path.join(api!.workspacePath, "reports"))).toEqual(["security-final.md"])
       } finally {
         await Session.remove(session.id)
       }
@@ -160,7 +168,7 @@ test("generate_report defaults to the only observed root target and saves a work
         expect(result.metadata.includedWorkspaceIDs).toContain(child!.id)
         expect(result.metadata.automaticallySaved).toBe(true)
         const reportPath = result.metadata.recommendedReportPath as string
-        expect(reportPath).toContain(root.workspace.relativePath + "/reports/report-")
+        expect(reportPath).toContain(root.workspace.relativePath + "/reports/security-final.md")
         const saved = await fs.readFile(reportPath, "utf-8")
         expect(saved).toContain("Scoped auto-report finding")
       } finally {

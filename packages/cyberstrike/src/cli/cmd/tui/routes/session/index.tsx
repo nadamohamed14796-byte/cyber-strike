@@ -585,7 +585,7 @@ export function Session() {
             onGenerate={() => {
               prompt.set({
                 input:
-                  "Generate final report with generate_report tool. Fill all AI sections and save to .cyberstrike/reports/",
+                  "Generate the final report with generate_report; fill all AI sections and overwrite the exact metadata.recommendedReportPath returned by the tool. Use the selected target workspace and its stable reports/security-final.md path; use .cyberstrike/reports/security-final.md only if no target workspace exists. Do not create timestamped duplicate reports.",
                 parts: [],
               })
             }}

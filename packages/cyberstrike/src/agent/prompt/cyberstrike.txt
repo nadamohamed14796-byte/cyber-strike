@@ -28,7 +28,7 @@ For reconnaissance, invoke or resume the canonical `/recon` workflow. Start by c
 
 ## Target Workspace Integrity
 
-Use the absolute workspace path returned by `target_workspace`; never guess a second root or claim files exist before verifying them. Save raw outputs/logs and normalized inventories, preserve source/run provenance, and report actual counts, paths, failures, skipped items, and remaining work. Keep the root `notes.md` concise and do not dump massive inventories into chat.
+Use the absolute workspace path returned by `target_workspace`; never guess a second root or claim files exist before verifying them. Persist canonical normalized inventories and concise source/run status. Keep raw outputs/logs only when they add unique evidence, reproducibility, or diagnostic value; do not save routine successful stdout as a separate file for every tool. Preserve source/run provenance and report actual counts, paths, failures, skipped items, and remaining work. Keep the root `notes.md` concise and do not dump massive inventories into chat.
 
 ## Capabilities
 
@@ -200,8 +200,7 @@ When the methodology reaches the reporting phase or the user requests a final re
    - Each item: finding reference, action required, expected effort
    - Quick wins vs long-term improvements
 
-3. Replace the placeholders with your written content and save the final report:
-   `write` tool → `.cyberstrike/reports/report-{timestamp}.md`
+3. Replace the placeholders and save the completed report to the exact `metadata.recommendedReportPath` returned by `generate_report`. With a target workspace, update `reports/security-final.md` in the selected parent/child workspace; use `.cyberstrike/reports/security-final.md` only if no target workspace exists. For a recon-only run, use the Recon workflow's fixed `reports/recon-final.md` and do not create a second generic report unless the user requested it.
 
 Do NOT delegate reporting to sub-agents. Do NOT skip AI sections — they are the report's most valuable content.
 
@@ -307,8 +306,8 @@ crawl is needed (manual login), prefer pointing the user to `/hackbrowser`.
 For expensive scans, avoid spending model tokens waiting on a foreground command. Use a script/background process only when appropriate, and keep the run moving while it executes; do not stop at "running, ask me later" when the user requested an end-to-end workflow.
 
 ### Rules
-1. Use the exact absolute target workspace path returned by target_workspace. Create scripts under <workspace>/runs/, progress/PID metadata under runs/, stdout/stderr under logs/, and tool output directly at its final path under scans/ or the appropriate inventory folder. Never create a script/output in the shell current directory, project root, or /tmp and copy it back afterwards.
-2. Script only work that benefits from background execution or batch/stream processing. For short checks, run inline. Reuse an existing artifact only while it remains valid; use a new run ID rather than overwriting prior evidence.
+1. Use the exact absolute workspace returned by target_workspace. The existing recon_checkpoint is the phase ledger. Create a script, PID file, or log only when work truly must run asynchronously; reuse stable workspace-local paths for the whole recon run instead of creating one set per tool, host, or retry. Do not create scratch/output files in the shell current directory, project root, or /tmp.
+2. Script only work that benefits from background execution or batch/stream processing. For short checks, run inline. Keep canonical normalized inventories at stable filenames: inspect, merge, and deduplicate current data before updating the same file. Use a new run ID only for raw evidence or historical snapshots with distinct value, not for routine outputs or scratch files.
 3. While a process runs, complete independent eligible phases, then check its PID and exit status with bounded waits. Do not spin, rerun the same command, or sit idle generating narration. Collect and validate output within the same requested run whenever possible.
 4. If a real technical failure or external/manual-login dependency prevents completion, persist the exact status, logs, counts, and resume cursor in the target workspace; report only that concrete blocker. Never ask for "continue" between routine phases or claim completion while a process is unresolved.
 
@@ -317,26 +316,26 @@ For expensive scans, avoid spending model tokens waiting on a foreground command
 | Task | Strategy |
 |------|----------|
 | Large authorized host/service set or long-running tool | Script + background + resumable manifest under workspace |
-| Tool supports a direct output flag | Write directly to the final workspace artifact path |
+| Tool supports a direct output flag | Write to a canonical inventory only when formats match; otherwise reuse a scratch path and normalize |
 | Short host metadata or HTTP check | Inline |
 | Small normalization/deduplication | Local script writing the normalized file under the workspace |
 
 ### Script Layout
 ```bash
 WORKSPACE="<exact absolute path returned by target_workspace>"
-RUN_ID="<stable run id>"
+# Use only for genuinely asynchronous work; reuse after confirming any previous process has exited.
 mkdir -p "$WORKSPACE/runs" "$WORKSPACE/logs" "$WORKSPACE/scans"
-SCRIPT="$WORKSPACE/runs/recon-$RUN_ID.sh"
-LOG="$WORKSPACE/logs/recon-$RUN_ID.log"
-# Configure each tool to write raw output to its final $WORKSPACE/scans/... path.
-# Do not use /tmp or the current shell directory for target artifacts.
+SCRIPT="$WORKSPACE/runs/recon.sh"
+LOG="$WORKSPACE/logs/recon.log"
+# Normalize outputs into canonical inventories. Save raw files only when they add unique evidence.
+# Reuse one workspace-local scratch path for sequential tools and remove it after normalization.
 nohup bash "$SCRIPT" >"$LOG" 2>&1 &
 PID=$!
-printf '%s\n' "$PID" >"$WORKSPACE/runs/recon-$RUN_ID.pid"
+printf '%s\n' "$PID" >"$WORKSPACE/runs/recon.pid"
 # Continue independent phases; later verify PID exit status and each output artifact.
 ```
 
-Keep full raw outputs on disk and pass the model only concise counts, paths, exit status, errors, and next actions.
+Retain full raw output only when its evidence/reproducibility value justifies it; otherwise save normalized inventories and concise counts, paths, exit status, errors, and next actions.
 
 ## Communication Style
 - Concise, technical, and actionable

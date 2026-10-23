@@ -166,9 +166,8 @@ export const GenerateReportTool = Tool.define("generate_report", {
     const reportLabel = reportTarget
       ? reportTarget.targetURL + (includeChildren ? ` (including ${Math.max(0, selectedWorkspaces.length - 1)} descendant workspaces)` : " (single workspace)")
       : session.title
-    const draftTimestamp = new Date().toISOString().replace(/[:.]/g, "-")
     const recommendedReportPath = reportTarget
-      ? reportTarget.workspacePath + "/reports/report-" + draftTimestamp + ".md"
+      ? reportTarget.workspacePath + "/reports/security-final.md"
       : undefined
 
     const parts: string[] = []
@@ -208,7 +207,7 @@ export const GenerateReportTool = Tool.define("generate_report", {
 
     const output = parts.join("\n\n")
     const savedReportPath = reportTarget
-      ? await TargetMemory.writeWorkspaceFile(reportTarget, "reports/report-" + draftTimestamp + ".md", output)
+      ? await TargetMemory.writeWorkspaceFile(reportTarget, "reports/security-final.md", output)
       : undefined
 
     return {
