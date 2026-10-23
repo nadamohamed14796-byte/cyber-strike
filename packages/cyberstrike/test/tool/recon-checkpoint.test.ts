@@ -106,6 +106,15 @@ test("asset discovery accepts terminal root/source coverage when the host invent
   expect(result).toMatchObject({ valid: true, roots: 2, sourcePairs: 4, uniqueHosts: 1, gaps: 0 })
 })
 
+test("asset discovery rejects stale source counters even when every pair is terminal", () => {
+  const { ledger, hostsText } = discoveryLedger(["example.com"], ["crt.sh"])
+  const counts = ledger.counts as Record<string, unknown>
+  counts.sources_success = 0
+  const result = validateAssetDiscoveryLedger(JSON.stringify(ledger), hostsText)
+  expect(result.valid).toBe(false)
+  expect(result.reason).toContain("sources_success")
+})
+
 test("intentional source-selection skips are terminal but do not count as coverage gaps", () => {
   const { ledger, hostsText } = discoveryLedger(["example.com"], ["crt.sh", "subfinder"])
   const rows = ledger.sources as Array<Record<string, unknown>>
