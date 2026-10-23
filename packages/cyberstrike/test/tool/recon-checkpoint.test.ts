@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun } from "../../src/target/recon-gate"
+import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision } from "../../src/target/recon-gate"
 import {
   reconRunID,
   reconBeginDisposition,
@@ -332,4 +332,29 @@ test("JavaScript and endpoint phases require non-skippable canonical handoff fil
   expect(missingRequiredReconArtifacts("javascript_analysis", ["./javascript-analysis.md", "endpoints.txt"])).toEqual([])
   expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints/candidates.json"])).toEqual(["endpoints.txt"])
   expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints.txt"])).toEqual([])
+})
+
+
+test("recon tool execution requires the phase to be running", () => {
+  const state = records("complete")
+  state.url_collection = { status: "pending" }
+  const decision = reconPhaseExecutionDecision("url_collection", state)
+  expect(decision.allowed).toBe(false)
+  expect(decision.reason).toContain("phase url_collection is pending")
+})
+
+test("recon tool execution blocks phase jumps when an earlier phase is unresolved", () => {
+  const state = records("complete")
+  state.url_collection = { status: "running" }
+  state.live_hosts_ports = { status: "failed", reason: "scanner failed" }
+  const decision = reconPhaseExecutionDecision("url_collection", state)
+  expect(decision.allowed).toBe(false)
+  expect(decision.reason).toContain("live_hosts_ports=failed")
+})
+
+test("recon tool execution allows a running phase when all prerequisites are resolved", () => {
+  const state = records("complete")
+  state.url_collection = { status: "running" }
+  const decision = reconPhaseExecutionDecision("url_collection", state)
+  expect(decision).toEqual({ allowed: true, reason: "scope and phase checks passed" })
 })
