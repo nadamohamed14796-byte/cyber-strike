@@ -508,6 +508,8 @@ export function passiveResearchLookup(
   args: string[],
 ): { targetURL: string; phase: ReconPhase } | undefined {
   if (requestURL.username || requestURL.password) return undefined
+  // curl normally reads a per-user config file; -q/--disable must be first.
+  if (args[0] !== "-q" && args[0] !== "--disable") return undefined
 
   // curl's method flag is case-sensitive: -X sets the method, while -x selects a proxy.
   if (args.some((item) => item === "-x" || item.startsWith("-x") && item.length > 2)) return undefined
