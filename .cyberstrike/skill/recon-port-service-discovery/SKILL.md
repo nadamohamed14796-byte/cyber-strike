@@ -95,7 +95,7 @@ Treat recon output as a candidate lead, not a finding. there is no fixed hypothe
 
 ### Evidence record and confidence
 
-For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, raw-evidence location, corroborating source, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
+For each candidate, preserve normalized asset, source/provenance, observation time, scope proof, resolver/HTTP/tool and relevant version, corroborating source, raw-evidence location when retained, negative control, attribution confidence, next action, and related-skill trigger. Separate **asset confidence** (is it related to the organization?) from **security confidence** (is a vulnerability demonstrated?).
 
 Use this scale consistently: **C0** unverified string; **C1** one passive source; **C2** independently corroborated attribution or service response; **C3** specific configuration/exposure verified with a control; **C4** security impact independently reproduced within scope. C1/C2 are not confirmed vulnerabilities.
 
@@ -131,7 +131,7 @@ For each host/port, record the exact resolver result, scope basis, service-detec
 Use only command-line tools that produce inspectable output. Port/service checks are active network activity: confirm the target and allowed port ranges before running them, respect program rate limits, and stop if instability appears.
 
 ### Tools and purpose
-- `naabu` — TCP port inventory for authorized hosts; preserve raw output and scanner errors.
+- `naabu` — TCP port inventory for authorized hosts; preserve scanner errors and retain raw output only when it adds unique evidence, reproducibility, or diagnostic value.
 - `nmap` — targeted service/version detection for explicitly permitted hosts and ports; avoid intrusive scripts unless separately authorized.
 - `tlsx` — TLS certificate and handshake metadata for discovered services.
 - `httpx` — HTTP/TLS metadata for confirmed web services, not a vulnerability verdict.
@@ -151,7 +151,7 @@ Use only command-line tools that produce inspectable output. Port/service checks
 - https://owasp.org/www-project-web-security-testing-guide/
 
 ### Output contract and helper guidance
-Normalize results into host, port, protocol, state, service, timestamp, tool/version, input artifact, and error fields. Keep scanner errors distinct from closed ports; a banner alone is not a vulnerability. Preserve native output and write normalized data separately. Do not silently overwrite source evidence. If no purpose-built helper fits, use a small local parser with JSON/JSONL output and fixtures rather than adding an unrelated dependency.
+Normalize results into host, port, protocol, state, service, timestamp, tool/version, input artifact, and error fields. Keep scanner errors distinct from closed ports; a banner alone is not a vulnerability. Normalize routine results into the canonical port/service inventory. Retain native output only when it adds unique service evidence, improves reproducibility, or diagnoses a failure; do not silently overwrite original input evidence. If no purpose-built helper fits, use a small local parser with JSON/JSONL output and fixtures rather than adding an unrelated dependency.
 
 ### Handoff
 Return command/tool and version, input/output artifact references, observed host/port counts, failures, limitations, confidence, and the next skill. Empty output or an unavailable tool is an explicit status, not proof that the phase completed.
