@@ -5,16 +5,21 @@ import { PHASE_REQUIRED_SKILLS, rankSkillsForPhase, skillQueriesForPhase } from 
 import { Skill } from "../../src/skill"
 import { Instance } from "../../src/project/instance"
 import type { SkillIndex } from "../../src/skill/index-engine"
-import { RECON_METHODOLOGY_PROMPT, RECON_SPECIALIZED_COVERAGE_PROMPT } from "../../src/methodology/recon"
+import { RECON_SPECIALIZED_COVERAGE_PROMPT } from "../../src/methodology/recon"
 
 describe("Recon prompt specialization", () => {
-  test("keeps the specialized coverage matrix without injecting the full workflow twice", () => {
+  test("keeps coverage detail without duplicating the canonical workflow", () => {
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("RECON COVERAGE MATRIX")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("DNS and subdomain coverage")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Infrastructure/ASN and origin leads")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("JavaScript and client-side surfaces")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("CANONICAL RECONNAISSANCE METHODOLOGY")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Specialized asset types")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("Coverage accounting")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).toContain("canonical /recon orchestrator")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("0. Read and validate the scope")
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("recon_checkpoint(action=")
     expect(RECON_SPECIALIZED_COVERAGE_PROMPT).not.toContain("4. Collect URLs from independent sources")
-    expect(RECON_SPECIALIZED_COVERAGE_PROMPT.length).toBeLessThan(RECON_METHODOLOGY_PROMPT.length / 2)
+    expect(RECON_SPECIALIZED_COVERAGE_PROMPT.length).toBeLessThan(7000)
   })
 })
 
