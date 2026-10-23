@@ -129,6 +129,6 @@ Reuse `recon_checkpoint` as the only phase-state ledger. Do not create a second 
 
 ## Adaptive tool selection
 
-The canonical `/recon` prompt owns initialization, scope, phase order, checkpoint actions, source resumption, canonical outputs, and completion/reporting. Consult `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` for phase-specific capability candidates when useful; it is a reference, not an allowlist or run-everything checklist.
+The canonical `/recon` prompt and `recon_checkpoint` own initialization, scope, phase order, checkpoint actions, source resumption, canonical outputs, and completion/reporting. Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Use `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` only for phase artifacts, dependencies, and completion criteria; it is not a tool catalog or run-everything checklist.
 
 Load specialist skills only when the observed asset type or evidence makes their deeper procedure relevant. Choose one primary method and add a tool/source only for distinct coverage, a concrete gap, or recovery from an actual failure. Check schemas/versions only for candidates to be run; do not repeat identical preflight across phases or install the whole catalog. Distinguish zero results from failure, unavailable, blocked, skipped-by-selection, not applicable, and pending work. A phase is complete only after applicable work and saved artifacts are verified, with remaining gaps stated honestly.
