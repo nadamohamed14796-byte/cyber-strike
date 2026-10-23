@@ -61,8 +61,21 @@ export function validateAssetDiscoveryLedger(
     return { valid: false, reason: "The source ledger is not valid JSON: " + (error instanceof Error ? error.message : String(error)) }
   }
 
-  if (ledger.schema_version !== 1 || !Array.isArray(ledger.roots) || !Array.isArray(ledger.sources) || !Array.isArray(ledger.hosts)) {
-    return { valid: false, reason: "The source ledger has an unsupported or incomplete schema; preserve it and repair/rebuild the ledger before completing asset_discovery." }
+  const missingSchemaFields = [
+    ...(ledger.schema_version === 1 ? [] : ["schema_version: 1"]),
+    ...(Array.isArray(ledger.roots) ? [] : ["roots: string[]"]),
+    ...(Array.isArray(ledger.sources) ? [] : ["sources: root/source records[]"]),
+    ...(Array.isArray(ledger.hosts) ? [] : ["hosts: normalized host records[]"]),
+  ]
+  if (missingSchemaFields.length) {
+    const observedKeys = Object.keys(ledger).sort()
+    return {
+      valid: false,
+      reason: "The source ledger schema is invalid. Missing or invalid required fields: " + missingSchemaFields.join(", ") +
+        ". Expected top-level fields: schema_version, roots, sources, hosts, counts, run_status. " +
+        "Observed top-level fields: " + (observedKeys.length ? observedKeys.join(", ") : "(none)") +
+        ". Repair the existing JSON using .cyberstrike/skill/TOOLING_CATALOG.md; do not guess a new schema or rerun successful collectors.",
+    }
   }
   const roots = ledger.roots
   if (!roots.length || roots.some((root) => typeof root !== "string" || !root.trim()) || new Set(roots).size !== roots.length) {
