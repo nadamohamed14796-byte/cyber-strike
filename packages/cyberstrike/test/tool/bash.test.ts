@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerTargets } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerTargets } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -67,6 +67,37 @@ describe("Scope-aware URL source input extraction", () => {
 
   test("does not infer a target from a file name when a source reads a list from disk", () => {
     expect(scannerTargets(["waybackurls"], "cat domains.txt | waybackurls")).toEqual([])
+  })
+})
+
+describe("Read-only passive-research API scope routing", () => {
+  test("routes recognized CT, passive-DNS, and archive lookups to the queried target domain", () => {
+    expect(passiveResearchLookup(new URL("https://crt.sh/?q=%25.example.com&output=json"), ["-s"])).toEqual({
+      targetURL: "https://example.com/",
+      phase: "asset_discovery",
+    })
+    expect(passiveResearchLookup(new URL("https://api.certspotter.com/v1/issuances?domain=api.example.com"), ["--silent"])).toEqual({
+      targetURL: "https://api.example.com/",
+      phase: "asset_discovery",
+    })
+    expect(passiveResearchLookup(new URL("https://otx.alienvault.com/api/v1/indicators/domain/example.com/passive_dns"), ["-s"])).toEqual({
+      targetURL: "https://example.com/",
+      phase: "asset_discovery",
+    })
+    expect(passiveResearchLookup(new URL("https://web.archive.org/cdx/search/cdx?url=*.example.com/*&output=json"), ["-s"])).toEqual({
+      targetURL: "https://example.com/",
+      phase: "url_collection",
+    })
+  })
+
+  test("does not treat writes, redirects, credentials, secrets, or unknown routes as passive lookups", () => {
+    const url = new URL("https://crt.sh/?q=%25.example.com&output=json")
+    expect(passiveResearchLookup(url, ["-X", "POST"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["--data", "domain=example.com"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-L"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-H", "Authorization: Bearer $TOKEN"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-H", "X-API-Key: $OTX_API_KEY"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api?domain=example.com"), ["-s"])).toBeUndefined()
   })
 })
 
