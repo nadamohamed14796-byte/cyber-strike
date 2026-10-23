@@ -7,8 +7,8 @@ import sys
 import urllib3
 urllib3.disable_warnings()
 
-def check_s3(name):
-    """Check AWS S3 bucket existence and permissions."""
+def check_s3(name, check_writes=False):
+    """Check AWS S3 bucket existence; write testing is explicit opt-in."""
     urls = [
         f"https://{name}.s3.amazonaws.com",
         f"https://s3.amazonaws.com/{name}",
@@ -27,14 +27,15 @@ def check_s3(name):
                     results.append({"url": url, "status": "LISTING_ENABLED", "severity": "HIGH", "preview": resp2.text[:500]})
             elif resp.status_code == 404 or "NoSuchBucket" in resp.text:
                 results.append({"url": url, "status": "NOT_FOUND", "severity": "NONE"})
-            # Try upload
-            try:
-                put_resp = requests.put(url + "/cyberstrike_test.txt", data="test", timeout=10, verify=False)
-                if put_resp.status_code in [200, 201]:
-                    results.append({"url": url, "status": "PUBLIC_WRITE", "severity": "CRITICAL"})
-                    requests.delete(url + "/cyberstrike_test.txt", timeout=5, verify=False)
-            except:
-                pass
+            # State-changing probe is opt-in; cleanup can fail even after a successful PUT.
+            if check_writes:
+                try:
+                    put_resp = requests.put(url + "/cyberstrike_test.txt", data="test", timeout=10, verify=False)
+                    if put_resp.status_code in [200, 201]:
+                        results.append({"url": url, "status": "PUBLIC_WRITE", "severity": "CRITICAL"})
+                        requests.delete(url + "/cyberstrike_test.txt", timeout=5, verify=False)
+                except Exception:
+                    pass
         except:
             pass
     return results
@@ -81,6 +82,11 @@ def main():
     parser = argparse.ArgumentParser(description="Cloud storage enumeration")
     parser.add_argument("target", help="Target name or domain")
     parser.add_argument("--names", nargs="+", default=None, help="Custom bucket names to check")
+    parser.add_argument(
+        "--check-writes",
+        action="store_true",
+        help="Explicitly try an S3 PUT/DELETE marker probe; only use with written program authorization",
+    )
     parser.add_argument("--json-output", action="store_true")
     args = parser.parse_args()
 
@@ -93,7 +99,7 @@ def main():
 
     for name in names:
         for provider, check_fn in [("S3", check_s3), ("Azure", check_azure), ("GCP", check_gcp)]:
-            results = check_fn(name)
+            results = check_s3(name, check_writes=args.check_writes) if provider == "S3" else check_fn(name)
             for r in results:
                 r["name"] = name
                 r["provider"] = provider
@@ -107,7 +113,12 @@ def main():
     print(f"Results: {len(vulns)} vulnerable / {len(all_results)} checked")
 
     if args.json_output:
-        print(json.dumps({"target": args.target, "vulnerabilities": vulns, "all_results": all_results}, indent=2))
+        print(json.dumps({
+            "target": args.target,
+            "write_probe_enabled": args.check_writes,
+            "vulnerabilities": vulns,
+            "all_results": all_results,
+        }, indent=2))
 
 if __name__ == "__main__":
     main()
