@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
-import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import fs from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
+import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -97,7 +100,7 @@ test("redacts sensitive JSON response preview values across key families and quo
   expect(preview).not.toContain("multi word credential must be hidden")
 })
 
-test("preserves exact literal secret candidates and source location in private target-local correlation artifacts", async () => {
+test("persists secret fingerprints and source locations without raw values", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const secret = "private-api-key-value-must-not-be-persisted"
   const [source] = extractCapturedJavaScriptSources([{
@@ -106,17 +109,17 @@ test("preserves exact literal secret candidates and source location in private t
     responseContentType: "application/javascript",
     responseBody: 'const api_key = "' + secret + '";',
   }])
-  expect(source?.analysis?.secretCandidates[0]?.value).toBe(secret)
-  expect(source?.analysis?.secretCandidates[0]?.fingerprint).toBeTruthy()
+  expect(source?.analysis?.secretCandidates[0]?.fingerprint).toMatch(/^[a-f0-9]{20}$/)
 
   const persisted = sanitizeJavaScriptSourceFileForPersistence(source!)
   const serialized = JSON.stringify(persisted)
-  expect(serialized).toContain(secret)
-  expect(persisted.analysis?.secretCandidates[0]?.value).toBe(secret)
-  expect(persisted.analysis?.secretCandidates[0]?.line).toBe(source?.analysis?.secretCandidates[0]?.line)
-  expect(persisted.analysis?.secretCandidates[0]?.fingerprint).toBe(source?.analysis?.secretCandidates[0]?.fingerprint)
-  expect(serialized).toContain("Exact candidate values are stored in this private target-local artifact")
-  expect(serialized).toContain("Do not export raw values")
+  expect(serialized).not.toContain(secret)
+  expect(persisted.analysis?.secretCandidates[0]).toMatchObject({
+    kind: "api-key",
+    line: 1,
+    confidence: "candidate",
+  })
+  expect(serialized).toContain("Secret-like values are never retained")
 })
 
 test("reuses analysis for the same JavaScript content hash", async () => {
@@ -563,4 +566,202 @@ test("merges static parameter variants into one canonical endpoint and unions th
   expect(endpoints[0]?.authSignals).toEqual(["bearer", "api-key"])
   expect(endpoints[0]?.cookieSignals).toEqual(["session", "preference"])
   expect(endpoints[0]?.sourceFiles).toEqual(["bundle-a.js", "bundle-b.js"])
+})
+
+
+test("discovers external sourceMappingURL references, resolves relative paths, strips query data, and deduplicates", () => {
+  const source = [
+    'fetch("/api/profile")',
+    "//# sourceMappingURL=app.js.map?token=must-not-be-forwarded",
+    "/*# sourceMappingURL=../maps/shared.js.map */",
+    "//@ sourceMappingURL=app.js.map#duplicate",
+  ].join("\n")
+  expect(extractJavaScriptSourceMapReferences(source, "https://app.example.com/assets/app.js")).toEqual([
+    "https://app.example.com/assets/app.js.map",
+    "https://app.example.com/maps/shared.js.map",
+  ])
+  expect(extractStaticJavaScriptEndpoints(source)).not.toContain("https://app.example.com/assets/app.js.map")
+})
+
+test("parses captured version-3 source maps and analyzes embedded source contents without retaining source text", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const secret = "map-secret-must-not-leak-12345"
+  const mapBody = JSON.stringify({
+    version: 3,
+    file: "app.js",
+    sources: ["src/profile.ts", "src/render.ts"],
+    sourcesContent: [
+      'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }',
+      'function renderUser(value) { document.body.innerHTML = value }\nconst api_key = "' + secret + '";',
+    ],
+    names: [],
+    mappings: "",
+  })
+  const files = extractCapturedJavaScriptSources([{
+    id: "captured-map",
+    url: "https://app.example.com/assets/app.js.map",
+    responseContentType: "application/json",
+    responseBody: mapBody,
+  }])
+  const map = files.find((file) => file.sourceMapSource === undefined)
+  const profileSource = files.find((file) => file.sourceMapSource === "src/profile.ts")
+  const renderSource = files.find((file) => file.sourceMapSource === "src/render.ts")
+  expect(files).toHaveLength(3)
+  expect(map).toMatchObject({
+    sourceMapStatus: "analyzed",
+    sourceMapVersion: 3,
+    sourceMapSourceCount: 2,
+    sourceMapEmbeddedSourceCount: 2,
+    sourceMapSourcesContentAvailable: true,
+  })
+  expect(profileSource?.analysis?.requests.some((request) => request.path === "/api/profiles/{profileId}")).toBe(true)
+  expect(renderSource?.analysis?.riskSignals.some((signal) => signal.kind === "dom-html-sink")).toBe(true)
+  expect(JSON.stringify(files)).toContain("src/profile.ts")
+  expect(JSON.stringify(files)).not.toContain(secret)
+  expect(JSON.stringify(files)).not.toContain("document.body.innerHTML = value")
+})
+
+test("marks maps without embedded sources and malformed or truncated maps as incomplete", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const noContent = extractCapturedJavaScriptSources([{
+    id: "map-no-content",
+    url: "https://app.example.com/assets/no-content.js.map",
+    responseContentType: "application/json",
+    responseBody: JSON.stringify({ version: 3, sources: ["src/app.ts"], names: [], mappings: "" }),
+  }])
+  expect(noContent).toHaveLength(1)
+  expect(noContent[0]?.sourceMapStatus).toBe("no-sources-content")
+  expect(noContent[0]?.analysis?.notes.some((note) => note.includes("no non-empty sourcesContent"))).toBe(true)
+
+  const partial = extractCapturedJavaScriptSources([{
+    id: "map-partial",
+    url: "https://app.example.com/assets/partial.js.map",
+    responseContentType: "application/json",
+    responseBody: JSON.stringify({
+      version: 3,
+      sources: ["src/available.ts", "src/missing.ts"],
+      sourcesContent: ['fetch("/api/available")', null],
+      names: [],
+      mappings: "",
+    }),
+  }])
+  expect(partial[0]?.sourceMapStatus).toBe("partial-sources-content")
+  expect(partial).toHaveLength(2)
+  expect(partial[1]?.sourceMapSource).toBe("src/available.ts")
+
+  const malformed = extractCapturedJavaScriptSources([{
+    id: "map-invalid",
+    url: "https://app.example.com/assets/invalid.js.map",
+    responseContentType: "application/json",
+    responseBody: "{not-json",
+  }])
+  expect(malformed[0]?.sourceMapStatus).toBe("invalid-json")
+
+  const truncated = extractCapturedJavaScriptSources([{
+    id: "map-truncated",
+    url: "https://app.example.com/assets/truncated.js.map",
+    responseContentType: "application/json",
+    responseBody: JSON.stringify({ version: 3, sources: ["src/app.ts"], sourcesContent: ['fetch("/api/from-map")'], names: [], mappings: "" }) + "\n[TRUNCATED - showing first 100KB of 1.2 MB]",
+  }])
+  expect(truncated[0]?.sourceMapStatus).toBe("truncated")
+  expect(truncated[0]?.analysis?.notes.some((note) => note.startsWith("SOURCE MAP INCOMPLETE"))).toBe(true)
+})
+
+test("classifies JavaScript and source-map response variants for ingest-triggered correlation", () => {
+  expect(isSourceMapResponse("application/json", "/assets/app.js.map")).toBe(true)
+  expect(isSourceMapResponse("application/source-map+json", "/assets/app")).toBe(true)
+  expect(isSourceMapResponse("text/x-source-map; charset=utf-8", "/assets/generated")).toBe(true)
+  expect(isJavaScriptOrSourceMapResponse("application/javascript", "/assets/app")).toBe(true)
+  expect(isJavaScriptOrSourceMapResponse("application/json", "/assets/app.js.map?version=2")).toBe(true)
+  expect(isJavaScriptOrSourceMapResponse("application/json", "/api/profile")).toBe(false)
+})
+
+test("does not persist source-map JSON in generic response previews", () => {
+  const preview = safeCorrelationResponsePreview({
+    id: "map-preview",
+    normalizedPath: "/assets/app.js.map",
+    responseContentType: "application/json",
+    processedResponse: JSON.stringify({ version: 3, sourcesContent: ["secret-like source payload"] }),
+  })
+  expect(preview).toContain("source-map response preview omitted")
+  expect(preview).not.toContain("secret-like source payload")
+})
+
+
+test("inventories local .map and inline source maps and analyzes embedded sources without persisting source code", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-js-inventory-"))
+  const javascriptDir = path.join(root, "javascript")
+  const secret = "local-source-map-secret-must-not-leak"
+  const mappedSource = 'export async function getTeam(teamId) { return fetch("/api/teams/" + teamId) }\nconst api_key = "' + secret + '";'
+  const mapBody = JSON.stringify({
+    version: 3,
+    file: "bundle.js",
+    sources: ["src/team.ts"],
+    sourcesContent: [mappedSource],
+    names: [],
+    mappings: "",
+  })
+  const inlineSource = 'function getBilling() { return fetch("/api/billing") }'
+  const inlineMap = JSON.stringify({
+    version: 3,
+    sources: ["src/inline.ts"],
+    sourcesContent: [inlineSource],
+    names: [],
+    mappings: "",
+  })
+  const inlineDataUrl = "data:application/json;base64," + Buffer.from(inlineMap).toString("base64")
+  try {
+    await fs.mkdir(javascriptDir, { recursive: true })
+    await fs.writeFile(path.join(javascriptDir, "bundle.js.map"), mapBody)
+    await fs.writeFile(path.join(javascriptDir, "inline.js"), "//# sourceMappingURL=" + inlineDataUrl)
+    await fs.writeFile(path.join(javascriptDir, "notes.txt"), "fetch('/api/should-not-be-scanned')")
+    const files = await inventoryJavaScriptFiles(javascriptDir)
+    const externalSource = files.find((file) => file.sourceMapSource === "src/team.ts")
+    const embeddedInlineSource = files.find((file) => file.sourceMapSource === "src/inline.ts")
+    expect(files.some((file) => file.sourceMapStatus === "analyzed")).toBe(true)
+    expect(externalSource?.analysis?.requests.some((request) => request.path === "/api/teams/{teamId}")).toBe(true)
+    expect(embeddedInlineSource?.analysis?.requests.some((request) => request.path === "/api/billing")).toBe(true)
+    expect(files.some((file) => file.basename === "notes.txt")).toBe(false)
+    expect(JSON.stringify(files)).not.toContain(secret)
+    expect(JSON.stringify(files)).not.toContain(mappedSource)
+    expect(JSON.stringify(files)).not.toContain(inlineSource)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+
+test("redacts legacy raw secret values when sanitizing an old graph artifact", () => {
+  const secret = "legacy-cache-secret-value-must-not-survive"
+  const legacyFile = {
+    relativePath: "captured/app.js",
+    basename: "app.js",
+    sha256: "legacy-digest",
+    bytes: 42,
+    endpointLiterals: [],
+    analysis: {
+      functions: [],
+      requests: [],
+      secretCandidates: [{
+        kind: "api-key",
+        line: 1,
+        value: secret,
+        fingerprint: "0123456789abcdefabcd",
+        confidence: "candidate",
+      }],
+      roleHints: [],
+      riskSignals: [],
+      notes: ["Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated."],
+    },
+  } as unknown as JavaScriptSourceFile
+
+  const sanitized = sanitizeJavaScriptSourceFileForPersistence(legacyFile)
+  expect(JSON.stringify(sanitized)).not.toContain(secret)
+  expect(sanitized.analysis?.secretCandidates[0]).toEqual({
+    kind: "api-key",
+    line: 1,
+    fingerprint: "0123456789abcdefabcd",
+    confidence: "candidate",
+  })
+  expect(JSON.stringify(sanitized)).not.toContain("Exact candidate values are available")
 })

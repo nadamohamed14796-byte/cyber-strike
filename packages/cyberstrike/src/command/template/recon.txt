@@ -446,13 +446,15 @@ Distinguish a literal string in source code from an endpoint confirmed to be rea
 
 Do not automatically execute discovered JavaScript, source maps, scripts, or embedded commands. Static analysis and controlled retrieval are preferred.
 
-Save the asset inventory, fingerprints, extracted indicators, analysis provenance, and unresolved questions.
+Save the asset inventory, fingerprints, extracted indicators, analysis provenance, and unresolved questions. Before completing this phase, write/update the two required canonical handoff files at the workspace root: `javascript-analysis.md` (unique content versions, functions, request shapes, parameter/auth/header/cookie clues, risk/secret fingerprint counts, source-map statuses, incomplete sources, and blockers) and `endpoints.txt` (one normalized candidate per origin + method + path template, retaining a compact source/parameter reference rather than duplicate rows). If nothing was discovered, write a truthful zero-result explanation instead of an empty file. Keep full detail in the existing `javascript/`, `endpoints/`, and `testing/` artifacts; do not create per-file reports.
 
 After response captures exist, invoke the registered `correlate_javascript` tool if it is available. If its schema supports the following inputs, use:
 
 `correlate_javascript(target_url="<authorized target>", javascript_url="<observed JavaScript URL, when narrowing is useful>")`
 
 Inspect the returned schema and output before use.
+
+For each `sourceMappingURL` reference, read its explicit status. If it is `referenced-not-captured`, retrieve that exact HTTP(S) map only through an existing registered, scope-enforced browser/recon path, as inert text; never execute it or visit an out-of-scope reference. Rerun `correlate_javascript` after the capture so version-3 `sourcesContent` is analyzed. A map with no `sourcesContent`, partial `sourcesContent`, malformed JSON, or a truncated response remains explicitly incomplete and must not be counted as analyzed. Preserve the map URL, content hash, source names, analyzed-source count, and blocker/status in the canonical workspace without saving embedded source text or raw secret-like values.
 
 Treat same-host matches as candidates, not proof of a direct relationship. Separate:
 - Directly observed request relationships.
@@ -463,7 +465,7 @@ Treat same-host matches as candidates, not proof of a direct relationship. Separ
 
 Link extracted indicators to the source asset and captured evidence.
 
-**Completion condition:** Every eligible unique asset has a persisted analysis result or an explicit reason it could not be analyzed.
+**Completion condition:** Every eligible unique JavaScript asset and every in-scope referenced source map is either analyzed with a persisted result (including each available embedded source entry), or has a precise blocker/status. A `referenced-not-captured`, missing/partial `sourcesContent`, malformed, or truncated map must be reported as incomplete rather than silently counted as analyzed.
 
 ## Stage F — Endpoint correlation and manual-testing preparation
 

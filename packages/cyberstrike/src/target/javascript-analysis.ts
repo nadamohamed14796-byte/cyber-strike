@@ -27,8 +27,7 @@ export interface JavaScriptRequestCandidate {
 export interface JavaScriptSecretCandidate {
   kind: string
   line: number
-  /** Exact source value for target-local evidence; never promote a pattern match to verified. */
-  value: string
+  /** SHA-256 fingerprint only; the matched value is never retained in analysis output. */
   fingerprint: string
   confidence: "candidate"
 }
@@ -477,7 +476,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     if (!rawValue || /^(?:\$\{|\{\{|\$[A-Z_][A-Z0-9_]*|<[^>]+>)/i.test(rawValue.trim())) continue
     const item: JavaScriptSecretCandidate = {
       kind: (match[1] ?? "secret").toLowerCase().replace(/[_-]+/g, "-"), line: lineNumber(lineStarts, match.index ?? 0),
-      value: rawValue, fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
+      fingerprint: createHash("sha256").update(rawValue).digest("hex").slice(0, 20), confidence: "candidate",
     }
     secrets.set(item.kind + ":" + item.fingerprint, item)
       }
@@ -525,7 +524,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     notes: [
       "Static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
-      "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated.",
+      "Secret-like values are never retained; only fingerprints, source locations, and candidate status are emitted.",
       "Static sink signals are triage candidates, can be false positives in comments/vendor code, and do not prove taint or exploitability.",
       "Function attribution uses lexical body spans; minified or complex TypeScript syntax may remain unattributed.",
     ],

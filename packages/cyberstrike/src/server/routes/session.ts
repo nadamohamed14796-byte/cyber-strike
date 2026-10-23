@@ -35,7 +35,7 @@ import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { TargetMemory } from "../../target"
-import { JavaScriptCorrelation, safeCorrelationResponsePreview } from "../../target/javascript-correlation"
+import { JavaScriptCorrelation, isJavaScriptOrSourceMapResponse, isSourceMapResponse, safeCorrelationResponsePreview } from "../../target/javascript-correlation"
 
 const log = Log.create({ service: "server" })
 
@@ -1253,15 +1253,16 @@ export const SessionRoutes = lazy(() =>
           const refreshJavaScriptCorrelation = async (
             capture: ReturnType<typeof Request.captureJavaScriptSource>,
             refreshEvenIfAlreadyCaptured = false,
+            forceForSourceMap = false,
           ) => {
-            if (!capture || !normalized.origin || (!capture.captured && !refreshEvenIfAlreadyCaptured)) return
+            if ((!capture && !forceForSourceMap) || !normalized.origin || (!forceForSourceMap && !capture?.captured && !refreshEvenIfAlreadyCaptured)) return
             try {
               const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
               const scopeDecision = await TargetMemory.checkURLScope(observedURL)
               if (!scopeDecision.allowed || !scopeDecision.workspace) {
-                log.info("JavaScript source version captured but correlation skipped by persisted scope", {
+                log.info("JavaScript/source-map correlation skipped by persisted scope", {
                   sessionID,
-                  requestID: capture.requestID,
+                  requestID: capture?.requestID ?? req.id,
                   reason: scopeDecision.reason,
                 })
                 return
@@ -1272,8 +1273,8 @@ export const SessionRoutes = lazy(() =>
               })
               log.info("JavaScript source version correlated after request dedup", {
                 sessionID,
-                requestID: capture.requestID,
-                contentHash: capture.contentHash,
+                requestID: capture?.requestID ?? req.id,
+                contentHash: capture?.contentHash ?? null,
                 targetID: scopeDecision.workspace.id,
                 sourceFiles: correlation.graph.sourceFiles.length,
                 endpointCandidates: correlation.graph.endpointCandidates.length,
@@ -1282,7 +1283,7 @@ export const SessionRoutes = lazy(() =>
             } catch (error) {
               log.warn("automatic correlation of a changed JavaScript source version failed", {
                 sessionID,
-                requestID: capture.requestID,
+                requestID: capture?.requestID ?? req.id,
                 error: error instanceof Error ? error.message : String(error),
               })
             }
@@ -1307,7 +1308,7 @@ export const SessionRoutes = lazy(() =>
               pageUrl: body.page_url,
             })
             recordObservation(javascriptCapture?.requestID)
-            await refreshJavaScriptCorrelation(javascriptCapture)
+            await refreshJavaScriptCorrelation(javascriptCapture, false, isSourceMapResponse(undefined, normalized.normalizedPath))
             log.info("duplicate request skipped", {
               sessionID,
               method: normalized.method,
@@ -1373,7 +1374,7 @@ export const SessionRoutes = lazy(() =>
             recordObservation(javascriptCapture?.requestID)
             // Request.add already persisted this capture inside its transaction.
             // Force a read-back correlation even if the helper's insert is now a no-op.
-            await refreshJavaScriptCorrelation(javascriptCapture, true)
+            await refreshJavaScriptCorrelation(javascriptCapture, true, isSourceMapResponse(undefined, normalized.normalizedPath))
             c.status(202)
             return c.json({
               sessionID,
@@ -1585,11 +1586,10 @@ export const SessionRoutes = lazy(() =>
                 // JavaScript response captures automatically refresh the target's static
                 // analysis/correlation graph after the request agent finishes. The builder
                 // reads only already-captured, in-scope traffic and persists redacted metadata.
-                const isJavaScriptResponse =
+                const isJavaScriptOrSourceMap =
                   Boolean(req.processed_response?.trim()) &&
-                  (/(?:java|ecma)script|x-javascript/i.test(req.response_content_type ?? "") ||
-                    /\.(?:m?js|cjs)(?:[?#]|$)/i.test(normalized.normalizedPath))
-                if (isJavaScriptResponse && normalized.origin) {
+                  isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath)
+                if (isJavaScriptOrSourceMap && normalized.origin) {
                   try {
                     const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
                     const scopeDecision = await TargetMemory.checkURLScope(observedURL)

@@ -20,7 +20,7 @@ Convert first-party JavaScript into validated leads for manual hunting. Do not t
 
 ## Workflow
 1. Inventory only target-related assets discovered by authorized navigation, passive sources, or recorded browser responses. Store URL, content hash, observation time, response type, and source.
-2. Check for source maps and readable bundles; identify minified/vendor code versus first-party application logic. Preserve source-to-bundle mapping when available.
+2. Check for source maps and readable bundles; identify minified/vendor code versus first-party application logic. Capture eligible external `sourceMappingURL` assets through the normal scope-enforced recon/browser path, then analyze version-3 `sourcesContent` as virtual source files. Track each reference as analyzed, pending capture, out of scope, missing/partial embedded sources, malformed, or truncated; never claim unresolved maps are complete. Preserve source-to-bundle mapping when available.
 3. Extract routes, API base URLs, methods, GraphQL operation names, WebSocket URLs, parameter names, feature flags, role/tenant hints, request headers, cookie names, storage keys, file-upload destinations, and URL-fetching features.
 4. Normalize endpoint templates but retain HTTP method, content type, API version, parameter shape, auth context, and discovery source. Do not collapse endpoints just because their paths look similar.
 5. Search for risky client sinks and data flows: innerHTML, insertAdjacentHTML, document.write, eval-like APIs, postMessage listeners, URL/redirect assignments, dynamic script loading, unsafe template rendering, and prototype-sensitive merge helpers. Confirm reachability and control of the source before assigning a vulnerability class.

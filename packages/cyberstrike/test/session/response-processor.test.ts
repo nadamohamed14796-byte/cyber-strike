@@ -37,3 +37,35 @@ test("recognizes JavaScript assets by URL when the response MIME type is wrong",
   })
   expect(processed.javascriptSource).toBe(source)
 })
+
+
+test("keeps captured source-map bodies available to static analysis even when JSON is truncated for the LLM preview", () => {
+  const map = JSON.stringify({
+    version: 3,
+    sources: ["src/profile.ts"],
+    sourcesContent: ['fetch("/api/profile");'],
+    names: [],
+    mappings: "",
+  }) + " ".repeat(110 * 1024)
+  const processed = processResponse({
+    status: 200,
+    headers: { "content-type": "application/json" },
+    url: "https://app.example.test/assets/app.js.map?version=2",
+    body: map,
+  })
+
+  expect(processed.content).toContain("[TRUNCATED - showing first 100KB")
+  expect(processed.content.length).toBeLessThan(map.length)
+  expect(processed.javascriptSource).toBe(map)
+})
+
+test("recognizes source-map MIME types when the URL has no .map suffix", () => {
+  const body = JSON.stringify({ version: 3, sources: [], sourcesContent: [], names: [], mappings: "" })
+  const processed = processResponse({
+    status: 200,
+    headers: { "content-type": "application/source-map+json" },
+    url: "https://app.example.test/assets/generated",
+    body,
+  })
+  expect(processed.javascriptSource).toBe(body)
+})

@@ -44,6 +44,17 @@ function safeURL(input?: string | null): URL | undefined {
 }
 
 /** Resolve the actual request origin without mistaking the page that triggered it for the request host. */
+export function isSourceMapResponse(contentType?: string | null, pathValue?: string | null): boolean {
+  return /(?:application\/(?:x-)?source-map\+json|text\/x-source-map)/i.test(contentType ?? "") ||
+    /\.map(?:[?#]|$)/i.test(pathValue ?? "")
+}
+
+export function isJavaScriptOrSourceMapResponse(contentType?: string | null, pathValue?: string | null): boolean {
+  return isSourceMapResponse(contentType, pathValue) ||
+    /(?:java|ecma)script|x-javascript/i.test(contentType ?? "") ||
+    /\.(?:m?js|cjs)(?:[?#]|$)/i.test(pathValue ?? "")
+}
+
 function observedRequestBaseURL(input: {
   origin?: string | null
   scheme?: string | null
@@ -90,26 +101,26 @@ export function matchesCapturedJavaScriptAsset(input: {
 
 function javascriptAssetURL(input: { type?: string | null; title?: string | null; detail?: string | null; asset?: string | null; tags?: string[] | null }): URL | undefined {
   const base = safeURL(input.asset)
-  if (base && /\.m?js$/i.test(base.pathname)) return base
+  if (base && /\.(?:m?js|cjs|map)$/i.test(base.pathname)) return base
 
   // Intel's asset field is usually a target host, not a JavaScript file URL.
   // Resolve an actual script path from title/detail instead of labeling the host as a JS asset.
   const text = [input.title, input.detail].filter(Boolean).join("\n")
-  const absolute = /https?:\/\/[^\s"'<>),\x60]+\.(?:m?js)(?:\?[^\s"'<>)]*)?/gi
+  const absolute = /https?:\/\/[^\s"'<>),\x60]+\.(?:m?js|cjs|map)(?:\?[^\s"'<>)]*)?/gi
   for (const match of text.matchAll(absolute)) {
     const url = safeURL(match[0].replace(/[.,;]+$/, ""))
-    if (url && /\.m?js$/i.test(url.pathname)) return url
+    if (url && /\.(?:m?js|cjs|map)$/i.test(url.pathname)) return url
   }
 
-  const relative = /(?:^|[\s"'(\x60=:])((?:\/|\.{1,2}\/)?[A-Za-z0-9_@.%+/-]+\.m?js(?:\?[^\s"'<>)]*)?)/gi
+  const relative = /(?:^|[\s"'(\x60=:])((?:\/|\.{1,2}\/)?[A-Za-z0-9_@.%+/-]+\.(?:m?js|cjs|map)(?:\?[^\s"'<>)]*)?)/gi
   for (const match of text.matchAll(relative)) {
     const candidate = match[1]
     const direct = safeURL(candidate)
-    if (direct && /\.m?js$/i.test(direct.pathname)) return direct
+    if (direct && /\.(?:m?js|cjs|map)$/i.test(direct.pathname)) return direct
     if (base) {
       try {
         const resolved = new URL(candidate, base)
-        if ((resolved.protocol === "http:" || resolved.protocol === "https:") && /\.m?js$/i.test(resolved.pathname)) return resolved
+        if ((resolved.protocol === "http:" || resolved.protocol === "https:") && /\.(?:m?js|cjs|map)$/i.test(resolved.pathname)) return resolved
       } catch {}
     }
   }
@@ -117,7 +128,7 @@ function javascriptAssetURL(input: { type?: string | null; title?: string | null
   const signal = [input.type, input.title, ...(input.tags ?? [])].filter(Boolean).join(" ").toLowerCase()
   if (!/\bjavascript\b|\bjavascript[-_ ]?file\b|\bjs[-_ ]?asset\b|\bscript[-_ ]?asset\b/.test(signal)) return undefined
   const titlePath = input.title?.trim()
-  if (base && titlePath && /\.m?js(?:$|[?#])/i.test(titlePath) && !/https?:\/\//i.test(titlePath)) {
+  if (base && titlePath && /\.(?:m?js|cjs|map)(?:$|[?#])/i.test(titlePath) && !/https?:\/\//i.test(titlePath)) {
     try {
       const resolved = new URL(titlePath, base)
       if (resolved.protocol === "http:" || resolved.protocol === "https:") return resolved
@@ -146,10 +157,9 @@ export function safeCorrelationResponsePreview(input: {
   processedResponse?: string | null
 }, max = 320): string | null {
   if (!input.processedResponse) return null
-  const isJavaScript =
-    /(?:java|ecma)script|x-javascript/i.test(input.responseContentType ?? "") ||
-    /\.(?:m?js|cjs)(?:[?#]|$)/i.test(input.normalizedPath ?? "")
-  if (isJavaScript) return "[JavaScript response preview omitted; inspect captured request ID " + input.id + " on demand]"
+  if (isJavaScriptOrSourceMapResponse(input.responseContentType, input.normalizedPath)) {
+    return "[JavaScript/source-map response preview omitted; inspect captured request ID " + input.id + " on demand]"
+  }
   return redact(input.processedResponse, max)
 }
 
@@ -190,6 +200,7 @@ function normalizeEndpointLiteral(value: string): string | undefined {
   if (!trimmed) return undefined
   const absolute = safeURL(trimmed)
   if (absolute) {
+    if (/\.map$/i.test(absolute.pathname)) return undefined
     const normalizedPath = normalizeJavaScriptEndpointPath(absolute.pathname).path
     return absolute.origin + normalizedPath
   }
@@ -223,6 +234,18 @@ export interface JavaScriptSourceFile {
   endpointLiterals: string[]
   /** Canonical source URL without query/fragment; provides the correct origin for relative routes. */
   sourceURL?: string
+  /** Canonical, query-free URL of the source map associated with this artifact. */
+  sourceMapURL?: string
+  /** Original sources[] path/name; embedded source contents are not persisted. */
+  sourceMapSource?: string
+  sourceMapVersion?: number | null
+  sourceMapStatus?: "analyzed" | "no-sources-content" | "partial-sources-content" | "invalid-json" | "unsupported" | "truncated"
+  sourceMapSourcesContentAvailable?: boolean
+  sourceMapSourceCount?: number
+  sourceMapEmbeddedSourceCount?: number
+  sourceMapInline?: boolean
+  /** External sourceMappingURL references found in this JavaScript response. */
+  sourceMapURLs?: string[]
   /** True when upstream response capture marked this body as truncated. */
   captureTruncated?: boolean
   /** First request ID is retained for backward-compatible artifact references. */
@@ -233,36 +256,41 @@ export interface JavaScriptSourceFile {
   sourceCaptureID?: string
   /** Persistent capture-row IDs for this canonical URL/content version. */
   sourceCaptureIDs?: string[]
-  /** Static-analysis metadata. Exact secret-like candidates may be retained in private target-local artifacts; redact separate exports. */
+  /** Static-analysis metadata; secret-like matches retain only fingerprints, never raw values. */
   analysis?: JavaScriptSourceAnalysis
 }
 
-const RAW_SECRET_PERSISTENCE_NOTE =
+const LEGACY_RAW_SECRET_NOTE =
   "Exact candidate values are available for target-local evidence; a static match remains unverified until independently validated."
 
-/**
- * Preserve exact secret-like candidate values in the private target-local correlation
- * artifact so the operator can inspect the literal and its source location. This is
- * not a finding verdict: static matches remain candidates until independently verified.
- * Do not copy this graph into global research, shared reports, or outbound payloads.
- */
+/** Remove legacy raw-value fields before old graph caches or new files can persist them. */
+function sanitizeJavaScriptSourceAnalysisForPersistence(analysis: JavaScriptSourceAnalysis): JavaScriptSourceAnalysis {
+  return {
+    ...analysis,
+    secretCandidates: analysis.secretCandidates.map((candidate) => ({
+      kind: candidate.kind,
+      line: candidate.line,
+      fingerprint: candidate.fingerprint,
+      confidence: candidate.confidence,
+    })),
+    notes: analysis.notes.map((note) => note === LEGACY_RAW_SECRET_NOTE
+      ? "Secret-like values are never retained in derived analysis output; only fingerprints, source locations, and candidate status are emitted."
+      : note),
+  }
+}
+
+/** Persist summaries and fingerprints only; never save source-map source text or raw secret-like values. */
 export function sanitizeJavaScriptSourceFileForPersistence(file: JavaScriptSourceFile): JavaScriptSourceFile {
   if (!file.analysis) return file
   return {
     ...file,
-    analysis: {
-      ...file.analysis,
-      secretCandidates: file.analysis.secretCandidates.map((candidate) => ({ ...candidate })),
-      notes: file.analysis.notes.map((note) => note === RAW_SECRET_PERSISTENCE_NOTE
-        ? "Exact candidate values are stored in this private target-local artifact with source location; a static match remains unverified until independently validated. Do not export raw values."
-        : note),
-    },
+    analysis: sanitizeJavaScriptSourceAnalysisForPersistence(file.analysis),
   }
 }
 
 /**
- * Extract route literals from already-captured JavaScript responses without
- * persisting or executing the response body. Bounds mirror local-file inventory.
+ * Unwrap the bounded LLM-facing response preview while preserving whether the
+ * upstream processor explicitly truncated it; complete capture-table bodies are preferred.
  */
 function unwrapProcessedResponseBody(value: string): { body: string; truncated: boolean } {
   const metadata = /^\[Status:\s*\d+,\s*Type:\s*[^,\]\r\n]+,\s*Size:\s*[^\]\r\n]+\]\r?\n/
@@ -270,6 +298,152 @@ function unwrapProcessedResponseBody(value: string): { body: string; truncated: 
   return {
     body: value.replace(metadata, "").replace(/\r?\n\[TRUNCATED - showing first 100KB of [^\]]+\]$/, ""),
     truncated,
+  }
+}
+
+export function extractJavaScriptSourceMapReferences(source: string, sourceURL: string): string[] {
+  const references = new Set<string>()
+  const pattern = /(?:\/\/[#@]\s*sourceMappingURL\s*=\s*([^\s*]+)|\/\*[#@]\s*sourceMappingURL\s*=\s*([^*\s]+)\s*\*\/)/g
+  for (const match of source.matchAll(pattern)) {
+    const candidate = (match[1] ?? match[2] ?? "").trim()
+    if (!candidate || /^data:/i.test(candidate)) continue
+    try {
+      const resolved = new URL(candidate, sourceURL)
+      if ((resolved.protocol === "http:" || resolved.protocol === "https:") && !resolved.username && !resolved.password) {
+        references.add(resolved.origin + resolved.pathname)
+      }
+    } catch {
+      // Invalid sourceMappingURL comments are not usable retrieval targets.
+    }
+  }
+  return [...references]
+}
+
+function emptyJavaScriptSourceAnalysis(notes: string[]): JavaScriptSourceAnalysis {
+  return { functions: [], requests: [], secretCandidates: [], roleHints: [], riskSignals: [], notes }
+}
+
+function sourceMapSourceBasename(sourceName: string, index: number): string {
+  const base = sourceName.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "source-" + (index + 1) + ".js"
+  return base.replace(/[^a-z0-9._-]/gi, "_").slice(0, 80) || "source-" + (index + 1) + ".js"
+}
+
+function sourceMapFilesFromContent(input: {
+  content: string
+  mapURL: string
+  basename: string
+  digest: string
+  bytes: number
+  requestID?: string
+  captureID?: string
+  truncated: boolean
+  inline?: boolean
+  analysisCache?: Map<string, JavaScriptSourceAnalysis>
+}): JavaScriptSourceFile[] {
+  const mapURL = safeURL(input.mapURL)
+  const canonicalMapURL = mapURL ? mapURL.origin + mapURL.pathname : input.mapURL
+  const host = mapURL?.hostname.toLowerCase() ?? "local"
+  const mapDirectory = "source-maps/" + host + "/" + input.digest.slice(0, 12)
+  let parsed: { version?: unknown; sources?: unknown; sourcesContent?: unknown } | undefined
+  let parseError = false
+  try {
+    const candidate = JSON.parse(input.content)
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) parsed = candidate
+    else parseError = true
+  } catch {
+    parseError = true
+  }
+  const sources = Array.isArray(parsed?.sources) ? parsed!.sources as unknown[] : []
+  const embedded = Array.isArray(parsed?.sourcesContent) ? parsed!.sourcesContent as unknown[] : []
+  const embeddedCount = embedded.filter((value): value is string => typeof value === "string" && value.length > 0).length
+  let status: NonNullable<JavaScriptSourceFile["sourceMapStatus"]>
+  const notes: string[] = []
+  if (input.truncated) {
+    status = "truncated"
+    notes.push("SOURCE MAP INCOMPLETE: captured response was marked truncated; available embedded source entries are partial evidence only.")
+  } else if (parseError) {
+    status = "invalid-json"
+    notes.push("SOURCE MAP UNPARSED: response is not valid JSON; recapture the complete .map response before considering its sources analyzed.")
+  } else if (parsed?.version !== 3 || !Array.isArray(parsed.sources)) {
+    status = "unsupported"
+    notes.push("SOURCE MAP UNSUPPORTED: expected a version 3 source-map object with a sources array.")
+  } else if (embeddedCount === 0) {
+    status = "no-sources-content"
+    notes.push("SOURCE MAP INCOMPLETE: no non-empty sourcesContent entries are embedded; referenced source files were not fetched or executed.")
+  } else if (embeddedCount < sources.length) {
+    status = "partial-sources-content"
+    notes.push("SOURCE MAP PARTIAL: " + embeddedCount + " of " + sources.length + " source entries contain embedded source text; available entries were analyzed, missing entries remain unresolved.")
+  } else {
+    status = "analyzed"
+    notes.push("SOURCE MAP ANALYZED: version 3 metadata parsed; " + embeddedCount + " embedded source file(s) are analyzed as separate virtual source records without persisting source code.")
+  }
+  const requestFields = {
+    ...(input.requestID ? { sourceRequestID: input.requestID, sourceRequestIDs: [input.requestID] } : {}),
+    ...(input.captureID ? { sourceCaptureID: input.captureID, sourceCaptureIDs: [input.captureID] } : {}),
+  }
+  const mapRecord: JavaScriptSourceFile = {
+    relativePath: mapDirectory + "/" + input.basename.replace(/[^a-z0-9._-]/gi, "_").slice(0, 100),
+    basename: input.basename,
+    sha256: input.digest,
+    bytes: input.bytes,
+    endpointLiterals: [],
+    sourceURL: canonicalMapURL,
+    sourceMapURL: canonicalMapURL,
+    sourceMapVersion: typeof parsed?.version === "number" ? parsed.version : null,
+    sourceMapStatus: status,
+    sourceMapSourcesContentAvailable: embeddedCount > 0,
+    sourceMapSourceCount: sources.length,
+    sourceMapEmbeddedSourceCount: embeddedCount,
+    ...(input.inline ? { sourceMapInline: true } : {}),
+    captureTruncated: input.truncated,
+    ...requestFields,
+    analysis: emptyJavaScriptSourceAnalysis(notes),
+  }
+  const output: JavaScriptSourceFile[] = [mapRecord]
+  if (parseError || parsed?.version !== 3 || !Array.isArray(parsed.sources)) return output
+  for (let index = 0; index < sources.length; index++) {
+    const sourceName = typeof sources[index] === "string" ? sources[index] as string : "source-" + (index + 1) + ".js"
+    const sourceContent = embedded[index]
+    if (typeof sourceContent !== "string" || sourceContent.length === 0) continue
+    const sourceDigest = createHash("sha256").update(sourceContent).digest("hex")
+    let analysis = input.analysisCache?.get(sourceDigest)
+    if (!analysis) {
+      analysis = analyzeJavaScriptSource(sourceContent)
+      input.analysisCache?.set(sourceDigest, analysis)
+    }
+    const sourceBasename = sourceMapSourceBasename(sourceName, index)
+    output.push({
+      relativePath: mapDirectory + "/sources/" + String(index + 1).padStart(4, "0") + "-" + sourceBasename + "-" + sourceDigest.slice(0, 8),
+      basename: sourceBasename,
+      sha256: sourceDigest,
+      bytes: Buffer.byteLength(sourceContent, "utf-8"),
+      endpointLiterals: extractStaticJavaScriptEndpoints(sourceContent),
+      sourceURL: canonicalMapURL,
+      sourceMapURL: canonicalMapURL,
+      sourceMapSource: sourceName,
+      sourceMapVersion: 3,
+      sourceMapStatus: status,
+      sourceMapSourcesContentAvailable: true,
+      captureTruncated: input.truncated,
+      ...requestFields,
+      analysis,
+    })
+  }
+  return output
+}
+
+function extractInlineSourceMapContent(source: string): string | undefined {
+  const match = /sourceMappingURL\s*=\s*(data:application\/json(?:;[^,\s*]*)?,[^\s*]+)/i.exec(source)
+  const dataURL = match?.[1]
+  if (!dataURL) return undefined
+  const comma = dataURL.indexOf(",")
+  if (comma < 0) return undefined
+  const metadata = dataURL.slice(0, comma)
+  const payload = dataURL.slice(comma + 1)
+  try {
+    return (/;base64/i.test(metadata) ? Buffer.from(payload, "base64").toString("utf-8") : decodeURIComponent(payload)).trim() || undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -309,11 +483,11 @@ export function extractCapturedJavaScriptSources(
     // strip them so source line numbers and content hashes refer to the captured JS itself.
     const unwrapped = unwrapProcessedResponseBody(storedBody)
     const body = unwrapped.body
+    const isSourceMap = isSourceMapResponse(request.responseContentType, url.pathname)
     const isJavaScript =
       /(?:java|ecma)script|x-javascript/i.test(request.responseContentType ?? "") ||
-      /\.m?js$/i.test(url.pathname) ||
-      /\.cjs$/i.test(url.pathname)
-    if (!isJavaScript) continue
+      /\.(?:m?js|cjs)$/i.test(url.pathname)
+    if (!isJavaScript && !isSourceMap) continue
     const bytes = Buffer.byteLength(body, "utf-8")
     if (bytes < 1) continue
     const digest = createHash("sha256").update(body).digest("hex")
@@ -329,7 +503,22 @@ export function extractCapturedJavaScriptSources(
       }
       continue
     }
-    const basename = (url.pathname.split("/").filter(Boolean).pop() || "captured.js").replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
+    const basename = (url.pathname.split("/").filter(Boolean).pop() || (isSourceMap ? "captured.map" : "captured.js")).replace(/[^a-z0-9._-]/gi, "_").slice(0, 100)
+    if (isSourceMap) {
+      sourceIndexByURLAndHash.set(identity, output.length)
+      output.push(...sourceMapFilesFromContent({
+        content: body,
+        mapURL: canonicalSourceURL,
+        basename,
+        digest,
+        bytes,
+        requestID: request.requestID ?? request.id,
+        ...(request.captureID ? { captureID: request.captureID } : {}),
+        truncated: unwrapped.truncated,
+        analysisCache,
+      }))
+      continue
+    }
     let analysis = analysisCache?.get(digest)
     if (!analysis) {
       analysis = analyzeJavaScriptSource(body)
@@ -341,6 +530,11 @@ export function extractCapturedJavaScriptSources(
         notes: [...analysis.notes, "PARTIAL SOURCE: captured response was explicitly truncated by the upstream response processor at 100KB; routes, parameters, functions, and sinks in the omitted tail were not analyzed. Retrieve the full response through the request-detail/capture pipeline before treating this inventory as complete."],
       }
     }
+    const inlineMapContent = extractInlineSourceMapContent(body)
+    const inlineMapReference = /sourceMappingURL\s*=\s*data:application\/json/i.test(body)
+    if (inlineMapReference && !inlineMapContent) {
+      analysis = { ...analysis, notes: [...analysis.notes, "INLINE SOURCE MAP UNPARSED: a data-URL source map was present but could not be decoded from the captured body."] }
+    }
     sourceIndexByURLAndHash.set(identity, output.length)
     const sourceURLKey = createHash("sha256").update(canonicalSourceURL).digest("hex").slice(0, 8)
     output.push({
@@ -350,12 +544,28 @@ export function extractCapturedJavaScriptSources(
       bytes,
       endpointLiterals: extractStaticJavaScriptEndpoints(body),
       sourceURL: canonicalSourceURL,
+      sourceMapURLs: extractJavaScriptSourceMapReferences(body, canonicalSourceURL),
       captureTruncated: unwrapped.truncated,
       sourceRequestID: request.requestID ?? request.id,
       sourceRequestIDs: [request.requestID ?? request.id],
       ...(request.captureID ? { sourceCaptureID: request.captureID, sourceCaptureIDs: [request.captureID] } : {}),
       analysis,
     })
+    if (inlineMapContent) {
+      const inlineDigest = createHash("sha256").update(inlineMapContent).digest("hex")
+      output.push(...sourceMapFilesFromContent({
+        content: inlineMapContent,
+        mapURL: canonicalSourceURL,
+        basename: "inline-source-map.map",
+        digest: inlineDigest,
+        bytes: Buffer.byteLength(inlineMapContent, "utf-8"),
+        requestID: request.requestID ?? request.id,
+        ...(request.captureID ? { captureID: request.captureID } : {}),
+        truncated: false,
+        inline: true,
+        analysisCache,
+      }))
+    }
   }
   return output
 }
@@ -610,8 +820,8 @@ export function correlateStaticJavaScriptEndpoints(
   return [...candidates.values()]
 }
 
-/** Inventory only local JS source files; never follow symlinks or execute their contents. */
-async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>, sourceBaseURL?: string): Promise<JavaScriptSourceFile[]> {
+/** Inventory local JavaScript and source-map files; never follow symlinks or execute their contents. */
+export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>, sourceBaseURL?: string): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
   const pendingDirectories = [root]
   while (pendingDirectories.length) {
@@ -630,23 +840,55 @@ async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string
         pendingDirectories.push(fullPath)
         continue
       }
-      if (!entry.isFile() || !/\.(?:m?js|cjs)$/i.test(entry.name)) continue
+      if (!entry.isFile() || !/\.(?:m?js|cjs|map)$/i.test(entry.name)) continue
       const content = await fs.readFile(fullPath, "utf-8")
       const digest = createHash("sha256").update(content).digest("hex")
+      const sourceBytes = Buffer.byteLength(content, "utf-8")
+      const workspaceRelativePath = path.relative(path.dirname(root), fullPath).split(path.sep).join("/")
+      if (/\.map$/i.test(entry.name)) {
+        output.push(...sourceMapFilesFromContent({
+          content,
+          mapURL: "local://" + workspaceRelativePath,
+          basename: entry.name,
+          digest,
+          bytes: sourceBytes,
+          truncated: false,
+          analysisCache,
+        }))
+        continue
+      }
       let analysis = analysisCache?.get(digest)
       if (!analysis) {
         analysis = analyzeJavaScriptSource(content)
         analysisCache?.set(digest, analysis)
       }
+      const inlineMapContent = extractInlineSourceMapContent(content)
+      const hasInlineMapReference = /sourceMappingURL\s*=\s*data:application\/json/i.test(content)
+      if (hasInlineMapReference && !inlineMapContent) {
+        analysis = { ...analysis, notes: [...analysis.notes, "INLINE SOURCE MAP UNPARSED: a data-URL source map was present but could not be decoded from the local source file."] }
+      }
       output.push({
-        relativePath: path.relative(path.dirname(root), fullPath).split(path.sep).join("/"),
+        relativePath: workspaceRelativePath,
         basename: entry.name,
         sha256: digest,
-        bytes: Buffer.byteLength(content, "utf-8"),
+        bytes: sourceBytes,
         endpointLiterals: extractStaticJavaScriptEndpoints(content),
         sourceURL: sourceBaseURL ? safeURL(sourceBaseURL)?.origin : undefined,
         analysis,
       })
+      if (inlineMapContent) {
+        const inlineDigest = createHash("sha256").update(inlineMapContent).digest("hex")
+        output.push(...sourceMapFilesFromContent({
+          content: inlineMapContent,
+          mapURL: "local://" + workspaceRelativePath,
+          basename: "inline-source-map.map",
+          digest: inlineDigest,
+          bytes: Buffer.byteLength(inlineMapContent, "utf-8"),
+          truncated: false,
+          inline: true,
+          analysisCache,
+        }))
+      }
     }
   }
   return output
@@ -666,6 +908,12 @@ export interface JavaScriptCorrelationGraph {
     tags: string[]
   }>
   sourceFiles: JavaScriptSourceFile[]
+  sourceMapReferences?: Array<{
+    url: string
+    sourceFiles: string[]
+    status: "analyzed" | "no-sources-content" | "invalid-json" | "unsupported" | "truncated" | "partial-sources-content" | "referenced-not-captured" | "out-of-scope"
+    note: string
+  }>
   /** Static JS review leads, kept separate from verified findings. */
   javascriptAnalysis: {
     functions: Array<JavaScriptFunctionCandidate & { sourceFile: string }>
@@ -953,7 +1201,9 @@ export namespace JavaScriptCorrelation {
         const previous = JSON.parse(await fs.readFile(previousGraphPath, "utf-8")) as JavaScriptCorrelationGraph
         if (previous.schemaVersion === 2 && previous.targetURL === workspace.targetURL) {
           for (const source of previous.sourceFiles ?? []) {
-            if (source.sha256 && source.analysis) analysisCache.set(source.sha256, source.analysis)
+            if (source.sha256 && source.analysis) {
+              analysisCache.set(source.sha256, sanitizeJavaScriptSourceAnalysisForPersistence(source.analysis))
+            }
           }
         }
       }
@@ -1176,8 +1426,45 @@ export namespace JavaScriptCorrelation {
     // content hash, so identical bytes are analyzed once but may produce multiple origin-aware
     // source records; this matters when the same bundle is served from different hosts.
     const mergedSourceFiles = [...sourceFiles, ...capturedSources]
-    // Preserve exact candidate values in private target-local graph/note artifacts for manual verification.
-    // Any export or outbound payload must use a separately redacted copy.
+    const sourceMapRecordsByURL = new Map<string, JavaScriptSourceFile[]>()
+    for (const file of mergedSourceFiles) {
+      if (!file.sourceMapURL || file.sourceMapSource || file.sourceMapInline) continue
+      const records = sourceMapRecordsByURL.get(file.sourceMapURL) ?? []
+      records.push(file)
+      sourceMapRecordsByURL.set(file.sourceMapURL, records)
+    }
+    const sourceMapReferenceInputs = new Map<string, Set<string>>()
+    for (const file of mergedSourceFiles) {
+      for (const sourceMapURL of file.sourceMapURLs ?? []) {
+        const files = sourceMapReferenceInputs.get(sourceMapURL) ?? new Set<string>()
+        files.add(file.relativePath)
+        sourceMapReferenceInputs.set(sourceMapURL, files)
+      }
+    }
+    const sourceMapReferences: NonNullable<JavaScriptCorrelationGraph["sourceMapReferences"]> = []
+    for (const [url, sources] of sourceMapReferenceInputs) {
+      const decision = await scopeDecisionFor(url)
+      const scopeAllowed = decision.allowed && Boolean(decision.workspace) && relatedTargetIDs.has(decision.workspace!.id)
+      const capturedMaps = sourceMapRecordsByURL.get(url) ?? []
+      let status: NonNullable<JavaScriptCorrelationGraph["sourceMapReferences"]>[number]["status"]
+      let note: string
+      if (!scopeAllowed) {
+        status = "out-of-scope"
+        note = "Reference was recorded from in-scope source, but the source-map URL does not pass the persisted target-scope/hierarchy gate; do not retrieve it."
+      } else if (capturedMaps.length > 0 && capturedMaps.every((file) => file.sourceMapStatus === "analyzed")) {
+        status = "analyzed"
+        note = "Captured source map was parsed and embedded source contents were analyzed as separate virtual source records."
+      } else if (capturedMaps.length) {
+        const preference: Array<NonNullable<JavaScriptSourceFile["sourceMapStatus"]>> = ["truncated", "invalid-json", "unsupported", "no-sources-content", "partial-sources-content"]
+        status = preference.find((candidate) => capturedMaps.some((file) => file.sourceMapStatus === candidate)) ?? "unsupported"
+        note = capturedMaps.flatMap((file) => file.analysis?.notes ?? []).filter((item) => item.startsWith("SOURCE MAP")).join(" ") || "Map response was captured but no embedded source content was analyzed."
+      } else {
+        status = "referenced-not-captured"
+        note = "Source map is referenced by JavaScript but was not present in the current captured responses. Retrieve it only through the normal scope-enforced recon/browser workflow, then rerun correlation."
+      }
+      sourceMapReferences.push({ url, sourceFiles: [...sources].sort(), status, note })
+    }
+    // Analysis artifacts keep hashes, source locations, fingerprints, and summaries only—never raw secret values or embedded source code.
     const persistedSourceFiles = mergedSourceFiles.map(sanitizeJavaScriptSourceFileForPersistence)
     const requestIDs = relevantRequests.map((request) => request.id)
     const requestIDSet = new Set(requestIDs)
@@ -1243,15 +1530,29 @@ export namespace JavaScriptCorrelation {
       createdAt: new Date().toISOString(),
       targetURL: normalizedTarget.targetURL,
       sessionID: rootSessionID,
-      javascriptAssets: assets.map((item) => ({
-        intelEntryID: item.row.id ?? null,
-        url: item.url.origin + item.url.pathname,
-        title: item.row.title,
-        discoveredBy: item.row.source ?? null,
-        confidence: item.row.confidence_level ?? null,
-        tags: (item.row.tags as string[] | null) ?? [],
-      })),
+      javascriptAssets: [
+        ...assets.map((item) => ({
+          intelEntryID: item.row.id ?? null,
+          url: item.url.origin + item.url.pathname,
+          title: item.row.title,
+          discoveredBy: item.row.source ?? null,
+          confidence: item.row.confidence_level ?? null,
+          tags: (item.row.tags as string[] | null) ?? [],
+        })),
+        ...sourceMapReferences
+          .filter((item) => item.status !== "out-of-scope")
+          .filter((item) => !assets.some((asset) => asset.url.origin + asset.url.pathname === item.url))
+          .map((item) => ({
+            intelEntryID: null,
+            url: item.url,
+            title: item.url.split("/").pop() || "source-map.map",
+            discoveredBy: "sourceMappingURL reference in " + item.sourceFiles.join(", "),
+            confidence: item.status === "analyzed" ? "observed" : "candidate",
+            tags: ["javascript", "source-map", item.status],
+          })),
+      ],
       sourceFiles: persistedSourceFiles,
+      sourceMapReferences,
       javascriptAnalysis: {
         functions: mergedSourceFiles.flatMap((file) => (file.analysis?.functions ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         requestCandidates: mergedSourceFiles.flatMap((file) => (file.analysis?.requests ?? []).flatMap((item) => {
@@ -1500,7 +1801,7 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Static endpoint candidates are saved separately under endpoints/; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
-    graph.notes.push("Response previews are length-limited and redacted heuristically; private target-local JavaScript artifacts retain exact secret-like candidate values with source locations for manual verification. Create a separate redacted copy before sharing or sending data externally.")
+    graph.notes.push("Response previews are length-limited and redacted heuristically; derived JavaScript artifacts retain secret fingerprints and source locations only, never raw candidate values. Captured request/source bodies remain in the existing private capture store for on-demand evidence inspection.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
 
     const testerSurveyAbsolutePath = path.join(workspace.workspacePath, testerSurveyRelativePath)
@@ -1538,11 +1839,14 @@ export namespace JavaScriptCorrelation {
       "- Target: " + workspace.targetURL,
       "- Session: " + rootSessionID,
       "- JavaScript asset URLs: " + graph.javascriptAssets.length,
-      "- Local JavaScript source files indexed: " + graph.sourceFiles.length,
+      "- JavaScript/source-map records indexed: " + graph.sourceFiles.length,
       "- Static endpoint literals extracted: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
+      "- Source-map references: " + (graph.sourceMapReferences ?? []).length,
+      "- Source maps awaiting capture: " + (graph.sourceMapReferences ?? []).filter((item) => item.status === "referenced-not-captured").length,
+      "- Embedded source entries analyzed: " + graph.sourceFiles.filter((file) => Boolean(file.sourceMapSource)).length,
       "- JavaScript function candidates: " + graph.javascriptAnalysis.functions.length,
       "- Structured request candidates: " + graph.javascriptAnalysis.requestCandidates.length,
-      "- Secret-like assignments (exact local evidence; candidate only): " + graph.javascriptAnalysis.secretCandidates.length,
+      "- Secret-like assignments (fingerprints only; candidate only): " + graph.javascriptAnalysis.secretCandidates.length,
       "- Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
       "- Static JavaScript sink candidates (not confirmed findings): " + graph.javascriptAnalysis.riskSignals.length,
       "- Unique endpoint candidates: " + graph.endpointCandidates.length,
@@ -1557,7 +1861,7 @@ export namespace JavaScriptCorrelation {
       "- Tester survey artifact: " + testerSurveyRelativePath,
       "",
       "## Local JavaScript files",
-      ...(graph.sourceFiles.length ? graph.sourceFiles.map((file) => "- " + file.relativePath + " — SHA-256 " + file.sha256 + " — " + file.bytes + " bytes — " + file.endpointLiterals.length + " static endpoint literal(s)") : ["No local .js/.mjs/.cjs source files found in the target workspace."]),
+      ...(graph.sourceFiles.length ? graph.sourceFiles.map((file) => "- " + file.relativePath + " — SHA-256 " + file.sha256 + " — " + file.bytes + " bytes — " + file.endpointLiterals.length + " static endpoint literal(s)" + (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : "")) : ["No local JavaScript/source-map source files found in the target workspace."]),
       "",
       "## Function candidates",
       ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) => "- " + fn.name + "(" + fn.parameters.join(", ") + ") — " + fn.sourceFile + ":" + fn.line) : ["No named function candidates extracted."]),
@@ -1565,8 +1869,8 @@ export namespace JavaScriptCorrelation {
       "## Structured request candidates",
       ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((request) => "- " + (request.method ?? "UNKNOWN") + " " + request.urlTemplate + " — source: " + request.sourceFile + ":" + request.sourceLine + (mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)?.sourceRequestID ? " — source request: " + mergedSourceFiles.find((file) => file.relativePath === request.sourceFile)!.sourceRequestID : "") + " — path[" + request.pathParameters.join(", ") + "], query[" + request.queryParameters.join(", ") + "], body[" + request.bodyParameters.join(", ") + "] — headers[" + request.headerNames.join(", ") + "] — auth: " + request.authAssessment + (request.observedRequestIDs.length ? " — captured requests: " + request.observedRequestIDs.join(", ") : " — no matching captured request") + " — review plan (not run): " + request.recommendedChecks.join("; ")) : ["No structured request candidates extracted."]),
       "",
-      "## Secret-like assignments (exact values; candidates, not verified)",
-      ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — value: `" + item.value.replace(/`/g, "\\`") + "` — source: " + item.sourceFile + ":" + item.line + " — fingerprint " + item.fingerprint + " — status: candidate (verify independently)") : ["No secret-like assignments matched the static heuristics."]),
+      "## Secret-like assignments (fingerprints only; candidates, not verified)",
+      ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) => "- " + item.kind + " — raw value omitted — source: " + item.sourceFile + ":" + item.line + " — fingerprint sha256:" + item.fingerprint + " — status: candidate (verify independently)") : ["No secret-like assignments matched the static heuristics."]),
       "",
       "## Static JavaScript risk-sink candidates (not confirmed findings)",
       ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) => "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — function: " + (item.functionName ?? "unknown") + " — candidate only") : ["No configured static sink patterns matched."]),
@@ -1576,6 +1880,11 @@ export namespace JavaScriptCorrelation {
       "",
       "## JavaScript assets",
       ...(urlList ? [urlList] : ["No JavaScript asset matched the current stored Intel. Provide --javascript-url or record an asset with add_intel first."]),
+      "",
+      "## Source-map references",
+      ...((graph.sourceMapReferences ?? []).length
+        ? (graph.sourceMapReferences ?? []).map((item) => "- " + item.url + " — " + item.status + " — source: " + item.sourceFiles.join(", ") + " — " + item.note)
+        : ["No external sourceMappingURL references were extracted from the analyzed JavaScript."]),
       "",
       "## Static endpoint candidates",
       ...(graph.endpointCandidates.length ? graph.endpointCandidates.map((endpoint) => "- " + (endpoint.host ? endpoint.host : "(relative)") + endpoint.path + " — " + (endpoint.observedInTraffic ? "path overlap observed" : "not yet observed in captured traffic") + " — source: " + endpoint.sourceFiles.join(", ") + (endpoint.observedRequestIDs.length ? " — requests: " + endpoint.observedRequestIDs.join(", ") : "")) : ["No static endpoint literals extracted."]),
@@ -1615,6 +1924,7 @@ export namespace JavaScriptCorrelation {
         note: "Static endpoint candidates are leads, not proof of reachability or vulnerability. observedInTraffic only records path overlap with captured requests.",
         endpoints: graph.endpointCandidates,
         javascriptAnalysis: graph.javascriptAnalysis,
+        sourceMapReferences: graph.sourceMapReferences ?? [],
         testerSurvey: testerSurveyRelativePath,
       }, null, 2) + "\n",
     )

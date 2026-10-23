@@ -4,6 +4,7 @@ import {
   reconRunID,
   reconBeginDisposition,
   RECON_PHASE_ARTIFACT_AREAS,
+  missingRequiredReconArtifacts,
   validateAssetDiscoveryLedger,
   unresolvedReconPrerequisites,
   type ReconPhase,
@@ -320,4 +321,15 @@ test("vulnerability testing artifacts must be saved in a testing, findings, or e
   expect(areas?.some((area) => "findings/issue-1.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "evidence/request-1.txt".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "reports/random.md".startsWith(area + "/"))).toBe(false)
+})
+
+
+test("JavaScript and endpoint phases require non-skippable canonical handoff files", () => {
+  expect(missingRequiredReconArtifacts("javascript_analysis", ["javascript/graph.json", "endpoints/candidates.json"])).toEqual([
+    "javascript-analysis.md",
+    "endpoints.txt",
+  ])
+  expect(missingRequiredReconArtifacts("javascript_analysis", ["./javascript-analysis.md", "endpoints.txt"])).toEqual([])
+  expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints/candidates.json"])).toEqual(["endpoints.txt"])
+  expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints.txt"])).toEqual([])
 })

@@ -245,6 +245,17 @@ export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly str
   reporting: ["reports"],
 }
 
+export const RECON_PHASE_REQUIRED_FLAT_ARTIFACTS: Partial<Record<ReconPhase, readonly string[]>> = {
+  // These are the two canonical handoff files consumed by endpoint_inventory and final reporting.
+  javascript_analysis: ["javascript-analysis.md", "endpoints.txt"],
+  endpoint_inventory: ["endpoints.txt"],
+}
+
+export function missingRequiredReconArtifacts(phase: ReconPhase, reportedPaths: readonly string[]): string[] {
+  const normalized = new Set(reportedPaths.map((item) => item.replace(/\\/g, "/").replace(/^\.\/+/, "")))
+  return [...(RECON_PHASE_REQUIRED_FLAT_ARTIFACTS[phase] ?? [])].filter((required) => !normalized.has(required))
+}
+
 export type ReconBeginDisposition = "start" | "resume_existing" | "already_resolved"
 
 export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhase): ReconBeginDisposition {
@@ -443,8 +454,8 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               url_collection: ["urls.txt"],
               parameter_discovery: ["parameters.txt"],
               parameter_fuzzing: ["parameter-tests.md"],
-              javascript_analysis: ["javascript-analysis.md", "endpoints.txt"],
-              endpoint_inventory: ["endpoints.txt"],
+              javascript_analysis: RECON_PHASE_REQUIRED_FLAT_ARTIFACTS.javascript_analysis ?? [],
+              endpoint_inventory: RECON_PHASE_REQUIRED_FLAT_ARTIFACTS.endpoint_inventory ?? [],
               vulnerability_testing: ["findings.md"],
             }
             const isFlatArtifact = !resolvedArtifactPath.includes("/") &&
@@ -470,11 +481,37 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           if (phase === "reporting" && !finalReconReportVerified) {
             return { title: "Recon report rejected", output: "The reporting phase requires a verified reports/recon-final.md artifact. Include that exact path and complete report before marking Recon finished.", metadata: { saved: false, reason: "final_recon_report_required" } }
           }
+          const reportedPaths = new Set(params.artifacts.map((artifact) => {
+            const candidate = path.isAbsolute(artifact) ? path.resolve(artifact) : path.resolve(realWorkspace, artifact)
+            return path.relative(realWorkspace, candidate).split(path.sep).join("/")
+          }))
+          const missingRequired = missingRequiredReconArtifacts(phase, [...reportedPaths])
+          if (missingRequired.length) {
+            return {
+              title: "Recon checkpoint rejected",
+              output: "Cannot complete " + phase + " without its canonical output file(s): " + missingRequired.join(", ") + ". Create/update these files with verified results, including an explicit zero-result or incomplete status when applicable, then retry.",
+              metadata: { saved: false, reason: "canonical_artifact_required", phase, missing_artifacts: missingRequired },
+            }
+          }
+          for (const required of RECON_PHASE_REQUIRED_FLAT_ARTIFACTS[phase] ?? []) {
+            try {
+              const content = await fs.readFile(path.join(realWorkspace, required), "utf-8")
+              if (!content.trim()) {
+                return {
+                  title: "Recon checkpoint rejected",
+                  output: "Cannot complete " + phase + ": canonical artifact is empty: " + required + ". Record verified counts or an explicit zero-result/incomplete status.",
+                  metadata: { saved: false, reason: "canonical_artifact_empty", phase, artifact: required },
+                }
+              }
+            } catch (error) {
+              return {
+                title: "Recon checkpoint rejected",
+                output: "Cannot read canonical artifact " + required + " for " + phase + ": " + (error instanceof Error ? error.message : String(error)),
+                metadata: { saved: false, reason: "canonical_artifact_unreadable", phase, artifact: required },
+              }
+            }
+          }
           if (phase === "asset_discovery") {
-            const reportedPaths = new Set(params.artifacts.map((artifact) => {
-              const candidate = path.isAbsolute(artifact) ? path.resolve(artifact) : path.resolve(realWorkspace, artifact)
-              return path.relative(realWorkspace, candidate).split(path.sep).join("/")
-            }))
             for (const required of ["subdomain-sources.json", "subdomains.txt"]) {
               if (!reportedPaths.has(required)) {
                 return {

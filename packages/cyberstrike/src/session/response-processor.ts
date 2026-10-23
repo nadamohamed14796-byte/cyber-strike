@@ -33,7 +33,7 @@ export interface ProcessedResponse {
   contentType: string
   originalSize: number
   content: string
-  /** Full JavaScript source for static analysis; excluded from the default LLM-facing preview. */
+  /** Full JavaScript or source-map body for static analysis/correlation; separate from the bounded response preview. */
   javascriptSource?: string
 }
 
@@ -78,7 +78,7 @@ export function processResponse(input: ResponseInput): ProcessedResponse {
     contentType,
     originalSize,
     content,
-    ...(isJavaScript(contentType, input.url) ? { javascriptSource: input.body } : {}),
+    ...(isJavaScriptOrSourceMap(contentType, input.url) ? { javascriptSource: input.body } : {}),
   }
 }
 
@@ -124,11 +124,12 @@ function isJson(contentType: string): boolean {
   return ct.includes("application/json") || ct.includes("+json")
 }
 
-function isJavaScript(contentType: string, url?: string): boolean {
+function isJavaScriptOrSourceMap(contentType: string, url?: string): boolean {
   const ct = contentType.toLowerCase()
   const scriptMimeType = ct.includes("javascript") || ct.includes("ecmascript") || ct === "text/jscript"
+  const sourceMapMimeType = /(?:application\/(?:x-)?source-map\+json|text\/x-source-map)/i.test(ct)
   const pathname = (url ?? "").split(/[?#]/, 1)[0] ?? ""
-  return scriptMimeType || /\.(?:m?js|cjs)$/i.test(pathname)
+  return scriptMimeType || sourceMapMimeType || /\.(?:m?js|cjs|map)$/i.test(pathname)
 }
 
 function isText(contentType: string): boolean {

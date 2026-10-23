@@ -297,10 +297,10 @@ test("retains target-local hard-coded secret evidence with a fingerprint and can
   expect(result.secretCandidates).toHaveLength(1)
   expect(result.secretCandidates[0]).toMatchObject({
     kind: "api-key",
-    value: secret,
     confidence: "candidate",
   })
   expect(result.secretCandidates[0]?.fingerprint).toMatch(/^[a-f0-9]{20}$/)
+  expect(JSON.stringify(result)).not.toContain(secret)
 })
 
 test("records roles and hidden-feature hints as candidates", () => {
@@ -312,17 +312,18 @@ test("records roles and hidden-feature hints as candidates", () => {
   expect(result.requests.some((request) => request.path === "/api/admin/reports")).toBe(true)
 })
 
-test("retains exact secret candidate values and keeps them unverified", () => {
-  const source = 'const api_key = "personal-test-token-value-12345";';
+test("retains only a secret fingerprint and source location, never the literal value", () => {
+  const secret = "personal-test-token-value-12345";
+  const source = 'const api_key = "' + secret + '";';
   const result = analyzeJavaScriptSource(source);
   expect(result.secretCandidates).toHaveLength(1);
   expect(result.secretCandidates[0]).toMatchObject({
     kind: "api-key",
     line: 1,
-    value: "personal-test-token-value-12345",
     confidence: "candidate",
   });
   expect(result.secretCandidates[0]?.fingerprint).toMatch(/^[a-f0-9]{20}$/);
+  expect(JSON.stringify(result)).not.toContain(secret);
 });
 
 
