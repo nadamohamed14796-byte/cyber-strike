@@ -136,6 +136,30 @@ export function unresolvedReconPrerequisites(
   return unresolved
 }
 
+/** Pure execution decision used by the runtime gate and unit tests. */
+export function reconPhaseExecutionDecision(
+  requiredPhase: ReconPhase,
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+): { allowed: boolean; reason: string } {
+  const phaseStatus = phases[requiredPhase].status
+  if (phaseStatus !== "running") {
+    return {
+      allowed: false,
+      reason: "Recon tool blocked: phase " + requiredPhase + " is " + phaseStatus + ". Begin or resume this phase through recon_checkpoint before running its tools.",
+    }
+  }
+
+  const unresolved = unresolvedReconPrerequisites(requiredPhase, phases)
+  if (unresolved.length) {
+    return {
+      allowed: false,
+      reason: "Recon tool blocked: earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + phases[phase].status).join(", ") + ". Resume the first unfinished phase before continuing.",
+    }
+  }
+
+  return { allowed: true, reason: "scope and phase checks passed" }
+}
+
 /** Fail-closed runtime gate for active scanner and web-recon tools. */
 export async function reconPhaseGate(
   workspace: Workspace,
@@ -176,23 +200,6 @@ export async function reconPhaseGate(
     }
   }
 
-  const phaseStatus = run.phases[requiredPhase].status
-  if (phaseStatus !== "running") {
-    return {
-      allowed: false,
-      reason: "Recon tool blocked: phase " + requiredPhase + " is " + phaseStatus + ". Begin or resume this phase through recon_checkpoint before running its tools.",
-      manifestPath,
-    }
-  }
-
-  const unresolved = unresolvedReconPrerequisites(requiredPhase, run.phases)
-  if (unresolved.length) {
-    return {
-      allowed: false,
-      reason: "Recon tool blocked: earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + run.phases[phase].status).join(", ") + ". Resume the first unfinished phase before continuing.",
-      manifestPath,
-    }
-  }
-
-  return { allowed: true, reason: "scope and phase checks passed", manifestPath }
+  const decision = reconPhaseExecutionDecision(requiredPhase, run.phases)
+  return { ...decision, manifestPath }
 }
