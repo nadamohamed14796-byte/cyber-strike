@@ -8,7 +8,7 @@ import { Tool } from "./tool"
 import { assertExternalDirectory } from "./external-directory"
 
 const AREAS = [
-  "scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints",
+  "root", "scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints",
   "testing", "findings", "evidence", "reports", "scans", "runs", "logs",
   "sessions", "research",
 ] as const
@@ -29,7 +29,7 @@ type TargetArtifactMetadata = {
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Exact existing target workspace URL. Use the root target for parent inventory and the child origin for per-asset artifacts."),
-  area: z.enum(AREAS).describe("Target-local artifact directory. Do not replace authoritative scope/asset/run index files."),
+  area: z.enum(AREAS).describe("Use root only for canonical top-level inventories required by recon_checkpoint; otherwise use the matching target-local artifact directory. Do not replace authoritative manifests/index files."),
   filename: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/).describe("Simple filename only, not a path. Use stable inventory names and unique run IDs for evidence."),
   content: z.string().max(2_000_000).optional().describe("Complete UTF-8 text/JSON/CSV content, maximum 2 MB. Exact evidence is preserved in this target-local workspace. Provide this OR source_path."),
   source_path: z.string().min(1).optional().describe("Absolute path to an existing user-provided text file on disk. Copies it into the target workspace without returning its contents to the model; files up to 32 MB. Provide this OR content."),
@@ -45,7 +45,8 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     "Use for recon inventories, live-host results, URL/endpoint lists, JavaScript analysis, request/response references, test logs, evidence indexes, scan manifests, run state, report drafts and target-specific research notes.",
     "The workspace must already exist in the current project. This tool never silently creates another directory or guesses a target path. Call target_workspace first.",
     "Provide exactly one input: content (up to 2 MB) or source_path (an absolute, existing regular text file up to 32 MB). source_path copies the file into the workspace without returning its contents to the model and reports its SHA-256 hash.",
-    "Only known artifact folders and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Exact evidence is preserved in this private target workspace; do not copy raw secrets into Git commits or global research.",
+    "Use area=root only for canonical top-level inventories such as scope.txt, subdomains.txt, subdomain-sources.json, live-hosts.txt, ports.txt, urls.txt, parameters.txt, parameter-tests.md, javascript-analysis.md, endpoints.txt, or findings.md. This writes directly to the existing workspace root; it does not create a root/ directory. Put other evidence in its named area, and keep the final report at reports/recon-final.md.",
+    "Only known artifact areas and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Exact evidence is preserved in this private target workspace; do not copy raw secrets into Git commits or global research.",
     "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, then verify the output file. Do not use the shell current directory or /root/targets implicitly.",
   ].join("\n"),
   parameters: Parameters,
@@ -64,7 +65,8 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     const reserved = ["target.json", "workspace.json", "notes.md"].includes(lower) ||
       (params.area === "scope" && lower === "scope.json") ||
       (params.area === "assets" && lower === "registry.json") ||
-      (params.area === "runs" && lower === "index.json")
+      (params.area === "runs" && lower === "index.json") ||
+      (params.area === "root" && ["scope.json", "registry.json", "index.json"].includes(lower))
     if (reserved) {
       return {
         title: "Target artifact not saved",
@@ -73,7 +75,8 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       }
     }
 
-    const filePath = path.join(workspace.workspacePath, params.area, filename)
+    const relativePath = params.area === "root" ? filename : path.join(params.area, filename)
+    const filePath = path.join(workspace.workspacePath, relativePath)
     const exists = await Bun.file(filePath).exists()
     if (exists && !params.overwrite) {
       return {
@@ -164,7 +167,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
     }
 
     const content = rawContent.endsWith("\n") ? rawContent : rawContent + "\n"
-    await TargetMemory.writeWorkspaceFile(workspace, params.area + "/" + filename, content)
+    await TargetMemory.writeWorkspaceFile(workspace, relativePath, content)
     return {
       title: "Target artifact saved",
       output: [

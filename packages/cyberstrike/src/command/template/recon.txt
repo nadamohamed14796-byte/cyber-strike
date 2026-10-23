@@ -64,7 +64,7 @@ Keep the main user-facing inventories as a small set of canonical files directly
 - `findings.md` — evidence-backed findings or an explicit empty status.
 - `reports/recon-final.md` — the final run report with truthful phase states, counts, sources, artifact paths, gaps, and the exact resume point when incomplete.
 
-Reuse and update these files instead of creating alternative names for the same inventory. A phase is not complete until its canonical artifacts match the saved ledger. Keep raw observations only when they add provenance, debugging, or audit value; never overwrite the only useful evidence copy.
+Use target_artifact(area="root", filename="<name>") for these top-level inventories; root writes directly into the existing workspace root. Use the matching named area for other artifacts and area="reports" with filename="recon-final.md" for the required final report. Reuse and update these files instead of creating alternative names for the same inventory. A phase is not complete until its canonical artifacts match the saved ledger. Keep raw observations only when they add provenance, debugging, or audit value; never overwrite the only useful evidence copy.
 If checkpoint validation rejects an artifact path, do not bypass the error or claim success: save the verified result to an allowed canonical path and retry. Live-host discovery and URL collection are separate phases; one never implies the other is complete.
 
 
