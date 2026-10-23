@@ -47,7 +47,7 @@ For every unfinished batch, persist:
 - Failed, deferred, and unprocessed items.
 - The reason each item remains unfinished.
 - The exact next operation required to resume.
- 
+
 ### 0.2.1 Canonical artifact ownership
 
 Do not maintain a second artifact list in this prompt. Before execution, use these existing authorities:

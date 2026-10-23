@@ -12,7 +12,6 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 - `packages/cyberstrike/src/research/sources.ts` is the executable source-adapter registry for global public-research ingestion via `/update`. It is separate from target reconnaissance and is not a duplicate of the per-root `subdomain-sources.json` run ledger. Do not delete or merge the two merely because both represent sources.
 - If instructions disagree, actual registered tool schemas and runtime validation determine what can execute. Reconcile the single authoritative documentation location instead of adding another list, manifest, collector, or helper.
 
-
 ## Selection rules
 
 1. Identify the phase and exact evidence gap before selecting a tool.
