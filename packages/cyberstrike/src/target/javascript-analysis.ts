@@ -50,6 +50,7 @@ export interface JavaScriptSourceAnalysis {
 }
 
 const cleanUnique = (values: string[]) => [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+const escapeRegexLiteral = (value: string) => value.replace(/[.*+?^\x24\x7B\x7D()|[\]\\]/g, "\\$&")
 function lineNumber(lineStarts: number[], index: number): number {
   let low = 0, high = lineStarts.length
   while (low < high) {
@@ -131,7 +132,7 @@ function objectPropertyNames(value: string): string[] {
 
 function objectBindingFields(source: string, name: string, beforeIndex: number): string[] {
   if (!/^[A-Za-z_$][\w$]*$/.test(name)) return []
-  const pattern = new RegExp("\\b(?:const|let|var)\\s+" + name + "\\s*=\\s*\\{", "g")
+  const pattern = new RegExp("\\b(?:const|let|var)\\s+" + escapeRegexLiteral(name) + "\\s*=\\s*\\{", "g")
   let match: RegExpExecArray | null
   let bestIndex = -1
   let fields: string[] = []
@@ -149,16 +150,17 @@ function objectBindingFields(source: string, name: string, beforeIndex: number):
 
 function configObjectFields(text: string, property: string, source: string, beforeIndex: number): string[] {
   const fields = new Set<string>()
-  const direct = new RegExp("\\b" + property + "\\s*:\\s*\\{", "g")
+  const escapedProperty = escapeRegexLiteral(property)
+  const direct = new RegExp("\\b" + escapedProperty + "\\s*:\\s*\\{", "g")
   let match: RegExpExecArray | null
   while ((match = direct.exec(text))) {
     const open = text.indexOf("{", match.index)
     const close = matchingObjectBrace(text, open)
     if (close >= 0) for (const key of objectPropertyNames(text.slice(open + 1, close))) fields.add(key)
   }
-  const reference = new RegExp("\\b" + property + "\\s*:\\s*([A-Za-z_$][\\w$]*)\\b").exec(text)
+  const reference = new RegExp("\\b" + escapedProperty + "\\s*:\\s*([A-Za-z_$][\\w$]*)\\b").exec(text)
   if (reference?.[1]) for (const key of objectBindingFields(source, reference[1], beforeIndex)) fields.add(key)
-  const shorthand = new RegExp("(?:^|[,{])\\s*" + property + "\\s*(?=,|})").test(text)
+  const shorthand = new RegExp("(?:^|[,{])\\s*" + escapedProperty + "\\s*(?=,|})").test(text)
   if (shorthand) for (const key of objectBindingFields(source, property, beforeIndex)) fields.add(key)
   return [...fields]
 }
@@ -448,7 +450,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       ...configObjectFields(optionText, "searchParams", source, index),
       ...Array.from(all.matchAll(/new\s+URLSearchParams\s*\(\s*\{([\s\S]*?)\}/gi), (m) => objectPropertyNames(m[1] ?? "")).flat(),
       ...urlSearchParamsVariables(requestContext).flatMap((name) =>
-        Array.from(requestContext.matchAll(new RegExp("\\b" + name + "\\s*\\.\\s*(?:set|append|get)\\s*\\(\\s*[\"']([^\"']+)[\"']", "gi")), (m) => m[1]!),
+        Array.from(requestContext.matchAll(new RegExp("(?<![\\w$])" + escapeRegexLiteral(name) + "(?![\\w$])\\s*\\.\\s*(?:set|append|get)\\s*\\(\\s*[\"']([^\"']+)[\"']", "gi")), (m) => m[1]!),
       ),
     )
     if (/\b(?:searchParams|URLSearchParams)\b/i.test(all)) {

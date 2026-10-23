@@ -352,3 +352,19 @@ test("analyzes a route found after the former 1 MB source boundary", () => {
   const result = analyzeJavaScriptSource(source)
   expect(result.requests.some((request) => request.path === "/api/v1/after-size-cap")).toBe(true)
 })
+
+
+test("extracts request metadata from dollar-prefixed JavaScript identifiers", () => {
+  const source = [
+    "async function loadItems() {",
+    '  const $params = new URLSearchParams()',
+    '  $params.append("page", currentPage)',
+    '  const $body = { displayName: profileName, active: true }',
+    '  return fetch("/api/items", { method: "POST", body: JSON.stringify($body) })',
+    "}",
+  ].join("\n")
+  const request = analyzeJavaScriptSource(source).requests[0]!
+  expect(request.queryParameters).toContain("page")
+  expect(request.bodyParameters).toContain("displayName")
+  expect(request.bodyParameters).toContain("active")
+})

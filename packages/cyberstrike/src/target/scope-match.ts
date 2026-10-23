@@ -37,9 +37,10 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
     }
     if (assetType === "cidr") {
       const v4 = identifier.match(/^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/)
-      const v6 = identifier.match(/^\[?([0-9a-f:.]+)\]?\/(\d{1,3})$/i)
+      const v6 = identifier.match(/^(?:\[([0-9a-f:.]+)\]|([0-9a-f:.]+))\/(\d{1,3})$/i)
+      const v6Address = v6?.[1] ?? v6?.[2]
       const validV4 = Boolean(v4 && ipv4ToNumber(v4[1]) !== null && Number(v4[2]) <= 32)
-      const validV6 = Boolean(v6 && v6[1].includes(":") && ipv6ToBigInt(v6[1]) !== null && Number(v6[2]) <= 128)
+      const validV6 = Boolean(v6 && v6Address && v6Address.includes(":") && ipv6ToBigInt(v6Address) !== null && Number(v6[3]) <= 128)
       if (!validV4 && !validV6) {
         return { matches: false, reason: "HackerOne CIDR assets must be a valid IPv4 or IPv6 CIDR range" }
       }
@@ -85,10 +86,11 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
 
   // IPv6 CIDR matching is separate from IPv4 CIDR parsing to avoid treating
   // malformed network entries as ordinary hostnames.
-  const ipv6Cidr = allowed.match(/^\[?([0-9a-f:.]+)\]?\/(\d{1,3})$/i)
-  if (ipv6Cidr && ipv6Cidr[1].includes(":")) {
-    const prefix = Number(ipv6Cidr[2])
-    const network = ipv6ToBigInt(ipv6Cidr[1])
+  const ipv6Cidr = allowed.match(/^(?:\[([0-9a-f:.]+)\]|([0-9a-f:.]+))\/(\d{1,3})$/i)
+  const ipv6Address = ipv6Cidr?.[1] ?? ipv6Cidr?.[2]
+  if (ipv6Cidr && ipv6Address && ipv6Address.includes(":")) {
+    const prefix = Number(ipv6Cidr[3])
+    const network = ipv6ToBigInt(ipv6Address)
     const hostname = parseHostname(value)
     const address = hostname ? ipv6ToBigInt(hostname) : null
     if (prefix < 0 || prefix > 128 || network === null || address === null) {
@@ -140,7 +142,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
   // Do not silently drop the path and broaden authorization to the entire origin.
   if (!typed && !allowed.includes("://") && allowed.includes("/") &&
       !/^\d+(?:\.\d+){3}\/\d{1,2}$/.test(allowed) &&
-      !/^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(allowed)) {
+      !/^(?:\[[0-9a-f:.]+\]|[0-9a-f:.]+)\/\d{1,3}$/i.test(allowed)) {
     return matchURLScope(rawTarget, allowed, true)
   }
 
@@ -169,7 +171,7 @@ export function checkMatch(target: string, scope: string): ScopeMatch {
       const escaped = labels
         .map((label) => label === "*" || /^\{[^{}]+\}$/.test(label)
           ? "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
-          : label.replace(/[.*+?^\x24()|[\]\\]/g, "\\$&"))
+          : label.replace(/[.*+?^\x24\x7B\x7D()|[\]\\]/g, "\\$&"))
         .join("\\.")
       let pattern: RegExp
       try { pattern = new RegExp("^" + escaped + "$", "i") }

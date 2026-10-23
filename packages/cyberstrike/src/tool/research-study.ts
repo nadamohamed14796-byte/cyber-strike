@@ -1094,8 +1094,10 @@ export const ResearchStudyTool = Tool.define<typeof ResearchStudyParameters, Too
 
       const documentType = note.document_type ?? classifyResearchDocumentType(claim.title ?? claim.source_url, text, source.kind)
       const vulnerabilityClass = canonicalClass(note.vulnerability_class)
-      const candidateCwe = note.cwe_id?.toUpperCase()
-      const cweID = candidateCwe && new RegExp("\\b" + candidateCwe.replace("-", "[-:#]?\\s*") + "\\b", "i").test((claim.title ?? "") + " " + text)
+      const candidateCwe = note.cwe_id?.trim().toUpperCase()
+      // Only interpolate validated digits into a regex; the model-proposed ID is not regex syntax.
+      const cweDigits = /^CWE-(\d{1,6})$/.exec(candidateCwe ?? "")?.[1]
+      const cweID = cweDigits && new RegExp("\\bCWE[-:#]?\\s*" + cweDigits + "\\b", "i").test((claim.title ?? "") + " " + text)
         ? candidateCwe
         : undefined
       const severity = severityFromSource(claim.title ?? "", text)

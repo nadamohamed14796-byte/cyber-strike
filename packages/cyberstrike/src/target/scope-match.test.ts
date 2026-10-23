@@ -80,4 +80,16 @@ describe("HackerOne typed scope assets", () => {
       expect(checkMatch("https://example.com/", scope).matches).toBe(false)
     }
   })
+
+  test("escapes regex metacharacters in fixed labels inside positional wildcards", () => {
+    expect(checkMatch("https://foo.example.com/", "fo{2}.example.*").matches).toBe(false)
+    expect(checkMatch("https://www.amazon.com/", "www.amazon.*").matches).toBe(true)
+  })
+
+  test("rejects IPv6 CIDR entries with mismatched square brackets", () => {
+    expect(checkMatch("https://[2001:db8::1]/", "CIDR: [2001:db8::/32").matches).toBe(false)
+    expect(checkMatch("https://[2001:db8::1]/", "CIDR: 2001:db8::]/32").matches).toBe(false)
+    expect(checkMatch("https://[2001:db8::1]/", "CIDR: 2001:db8::/32").matches).toBe(true)
+    expect(checkMatch("https://[2001:db8::1]/", "CIDR: [2001:db8::]/32").matches).toBe(true)
+  })
 })
