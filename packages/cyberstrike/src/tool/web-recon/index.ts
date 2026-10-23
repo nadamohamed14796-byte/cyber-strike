@@ -273,7 +273,7 @@ async function removeMigratedLegacyArtifacts(
     const old = legacy.record
     const fingerprint = webReconFingerprint(old.program, old.requestedTarget, old.result)
     const observation = aggregate.observations.find((item) => item.fingerprint === fingerprint)
-    if (!observation?.attempts.some((attempt) => attempt.completedAt === old.completedAt && attempt.sessionID === old.sessionID)) continue
+    if (!observation?.attempts.some((attempt) => attempt.completedAt === old.completedAt && attempt.sessionID === old.sessionID && attempt.messageID === undefined)) continue
     try {
       const info = await fs.lstat(legacy.filepath)
       if (info.isSymbolicLink() || !info.isFile()) continue
@@ -401,6 +401,7 @@ async function persistWebReconResult(input: {
   requestedTarget: string
   completedAt: string
   sessionID: string
+  messageID: string
   result: WebReconResult
 }): Promise<string> {
   const artifactPath = path.join(input.workspace.workspacePath, input.filename)
