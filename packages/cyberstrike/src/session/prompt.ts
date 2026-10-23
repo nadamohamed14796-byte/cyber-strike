@@ -857,7 +857,7 @@ export namespace SessionPrompt {
         const lines = [
           "# MCP Tools",
           `You have ${mcpLazyStats.available} tools available from MCP servers. These tools are NOT yet in your context.`,
-          "Use `tool_search` to find tools by capability, then `load_tools` to make them usable.",
+          "At each new checkpoint, search tools by its objective and evidence gap with `tool_search`; retry with synonyms or a broader limit if results are thin, then use `load_tools` for matching IDs. Tool-category examples never assign a required tool.",
           "",
           "Available servers:",
         ]
