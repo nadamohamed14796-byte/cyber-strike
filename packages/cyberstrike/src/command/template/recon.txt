@@ -87,7 +87,7 @@ Do not report a tool as installed merely because its name appears in this prompt
 
 ### 0.3.1 Adaptive tool and skill readiness — once per run
 
-At run start, inspect the canonical workspace and `recon_checkpoint` state once. The canonical prompt and checkpoint define the workflow; the tool matrix is an optional capability reference, not an allowlist.
+At run start, inspect the canonical workspace and `recon_checkpoint` state once. This prompt and the checkpoint define workflow/state. Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the sole tool/API/CLI/helper catalog, and `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` only for phase artifacts and completion criteria; neither file is an allowlist or a run-everything checklist.
 
 1. Inspect a registered tool's schema before first use. Check a CLI's executable/help/version only when it is a candidate to run and only once per runtime or version change.
 2. Choose one suitable primary method. Add a source or tool only for independent coverage, a concrete gap, or recovery from a real failure. Do not run equivalent tools merely to increase counts or install a catalog of tools.
