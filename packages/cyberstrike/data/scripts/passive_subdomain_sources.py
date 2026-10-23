@@ -24,6 +24,15 @@ API_SOURCES = ("crt.sh", "certspotter", "otx_passive_dns")
 ALL_SOURCES = (*API_SOURCES, *CLI_SOURCES)
 HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$", re.I)
 
+def default_source_selection() -> list[str]:
+    """Pick independent public APIs plus one installed primary CLI, not every equivalent CLI."""
+    selected = list(API_SOURCES)
+    primary_cli = next((source for source in CLI_SOURCES if shutil.which(source)), None)
+    if primary_cli:
+        selected.append(primary_cli)
+    return selected
+
+
 def normalize_host(value: str, root: str) -> str | None:
     host = value.strip().lower().rstrip(".")
     if host.startswith("*."):
@@ -410,7 +419,7 @@ def refresh_inventory(document: dict) -> None:
     ]
     counts = {
         "roots": len(document["roots"]),
-        "sources_attempted": sum(int(item.get("attempt_count", 0)) > 0 or item.get("status") != "pending" for item in source_records),
+        "sources_attempted": sum(int(item.get("attempt_count", 0)) > 0 for item in source_records),
         "sources_pending": sum(item.get("status") == "pending" for item in source_records),
         "sources_not_started": sum(item.get("status") == "pending" and int(item.get("attempt_count", 0)) == 0 for item in source_records),
         "sources_running_or_interrupted": sum(item.get("status") == "pending" and int(item.get("attempt_count", 0)) > len(item.get("attempt_history", [])) for item in source_records),
@@ -441,6 +450,26 @@ def persist_snapshot(document: dict, output_path: Path | None, hosts_path: Path 
         atomic_write_text(hosts_path, "".join(item["host"] + "\n" for item in document["hosts"]))
     if output_path is not None:
         atomic_write_text(output_path, json.dumps(document, indent=2, sort_keys=True) + "\n")
+
+
+def append_interrupted_attempt(item: dict) -> list[dict]:
+    """Preserve a started source attempt when its process ended before a terminal save."""
+    history = list(item.get("attempt_history", []))
+    if item.get("status") == "pending" and item.get("started_at") and not item.get("finished_at"):
+        history.append({
+            "attempt": int(item.get("attempt_count", len(history) + 1)),
+            "started_at": item["started_at"],
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "status": "interrupted",
+            "raw_records": int(item.get("raw_records", 0)),
+            "valid_observations": int(item.get("valid_observations", 0)),
+            "unique_hosts": int(item.get("unique_hosts", 0)),
+            "duplicate_observations": int(item.get("duplicate_observations", 0)),
+            "rejected_records": int(item.get("rejected_records", 0)),
+            "error": "Previous invocation ended before a terminal source result was persisted",
+            "hosts": sorted(set(item.get("hosts", []))),
+        })
+    return history
 
 
 def main() -> int:
@@ -476,7 +505,7 @@ def main() -> int:
     output_path = Path(args.output).expanduser().resolve() if args.output else None
     hosts_path = Path(args.hosts_output).expanduser().resolve() if args.hosts_output else None
     default_sources = list(ALL_SOURCES)
-    selected_sources = list(dict.fromkeys(args.source or default_sources))
+    selected_sources = list(dict.fromkeys(args.source or default_source_selection()))
     retry_sources = set(args.retry_source or [])
     selected_sources = list(dict.fromkeys([*selected_sources, *retry_sources]))
 
@@ -548,6 +577,18 @@ def main() -> int:
                     "hosts": [],
                     "error": None,
                 })
+                item.pop("skipped_by_selection", None)
+            elif source in selected_sources and item.get("skipped_by_selection") is True:
+                # A source intentionally skipped in an earlier run becomes eligible
+                # automatically if later selected; successful/failed attempts remain
+                # terminal until an explicit --retry-source is supplied.
+                item.update({
+                    "status": "pending",
+                    "started_at": None,
+                    "finished_at": None,
+                    "error": None,
+                })
+                item.pop("skipped_by_selection", None)
 
     if not args.fresh and retry_sources:
         # A retry should not mark a source in a root as complete if it was omitted
@@ -555,29 +596,36 @@ def main() -> int:
         # every explicitly requested retry source.
         pass
 
+    # A selected worklist must not leave unselected sources looking like unfinished
+    # jobs. Save an explicit skipped outcome so the run can finish honestly with gaps;
+    # if one of these sources is selected in a later invocation, it becomes pending.
+    for item in document["sources"]:
+        if item.get("source") in selected_sources or item.get("status") != "pending":
+            continue
+        history = append_interrupted_attempt(item)
+        item["attempt_history"] = history
+        source = item["source"]
+        if source in CLI_SOURCES and not shutil.which(source):
+            reason = f"{source} is not installed and was not selected automatically; install it only if needed coverage is missing, then select it explicitly"
+        elif source in CLI_SOURCES:
+            reason = f"{source} was not selected automatically because an equivalent primary CLI was preferred; select it explicitly if it can add independent coverage"
+        else:
+            reason = f"{source} was not selected for this invocation; select it explicitly if its distinct coverage is needed"
+        item.update({
+            "status": "skipped",
+            "started_at": None,
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+            "error": reason,
+            "skipped_by_selection": True,
+        })
+
     persist_snapshot(document, output_path, hosts_path)
     # Only pending records for the selected source set run. Prior terminal records
     # remain available as evidence and are never rerun implicitly.
     for item in document["sources"]:
         if item.get("root") not in roots or item.get("source") not in selected_sources or item.get("status") != "pending":
             continue
-        history = list(item.get("attempt_history", []))
-        # A prior pending record with a start timestamp means the process ended or
-        # was interrupted before a terminal result reached the ledger.
-        if item.get("status") == "pending" and item.get("started_at") and not item.get("finished_at"):
-            history.append({
-                "attempt": int(item.get("attempt_count", len(history) + 1)),
-                "started_at": item["started_at"],
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "status": "interrupted",
-                "raw_records": int(item.get("raw_records", 0)),
-                "valid_observations": int(item.get("valid_observations", 0)),
-                "unique_hosts": int(item.get("unique_hosts", 0)),
-                "duplicate_observations": int(item.get("duplicate_observations", 0)),
-                "rejected_records": int(item.get("rejected_records", 0)),
-                "error": "Previous invocation ended before a terminal source result was persisted",
-                "hosts": sorted(set(item.get("hosts", []))),
-            })
+        history = append_interrupted_attempt(item)
         attempt_number = int(item.get("attempt_count", 0)) + 1
         started_at = datetime.now(timezone.utc).isoformat()
         item["attempt_history"] = history
