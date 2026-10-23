@@ -33,7 +33,7 @@ Do not infer a flaw from a route name, token presence, or error message alone.
 
 ### 2. Run minimal controlled comparisons
 
-Use `http_replay` with the captured request:
+Select a registered request-execution capability that fits this check, inspect its schema and scope behavior, and use the captured request where supported (for example, `http_replay` when suitable):
 - Compare the original authorized test identity against an unauthenticated request only when the endpoint should require authentication.
 - Compare two explicitly authorized test identities only when their role/ownership difference is relevant.
 - For token validation, prefer offline structural/claim review. If an active negative control is needed, use one minimally altered token derived from a test account and verify rejection on a harmless endpoint. Do not brute-force secrets, forge tokens for other users, or attempt privilege escalation against real resources.

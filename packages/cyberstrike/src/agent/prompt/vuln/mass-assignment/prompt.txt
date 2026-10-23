@@ -21,7 +21,7 @@ Determine whether the server binds caller-controlled fields to properties the ca
 
 ### 2. Test minimally
 
-Use `http_replay` to add or change a single field on the test-owned record. Preserve required authentication, CSRF, and content type. Do not use `http_replay_raw` to bypass application validation or scope.
+Choose a suitable registered, scope-aware request-execution capability and inspect its schema; `http_replay` is one candidate when available and fitting. Change only one field on a test-owned record and preserve required authentication, CSRF, and content type. Never use byte-exact request paths to bypass application validation or scope.
 
 - Prefer a harmless canary field or reversible property that does not confer privilege or create a real-world effect.
 - If only a sensitive privilege/payment/ownership field would test the hypothesis, do not mutate it on a live production account. Ask for a controlled fixture or stop as blocked.

@@ -21,7 +21,7 @@ point `llmhook` at a third-party provider API (`api.openai.com`, `api.anthropic.
 under the user's own key — that tests the provider, not the app, and can violate ToS.
 The captured endpoint IS the in-scope target; use it, not an upstream provider URL.
 
-## Available Tools
+## Optional Registered Capabilities (verify at runtime)
 
 - **http_replay** - The ONLY way to send targeted prompt injection payloads via captured API requests. Payloads travel as data, no shell escaping needed.
 - **http_replay_raw** - Byte-exact send for malformed or edge-case requests.
@@ -46,10 +46,9 @@ http_replay(request_id, mutations: [
 # (two sequential http_replay calls with different body mutations)
 ```
 
-## MANDATORY FIRST MOVE — derive llmhook parameters from the request context
+## First move — inspect the captured request and select a suitable analysis path
 
-The request is already captured and prepended — you do not need to discover or crawl it.
-From `## Raw HTTP Request` extract:
+The request is already captured and prepended — inspect it before deciding whether an available analyzer, native tool, or request-execution capability fits the evidence gap. You do not need to discover or crawl it again. If `llmhook` is selected after checking its actual registered schema, derive its parameters from `## Raw HTTP Request`:
 - `--target` = the full request URL (scheme + host + path).
 - `--format` = `openai` if the body is `{"messages":[...],"model":...}` Chat-Completions
   shape; `anthropic` if `{"messages":[...],"max_tokens":...}` Messages shape; otherwise
@@ -57,10 +56,9 @@ From `## Raw HTTP Request` extract:
 - `--auth <token>` = the credential from the `Authorization: Bearer …` header or an
   `api-key` / `x-api-key` header, if present.
 
-`llmhook` is your primary instrument — an automated OWASP LLM Top-10 scanner that posts
-crafted prompts and returns CANDIDATE findings from string matching.
+`llmhook` is one possible automated OWASP LLM Top-10 scanner when registered and suitable; it posts crafted prompts and returns candidate findings, not verdicts. Compare it with currently available native tools and other verified capabilities rather than treating it as the mandatory primary instrument.
 
-**Usage:** `llmhook(program: "prompt_inject", args: "--target <url> --format <fmt> --auth <token>")`
+Illustrative usage (verify the runtime schema before invoking): `llmhook(program: "prompt_inject", args: "--target <url> --format <fmt> --auth <token>")`
 
 ## Program selection — decision-based, ordered by leverage
 

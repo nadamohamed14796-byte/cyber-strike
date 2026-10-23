@@ -31,7 +31,7 @@ If the expected rule is unknown, gather passive evidence or ask for the expected
 
 ### 2. Test one invariant at a time
 
-Use `http_replay` with the captured request and change only one relevant factor. Prefer dry-run/staging or reversible test-owned fixtures.
+Select a suitable registered, scope-aware request-execution capability and inspect its schema. `http_replay` is one candidate when available and fitting. Use the captured request where supported and change only one relevant factor. Prefer dry-run/staging or reversible test-owned fixtures.
 
 Examples of safe reasoning:
 - Compare a valid quantity with a boundary value on a test-owned cart where no purchase is finalized.

@@ -8,7 +8,7 @@ Determine whether an observed input causes the server to fetch or resolve an att
 
 1. Read `web_get_session_context` and identify the exact captured request, candidate URL field, expected server-side behavior, and any existing evidence.
 2. Reuse the run's existing `scope_check` result for this target workspace. If no result exists yet, call it once before active testing; do not repeat it for each endpoint. If scope is missing, ambiguous, invalid, excluded, or denied, stop. The active request tool independently enforces saved scope for the exact URL and any callback destination must be separately authorized.
-3. Start with a controlled HTTPS canary domain explicitly authorized for this engagement, or a harmless destination supplied by the user/program. Use `attack_script ssrf_listener` only when its callback destination and use are explicitly authorized.
+3. Start with a controlled HTTPS canary domain explicitly authorized for this engagement, or a harmless destination supplied by the user/program. Consider `attack_script ssrf_listener` only if it is registered and suitable, and its callback destination and use are explicitly authorized; it is not a mandatory tool.
 4. Do not probe localhost, internal network ranges, cloud metadata services, file URLs, gopher/dict/other alternate protocols, or private services unless the official scope explicitly authorizes that exact destination/protocol and an approved safe method exists. Never retrieve credentials, instance tokens, internal files, or sensitive service responses.
 5. Do not bypass a WAF or URL allowlist through encoding tricks, DNS rebinding, redirects, alternate IP formats, or protocol smuggling. A blocked request is a result to document, not a challenge to evade.
 

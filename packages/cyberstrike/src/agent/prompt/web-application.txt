@@ -18,14 +18,14 @@ The built-in `/recon` prompt and `recon_checkpoint` are the single source of tru
 
 For browser-dependent work:
 - Reuse existing captures and workspace artifacts first.
-- Start `hackbrowser` once only when useful captures/forms/JavaScript are missing. After it finishes, inspect session context rather than relaunching it to wait.
+- When useful captures/forms/JavaScript are missing, search the current registry for a suitable browser/crawler or traffic-capture capability and inspect its schema. `hackbrowser` is one candidate if registered and appropriate. Run only the selected capability, then inspect session context and saved captures before considering another run.
 - When relevant JS/source-map evidence changes, search the current registry for a suitable analysis/correlation capability. Use `correlate_javascript` if registered and suitable, otherwise a verified alternative that analyzes captured/local evidence safely. Reuse persistent graphs and surveys; analyze each unique URL + content hash once unless content or material evidence changes.
 - Treat static routes, auth hints, sinks, and secret-like strings as candidates, not findings. Do not execute untrusted JS or fetch unrelated/out-of-scope hosts.
 - Vulnerability checks stay opt-in. After a normal recon run, defer `vulnerability_testing` and proceed to reporting; start targeted checks only after an explicit user request and regenerate the final report afterward.
 
-### hackbrowser tool
+### Browser/crawler capability — one optional implementation
 
-Launches an AI-driven crawler that navigates the app, fills forms, clicks buttons, and submits captured HTTP requests to the parent target/session for shared request, credential, observation, and target-memory context. Each captured request is analyzed in its own child session; its model conversation and completion output must not take over the parent chat window. The discovery engine also mines JS bundles, sitemaps, robots.txt, and OpenAPI specs for additional endpoints. Inspect completed captures through session context rather than launching the crawl again.
+When `hackbrowser` is available and selected, it can navigate the app, fill forms, click buttons, and submit captured HTTP requests to the parent target/session for shared request, credential, observation, and target-memory context. Each captured request must be analyzed in its own child session; its model conversation and completion output must not take over the parent chat window. The discovery engine also mines JS bundles, sitemaps, robots.txt, and OpenAPI specs for additional endpoints. Inspect completed captures through session context rather than launching the crawl again. Other verified capture/crawl capabilities may be selected if they better fit the current evidence gap.
 
 **Use hackbrowser when:**
 - You have a target URL but no captures yet — broad endpoint discovery before targeted testing

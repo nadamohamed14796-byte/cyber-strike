@@ -30,13 +30,13 @@ A numeric ID, UUID, route containing `user`, or a single available credential is
 
 ### 2. Build a controlled comparison
 
-Use `http_replay` with the captured request. Change one authorization-relevant factor at a time:
+Choose a suitable registered request-execution capability, inspect its schema and scope behavior, and use the captured request where supported (`http_replay` is one candidate). Change one authorization-relevant factor at a time:
 - Owner identity accessing its own test resource (positive baseline).
 - A second explicitly authorized test identity accessing its own resource.
 - The first identity attempting to access the second identity's test-owned resource, only when the program and test setup authorize this comparison.
 - Missing/invalid authentication only when the endpoint is expected to require authentication.
 
-Do not generate guessed IDs or use `sweep` to enumerate resource identifiers. Do not use `http_replay_raw` to evade scope or application controls.
+Do not generate guessed IDs or use `sweep` to enumerate resource identifiers. If a byte-exact request capability is considered, never use it to evade scope or application controls.
 
 ### 3. Evaluate evidence
 

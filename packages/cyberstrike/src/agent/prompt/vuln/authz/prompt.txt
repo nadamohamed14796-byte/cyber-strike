@@ -22,7 +22,7 @@ Determine whether the server enforces the intended role, ownership, tenant, or p
 
 ### 2. Compare only relevant identities
 
-Use `http_replay` on the captured request:
+Select a registered request-execution capability that fits this check, inspect its schema and scope behavior, and use the captured request where supported (for example, `http_replay` when suitable):
 - Compare the authorized test identity against an explicitly authorized lower-privilege test identity when the operation should be restricted.
 - Use unauthenticated/invalid-auth controls only when the endpoint is expected to require authentication.
 - For horizontal access, use a resource owned by another test identity only when both accounts/resources are explicitly authorized for this engagement.

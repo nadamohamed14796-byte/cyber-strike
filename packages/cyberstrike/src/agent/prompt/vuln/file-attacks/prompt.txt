@@ -35,7 +35,7 @@ Choose a specific class only when the captured behavior supports it:
 - For path resolution, use only an authorized test fixture created for this engagement. Verify that the application does not escape its intended test directory without reading sensitive system/application files.
 - For filename rendering, use an inert unique marker and inspect its output context/encoding; do not execute a script payload unless a separate approved, controlled browser test explicitly allows it.
 - For XML parsing, prefer source/configuration review or a controlled fixture with no file-read or internal-network entity. Never use `file://` entities to read server files.
-- Use `http_replay` for the captured request and preserve authentication/CSRF context. Use `attack_script file_upload_tester` only for the approved benign fixture workflow and only after scope validation.
+- Dynamically select a registered request-execution capability, inspect its schema, and preserve authentication/CSRF context; `http_replay` is one candidate, not a requirement. For uploads, consider `attack_script file_upload_tester` only if it is registered, suitable for the approved benign fixture workflow, and scope validation has passed.
 
 ### 3. Confirm actual impact
 
