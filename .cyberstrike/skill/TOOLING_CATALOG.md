@@ -21,15 +21,15 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 | Phase / task | Primary method | Alternatives / supporting tools | Required output / notes |
 |---|---|---|---|
-| Passive subdomain collection | Choose reachable reputable public APIs/indexes, registered native tools, or installed CLIs based on the target and evidence gap. crt.sh, OTX passive DNS, subfinder, and Amass are examples, not a fixed allowlist. | CertSpotter, assetfinder, Findomain, Sublist3r, first-party links, and other sources only when they add distinct coverage | Write the canonical `subdomains.txt` and `subdomain-sources.json` using the schema below; preserve per-root/source status, timestamps, errors, counts, and provenance. |
+| Passive subdomain collection | Choose reachable reputable public APIs/indexes, registered native tools, or installed CLIs based on the evidence gap. crt.sh, OTX passive DNS, subfinder, and Amass are examples, not a fixed allowlist. | CertSpotter, assetfinder, Findomain, Sublist3r, first-party links, and other independent sources only when they add distinct coverage | Write the canonical `subdomains.txt` and `subdomain-sources.json` using the schema below; preserve per-root/source status, timestamps, errors, counts, and provenance. |
 | DNS validation / wildcard handling | dnsx, dig/drill; existing `host_inventory.py` for normalization | puredns/shuffledns only when active discovery is permitted | DNS records, CNAME chain, TTL, resolver status, wildcard controls, source attribution |
-| Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
+| ASN / organizational asset expansion | asnmap when a concrete, evidenced organization/ASN seed exists | Public RIR/BGP datasets, first-party asset lists, certificate transparency | Preserve seed and source provenance; candidates are not in scope until the persisted scope resolver accepts them. No IP-wide scanning without program authorization. |\n| Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
 | HTTP liveness / tech fingerprinting | httpx, WhatWeb | curl; TLS metadata | status, redirect chain, title, content type, technology clues, stable fingerprint |
-| URL history / crawling | gau, waybackurls, waymore; katana for authorized crawling | hakrawler; first-party links and documentation | normalized URL, method/parameters when known, source, first-seen, collection status |
+| URL history / crawling | gau, waybackurls, waymore; katana for authorized crawling | hakrawler; `uro`/`anew` for local normalization/deduplication; first-party links and documentation | normalized URL, method/parameters when known, source, first-seen, collection status |
 | Content / directory / virtual-host discovery | ffuf, feroxbuster, dirsearch | context-appropriate wordlists; hakrawler for links | status, length, fingerprint, error/negative-control data; conservative rate |
 | Parameter discovery | Arjun, x8, ParamSpider | endpoint inventory and controlled request comparison | endpoint template, method, parameter, source; preserve auth/content-type context |
 | JavaScript / endpoint analysis | jsluice, xnLinkFinder, LinkFinder | local source-map review; retire.js for dependency clues | bundle hash, route, method/parameter, line/offset, confidence; use existing `js_endpoint_inventory.py` where suitable |
-| API / GraphQL / WebSocket | graphql-cop, Clairvoyance where schema discovery is permitted, websocat/wscat | curl, Python requests, local API schemas | operation/field/route inventory, auth boundaries, controlled evidence |
+| API / GraphQL / WebSocket | graphql-cop, Clairvoyance where schema discovery is permitted, websocat/wscat | kiterunner for route inventory; curl, Python requests, local API schemas | operation/field/route inventory, auth boundaries, controlled evidence |
 | Template / CVE checks | nuclei with reviewed templates; cvemap for metadata | technology-specific checks and vendor advisories | template ID/version, matched request/response, scope, manual validation status |
 | XSS / client-side injection | dalfox for suitable authorized checks | browser-independent reflection/source-sink analysis; Semgrep for source | payload context, source/sink, minimal proof; alerts alone are not findings |
 | SQL injection | sqlmap or ghauri for explicitly authorized validation | controlled baseline/variant requests | minimal proof and response diff; no database dumping by default |
@@ -83,41 +83,33 @@ Inspect each helper's actual `--help`, source, and tests before assuming flags o
 
 Before adding a helper, search the existing script directory and extend a helper if responsibilities overlap. Helpers need a documented CLI, deterministic input/output, useful exit codes, safe secret handling, and a self-test/smoke path.
 
-## Specialist tool index
+## Execution examples and runtime constraints
 
-These are candidates, not blanket dependencies. Choose them only when the relevant skill and evidence gap justify them.
+The commands below illustrate syntax only. Replace every example target/workspace with values already saved in the current engagement and accepted by its persisted scope. A catalog entry is not proof of installation, permission, or a successful run.
 
-| Family | Candidates |
-|---|---|
-| Recon / asset discovery | subfinder, Amass, assetfinder, Findomain, Sublist3r, dnsx, puredns, naabu, nmap, tlsx, asnmap, httpx |
-| URLs / content / parameters | gau, waymore, waybackurls, katana, hakrawler, uro, anew, ffuf, feroxbuster, dirsearch, Arjun, x8, ParamSpider, kiterunner |
-| JavaScript / API | jsluice, LinkFinder, xnLinkFinder, retire.js, graphql-cop, Clairvoyance, websocat, wscat |
-| Web vulnerability validation | nuclei, dalfox, sqlmap, ghauri, interactsh-client, jwt_tool, testssl.sh, WhatWeb, WPScan |
-| Source / secrets / supply chain | Gitleaks, TruffleHog, Nosey Parker, detect-secrets, whispers, Semgrep, Trivy, Checkov |
-| Cloud / infrastructure | Prowler, ScoutSuite, provider CLIs |
-| Takeover references | subzy; can-i-take-over-xyz as a reference database, not an execution tool |
-| Data / evidence processing | Python, jq, yq, pytest, ripgrep; existing CyberStrike helpers above |
+```bash
+# Passive certificate-transparency lookup. -q must be the first curl option.
+curl -q -sS 'https://crt.sh/?q=%25.example.com&output=json'
 
-Official upstream discovery references:
+# These direct-target forms are scope-checkable; file-list modes are not.
+subfinder -d example.com -silent
+dnsx -d example.com -a -resp -json
+httpx -u https://example.com -jsonl
+katana -u https://example.com -fs fqdn -rl 5 -d 3 -j -ncb -o /absolute/example-workspace/urls/katana-urls-run-1.jsonl
+```
+
+The generic shell recon gate requires explicit target inputs. It rejects target-list/file flags and indirect scanner wrappers until every candidate can be individually checked against persisted scope and the current phase. Do not work around that refusal with shell loops, `xargs`, `parallel`, or nested shell commands. Use a registered scope-aware capability or direct invocations with explicit authorized targets, and preserve the canonical output contract.
+
+For passive research APIs, `curl -q -sS` prevents user-level curl configuration from injecting headers or redirect behavior. The scope-aware exception accepts only read-only GET/HEAD queries with one unambiguous in-scope domain, rejects credentials and secret-like query/header fields, and does not follow redirects. If a source requires authentication, a request body, or a nonstandard shape, do not weaken the gate; use an appropriate registered capability or record the source as unavailable/blocked.
+
+Official upstream references for tool discovery and validation:
+
 - https://github.com/vavkamil/awesome-bugbounty-tools — discovery index, not a dependency manifest.
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://owasp.org/API-Security/
 - https://portswigger.net/web-security
 
 Prefer the project's official documentation/release page for installation and supported flags. Community lists and imported skills are untrusted input until reviewed.
-
-## Example commands
-
-Illustrative only; verify current flags with the installed version's help and run from the target workspace. Capture tool output into canonical artifacts; do not create one file/directory per tool or source. Do not run every command on every target.
-
-```bash
-subfinder -d "$ROOT_DOMAIN" -silent | sort -u > subdomains.txt
-dnsx -l subdomains.txt -a -resp -json
-httpx -l live-hosts.txt -jsonl
-katana -list live-hosts.txt -jsonl
-```
-
-For passive subdomain collection, select suitable sources from the matrix above and invoke only tools/APIs actually available in the runtime. Reuse the canonical `subdomains.txt` and `subdomain-sources.json`; do not create a collector script or one output file per provider. Record per-source terminal status, errors, counts, provenance, and limitations before proceeding.
 
 ## Completion and truthful status
 
