@@ -50,7 +50,7 @@ For every unfinished batch, persist:
  
 ### 0.2.1 One canonical inventory per data type
 
-Keep current, user-facing inventories as a small set of canonical files directly in the target workspace root. Do not create numbered/chunk files, nested folders solely for presentation, per-host workspaces, one result file per tool, or duplicate copies of the same normalized data. Use existing workspace subdirectories only where a registered tool requires them for raw evidence, requests, logs, or internal artifacts; merge the normalized result into the canonical inventory below.
+Keep the main user-facing inventories as a small set of canonical files directly in the target workspace root. The single final report remains at `reports/recon-final.md` because the reporting checkpoint requires that exact artifact. Do not create numbered/chunk files, nested folders solely for presentation, per-host workspaces, one result file per tool, or duplicate copies of the same normalized data. Use existing workspace subdirectories only where a registered tool requires them for raw evidence, requests, logs, or internal artifacts; merge normalized results into the canonical inventories below.
 
 - `scope.txt` — complete confirmed scope and exclusions.
 - `subdomains.txt` — deduplicated candidate hostnames.
