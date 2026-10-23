@@ -178,6 +178,17 @@ function pathWithinScope(candidate: string | null | undefined, scopedPath: strin
 }
 
 /** Local correlation boundary only; this does not replace the existing scope engine. */
+/** Keep in-scope hostnames as candidates until the authoritative scope engine decides. */
+export function selectJavaScriptAssetsForCorrelation<T extends { url: URL }>(
+  candidates: readonly T[],
+  explicitURL?: URL,
+): T[] {
+  if (!explicitURL) return [...candidates]
+  return candidates.filter((item) =>
+    item.url.origin === explicitURL.origin && item.url.pathname === explicitURL.pathname,
+  )
+}
+
 export function isJavaScriptAssetAllowed(input: {
   targetURL: string
   javascriptURL: string
@@ -1287,16 +1298,9 @@ export namespace JavaScriptCorrelation {
         })
       }
     }
-    const filteredAssets = explicitJS
-      ? jsCandidates.filter((item) => item.url.origin + item.url.pathname === explicitJS.origin + explicitJS.pathname)
-      : jsCandidates.filter((item) => {
-          const hostMatches = item.url.hostname === targetURL.hostname || item.url.hostname.endsWith("." + targetURL.hostname)
-          if (!hostMatches) return false
-          // For a path-scoped application, ignore scripts from sibling applications
-          // mounted on the same hostname.
-          if (item.url.hostname === targetURL.hostname && targetPath !== "/" && !pathWithinScope(item.url.pathname, targetPath)) return false
-          return true
-        })
+    // Do not pre-filter by hostname or pathname here: program scope can explicitly
+    // allow a CDN or separate asset domain. The persisted scope gate below is authoritative.
+    const filteredAssets = selectJavaScriptAssetsForCorrelation(jsCandidates, explicitJS)
     const seenAssets = new Set<string>()
     const assets: typeof filteredAssets = []
     for (const item of filteredAssets) {

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence } from "../../src/target/javascript-correlation"
+import { correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -764,4 +764,15 @@ test("redacts legacy raw secret values when sanitizing an old graph artifact", (
     confidence: "candidate",
   })
   expect(JSON.stringify(sanitized)).not.toContain("Exact candidate values are available")
+})
+
+
+test("retains separately hosted JavaScript as a scope-check candidate, while explicit-URL mode stays narrow", () => {
+  const candidates = [
+    { url: new URL("https://app.example.test/assets/main.js"), tag: "app" },
+    { url: new URL("https://static.cdn-example.net/chunks/vendor.js"), tag: "cdn" },
+    { url: new URL("https://api.example.test/assets/client.mjs"), tag: "api" },
+  ]
+  expect(selectJavaScriptAssetsForCorrelation(candidates).map((item) => item.tag)).toEqual(["app", "cdn", "api"])
+  expect(selectJavaScriptAssetsForCorrelation(candidates, new URL("https://static.cdn-example.net/chunks/vendor.js?cache=2")).map((item) => item.tag)).toEqual(["cdn"])
 })
