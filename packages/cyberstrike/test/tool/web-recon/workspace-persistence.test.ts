@@ -73,7 +73,7 @@ test("web_recon persists results and synchronizes target notes in the canonical 
           sessionID: "ses_legacy_recon",
           completedAt: legacyCompletedAt,
           result: { output: "Legacy redacted header finding snapshot", findings: [] },
-        }, null, 2) + "\\n")
+        }, null, 2) + "\n")
         const tool = await WebReconTool.init()
         const result = await tool.execute({
           program: "robots_scan",

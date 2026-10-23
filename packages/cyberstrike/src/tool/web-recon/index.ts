@@ -83,7 +83,7 @@ type WebReconObservation = {
   firstSeenAt: string
   lastSeenAt: string
   occurrences: number
-  attempts: Array<{ completedAt: string; sessionID: string }>
+  attempts: Array<{ completedAt: string; sessionID: string; messageID?: string }>
   result: WebReconResult
 }
 
@@ -210,11 +210,16 @@ function addWebReconObservation(
     requestedTarget: string
     completedAt: string
     sessionID: string
+    messageID?: string
     result: WebReconResult
   },
 ): void {
   const fingerprint = webReconFingerprint(input.program, input.requestedTarget, input.result)
-  const attempt = { completedAt: input.completedAt, sessionID: input.sessionID }
+  const attempt = {
+    completedAt: input.completedAt,
+    sessionID: input.sessionID,
+    ...(input.messageID ? { messageID: input.messageID } : {}),
+  }
   const existing = artifact.observations.find((item) => item.fingerprint === fingerprint)
   if (!existing) {
     artifact.observations.push({
@@ -229,7 +234,7 @@ function addWebReconObservation(
     })
     return
   }
-  if (!existing.attempts.some((item) => item.completedAt === attempt.completedAt && item.sessionID === attempt.sessionID)) {
+  if (!existing.attempts.some((item) => item.completedAt === attempt.completedAt && item.sessionID === attempt.sessionID && (item.messageID ?? "") === (attempt.messageID ?? ""))) {
     existing.attempts.push(attempt)
     existing.attempts.sort((a, b) => Date.parse(a.completedAt) - Date.parse(b.completedAt))
   }
@@ -292,9 +297,10 @@ async function persistWebReconResultUnlocked(input: {
   requestedTarget: string
   completedAt: string
   sessionID: string
+  messageID: string
   result: WebReconResult
 }): Promise<string> {
-  const { workspace, filename, program, requestedTarget, completedAt, sessionID, result } = input
+  const { workspace, filename, program, requestedTarget, completedAt, sessionID, messageID, result } = input
   const absolutePath = path.join(workspace.workspacePath, filename)
   const legacyFiles = await loadLegacyWebReconArtifacts(workspace, path.posix.dirname(filename))
   let artifact: WebReconArtifact | undefined
@@ -329,7 +335,7 @@ async function persistWebReconResultUnlocked(input: {
         typeof item.lastSeenAt !== "string" ||
         !Number.isSafeInteger(item.occurrences) || Number(item.occurrences) < 1 ||
         !Array.isArray(item.attempts) ||
-        item.attempts.some((attempt) => !attempt || typeof attempt !== "object" || typeof attempt.completedAt !== "string" || typeof attempt.sessionID !== "string") ||
+        item.attempts.some((attempt) => !attempt || typeof attempt !== "object" || typeof attempt.completedAt !== "string" || typeof attempt.sessionID !== "string" || (attempt.messageID !== undefined && typeof attempt.messageID !== "string")) ||
         item.occurrences !== item.attempts.length ||
         !item.result || typeof item.result !== "object"
       )
@@ -362,7 +368,7 @@ async function persistWebReconResultUnlocked(input: {
       result: legacy.record.result,
     })
   }
-  addWebReconObservation(artifact, { program, requestedTarget, completedAt, sessionID, result })
+  addWebReconObservation(artifact, { program, requestedTarget, completedAt, sessionID, messageID, result })
   artifact.workspacePath = workspace.workspacePath
   artifact.updatedAt = completedAt
   const savedPath = await TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\\n")
@@ -644,6 +650,7 @@ export const WebReconTool = Tool.define("web_recon", {
           requestedTarget,
           completedAt,
           sessionID: ctx.sessionID,
+          messageID: ctx.messageID,
           result,
         })
         try {
