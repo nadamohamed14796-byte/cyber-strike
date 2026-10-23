@@ -44,6 +44,12 @@ Use `.cyberstrike/skill/TOOLING_CATALOG.md` for tool candidates by task, helper 
 - Source exposure, secrets, dependency/CVE, cloud, containers, CMS, CI/CD, mobile, or identity: load the relevant platform or assessment skill.
 - Evidence/reporting: use evidence-hygiene, triage-validation, report-writing, and the validators listed in the canonical catalog.
 
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use the canonical `.cyberstrike/skill/TOOLING_CATALOG.md` for the current tool candidates and output contracts. Before using a relevant external CLI, run `python3 .cyberstrike/skill/scripts/tool_preflight.py --json <tool-name>` once for the active runtime/version; review official docs, flags, license, dependencies, permissions, and network behavior before installation or use. Do not install or run every catalog entry.
+
+Official general references: [Python CLI documentation](https://docs.python.org/3/), [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/), and the [bug bounty tool discovery index](https://github.com/vavkamil/awesome-bugbounty-tools). Prefer each tool's own official project documentation for exact flags and installation details.
+
 ## Completion check
 
 Before handing off, confirm the selected tool really ran, output and errors were inspected, artifacts were saved and verified, sensitive values are redacted, and remaining gaps have explicit reasons. Do not claim installation, execution, coverage, or vulnerability confirmation without evidence.
