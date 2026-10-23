@@ -549,10 +549,13 @@ export function passiveResearchLookup(
           : undefined
     if (header) {
       const name = header.split(":", 1)[0]!.trim()
-      if (/(?:authorization|proxy-authorization|cookie|set-cookie|api[-_]key|token|secret|credential)/i.test(name) ||
+      if (/(?:authorization|proxy-authorization|(?:^|[-_])auth(?:$|[-_])|cookie|set-cookie|api[-_]?key|token|secret|credential|password|signature)/i.test(name) ||
           /\b(?:bearer|basic)\s+\S+/i.test(header)) return undefined
     }
   }
+
+  const sensitiveQueryKey = /(?:authorization|(?:^|[-_])auth(?:$|[-_])|cookie|api[-_]?key|(?:^|[-_])key(?:$|[-_])|access[-_]?token|token|secret|credential|password|signature|(?:^|[-_])sig(?:$|[-_])/i
+  if ([...requestURL.searchParams.keys()].some((key) => sensitiveQueryKey.test(key))) return undefined
 
   const hostname = requestURL.hostname.toLowerCase()
   const pathname = requestURL.pathname
@@ -689,7 +692,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   // Public read-only research APIs are contacted as providers, but authorization
   // is checked against the domain being queried, not the provider hostname.
   // The helper rejects writes, redirects, credentials, and unrecognized API routes.
-  if (["curl", "wget"].includes(scanner) && targets.length === 1) {
+  if (scanner === "curl" && targets.length === 1) {
     let requestURL: URL | undefined
     try { requestURL = new URL(targets[0]!) } catch {}
     if (requestURL) {
