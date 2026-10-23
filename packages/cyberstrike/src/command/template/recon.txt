@@ -540,7 +540,7 @@ The final report's aggregate status is derived from the actual checkpoint and ev
 - `complete`: all required phases and artifacts are verified and no eligible work remains.
 - `partial`: useful results are saved, but work or evidence remains incomplete.
 - `blocked`: a mandatory prerequisite prevents meaningful progress.
-  
+
 Do not mark reconnaissance complete merely because the process or a batch ended. A recon-only run defers `vulnerability_testing` through the checkpoint and continues to `reporting`; it does not launch vulnerability scanners by default.
 
 ---
