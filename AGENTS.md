@@ -122,7 +122,7 @@ When a request contains a target, program scope, scope file, domain/subdomain li
 3. Store technical observations tied to session evidence with `target_note`. Use `target_workspace(action="record_summary")` for verified run/scope/checkpoint summaries so `notes.md` is updated even before a target request is captured. Save inventories/logs/JSON/CSV/evidence references with `target_artifact`; for a local file, use `source_path` to copy it without loading every line into model context. Do not send target-specific data into generic project memory or the global research knowledge base.
 4. For large scope files, persist the original input beneath the root workspace, process bounded chunks, write checkpoints/run manifests, and make child workspaces nested below the root assets folder only as assets are validated/processed. Never create one workspace per unvalidated candidate.
 5. Never write target outputs to an invented folder such as /root/targets or the current shell directory by default. A failed/missing workspace or failed save is not success; report the exact failure and do not claim the artifact exists.
-6. Keep the root notes.md as a concise parent summary and each child asset's notes.md/evidence inside its own workspace. Validate final artifact paths, sizes, counts, and run status before saying work is complete.
+6. Keep the root notes.md as a concise program summary. Store ordinary discovered assets, hosts, URLs, and endpoints in the root workspace inventories; only assets explicitly attached for an independent investigation get their own child workspace and child notes/evidence. Validate final artifact paths, sizes, counts, and run status before saying work is complete.
 
 ## CyberStrike agent instruction ownership
 
