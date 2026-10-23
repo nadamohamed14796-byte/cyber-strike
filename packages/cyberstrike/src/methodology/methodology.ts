@@ -412,7 +412,7 @@ export namespace Methodology {
       infrastructure:
         "Test infrastructure: cloud misconfigurations, DNS zone transfer, open services, default installations. Log with tag 'infrastructure'.",
       reporting:
-        "Call `generate_report` to compile all session data into a structured Markdown report. Review the output, then write three AI sections: Executive Summary (overall risk posture), Risk Assessment (likelihood × impact matrix), and Remediation Priorities (actionable steps). Replace the `<!-- AI: ... -->` placeholders and save to `.cyberstrike/reports/report-<timestamp>.md` via the write tool. Ensure all blocking violations are resolved before finalizing.",
+        "Call `generate_report` to compile the report for the selected target workspace. Fill the Executive Summary, Risk Assessment, and Remediation Priorities from verified evidence. When a target workspace is selected, overwrite the exact `metadata.recommendedReportPath` returned by the tool; it is the stable `reports/security-final.md` in that workspace. Use `.cyberstrike/reports/security-final.md` only when no target workspace exists. For recon-only work, follow `/recon` and its `reports/recon-final.md` contract instead of creating a second security report. Do not create a timestamped report for every run. Ensure all blocking violations are resolved before finalizing.",
     }
     return directives[phaseId] || ""
   }
