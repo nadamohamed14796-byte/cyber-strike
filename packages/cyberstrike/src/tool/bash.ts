@@ -814,7 +814,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
           throw new Error("output file already exists")
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-            throw new Error("Recon execution gate blocked katana because its output path already exists or cannot be checked: " + outputPath + ". Choose a new run-specific path. No crawler command was started.")
+            throw new Error("Recon execution gate blocked katana because its output path already exists or cannot be checked: " + outputPath + ". Inspect and normalize the existing scratch output first. Remove it only after the normalized results are saved and verified, unless it is worth retaining as evidence. Reuse the same stable scratch path for sequential attempts instead of creating a new file per retry. No crawler command was started.")
           }
         }
       }
