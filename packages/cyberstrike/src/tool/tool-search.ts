@@ -14,19 +14,19 @@ const log = Log.create({ service: "tool.tool-search" })
 export const ToolSearchTool = Tool.define("tool_search", async () => {
   return {
     description: [
-      "Search for available tools by capability or description.",
-      "Use this to find tools before using them.",
-      "Returns tool IDs that can be loaded with load_tools.",
-      "",
-      "Example queries:",
-      '- "sql injection testing"',
-      '- "port scanner"',
-      '- "subdomain enumeration"',
-      '- "aws security"',
+      "Discover available connected tools by the current task, active checkpoint, evidence gap, asset type, protocol, or observed technology.",
+      "Search afresh when entering a new checkpoint or when new evidence changes the needed capability; reuse already-loaded tool definitions when the need has not changed.",
+      "Search is discovery, not a tool allowlist. Results are ranked candidates, not a requirement to use any particular tool.",
+      "If results are missing or too narrow, retry with distinct synonyms, the capability name, protocol, or observable behavior. Increase limit when comparing more candidates.",
+      "Inspect the selected tool's real schema and capabilities, then load relevant exact IDs with load_tools before invocation.",
+      "Example query shapes (illustrative only):",
+      '- "<active checkpoint> <missing evidence>"',
+      '- "<observed protocol or technology> enumeration"',
+      '- "<specific behavior> analysis or validation"',
     ].join("\n"),
     parameters: z.object({
       query: z.string().describe("Search query describing the capability you need"),
-      limit: z.number().optional().default(5).describe("Maximum number of results (default: 5)"),
+      limit: z.number().int().positive().optional().default(10).describe("Maximum number of ranked candidates to return (default: 10); increase it when comparing a broader set of available tools."),
     }),
     async execute(params, _ctx) {
       const { query, limit } = params
@@ -58,11 +58,12 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
 export const LoadToolsTool = Tool.define("load_tools", async () => {
   return {
     description: [
-      "Load tools into context so they can be used.",
-      "Use tool_search first to find tool IDs.",
-      "Loaded tools will be available in the next turn.",
+      "Load selected connected-tool definitions into context so they can be used.",
+      "Use tool_search to discover candidates, then load only the exact IDs whose documented capabilities fit the current task.",
+      "Do not load or run every candidate. Do not treat tool names, search ranking, or catalog examples as proof of suitability.",
+      "Inspect the loaded schema and use the returned tool definitions; loaded tools will be available in the next turn.",
       "",
-      "Note: Loading too many tools may exceed context budget.",
+      "Load additional tools when new evidence creates a new need. Keep context use practical without imposing a fixed number of tools per checkpoint.",
     ].join("\n"),
     parameters: z.object({
       tool_ids: z.array(z.string()).describe("Tool IDs to load (from tool_search results)"),
