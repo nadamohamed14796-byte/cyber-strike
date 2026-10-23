@@ -524,7 +524,7 @@ def main() -> int:
 
     output_path = Path(args.output).expanduser().resolve() if args.output else None
     hosts_path = Path(args.hosts_output).expanduser().resolve() if args.hosts_output else None
-    default_sources = list(ALL_SOURCES)
+    known_sources = list(ALL_SOURCES)
     selected_sources = list(dict.fromkeys(args.source or default_source_selection()))
     retry_sources = set(args.retry_source or [])
     selected_sources = list(dict.fromkeys([*selected_sources, *retry_sources]))
@@ -558,13 +558,13 @@ def main() -> int:
             "run_status": "running",
         }
 
-    # Merge an explicit source subset into the existing worklist without discarding
-    # earlier records; normal full runs add all five CLI sources and crt.sh.
+    # Keep every supported adapter represented in the ledger without running them all.
+    # selected_sources controls this invocation; skipped alternatives stay explicit.
     indexed = {(item["root"], item["source"]): item for item in document["sources"]}
     for root in roots:
-        # Always record the full default worklist; --source selects what this invocation
-        # executes, not what the run is allowed to claim it covered.
-        for source in default_sources:
+        # Every known adapter has a status per root; selected_sources determines which
+        # adapters actually run. An unselected adapter is recorded as not selected.
+        for source in known_sources:
             key = (root, source)
             if key not in indexed:
                 item = {
@@ -616,9 +616,8 @@ def main() -> int:
         # every explicitly requested retry source.
         pass
 
-    # A selected worklist must not leave unselected sources looking like unfinished
-    # jobs. Save an explicit skipped outcome so the run can finish honestly with gaps;
-    # if one of these sources is selected in a later invocation, it becomes pending.
+    # Unselected sources must not look like unfinished jobs. Save an explicit
+    # skipped-by-selection outcome; a later explicit selection reactivates that source.
     for item in document["sources"]:
         if item.get("source") in selected_sources or item.get("status") != "pending":
             continue
