@@ -80,9 +80,9 @@ Prioritize trust boundaries, newly discovered assets, exposed APIs, cross-tenant
 
 ## 3. Delta analysis and resumability
 
-Compare each recon run with the prior snapshot. Highlight new hosts, changed technologies, newly exposed endpoints, changed authentication behavior, new JavaScript assets, and DNS/provider changes. Reuse stable results where their TTL and source permit it. Do not repeat expensive scans if the delta does not justify them.
+Compare new observations with the previous verified snapshot: hosts/DNS/CNAME/provider changes, TLS/HTTP fingerprints, URL/method/parameter combinations, JavaScript content hashes, authentication state, and third-party destinations. Reuse earlier evidence only when its input, tool/settings, and source freshness/TTL remain valid. Revalidate changed or stale evidence rather than repeating a whole scan.
 
-Persist run state and per-target progress so an interrupted scan can resume from pending work rather than restart completed discovery. Use stable IDs or fingerprints for deduplication; keep status transitions explicit and never silently reset a completed or rejected item. When a source requires login, record the blocked state and resume after authorized credentials are configured instead of treating the page as empty.
+Persist item-level outcomes and cursors in the canonical checkpoint/source ledger. Resume unfinished work without resetting completed or rejected items. Missing credentials are a blocker, not an empty/safe result. Keep ownership/scope confidence separate from vulnerability confidence; queue only signal-matched follow-up hypotheses with required roles, baseline/control, one bounded next step, and a stop condition.
 
 ## 4. Evidence and data hygiene
 
@@ -109,46 +109,26 @@ Before handing a lead to a testing skill:
 
 Return normalized asset and endpoint inventories, scope decisions, provenance, delta summary, authentication coverage, deduplicated prioritized hypotheses, blockers, and next-step recommendations. Keep discovery facts separate from security conclusions.
 
-## Targeted quality-loop enrichment (2026-10-19)
+## Agent-executable tools, resources, and reusable helpers
 
-### Delta-driven prioritization and handoff
-Every recon wave should diff hosts, DNS/CNAME/provider changes, TLS/HTTP fingerprints, new API paths, methods/parameters, JavaScript hashes, authentication state, and third-party destinations against the previous snapshot. Reuse observations only while their source freshness/TTL remains credible; revalidate changes and stale evidence rather than repeating a whole scan. Keep asset ownership confidence separate from vulnerability confidence. Each queue item must state the security property, expected policy, prerequisites, baseline needed, exact next observation, and stopping condition. A candidate with missing credentials stays blocked, not safe. Hand off only signal-matched cases to specialist skills and preserve the source/provenance for later audit.
+Use registered tools for app/network activity and locally verified CLIs for local processing. A browser or intercepting proxy is not a dependency when captured requests or local files already provide the needed evidence.
 
-## Agent-executable CLI tooling, resources, and helper scripts
+- Python/jq: validate and normalize manifests/inventories.
+- subfinder, dnsx, httpx, and Katana: candidates for their matching recon phase only after runtime preflight and scope/policy checks.
+- Nuclei: not part of default reconnaissance. Use only in a separate, explicitly requested testing phase with reviewed templates and required authorization.
+- git diff: review changes to persisted artifacts.
 
-Use agent-executable CLI tools and local scripts. Browser interfaces, browser extensions, and interactive intercepting proxies are not required dependencies. Verify tool availability/version and official installation guidance before use; inspect request impact and permissions before active testing.
-
-### Recommended tools
-- jq/Python — machine-readable phase manifests
-- subfinder, dnsx, httpx, katana — only for the corresponding phase and target permissions
-- nuclei — selected templates after reviewing requests and impact
-- git diff — audit artifact changes
-
-### Resources
-- https://github.com/vavkamil/awesome-bugbounty-tools
+References:
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://owasp.org/API-Security/
 - https://github.com/vavkamil/awesome-bugbounty-tools
 
-Community lists are discovery aids; confirm maintenance, license, provenance, and exact CLI behavior from official sources.
+Community lists are discovery aids, not proof of maintenance or CLI behavior. Verify the official source/version before invocation.
 
-### Helper-script contract
-Create a phase runner manifest mapping each phase to prerequisites, primary tool, optional alternatives, expected artifacts, validation command, failure states, and downstream consumers. Do not treat missing tooling as a clean scan.
+Reuse `recon_checkpoint` as the only phase-state ledger. Do not create a second phase manifest or per-phase runner manifest that duplicates its states. Add a small run/item record only when the existing checkpoint/source ledger lacks a necessary cursor, tool version, artifact hash, exit code, or failure detail. Keep raw evidence only when needed for provenance/debugging, normalize once into canonical inventories, and report actual commands/tools used, paths, verified counts, failures, confidence, and the next relevant specialist skill.
 
-Preserve raw outputs and normalize a separate copy. Helpers should retain provenance, timestamps, tool/version, errors, confidence, and output paths; redact secrets; support JSON/JSONL where useful; and include local fixtures.
+## Adaptive tool selection
 
-### Handoff
-Report commands actually executed, tool versions, input/output artifact references, deduplication counts, errors/blocked sources, confidence, limitations, and the next skill.
+The canonical `/recon` prompt owns initialization, scope, phase order, checkpoint actions, source resumption, canonical outputs, and completion/reporting. Consult `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` for phase-specific capability candidates when useful; it is a reference, not an allowlist or run-everything checklist.
 
-
-## Adaptive tool readiness and phase coverage
-
-At the start of a recon run, inspect the checkpoint/workspace and read `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` once. Keep a compact runtime inventory of tools, CLI versions/schemas, and loaded skill content so later phases can reuse them.
-
-- Load this methodology and `community-tool-selection` once when their content is not available in the active context. Search and load specialist skills on demand when observed technology, a concrete endpoint/request shape, or a test hypothesis makes them useful. A later phase may load a new skill; do not force all specialist skills to load at the beginning. Reuse loaded skill content until evidence/task/context changes or a prior load failed.
-- Inspect the registered CyberStrike tool schema before first use. For CLI tools, preflight only candidates that might actually help and verify executable/help/version once per runtime or version change. Do not repeat the same preflight at every phase boundary.
-- There is no fixed tool-count limit and no ban on scripts/code. Choose a relevant primary method and add as many genuinely useful alternatives as the evidence requires. Use alternatives when they add independent coverage, corroboration, or recovery from a failure; don't duplicate methods merely to increase counts or refuse a script solely because other tools are selected.
-- Preserve phase ordering and prerequisites. A matrix row is a capability map, not a requirement to execute every listed candidate. Do not install the entire catalog; install only for a concrete need when no sufficient verified alternative is available and installation is permitted.
-- For each phase, persist the capability needed, methods actually used and why, source/tool/version/status, errors/partial output, raw/normalized artifact paths, provenance, deduplication counts, and validation. Keep large outputs in target-local artifacts and put counts/paths in the model context.
-- Distinguish missing tool, failed execution, zero results, blocked source, not applicable, and work not attempted. Preserve partial results and use a suitable alternative when it adds value; retry only when the failure cause changes or a bounded retry is justified.
-- A phase is complete only when applicable source coverage is attempted, the eligible frontier is exhausted, and artifacts are verified. Actual request-level scope enforcement is still required even though the agent-level setup check is not repeated for each URL or phase.
+Load specialist skills only when the observed asset type or evidence makes their deeper procedure relevant. Choose one primary method and add a tool/source only for distinct coverage, a concrete gap, or recovery from an actual failure. Check schemas/versions only for candidates to be run; do not repeat identical preflight across phases or install the whole catalog. Distinguish zero results from failure, unavailable, blocked, skipped-by-selection, not applicable, and pending work. A phase is complete only after applicable work and saved artifacts are verified, with remaining gaps stated honestly.
