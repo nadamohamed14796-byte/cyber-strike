@@ -351,6 +351,26 @@ test("normal tools may contribute to the active checkpoint regardless of their n
   expect(decision.reason).toContain("advisory, not a tool allowlist")
 })
 
+test("normal tools can be selected at every active checkpoint regardless of nominal classification", () => {
+  for (const activePhase of phases.filter((phase) => phase !== "scope_validation")) {
+    const state = records("complete")
+    state[activePhase] = { status: "running" }
+    const nominalToolPhase = activePhase === "asset_discovery" ? "url_collection" : "asset_discovery"
+    const decision = reconPhaseExecutionDecision(nominalToolPhase, state)
+    expect(decision.allowed).toBe(true)
+    expect(decision.reason).toContain("active checkpoint " + activePhase)
+  }
+})
+
+test("recon tool execution fails closed when multiple checkpoints are running", () => {
+  const state = records("complete")
+  state.url_collection = { status: "running" }
+  state.asset_discovery = { status: "running" }
+  const decision = reconPhaseExecutionDecision("url_collection", state)
+  expect(decision.allowed).toBe(false)
+  expect(decision.reason).toContain("expected exactly one active recon checkpoint, found 2")
+})
+
 test("recon tool execution blocks when prerequisites of the active checkpoint are unresolved", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
