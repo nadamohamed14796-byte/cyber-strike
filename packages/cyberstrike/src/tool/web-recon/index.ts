@@ -1,5 +1,7 @@
-import z from "zod"
+import { createHash } from "node:crypto"
+import fs from "node:fs/promises"
 import path from "node:path"
+import z from "zod"
 import { Tool } from "../tool"
 import { reconPhaseGate, type ReconPhase } from "../../target/recon-gate"
 import { requiredPhasesForWebRecon } from "./phase"
@@ -73,6 +75,122 @@ const PROGRAMS = {
 } as const satisfies Record<string, { description: string }>
 
 type Program = keyof typeof PROGRAMS
+
+type WebReconObservation = {
+  fingerprint: string
+  program: Program
+  requestedTarget: string
+  firstSeenAt: string
+  lastSeenAt: string
+  occurrences: number
+  attempts: Array<{ completedAt: string; sessionID: string }>
+  result: WebReconResult
+}
+
+type WebReconArtifact = {
+  schemaVersion: 1
+  recordType: "web-recon-results"
+  canonicalTarget: string
+  workspaceID: string
+  workspacePath: string
+  updatedAt: string
+  observations: WebReconObservation[]
+}
+
+/**
+ * Save web_recon history into one stable workspace artifact per workflow family.
+ * Identical snapshots are represented once with observation timestamps; distinct
+ * outputs are retained as separate records. Unknown/corrupt files are never replaced.
+ */
+async function persistWebReconResult(input: {
+  workspace: Workspace
+  filename: string
+  program: Program
+  requestedTarget: string
+  completedAt: string
+  sessionID: string
+  result: WebReconResult
+}): Promise<string> {
+  const { workspace, filename, program, requestedTarget, completedAt, sessionID, result } = input
+  const identity = JSON.stringify({ program, requestedTarget, result })
+  const fingerprint = createHash("sha256").update(identity).digest("hex")
+  const absolutePath = path.join(workspace.workspacePath, filename)
+  let artifact: WebReconArtifact | undefined
+
+  try {
+    const info = await fs.lstat(absolutePath)
+    if (info.isSymbolicLink() || !info.isFile()) {
+      throw new Error("Existing web_recon history path is not a regular file: " + filename)
+    }
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await fs.readFile(absolutePath, "utf-8"))
+    } catch (error) {
+      throw new Error("Existing web_recon history is not valid JSON; it was left untouched: " + filename + " (" + (error instanceof Error ? error.message : String(error)) + ")")
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Existing web_recon history has an unsupported structure; it was left untouched: " + filename)
+    }
+    const saved = parsed as Partial<WebReconArtifact>
+    if (
+      saved.schemaVersion !== 1 ||
+      saved.recordType !== "web-recon-results" ||
+      saved.workspaceID !== workspace.id ||
+      saved.canonicalTarget !== workspace.targetURL ||
+      !Array.isArray(saved.observations) ||
+      saved.observations.some((item) =>
+        !item || typeof item !== "object" ||
+        typeof item.fingerprint !== "string" ||
+        typeof item.program !== "string" ||
+        typeof item.requestedTarget !== "string" ||
+        typeof item.firstSeenAt !== "string" ||
+        typeof item.lastSeenAt !== "string" ||
+        !Number.isSafeInteger(item.occurrences) || Number(item.occurrences) < 1 ||
+        !Array.isArray(item.attempts) ||
+        !item.result || typeof item.result !== "object"
+      )
+    ) {
+      throw new Error("Existing web_recon history does not match this workspace/schema; it was left untouched: " + filename)
+    }
+    artifact = saved as WebReconArtifact
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+  }
+
+  if (!artifact) {
+    artifact = {
+      schemaVersion: 1,
+      recordType: "web-recon-results",
+      canonicalTarget: workspace.targetURL,
+      workspaceID: workspace.id,
+      workspacePath: workspace.workspacePath,
+      updatedAt: completedAt,
+      observations: [],
+    }
+  }
+
+  const attempt = { completedAt, sessionID }
+  const existing = artifact.observations.find((item) => item.fingerprint === fingerprint)
+  if (existing) {
+    existing.lastSeenAt = completedAt
+    existing.occurrences += 1
+    existing.attempts.push(attempt)
+  } else {
+    artifact.observations.push({
+      fingerprint,
+      program,
+      requestedTarget,
+      firstSeenAt: completedAt,
+      lastSeenAt: completedAt,
+      occurrences: 1,
+      attempts: [attempt],
+      result,
+    })
+  }
+  artifact.workspacePath = workspace.workspacePath
+  artifact.updatedAt = completedAt
+  return TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\n")
+}
 
 const dispatch: Record<
   Exclude<Program, "session_scan">,
@@ -304,25 +422,21 @@ export const WebReconTool = Tool.define("web_recon", {
     let finalOutput = output
     if (targetWorkspace && (program === "session_scan" || params.target)) {
       const completedAt = new Date().toISOString()
-      const artifactDirectory = program === "session_scan" ? "scans" : "recon"
-      const filename = artifactDirectory + "/" + program + "-" + completedAt.replace(/[:.]/g, "-") + ".json"
-      const record = {
-        schemaVersion: 1,
-        recordType: "web-recon-result",
-        program,
-        requestedTarget: params.target ?? "session_scan: authorized origins from the current session",
-        canonicalTarget: targetWorkspace.targetURL,
-        workspaceID: targetWorkspace.id,
-        workspacePath: targetWorkspace.workspacePath,
-        sessionID: ctx.sessionID,
-        completedAt,
-        result,
-      }
+      const filename = program === "session_scan" ? "scans/session-scan-results.json" : "recon/web-recon-results.json"
+      const requestedTarget = params.target ?? "session_scan: authorized origins from the current session"
       try {
-        // The original recon record stays in the private target workspace so exact
-        // observed values remain inspectable. Redact only a separate export/share copy.
-        const content = JSON.stringify(record, null, 2) + "\n"
-        artifactPath = await TargetMemory.writeWorkspaceFile(targetWorkspace, filename, content)
+        // Preserve distinct result snapshots and attempt provenance in one stable
+        // artifact; identical snapshots update their observation history instead of
+        // producing another JSON file. Redact only a separate export/share copy.
+        artifactPath = await persistWebReconResult({
+          workspace: targetWorkspace,
+          filename,
+          program,
+          requestedTarget,
+          completedAt,
+          sessionID: ctx.sessionID,
+          result,
+        })
         try {
           const note = await TargetMemory.addNote(targetWorkspace.targetURL, {
             kind: "asset",
@@ -331,10 +445,10 @@ export const WebReconTool = Tool.define("web_recon", {
               "## Recon run summary",
               "",
               "Program: " + program,
-              "Requested URL: " + (params.target ?? "authorized origins from the current session"),
+              "Requested URL: " + requestedTarget,
               "Completed at: " + completedAt,
               "Run artifact: " + path.relative(targetWorkspace.workspacePath, artifactPath).split(path.sep).join("/"),
-              "Result status: completed; the linked JSON artifact is the full evidence record.",
+              "Result status: completed; the linked JSON artifact contains distinct result snapshots and their observation/attempt history.",
               "Finding-like signals returned: " + result.findings.length + " (scanner/check output is a lead, not automatic confirmation).",
               "Severity distribution: " + (["critical", "high", "medium", "low", "info"].map((severity) => {
                 const count = enriched.filter((finding) => finding.severity === severity).length

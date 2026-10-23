@@ -80,15 +80,40 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         expect(result.metadata.artifact_saved).toBe(true)
         expect(result.metadata.notes_saved).toBe(true)
         expect(result.metadata.target_workspace).toBe(workspace.workspacePath)
-        expect(result.metadata.artifact_path).toContain(path.join(workspace.workspacePath, "recon", "robots_scan-"))
+        expect(result.metadata.artifact_path).toBe(path.join(workspace.workspacePath, "recon", "web-recon-results.json"))
         const artifactPath = result.metadata.artifact_path as string
         const saved = JSON.parse(await fs.readFile(artifactPath, "utf-8"))
-        expect(saved.program).toBe("robots_scan")
+        expect(saved.recordType).toBe("web-recon-results")
         expect(saved.workspaceID).toBe(workspace.id)
-        expect(saved.result.output).toContain("robots.txt found")
+        expect(saved.observations).toHaveLength(1)
+        expect(saved.observations[0].program).toBe("robots_scan")
+        expect(saved.observations[0].result.output).toContain("robots.txt found")
+
+        const repeated = await tool.execute({
+          program: "robots_scan",
+          target,
+          args: [],
+          timeout_seconds: 2,
+        }, {
+          sessionID: "ses_web_recon_workspace_persistence",
+          messageID: "msg_web_recon_workspace_persistence_repeat",
+          agent: "test",
+          abort: new AbortController().signal,
+          messages: [],
+          ask: async () => {},
+          metadata: () => {},
+        } as never)
+        expect(requests).toEqual(["/robots.txt", "/robots.txt"])
+        expect(repeated.metadata.artifact_path).toBe(artifactPath)
+        const afterRepeat = JSON.parse(await fs.readFile(artifactPath, "utf-8"))
+        expect(afterRepeat.observations).toHaveLength(1)
+        expect(afterRepeat.observations[0].occurrences).toBe(2)
+        expect(afterRepeat.observations[0].attempts).toHaveLength(2)
+        expect(await fs.readdir(path.join(workspace.workspacePath, "recon"))).toEqual(["web-recon-results.json"])
+
         const notes = await fs.readFile(path.join(workspace.workspacePath, "notes.md"), "utf-8")
         expect(notes).toContain("Recon run: robots_scan")
-        expect(notes).toContain("recon/robots_scan-")
+        expect(notes).toContain("recon/web-recon-results.json")
         } finally { await Instance.dispose() }
     },
     })
