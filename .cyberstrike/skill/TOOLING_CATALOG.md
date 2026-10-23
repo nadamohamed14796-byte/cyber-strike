@@ -8,7 +8,7 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 1. Identify the phase and exact evidence gap before selecting a tool.
 2. Check native CyberStrike registered tools and existing helpers first; extend a helper instead of adding a duplicate.
-3. Preflight external CLIs with `command -v TOOL` and the documented version/help flag. Use `python3 .cyberstrike/skill/scripts/tool_preflight.py --json TOOL [TOOL...]` when available. Reuse successful checks only while the same runtime/binary version remains.
+3. Preflight external CLIs with `command -v TOOL` and the documented version/help flag. Use tool_preflight.py only after resolving its real path from the installed skill/catalog root, and invoke it by absolute path; do not assume `.cyberstrike/skill/scripts/` exists relative to the target workspace. If the helper is unavailable, use direct local checks—do not copy the helper or fail a phase solely because its path is unavailable. Reuse successful checks only while the same runtime/binary version remains.
 4. Prefer official docs/releases; review maintenance, license, platform/dependencies, package provenance, permissions, network behavior, flags, output format, and rate behavior before install/use.
 5. Select the smallest useful set by default; add independent alternatives when they close a real coverage gap, corroborate evidence, or recover a failed source. Do not run equivalent collectors in parallel or use a fixed arbitrary tool count.
 6. Keep native/raw output and normalized output separate. Preserve tool/version, exact redacted command, input assets, timestamps, exit status, stderr/errors, raw/normalized artifact paths, source provenance, and limitations.
@@ -67,21 +67,37 @@ The recon command and registered `recon_checkpoint` enforce this contract. This 
 
 The existing helper `host_inventory.py` is an offline observation normalizer, not a network collector or source ledger writer. Use it for hostname normalization when its JSONL input/output fits the task; do not claim it queried a source. Do not restore or create a dedicated collector merely to duplicate the catalog: the agent selects and invokes suitable registered tools, reachable APIs, and available CLIs directly, then persists the validated ledger above.
 
-## Built-in CyberStrike scripts and helpers
+## Workspace/skill helper scripts
 
-Inspect each helper's actual `--help`, source, and tests before assuming flags or behavior. Reuse these instead of creating near-duplicates.
+These helpers live with the installed skill/repository assets, not necessarily beside the executable or inside a target workspace. Resolve the actual installed path before calling them. Use helpers when their input/output contract fits the task; otherwise use an equivalent local operation without creating duplicate files.
 
-- `host_inventory.py`: normalize hostname observations while retaining each source record; no network traffic.
-- `normalize_urls.py`: normalize and deduplicate collected URLs.
-- `js_endpoint_inventory.py`: local JavaScript endpoint candidate inventory.
-- `http_response_diff.py`: compare baseline and controlled variants.
-- `authorization_matrix.py`: validate explicit test-owned principal/object/action cases and create a planned JSONL matrix; no network traffic.
-- `validate_evidence_manifest.py`: validate evidence manifests.
-- `tool_preflight.py`: check local CLI availability/version without installing tools or contacting targets.
-- `audit_skill_enrichment.py`: audit direct skills for executable tooling guidance.
-- `validate_skill_catalog.py`: structural catalog checks.
+- **host_inventory.py**: offline hostname normalization from JSONL, retaining every source observation and writing invalid-record diagnostics. It is not a network collector or source-ledger writer.
+- **normalize_urls.py**: local URL normalization/deduplication.
+- **js_endpoint_inventory.py**: local JavaScript endpoint candidate inventory.
+- **http_response_diff.py**: compare baseline and controlled variants.
+- **authorization_matrix.py**: validate explicit test-owned principal/object/action cases and create a planned JSONL matrix; no network traffic.
+- **validate_evidence_manifest.py**: validate evidence manifests.
+- **tool_preflight.py**: local CLI presence/version checks only; does not install tools or contact targets.
+- **audit_skill_enrichment.py** and **validate_skill_catalog.py**: repository-maintainer quality checks, not target-assessment tools. Do not use them as part of recon or vulnerability testing.
 
-Before adding a helper, search the existing script directory and extend a helper if responsibilities overlap. Helpers need a documented CLI, deterministic input/output, useful exit codes, safe secret handling, and a self-test/smoke path.
+Before adding a helper, search the existing helper directory and extend a helper if responsibilities overlap. Helpers need a documented CLI, deterministic input/output, useful exit codes, safe secret handling, and a self-test/smoke path.
+
+## Bundled attack_script capabilities
+
+The registered attack_script tool exposes only these bundled keys and argument forms; invoke them through the native tool, not as arbitrary script paths. The runner starts Python directly and does **not** apply the generic Bash scanner/scope gate, so its presence is not permission to use it. Validate the real target and current phase against the saved engagement scope before any network operation.
+
+| Registered script | Purpose and input | Network/impact rules |
+|---|---|---|
+| **jwt_tamper** | TOKEN [--decode-only] [--set key=value] [--set-header key=value] [--key SECRET] [--json-output] | Local token manipulation only. Use test tokens; never place live tokens, signing keys, or claims in persistent notes. |
+| **race_tester** | URL [-m METHOD] [-H key:value] [-d JSON_BODY] [-c COUNT] [--delay MS] [--json-output] | Sends concurrent HTTP requests; default is POST with 20 requests. Use only in an explicitly requested vulnerability-testing phase on a test-owned/approved operation; specify method, count, body, delay, and stop condition explicitly. |
+| **ssrf_listener** | [-p PORT] [-o OUTPUT_FILE] [--timeout SECONDS] | Starts a local HTTP listener. Bind/use only the planned callback port, choose a finite timeout, and save only necessary redacted evidence. |
+| **file_upload_tester** | URL [--field NAME] [-H key:value] [--data JSON] [--json-output] | Sends multiple crafted uploads, including executable PHP/JSP content and SVG payloads referencing cloud metadata. Active testing only with explicit permission and a dedicated test upload endpoint; do not run during recon or against real user data. |
+| **cloud_storage_enum** | TARGET [--names BUCKET_NAME...] [--json-output] | Enumerates guessed storage names across cloud providers. **Current implementation also attempts an S3 PUT and DELETE for each candidate**; do not run unless the program explicitly permits write testing. A public name or a root-domain match is not sufficient authorization. |
+| **subdomain_takeover** | FILE_OR_DOMAIN [--json-output] | Resolves CNAMEs and sends HTTP checks. Only use with a fully scope-checked candidate list; never register/claim a resource and do not infer takeover from a fingerprint alone. |
+| **github_dorker** | ORG [--repo ORG/REPO] [--patterns PATTERN...] [--commits] [--json-output] | Uses gh to search GitHub content/commit metadata. Restrict searches to an owned or explicitly program-authorized organization/repository; redact any secret-like output and never use discovered credentials. |
+| **wayback_endpoints** | DOMAIN [--probe] [--limit N] [--json-output] | Default mode queries public archive history; use only for URL collection after verifying the domain. --probe sends live HEAD requests to historical URLs and follows redirects, so do not use it through this generic runner; use scope-aware live-URL validation instead. If the configured limit truncates useful output, increase it and resume—do not report the truncated result as complete. |
+
+Do not run equivalent native scripts and CLIs in parallel just because both are listed. Choose one method based on the evidence gap; use an alternative only for a distinct coverage gap or a measured failure. State-changing and high-volume scripts are never default reconnaissance.
 
 ## Execution examples and runtime constraints
 
