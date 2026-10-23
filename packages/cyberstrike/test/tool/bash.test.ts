@@ -114,6 +114,9 @@ describe("Read-only passive-research API scope routing", () => {
       phase: "asset_discovery",
     })
     expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&host=api.example.com"), ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&api_key=hidden"), ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&access_token=hidden"), ["-s"])).toBeUndefined()
+    expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&key=hidden"), ["-s"])).toBeUndefined()
     expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-fsSL"])).toBeUndefined()
     expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-d@payload.json"])).toBeUndefined()
   })
