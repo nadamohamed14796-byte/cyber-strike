@@ -30,10 +30,10 @@ type TargetArtifactMetadata = {
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Exact existing target workspace URL. Use the root target for parent inventory and the child origin for per-asset artifacts."),
   area: z.enum(AREAS).describe("Use root only for canonical top-level inventories required by recon_checkpoint; otherwise use the matching target-local artifact directory. Do not replace authoritative manifests/index files."),
-  filename: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/).describe("Simple filename only, not a path. Use stable inventory names and unique run IDs for evidence."),
-  content: z.string().max(2_000_000).optional().describe("Complete UTF-8 text/JSON/CSV content, maximum 2 MB. Exact evidence is preserved in this target-local workspace. Provide this OR source_path."),
+  filename: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/).describe("Simple filename only, not a path. Reuse the canonical inventory filename; do not suffix or number a duplicate current inventory."),
+  content: z.string().max(2_000_000).optional().describe("Complete UTF-8 text/JSON/CSV content, maximum 2 MB. For an existing canonical inventory, first inspect and merge its current contents and provenance. Provide this OR source_path."),
   source_path: z.string().min(1).optional().describe("Absolute path to an existing user-provided text file on disk. Copies it into the target workspace without returning its contents to the model; files up to 32 MB. Provide this OR content."),
-  overwrite: z.boolean().default(false).describe("Existing artifacts are immutable by default. Set true only when replacement is intentional."),
+  overwrite: z.boolean().default(false).describe("Evidence remains immutable by default. For an existing canonical normalized inventory, read it, merge/deduplicate, then set true to replace that same filename intentionally. Do not create an alternate filename merely because the current artifact exists."),
 }).refine(
   (value) => (value.content !== undefined) !== (value.source_path !== undefined),
   { message: "Supply exactly one of content or source_path." },
@@ -41,13 +41,13 @@ const Parameters = z.object({
 
 export const TargetArtifactTool = Tool.define("target_artifact", {
   description: [
-    "Persist text artifacts in the exact existing target workspace and return the absolute output path.",
-    "Use for recon inventories, live-host results, URL/endpoint lists, JavaScript analysis, request/response references, test logs, evidence indexes, scan manifests, run state, report drafts and target-specific research notes.",
+    "Persist and update target artifacts only inside the exact existing target workspace; return the absolute path.",
+    "Use for canonical recon inventories, live-host results, URL/endpoint inventories, JavaScript analysis, request/response references, essential raw evidence, and the final report.",
     "The workspace must already exist in the current project. This tool never silently creates another directory or guesses a target path. Call target_workspace first.",
     "Provide exactly one input: content (up to 2 MB) or source_path (an absolute, existing regular text file up to 32 MB). source_path copies the file into the workspace without returning its contents to the model and reports its SHA-256 hash.",
-    "Use area=root only for canonical top-level inventories such as scope.txt, subdomains.txt, subdomain-sources.json, live-hosts.txt, ports.txt, urls.txt, parameters.txt, parameter-tests.md, javascript-analysis.md, endpoints.txt, or findings.md. This writes directly to the existing workspace root; it does not create a root/ directory. Put other evidence in its named area, and keep the final report at reports/recon-final.md.",
+    "Use area=root only for canonical top-level inventories accepted by recon_checkpoint; this writes directly to the workspace root. Put detailed evidence in its matching area and keep the final recon report at reports/recon-final.md. Read and merge any existing canonical inventory, then overwrite the same filename intentionally rather than creating a duplicate.",
     "Only known artifact areas and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Exact evidence is preserved in this private target workspace; do not copy raw secrets into Git commits or global research.",
-    "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, then verify the output file. Do not use the shell current directory or /root/targets implicitly.",
+    "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, verify it, normalize it into the canonical inventory, and remove temporary output unless that raw file must be retained as evidence. Do not use the shell current directory or /root/targets implicitly.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
