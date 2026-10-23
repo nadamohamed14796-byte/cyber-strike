@@ -47,6 +47,18 @@ def normalize_root(value: str) -> str | None:
     return root if root == root_hint else None
 
 
+def normalize_roots(values: list[str]) -> list[str]:
+    """Normalize and deduplicate roots so apex + wildcard entries are scanned once."""
+    roots: list[str] = []
+    for value in values:
+        root = normalize_root(value)
+        if not root:
+            raise ValueError(f"invalid root domain: {value!r}")
+        if root not in roots:
+            roots.append(root)
+    return roots
+
+
 def normalize_host(value: str, root: str) -> str | None:
     host = value.strip().lower().rstrip(".")
     if host.startswith("*."):
@@ -247,6 +259,8 @@ def self_test() -> int:
     assert normalize_host("*.api.example.com", "example.com") == "api.example.com"
     assert normalize_root("example.com") == "example.com"
     assert normalize_root("*.example.com") == "example.com"
+    assert normalize_roots(["example.com", "*.example.com", "example.com."]) == ["example.com"]
+    assert normalize_roots(["example.com", "api.example.com"]) == ["example.com", "api.example.com"]
     assert normalize_root("*.BÜCHER.example") == "xn--bcher-kva.example"
     assert normalize_root("https://example.com") is None
     assert normalize_host("example.com", "example.com") == "example.com"
@@ -525,12 +539,10 @@ def main() -> int:
     if not args.roots:
         parser.error("provide at least one root domain or use --self-test")
 
-    roots: list[str] = []
-    for value in args.roots:
-        root = normalize_root(value)
-        if not root:
-            parser.error(f"invalid root domain: {value!r}")
-        roots.append(root)
+    try:
+        roots = normalize_roots(args.roots)
+    except ValueError as error:
+        parser.error(str(error))
     roots = list(dict.fromkeys(roots))
     if not roots:
         parser.error("no valid root domains")
