@@ -108,6 +108,8 @@ describe("Read-only passive-research API scope routing", () => {
     expect(passiveResearchLookup(url, ["-q", "--data", "domain=example.com"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-q", "-L"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-q", "-H", "Authorization: Bearer $TOKEN"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-H", "X-Note: Bearer $TOKEN"])).toBeUndefined()
+    expect(passiveResearchLookup(url, ["-q", "-H", "X-Note: Basic $TOKEN"])).toBeUndefined()
     expect(passiveResearchLookup(url, ["-q", "-H", "X-API-Key: $OTX_API_KEY"])).toBeUndefined()
     expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api"), ["-q", "-s"])).toBeUndefined()
     expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com"), ["-q", "-s"])).toEqual({
