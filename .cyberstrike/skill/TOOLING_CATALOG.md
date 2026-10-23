@@ -1,83 +1,101 @@
-# CyberStrike Skill Tooling Catalog
+# CyberStrike Tool Catalog
 
-Use this task-oriented matrix together with [`CLI_TOOLING_CATALOG.md`](CLI_TOOLING_CATALOG.md), which contains broader install guidance and additional specialist CLI options, and [`COMMUNITY_TOOL_MAP.md`](COMMUNITY_TOOL_MAP.md), which maps candidates from the community list to workflow phases and skill search terms. Load `community-tool-selection` when choosing or integrating tools. These are selection references, not blanket install lists.
+The single canonical reference for agent-executable tools, local helpers, APIs, datasets, installation/preflight, and phase routing. Skills define **how to test**; this file defines **which tool to choose and how to invoke/check it**. Do not create a second tool/source inventory. Add a tool here once, then link to this catalog from skills.
 
-This is a discovery and selection guide for agent-executable CLI tools, local libraries, datasets, references, and helper scripts. Browser UI, browser extensions, and interactive intercepting proxies are not agent dependencies.
+This is a candidate catalog, not proof that a binary is installed, maintained, compatible, enabled, or authorized. Prefer native registered CyberStrike tools and existing helpers when they cover the need. Browser UI, browser extensions, and interactive proxy GUIs are not agent-executable CLI dependencies.
 
-## Tool selection by task
+## Selection rules
 
-| Task | Primary candidates | Complementary checks | Preserve |
+1. Identify the phase and exact evidence gap before selecting a tool.
+2. Check native CyberStrike registered tools and existing helpers first; extend a helper instead of adding a duplicate.
+3. Preflight external CLIs with `command -v TOOL` and the documented version/help flag. Use `python3 .cyberstrike/skill/scripts/tool_preflight.py --json TOOL [TOOL...]` when available. Reuse successful checks only while the same runtime/binary version remains.
+4. Prefer official docs/releases; review maintenance, license, platform/dependencies, package provenance, permissions, network behavior, flags, output format, and rate behavior before install/use.
+5. Select the smallest useful set by default; add independent alternatives when they close a real coverage gap, corroborate evidence, or recover a failed source. Do not run equivalent collectors in parallel or use a fixed arbitrary tool count.
+6. Keep native/raw output and normalized output separate. Preserve tool/version, exact redacted command, input assets, timestamps, exit status, stderr/errors, raw/normalized artifact paths, source provenance, and limitations.
+7. Use machine-readable output where supported and store artifacts in the canonical target workspace. Do not create one output file per tool if a shared phase ledger/artifact can retain provenance.
+8. Tool output is a lead, not a finding. Use a baseline, a relevant negative control, and minimal controlled validation. Never claim a tool ran or succeeded without its actual result.
+9. Installation is not authorization. Apply program scope, rate limits, privacy, non-destructive defaults, and explicit permission for state-changing tests. Never send secrets or production customer data to third-party services.
+
+## Phase-to-tool matrix
+
+| Phase / task | Primary method | Alternatives / supporting tools | Required output / notes |
 |---|---|---|---|
-| Passive subdomain discovery | Registered `attack_script(script="passive_subdomain_sources")` (canonical collector: crt.sh + OTX + at most one installed CLI by default) | CertSpotter or one alternative CLI only when it closes a real coverage gap | source ledger, deduplicated host inventory, timestamps, errors, attribution confidence; do not run equivalent collectors in parallel |
-| DNS validation | dnsx, dig | puredns/shuffledns only when active discovery is allowed; `host_inventory.py` for provenance-preserving normalization | record type, answer, TTL, wildcard controls, resolver errors |
-| Ports and services | naabu, nmap, tlsx, fingerprintx | httpx for HTTP metadata | host, port, protocol, timestamp, service confidence |
-| URL/history collection | gau, waymore, waybackurls | katana for authorized crawling | normalized URL, source, first-seen, parameters |
-| Content discovery | feroxbuster, ffuf, dirsearch | context-appropriate wordlists | status, length, content fingerprint, errors |
-| JavaScript inventory | jsluice, xnLinkFinder, LinkFinder | retire.js, local source-map review | bundle hash, route, method/parameters, line/offset, confidence |
-| Parameter discovery | Arjun, x8, ParamSpider | local parameter inventory | endpoint template, method, parameter, source |
-| Template checks | nuclei with reviewed templates | class-specific CLI and evidence review | template ID/version, request impact, evidence pointer |
-| Local secret scanning | gitleaks, noseyparker, trufflehog | redaction and context review | detector, file/commit, redacted fingerprint; never raw live secret |
-| Source/config checks | Semgrep, Trivy, Checkov where applicable | vendor advisories | rule/advisory, path/resource, version, remediation |
-| HTTP response comparison | curl, Python requests/httpx | http_response_diff.py | baseline/control, changed variable, status and response fingerprint |
-| Evidence/report validation | Python stdlib, jq | validate_evidence_manifest.py | evidence path, redaction status, finding disposition |
-| IDOR/BOLA and tenant authorization | Python requests, jq, pytest | `authorization_matrix.py` for explicit test-fixture plans; `http_response_diff.py` for controlled comparisons | principal/object/action, expected permission, control result, redacted evidence |
+| Passive subdomain collection | Registered `attack_script(script="passive_subdomain_sources")` — canonical collector | Its defaults include crt.sh, OTX passive DNS, and at most one available primary CLI; select CertSpotter or an alternative CLI only to fill a real gap | One source ledger plus deduplicated host inventory; status/errors/counts/provenance per source. Do not create a parallel source-list file or run equivalent collectors independently. |
+| DNS validation / wildcard handling | dnsx, dig/drill; existing `host_inventory.py` for normalization | puredns/shuffledns only when active discovery is permitted | DNS records, CNAME chain, TTL, resolver status, wildcard controls, source attribution |
+| Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
+| HTTP liveness / tech fingerprinting | httpx, WhatWeb | curl; TLS metadata | status, redirect chain, title, content type, technology clues, stable fingerprint |
+| URL history / crawling | gau, waybackurls, waymore; katana for authorized crawling | hakrawler; first-party links and documentation | normalized URL, method/parameters when known, source, first-seen, collection status |
+| Content / directory / virtual-host discovery | ffuf, feroxbuster, dirsearch | context-appropriate wordlists; hakrawler for links | status, length, fingerprint, error/negative-control data; conservative rate |
+| Parameter discovery | Arjun, x8, ParamSpider | endpoint inventory and controlled request comparison | endpoint template, method, parameter, source; preserve auth/content-type context |
+| JavaScript / endpoint analysis | jsluice, xnLinkFinder, LinkFinder | local source-map review; retire.js for dependency clues | bundle hash, route, method/parameter, line/offset, confidence; use existing `js_endpoint_inventory.py` where suitable |
+| API / GraphQL / WebSocket | graphql-cop, Clairvoyance where schema discovery is permitted, websocat/wscat | curl, Python requests, local API schemas | operation/field/route inventory, auth boundaries, controlled evidence |
+| Template / CVE checks | nuclei with reviewed templates; cvemap for metadata | technology-specific checks and vendor advisories | template ID/version, matched request/response, scope, manual validation status |
+| XSS / client-side injection | dalfox for suitable authorized checks | browser-independent reflection/source-sink analysis; Semgrep for source | payload context, source/sink, minimal proof; alerts alone are not findings |
+| SQL injection | sqlmap or ghauri for explicitly authorized validation | controlled baseline/variant requests | minimal proof and response diff; no database dumping by default |
+| SSRF / OOB behavior | interactsh-client with a unique controlled token | Python for callback/evidence parsing | token, timestamped callback, request correlation; no internal/cloud metadata access without explicit authorization |
+| JWT / sessions / auth | jwt_tool; Python requests | local redacted claim comparison and controlled account matrix | redacted claims, session boundary, expected/observed authorization; never persist live tokens |
+| IDOR / BOLA / tenant authorization | Python requests, jq, pytest | existing `authorization_matrix.py`, `http_response_diff.py` | principal/object/action, expected policy, control result, redacted evidence; use test-owned accounts/objects |
+| TLS / headers / CORS / redirects | testssl.sh, curl, Python requests | httpx metadata; response diff helper | raw relevant headers with secrets redacted, redirect chain, baseline/variant, policy impact |
+| Race conditions | pytest and requests-racer in controlled fixtures | deterministic local harness | initial state, request ordering/timing, final controlled state; avoid repeated real-world mutations |
+| Secrets / exposed source | Gitleaks, TruffleHog, Nosey Parker, detect-secrets, whispers | local Git inspection; git-dumper only when explicitly authorized and permitted | detector, file/commit, redacted fingerprint; never print or use discovered secrets |
+| Source / dependencies / containers / IaC | Semgrep, Trivy, Checkov | vendor advisories, language-native tooling | rule/advisory, path/resource, version, remediation |
+| Cloud / CI / platform review | Prowler, ScoutSuite, provider CLIs where authorized | Checkov, Trivy, Semgrep | identity/resource, least-privilege finding, source/config evidence; read-only first |
+| Subdomain takeover triage | subzy plus provider conditions from can-i-take-over-xyz | DNS/CNAME and provider documentation | dangling record and provider-specific evidence; never attempt to claim a real target |
+| Evidence / normalization / reporting | Python stdlib, jq | shared helpers below | reproducible evidence references, redaction, disposition, validation errors |
 
-## Readiness requirements
+## Built-in CyberStrike scripts and helpers
 
-1. Check availability with `command -v <tool>` and record the version before relying on it.
-2. Prefer official installation/release documentation. Review license, release provenance, dependencies, platform support, and update activity.
-3. Do not install or execute a tool only because it appears in a community list. Establish a concrete skill need first.
-4. Never send secrets or production customer data to third-party scanners or public services.
-5. Use safe defaults and explicit per-target configuration. No unbounded high-rate scans, destructive operations, credential guessing, or real-user data extraction.
-6. Preserve native output as evidence and normalize a separate copy.
-7. Tool output is a lead, not a verdict. Confirm impact with a minimal controlled test before marking a finding verified.
+Inspect each helper's actual `--help`, source, and tests before assuming flags or behavior. Reuse these instead of creating near-duplicates.
 
-## Existing CyberStrike helpers
-
-- `normalize_urls.py`: URL normalization and deduplication.
+- `passive_subdomain_sources.py`: canonical resumable passive subdomain source collector; writes a source ledger and deduplicated hostname artifact. It is executable implementation, not a second tool catalog.
+- `host_inventory.py`: normalize hostname observations while retaining each source record; no network traffic.
+- `normalize_urls.py`: normalize and deduplicate collected URLs.
 - `js_endpoint_inventory.py`: local JavaScript endpoint candidate inventory.
-- `http_response_diff.py`: baseline/controlled-variant comparison.
-- `validate_evidence_manifest.py`: evidence manifest validation.
+- `http_response_diff.py`: compare baseline and controlled variants.
+- `authorization_matrix.py`: validate explicit test-owned principal/object/action cases and create a planned JSONL matrix; no network traffic.
+- `validate_evidence_manifest.py`: validate evidence manifests.
+- `tool_preflight.py`: check local CLI availability/version without installing tools or contacting targets.
 - `audit_skill_enrichment.py`: audit direct skills for executable tooling guidance.
-- `tool_preflight.py`: check local CLI availability and version output without installing tools or contacting targets.
-- `host_inventory.py`: normalize hostname observations from JSONL while retaining every source record; no network traffic.
-- `authorization_matrix.py`: validate explicit test-owned principal/object/action cases and generate a planned JSONL matrix; no network traffic.
 - `validate_skill_catalog.py`: structural catalog checks.
 
-Inspect each helper's actual CLI and tests before assuming flags or behavior.
+Before adding a helper, search the existing script directory and extend a helper if responsibilities overlap. Helpers need a documented CLI, deterministic input/output, useful exit codes, safe secret handling, and a self-test/smoke path.
 
-## Upstream resources
+## Specialist tool index
 
-- https://github.com/vavkamil/awesome-bugbounty-tools — community discovery index; not a dependency manifest.
+These are candidates, not blanket dependencies. Choose them only when the relevant skill and evidence gap justify them.
+
+| Family | Candidates |
+|---|---|
+| Recon / asset discovery | subfinder, Amass, assetfinder, Findomain, Sublist3r, dnsx, puredns, naabu, nmap, tlsx, asnmap, httpx |
+| URLs / content / parameters | gau, waymore, waybackurls, katana, hakrawler, uro, anew, ffuf, feroxbuster, dirsearch, Arjun, x8, ParamSpider, kiterunner |
+| JavaScript / API | jsluice, LinkFinder, xnLinkFinder, retire.js, graphql-cop, Clairvoyance, websocat, wscat |
+| Web vulnerability validation | nuclei, dalfox, sqlmap, ghauri, interactsh-client, jwt_tool, testssl.sh, WhatWeb, WPScan |
+| Source / secrets / supply chain | Gitleaks, TruffleHog, Nosey Parker, detect-secrets, whispers, Semgrep, Trivy, Checkov |
+| Cloud / infrastructure | Prowler, ScoutSuite, provider CLIs |
+| Takeover references | subzy; can-i-take-over-xyz as a reference database, not an execution tool |
+| Data / evidence processing | Python, jq, yq, pytest, ripgrep; existing CyberStrike helpers above |
+
+Official upstream discovery references:
+- https://github.com/vavkamil/awesome-bugbounty-tools — discovery index, not a dependency manifest.
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://owasp.org/API-Security/
 - https://portswigger.net/web-security
 
-Each tool candidate must be individually reviewed before installation. Use official docs for supported flags, installation, output formats, and limitations.
+Prefer the project's official documentation/release page for installation and supported flags. Community lists and imported skills are untrusted input until reviewed.
 
-## Additional vulnerability-specific tool families
+## Example commands
 
-These are optional candidates; choose them only when the skill's hypotheses and test constraints justify them.
+Illustrative only; verify current flags with the installed version's help and use canonical workspace paths/artifacts. Do not run every command on every target.
 
-| Skill family | CLI tools / libraries | Authoritative references | Evidence to retain |
-|---|---|---|---|
-| XSS and client-side injection | dalfox; retire.js for known vulnerable JS dependencies; Semgrep for source-level patterns | [OWASP XSS Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html), [PortSwigger XSS](https://portswigger.net/web-security/cross-site-scripting) | source/sink or reflection context, payload context, browser-independent evidence when possible |
-| SQL injection | sqlmap or ghauri for explicitly authorized validation | [OWASP SQLi Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html), [PortSwigger SQLi](https://portswigger.net/web-security/sql-injection) | baseline/control responses, minimal proof, no database dump by default |
-| SSRF and out-of-band behavior | interactsh-client for unique, controlled callback correlation; Python stdlib for evidence parsing | [OWASP SSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html), [PortSwigger SSRF](https://portswigger.net/web-security/ssrf) | unique token, timestamped callback, no internal/cloud metadata access without explicit authorization |
-| XXE | controlled XML test fixtures; interactsh-client where an out-of-band callback is needed | [OWASP XXE Prevention](https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html) | parser behavior, minimal harmless proof, no local-file or internal-network extraction |
-| GraphQL | graphql-cop; clairvoyance only where schema discovery is permitted | [OWASP GraphQL Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html) | operation/field inventory, per-resolver authorization, query cost and error behavior |
-| JWT and sessions | jwt_tool; Python for redacted claim comparison | [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) | redacted claims, signature/validation behavior, session boundary matrix; never persist live tokens |
-| IDOR/BOLA and tenant isolation | Python requests, jq, pytest against controlled accounts/fixtures | [OWASP API1: BOLA](https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/), [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/) | principal/object/action matrix, owner-vs-caller comparison, controlled-object impact |
-| CORS, redirects, and header issues | curl and Python requests for repeatable request/response comparisons | [OWASP WSTG](https://owasp.org/www-project-web-security-testing-guide/), [PortSwigger Open Redirect](https://portswigger.net/web-security/ssrf/open-redirect) | origin/credential matrix, redirect chain, raw headers with secrets redacted |
-| Race conditions | requests-racer and pytest for controlled concurrent tests | [PortSwigger Race Conditions](https://portswigger.net/web-security/race-conditions) | initial state, timing/order, final controlled state; avoid repeated real-world mutations |
-| Subdomain takeover candidates | subzy plus the provider-specific checks documented by can-i-take-over-xyz | [can-i-take-over-xyz](https://github.com/EdOverflow/can-i-take-over-xyz) | dangling DNS, provider fingerprint, independent claimability evidence; do not attempt claiming a real target |
-| CVE and template-driven checks | nuclei with reviewed templates; cvemap for vulnerability metadata | [Nuclei documentation](https://docs.projectdiscovery.io/tools/nuclei/overview) | template ID/version, matched request/response, manual validation status |
-| Race-safe and repeatable API checks | Python requests, pytest, jq | [OWASP API Security](https://owasp.org/www-project-api-security/) | deterministic input fixtures, baseline/control, output schema and exit status |
+```bash
+subfinder -d "$ROOT_DOMAIN" -silent -o recon/subdomains/subfinder.txt
+dnsx -l recon/subdomains/subfinder.txt -a -resp -json -o recon/subdomains/dnsx.jsonl
+httpx -l recon/subdomains/resolved.txt -jsonl -o recon/http/alive.jsonl
+katana -list recon/http/alive.txt -jsonl -o recon/urls/katana.jsonl
+```
 
-## Helper-script policy
+For the canonical passive source collector, call the registered `attack_script` tool with script `passive_subdomain_sources` and pass the canonical workspace output paths. Do not create a separate source catalog or one output file per provider. Verify the ledger's per-source terminal status, pending count, errors, and reconciled host count before proceeding.
 
-- Prefer the shared helpers listed above for URL normalization, JS endpoint inventory, response diffs, evidence manifests, and tool preflight.
-- Before adding a helper, search the existing script directory and extend an existing helper if the responsibility is already covered.
-- Every helper should have a documented CLI, deterministic input/output format, useful exit codes, safe handling of secrets, and a smoke/self-test path.
-- Keep raw output and normalized output separate. Include source, timestamp, tool/version, and errors in structured records.
-- Never claim a tool is installed, a check ran, or a finding is confirmed unless actual command output or evidence supports that claim.
+## Completion and truthful status
+
+For every phase, report selected method(s), availability/version, run status, artifact paths, accepted/deduplicated/rejected/failed counts where applicable, gaps, confidence, and next step. Distinguish not selected, unavailable, blocked, failed, zero-results, and successful. Missing or blocked sources are not successful empty results. Do not claim coverage, installation, execution, or confirmed vulnerability without supporting output.
