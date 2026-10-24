@@ -179,7 +179,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     for (const url of inputURLs) {
       const prior = byURL.get(url)
       if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
-        const sources = [...new Set([...(prior.sources ?? [prior.source]), params.source])].filter(Boolean).sort()\n        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
+        const sources = [...new Set([...(prior.sources ?? [prior.source]), params.source])].filter(Boolean).sort()
+        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
         records.push(record)
         byURL.set(url, record)
         reused++
@@ -211,7 +212,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         records.push(record); byURL.set(url, record); failed++
         continue
       }
-      receivedBytes += bytes.byteLength\n      if (receivedBytes > MAX_TOTAL_BYTES) {
+      receivedBytes += bytes.byteLength
+      if (receivedBytes > MAX_TOTAL_BYTES) {
         const record: AssetRecord = { url, finalURL, source: params.source, status: "skipped", contentType, bytes: bytes.byteLength, error: "batch download budget exceeded", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         continue
@@ -233,7 +235,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         })
         byHash.set(contentHash, { url, finalURL, source: params.source, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
-      const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])\n      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), params.source])].filter(Boolean).sort()\n      const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
+      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), params.source])].filter(Boolean).sort()
+      const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
       if (existingContent) reused++
@@ -278,7 +282,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Reused URL/content records: " + reused,
         "Skipped responses: " + skipped,
         "Failed URLs: " + failed,
-        "Newly downloaded bytes: " + downloadedBytes,\n        "Total response bytes received: " + receivedBytes,
+        "Newly downloaded bytes: " + downloadedBytes,
+        "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
         analysisSummary,
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => record.url + " — " + record.status + ": " + record.error),
@@ -293,7 +298,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         reused,
         skipped,
         failed,
-        downloaded_bytes: downloadedBytes,\n        received_bytes: receivedBytes,
+        downloaded_bytes: downloadedBytes,
+        received_bytes: receivedBytes,
         analysis_error: analysisError,
       },
     }
