@@ -150,7 +150,8 @@ export function reconPhaseExecutionDecision(
 ): { allowed: boolean; reason: string } {
   // The checkpoint tracks progress; it must not restrict ordinary recon tools to
   // a preassigned phase or block useful collection because a prior phase is stale.
-  // Authorization is still enforced by reconPhaseGate and each request-level tool.
+  // Concrete target authorization is enforced by the caller's request-level checks
+  // and by each request-capable tool before any network activity.
   if (requiredPhase !== "vulnerability_testing") {
     return {
       allowed: true,
