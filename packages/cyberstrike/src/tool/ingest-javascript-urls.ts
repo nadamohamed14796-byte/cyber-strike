@@ -3,7 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
 import { TargetMemory } from "../target"
-import { JavaScriptCorrelation } from "../target/javascript-correlation"
+import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
 const MAX_URLS = 500
@@ -167,7 +167,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
 
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
-    const invalidCount = params.urls.length - inputURLs.length
+    const queuedURLs = new Set(inputURLs)
+    const sourceByURL = new Map<string, string>(inputURLs.map((url) => [url, params.source] as const))
+    const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
     let receivedBytes = 0
@@ -177,9 +179,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let failed = 0
 
     for (const url of inputURLs) {
+      const assetSource = sourceByURL.get(url) ?? params.source
       const prior = byURL.get(url)
       if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
-        const sources = [...new Set([...(prior.sources ?? [prior.source]), params.source])].filter(Boolean).sort()
+        const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), assetSource])].filter(Boolean).sort()
         const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
         records.push(record)
         byURL.set(url, record)
@@ -223,6 +226,15 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         continue
+      }
+      // Feed external source-map links discovered inside each bundle into this same queue.
+      // Every map goes through the same persisted-scope and redirect checks as any other URL.
+      for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
+        const normalizedMapURL = normalizeURL(mapURL)
+        if (!normalizedMapURL || queuedURLs.has(normalizedMapURL) || queuedURLs.size >= MAX_URLS) continue
+        queuedURLs.add(normalizedMapURL)
+        inputURLs.push(normalizedMapURL)
+        sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
