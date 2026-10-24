@@ -1,17 +1,22 @@
 import { expect, test } from "bun:test"
-import { requiredPhasesForWebRecon } from "../../src/tool/web-recon/phase"
+import { executionPhaseForWebRecon } from "../../src/tool/web-recon/phase"
 
-test("technology detection can run in live-host or active URL-collection phase", () => {
-  expect(requiredPhasesForWebRecon("tech_detect")).toEqual(["live_hosts_ports", "url_collection"])
-})
-
-test("sitemap, robots, and OpenAPI discovery are gated by URL collection", () => {
-  for (const program of ["sitemap_scan", "robots_scan", "openapi_scan"]) {
-    expect(requiredPhasesForWebRecon(program)).toEqual(["url_collection"])
+test("ordinary discovery is not blocked by checkpoint phase status", () => {
+  for (const program of [
+    "tech_detect",
+    "sitemap_scan",
+    "robots_scan",
+    "openapi_scan",
+    "header_audit",
+    "method_check",
+    "graphql_probe",
+  ]) {
+    expect(executionPhaseForWebRecon(program)).toBe("url_collection")
   }
 })
 
-test("active web checks remain gated by vulnerability testing", () => {
-  expect(requiredPhasesForWebRecon("header_audit")).toEqual(["vulnerability_testing"])
-  expect(requiredPhasesForWebRecon("sensitive_files")).toEqual(["vulnerability_testing"])
+test("active vulnerability-oriented checks remain explicitly gated", () => {
+  for (const program of ["sensitive_files", "cors_check", "open_redirect", "full_recon", "session_scan"]) {
+    expect(executionPhaseForWebRecon(program)).toBe("vulnerability_testing")
+  }
 })
