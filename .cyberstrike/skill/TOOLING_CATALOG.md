@@ -6,10 +6,10 @@ This is a candidate catalog, not proof that a binary is installed, maintained, c
 
 ## Source-of-truth boundaries
 
-- This file owns the shared tool/API/CLI/helper catalog and the asset-discovery source-ledger schema. It does not own recon phase state or define a second phase-to-artifact list.
+- This file owns the shared tool/API/CLI/helper catalog. It does not own recon phase state or define a second phase-to-artifact list.
 - `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` documents useful phase outputs. The recon orchestrator describes the workflow; `recon_checkpoint` records progress and verifies saved artifacts without restricting ordinary recon tools to a strict phase sequence.
-- Specialist skills own technique-specific decision steps and evidence criteria. They may include a minimal command example needed to explain a technique, but must not repeat the general tool inventory, helper inventory, installation/preflight guide, or source-ledger schema. Add a shared tool/helper here once, then reference it from skills.
-- `packages/cyberstrike/src/research/sources.ts` is the executable source-adapter registry for global public-research ingestion via `/update`; `.cyberstrike/skill/RESEARCH_SOURCES_2026-10-19.md` is a dated reference list for skill maintenance, not a runtime source registry or tool catalog. Both are separate from target reconnaissance's per-root `subdomain-sources.json`, which records actual source outcomes for a specific run. Do not delete or merge these merely because all refer to sources.
+- Specialist skills own technique-specific decision steps and evidence criteria. They may include a minimal command example needed to explain a technique, but must not repeat the general tool inventory, helper inventory, installation/preflight guide. Add a shared tool/helper here once, then reference it from skills.
+- `packages/cyberstrike/src/research/sources.ts` is the executable source-adapter registry for global public-research ingestion via `/update`; `.cyberstrike/skill/RESEARCH_SOURCES_2026-10-19.md` is a dated reference list for skill maintenance, not a runtime source registry or tool catalog. They are used by the separate `/update` research workflow.
 - If instructions disagree, actual registered tool schemas and runtime validation determine what can execute. Reconcile the single authoritative documentation location instead of adding another list, manifest, collector, or helper.
 
 ## Selection rules
@@ -31,7 +31,7 @@ Search the live connected-tool registry through `tool_search` at the start of a 
 
 | Evidence gap / capability | Example candidates (optional, unranked) | Other examples / supporting methods | Output / evidence contract |
 |---|---|---|---|
-| Passive subdomain collection | Choose reachable reputable public APIs/indexes, registered native tools, or installed CLIs based on the evidence gap. crt.sh, OTX passive DNS, subfinder, and Amass are examples, not a fixed allowlist. | CertSpotter, assetfinder, Findomain, Sublist3r, first-party links, and other independent sources only when they add distinct coverage | Write the canonical `subdomains.txt` and `subdomain-sources.json` using the schema below; preserve per-root/source status, timestamps, errors, counts, and provenance. |
+| Passive subdomain collection | Choose reachable reputable public APIs/indexes, registered native tools, or installed CLIs based on the evidence gap. crt.sh, OTX passive DNS, subfinder, and Amass are examples, not a fixed allowlist. | CertSpotter, assetfinder, Findomain, Sublist3r, first-party links, and other independent sources only when they add distinct coverage | Write the canonical `subdomains.txt` with normalized, deduplicated hostnames. Preserve partial results and continue when an individual source fails. |
 | DNS validation / wildcard handling | dnsx, dig/drill; existing `host_inventory.py` for normalization | puredns/shuffledns only when active discovery is permitted | DNS records, CNAME chain, TTL, resolver status, wildcard controls, source attribution |
 | ASN / organizational asset expansion | asnmap when a concrete, evidenced organization/ASN seed exists | Public RIR/BGP datasets, first-party asset lists, certificate transparency | Preserve seed and source provenance; candidates are not in scope until the persisted scope resolver accepts them. No IP-wide scanning without program authorization. |
 | Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
@@ -57,19 +57,13 @@ Search the live connected-tool registry through `tool_search` at the start of a 
 
 ## Canonical asset-discovery output
 
-The minimum canonical output for passive subdomain discovery is `subdomains.txt`: one normalized, deduplicated hostname per line, saved in the target workspace. Preserve useful partial results and continue to later recon work when an individual source fails.
-
-An optional `subdomain-sources.json` may be kept when source provenance or resumability materially helps. It is supporting evidence, not a prerequisite for using the discovered hosts or moving to the next recon phase. Do not create it merely to satisfy a checklist, and do not require every possible source or every root/source combination to finish before continuing.
-
-If a source ledger is useful, keep source names, root, status, counts, and errors truthful; distinguish successful zero-results from failures and blocked/unavailable sources. Merge duplicates in the canonical host list. Never fabricate counts or claim complete source coverage when work remains.
-
-The offline `host_inventory.py` helper can normalize host observations when its input/output format fits the task; it is not a network collector. Prefer existing inventories and suitable available tools over creating a dedicated collector just to produce extra metadata.
+Write one normalized, deduplicated hostname per line to `subdomains.txt` in the target workspace. Keep useful results as soon as they arrive; a failed, unavailable, or empty source must not block other sources or later recon phases. Keep provenance in concise notes only when it changes how a result should be interpreted. `host_inventory.py` is an optional offline normalizer, not a required collector.
 
 ## Workspace/skill helper scripts
 
 These helpers live with the installed skill/repository assets, not necessarily beside the executable or inside a target workspace. Resolve the actual installed path before calling them. Use helpers when their input/output contract fits the task; otherwise use an equivalent local operation without creating duplicate files.
 
-- **host_inventory.py**: offline hostname normalization from JSONL, retaining every source observation and writing invalid-record diagnostics. It is not a network collector or source-ledger writer.
+- **host_inventory.py**: optional offline hostname normalization from JSONL. It is not a network collector.
 - **normalize_urls.py**: local URL normalization/deduplication.
 - **js_endpoint_inventory.py**: local JavaScript endpoint candidate inventory.
 - **http_response_diff.py**: compare baseline and controlled variants.
