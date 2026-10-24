@@ -197,6 +197,7 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
     }
     if (![301, 302, 303, 307, 308].includes(response.status)) return { response, finalURL: current }
     const location = response.headers.get("location")
+    await response.body?.cancel().catch(() => {})
     if (!location) return { error: "redirect response has no Location header" }
     if (redirects === MAX_REDIRECTS) return { error: "redirect limit exceeded" }
     let next: string | undefined
@@ -481,6 +482,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       const { response, finalURL } = result
       if (!response.ok) {
+        await response.body?.cancel().catch(() => {})
         const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await persistProgress(inputURLs.slice(urlIndex + 1))
@@ -489,6 +491,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
       const declaredLength = Number(response.headers.get("content-length") ?? "0")
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
+        await response.body?.cancel().catch(() => {})
         const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         await persistProgress(inputURLs.slice(urlIndex + 1))
@@ -497,6 +500,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
       const batchRemaining = MAX_BATCH_BYTES - receivedBytes
       if (Number.isFinite(declaredLength) && declaredLength > batchRemaining) {
+        await response.body?.cancel().catch(() => {})
         const record: AssetRecord = {
           url,
           finalURL,
