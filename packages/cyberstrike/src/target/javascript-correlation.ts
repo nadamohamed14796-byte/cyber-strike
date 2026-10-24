@@ -1152,6 +1152,7 @@ export namespace JavaScriptCorrelation {
     endpointPath: string
     testerSurveyPath: string
     noteID: string
+    capturedAssetCount: number
   }
 
   const buildQueues = new Map<string, Promise<BuildResult>>()
@@ -2131,6 +2132,6 @@ export namespace JavaScriptCorrelation {
         upsertByIdentity: true,
       })
     }
-    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, testerSurveyPath, noteID: note.note.id }
+    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, testerSurveyPath, noteID: note.note.id, capturedAssetCount: capturedAssetIndex.length }
   }
 }
