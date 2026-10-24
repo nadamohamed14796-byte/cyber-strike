@@ -239,6 +239,7 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
   const findings: Finding[] = []
   const output: string[] = [`[*] Probing for OpenAPI/Swagger specs at ${target}`]
   const origin = new URL(target).origin
+  let specsFound = 0
 
   for (const path of SPEC_CANDIDATES) {
     const resp = await fetchScoped(origin + path, { timeout })
@@ -251,6 +252,7 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
       continue
     }
     if (!spec.openapi && !spec.swagger) continue
+    specsFound++
 
     const version = (spec.openapi || spec.swagger) as string
     const specUrl = origin + path
@@ -307,10 +309,13 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
       output.push(`\n[+] Auth schemes: ${Object.keys(secDefs as object).join(", ")}`)
     }
 
-    return { output: output.join("\n"), findings }
   }
 
-  output.push("[-] No OpenAPI/Swagger spec found at standard paths")
+  if (specsFound === 0) {
+    output.push("[-] No OpenAPI/Swagger spec found at standard paths")
+  } else {
+    output.push(`[*] Valid OpenAPI/Swagger documents processed: ${specsFound}`)
+  }
   return { output: output.join("\n"), findings }
 }
 
