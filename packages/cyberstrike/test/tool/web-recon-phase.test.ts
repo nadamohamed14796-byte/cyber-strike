@@ -1,17 +1,17 @@
 import { expect, test } from "bun:test"
-import { requiredPhasesForWebRecon } from "../../src/tool/web-recon/phase"
+import { phaseForWebRecon } from "../../src/tool/web-recon/phase"
 
-test("technology detection can run in live-host or active URL-collection phase", () => {
-  expect(requiredPhasesForWebRecon("tech_detect")).toEqual(["live_hosts_ports", "url_collection"])
+test("technology detection has an advisory live-host phase label", () => {
+  expect(phaseForWebRecon("tech_detect")).toBe("live_hosts_ports")
 })
 
-test("sitemap, robots, and OpenAPI discovery are gated by URL collection", () => {
+test("sitemap, robots, and OpenAPI discovery use the URL-collection label", () => {
   for (const program of ["sitemap_scan", "robots_scan", "openapi_scan"]) {
-    expect(requiredPhasesForWebRecon(program)).toEqual(["url_collection"])
+    expect(phaseForWebRecon(program)).toBe("url_collection")
   }
 })
 
-test("active web checks remain gated by vulnerability testing", () => {
-  expect(requiredPhasesForWebRecon("header_audit")).toEqual(["vulnerability_testing"])
-  expect(requiredPhasesForWebRecon("sensitive_files")).toEqual(["vulnerability_testing"])
+test("active web checks remain classified as vulnerability testing", () => {
+  expect(phaseForWebRecon("header_audit")).toBe("vulnerability_testing")
+  expect(phaseForWebRecon("sensitive_files")).toBe("vulnerability_testing")
 })
