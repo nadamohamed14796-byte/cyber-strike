@@ -1,6 +1,5 @@
 import { Identifier } from "../id/id"
 import { Session } from "."
-import { MessageV2 } from "./message-v2"
 import { WebFunction } from "./web/web-function"
 import { WebObject } from "./web/web-object"
 import { WebRole } from "./web/web-role"
