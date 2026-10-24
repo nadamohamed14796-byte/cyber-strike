@@ -119,7 +119,7 @@ test("merges provenance when multiple JavaScript bundles reference the same sour
       if (pathname === "/shared.js.map") {
         return new Response(sourceMap, { status: 200, headers: { "content-type": "application/json" } })
       }
-      if (pathname === "/app-one.js" || pathname === "/app-two.js") {
+      if (["/app-one.js", "/app-two.js", "/app-three.js", "/app-four.js"].includes(pathname)) {
         return new Response(javascript, { status: 200, headers: { "content-type": "application/javascript" } })
       }
       return new Response("not found", { status: 404 })
@@ -150,13 +150,13 @@ test("merges provenance when multiple JavaScript bundles reference the same sour
           response: {
             status: 200,
             headers: { "content-type": "text/html" },
-            body: '<script src="/app-one.js"></script><script src="/app-two.js"></script>',
+            body: '<script src="/app-one.js"></script><script src="/app-two.js"></script><script src="/app-three.js"></script><script src="/app-four.js"></script>',
           },
         })
         const tool = await IngestJavaScriptURLsTool.init()
         const result = await tool.execute({
           target_url: canonicalTarget,
-          urls: [canonicalTarget + "/app-one.js", canonicalTarget + "/app-two.js"],
+          urls: [canonicalTarget + "/app-one.js", canonicalTarget + "/app-two.js", canonicalTarget + "/app-three.js", canonicalTarget + "/app-four.js"],
           source: "collector",
           url_sources: [],
           force_refresh: false,
@@ -170,6 +170,10 @@ test("merges provenance when multiple JavaScript bundles reference the same sour
         expect(mapRecord).toBeDefined()
         expect(mapRecord.sources).toContain("sourceMappingURL from " + canonicalTarget + "/app-one.js")
         expect(mapRecord.sources).toContain("sourceMappingURL from " + canonicalTarget + "/app-two.js")
+        expect(mapRecord.sources).toContain("sourceMappingURL from " + canonicalTarget + "/app-three.js")
+        expect(mapRecord.sources).toContain("sourceMappingURL from " + canonicalTarget + "/app-four.js")
+        expect(mapRecord.sources).toHaveLength(4)
+        expect(mapRecord.source.length).toBeLessThanOrEqual(120)
       },
     })
   } finally {
