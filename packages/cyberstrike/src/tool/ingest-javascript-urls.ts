@@ -443,6 +443,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       catch (error) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       receivedBytes += bytes.byteLength
@@ -457,6 +458,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       // Feed external source-map links discovered inside each bundle into this same queue.
@@ -472,15 +474,6 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       // Persist newly discovered maps immediately after parsing each bundle. If the
       // process stops before the end-of-batch save, these URLs still remain resumable.
       if (inputURLs.length > queueLengthBeforeMaps) {
-        manifest = {
-          ...manifest,
-          updatedAt: new Date().toISOString(),
-          pendingURLs: inputURLs,
-          pendingSources: inputURLs.map((pendingURL) => ({
-            url: pendingURL,
-            source: sourceByURL.get(pendingURL) ?? params.source,
-          })),
-        }
         await persistProgress(inputURLs.slice(urlIndex))
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
