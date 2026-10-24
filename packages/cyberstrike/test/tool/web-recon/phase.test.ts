@@ -15,9 +15,12 @@ test("read-only discovery programs are not gated by checkpoint status", () => {
   }
 })
 
+test("sensitive-file collection is ordinary read-only recon", () => {
+  expect(executionPhaseForWebRecon("sensitive_files")).toBe("url_collection")
+})
+
 test("active vulnerability-oriented web-recon programs remain opt-in", () => {
   for (const program of [
-    "sensitive_files",
     "cors_check",
     "open_redirect",
     "full_recon",
