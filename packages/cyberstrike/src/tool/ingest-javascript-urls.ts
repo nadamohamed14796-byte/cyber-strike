@@ -82,10 +82,10 @@ function looksLikeJavaScript(body: string, contentType: string, url: string): bo
 }
 
 async function isSavedAssetPath(candidatePath: string, assetsDir: string): Promise<boolean> {
-  const lexicalRoot = path.resolve(assetsDir)
-  const candidate = path.resolve(candidatePath)
-  if (!candidate.startsWith(lexicalRoot + path.sep)) return false
   try {
+    const lexicalRoot = path.resolve(assetsDir)
+    const candidate = path.resolve(candidatePath)
+    if (!candidate.startsWith(lexicalRoot + path.sep)) return false
     const assetsRoot = await fs.realpath(assetsDir)
     const realCandidate = await fs.realpath(candidate)
     return realCandidate.startsWith(assetsRoot + path.sep)
