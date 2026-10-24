@@ -118,7 +118,18 @@ test("openapiScan preserves every path and HTTP method from a large API specific
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
-      if (new URL(request.url).pathname !== "/openapi.json") {
+      const pathname = new URL(request.url).pathname
+      if (pathname === "/swagger.json") {
+        return new Response(JSON.stringify({
+          swagger: "2.0",
+          info: { title: "Secondary fixture API", version: "2" },
+          paths: { "/api/second-spec": { get: { summary: "Secondary operation" } } },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      }
+      if (pathname !== "/openapi.json") {
         return new Response("not found", { status: 404 })
       }
       return new Response(JSON.stringify({
@@ -137,7 +148,9 @@ test("openapiScan preserves every path and HTTP method from a large API specific
     const result = await openapiScan(target, [], 2)
     expect(result.output).toContain("GET /api/items/0")
     expect(result.output).toContain("POST /api/items/39")
+    expect(result.output).toContain("GET /api/second-spec")
     expect(result.output).toContain("Endpoints: 80")
+    expect(result.output).toContain("Valid OpenAPI/Swagger documents processed: 2")
     expect(result.output).not.toContain("... and")
   } finally {
     server.stop(true)
