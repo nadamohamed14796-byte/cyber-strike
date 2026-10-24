@@ -19,11 +19,11 @@ Do the reconnaissance work, do not narrate a plan. Use the existing canonical ta
 ## Workflow
 
 1. Reuse or initialize the canonical workspace and verify the saved scope once. Run the required starting-asset scope check only when the scope is new, changed, or unresolved.
-2. Enumerate subdomains using appropriate passive and available sources. Preserve useful results and deduplicate into `subdomains.txt`.
-3. Identify live hosts and relevant services; save the normalized inventory.
-4. Collect URLs and parameters from reachable hosts, crawlers, historical sources, and other suitable sources.
-5. Collect and analyze JavaScript and correlate discovered endpoints and request details.
-6. Check relevant sensitive-file paths where appropriate and authorized. Label unverified exposures as candidates.
+2. Start subdomain discovery immediately. In parallel where practical, use available passive sources such as certificate transparency/crt.sh, subfinder, assetfinder, Amass, Findomain, and suitable public APIs. Merge each result as it arrives into one deduplicated `subdomains.txt`; never wait for every source, require a per-source ledger, or stop because one tool is missing.
+3. Feed discovered hosts into available DNS/HTTP/TLS checks (for example dnsx, httpx, tlsx). Save one normalized `live-hosts.txt` and useful service metadata; do not repeat enumeration because a different phase label is active.
+4. Collect URLs from live hosts with suitable available crawlers/history sources (for example katana, gau, waybackurls, gospider, hakrawler, or waymore). Merge into one deduplicated `urls.txt`, then derive `parameters.txt`, API/auth/admin candidates, redirect candidates, and sensitive-file candidates locally.
+5. Prioritize JavaScript: extract every distinct reachable `.js` URL from crawled/history URLs and HTML, fetch and analyze each distinct bundle once, inspect source maps as inert text, and merge routes/endpoints, methods, parameters, request headers/cookies, auth clues, and redacted secret indicators into the endpoint inventory. Use suitable available analyzers such as subjs, SecretFinder, or other installed tools; tool names are examples, not requirements.
+6. Check relevant historical sensitive-file URLs and exposed-file candidates where appropriate. Use directory/parameter fuzzers, port scanners, nuclei templates, or other active checks only when the program policy permits that activity and each request passes scope/rate/impact controls. Keep exploit-style or state-changing vulnerability tests opt-in.
 7. Write/update `reports/recon-final.md` with actual counts, completed and partial work, useful findings, artifact paths, source failures, and remaining gaps.
 
 The sequence is a practical guide, not a tool restriction. Use any suitable tool at any point when it helps close an evidence gap. Reuse existing results and continue from unfinished work.
