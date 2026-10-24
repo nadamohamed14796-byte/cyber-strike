@@ -659,7 +659,65 @@ function normalizePassiveLookupDomain(value: string | null | undefined): string 
   return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain) ? domain : undefined
 }
 
-async function assertScannerReconGate(command: string[], commandText: string): Promise<void> {
+const TARGET_LIST_FLAGS = new Set(["-l", "-list", "--list", "-dl", "-il", "-targets", "--targets-file"])
+
+async function readTargetListInputs(args: string[], cwd: string): Promise<{ present: boolean; targets: string[] }> {
+  const files: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const flag = stripOuterShellQuotes(args[i]!).toLowerCase()
+    if (TARGET_LIST_FLAGS.has(flag)) {
+      const value = args[i + 1] ? stripOuterShellQuotes(args[i + 1]!) : ""
+      if (!value || value.startsWith("-")) {
+        throw new Error("Target-list mode requires a readable file path after " + flag + ".")
+      }
+      files.push(value)
+      i++
+      continue
+    }
+    const inline = [...TARGET_LIST_FLAGS].find((item) => flag.startsWith(item + "="))
+    if (inline) {
+      const value = stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
+      if (!value) throw new Error("Target-list mode requires a readable file path after " + inline + ".")
+      files.push(value)
+    }
+  }
+  if (!files.length) return { present: false, targets: [] }
+
+  const targets = new Set<string>()
+  for (const file of files) {
+    let raw: string
+    try {
+      raw = await fs.readFile(path.resolve(cwd, file), "utf8")
+    } catch (error) {
+      throw new Error("Cannot read target list " + file + ": " + (error instanceof Error ? error.message : String(error)))
+    }
+    for (const row of raw.split(/\r?\n/)) {
+      const line = row.trim()
+      if (!line || line.startsWith("#")) continue
+      for (let value of line.split(",").map((item) => item.trim()).filter(Boolean)) {
+        value = value.replace(/^\*\./, "")
+        if (/^https?:\/\//i.test(value)) {
+          let parsed: URL
+          try { parsed = new URL(value) } catch { throw new Error("Invalid URL in target list " + file + ": " + value) }
+          if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
+            throw new Error("Target list contains a non-HTTP(S) or credentialed URL: " + value)
+          }
+          targets.add(parsed.href)
+          continue
+        }
+        if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(value) &&
+            !/^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(value)) {
+          throw new Error("Target list contains an invalid hostname or URL: " + value)
+        }
+        targets.add("https://" + value)
+      }
+    }
+  }
+  if (!targets.size) throw new Error("Target list contains no usable hostnames or URLs.")
+  return { present: true, targets: [...targets] }
+}
+
+async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
   const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
     const executableIndex = commandExecutableIndex(command)
@@ -692,10 +750,8 @@ async function assertScannerReconGate(command: string[], commandText: string): P
   // These flags identify target-list modes for recon scanners. Do not apply this
   // generic check to curl/wget: curl's case-sensitive -L means "follow redirects",
   // and lowercasing it incorrectly turns it into the blocked "-l" list flag.
-  const supportsTargetListGate = !["curl", "wget"].includes(scanner)
-  if (supportsTargetListGate && args.some((value) => ["-l", "-list", "--list", "-dl", "-il", "-targets", "--targets-file"].includes(value.toLowerCase()))) {
-    throw new Error("Recon execution gate blocked " + scanner + ": target-list input is not accepted until every entry can be individually scope-checked and tied to the current phase manifest.")
-  }
+  // Target lists are allowed only after every concrete entry is parsed and
+  // checked against the persisted scope below; the list itself grants no access.
   let portScanPorts: number[] | undefined
   if (["nmap", "masscan", "naabu"].includes(scanner)) {
     const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
@@ -730,6 +786,8 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
   }
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
+  const listedTargets = await readTargetListInputs(args, cwd)
+  if (listedTargets.present) targets = [...new Set([...targets, ...listedTargets.targets])]
 
   // Public read-only research APIs are contacted as providers, but authorization
   // is checked against the domain being queried, not the provider hostname.
@@ -753,7 +811,7 @@ async function assertScannerReconGate(command: string[], commandText: string): P
     }
   }
   if (!targets.length) {
-    throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s). Target-list/file mode is blocked until each target can be checked against persisted scope and phase checkpoints.")
+    throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s) or a readable target list so every concrete entry can be checked against persisted scope.")
   }
   const workspaceScopes = new Map<string, Promise<TargetScope[]>>()
   const scopesForWorkspace = (start: Workspace): Promise<TargetScope[]> => {
@@ -1006,7 +1064,7 @@ export const BashTool = Tool.define("bash", async () => {
         }
 
         // Enforce target scope + durable phase gates before known recon/scanner binaries start.
-        await assertScannerReconGate(command, commandText)
+        await assertScannerReconGate(command, commandText, cwd)
 
         // not an exhaustive list, but covers most common cases
         if (["cd", "rm", "cp", "mv", "mkdir", "touch", "chmod", "chown", "cat"].includes(command[0])) {
