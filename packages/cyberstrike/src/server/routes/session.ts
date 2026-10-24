@@ -1503,10 +1503,13 @@ export const SessionRoutes = lazy(() =>
               sessionID,
               `Extension request queued for independent analysis: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; child session ${childSessionID}. Analysis runs separately and will not take over this chat.`,
             ).catch((error) => log.warn("parent ingest notice failed", { sessionID, requestID: req.id, error: String(error) }))
-            // Keep proxy work in its own child session while inheriting the parent's
-            // pause/resume controls and queue accounting via the parentSessionID argument
-            // at the end of this enqueue call. Sibling request analyses remain independent.
-            IngestQueue.enqueue(childSessionID, async () => {
+            // Serialize captured-request analyses on the owning parent session's queue, while
+            // executing each analysis in its own child session. Enqueueing by child ID
+            // creates a fresh queue per request and accidentally runs every LLM task at
+            // once, defeating backpressure and making bursts appear queued but overwhelm
+            // the model/provider. The parent queue guarantees FIFO: first request starts,
+            // later requests wait, and the next starts only when the current task settles.
+            IngestQueue.enqueue(sessionID, async () => {
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
