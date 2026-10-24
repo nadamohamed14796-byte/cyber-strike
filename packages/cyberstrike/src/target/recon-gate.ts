@@ -176,7 +176,11 @@ export function reconPhaseExecutionDecision(
   return { allowed: true, reason: "explicit vulnerability-testing checkpoint and prerequisites passed" }
 }
 
-/** Fail-closed runtime gate for active scanner and web-recon tools. */
+/** Checkpoint gate for explicit vulnerability-testing tools.
+ *
+ * Ordinary recon callers must enforce persisted scope for each concrete request;
+ * their availability does not depend on a checkpoint file or phase status.
+ */
 export async function reconPhaseGate(
   workspace: Workspace,
   requiredPhase: ReconPhase,
@@ -191,6 +195,18 @@ export async function reconPhaseGate(
     root = parent
   }
   const manifestPath = path.join(root.workspacePath, "runs", "recon-" + reconRunID(root.id) + ".json")
+
+  // Request-level scope checks happen in each caller before this gate. Do not
+  // require a phase manifest for ordinary recon collectors such as subfinder,
+  // crt.sh lookups, URL collection, and passive fingerprinting.
+  if (requiredPhase !== "vulnerability_testing") {
+    return {
+      allowed: true,
+      reason: "ordinary recon tools are not blocked by checkpoint status; request-level scope checks remain required",
+      manifestPath,
+    }
+  }
+
   let run: ReconRunManifest
   try {
     run = parseReconRun(await fs.readFile(manifestPath, "utf-8"), root.id, root.targetURL)
