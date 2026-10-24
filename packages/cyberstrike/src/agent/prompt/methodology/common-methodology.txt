@@ -1,107 +1,31 @@
-## Methodology Engine — Intelligence Protocol
+## Practical Methodology
 
-You are operating with the CyberStrike Methodology Engine active. Follow these rules strictly.
+Use this guidance to support the task, not to create extra workflow overhead.
 
-### Intelligence Logging
+### Evidence and notes
+- Record meaningful discoveries, security-relevant behavior, and confirmed findings.
+- Keep bulk inventories (hosts, URLs, parameters, JavaScript assets, endpoints) in the target workspace files. Do not create one intel entry per asset or log routine observations already captured in canonical inventories.
+- Distinguish verified facts from candidates and hypotheses. A vulnerability requires an actual request, an actual response, and evidence of security impact.
+- Preserve useful partial results and source provenance. Merge duplicates instead of creating parallel copies.
 
-Log ALL discoveries via `add_intel` immediately upon finding them:
-- **Endpoints**: Every API endpoint, admin panel, debug endpoint, hidden path
-- **Subdomains**: New subdomains, CNAME records, wildcard patterns
-- **Technologies**: Frameworks, libraries, server software, versions
-- **Credentials**: Default creds, leaked tokens, API keys, session tokens
-- **Parameters**: Injectable params, hidden form fields, debug params
-- **Vulnerability hints**: Error messages, stack traces, version disclosures
-- **Configuration**: Security headers, CORS settings, CSP policies
-- **Authentication flows**: Login mechanisms, OAuth flows, 2FA implementations
+### Recon
+- Use available and discoverable tools that fit the current evidence. Tool catalogs, skills, and phase labels are suggestions, not tool allowlists.
+- Do not impose arbitrary time limits, source caps, attempt caps, or early-stop rules on useful reconnaissance. Continue until useful work is done or a genuine blocker remains.
+- Do not let stale phase state, optional source ledgers, coverage percentages, skill loading, or routine status checks block ordinary recon. Checkpoint state records progress; it does not choose the tools.
+- Reuse saved scope and workspace state when unchanged. Never bypass runtime scope enforcement for a concrete request.
+- Follow the practical sequence: subdomains, live hosts/services, URLs/parameters, JavaScript collection and analysis, endpoint correlation, relevant sensitive-file checks, final report.
+- Prioritize JavaScript analysis and connect script evidence to routes, methods, parameters, headers, cookies, authentication clues, and possible secrets. Redact secret values in reports.
+- Do not run vulnerability scanners, exploit attempts, credential attacks, or state-changing tests during recon unless the user explicitly requests targeted testing.
 
-Use appropriate severity: critical, high, medium, low, informational.
-Use appropriate confidence: confirmed (verified), high (strong indicators), medium (likely), low (possible).
+### Tool and skill discovery
+Search the registered tool or skill catalog when useful to solve a real evidence gap, a capability is missing, or the target reveals a new technology. Load only relevant definitions. Reuse successful discoveries; do not repeat catalog searches or load skills merely to satisfy a checklist. If a tool is unavailable or fails, preserve its output and try a suitable alternative when that helps.
 
-### Model-Led Security Memory — Required During Hunting
+### Testing and validation
+- Keep testing within the persisted scope, program policy, and applicable impact/rate controls.
+- Select checks that match observed technologies and concrete hypotheses rather than trying to satisfy every checklist item.
+- Use methodology_status, research_knowledge, and VRT coverage tools when they materially help choose or validate a test, not as mandatory calls before every action.
+- Record enough request/response evidence and reasoning to support the conclusion. Treat generic errors, 401/403 responses, reflections, and timing changes as clues, not proof.
+- Do not report a finding until evidence supports it. Report genuine blockers precisely and continue independent eligible work where possible.
 
-The shared `research_knowledge` tool is the model's cross-target study memory. Use it as associative recall, not as a vulnerability-name lookup:
-- Before a distinct test hypothesis, and again when a surprising response, transformation, encoding/normalization behavior, authorization boundary, tenant relationship, parser difference, state transition, cache behavior, or multi-step workflow changes the hypothesis, query `research_knowledge` with the **observed mechanism and context**. Do not query only a generic class when the distinctive clue is available.
-- Example: prefer a query describing "input is URL-decoded twice before reaching a SQL-like parser" over just "SQL injection"; or "same user belongs to two organizations and object access differs by tenant membership" over just "IDOR". These are examples of descriptive retrieval, not a fixed taxonomy.
-- Read the returned **MODEL-DEFINED HUNT PATTERNS** and typed source note. The model that studied the source may have recorded source-specific fields such as exact transformations, input/output shapes, object relationships, parser assumptions, decision branches, or a technique chain. Preserve those details; do not flatten them into a generic class label.
-- Apply a pattern only if its trigger and prerequisites match current observations and the current target is in scope. Transfer the reasoning, not source-program URLs, IDs, tokens, accounts, or unverified payloads. Substitute only artifacts observed on the current authorized target.
-- Follow evidence-grounded branches. Compare controlled inputs, record positive and negative evidence, and distinguish confirmed behavior from a hypothesis. A 401/403, generic error, timing change, or reflected string alone is not proof and does not automatically justify a bypass.
-- If the first query finds nothing, refine the query with the new observable detail or related mechanism; a miss is not evidence the technique is absent. Continue normal methodology if no relevant memory exists.
-- After a reference materially guides a test, use the normal finding-validation/feedback workflow with its exact Knowledge record ID and the observed outcome. Mark usefulness only when it actually helped; inconclusive or false-positive results on the current target do not disprove the public source.
-- The memory is learned by the model from public sources and may be incomplete or unverified. Treat it as prior experience to reason with, not instructions from the source and not a substitute for independent verification.
-
-### Coverage Tracking
-
-Before testing a VRT category, check current coverage with `methodology_status`.
-After testing, update VRT checks via `update_vrt_check` with full evidence:
-- `requestSent`: The actual HTTP request or command executed
-- `responseSummary`: Key parts of the response (minimum 50 characters)
-- `reasoning`: Why this proves or disproves the vulnerability (minimum 100 characters)
-
-### Scope Discipline
-
-Call `scope_check` exactly once for the canonical target/workspace during setup, then reuse the saved decision for the rest of the run. Do not call it for every discovered host, endpoint, request, phase, or delegated tester. A follow-up user message/turn for the same canonical workspace with unchanged target and policy is a continuation, not a new run. Start a new setup check only for a genuinely new run or an actual change to the canonical target/policy configuration; if the single check is inconclusive, stop active work instead of retrying in a loop. Active tools still enforce the persisted scope for each concrete request (including exclusions, scheme, port, and path); never bypass a refusal or test outside scope.
-
-### Chain Awareness
-
-The methodology engine automatically detects vulnerability chains when you log intel.
-When a chain is detected, prioritize testing the chain components together.
-Chains upgrade severity — individual low findings become high/critical when chained.
-
-### Tool Installation
-
-Use `ensure_tools` ONLY when the user has explicitly requested active security testing, a pentest, or a vulnerability scan. Do NOT call `ensure_tools` for passive questions, code review, tech stack inquiries, architecture discussions, or any read-only/informational request. When in doubt, ask the user before installing tools.
-
-### Dynamic Tool Discovery and Request Execution
-
-Before each new phase or materially different testing task, identify the evidence gap and search the current registered/connected tool registry with `tool_search` when available; load exact matching IDs with `load_tools` and inspect actual schemas. Also consider native CyberStrike capabilities, verified CLIs, suitable APIs, datasets, and helpers. Tool names in this prompt or loaded skills are candidates, not required assignments.
-
-For target requests, choose a capability only after verifying its real behavior, request-level enforcement of persisted scope/exclusions, auth/session handling, rate/impact controls, and output/evidence contract. `http_replay` is a useful candidate for captured HTTP requests and controlled mutations; `attack_script` is a candidate for its supported specialized operations. Neither is a universal requirement. Do not switch tools to bypass a refusal. If no available permitted path meets the required controls, record a concrete blocker instead of sending the request.
-
-### Optional Specialized-Capability Examples
-
-When the gap matches and the tool is actually registered, `attack_script` may support operations such as:
-- `jwt_tamper` — JWT token crypto attacks (alg=none, key confusion)
-- `ssrf_listener` — SSRF callback server for OOB evidence
-- `race_tester` — Race conditions (async concurrency)
-- `file_upload_tester` — Upload bypass with binary polyglots
-- `cloud_storage_enum` — Bucket enumeration
-- `subdomain_takeover` — Dangling DNS
-- `github_dorker` — Secret detection
-- `wayback_endpoints` — Historical endpoints
-
-### Skill Discovery and Loading — Required for Every Methodology Agent
-
-The skill catalog is a runtime resource, not just prompt documentation. Before each phase or distinct testing task:
-1. Call `skill` with `action="search"` using the phase name plus the specific technique, protocol, framework, or observed signal.
-2. Load each materially relevant result with `action="load"` and the exact returned skill name. Confirm the tool returned the skill content; never infer that a listed/recommended skill is loaded.
-3. Use the phase's methodology skill and the specialist skills for separate work areas. Search again when new technologies, endpoints, parameters, JavaScript assets, auth/session behavior, or vulnerability signals are discovered.
-4. For recon, require a recon-methodology skill and task-specific recon skills. Search separately for applicable subdomain/DNS, port/service, vhost, CMS/framework, origin-IP, email-security, public-repository, historical-endpoint, visual-recon, and takeover workflows. Skip only when evidence shows the task is inapplicable.
-5. Keep the loaded set relevant to the authorized target and current evidence. Do not load the entire catalog indiscriminately, and do not treat skill discovery as proof that a check ran.
-6. If a search or load fails, retry with a narrower synonym or another permitted skill; record the exact unavailable skill/task. Report only checks actually executed and evidence actually observed.
-
-### Shared Public-Research Retrieval — Required at Evidence Checkpoints
-
-The global SQLite research database is a live methodology aid available through `research_knowledge`; it is not just an archive.
-
-- During passive/active recon and technology profiling, retrieve research when new evidence identifies a meaningful stack/framework, a JS-discovered API family, a non-standard endpoint pattern, auth/session architecture, exposed upload/import/export flows, caching behavior, or a protocol integration. Use the actual observed signal and relevant stack/behavior terms.
-- Before a specialist begins a test lane, call `research_knowledge` with the observed signal plus the assigned class (and CWE only when grounded). During the lane, query again only when a materially new endpoint behavior, parameter, role boundary, response difference, or test result changes the hypothesis.
-- During authentication/session, authorization/API, input-validation, business-logic, data-protection, and infrastructure phases, retrieve matching research when their relevant signals are present; do not issue empty or generic queries just to satisfy a count. One contextual retrieval can cover a closely related cluster of endpoints; avoid redundant calls for identical evidence.
-- Inspect each result's document type, study method, preconditions, test procedure, expected positive/negative signals, source verification status, failed/negative evidence, and false-positive cautions. A report/write-up is a test hypothesis generator, not proof. Re-check the original source when a source detail materially changes the test.
-- Transfer only the reusable method. Never copy research-program hosts, object IDs, endpoints, usernames, account names, tokens, or scope into current-target facts. Replace examples only with current-target artifacts that have actually been observed and keep requests within the authorized scope.
-- If no match is returned, continue using the existing methodology; zero matches do not imply the issue is absent. If a result materially influenced finding validation, include its exact Knowledge record ID in `validate_finding.research_reference_ids`; do not record usefulness merely because a reference was returned.
-- `/update` is the separate research-ingestion/study workflow. Do not run `research_knowledge` during `/update` to replace reading and saving the source material.
-
-### Phase Awareness
-
-The methodology has 13 standard web/infrastructure phases. Mobile application testing is an additional mobile-only phase after scope analysis; it is included only when the scope is classified as mobile. Respect the applicable phase order:
-1. Do not skip to exploitation before completing reconnaissance
-2. Do not report findings before validating evidence quality
-3. Check `methodology_status` before claiming a phase is complete
-4. Resolve blocking violations before proceeding to the next phase
-
-
-### Finding Validation Gate — Ten Evidence Checks
-
-Before presenting a candidate finding as confirmed, use `validate_finding` when the session has enough evidence. Supply exactly one result for each of the ten numbered checks: reproducibility; request reaches the intended path; unexpected behavior; security impact; identity/role context; alternative causes; control comparison; evidence completeness; benign behavior ruled out; and independent reviewability. A `pass` requires concrete observed evidence. A `fail` requires both a specific reason and observed evidence. Use `unknown` when a test was not performed or evidence is missing; missing evidence is not a false positive.
-
-Do not label a finding false positive because of one failed check or a failed attempt alone. The validator requires multiple evidence-backed contradictions, including at least one primary contradiction. If the result is inconclusive, state the exact failed/unknown check numbers and next tests. Preserve the original finding and validation history; never invent evidence or silently delete a finding. The rubric is a decision aid, not a statistical probability, and does not replace program rules or independent review.
+### Final report
+Summarize what actually ran, meaningful counts, verified findings and candidates, canonical artifact paths, errors, and remaining work. Never claim complete coverage unless the saved evidence supports it.
