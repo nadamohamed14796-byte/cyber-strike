@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
@@ -6,17 +6,22 @@ import { TargetMemory } from "../target"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
-const MAX_URLS = 500
+const MAX_URLS = 500 // Per invocation; continue remaining URLs in subsequent calls.
 const MAX_ASSET_BYTES = 8 * 1024 * 1024
-const MAX_TOTAL_BYTES = 64 * 1024 * 1024
+const MAX_BATCH_BYTES = 64 * 1024 * 1024 // Per invocation only; never a lifetime collection cap.
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
-  urls: z.array(z.string().trim().min(1).max(8192)).min(1).max(MAX_URLS)
-    .describe("JavaScript asset URLs from ANY source: the URL collector, crawler/HTML, source-map references, a URL inventory, or URLs manually supplied by the user. Pass the actual URLs, not local file paths."),
+  urls: z.array(z.string().trim().min(1).max(8192)).max(MAX_URLS).default([])
+    .describe("Optional JavaScript asset URLs from the URL collector, crawler/HTML, source-map references, a URL inventory, or the user. Pass actual URLs, not local file paths. Leave empty to resume the pending URL queue saved in the target manifest."),
   source: z.string().trim().min(1).max(120).default("unspecified")
-    .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
+    .describe("Fallback provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
+  url_sources: z.array(z.object({
+    url: z.string().trim().min(1).max(8192),
+    source: z.string().trim().min(1).max(120),
+  })).max(MAX_URLS).default([])
+    .describe("Optional per-URL provenance overrides for resuming a mixed-source batch. Entries apply only to URLs also present in urls."),
   force_refresh: z.boolean().default(false)
     .describe("False reuses an already downloaded URL and its content hash. True re-fetches existing URLs to check for changed content."),
 })
@@ -39,6 +44,8 @@ type Manifest = {
   schemaVersion: 1
   updatedAt: string
   assets: AssetRecord[]
+  pendingURLs?: string[]
+  pendingSources?: Array<{ url: string; source: string; sources?: string[] }>
 }
 
 function normalizeURL(input: string): string | undefined {
@@ -50,6 +57,16 @@ function normalizeURL(input: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+function mergeProvenance(...values: Array<string | undefined>): string {
+  const tokens = [...new Set(values.flatMap((value) => (value ?? "").split(" | ").map((item) => item.trim()).filter(Boolean)))]
+  const accepted: string[] = []
+  for (const token of tokens) {
+    if ([...accepted, token].join(" | ").length > 120) continue
+    accepted.push(token)
+  }
+  return accepted.join(" | ") || "unspecified"
 }
 
 function extensionFor(url: string, contentType: string): string {
@@ -74,6 +91,54 @@ function looksLikeJavaScript(body: string, contentType: string, url: string): bo
   const sample = body.slice(0, 4096).trimStart()
   if (/^(?:<!doctype\s+html|<html\b)/i.test(sample)) return false
   return /(?:\b(?:function|const|let|var|import|export|class)\b|\b(?:fetch|axios)\s*\(|=>|sourceMappingURL)/.test(sample)
+}
+
+async function isSavedAssetPath(candidatePath: string, assetsDir: string): Promise<boolean> {
+  try {
+    const lexicalRoot = path.resolve(assetsDir)
+    const candidate = path.resolve(candidatePath)
+    if (!candidate.startsWith(lexicalRoot + path.sep)) return false
+    const assetsRoot = await fs.realpath(assetsDir)
+    const realCandidate = await fs.realpath(candidate)
+    return realCandidate.startsWith(assetsRoot + path.sep)
+  } catch {
+    return false
+  }
+}
+
+async function savedAssetMatchesHash(candidatePath: string, expectedHash: string): Promise<boolean> {
+  try {
+    const digest = createHash("sha256").update(await fs.readFile(candidatePath)).digest("hex")
+    return digest === expectedHash
+  } catch {
+    return false
+  }
+}
+
+async function writeManifestAtomically(manifestPath: string, manifest: Manifest): Promise<void> {
+  const temporaryPath = manifestPath + "." + randomUUID() + ".tmp"
+  try {
+    await fs.writeFile(temporaryPath, JSON.stringify(manifest, null, 2) + "\n", {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    })
+    await fs.rename(temporaryPath, manifestPath)
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => {})
+    throw error
+  }
+}
+
+async function writeAssetAtomically(localPath: string, bytes: Uint8Array): Promise<void> {
+  const temporaryPath = localPath + "." + randomUUID() + ".tmp"
+  try {
+    await fs.writeFile(temporaryPath, bytes, { flag: "wx", mode: 0o600 })
+    await fs.rename(temporaryPath, localPath)
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => {})
+    throw error
+  }
 }
 
 async function readBounded(response: Response, limit: number): Promise<Uint8Array> {
@@ -121,7 +186,12 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
     const location = response.headers.get("location")
     if (!location) return { error: "redirect response has no Location header" }
     if (redirects === MAX_REDIRECTS) return { error: "redirect limit exceeded" }
-    const next = normalizeURL(new URL(location, current).toString())
+    let next: string | undefined
+    try {
+      next = normalizeURL(new URL(location, current).toString())
+    } catch {
+      return { error: "redirect destination is invalid" }
+    }
     if (!next) return { error: "redirect destination is not a credential-free HTTP(S) URL" }
     current = next
   }
@@ -131,9 +201,9 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in the urls array and identify their provenance in source.",
+    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Pass new URLs in batches of at most 500; leaving urls empty resumes the persistent pending queue saved in the manifest. Use source as fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, immediately invoke the tool again with the same target_url and urls: []; do not copy the pending list back into the call because the manifest already persists those URLs and their sources. Repeat until metadata.pending_urls is empty. The 64 MiB byte budget is enforced before body consumption and applies per invocation, not to the total run.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
-    "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
+    "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, errors, and a persistent pending queue so interrupted batches can resume on the next invocation. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
   ].join("\n"),
@@ -152,23 +222,151 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const root = path.join(workspace.workspacePath, "javascript")
     const assetsDir = path.join(root, "assets")
     const manifestPath = path.join(root, "asset-manifest.json")
-    await fs.mkdir(assetsDir, { recursive: true })
+    try {
+      const workspaceRealPath = await fs.realpath(workspace.workspacePath)
+      await fs.mkdir(root, { recursive: true })
+      const rootInfo = await fs.lstat(root)
+      const rootRealPath = await fs.realpath(root)
+      if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory() || rootRealPath !== path.join(workspaceRealPath, "javascript")) {
+        throw new Error("javascript directory is not a real directory inside the canonical target workspace")
+      }
+      await fs.mkdir(assetsDir, { recursive: true })
+      const assetsInfo = await fs.lstat(assetsDir)
+      const assetsRealPath = await fs.realpath(assetsDir)
+      if (assetsInfo.isSymbolicLink() || !assetsInfo.isDirectory() || assetsRealPath !== path.join(rootRealPath, "assets")) {
+        throw new Error("javascript/assets is not a real directory inside the target JavaScript workspace")
+      }
+    } catch (error) {
+      return {
+        title: "JavaScript URL ingestion stopped",
+        output: "Refusing to read or write JavaScript artifacts outside the canonical target workspace: " + (error instanceof Error ? error.message : String(error)),
+        metadata: { error: "unsafe_asset_directory", workspace: workspace.workspacePath, manifest_path: manifestPath },
+      }
+    }
 
     let manifest: Manifest = { schemaVersion: 1, updatedAt: new Date().toISOString(), assets: [] }
     try {
-      const parsed = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Partial<Manifest>
-      if (parsed.schemaVersion === 1 && Array.isArray(parsed.assets)) manifest = parsed as Manifest
-    } catch { /* First run or unreadable prior manifest: begin a new manifest. */ }
+      const manifestInfo = await fs.lstat(manifestPath)
+      if (manifestInfo.isSymbolicLink() || !manifestInfo.isFile()) {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest is not a regular file inside the target workspace. It was preserved without reading or overwriting: " + manifestPath,
+          metadata: { error: "manifest_unsafe_path", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+      const rawManifest = await fs.readFile(manifestPath, "utf8")
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(rawManifest)
+      } catch {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest is invalid JSON. It was preserved without overwrite; repair or back it up before retrying: " + manifestPath,
+          metadata: { error: "manifest_invalid_json", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest has an invalid top-level value. It was preserved without overwrite: " + manifestPath,
+          metadata: { error: "manifest_invalid_schema", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+      const candidate = parsed as Partial<Manifest>
+      const validAssets = Array.isArray(candidate.assets) && candidate.assets.every((item) => {
+        if (!item || typeof item !== "object") return false
+        const asset = item as Partial<AssetRecord>
+        return typeof asset.url === "string" &&
+          typeof asset.source === "string" &&
+          ["downloaded", "reused", "skipped", "failed"].includes(asset.status as string) &&
+          (asset.finalURL === undefined || typeof asset.finalURL === "string") &&
+          (asset.contentHash === undefined || typeof asset.contentHash === "string") &&
+          (asset.localPath === undefined || typeof asset.localPath === "string") &&
+          (asset.contentType === undefined || typeof asset.contentType === "string") &&
+          (asset.bytes === undefined || typeof asset.bytes === "number") &&
+          (asset.fetchedAt === undefined || typeof asset.fetchedAt === "string") &&
+          (asset.error === undefined || typeof asset.error === "string") &&
+          (asset.sources === undefined || (Array.isArray(asset.sources) && asset.sources.every((source) => typeof source === "string")))
+      })
+      const validPendingURLs = candidate.pendingURLs === undefined ||
+        (Array.isArray(candidate.pendingURLs) && candidate.pendingURLs.every((url) => typeof url === "string" && Boolean(normalizeURL(url))))
+      const validPendingSources = candidate.pendingSources === undefined ||
+        (Array.isArray(candidate.pendingSources) && candidate.pendingSources.every((item) =>
+          !!item && typeof item === "object" &&
+          typeof item.url === "string" && Boolean(normalizeURL(item.url)) &&
+          typeof item.source === "string" && item.source.length > 0 && item.source.length <= 120 &&
+          (item.sources === undefined || (
+            Array.isArray(item.sources) &&
+            item.sources.every((source) => typeof source === "string" && source.length > 0 && source.length <= 120)
+          ))
+        ))
+      if (candidate.schemaVersion !== 1 || !validAssets || !validPendingURLs || !validPendingSources) {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest has an unsupported schema or invalid asset record. It was preserved without overwrite: " + manifestPath,
+          metadata: { error: "manifest_invalid_schema", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+      manifest = candidate as Manifest
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest could not be read and was preserved: " + (error instanceof Error ? error.message : String(error)),
+          metadata: { error: "manifest_read_failed", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+    }
 
     const byURL = new Map(manifest.assets.map((item) => [normalizeURL(item.url) ?? item.url, item]))
     const byHash = new Map<string, AssetRecord>()
     for (const item of manifest.assets) {
-      if (item.contentHash && item.localPath && await Bun.file(item.localPath).exists()) byHash.set(item.contentHash, item)
+      if (item.contentHash && item.localPath && await isSavedAssetPath(item.localPath, assetsDir)) {
+        byHash.set(item.contentHash, item)
+      }
     }
 
-    const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
+    // Resume any deferred URLs from the manifest before adding new caller inputs.
+    const inputURLs = [...new Set([...(manifest.pendingURLs ?? []), ...params.urls]
+      .map(normalizeURL)
+      .filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
-    const sourceByURL = new Map<string, string>(inputURLs.map((url) => [url, params.source] as const))
+    const sourceByURL = new Map<string, string>()
+    const sourceOriginsByURL = new Map<string, string[]>()
+    const addSource = (url: string, value: string) => {
+      const origins = sourceOriginsByURL.get(url) ?? []
+      for (const item of value.split(" | ").map((source) => source.trim()).filter(Boolean)) {
+        if (item.length <= 120 && !origins.includes(item)) origins.push(item)
+      }
+      sourceOriginsByURL.set(url, origins)
+      sourceByURL.set(url, mergeProvenance(...origins))
+    }
+    for (const item of manifest.pendingSources ?? []) {
+      const sourceURL = normalizeURL(item.url)
+      if (sourceURL && queuedURLs.has(sourceURL)) {
+        for (const origin of item.sources ?? [item.source]) addSource(sourceURL, origin)
+      }
+    }
+    for (const item of params.url_sources) {
+      const sourceURL = normalizeURL(item.url)
+      if (sourceURL && queuedURLs.has(sourceURL)) addSource(sourceURL, item.source)
+    }
+    for (const rawURL of params.urls) {
+      const normalized = normalizeURL(rawURL)
+      if (normalized && queuedURLs.has(normalized) && !sourceByURL.has(normalized)) {
+        addSource(normalized, params.source)
+      }
+    }
+    for (const url of inputURLs) {
+      if (!sourceByURL.has(url)) addSource(url, params.source)
+    }
+    if (!inputURLs.length) {
+      return {
+        title: "JavaScript URL ingestion stopped",
+        output: "No input URLs were supplied and the target manifest has no pending URLs to resume.",
+        metadata: { error: "no_urls_or_pending_queue", manifest_path: manifestPath, workspace: workspace.workspacePath },
+      }
+    }
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
@@ -177,94 +375,252 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let downloaded = 0
     let skipped = 0
     let failed = 0
+    let budgetDeferredURL: string | undefined
 
-    for (const url of inputURLs) {
+    // Persist both the completed asset records and remaining work after each URL.
+    // A stopped process resumes from the first unfinished URL without re-fetching
+    // successful assets or losing source-map discoveries.
+    const persistProgress = async (pendingURLs: string[]) => {
+      manifest = {
+        ...manifest,
+        updatedAt: new Date().toISOString(),
+        assets: [...byURL.values()].sort((a, b) => a.url.localeCompare(b.url)),
+        pendingURLs,
+        pendingSources: pendingURLs.map((pendingURL) => ({
+          url: pendingURL,
+          source: sourceByURL.get(pendingURL) ?? params.source,
+          sources: sourceOriginsByURL.get(pendingURL) ?? [params.source],
+        })),
+      }
+      await writeManifestAtomically(manifestPath, manifest)
+    }
+    await persistProgress(inputURLs)
+
+    for (let urlIndex = 0; urlIndex < inputURLs.length; urlIndex++) {
+      const url = inputURLs[urlIndex]!
       const assetSource = sourceByURL.get(url) ?? params.source
+      const assetSources = sourceOriginsByURL.get(url) ?? assetSource.split(" | ")
       const prior = byURL.get(url)
-      if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
-        const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), assetSource])].filter(Boolean).sort()
-        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
+      if (
+        !params.force_refresh &&
+        prior?.contentHash &&
+        prior.localPath &&
+        await isSavedAssetPath(prior.localPath, assetsDir) &&
+        await savedAssetMatchesHash(prior.localPath, prior.contentHash)
+      ) {
+        const currentScope = await TargetMemory.checkURLScope(url)
+        const finalScope = prior.finalURL ? await TargetMemory.checkURLScope(prior.finalURL) : currentScope
+        if (!currentScope.allowed || !finalScope.allowed) {
+          const reason = !currentScope.allowed
+            ? "cached asset is no longer in persisted scope: " + currentScope.reason
+            : "cached redirect destination is no longer in persisted scope: " + finalScope.reason
+          const sources = [...new Set([
+            ...(prior.sources ?? prior.source.split(" | ")),
+            ...assetSources,
+          ])].filter(Boolean).sort()
+          sourceOriginsByURL.set(url, sources)
+          sourceByURL.set(url, mergeProvenance(...sources))
+          const record: AssetRecord = { ...prior, source: mergeProvenance(...sources), sources, status: "skipped", error: reason }
+          records.push(record)
+          byURL.set(url, record)
+          skipped++
+          await persistProgress(inputURLs.slice(urlIndex + 1))
+          continue
+        }
+        const sources = [...new Set([
+          ...(prior.sources ?? prior.source.split(" | ")),
+          ...(sourceOriginsByURL.get(url) ?? assetSource.split(" | ")),
+        ])].filter(Boolean).sort()
+        sourceOriginsByURL.set(url, sources)
+        sourceByURL.set(url, mergeProvenance(...sources))
+        const record: AssetRecord = { ...prior, source: mergeProvenance(...sources), sources, status: "reused", error: undefined }
         records.push(record)
         byURL.set(url, record)
         reused++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
+      // Cached reuse above costs no network bytes. Once the per-invocation
+      // byte budget is exhausted, defer the next network URL without fetching it.
+      if (receivedBytes >= MAX_BATCH_BYTES) {
+        const record: AssetRecord = {
+          url,
+          source: assetSource,
+          sources: assetSources,
+          status: "skipped",
+          error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
+          fetchedAt: new Date().toISOString(),
+        }
+        records.push(record)
+        byURL.set(url, record)
+        skipped++
+        budgetDeferredURL = url
+        await persistProgress(inputURLs.slice(urlIndex))
+        break
+      }
+
       const result = await fetchScoped(url)
       if ("error" in result) {
-        const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, source: assetSource, sources: assetSources, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
       const declaredLength = Number(response.headers.get("content-length") ?? "0")
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
+
+      const batchRemaining = MAX_BATCH_BYTES - receivedBytes
+      if (Number.isFinite(declaredLength) && declaredLength > batchRemaining) {
+        const record: AssetRecord = {
+          url,
+          finalURL,
+          source: assetSource,
+          sources: assetSources,
+          status: "skipped",
+          contentType,
+          bytes: declaredLength,
+          error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
+          fetchedAt: new Date().toISOString(),
+        }
+        records.push(record); byURL.set(url, record); skipped++
+        budgetDeferredURL = url
+        await persistProgress(inputURLs.slice(urlIndex))
+        break
+      }
+
       let bytes: Uint8Array
-      try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
-      catch (error) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
+      try {
+        bytes = await readBounded(response, Math.min(MAX_ASSET_BYTES, batchRemaining))
+      } catch (error) {
+        const limitIsBatchBudget = batchRemaining < MAX_ASSET_BYTES &&
+          error instanceof Error &&
+          error.message === "response exceeds the " + batchRemaining + " byte asset limit"
+        if (limitIsBatchBudget) {
+          const record: AssetRecord = {
+            url,
+            finalURL,
+            source: assetSource,
+            sources: assetSources,
+            status: "skipped",
+            contentType,
+            error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
+            fetchedAt: new Date().toISOString(),
+          }
+          records.push(record); byURL.set(url, record); skipped++
+          budgetDeferredURL = url
+          await persistProgress(inputURLs.slice(urlIndex))
+          break
+        }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       receivedBytes += bytes.byteLength
-      if (receivedBytes > MAX_TOTAL_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "batch download budget exceeded", fetchedAt: new Date().toISOString() }
-        records.push(record); byURL.set(url, record); skipped++
-        continue
-      }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       // Feed external source-map links discovered inside each bundle into this same queue.
       // Every map goes through the same persisted-scope and redirect checks as any other URL.
+      const queueLengthBeforeMaps = inputURLs.length
       for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
         const normalizedMapURL = normalizeURL(mapURL)
-        if (!normalizedMapURL || queuedURLs.has(normalizedMapURL) || queuedURLs.size >= MAX_URLS) continue
+        if (!normalizedMapURL) continue
+        const mapSource = ("sourceMappingURL from " + url).slice(0, 120)
+        if (queuedURLs.has(normalizedMapURL)) {
+          // The same map may be shared by multiple bundles or supplied directly
+          // before its parent bundle is processed. Preserve every observed origin.
+          addSource(normalizedMapURL, mapSource)
+          const priorMap = byURL.get(normalizedMapURL)
+          if (priorMap) {
+            const sources = [...new Set([
+              ...(priorMap.sources ?? priorMap.source.split(" | ")),
+              ...(sourceOriginsByURL.get(normalizedMapURL) ?? []),
+            ])].filter(Boolean).sort()
+            sourceOriginsByURL.set(normalizedMapURL, sources)
+            sourceByURL.set(normalizedMapURL, mergeProvenance(...sources))
+            byURL.set(normalizedMapURL, {
+              ...priorMap,
+              source: mergeProvenance(...sources),
+              sources,
+            })
+          }
+          continue
+        }
         queuedURLs.add(normalizedMapURL)
         inputURLs.push(normalizedMapURL)
-        sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
+        addSource(normalizedMapURL, mapSource)
+      }
+      // Persist newly discovered maps immediately after parsing each bundle. If the
+      // process stops before the end-of-batch save, these URLs still remain resumable.
+      if (inputURLs.length > queueLengthBeforeMaps) {
+        await persistProgress(inputURLs.slice(urlIndex))
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
-      let localPath = existingContent?.localPath
-      if (!localPath || !await Bun.file(localPath).exists()) {
+      let localPath: string
+      let reusedExistingContent = false
+      if (
+        existingContent?.localPath &&
+        await isSavedAssetPath(existingContent.localPath, assetsDir) &&
+        await savedAssetMatchesHash(existingContent.localPath, contentHash)
+      ) {
+        localPath = existingContent.localPath
+        reusedExistingContent = true
+      } else {
         const extension = extensionFor(finalURL, contentType)
         localPath = path.join(assetsDir, contentHash + extension)
-        await fs.writeFile(localPath, bytes, { flag: "wx" }).catch(async (error: NodeJS.ErrnoException) => {
-          if (error.code !== "EEXIST") throw error
-        })
+        // A content-addressed file is always written completely before it becomes
+        // visible under its final name; orphaned partial files are never reused.
+        await writeAssetAtomically(localPath, bytes)
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
-      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), params.source])].filter(Boolean).sort()
-      const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const sources = [...new Set([
+        ...priorSources.flatMap((value) => value.split(" | ")),
+        ...(sourceOriginsByURL.get(url) ?? assetSource.split(" | ")),
+      ])].filter(Boolean).sort()
+      sourceOriginsByURL.set(url, sources)
+      sourceByURL.set(url, mergeProvenance(...sources))
+      const record: AssetRecord = { url, finalURL, source: mergeProvenance(...sources), sources, status: reusedExistingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
-      if (existingContent) reused++
+      if (reusedExistingContent) reused++
       else { downloaded++; downloadedBytes += bytes.byteLength }
+      await persistProgress(inputURLs.slice(urlIndex + 1))
     }
 
+    const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
+    const pendingSources = pendingURLs.map((url) => ({
+      url,
+      source: sourceByURL.get(url) ?? params.source,
+      sources: sourceOriginsByURL.get(url) ?? [params.source],
+    }))
     manifest = {
       schemaVersion: 1,
       updatedAt: new Date().toISOString(),
       assets: [...byURL.values()].sort((a, b) => a.url.localeCompare(b.url)),
+      pendingURLs,
+      pendingSources,
     }
-    const temporaryManifest = manifestPath + ".tmp"
-    await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", "utf8")
-    await fs.rename(temporaryManifest, manifestPath)
-
+    await writeManifestAtomically(manifestPath, manifest)
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
     if (downloaded + reused > 0) {
@@ -284,11 +640,16 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
 
     return {
-      title: "JavaScript URL ingestion complete",
+      title: pendingURLs.length
+        ? "JavaScript URL ingestion paused — continue pending URLs"
+        : analysisError
+          ? "JavaScript assets fetched; correlation failed"
+          : "JavaScript URL ingestion complete",
       output: [
         "Workspace: " + workspace.workspacePath,
         "Input URLs: " + params.urls.length,
-        "Valid unique URLs: " + inputURLs.length,
+        "Valid unique URLs queued (including discovered source maps): " + inputURLs.length,
+        "Pending URLs for subsequent batches: " + pendingURLs.length,
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions: " + downloaded,
         "Reused URL/content records: " + reused,
@@ -298,6 +659,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
         analysisSummary,
+        ...(pendingURLs.length ? [
+          "Resume by calling ingest_javascript_urls again with the same target_url and urls: []. The manifest already persists pending URLs and their sources, so do not pass metadata.pending_urls back as new inputs. Repeat until the pending list is empty.",
+        ] : []),
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => record.url + " — " + record.status + ": " + record.error),
       ].join("\n"),
       metadata: {
@@ -313,6 +677,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         downloaded_bytes: downloadedBytes,
         received_bytes: receivedBytes,
         analysis_error: analysisError,
+        pending_urls: pendingURLs,
+        pending_sources: pendingSources,
+        byte_budget_reached: pendingURLs.length > 0,
       },
     }
   },

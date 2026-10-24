@@ -4,7 +4,7 @@ import path from "node:path"
 import z from "zod"
 import { Tool } from "../tool"
 import { reconPhaseGate, type ReconPhase } from "../../target/recon-gate"
-import { requiredPhasesForWebRecon } from "./phase"
+import { executionPhaseForWebRecon } from "./phase"
 import { TargetMemory, type Workspace } from "../../target"
 import type { ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
@@ -30,11 +30,11 @@ const PROGRAMS = {
   },
   full_recon: {
     description:
-      "Run all reconnaissance programs against a single target URL and return aggregated results — useful for quick standalone checks without hackbrowser",
+      "Run the combined web-recon suite against one target URL, including active vulnerability-oriented probes. Use only after an explicit request with the vulnerability_testing checkpoint active; use individual read-only discovery programs for recon-only runs.",
   },
   sitemap_scan: {
     description:
-      "Fetch sitemap.xml and sitemapindex, extract all declared page URLs. Follows child sitemaps up to 20 deep",
+      "Fetch sitemap.xml and sitemapindex, follow nested indexes without a fixed count/depth cap, prevent cycles, and include only URLs permitted by the persisted scope resolver",
   },
   robots_scan: {
     description:
@@ -46,7 +46,7 @@ const PROGRAMS = {
   },
   graphql_probe: {
     description:
-      "Probe common GraphQL endpoints (/graphql, /api/graphql, /query, /v1/graphql, /gql) with {__typename}, test introspection",
+      "Discover common GraphQL endpoints with the read-only {__typename} query and schema introspection; scope-check each request and do not send mutations.",
   },
   tech_detect: {
     description:
@@ -66,7 +66,7 @@ const PROGRAMS = {
   },
   method_check: {
     description:
-      "Test TRACE (XST), PUT, DELETE methods on target. Check OPTIONS Allow header for dangerous method advertisement",
+      "Send OPTIONS only and record the server's Allow header. Never send TRACE, PUT, or DELETE; advertised methods are leads, not proof of exploitable behavior.",
   },
   open_redirect: {
     description:
@@ -568,25 +568,8 @@ export const WebReconTool = Tool.define("web_recon", {
       // for each host just because it matches a wildcard. The scope decision above
       // remains authoritative for the requested URL and active tools enforce scope.
 
-      const requiredPhases = requiredPhasesForWebRecon(program)
-      let requiredPhase = requiredPhases[0]
-      let gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
-      // If host inventory is already complete and URL collection is the active
-      // phase, allow the passive technology fingerprint to contribute there.
-      // Never reopen/restart the completed live_hosts_ports checkpoint.
-      if (
-        !gate.allowed &&
-        program === "tech_detect" &&
-        gate.reason.includes("current status is complete") &&
-        requiredPhases[1]
-      ) {
-        const fallbackPhase = requiredPhases[1]
-        const fallbackGate = await reconPhaseGate(targetWorkspace!, fallbackPhase)
-        if (fallbackGate.allowed) {
-          requiredPhase = fallbackPhase
-          gate = fallbackGate
-        }
-      }
+      const requiredPhase = executionPhaseForWebRecon(program)
+      const gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
       if (!gate.allowed) {
         return fail([
           "[-] Recon phase gate blocked " + program + ".",

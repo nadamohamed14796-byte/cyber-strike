@@ -36,8 +36,8 @@ Search the live connected-tool registry through `tool_search` at the start of a 
 | ASN / organizational asset expansion | asnmap when a concrete, evidenced organization/ASN seed exists | Public RIR/BGP datasets, first-party asset lists, certificate transparency | Preserve seed and source provenance; candidates are not in scope until the persisted scope resolver accepts them. No IP-wide scanning without program authorization. |
 | Ports / services / TLS | naabu, nmap, tlsx | httpx for HTTP metadata; fingerprintx where available | host/port/protocol, service fingerprint, timestamp, confidence, rate/authorization notes |
 | HTTP liveness / tech fingerprinting | httpx, WhatWeb | curl; TLS metadata | status, redirect chain, title, content type, technology clues, stable fingerprint |
-| URL history / crawling | gau, waybackurls, waymore; katana for authorized crawling | hakrawler; `uro`/`anew` for local normalization/deduplication; first-party links and documentation | normalized URL, method/parameters when known, source, first-seen, collection status |
-| Content / directory / virtual-host discovery | ffuf, feroxbuster, dirsearch | context-appropriate wordlists; hakrawler for links | status, length, fingerprint, error/negative-control data; conservative rate |
+| URL history / crawling | gau, waybackurls, waymore; katana for scope-aware crawling | `uro`/`anew` for local normalization/deduplication; first-party links and documentation. Generic-shell `hakrawler`/`gospider` invocations are blocked because they cannot enforce persisted scope for every request; use a scope-aware pipeline instead. | normalized URL, method/parameters when known, source, first-seen, collection status |
+| Content / directory / virtual-host discovery | ffuf, feroxbuster, dirsearch | context-appropriate wordlists and previously collected in-scope links | status, length, fingerprint, error/negative-control data; conservative rate |
 | Parameter discovery | Arjun, x8, ParamSpider | endpoint inventory and controlled request comparison | endpoint template, method, parameter, source; preserve auth/content-type context |
 | JavaScript / endpoint analysis | jsluice, xnLinkFinder, LinkFinder | local source-map review; retire.js for dependency clues | bundle hash, route, method/parameter, line/offset, confidence; use existing `js_endpoint_inventory.py` where suitable |
 | API / GraphQL / WebSocket | graphql-cop, Clairvoyance where schema discovery is permitted, websocat/wscat | kiterunner for route inventory; curl, Python requests, local API schemas | operation/field/route inventory, auth boundaries, controlled evidence |
@@ -103,7 +103,7 @@ curl -q -sS 'https://crt.sh/?q=%25.example.com&output=json'
 subfinder -d example.com -silent
 dnsx -d example.com -a -resp -json
 httpx -u https://example.com -jsonl
-katana -u https://example.com -fs fqdn -rl 5 -d 3 -j -ncb
+katana -u https://example.com -fs fqdn -rl 5 -d 3 -j -ncb  # conservative starting profile only; tune rate/depth to policy and evidence needs
 ```
 
 The generic shell recon gate accepts explicit targets and target-list files only after it can read and normalize every concrete entry and verify each one against the persisted scope. Use a supported list flag directly when the tool accepts it; do not bypass scope checks with shell wrappers, `xargs`, `parallel`, or nested commands. Prefer stdout/local normalization and one canonical inventory rather than a persistent output file for every tool. If a tool needs a file, reuse one target-local scratch path, normalize and verify its results, then remove it unless it adds distinct evidence. Never invent alternate filenames to get around an existing-file refusal.
