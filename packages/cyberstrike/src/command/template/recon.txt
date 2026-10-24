@@ -1,33 +1,28 @@
-**Command arguments:** `$ARGUMENTS`
+**Command arguments:** \`$ARGUMENTS\`
 
 # CyberStrike Recon
 
-Do the reconnaissance work, do not narrate a plan. Use the existing canonical target workspace and saved scope. If the scope is already configured and unchanged, reuse it; do not repeatedly ask for confirmation or restart setup.
+Do the work instead of narrating a plan. Reuse the canonical target workspace and saved scope; do not restart completed work.
 
 ## Rules
 
-- Keep authorization intact. Every concrete target request must pass the runtime's persisted scope checks. Do not bypass a refusal or broaden scope.
-- Use the tools that best fit the current evidence and environment. Discover and combine available tools as useful; no fixed phase-to-tool allowlist and no requirement to run every tool in a catalog.
-- Do not impose arbitrary time limits, result caps, source counts, attempt counts, or early-stop rules on useful reconnaissance. Continue until the useful work is done, the available sources are exhausted, the user stops you, or a genuine blocker remains.
-- If a tool fails, preserve its partial results and try another suitable method. Do not repeat successful work without a reason.
-- Use checkpoint records to remember progress, not to block ordinary recon tools. Do not stop because an earlier phase status is stale or an optional ledger is incomplete. Keep vulnerability testing separate: do not run it unless the user explicitly requests it.
-- Save results directly into the existing target workspace. Maintain one normalized inventory per data type, merge and deduplicate results, and avoid temporary copies, per-tool files, per-host folders, and repetitive intel entries.
-- Keep bulk host/URL/parameter data in files. Use concise intel notes only for meaningful findings or phase summaries.
-- JavaScript is a priority: collect all reachable in-scope JavaScript assets, deduplicate by content/URL, analyze scripts and available source maps as inert text, and connect routes/endpoints, methods, parameters, headers, cookies, auth clues, and possible secrets. Redact secret values.
-- Do not mark a phase complete merely because a command ended. Record real results, partial work, errors, and what remains. Do not require verbose per-source bookkeeping when a useful normalized inventory is already saved.
+- Enforce the persisted scope on every concrete request and redirect. Never infer or broaden scope.
+- Choose any suitable registered tool, local CLI, API, or helper at any checkpoint. Phase names, skills, and catalogs guide selection; they do not restrict tools. Do not install/run every candidate or let stale checkpoint records block useful recon.
+- Do not impose arbitrary time, result, source, or attempt caps. Preserve partial results, recover from genuine tool failures with suitable alternatives, and stop when useful sources are exhausted or a real blocker remains.
+- Maintain one canonical inventory per data type in the existing workspace. Merge/deduplicate results as they arrive; avoid temporary copies, per-tool files, per-host folders, and repetitive notes. Keep source details only when they affect provenance or interpretation.
+- Treat static content and scanner signals as leads, not findings. Keep vulnerability testing opt-in: do not run vulnerability scanners or \`session_scan\` unless the user explicitly requests testing and the checkpoint/scope/policy controls permit it.
 
 ## Workflow
 
-1. Reuse or initialize the canonical workspace and verify the saved scope once. Run the required starting-asset scope check only when the scope is new, changed, or unresolved.
-2. Start subdomain discovery immediately. In parallel where practical, use available passive sources such as certificate transparency/crt.sh, subfinder, assetfinder, Amass, Findomain, and suitable public APIs. Merge each result as it arrives into one deduplicated `subdomains.txt`; never wait for every source or stop because one tool is missing.
-3. Feed discovered hosts into available DNS/HTTP/TLS checks (for example dnsx, httpx, tlsx). Save one normalized `live-hosts.txt` and useful service metadata; do not repeat enumeration because a different phase label is active.
-4. Collect URLs from live hosts with suitable available crawlers/history sources (for example katana, gau, waybackurls, gospider, hakrawler, or waymore). Merge into one deduplicated `urls.txt`, then derive `parameters.txt`, API/auth/admin candidates, redirect candidates, and sensitive-file candidates locally.
-5. Prioritize JavaScript: merge every discovered `.js`/ `.mjs`/ `.cjs` and relevant source-map URL from the URL collector, crawled/history URLs, HTML, other tool output, and any URLs the user supplies. Pass the merged URL list to `ingest_javascript_urls` with source provenance. It fetches and saves actual response bodies under the target-local `javascript/assets/`, scope-checks every URL and redirect, reuses repeated URLs, and deduplicates identical content by SHA-256. Analyze each unique content version once, inspect source maps as inert data, and merge routes/endpoints, methods, parameters, request headers/cookies, auth clues, and redacted secret indicators into the endpoint inventory. Use suitable available analyzers such as subjs, SecretFinder, or other installed tools; tool names are examples, not requirements.
-6. Check relevant historical sensitive-file URLs and exposed-file candidates where appropriate. Use directory/parameter fuzzers, port scanners, nuclei templates, or other active checks only when the program policy permits that activity and each request passes scope/rate/impact controls. Keep exploit-style or state-changing vulnerability tests opt-in.
-7. Write/update `reports/recon-final.md` with actual counts, completed and partial work, useful findings, artifact paths, source failures, and remaining gaps.
+1. **Resume and scope.** Reuse the root workspace and checkpoint. Initialize only when missing. For a new, changed, or unresolved scope manifest, check the actual starting asset once; reuse a valid saved decision on resume.
+2. **Discover assets.** Start passive subdomain discovery immediately. Combine useful available sources such as certificate transparency, \`subfinder\`, Amass, assetfinder, and public APIs. Merge each result into one deduplicated \`subdomains.txt\`; a missing or failed source must not block other work.
+3. **Validate and collect URLs.** Resolve/check hosts using suitable DNS, HTTP, and TLS methods; save \`live-hosts.txt\`. Collect crawler/history/application URLs into \`urls.txt\`, then derive a deduplicated \`parameters.txt\` and relevant API, auth, redirect, and sensitive-file candidates.
+4. **Prioritize JavaScript.** Merge JavaScript and relevant source-map URLs from collectors, crawlers, HTML, other tools, and user-supplied links. Send all available URLs with their provenance to \`ingest_javascript_urls\`. It performs scope-checked GETs, rechecks redirects, saves bodies and the asset manifest under \`javascript/\`, and reuses/deduplicates content. Analyze each unique content version and available source maps as inert text. Merge endpoint, method, parameter, header/cookie, auth/role, feature, and redacted secret indicators into the canonical endpoint inventory. Deduplicate endpoint identity by origin + method + path template while merging meaningful parameter and source evidence.
+5. **Close relevant gaps.** Review exposed-file candidates and historical sensitive URLs. Use directory/parameter fuzzers, port scans, or other active recon only when policy and request-level controls allow it. Do not execute downloaded JavaScript or automatically turn static leads into vulnerability probes.
+6. **Report.** Update \`reports/recon-final.md\` with verified counts, actual artifact paths, completed/partial work, source failures, remaining gaps, and a resume point when needed. Never claim exhaustive coverage without evidence.
 
-The sequence is a practical guide, not a tool restriction. Use any suitable tool at any point when it helps close an evidence gap. Reuse existing results and continue from unfinished work.
+This order is a workflow guide, not a tool allowlist. Use any suitable tool whenever it closes an evidence gap, and verify saved artifacts before marking work complete.
 
 ## Final response
 
-Give a concise status, meaningful counts, the workspace path, key findings, artifact paths, and genuine blockers only. Never claim exhaustive coverage without evidence.
+Give a concise status, meaningful counts, the workspace path, key findings, artifact paths, and genuine blockers only.
