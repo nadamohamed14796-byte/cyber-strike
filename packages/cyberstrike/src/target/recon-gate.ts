@@ -148,40 +148,32 @@ export function reconPhaseExecutionDecision(
   requiredPhase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
 ): { allowed: boolean; reason: string } {
-  const activePhases = RECON_PHASES.filter((phase) => phases[phase].status === "running")
-  if (activePhases.length !== 1) {
+  // The checkpoint tracks progress; it must not restrict ordinary recon tools to
+  // a preassigned phase or block useful collection because a prior phase is stale.
+  // Authorization is still enforced by reconPhaseGate and each request-level tool.
+  if (requiredPhase !== "vulnerability_testing") {
     return {
-      allowed: false,
-      reason: "Recon tool blocked: expected exactly one active recon checkpoint, found " + activePhases.length +
-        (activePhases.length ? " (" + activePhases.join(", ") + ")" : "") +
-        ". Resume or begin the correct checkpoint through recon_checkpoint before running tools.",
+      allowed: true,
+      reason: "ordinary reconnaissance tools are not restricted by checkpoint phase or prerequisite status",
     }
   }
 
-  const activePhase = activePhases[0]!
-  if (requiredPhase === "vulnerability_testing" && activePhase !== "vulnerability_testing") {
+  // Vulnerability testing remains explicitly opt-in and must follow endpoint inventory.
+  if (phases.vulnerability_testing.status !== "running") {
     return {
       allowed: false,
-      reason: "Vulnerability testing is opt-in. The active checkpoint is " + activePhase +
-        "; explicitly begin vulnerability_testing only after endpoint_inventory is complete and the user has requested targeted testing.",
+      reason: "Vulnerability testing is opt-in; explicitly begin vulnerability_testing only after endpoint_inventory is complete and the user has requested targeted testing.",
     }
   }
-
-  const unresolved = unresolvedReconPrerequisites(activePhase, phases)
-  if (unresolved.length) {
+  if (phases.scope_validation.status !== "complete" ||
+      phases.workspace_setup.status !== "complete" ||
+      phases.endpoint_inventory.status !== "complete") {
     return {
       allowed: false,
-      reason: "Recon tool blocked by the active checkpoint " + activePhase +
-        ": earlier phases are unresolved: " + unresolved.map((phase) => phase + "=" + phases[phase].status).join(", ") +
-        ". Resume the first unfinished phase before continuing.",
+      reason: "Vulnerability testing requires completed scope validation, workspace setup, and endpoint inventory.",
     }
   }
-
-  return {
-    allowed: true,
-    reason: "scope and active checkpoint " + activePhase + " checks passed; nominal tool phase " +
-      requiredPhase + " is advisory, not a tool allowlist",
-  }
+  return { allowed: true, reason: "explicit vulnerability-testing checkpoint and prerequisites passed" }
 }
 
 /** Fail-closed runtime gate for active scanner and web-recon tools. */
