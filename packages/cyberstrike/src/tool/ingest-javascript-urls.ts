@@ -266,13 +266,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         records.push(record); byURL.set(url, record); failed++
         continue
       }
-      if (receivedBytes + bytes.byteLength > MAX_BATCH_BYTES) {
+      receivedBytes += bytes.byteLength
+      if (receivedBytes > MAX_BATCH_BYTES) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "per-invocation byte budget reached; retry this URL in a subsequent batch", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         budgetDeferredURL = url
         break
       }
-      receivedBytes += bytes.byteLength
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
