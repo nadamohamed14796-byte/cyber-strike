@@ -221,7 +221,14 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       let bytes: Uint8Array
       try { bytes = await readBounded(response, readLimit) }
       catch (error) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
+        const message = error instanceof Error ? error.message : String(error)
+        // If an unknown-length response exceeds the remaining batch budget,
+        // readBounded cancels its stream. Stop subsequent body reads as well;
+        // otherwise each later URL could consume the same remaining budget.
+        if (remainingBudget <= MAX_ASSET_BYTES && message.startsWith("response exceeds the ")) {
+          receivedBytes = MAX_TOTAL_BYTES
+        }
+        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: message, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         continue
       }
