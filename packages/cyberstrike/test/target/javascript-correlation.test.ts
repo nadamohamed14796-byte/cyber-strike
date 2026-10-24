@@ -890,6 +890,15 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         const diskGraph = JSON.parse(await fs.readFile(result.graphPath, "utf-8"))
         const endpointInventory = JSON.parse(await fs.readFile(result.endpointPath, "utf-8"))
         const testerSurvey = JSON.parse(await fs.readFile(result.testerSurveyPath, "utf-8"))
+        const capturedIndex = JSON.parse(await fs.readFile(path.join(result.workspacePath, "javascript/captured-index.json"), "utf-8"))
+        expect(result.capturedAssetCount).toBeGreaterThanOrEqual(2)
+        expect(capturedIndex.assets.some((asset: { url: string }) => asset.url === bundleURL)).toBe(true)
+        expect(capturedIndex.assets.some((asset: { url: string }) => asset.url === sourceMapURL)).toBe(true)
+        const persistedMap = capturedIndex.assets.find((asset: { url: string }) => asset.url === sourceMapURL)
+        expect(persistedMap).toBeDefined()
+        const persistedMapBody = await fs.readFile(path.join(result.workspacePath, persistedMap.file), "utf-8")
+        expect(persistedMapBody).toBe(mapBody)
+        // Raw captures are sensitive local evidence; derived graph/report artifacts stay redacted.
         const mapReference = result.graph.sourceMapReferences?.find((item) => item.url === sourceMapURL)
         const mappedProfile = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/profile.ts")
         const mappedRender = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/render.ts")
@@ -916,6 +925,17 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
           expect(artifact).not.toContain(rawSecret)
           expect(artifact).not.toContain("document.body.innerHTML = value")
         }
+
+        // Re-running correlation must reuse the captured evidence without duplicating
+        // the same raw local files as additional source records or endpoint candidates.
+        const resumed = await JavaScriptCorrelation.build({
+          sessionID: session.id,
+          targetURL,
+          javascriptURL: bundleURL,
+        })
+        expect(resumed.capturedAssetCount).toBe(result.capturedAssetCount)
+        expect(resumed.graph.sourceFiles.length).toBe(result.graph.sourceFiles.length)
+        expect(resumed.graph.endpointCandidates.length).toBe(result.graph.endpointCandidates.length)
       } finally {
         await Instance.dispose()
       }
