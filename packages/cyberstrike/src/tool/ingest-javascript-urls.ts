@@ -399,6 +399,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     for (let urlIndex = 0; urlIndex < inputURLs.length; urlIndex++) {
       const url = inputURLs[urlIndex]!
       const assetSource = sourceByURL.get(url) ?? params.source
+      const assetSources = sourceOriginsByURL.get(url) ?? assetSource.split(" | ")
       const prior = byURL.get(url)
       if (
         !params.force_refresh &&
@@ -413,7 +414,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           const reason = !currentScope.allowed
             ? "cached asset is no longer in persisted scope: " + currentScope.reason
             : "cached redirect destination is no longer in persisted scope: " + finalScope.reason
-          const record: AssetRecord = { ...prior, source: assetSource, status: "skipped", error: reason }
+          const sources = [...new Set([
+            ...(prior.sources ?? prior.source.split(" | ")),
+            ...assetSources,
+          ])].filter(Boolean).sort()
+          sourceOriginsByURL.set(url, sources)
+          sourceByURL.set(url, mergeProvenance(...sources))
+          const record: AssetRecord = { ...prior, source: mergeProvenance(...sources), sources, status: "skipped", error: reason }
           records.push(record)
           byURL.set(url, record)
           skipped++
@@ -439,6 +446,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const record: AssetRecord = {
           url,
           source: assetSource,
+          sources: assetSources,
           status: "skipped",
           error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
           fetchedAt: new Date().toISOString(),
@@ -453,14 +461,14 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
       const result = await fetchScoped(url)
       if ("error" in result) {
-        const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, source: assetSource, sources: assetSources, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
@@ -468,7 +476,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
       const declaredLength = Number(response.headers.get("content-length") ?? "0")
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
@@ -480,6 +488,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           url,
           finalURL,
           source: assetSource,
+          sources: assetSources,
           status: "skipped",
           contentType,
           bytes: declaredLength,
@@ -504,6 +513,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
             url,
             finalURL,
             source: assetSource,
+            sources: assetSources,
             status: "skipped",
             contentType,
             error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
@@ -514,7 +524,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           await persistProgress(inputURLs.slice(urlIndex))
           break
         }
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
@@ -522,7 +532,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       receivedBytes += bytes.byteLength
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = { url, finalURL, source: assetSource, sources: assetSources, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
