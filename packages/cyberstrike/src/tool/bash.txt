@@ -18,7 +18,7 @@ Executes a bash command in a persistent shell session. Commands run in ${directo
 - Do not claim a process or phase completed while it is still running or its output has not been verified.
 
 ## Authorization and safety
-- The persisted scope manifest and request-level runtime checks are authoritative. Never bypass a scope refusal or broaden scope to make a tool work. Generic `curl` commands must put `-q`/`--disable` first and must not follow redirects; generic `wget` commands require explicit `--max-redirect=0`. Use a scope-aware request pipeline when redirects must be followed.
+- The persisted scope manifest and request-level runtime checks are authoritative. Never bypass a scope refusal or broaden scope to make a tool work. Generic `curl` commands must put `-q`/`--disable` first and must not follow redirects; generic `wget` commands must disable user config with `env WGETRC=/dev/null` and set `--max-redirect=0`. Use a scope-aware request pipeline when redirects must be followed.
 - Recon remains non-destructive by default. Vulnerability testing, exploit attempts, credential attacks, and state-changing actions require an explicit user request and the appropriate testing checkpoint.
 - Preserve evidence accurately, redact secret values in general notes/reports, and distinguish candidates from verified findings.
 
