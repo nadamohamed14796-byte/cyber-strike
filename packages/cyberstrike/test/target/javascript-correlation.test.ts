@@ -8,7 +8,7 @@ import { Request } from "../../src/session/request"
 import { TargetMemory } from "../../src/target"
 import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
 import { tmpdir } from "../fixture/fixture"
-import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
+import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -303,6 +303,56 @@ test("merges equivalent named route placeholders and unions all source evidence"
   expect(endpoints[0]?.observedRequestIDs).toContain("req-users")
   expect(endpoints[0]?.observedInTraffic).toBe(true)
 })
+
+test("canonical endpoint merge keeps captured request IDs attached to their actual HTTP method", () => {
+  const route = "/api/users/{id}"
+  const generic: JavaScriptEndpointCandidate = {
+    id: "endpoint:generic",
+    literal: route,
+    host: "api.example.test",
+    origin: "https://api.example.test",
+    path: route,
+    sourceFiles: ["javascript/routes.js"],
+    observedRequestIDs: ["req-get", "req-post"],
+    observedInTraffic: true,
+    confidence: "observed",
+  }
+  const get: JavaScriptEndpointCandidate = {
+    id: "endpoint:get",
+    literal: route,
+    host: "api.example.test",
+    origin: "https://api.example.test",
+    path: route,
+    method: "GET",
+    sourceFiles: ["javascript/get.js"],
+    observedRequestIDs: [],
+    observedInTraffic: false,
+    confidence: "candidate",
+  }
+  const post: JavaScriptEndpointCandidate = {
+    ...get,
+    id: "endpoint:post",
+    method: "POST",
+    sourceFiles: ["javascript/post.js"],
+  }
+  const requests = [
+    { id: "req-get", method: "GET" },
+    { id: "req-post", method: "POST" },
+  ]
+  const endpoints = mergeCanonicalJavaScriptEndpoints([
+    { endpointCandidates: [generic], requests },
+    { endpointCandidates: [get, post], requests },
+  ])
+  expect(endpoints).toHaveLength(2)
+  const getEndpoint = endpoints.find((endpoint) => endpoint.method === "GET")!
+  const postEndpoint = endpoints.find((endpoint) => endpoint.method === "POST")!
+  expect(getEndpoint.observedRequestIDs).toContain("req-get")
+  expect(getEndpoint.observedRequestIDs).not.toContain("req-post")
+  expect(postEndpoint.observedRequestIDs).toContain("req-post")
+  expect(postEndpoint.observedRequestIDs).not.toContain("req-get")
+  expect(endpoints.every((endpoint) => endpoint.sourceFiles.includes("javascript/routes.js"))).toBe(true)
+})
+
 
 test("generates an idempotent tester survey with request shape and resumable check progress", () => {
   const candidate = {
