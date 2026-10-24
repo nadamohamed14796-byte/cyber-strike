@@ -186,6 +186,37 @@ describe("IngestQueue.pause / resume", () => {
 })
 
 describe("IngestQueue parent-child controls", () => {
+  test("captured requests use one parent queue while each task runs in its child session", async () => {
+    await withInstance(async () => {
+      const parent = "parent-serial-ingest"
+      const childA = "child-serial-ingest-a"
+      const childB = "child-serial-ingest-b"
+      const firstStarted = defer()
+      const releaseFirst = defer()
+      const order: string[] = []
+
+      IngestQueue.enqueue(parent, async () => {
+        firstStarted.resolve()
+        await releaseFirst.promise
+        order.push(childA)
+      }, parent)
+      await firstStarted.promise
+
+      IngestQueue.enqueue(parent, async () => {
+        order.push(childB)
+      }, parent)
+
+      await new Promise((r) => setTimeout(r, 10))
+      expect(order).toEqual([])
+      expect(IngestQueue.pendingCount(parent)).toBe(2)
+
+      releaseFirst.resolve()
+      await new Promise((r) => setTimeout(r, 20))
+      expect(order).toEqual([childA, childB])
+      expect(IngestQueue.pendingCount(parent)).toBe(0)
+    })
+  })
+
   test("parent pause gates child request queues without serializing siblings", async () => {
     await withInstance(async () => {
       const parent = "parent-ingest"
