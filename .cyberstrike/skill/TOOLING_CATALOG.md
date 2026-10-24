@@ -55,28 +55,15 @@ Search the live connected-tool registry through `tool_search` at the start of a 
 | Subdomain takeover triage | subzy plus provider conditions from can-i-take-over-xyz | DNS/CNAME and provider documentation | dangling record and provider-specific evidence; never attempt to claim a real target |
 | Evidence / normalization / reporting | Python stdlib, jq | shared helpers below | reproducible evidence references, redaction, disposition, validation errors |
 
-## Canonical asset-discovery artifacts and ledger schema
+## Canonical asset-discovery output
 
-The recon command and registered `recon_checkpoint` enforce this contract. This is the only place that defines the source-ledger format; recon skills and phase references must link here rather than invent a second schema.
+The minimum canonical output for passive subdomain discovery is `subdomains.txt`: one normalized, deduplicated hostname per line, saved in the target workspace. Preserve useful partial results and continue to later recon work when an individual source fails.
 
-### Required files
+An optional `subdomain-sources.json` may be kept when source provenance or resumability materially helps. It is supporting evidence, not a prerequisite for using the discovered hosts or moving to the next recon phase. Do not create it merely to satisfy a checklist, and do not require every possible source or every root/source combination to finish before continuing.
 
-- `subdomains.txt`: one normalized hostname per line, sorted and globally unique across the approved root set. It must exactly match the `host` values in the JSON ledger. It may be empty only when the ledger also has zero hosts and the source results support that outcome.
-- `subdomain-sources.json`: one JSON object with `schema_version: 1`, `roots`, `sources`, `hosts`, `counts`, and `run_status`. Preserve provenance per source/root pair; do not create one file per source.
+If a source ledger is useful, keep source names, root, status, counts, and errors truthful; distinguish successful zero-results from failures and blocked/unavailable sources. Merge duplicates in the canonical host list. Never fabricate counts or claim complete source coverage when work remains.
 
-### Source-ledger rules
-
-1. `roots` is a non-empty, duplicate-free array of normalized root hostnames drawn from the saved scope. Do not put URLs, paths, wildcard prefixes, or unvalidated candidates in this array.
-2. `sources` contains exactly one record for every `root` × `source` pair represented in the run. Every root must have a record for each source name used anywhere in the ledger. Source names are discovered dynamically; the examples in the tool matrix are not an allowlist.
-3. Every source record contains `root`, `source`, `status`, `started_at`, `finished_at`, `attempt_count`, `raw_records`, `valid_observations`, `unique_hosts`, `duplicate_observations`, `rejected_records`, `hosts`, and `attempt_history`. Use the terminal statuses `success`, `zero-results`, `failed`, `unavailable`, `blocked`, or `skipped`. Never leave a `pending` record when completing the phase.
-4. A completed attempt has a real start/finish timestamp and `attempt_count >= 1`. A deliberately unselected alternative uses `status: "skipped"`, `skipped_by_selection: true`, `attempt_count: 0`, a finish timestamp, zero counts, and a plain-language `error` or `reason`. The same source names must be represented for every root; use a per-root skipped/failed/unavailable record when appropriate.
-5. Counts must reconcile for each record: `raw_records = valid_observations + rejected_records`; `valid_observations = unique_hosts + duplicate_observations`. `hosts` is the duplicate-free list of normalized hostnames produced by that source for that root, and its length must equal `unique_hosts`. For an attempted source with no valid results, use `zero-results` only when the source actually completed successfully; otherwise record the true failure/blocked/unavailable state and reason.
-6. `hosts` at the ledger root is the globally deduplicated array of objects with at least a `host` field. Preserve useful `roots`, `sources`, `observations`, and `observation_count` fields so merging duplicates does not discard source attribution. Do not store live credentials or secrets in evidence summaries.
-7. `counts` must contain reconciled integer values for `roots`, `sources_attempted`, `sources_pending`, `sources_not_started`, `sources_running_or_interrupted`, `sources_success`, `sources_zero_results`, `sources_failed`, `sources_blocked`, `sources_unavailable`, `sources_skipped`, `sources_not_selected`, `unique_hosts`, and `duplicate_observations`. These are derived from the saved records, not estimates. Terminal ledgers have all three pending/not-started/interrupted counters at zero.
-8. Set `run_status: "complete"` only when every root/source record is terminal and there are no failed, unavailable, blocked, or non-selection-skipped records. Use `"finished_with_gaps"` when any such gap exists. Intentional `skipped_by_selection` records are reported separately and are not falsely counted as attempted.
-9. Write both files through the canonical target workspace, read them back, recompute all counts, compare the host list with ledger hosts, and only then complete `asset_discovery`. A source being omitted from the tool selection is not proof that it returned zero results.
-
-The existing helper `host_inventory.py` is an offline observation normalizer, not a network collector or source ledger writer. Use it for hostname normalization when its JSONL input/output fits the task; do not claim it queried a source. Do not restore or create a dedicated collector merely to duplicate the catalog: the agent selects and invokes suitable registered tools, reachable APIs, and available CLIs directly, then persists the validated ledger above.
+The offline `host_inventory.py` helper can normalize host observations when its input/output format fits the task; it is not a network collector. Prefer existing inventories and suitable available tools over creating a dedicated collector just to produce extra metadata.
 
 ## Workspace/skill helper scripts
 
