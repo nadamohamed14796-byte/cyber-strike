@@ -293,10 +293,10 @@ const Parameters = z.object({
 
 export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>("recon_checkpoint", {
   description: [
-    "Authoritative phase-state control for reconnaissance; this is not a scanner and does not authorize requests. Call status before choosing work, begin before a phase, and then use the registered action schema with verified counts/artifacts or a concrete reason. If a phase is already running, resume it without calling begin again; do not create a parallel phase ledger.",
+    "Lightweight progress tracking for reconnaissance, not a tool allowlist. Use status when helpful and begin/complete to record progress, but ordinary recon tools are not blocked by stale phase order or missing earlier phase records. If a phase is already running, resume it without beginning it again. Scope checks remain enforced by the runtime.",
     "Phase order: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → vulnerability_testing → reporting.",
     "A normal recon run defers vulnerability_testing and proceeds to reporting; only an explicit user request may begin testing after endpoint_inventory. Reopening testing invalidates reporting, which must be regenerated. Never launch scanners/session_scan automatically. Save wordlists/settings/results for directory and parameter phases; link JavaScript sources, request shapes, and correlation evidence for JavaScript analysis. Reporting requires the exact verified artifact reports/recon-final.md.",
-    "scope_validation, workspace_setup, javascript_analysis, and endpoint_inventory are mandatory and cannot be bypassed as unavailable. Other discovery phases may be unavailable only with a real reason; resolve blocked/failed prerequisites before progressing. Complete a phase only after its required artifacts are verified under the canonical workspace. Do not rerun completed work without new evidence or a justified reason.",
+    "Keep useful phase records and verified artifact paths, but do not let a missing optional source ledger or stale ordinary phase status block reconnaissance. Scope validation and workspace setup remain required; JavaScript and endpoint inventories should be recorded when produced. Vulnerability testing remains opt-in and requires completed endpoint inventory.",
     "This tool enforces phase order, not request authorization. Verify the saved scope; when it is new/changed or unresolved, call scope_check once for the actual starting asset with target_url selecting the canonical program-root workspace. Complete scope_validation only by supplying scope_validation_target with that exact absolute HTTP(S) asset URL; runtime rechecks and persists it, then revalidates it on resume. Do not check the root container merely because it identifies the workspace. Active-request tools still enforce persisted scope for every concrete request.",
   ].join("\n"),
   parameters: Parameters,
@@ -408,9 +408,15 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the canonical program workspace has no configured, non-empty authorization scope. Configure and review the official scope before continuing.", metadata: { saved: false, reason: "persisted_scope_unconfigured" } }
           }
         }
-        const unresolved = unresolvedReconPrerequisites(phase, run.phases)
-        if (unresolved.length) {
-          return { title: "Recon phase blocked by prerequisites", output: "Cannot begin " + phase + ". Resolve earlier phases first: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "prerequisites_unresolved", unresolved } }
+        // Ordinary recon phases are progress markers, not hard gates. The agent may
+        // use any suitable recon capability when useful evidence becomes available.
+        // Keep only the explicit testing handoff gated by completed endpoint inventory.
+        if (phase === "vulnerability_testing") {
+          const required = ["scope_validation", "workspace_setup", "endpoint_inventory"] as const
+          const unresolved = required.filter((item) => run.phases[item].status !== "complete")
+          if (unresolved.length) {
+            return { title: "Testing checkpoint requires endpoint inventory", output: "Begin vulnerability_testing only after scope validation, workspace setup, and endpoint inventory are complete: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "testing_prerequisites_unresolved", unresolved } }
+          }
         }
         if (disposition === "resume_existing") {
           return {
@@ -519,7 +525,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             const resolvedArtifactPath = relative.split(path.sep).join("/")
             const requiredAreas = RECON_PHASE_ARTIFACT_AREAS[phase]
             const flatArtifacts: Partial<Record<ReconPhase, readonly string[]>> = {
-              asset_discovery: ["scope.txt", "subdomains.txt", "subdomain-sources.json"],
+              asset_discovery: ["subdomains.txt"],
               live_hosts_ports: ["live-hosts.txt", "ports.txt"],
               url_collection: ["urls.txt"],
               parameter_discovery: ["parameters.txt"],
@@ -581,42 +587,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               }
             }
           }
-          if (phase === "asset_discovery") {
-            for (const required of ["subdomain-sources.json", "subdomains.txt"]) {
-              if (!reportedPaths.has(required)) {
-                return {
-                  title: "Asset discovery checkpoint rejected",
-                  output: "Cannot complete asset_discovery without both canonical artifacts: subdomain-sources.json and subdomains.txt. A host list alone cannot prove that every root/source task finished; resume the existing source ledger and include both verified paths.",
-                  metadata: { saved: false, reason: "discovery_ledger_required", missing_artifact: required },
-                }
-              }
-            }
-            try {
-              const ledgerPath = path.join(realWorkspace, "subdomain-sources.json")
-              const hostsPath = path.join(realWorkspace, "subdomains.txt")
-              for (const candidate of [ledgerPath, hostsPath]) {
-                const info = await fs.lstat(candidate)
-                if (!info.isFile() || info.isSymbolicLink()) throw new Error(path.basename(candidate) + " is not a regular file")
-              }
-              const validation = validateAssetDiscoveryLedger(
-                await fs.readFile(ledgerPath, "utf-8"),
-                await fs.readFile(hostsPath, "utf-8"),
-              )
-              if (!validation.valid) {
-                return {
-                  title: "Asset discovery checkpoint rejected",
-                  output: "Cannot mark asset_discovery complete: " + validation.reason,
-                  metadata: { saved: false, reason: "discovery_ledger_incomplete", ...validation },
-                }
-              }
-            } catch (error) {
-              return {
-                title: "Asset discovery checkpoint rejected",
-                output: "Cannot verify the canonical subdomain source ledger and host inventory: " + (error instanceof Error ? error.message : String(error)),
-                metadata: { saved: false, reason: "discovery_ledger_verification_failed" },
-              }
-            }
-          }
+          // The canonical subdomains inventory is sufficient to record progress.
+          // The detailed per-source ledger is optional evidence, not a completion gate;
+          // an incomplete source must not prevent the rest of recon from continuing.
         }
         run.phases[phase] = {
           ...record,
