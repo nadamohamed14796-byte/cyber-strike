@@ -1538,6 +1538,16 @@ export const SessionRoutes = lazy(() =>
                 const analysisSessionID = childSession.id
                 childSessionID = analysisSessionID
                 Request.updateStatus({ id: req.id, status: "processing" })
+                log.info("captured request subagent started", {
+                  sessionID,
+                  analysisSessionID,
+                  requestID: req.id,
+                  agent: proxyAgent.name,
+                })
+                await IngestSummary.notice(
+                  sessionID,
+                  `Extension request analysis started: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; proxy-agent subtask ${analysisSessionID} is working now.`,
+                ).catch((error) => log.warn("parent ingest start notice failed", { sessionID, requestID: req.id, error: String(error) }))
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
@@ -1728,6 +1738,12 @@ export const SessionRoutes = lazy(() =>
                 }
               } finally {
                 Request.updateStatus({ id: req.id, status: finalStatus })
+                log.info("captured request subagent finished", {
+                  sessionID,
+                  analysisSessionID: childSessionID,
+                  requestID: req.id,
+                  status: finalStatus,
+                })
                 await IngestSummary.notice(
                   sessionID,
                   finalStatus === "processed"
