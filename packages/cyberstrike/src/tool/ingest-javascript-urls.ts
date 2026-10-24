@@ -59,6 +59,19 @@ function normalizeURL(input: string): string | undefined {
   }
 }
 
+function sourceMapProvenance(parentURL: string): string {
+  try {
+    const url = new URL(parentURL)
+    const queryKeys = [...new Set([...url.searchParams.keys()])]
+    // Provenance needs the referring endpoint, not signed query values or tokens.
+    url.search = queryKeys.map((key) => encodeURIComponent(key) + "=[value omitted]").join("&")
+    url.hash = ""
+    return "sourceMappingURL from " + url.toString()
+  } catch {
+    return "sourceMappingURL from [invalid referring URL]"
+  }
+}
+
 function mergeProvenance(...values: Array<string | undefined>): string {
   const tokens = [...new Set(values.flatMap((value) => (value ?? "").split(" | ").map((item) => item.trim()).filter(Boolean)))]
   const accepted: string[] = []
@@ -297,7 +310,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           typeof item.source === "string" && item.source.length > 0 && item.source.length <= 120 &&
           (item.sources === undefined || (
             Array.isArray(item.sources) &&
-            item.sources.every((source) => typeof source === "string" && source.length > 0 && source.length <= 120)
+            item.sources.every((source) => typeof source === "string" && source.length > 0 && source.length <= 16384)
           ))
         ))
       if (candidate.schemaVersion !== 1 || !validAssets || !validPendingURLs || !validPendingSources) {
@@ -336,7 +349,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const addSource = (url: string, value: string) => {
       const origins = sourceOriginsByURL.get(url) ?? []
       for (const item of value.split(" | ").map((source) => source.trim()).filter(Boolean)) {
-        if (item.length <= 120 && !origins.includes(item)) origins.push(item)
+        if (item.length <= 16384 && !origins.includes(item)) origins.push(item)
       }
       sourceOriginsByURL.set(url, origins)
       sourceByURL.set(url, mergeProvenance(...origins))
@@ -543,7 +556,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
         const normalizedMapURL = normalizeURL(mapURL)
         if (!normalizedMapURL) continue
-        const mapSource = ("sourceMappingURL from " + url).slice(0, 120)
+        const mapSource = sourceMapProvenance(url)
         if (queuedURLs.has(normalizedMapURL)) {
           // The same map may be shared by multiple bundles or supplied directly
           // before its parent bundle is processed. Preserve every observed origin.
