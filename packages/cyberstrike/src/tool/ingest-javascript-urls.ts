@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
@@ -44,6 +44,8 @@ type Manifest = {
   schemaVersion: 1
   updatedAt: string
   assets: AssetRecord[]
+  pendingURLs?: string[]
+  pendingSources?: Array<{ url: string; source: string }>
 }
 
 function normalizeURL(input: string): string | undefined {
@@ -55,6 +57,16 @@ function normalizeURL(input: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+function mergeProvenance(...values: Array<string | undefined>): string {
+  const tokens = [...new Set(values.flatMap((value) => (value ?? "").split(" | ").map((item) => item.trim()).filter(Boolean)))]
+  const accepted: string[] = []
+  for (const token of tokens) {
+    if ([...accepted, token].join(" | ").length > 120) continue
+    accepted.push(token)
+  }
+  return accepted.join(" | ") || "unspecified"
 }
 
 function extensionFor(url: string, contentType: string): string {
@@ -156,7 +168,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
     "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in urls batches of at most 500. Use source as the fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, immediately continue with those URLs in batches of at most 500, pass matching metadata.pending_sources as url_sources, and repeat until no pending URLs remain. The 64 MiB byte budget is per invocation, not a total-work cap.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
-    "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
+    "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, errors, and a persistent pending queue so interrupted batches can resume on the next invocation. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
   ].join("\n"),
@@ -210,15 +222,38 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           metadata: { error: "manifest_invalid_json", manifest_path: manifestPath, workspace: workspace.workspacePath },
         }
       }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest has an invalid top-level value. It was preserved without overwrite: " + manifestPath,
+          metadata: { error: "manifest_invalid_schema", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
       const candidate = parsed as Partial<Manifest>
       const validAssets = Array.isArray(candidate.assets) && candidate.assets.every((item) => {
         if (!item || typeof item !== "object") return false
         const asset = item as Partial<AssetRecord>
         return typeof asset.url === "string" &&
           typeof asset.source === "string" &&
-          ["downloaded", "reused", "skipped", "failed"].includes(asset.status as string)
+          ["downloaded", "reused", "skipped", "failed"].includes(asset.status as string) &&
+          (asset.finalURL === undefined || typeof asset.finalURL === "string") &&
+          (asset.contentHash === undefined || typeof asset.contentHash === "string") &&
+          (asset.localPath === undefined || typeof asset.localPath === "string") &&
+          (asset.contentType === undefined || typeof asset.contentType === "string") &&
+          (asset.bytes === undefined || typeof asset.bytes === "number") &&
+          (asset.fetchedAt === undefined || typeof asset.fetchedAt === "string") &&
+          (asset.error === undefined || typeof asset.error === "string") &&
+          (asset.sources === undefined || (Array.isArray(asset.sources) && asset.sources.every((source) => typeof source === "string")))
       })
-      if (candidate.schemaVersion !== 1 || !validAssets) {
+      const validPendingURLs = candidate.pendingURLs === undefined ||
+        (Array.isArray(candidate.pendingURLs) && candidate.pendingURLs.every((url) => typeof url === "string" && Boolean(normalizeURL(url))))
+      const validPendingSources = candidate.pendingSources === undefined ||
+        (Array.isArray(candidate.pendingSources) && candidate.pendingSources.every((item) =>
+          !!item && typeof item === "object" &&
+          typeof item.url === "string" && Boolean(normalizeURL(item.url)) &&
+          typeof item.source === "string" && item.source.length > 0 && item.source.length <= 120
+        ))
+      if (candidate.schemaVersion !== 1 || !validAssets || !validPendingURLs || !validPendingSources) {
         return {
           title: "JavaScript URL ingestion stopped",
           output: "The existing asset manifest has an unsupported schema or invalid asset record. It was preserved without overwrite: " + manifestPath,
@@ -244,12 +279,32 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
 
-    const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
+    // Resume any deferred URLs from the manifest before adding new caller inputs.
+    const inputURLs = [...new Set([...(manifest.pendingURLs ?? []), ...params.urls]
+      .map(normalizeURL)
+      .filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
-    const sourceByURL = new Map<string, string>(inputURLs.map((url) => [url, params.source] as const))
+    const sourceByURL = new Map<string, string>()
+    for (const item of manifest.pendingSources ?? []) {
+      const sourceURL = normalizeURL(item.url)
+      if (sourceURL && queuedURLs.has(sourceURL)) {
+        sourceByURL.set(sourceURL, mergeProvenance(sourceByURL.get(sourceURL), item.source))
+      }
+    }
     for (const item of params.url_sources) {
       const sourceURL = normalizeURL(item.url)
-      if (sourceURL && queuedURLs.has(sourceURL)) sourceByURL.set(sourceURL, item.source)
+      if (sourceURL && queuedURLs.has(sourceURL)) {
+        sourceByURL.set(sourceURL, mergeProvenance(sourceByURL.get(sourceURL), item.source))
+      }
+    }
+    for (const rawURL of params.urls) {
+      const normalized = normalizeURL(rawURL)
+      if (normalized && queuedURLs.has(normalized) && !sourceByURL.has(normalized)) {
+        sourceByURL.set(normalized, params.source)
+      }
+    }
+    for (const url of inputURLs) {
+      if (!sourceByURL.has(url)) sourceByURL.set(url, params.source)
     }
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
@@ -352,17 +407,25 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       else { downloaded++; downloadedBytes += bytes.byteLength }
     }
 
+    const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
+    const pendingSources = pendingURLs.map((url) => ({ url, source: sourceByURL.get(url) ?? params.source }))
     manifest = {
       schemaVersion: 1,
       updatedAt: new Date().toISOString(),
       assets: [...byURL.values()].sort((a, b) => a.url.localeCompare(b.url)),
+      pendingURLs,
+      pendingSources,
     }
-    const temporaryManifest = manifestPath + ".tmp"
-    await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", "utf8")
-    await fs.rename(temporaryManifest, manifestPath)
-
-    const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
-    const pendingSources = pendingURLs.map((url) => ({ url, source: sourceByURL.get(url) ?? params.source }))
+    // Use an exclusive, unpredictable temporary name so a pre-existing symlink
+    // cannot redirect manifest writes outside the target workspace.
+    const temporaryManifest = manifestPath + "." + randomUUID() + ".tmp"
+    try {
+      await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", { encoding: "utf8", flag: "wx", mode: 0o600 })
+      await fs.rename(temporaryManifest, manifestPath)
+    } catch (error) {
+      await fs.rm(temporaryManifest, { force: true }).catch(() => {})
+      throw error
+    }
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
     if (downloaded + reused > 0) {
