@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { SessionTurn } from "@cyberstrike-io/ui/session-turn"
 import { useSDK } from "@/context/sdk"
@@ -107,31 +107,32 @@ export function CapturedRequestAnalysisPanel() {
     if (item.status === "analyzing") setOpen(true)
   })
 
-  createEffect(() => {
-    const id = analysisSessionID()
-    if (!open() || !id) return
-    void sync.session.sync(id).catch(() => {})
-  })
+  createEffect(
+    on([open, analysisSessionID], ([visible, id]) => {
+      if (!visible || !id) return
+      void sync.session.sync(id).catch(() => {})
+    }),
+  )
 
-  createEffect(() => {
-    const sessionID = parentID()
-    const requestID = selected()?.requestID
-    if (!open() || !sessionID || !requestID) return
-    const generation = ++requestLoadGeneration
-    setRequest(undefined)
-    setRequestLoadError("")
-    void sdk.client.session.request({ sessionID }).then((result) => {
-      if (generation !== requestLoadGeneration) return
-      const rows = (result.data ?? []) as unknown as RequestRow[]
-      setRequest(rows.find((item) => item.id === requestID))
-    }).catch((error: unknown) => {
-      if (generation !== requestLoadGeneration) return
-      setRequestLoadError(error instanceof Error ? error.message : String(error))
-    })
-    onCleanup(() => {
-      requestLoadGeneration += 1
-    })
-  })
+  createEffect(
+    on([open, parentID, () => selected()?.requestID], ([visible, sessionID, requestID]) => {
+      if (!visible || !sessionID || !requestID) return
+      const generation = ++requestLoadGeneration
+      setRequest(undefined)
+      setRequestLoadError("")
+      void sdk.client.session.request({ sessionID }).then((result) => {
+        if (generation !== requestLoadGeneration) return
+        const rows = (result.data ?? []) as unknown as RequestRow[]
+        setRequest(rows.find((item) => item.id === requestID))
+      }).catch((error: unknown) => {
+        if (generation !== requestLoadGeneration) return
+        setRequestLoadError(error instanceof Error ? error.message : String(error))
+      })
+      onCleanup(() => {
+        requestLoadGeneration += 1
+      })
+    }),
+  )
 
   const statusLabel = () => {
     const status = selected()?.status
