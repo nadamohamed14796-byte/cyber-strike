@@ -22,6 +22,8 @@ type RequestRow = {
   raw_request?: string
   response_status?: number
   response_content_type?: string
+  response_headers?: Record<string, string>
+  processed_response?: string
   response_size?: number
   status?: string
 }
@@ -269,6 +271,30 @@ export function CapturedRequestAnalysisPanel() {
               <details class="mb-3 rounded border border-border-weak-base p-2">
                 <summary class="cursor-pointer text-11-medium text-text-base">Request body</summary>
                 <pre class="mt-2 whitespace-pre-wrap break-all text-10-regular text-text-weak">{requestParts().body || "(empty or unavailable)"}</pre>
+              </details>
+              <details class="mb-3 rounded border border-border-weak-base p-2">
+                <summary class="cursor-pointer text-11-medium text-text-base">
+                  Response headers ({Object.keys(request()?.response_headers ?? {}).length})
+                </summary>
+                <Show
+                  when={Object.keys(request()?.response_headers ?? {}).length > 0}
+                  fallback={<p class="mt-2 text-10-regular text-text-weak">Response headers are unavailable.</p>}
+                >
+                  <pre class="mt-2 whitespace-pre-wrap break-all text-10-regular text-text-weak">
+                    {Object.entries(request()?.response_headers ?? {}).map(([key, value]) => key + ": " + value).join("\n")}
+                  </pre>
+                </Show>
+              </details>
+              <details class="mb-3 rounded border border-border-weak-base p-2">
+                <summary class="cursor-pointer text-11-medium text-text-base">
+                  Captured response body ({request()?.response_size ?? 0} bytes)
+                </summary>
+                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-10-regular text-text-weak">
+                  {request()?.processed_response?.slice(0, 12000) || "(empty or unavailable)"}
+                </pre>
+                <Show when={(request()?.processed_response?.length ?? 0) > 12000}>
+                  <p class="mt-2 text-10-regular text-text-weaker">Preview limited to the first 12,000 characters.</p>
+                </Show>
               </details>
               <Show when={requestLoadError()}>
                 <p class="text-11-regular text-icon-danger-base">Could not load raw request: {requestLoadError()}</p>
