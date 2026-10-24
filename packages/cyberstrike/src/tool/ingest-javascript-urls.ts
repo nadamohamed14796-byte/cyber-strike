@@ -390,8 +390,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           skipped++
           continue
         }
-        const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), assetSource])].filter(Boolean).sort()
-        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused", error: undefined }
+        const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), ...assetSource.split(" | ")])].filter(Boolean).sort()
+        const record: AssetRecord = { ...prior, source: mergeProvenance(...sources), sources, status: "reused", error: undefined }
         records.push(record)
         byURL.set(url, record)
         reused++
@@ -461,8 +461,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
-      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), assetSource])].filter(Boolean).sort()
-      const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), ...assetSource.split(" | ")])].filter(Boolean).sort()
+      const record: AssetRecord = { url, finalURL, source: mergeProvenance(...sources), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
       if (existingContent) reused++
