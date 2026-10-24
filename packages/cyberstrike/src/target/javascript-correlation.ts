@@ -145,7 +145,7 @@ function redact(value?: string | null, max = 320): string | null {
     .replace(/\b(authorization|proxy-authorization|x-auth-token|x-access-token|x-csrf-token|cookie|set-cookie|x-api-key|api[_-]?(?:key|secret)|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|jwt|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
+    .replace(/[\r\n]/g, " ")
     .slice(0, max)
 }
 
@@ -529,7 +529,7 @@ export function extractCapturedJavaScriptSources(
     if (bytes < 1) continue
     const digest = createHash("sha256").update(body).digest("hex")
     const canonicalSourceURL = url.origin + url.pathname
-    const identity = canonicalSourceURL + "\\0" + digest
+    const identity = canonicalSourceURL + "\0" + digest
     const previousIndex = sourceIndexByURLAndHash.get(identity)
     if (previousIndex !== undefined) {
       const previous = output[previousIndex]!
@@ -661,7 +661,7 @@ export function mergeStructuredJavaScriptEndpoints(
 ): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
   const routeKeyOf = (origin: string | null, route: string) =>
-    (origin?.toLowerCase() ?? "*") + "\\0" + normalizedTemplateShape(route)
+    (origin?.toLowerCase() ?? "*") + "\0" + normalizedTemplateShape(route)
   const normalizeMethod = (method?: string | null) => method?.trim().toUpperCase() || null
   const keyOf = (origin: string | null, route: string, method?: string | null) =>
     routeKeyOf(origin, route) + "\\0method:" + (normalizeMethod(method) ?? "*")
@@ -827,7 +827,7 @@ export function correlateStaticJavaScriptEndpoints(
       }
 
       for (const variant of variants.values()) {
-        const key = (variant.origin ?? "*") + "\\0" + normalizedTemplateShape(endpointPath)
+        const key = (variant.origin ?? "*") + "\0" + normalizedTemplateShape(endpointPath)
         let candidate = candidates.get(key)
         if (!candidate) {
           candidate = {
@@ -1029,9 +1029,9 @@ function normalizeEndpointOrigin(value?: string | null): string {
 function mergeCanonicalJavaScriptEndpoints(graphs: JavaScriptCorrelationGraph[]): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
   const routeKey = (endpoint: JavaScriptEndpointCandidate) =>
-    normalizeEndpointOrigin(endpoint.origin) + "\\0" + normalizedTemplateShape(endpoint.path)
+    normalizeEndpointOrigin(endpoint.origin) + "\0" + normalizedTemplateShape(endpoint.path)
   const keyOf = (endpoint: JavaScriptEndpointCandidate) =>
-    routeKey(endpoint) + "\\0" + (endpoint.method?.trim().toUpperCase() || "UNKNOWN")
+    routeKey(endpoint) + "\0" + (endpoint.method?.trim().toUpperCase() || "UNKNOWN")
   const uniqueStrings = (values: string[]) => [...new Set(values.filter(Boolean))]
 
   for (const endpoint of graphs.flatMap((graph) => graph.endpointCandidates ?? [])) {
@@ -1112,14 +1112,14 @@ function safeSummaryURL(input: string): string {
     // Keep the endpoint and parameter names, never signed/token-bearing query values.
     return url.origin + url.pathname + (keys.length ? "?" + keys.map((key) => encodeURIComponent(key) + "=[value omitted]").join("&") : "")
   } catch {
-    return input.replace(/[\\r\\n]/g, " ").slice(0, 500)
+    return input.replace(/[\r\n]/g, " ").slice(0, 500)
   }
 }
 
 function safeSummaryText(input: string): string {
   return input
-    .replace(/Bearer\\s+[-A-Za-z0-9._~+\\/]+=*/gi, "Bearer [REDACTED]")
-    .replace(/((?:token|secret|password|passwd|api[_-]?key|client[_-]?secret|authorization|signature|session[_-]?id)\\s*[:=]\\s*)["']?[^\\s,;\\]"']+/gi, "$1[REDACTED]")
+    .replace(/Bearer\s+[-A-Za-z0-9._~+\/]+=*/gi, "Bearer [REDACTED]")
+    .replace(/((?:token|secret|password|passwd|api[_-]?key|client[_-]?secret|authorization|signature|session[_-]?id)\s*[:=]\s*)["']?[^\s,;"']+/gi, "$1[REDACTED]")
     .replace(/[\\r\\n]/g, " ")
 }
 
@@ -1149,7 +1149,7 @@ async function readSafeWorkspaceText(workspacePath: string, relativePath: string
 }
 
 function replaceManagedSection(existing: string, begin: string, end: string, generated: string): string {
-  const lines = existing.split(/\\r?\\n/)
+  const lines = existing.split(/\r?\n/)
   const preserved: string[] = []
   let inside = false
   let sawBegin = false
@@ -1172,8 +1172,8 @@ function replaceManagedSection(existing: string, begin: string, end: string, gen
   if (inside || sawBegin !== sawEnd) {
     throw new Error("Existing generated artifact section is incomplete; refusing to overwrite the target artifact.")
   }
-  const prefix = preserved.join("\\n").trimEnd()
-  return (prefix ? prefix + "\\n\\n" : "") + generated.trimEnd() + "\\n"
+  const prefix = preserved.join("\n").trimEnd()
+  return (prefix ? prefix + "\n\n" : "") + generated.trimEnd() + "\n"
 }
 
 type CanonicalAssetManifest = {
@@ -1249,7 +1249,7 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
         : { ...asset, tags: [...asset.tags] })
     }
     for (const file of graph.sourceFiles) {
-      const key = file.relativePath + "\\0" + file.sha256
+      const key = file.relativePath + "\0" + file.sha256
       const previous = sourceFiles.get(key)
       sourceFiles.set(key, previous ? {
         ...previous,
@@ -1269,11 +1269,11 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
     }
   }
   const mergeRecords = <T>(lists: T[][], key: (item: T) => string): T[] => uniqueValues(lists.flat(), key)
-  const functions = mergeRecords(graphs.map((g) => g.javascriptAnalysis.functions), (item) => [item.sourceFile, item.line, item.name].join("\\0"))
-  const requestCandidates = mergeRecords(graphs.map((g) => g.javascriptAnalysis.requestCandidates), (item) => [item.sourceFile, item.sourceLine, item.method ?? "", item.urlTemplate].join("\\0"))
-  const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\\0"))
-  const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\\0"))
-  const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\\0"))
+  const functions = mergeRecords(graphs.map((g) => g.javascriptAnalysis.functions), (item) => [item.sourceFile, item.line, item.name].join("\0"))
+  const requestCandidates = mergeRecords(graphs.map((g) => g.javascriptAnalysis.requestCandidates), (item) => [item.sourceFile, item.sourceLine, item.method ?? "", item.urlTemplate].join("\0"))
+  const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\0"))
+  const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
+  const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\0"))
   const uniqueObjects = <T>(items: T[], key: (item: T) => string) => uniqueValues(items, key)
   return {
     ...latest,
@@ -1287,7 +1287,7 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
     webFunctions: uniqueObjects(graphs.flatMap((g) => g.webFunctions), (x) => x.id),
     observations: uniqueObjects(graphs.flatMap((g) => g.observations), (x) => x.id),
     findings: uniqueObjects(graphs.flatMap((g) => g.findings), (x) => x.id),
-    edges: uniqueObjects(graphs.flatMap((g) => g.edges), (x) => [x.from, x.to, x.relation, x.evidence].join("\\0")),
+    edges: uniqueObjects(graphs.flatMap((g) => g.edges), (x) => [x.from, x.to, x.relation, x.evidence].join("\0")),
     notes: [...new Set(graphs.flatMap((g) => g.notes))],
   }
 }
@@ -1647,7 +1647,7 @@ export namespace JavaScriptCorrelation {
     const targetURL = TargetMemory.normalize(input.targetURL).targetURL
     const selectorURL = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     const selector = selectorURL ? selectorURL.origin + selectorURL.pathname : "all-assets"
-    const key = rootSessionID + "\\0" + targetURL + "\\0" + selector
+    const key = rootSessionID + "\0" + targetURL + "\0" + selector
     const previous = buildQueues.get(key)
     const current = (previous ? previous.catch(() => undefined) : Promise.resolve(undefined)).then(() =>
       buildInternal(input),
