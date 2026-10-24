@@ -1166,7 +1166,8 @@ export namespace JavaScriptCorrelation {
     const targetURL = TargetMemory.normalize(input.targetURL).targetURL
     const selectorURL = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     const selector = selectorURL ? selectorURL.origin + selectorURL.pathname : "all-assets"
-    // Serialize all selectors for one target/session so concurrent per-URL runs cannot race the shared captured-asset index.\n    const key = rootSessionID + "\\0" + targetURL
+    // Serialize all selectors for one target/session so concurrent per-URL runs cannot race the shared captured-asset index.
+    const key = rootSessionID + "\0" + targetURL
     const previous = buildQueues.get(key)
     const current = (previous ? previous.catch(() => undefined) : Promise.resolve(undefined)).then(() =>
       buildInternal(input),
