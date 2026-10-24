@@ -103,7 +103,7 @@ curl -q -sS 'https://crt.sh/?q=%25.example.com&output=json'
 subfinder -d example.com -silent
 dnsx -d example.com -a -resp -json
 httpx -u https://example.com -jsonl
-katana -u https://example.com -fs fqdn -rl 5 -d 3 -j -ncb
+katana -u https://example.com -fs fqdn -rl 5 -d 3 -j -ncb  # conservative starting profile only; tune rate/depth to policy and evidence needs
 ```
 
 The generic shell recon gate accepts explicit targets and target-list files only after it can read and normalize every concrete entry and verify each one against the persisted scope. Use a supported list flag directly when the tool accepts it; do not bypass scope checks with shell wrappers, `xargs`, `parallel`, or nested commands. Prefer stdout/local normalization and one canonical inventory rather than a persistent output file for every tool. If a tool needs a file, reuse one target-local scratch path, normalize and verify its results, then remove it unless it adds distinct evidence. Never invent alternate filenames to get around an existing-file refusal.
