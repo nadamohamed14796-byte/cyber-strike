@@ -515,10 +515,29 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const queueLengthBeforeMaps = inputURLs.length
       for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
         const normalizedMapURL = normalizeURL(mapURL)
-        if (!normalizedMapURL || queuedURLs.has(normalizedMapURL)) continue
+        if (!normalizedMapURL) continue
+        const mapSource = ("sourceMappingURL from " + url).slice(0, 120)
+        if (queuedURLs.has(normalizedMapURL)) {
+          // The same map may be shared by multiple bundles or supplied directly
+          // before its parent bundle is processed. Preserve every observed origin.
+          sourceByURL.set(normalizedMapURL, mergeProvenance(sourceByURL.get(normalizedMapURL), mapSource))
+          const priorMap = byURL.get(normalizedMapURL)
+          if (priorMap) {
+            const sources = [...new Set([
+              ...(priorMap.sources ?? priorMap.source.split(" | ")),
+              ...sourceByURL.get(normalizedMapURL)!.split(" | "),
+            ])].filter(Boolean).sort()
+            byURL.set(normalizedMapURL, {
+              ...priorMap,
+              source: mergeProvenance(...sources),
+              sources,
+            })
+          }
+          continue
+        }
         queuedURLs.add(normalizedMapURL)
         inputURLs.push(normalizedMapURL)
-        sourceByURL.set(normalizedMapURL, ("sourceMappingURL from " + url).slice(0, 120))
+        sourceByURL.set(normalizedMapURL, mapSource)
       }
       // Persist newly discovered maps immediately after parsing each bundle. If the
       // process stops before the end-of-batch save, these URLs still remain resumable.
