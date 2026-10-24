@@ -1461,8 +1461,70 @@ export namespace JavaScriptCorrelation {
       responseContentType: request.response_content_type,
       responseBody: request.javascript_source ?? request.processed_response,
     }))
+    // Preserve the actual in-scope JavaScript and source-map response bodies in the
+    // target workspace. The graph stays redacted, while analysts can inspect the
+    // original assets locally and resume analysis without depending on transient DB rows.
+    // These inputs have already passed the persisted target-scope and session-tree checks.
+    const capturedAssetInputs = [...versionedSourceInputs, ...legacySourceInputs]
+    const capturedAssetIndexPath = "javascript/captured-index.json"
+    type CapturedAssetIndexEntry = {
+      url: string
+      requestID: string
+      captureID?: string
+      contentType: string | null
+      sha256: string
+      bytes: number
+      file: string
+    }
+    let capturedAssetIndex: CapturedAssetIndexEntry[] = []
+    try {
+      const indexInfo = await fs.lstat(path.join(workspace.workspacePath, capturedAssetIndexPath))
+      if (!indexInfo.isFile() || indexInfo.isSymbolicLink()) {
+        throw new Error("Captured JavaScript index is not a regular file; refusing to overwrite it.")
+      }
+      const previousIndex = JSON.parse(await fs.readFile(path.join(workspace.workspacePath, capturedAssetIndexPath), "utf-8"))
+      if (previousIndex?.schemaVersion !== 1 || previousIndex?.targetURL !== workspace.targetURL || !Array.isArray(previousIndex.assets)) {
+        throw new Error("Captured JavaScript index has an invalid schema or target identity; refusing to overwrite it.")
+      }
+      capturedAssetIndex = previousIndex.assets
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+    const capturedAssetByFile = new Map(capturedAssetIndex.map((asset) => [asset.file, asset]))
+    for (const item of capturedAssetInputs) {
+      const sourceURL = safeURL(item.url) ?? safeURL(item.origin)
+      if (!sourceURL || !isJavaScriptOrSourceMapResponse(item.responseContentType, sourceURL.pathname)) continue
+      const body = unwrapProcessedResponseBody(item.responseBody ?? "").body
+      if (!body.trim()) continue
+      const sha256 = createHash("sha256").update(body, "utf-8").digest("hex")
+      const extension = isSourceMapResponse(item.responseContentType, sourceURL.pathname) ? ".map" : ".js"
+      const relativeFile = "javascript/captured/" +
+        sha256.slice(0, 16) + "-" +
+        createHash("sha256").update(sourceURL.origin + sourceURL.pathname).digest("hex").slice(0, 8) +
+        extension
+      await TargetMemory.writeWorkspaceFile(workspace, relativeFile, body)
+      capturedAssetByFile.set(relativeFile, {
+        url: sourceURL.href,
+        requestID: item.requestID,
+        ...(item.captureID ? { captureID: item.captureID } : {}),
+        contentType: item.responseContentType ?? null,
+        sha256,
+        bytes: Buffer.byteLength(body, "utf-8"),
+        file: relativeFile,
+      })
+    }
+    capturedAssetIndex = [...capturedAssetByFile.values()].sort((left, right) => left.file.localeCompare(right.file))
+    await TargetMemory.writeWorkspaceFile(workspace, capturedAssetIndexPath, JSON.stringify({
+      schemaVersion: 1,
+      targetURL: workspace.targetURL,
+      updatedAt: new Date().toISOString(),
+      assetCount: capturedAssetIndex.length,
+      assets: capturedAssetIndex,
+      note: "Raw assets are retained only for responses that passed the persisted target scope/session checks. Treat source contents as sensitive local evidence; never publish raw values in reports.",
+    }, null, 2) + "\\n")
+
     const capturedSources = extractCapturedJavaScriptSources(
-      [...versionedSourceInputs, ...legacySourceInputs],
+      capturedAssetInputs,
       analysisCache,
     )
     // Keep every distinct source location/URL for provenance. analysisCache is keyed by
