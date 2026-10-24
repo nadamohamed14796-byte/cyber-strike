@@ -1404,7 +1404,7 @@ export namespace JavaScriptCorrelation {
     const explicitSourceMapURLs = new Set<string>(
       explicitJS ? collectExplicitJavaScriptSourceMapURLs(explicitJS, [
         ...sourceCaptureRows.map((capture) => ({
-          url: capture.source_url,
+          url: capture.source_url ?? requestURL(request)?.href,
           responseBody: capture.source_content,
         })),
         ...relevantRequests.map((request) => ({
