@@ -568,25 +568,8 @@ export const WebReconTool = Tool.define("web_recon", {
       // for each host just because it matches a wildcard. The scope decision above
       // remains authoritative for the requested URL and active tools enforce scope.
 
-      const requiredPhases = requiredPhasesForWebRecon(program)
-      let requiredPhase = requiredPhases[0]
-      let gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
-      // If host inventory is already complete and URL collection is the active
-      // phase, allow the passive technology fingerprint to contribute there.
-      // Never reopen/restart the completed live_hosts_ports checkpoint.
-      if (
-        !gate.allowed &&
-        program === "tech_detect" &&
-        gate.reason.includes("current status is complete") &&
-        requiredPhases[1]
-      ) {
-        const fallbackPhase = requiredPhases[1]
-        const fallbackGate = await reconPhaseGate(targetWorkspace!, fallbackPhase)
-        if (fallbackGate.allowed) {
-          requiredPhase = fallbackPhase
-          gate = fallbackGate
-        }
-      }
+      const requiredPhase = requiredPhasesForWebRecon(program)[0]!
+      const gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
       if (!gate.allowed) {
         return fail([
           "[-] Recon phase gate blocked " + program + ".",
