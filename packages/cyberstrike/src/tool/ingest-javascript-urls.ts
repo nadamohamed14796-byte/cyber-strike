@@ -196,6 +196,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         continue
       }
       const { response, finalURL } = result
+      const remainingBudget = MAX_TOTAL_BYTES - receivedBytes
+      if (remainingBudget <= 0) {
+        await response.body?.cancel("Total JavaScript download budget exhausted")
+        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", error: "batch download budget exhausted", fetchedAt: new Date().toISOString() }
+        records.push(record); byURL.set(url, record); skipped++
+        continue
+      }
       if (!response.ok) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
@@ -203,24 +210,22 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
       const declaredLength = Number(response.headers.get("content-length") ?? "0")
-      if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
+      const readLimit = Math.min(MAX_ASSET_BYTES, remainingBudget)
+      if (Number.isFinite(declaredLength) && declaredLength > readLimit) {
+        await response.body?.cancel("JavaScript response exceeds the remaining download budget")
+        const reason = remainingBudget < MAX_ASSET_BYTES ? "declared response size exceeds the remaining batch budget" : "declared response size exceeds the asset limit"
+        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: reason, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         continue
       }
       let bytes: Uint8Array
-      try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
+      try { bytes = await readBounded(response, readLimit) }
       catch (error) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         continue
       }
       receivedBytes += bytes.byteLength
-      if (receivedBytes > MAX_TOTAL_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "batch download budget exceeded", fetchedAt: new Date().toISOString() }
-        records.push(record); byURL.set(url, record); skipped++
-        continue
-      }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
@@ -248,7 +253,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
-      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), params.source])].filter(Boolean).sort()
+      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), assetSource])].filter(Boolean).sort()
       const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
