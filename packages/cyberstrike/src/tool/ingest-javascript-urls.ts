@@ -45,7 +45,7 @@ type Manifest = {
   updatedAt: string
   assets: AssetRecord[]
   pendingURLs?: string[]
-  pendingSources?: Array<{ url: string; source: string }>
+  pendingSources?: Array<{ url: string; source: string; sources?: string[] }>
 }
 
 function normalizeURL(input: string): string | undefined {
@@ -294,7 +294,11 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         (Array.isArray(candidate.pendingSources) && candidate.pendingSources.every((item) =>
           !!item && typeof item === "object" &&
           typeof item.url === "string" && Boolean(normalizeURL(item.url)) &&
-          typeof item.source === "string" && item.source.length > 0 && item.source.length <= 120
+          typeof item.source === "string" && item.source.length > 0 && item.source.length <= 120 &&
+          (item.sources === undefined || (
+            Array.isArray(item.sources) &&
+            item.sources.every((source) => typeof source === "string" && source.length > 0 && source.length <= 120)
+          ))
         ))
       if (candidate.schemaVersion !== 1 || !validAssets || !validPendingURLs || !validPendingSources) {
         return {
@@ -328,26 +332,33 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       .filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, string>()
+    const sourceOriginsByURL = new Map<string, string[]>()
+    const addSource = (url: string, value: string) => {
+      const origins = sourceOriginsByURL.get(url) ?? []
+      for (const item of value.split(" | ").map((source) => source.trim()).filter(Boolean)) {
+        if (item.length <= 120 && !origins.includes(item)) origins.push(item)
+      }
+      sourceOriginsByURL.set(url, origins)
+      sourceByURL.set(url, mergeProvenance(...origins))
+    }
     for (const item of manifest.pendingSources ?? []) {
       const sourceURL = normalizeURL(item.url)
       if (sourceURL && queuedURLs.has(sourceURL)) {
-        sourceByURL.set(sourceURL, mergeProvenance(sourceByURL.get(sourceURL), item.source))
+        for (const origin of item.sources ?? [item.source]) addSource(sourceURL, origin)
       }
     }
     for (const item of params.url_sources) {
       const sourceURL = normalizeURL(item.url)
-      if (sourceURL && queuedURLs.has(sourceURL)) {
-        sourceByURL.set(sourceURL, mergeProvenance(sourceByURL.get(sourceURL), item.source))
-      }
+      if (sourceURL && queuedURLs.has(sourceURL)) addSource(sourceURL, item.source)
     }
     for (const rawURL of params.urls) {
       const normalized = normalizeURL(rawURL)
       if (normalized && queuedURLs.has(normalized) && !sourceByURL.has(normalized)) {
-        sourceByURL.set(normalized, params.source)
+        addSource(normalized, params.source)
       }
     }
     for (const url of inputURLs) {
-      if (!sourceByURL.has(url)) sourceByURL.set(url, params.source)
+      if (!sourceByURL.has(url)) addSource(url, params.source)
     }
     if (!inputURLs.length) {
       return {
@@ -378,6 +389,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         pendingSources: pendingURLs.map((pendingURL) => ({
           url: pendingURL,
           source: sourceByURL.get(pendingURL) ?? params.source,
+          sources: sourceOriginsByURL.get(pendingURL) ?? [params.source],
         })),
       }
       await writeManifestAtomically(manifestPath, manifest)
@@ -408,7 +420,12 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           await persistProgress(inputURLs.slice(urlIndex + 1))
           continue
         }
-        const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), ...assetSource.split(" | ")])].filter(Boolean).sort()
+        const sources = [...new Set([
+          ...(prior.sources ?? prior.source.split(" | ")),
+          ...(sourceOriginsByURL.get(url) ?? assetSource.split(" | ")),
+        ])].filter(Boolean).sort()
+        sourceOriginsByURL.set(url, sources)
+        sourceByURL.set(url, mergeProvenance(...sources))
         const record: AssetRecord = { ...prior, source: mergeProvenance(...sources), sources, status: "reused", error: undefined }
         records.push(record)
         byURL.set(url, record)
@@ -520,13 +537,15 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         if (queuedURLs.has(normalizedMapURL)) {
           // The same map may be shared by multiple bundles or supplied directly
           // before its parent bundle is processed. Preserve every observed origin.
-          sourceByURL.set(normalizedMapURL, mergeProvenance(sourceByURL.get(normalizedMapURL), mapSource))
+          addSource(normalizedMapURL, mapSource)
           const priorMap = byURL.get(normalizedMapURL)
           if (priorMap) {
             const sources = [...new Set([
               ...(priorMap.sources ?? priorMap.source.split(" | ")),
-              ...sourceByURL.get(normalizedMapURL)!.split(" | "),
+              ...(sourceOriginsByURL.get(normalizedMapURL) ?? []),
             ])].filter(Boolean).sort()
+            sourceOriginsByURL.set(normalizedMapURL, sources)
+            sourceByURL.set(normalizedMapURL, mergeProvenance(...sources))
             byURL.set(normalizedMapURL, {
               ...priorMap,
               source: mergeProvenance(...sources),
@@ -537,7 +556,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         }
         queuedURLs.add(normalizedMapURL)
         inputURLs.push(normalizedMapURL)
-        sourceByURL.set(normalizedMapURL, mapSource)
+        addSource(normalizedMapURL, mapSource)
       }
       // Persist newly discovered maps immediately after parsing each bundle. If the
       // process stops before the end-of-batch save, these URLs still remain resumable.
@@ -564,7 +583,12 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
-      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), ...assetSource.split(" | ")])].filter(Boolean).sort()
+      const sources = [...new Set([
+        ...priorSources.flatMap((value) => value.split(" | ")),
+        ...(sourceOriginsByURL.get(url) ?? assetSource.split(" | ")),
+      ])].filter(Boolean).sort()
+      sourceOriginsByURL.set(url, sources)
+      sourceByURL.set(url, mergeProvenance(...sources))
       const record: AssetRecord = { url, finalURL, source: mergeProvenance(...sources), sources, status: reusedExistingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
@@ -574,7 +598,11 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
 
     const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
-    const pendingSources = pendingURLs.map((url) => ({ url, source: sourceByURL.get(url) ?? params.source }))
+    const pendingSources = pendingURLs.map((url) => ({
+      url,
+      source: sourceByURL.get(url) ?? params.source,
+      sources: sourceOriginsByURL.get(url) ?? [params.source],
+    }))
     manifest = {
       schemaVersion: 1,
       updatedAt: new Date().toISOString(),
