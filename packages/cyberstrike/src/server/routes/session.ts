@@ -1497,16 +1497,9 @@ export const SessionRoutes = lazy(() =>
             // Mirror TaskTool's permission/tool restrictions so proxy-agent can delegate
             // to specialists without inheriting primary-only tools.
             let childSessionID: string | undefined
-            await IngestSummary.notice(
-              sessionID,
-              `[QUEUED] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}. It will appear as ANALYZING when its turn starts.`,
-            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, requestID: req.id, error: String(error) }))
-            // Serialize captured-request analyses on the owning parent session's queue, while
-            // executing each analysis in its own child session. Enqueueing by child ID
-            // creates a fresh queue per request and accidentally runs every LLM task at
-            // once, defeating backpressure and making bursts appear queued but overwhelm
-            // the model/provider. The parent queue guarantees FIFO: first request starts,
-            // later requests wait, and the next starts only when the current task settles.
+            // Keep queue bookkeeping out of the conversation transcript.
+            // The request is shown to the user only when its analysis actually starts.
+
             IngestQueue.enqueue(sessionID, async () => {
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
