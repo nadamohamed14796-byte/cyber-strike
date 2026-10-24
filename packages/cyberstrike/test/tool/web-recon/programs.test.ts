@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { headerAudit, methodCheck, sitemapScan } from "../../../src/tool/web-recon/programs"
+import { headerAudit, methodCheck, openapiScan, sitemapScan } from "../../../src/tool/web-recon/programs"
 
 test("methodCheck is passive and never sends TRACE, PUT, or DELETE", async () => {
   const methods: string[] = []
@@ -103,6 +103,42 @@ test("sitemapScan follows nested indexes and processes more than twenty eligible
     expect(result.output).toContain(target + "/pages/21")
     expect(result.output).toContain(target + "/pages/nested")
     expect(requests).toHaveLength(24)
+  } finally {
+    server.stop(true)
+  }
+})
+
+
+test("openapiScan preserves every path and HTTP method from a large API specification", async () => {
+  const paths = Object.fromEntries(Array.from({ length: 40 }, (_, index) => [
+    "/api/items/" + index,
+    { get: { summary: "Read item " + index }, post: { summary: "Update item " + index } },
+  ]))
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname !== "/openapi.json") {
+        return new Response("not found", { status: 404 })
+      }
+      return new Response(JSON.stringify({
+        openapi: "3.0.0",
+        info: { title: "Fixture API", version: "1" },
+        paths,
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    },
+  })
+
+  try {
+    const target = "http://127.0.0.1:" + server.port
+    const result = await openapiScan(target, [], 2)
+    expect(result.output).toContain("GET /api/items/0")
+    expect(result.output).toContain("POST /api/items/39")
+    expect(result.output).toContain("Endpoints: 80")
+    expect(result.output).not.toContain("... and")
   } finally {
     server.stop(true)
   }
