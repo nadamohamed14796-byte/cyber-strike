@@ -201,7 +201,7 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Pass URLs in batches of at most 500; leaving urls empty resumes the pending queue saved in the manifest. Use source as fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, continue with those URLs in batches of at most 500 and pass matching metadata.pending_sources as url_sources until no pending URLs remain. The pending queue is persisted; the 64 MiB byte budget is per invocation, not a total-work cap.",
+    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Pass new URLs in batches of at most 500; leaving urls empty resumes the persistent pending queue saved in the manifest. Use source as fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, immediately invoke the tool again with the same target_url and urls: []; do not copy the pending list back into the call because the manifest already persists those URLs and their sources. Repeat until metadata.pending_urls is empty. The 64 MiB byte budget is enforced before body consumption and applies per invocation, not to the total run.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, errors, and a persistent pending queue so interrupted batches can resume on the next invocation. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
@@ -503,13 +503,6 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         continue
       }
       receivedBytes += bytes.byteLength
-      if (receivedBytes > MAX_BATCH_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "per-invocation byte budget reached; retry this URL in a subsequent batch", fetchedAt: new Date().toISOString() }
-        records.push(record); byURL.set(url, record); skipped++
-        budgetDeferredURL = url
-        await persistProgress(inputURLs.slice(urlIndex))
-        break
-      }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
@@ -610,7 +603,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Manifest: " + manifestPath,
         analysisSummary,
         ...(pendingURLs.length ? [
-          "Continue by passing metadata.pending_urls to ingest_javascript_urls in batches of at most " + MAX_URLS + " URLs, plus matching metadata.pending_sources as url_sources to preserve provenance. The byte budget applies per invocation, not to the total run.",
+          "Resume by calling ingest_javascript_urls again with the same target_url and urls: []. The manifest already persists pending URLs and their sources, so do not pass metadata.pending_urls back as new inputs. Repeat until the pending list is empty.",
         ] : []),
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => record.url + " — " + record.status + ": " + record.error),
       ].join("\n"),
