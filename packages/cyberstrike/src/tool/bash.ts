@@ -723,7 +723,7 @@ async function readTargetListInputs(args: string[], cwd: string): Promise<{ pres
  * Requests that do not follow redirects remain eligible for the ordinary
  * per-target scope check below.
  */
-export function scannerRedirectScopeBlockReason(
+export function scannerRequestScopeBlockReason(
   scannerInput: string,
   args: string[],
   launcherPrefix: string[] = [],
@@ -731,9 +731,24 @@ export function scannerRedirectScopeBlockReason(
   const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
   const values = args.map(stripOuterShellQuotes)
   const prefix = launcherPrefix.map(stripOuterShellQuotes)
+  const hasOption = (options: string[]) => values.some((value) =>
+    options.some((option) => value === option || value.startsWith(option + "=")),
+  )
+  const hasHostOverride = () => {
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i]!
+      let header: string | undefined
+      if (value === "-H" || value.toLowerCase() === "--header") header = values[i + 1]
+      else if (value.toLowerCase().startsWith("--header=")) header = value.slice(value.indexOf("=") + 1)
+      else if (value.startsWith("-H") && value.length > 2) header = value.slice(2)
+      if (header && header.split(":", 1)[0]!.trim().toLowerCase() === "host") return true
+    }
+    return false
+  }
+
   if (scanner === "curl") {
     if (values[0] !== "-q" && values[0] !== "--disable") {
-      return "curl may load ~/.curlrc, which can alter redirects and request behavior. Put -q (or --disable) first so the checked command is the effective command."
+      return "curl may load ~/.curlrc, which can alter redirects, routing, and request behavior. Put -q (or --disable) first so the checked command is the effective command."
     }
     const followsRedirect = values.some((value) =>
       value === "--location" ||
@@ -744,7 +759,17 @@ export function scannerRedirectScopeBlockReason(
     if (followsRedirect) {
       return "curl redirect-follow options can issue a second request outside the persisted scope. Remove -L/--location or use a scope-aware request pipeline that checks every redirect target."
     }
+    if (hasOption([
+      "--resolve", "--connect-to", "--proxy", "--preproxy", "--proxy-header",
+      "--interface", "--unix-socket", "--abstract-unix-socket", "--config",
+    ]) || values.some((value) => value === "-x" || /^-x.+/.test(value) || value === "-K" || /^-K.+/.test(value))) {
+      return "curl routing/configuration overrides can change the actual destination or request behavior after the URL scope check. Remove proxy, resolve/connect-to, interface, socket, and explicit config overrides; use a scope-aware request tool if they are essential."
+    }
+    if (hasHostOverride()) {
+      return "Overriding the HTTP Host header can route an in-scope URL to a different virtual host. Remove the Host override and use an explicitly scoped target URL."
+    }
   }
+
   if (scanner === "wget") {
     const configDisabled = prefix.some((value) => value.toLowerCase() === "env") &&
       prefix.some((value) => value === "WGETRC=/dev/null")
@@ -758,11 +783,18 @@ export function scannerRedirectScopeBlockReason(
       return "wget follows redirects by default. Set exactly one explicit --max-redirect=0 so no redirected request can bypass persisted-scope checking."
     }
     const option = optionIndexes[0]!
-    const value = option.value.startsWith("--max-redirect=")
+    const redirectValue = option.value.startsWith("--max-redirect=")
       ? option.value.slice("--max-redirect=".length)
       : values[option.index + 1]
-    if (value !== "0") {
+    if (redirectValue !== "0") {
       return "wget redirect following is blocked for generic shell mode. Set --max-redirect=0, or use a scope-aware request pipeline that checks every redirect target."
+    }
+    if (hasOption(["-i", "--input-file", "--input-file=", "--execute", "-e", "--recursive", "--mirror", "--span-hosts", "--page-requisites"]) ||
+      values.some((value) => /^-[^-]*[rHmpe]/.test(value))) {
+      return "wget input-list, configuration-execution, recursive, cross-host, and page-requisite modes can issue unchecked follow-up requests. Use one explicit URL with no recursive/list mode, or use a scope-aware collection pipeline."
+    }
+    if (hasHostOverride()) {
+      return "Overriding the HTTP Host header can route an in-scope URL to a different virtual host. Remove the Host override and use an explicitly scoped target URL."
     }
   }
   return undefined
@@ -798,7 +830,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   if (["hakrawler", "gospider"].includes(scanner)) {
     throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl cannot consult persisted scope before each request. Use the scope-aware browser/recon pipeline.")
   }
-  const redirectReason = scannerRedirectScopeBlockReason(scanner, args, command.slice(0, scannerIndex))
+  const redirectReason = scannerRequestScopeBlockReason(scanner, args, command.slice(0, scannerIndex))
   if (redirectReason) {
     throw new Error("Recon execution gate blocked " + scanner + ": " + redirectReason + " No network request was started.")
   }
@@ -835,9 +867,28 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   // Plain retrieval belongs to URL collection; mutating/non-safe HTTP methods
   // are active vulnerability testing and must wait for the final inventory gate.
   if (scanner === "curl") {
-    const methodIndex = args.findIndex((value) => ["-x", "--request"].includes(value.toLowerCase()))
-    const explicitMethod = methodIndex >= 0 ? args[methodIndex + 1]?.toUpperCase() : undefined
-    const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form"].includes(value))
+    const methodIndex = args.findIndex((value) => ["-x", "--request", "--method"].includes(value.toLowerCase()))
+    const inlineMethod = args.find((value) => /^-X(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)$/i.test(value))
+      ?? args.find((value) => /^(?:--request|--method)=/i.test(value))
+    const explicitMethod = methodIndex >= 0
+      ? args[methodIndex + 1]?.toUpperCase()
+      : inlineMethod?.replace(/^(?:--request|--method)=/i, "").replace(/^-X/i, "").toUpperCase()
+    const hasBody = args.some((value) => [
+      "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--json",
+      "-F", "--form", "--form-string", "-T", "--upload-file", "--upload-file=",
+    ].some((flag) => value === flag || value.startsWith(flag + "=")))
+    if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
+  }
+  if (scanner === "wget") {
+    const explicitMethodIndex = args.findIndex((value) => value === "--method" || value.startsWith("--method="))
+    const explicitMethod = explicitMethodIndex >= 0
+      ? (args[explicitMethodIndex]!.includes("=")
+        ? args[explicitMethodIndex]!.slice(args[explicitMethodIndex]!.indexOf("=") + 1)
+        : args[explicitMethodIndex + 1])?.toUpperCase()
+      : undefined
+    const hasBody = args.some((value) => [
+      "--body-data", "--body-file", "--post-data", "--post-file",
+    ].some((flag) => value === flag || value.startsWith(flag + "=")))
     if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
   }
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
