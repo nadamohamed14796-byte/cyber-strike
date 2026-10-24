@@ -246,6 +246,14 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     let manifest: Manifest = { schemaVersion: 1, updatedAt: new Date().toISOString(), assets: [] }
     try {
+      const manifestInfo = await fs.lstat(manifestPath)
+      if (manifestInfo.isSymbolicLink() || !manifestInfo.isFile()) {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest is not a regular file inside the target workspace. It was preserved without reading or overwriting: " + manifestPath,
+          metadata: { error: "manifest_unsafe_path", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
       const rawManifest = await fs.readFile(manifestPath, "utf8")
       let parsed: unknown
       try {
@@ -438,12 +446,27 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       // Feed external source-map links discovered inside each bundle into this same queue.
       // Every map goes through the same persisted-scope and redirect checks as any other URL.
+      const queueLengthBeforeMaps = inputURLs.length
       for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
         const normalizedMapURL = normalizeURL(mapURL)
         if (!normalizedMapURL || queuedURLs.has(normalizedMapURL)) continue
         queuedURLs.add(normalizedMapURL)
         inputURLs.push(normalizedMapURL)
         sourceByURL.set(normalizedMapURL, ("sourceMappingURL from " + url).slice(0, 120))
+      }
+      // Persist newly discovered maps immediately after parsing each bundle. If the
+      // process stops before the end-of-batch save, these URLs still remain resumable.
+      if (inputURLs.length > queueLengthBeforeMaps) {
+        manifest = {
+          ...manifest,
+          updatedAt: new Date().toISOString(),
+          pendingURLs: inputURLs,
+          pendingSources: inputURLs.map((pendingURL) => ({
+            url: pendingURL,
+            source: sourceByURL.get(pendingURL) ?? params.source,
+          })),
+        }
+        await writeManifestAtomically(manifestPath, manifest)
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
