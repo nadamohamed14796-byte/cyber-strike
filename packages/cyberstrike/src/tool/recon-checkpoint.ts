@@ -346,6 +346,79 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               metadata: { saved: false, reason: "canonical_artifact_required", phase, missing_artifacts: missingRequired },
             }
           }
+          if (phase === "javascript_analysis") {
+            // A non-empty markdown summary alone is not proof that JavaScript was
+            // collected and analyzed. Require at least one non-empty source file in
+            // the canonical javascript/ directory, or a valid captured-asset index
+            // whose referenced files exist inside the same target workspace.
+            const javascriptRoot = path.join(realWorkspace, "javascript")
+            let hasJavaScriptEvidence = false
+            const indexPath = path.join(javascriptRoot, "captured-index.json")
+            try {
+              const indexInfo = await fs.lstat(indexPath)
+              if (!indexInfo.isFile() || indexInfo.isSymbolicLink()) throw new Error("captured index is not a regular file")
+              const index = JSON.parse(await fs.readFile(indexPath, "utf-8"))
+              if (index?.schemaVersion !== 1 || index?.targetURL !== workspace.targetURL || !Array.isArray(index.assets)) {
+                throw new Error("captured index has an invalid schema or target identity")
+              }
+              for (const asset of index.assets) {
+                if (typeof asset?.file !== "string" || asset.file.includes("\\\\") || asset.file.split("/").some((part: string) => part === "..")) continue
+                const candidate = path.resolve(realWorkspace, asset.file)
+                const relative = path.relative(realWorkspace, candidate)
+                if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) continue
+                try {
+                  const info = await fs.lstat(candidate)
+                  if (info.isFile() && !info.isSymbolicLink() && info.size > 0) {
+                    hasJavaScriptEvidence = true
+                    break
+                  }
+                } catch {
+                  // A missing indexed asset does not count as evidence.
+                }
+              }
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+                return { title: "JavaScript checkpoint rejected", output: "Cannot verify captured JavaScript evidence: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "javascript_evidence_index_invalid" } }
+              }
+            }
+            if (!hasJavaScriptEvidence) {
+              const pending: string[] = [javascriptRoot]
+              while (pending.length && !hasJavaScriptEvidence) {
+                const directory = pending.pop()!
+                let entries
+                try {
+                  entries = await fs.readdir(directory, { withFileTypes: true })
+                } catch {
+                  continue
+                }
+                for (const entry of entries) {
+                  const candidate = path.join(directory, entry.name)
+                  if (entry.isSymbolicLink()) continue
+                  if (entry.isDirectory()) {
+                    if (candidate !== javascriptRoot) pending.push(candidate)
+                    continue
+                  }
+                  if (!entry.isFile() || !/\\.(?:m?js|cjs|map)$/i.test(entry.name)) continue
+                  try {
+                    const info = await fs.lstat(candidate)
+                    if (info.isFile() && !info.isSymbolicLink() && info.size > 0) {
+                      hasJavaScriptEvidence = true
+                      break
+                    }
+                  } catch {
+                    // Ignore files that disappeared while checking.
+                  }
+                }
+              }
+            }
+            if (!hasJavaScriptEvidence) {
+              return {
+                title: "JavaScript checkpoint rejected",
+                output: "Cannot mark javascript_analysis complete: no non-empty JavaScript/source-map asset was verified under javascript/. Collect and save the in-scope response bodies, then run correlate_javascript. If the target genuinely exposes no JavaScript assets, mark this phase unavailable with that evidence instead of claiming completion.",
+                metadata: { saved: false, reason: "javascript_evidence_missing", phase },
+              }
+            }
+          }
           for (const required of RECON_PHASE_REQUIRED_FLAT_ARTIFACTS[phase] ?? []) {
             try {
               const content = await fs.readFile(path.join(realWorkspace, required), "utf-8")
