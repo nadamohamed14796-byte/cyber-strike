@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { IngestQueue } from "../../src/session/ingest-queue"
+import { IngestSummary } from "../../src/session/ingest-summary"
 import { SessionQueueStatus } from "../../src/session/queue-status"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -278,6 +279,25 @@ describe("SessionQueueStatus", () => {
   })
 })
 
+
+describe("Extension ingest transcript visibility", () => {
+  test("writes intake and completion notices into the parent session transcript", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "extension-ingest-visibility-test" })
+      await IngestSummary.notice(session.id, "Extension request queued for independent analysis: GET /profile")
+      await IngestSummary.notice(session.id, "Extension request analysis completed: GET /profile")
+
+      const messages = await Session.messages({ sessionID: session.id })
+      const text = messages.flatMap((message) => message.parts)
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+
+      expect(text).toContain("Extension request queued for independent analysis: GET /profile")
+      expect(text).toContain("Extension request analysis completed: GET /profile")
+      await Session.remove(session.id)
+    })
+  })
+})
 
 describe("Request processing outcome persistence", () => {
   test("stores failed separately from processed", async () => {
