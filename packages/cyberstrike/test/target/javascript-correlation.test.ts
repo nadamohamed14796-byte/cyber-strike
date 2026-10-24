@@ -925,6 +925,17 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
           expect(artifact).not.toContain(rawSecret)
           expect(artifact).not.toContain("document.body.innerHTML = value")
         }
+
+        // Re-running correlation must reuse the captured evidence without duplicating
+        // the same raw local files as additional source records or endpoint candidates.
+        const resumed = await JavaScriptCorrelation.build({
+          sessionID: session.id,
+          targetURL,
+          javascriptURL: bundleURL,
+        })
+        expect(resumed.capturedAssetCount).toBe(result.capturedAssetCount)
+        expect(resumed.graph.sourceFiles.length).toBe(result.graph.sourceFiles.length)
+        expect(resumed.graph.endpointCandidates.length).toBe(result.graph.endpointCandidates.length)
       } finally {
         await Instance.dispose()
       }
