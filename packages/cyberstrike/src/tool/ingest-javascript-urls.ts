@@ -478,12 +478,16 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
-      let localPath = existingContent?.localPath
+      let localPath: string
+      let reusedExistingContent = false
       if (
-        !localPath ||
-        !await isSavedAssetPath(localPath, assetsDir) ||
-        !await savedAssetMatchesHash(localPath, contentHash)
+        existingContent?.localPath &&
+        await isSavedAssetPath(existingContent.localPath, assetsDir) &&
+        await savedAssetMatchesHash(existingContent.localPath, contentHash)
       ) {
+        localPath = existingContent.localPath
+        reusedExistingContent = true
+      } else {
         const extension = extensionFor(finalURL, contentType)
         localPath = path.join(assetsDir, contentHash + extension)
         // A content-addressed file is always written completely before it becomes
@@ -493,10 +497,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
       const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), ...assetSource.split(" | ")])].filter(Boolean).sort()
-      const record: AssetRecord = { url, finalURL, source: mergeProvenance(...sources), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const record: AssetRecord = { url, finalURL, source: mergeProvenance(...sources), sources, status: reusedExistingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
-      if (existingContent) reused++
+      if (reusedExistingContent) reused++
       else { downloaded++; downloadedBytes += bytes.byteLength }
       await persistProgress(inputURLs.slice(urlIndex + 1))
     }
