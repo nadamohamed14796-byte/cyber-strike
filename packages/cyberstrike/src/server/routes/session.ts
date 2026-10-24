@@ -1490,18 +1490,12 @@ export const SessionRoutes = lazy(() =>
             // agent or an unrelated specialist; plain-text ingest retains its explicit agent option.
             const agentName = "proxy-agent"
             const source = `${normalized.method} ${normalized.normalizedPath}`
-            // Give every captured request its own child session. The old queue was keyed
-            // by the shared parent session, so one slow extension request blocked every
-            // later request and changed the parent session active status/model context.
-            // Child sessions run independently while session-tree-aware tools continue to
-            // read/write shared root request, credential, observation and target memory.
-            // Dispatch this capture as a real proxy-agent subtask. Subagents are
-            // backed by an internal child session in CyberStrike, but this is not a new
-            // user chat/window: it is a bounded task owned by the active session.
-            // Mirror TaskTool's permission and tool restrictions so proxy-agent can
-            // delegate to specialists without inheriting primary-only tools.
-            // Do not create a subagent session for every queued request up front.
-            // Start the subagent only when this request reaches the head of the FIFO queue.
+            // Each captured request is a bounded proxy-agent subtask owned by the active
+            // session, not a new user chat/window. CyberStrike backs subagents with an
+            // internal child session, but we create it only when the request reaches the
+            // head of the parent's FIFO queue so queued requests do not open idle sessions.
+            // Mirror TaskTool's permission/tool restrictions so proxy-agent can delegate
+            // to specialists without inheriting primary-only tools.
             let childSessionID: string | undefined
             await IngestSummary.notice(
               sessionID,
