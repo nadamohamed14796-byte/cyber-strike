@@ -1484,8 +1484,19 @@ export namespace JavaScriptCorrelation {
         throw new Error("Captured JavaScript index is not a regular file; refusing to overwrite it.")
       }
       const previousIndex = JSON.parse(await fs.readFile(path.join(workspace.workspacePath, capturedAssetIndexPath), "utf-8"))
-      if (previousIndex?.schemaVersion !== 1 || previousIndex?.targetURL !== workspace.targetURL || !Array.isArray(previousIndex.assets)) {
-        throw new Error("Captured JavaScript index has an invalid schema or target identity; refusing to overwrite it.")
+      if (
+        previousIndex?.schemaVersion !== 1 ||
+        previousIndex?.targetURL !== workspace.targetURL ||
+        !Array.isArray(previousIndex.assets) ||
+        !previousIndex.assets.every((asset: CapturedAssetIndexEntry) =>
+          typeof asset?.file === "string" &&
+          typeof asset.url === "string" &&
+          typeof asset.requestID === "string" &&
+          typeof asset.sha256 === "string" &&
+          typeof asset.bytes === "number"
+        )
+      ) {
+        throw new Error("Captured JavaScript index has an invalid schema, asset record, or target identity; refusing to overwrite it.")
       }
       capturedAssetIndex = previousIndex.assets
     } catch (error) {
