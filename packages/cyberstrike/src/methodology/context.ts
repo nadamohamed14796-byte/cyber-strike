@@ -227,9 +227,10 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
   const isReconPhase = ["scope_analysis", "passive_recon", "active_recon"].includes(phaseId)
   const lines = [
     ...(isReconPhase ? [
-      "## Canonical Recon Workflow",
-      "Follow methodology/recon.ts and the registered recon_checkpoint for phase order, prerequisites, and state. The checkpoint and phase matrix define objectives, canonical artifacts, and completion checks—not a tool allowlist. At every active checkpoint, consider all actually registered/connected tools, suitable verified CLIs, and reachable APIs; choose dynamically based on evidence gaps, capability, runtime availability, saved results, and policy. Read .cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md for phase artifacts/completion only; use .cyberstrike/skill/TOOLING_CATALOG.md as the sole non-exhaustive tool/API/CLI/helper reference and asset-discovery ledger schema. Tool-category examples are advisory, not assignments. Preflight a CLI once per runtime/version change. Preserve the explicit vulnerability-testing checkpoint and request-level scope gates.",
-      "Persist useful raw and normalized artifacts with provenance, counts, and errors. Distinguish zero results from failed/unavailable/blocked sources, and complete a phase only after its artifacts are verified. Reuse completed outputs; do not repeat equivalent work without new evidence or a changed failure cause.",
+      "## Recon Workflow",
+      "Follow packages/cyberstrike/src/command/template/recon.txt for the workflow and methodology/recon.ts plus recon_checkpoint for resumable phase state.",
+      "The phase matrix defines canonical outputs; TOOLING_CATALOG is the shared, non-exhaustive tool reference. Neither is a tool allowlist. At every checkpoint, select any suitable available registered tool, verified CLI, or API based on the current evidence gap, capability, saved results, and policy. Preflight a CLI once per runtime/version, and never let stale phase state block useful recon.",
+      "Reuse verified work, save canonical artifacts with useful provenance, and distinguish empty results from failures or blocked sources. Prioritize collecting and analyzing JavaScript URLs and source maps as inert text, then merge deduplicated endpoint evidence. Preserve request-level scope enforcement and keep vulnerability testing opt-in.",
       "",
     ] : []),
     "## Required Skill Preflight",
