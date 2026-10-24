@@ -106,6 +106,41 @@ async function isSavedAssetPath(candidatePath: string, assetsDir: string): Promi
   }
 }
 
+async function savedAssetMatchesHash(candidatePath: string, expectedHash: string): Promise<boolean> {
+  try {
+    const digest = createHash("sha256").update(await fs.readFile(candidatePath)).digest("hex")
+    return digest === expectedHash
+  } catch {
+    return false
+  }
+}
+
+async function writeManifestAtomically(manifestPath: string, manifest: Manifest): Promise<void> {
+  const temporaryPath = manifestPath + "." + randomUUID() + ".tmp"
+  try {
+    await fs.writeFile(temporaryPath, JSON.stringify(manifest, null, 2) + "\n", {
+      encoding: "utf8",
+      flag: "wx",
+      mode: 0o600,
+    })
+    await fs.rename(temporaryPath, manifestPath)
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => {})
+    throw error
+  }
+}
+
+async function writeAssetAtomically(localPath: string, bytes: Uint8Array): Promise<void> {
+  const temporaryPath = localPath + "." + randomUUID() + ".tmp"
+  try {
+    await fs.writeFile(temporaryPath, bytes, { flag: "wx", mode: 0o600 })
+    await fs.rename(temporaryPath, localPath)
+  } catch (error) {
+    await fs.rm(temporaryPath, { force: true }).catch(() => {})
+    throw error
+  }
+}
+
 async function readBounded(response: Response, limit: number): Promise<Uint8Array> {
   if (!response.body) return new Uint8Array()
   const reader = response.body.getReader()
@@ -323,10 +358,26 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let failed = 0
     let budgetDeferredURL: string | undefined
 
+    // Persist the full queue before network work begins. If the terminal or process
+    // stops mid-batch, the next invocation can safely retry the remaining inputs.
+    manifest = {
+      ...manifest,
+      updatedAt: new Date().toISOString(),
+      pendingURLs: inputURLs,
+      pendingSources: inputURLs.map((url) => ({ url, source: sourceByURL.get(url) ?? params.source })),
+    }
+    await writeManifestAtomically(manifestPath, manifest)
+
     for (const url of inputURLs) {
       const assetSource = sourceByURL.get(url) ?? params.source
       const prior = byURL.get(url)
-      if (!params.force_refresh && prior?.contentHash && prior.localPath && await isSavedAssetPath(prior.localPath, assetsDir)) {
+      if (
+        !params.force_refresh &&
+        prior?.contentHash &&
+        prior.localPath &&
+        await isSavedAssetPath(prior.localPath, assetsDir) &&
+        await savedAssetMatchesHash(prior.localPath, prior.contentHash)
+      ) {
         const currentScope = await TargetMemory.checkURLScope(url)
         const finalScope = prior.finalURL ? await TargetMemory.checkURLScope(prior.finalURL) : currentScope
         if (!currentScope.allowed || !finalScope.allowed) {
@@ -397,12 +448,16 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
       let localPath = existingContent?.localPath
-      if (!localPath || !await Bun.file(localPath).exists()) {
+      if (
+        !localPath ||
+        !await isSavedAssetPath(localPath, assetsDir) ||
+        !await savedAssetMatchesHash(localPath, contentHash)
+      ) {
         const extension = extensionFor(finalURL, contentType)
         localPath = path.join(assetsDir, contentHash + extension)
-        await fs.writeFile(localPath, bytes, { flag: "wx" }).catch(async (error: NodeJS.ErrnoException) => {
-          if (error.code !== "EEXIST") throw error
-        })
+        // A content-addressed file is always written completely before it becomes
+        // visible under its final name; orphaned partial files are never reused.
+        await writeAssetAtomically(localPath, bytes)
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
@@ -423,16 +478,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       pendingURLs,
       pendingSources,
     }
-    // Use an exclusive, unpredictable temporary name so a pre-existing symlink
-    // cannot redirect manifest writes outside the target workspace.
-    const temporaryManifest = manifestPath + "." + randomUUID() + ".tmp"
-    try {
-      await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", { encoding: "utf8", flag: "wx", mode: 0o600 })
-      await fs.rename(temporaryManifest, manifestPath)
-    } catch (error) {
-      await fs.rm(temporaryManifest, { force: true }).catch(() => {})
-      throw error
-    }
+    await writeManifestAtomically(manifestPath, manifest)
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
     if (downloaded + reused > 0) {
