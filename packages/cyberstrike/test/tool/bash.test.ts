@@ -140,12 +140,13 @@ describe("Redirect scope enforcement for generic HTTP clients", () => {
     expect(scannerRedirectScopeBlockReason("curl", ["-q", "--location-trusted", "https://example.com/asset.js"])).toContain("persisted scope")
   })
 
-  test("wget must explicitly disable automatic redirects in generic shell mode", () => {
-    expect(scannerRedirectScopeBlockReason("wget", ["https://example.com/asset.js"])).toContain("follows redirects by default")
-    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect=0", "https://example.com/asset.js"])).toBeUndefined()
-    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect", "0", "https://example.com/asset.js"])).toBeUndefined()
-    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect=1", "https://example.com/asset.js"])).toContain("redirect following is blocked")
-    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect=0", "--max-redirect=5", "https://example.com/asset.js"])).toContain("exactly one explicit")
+  test("wget disables user config and automatic redirects in generic shell mode", () => {
+    expect(scannerRedirectScopeBlockReason("wget", ["https://example.com/asset.js"])).toContain("~/.wgetrc")
+    const noConfig = ["env", "WGETRC=/dev/null"]
+    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect=0", "https://example.com/asset.js"], noConfig)).toBeUndefined()
+    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect", "0", "https://example.com/asset.js"], noConfig)).toBeUndefined()
+    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect=1", "https://example.com/asset.js"], noConfig)).toContain("redirect following is blocked")
+    expect(scannerRedirectScopeBlockReason("wget", ["--max-redirect=0", "--max-redirect=5", "https://example.com/asset.js"], noConfig)).toContain("exactly one explicit")
   })
 })
 
