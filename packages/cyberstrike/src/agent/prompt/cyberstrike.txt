@@ -267,9 +267,7 @@ Use **web_recon** only after the user explicitly requests targeted vulnerability
 - Passively checks OPTIONS `Allow` headers for advertised dangerous methods; never sends TRACE, PUT, or DELETE requests
 - Tests open redirect on pages with redirect-like query parameters
 
-**Limits:** max 10 origins, 3 CORS targets per origin, 10 redirect pages, 5 min deadline.
-Template paths ({id}) from discovery are skipped (origin-level checks still run).
-If more origins exist or template endpoints need testing, run targeted programs.
+Process all eligible origins and redirect-like pages; use resumable batches when needed, without arbitrary total caps or a fixed overall deadline. Preserve the tool's request-level scope, rate, and impact safeguards. Template paths ({id}) may need a suitable targeted check; do not silently count skipped endpoints as tested.
 
 **Standalone checks:** Individual programs (`header_audit`, `cors_check`,
 `sensitive_files`, `tech_detect`, etc.) can also run against a specific target URL
