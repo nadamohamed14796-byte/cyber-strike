@@ -81,10 +81,21 @@ export namespace IngestSummary {
     })
   }
 
+  export type RequestAnalysisStatus = "analyzing" | "processed" | "failed"
+
+  export interface RequestAnalysis {
+    requestID: string
+    analysisSessionID: string
+    method: string
+    url: string
+    status: RequestAnalysisStatus
+  }
+
   export interface LiveNotice {
     messageID: string
     partID: string
     startedAt: number
+    requestAnalysis: Omit<RequestAnalysis, "status">
   }
 
   /** Create one parent-transcript entry that can be updated as the subagent streams.
@@ -95,6 +106,7 @@ export namespace IngestSummary {
     agent: string
     model: { providerID: string; modelID: string }
     text: string
+    requestAnalysis: Omit<RequestAnalysis, "status">
   }): Promise<LiveNotice> {
     const startedAt = Date.now()
     const messageID = Identifier.ascending("message")
@@ -114,9 +126,14 @@ export namespace IngestSummary {
       type: "text",
       text: input.text,
       time: { start: startedAt },
-      metadata: { kind: KIND, notice: true, live: true },
+      metadata: {
+        kind: KIND,
+        notice: true,
+        live: true,
+        requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
+      },
     })
-    return { messageID, partID, startedAt }
+    return { messageID, partID, startedAt, requestAnalysis: input.requestAnalysis }
   }
 
   /** Update the same visible transcript entry while the captured request is analyzed. */
@@ -125,6 +142,7 @@ export namespace IngestSummary {
     live: LiveNotice
     text: string
     completed?: boolean
+    status?: RequestAnalysisStatus
   }): Promise<void> {
     await Session.updatePart({
       id: input.live.partID,
@@ -136,7 +154,15 @@ export namespace IngestSummary {
         start: input.live.startedAt,
         ...(input.completed ? { end: Date.now() } : {}),
       },
-      metadata: { kind: KIND, notice: true, live: !input.completed },
+      metadata: {
+        kind: KIND,
+        notice: true,
+        live: !input.completed,
+        requestAnalysis: {
+          ...input.live.requestAnalysis,
+          status: input.status ?? "analyzing",
+        },
+      },
     })
   }
 
