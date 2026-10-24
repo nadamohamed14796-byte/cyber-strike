@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision } from "../../src/target/recon-gate"
+import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconManifestExecutionDecision, reconPhaseExecutionDecision } from "../../src/target/recon-gate"
 import {
   reconRunID,
   reconBeginDisposition,
@@ -193,6 +193,37 @@ test("JavaScript and endpoint phases require non-skippable canonical handoff fil
   expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints.txt"])).toEqual([])
 })
 
+
+
+test("ordinary recon is not blocked when the checkpoint manifest is absent or stale", () => {
+  expect(reconManifestExecutionDecision("asset_discovery")).toEqual({
+    allowed: true,
+    reason: "ordinary reconnaissance tools are governed by request-level scope checks, not checkpoint manifest state",
+  })
+  expect(reconManifestExecutionDecision("url_collection")).toEqual({
+    allowed: true,
+    reason: "ordinary reconnaissance tools are governed by request-level scope checks, not checkpoint manifest state",
+  })
+})
+
+test("vulnerability testing fails closed without a valid checkpoint manifest", () => {
+  const decision = reconManifestExecutionDecision("vulnerability_testing")
+  expect(decision.allowed).toBe(false)
+  expect(decision.reason).toContain("requires a valid recon checkpoint manifest")
+})
+
+test("vulnerability testing keeps the explicit checkpoint and handoff requirements", () => {
+  const run = initialReconRun("https://example.com", "target-root-1", "session-1")
+  run.phases.scope_validation = { status: "complete" }
+  run.phases.workspace_setup = { status: "complete" }
+  run.phases.endpoint_inventory = { status: "complete" }
+  expect(reconManifestExecutionDecision("vulnerability_testing", run).allowed).toBe(false)
+  run.phases.vulnerability_testing = { status: "running" }
+  expect(reconManifestExecutionDecision("vulnerability_testing", run)).toEqual({
+    allowed: true,
+    reason: "explicit vulnerability-testing checkpoint and prerequisites passed",
+  })
+})
 
 test("ordinary recon tools are allowed when no checkpoint is actively running", () => {
   const state = records("complete")
