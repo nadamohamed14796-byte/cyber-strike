@@ -56,6 +56,32 @@ export namespace IngestSummary {
     after: Snapshot
   }
 
+  /** Add a non-agent notification to the parent transcript. This makes extension
+   * intake and completion visible in the active window without starting or
+   * interrupting the parent agent. */
+  export async function notice(sessionID: string, text: string): Promise<void> {
+    const { SessionPrompt } = await import("./prompt")
+    const model = await SessionPrompt.lastModel(sessionID)
+    const messageID = Identifier.ascending("message")
+    await Session.updateMessage({
+      id: messageID,
+      role: "user",
+      sessionID,
+      time: { created: Date.now() },
+      agent: "proxy-agent",
+      model,
+    })
+    await Session.updatePart({
+      id: Identifier.ascending("part"),
+      messageID,
+      sessionID,
+      type: "text",
+      text,
+      time: { start: Date.now(), end: Date.now() },
+      metadata: { kind: KIND, notice: true },
+    })
+  }
+
   export async function write(input: WriteInput): Promise<void> {
     const delta = formatDelta(input.before, input.after)
     if (!delta) return
