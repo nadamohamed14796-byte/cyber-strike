@@ -41,9 +41,9 @@ function isBinaryBuffer(buf: Buffer): boolean {
 }
 
 /**
- * Nominal task classification used to identify agent-executable scanner commands.
- * Values are advisory routing hints, not a per-checkpoint tool allowlist; the
- * active recon checkpoint and persisted scope are enforced separately below.
+ * Classify scanner intent, not tool availability.
+ * Ordinary recon is not phase-gated; persisted scope is checked per target below.
+ * Only vulnerability-testing commands require the explicit testing checkpoint.
  */
 const SCANNER_NOMINAL_PHASES: Record<string, ReconPhase> = {
   subfinder: "asset_discovery",
