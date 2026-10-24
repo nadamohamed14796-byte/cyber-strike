@@ -772,6 +772,21 @@ test("does not persist source-map JSON in generic response previews", () => {
 })
 
 
+test("refuses to inventory JavaScript through a root symlink", async () => {
+  const parent = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-js-root-symlink-"))
+  const outside = path.join(parent, "outside")
+  const root = path.join(parent, "javascript")
+  try {
+    await fs.mkdir(outside)
+    await fs.writeFile(path.join(outside, "app.js"), 'fetch("/api/private")')
+    await fs.symlink(outside, root, "dir")
+    await expect(inventoryJavaScriptFiles(root)).rejects.toThrow(/symbolic link|canonical workspace/i)
+  } finally {
+    await fs.rm(parent, { recursive: true, force: true })
+  }
+})
+
+
 test("inventories local .map and inline source maps and analyzes embedded sources without persisting source code", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-js-inventory-"))
   const javascriptDir = path.join(root, "javascript")
