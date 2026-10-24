@@ -1499,7 +1499,7 @@ export const SessionRoutes = lazy(() =>
             let childSessionID: string | undefined
             await IngestSummary.notice(
               sessionID,
-              `Extension request queued for proxy-agent subtask: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}. It will start automatically when earlier requests finish.`,
+              `[QUEUED] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}. It will appear as ANALYZING when its turn starts.`,
             ).catch((error) => log.warn("parent ingest notice failed", { sessionID, requestID: req.id, error: String(error) }))
             // Serialize captured-request analyses on the owning parent session's queue, while
             // executing each analysis in its own child session. Enqueueing by child ID
@@ -1511,6 +1511,10 @@ export const SessionRoutes = lazy(() =>
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
+              let liveNotice: IngestSummary.LiveNotice | undefined
+              let unsubscribeLive: (() => void) | undefined
+              let latestAgentText = ""
+              const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
               try {
                 // Resolve runtime dependencies only when this request actually starts.
                 // If configuration or agent lookup fails, the request is marked failed
@@ -1546,12 +1550,46 @@ export const SessionRoutes = lazy(() =>
                 })
                 await IngestSummary.notice(
                   sessionID,
-                  `Extension request analysis started: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; proxy-agent subtask ${analysisSessionID} is working now.`,
+                  `[ANALYZING] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}; live output is shown in the captured-request entry below; subtask ${analysisSessionID}.`,
                 ).catch((error) => log.warn("parent ingest start notice failed", { sessionID, requestID: req.id, error: String(error) }))
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
                 const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
+                liveNotice = await IngestSummary.createLiveNotice({
+                  sessionID,
+                  agent: proxyAgent.name,
+                  model,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis output will appear here as it streams.\n`,
+                })
+                // Mirror only the subagent's visible text output into this stable parent
+                // transcript entry. Tool internals and hidden reasoning are not copied.
+                // This lets the user watch the request being analyzed without opening a
+                // separate chat window or creating one parent message per token.
+                unsubscribeLive = Bus.subscribe(MessageV2.Event.PartUpdated, async (event) => {
+                  const part = event.properties.part
+                  if (part.sessionID !== analysisSessionID || part.type !== "text" || part.synthetic) return
+                  try {
+                    const message = await MessageV2.get({
+                      sessionID: analysisSessionID,
+                      messageID: part.messageID,
+                    })
+                    if (message.info.role !== "assistant") return
+                    latestAgentText = part.text.slice(-6000)
+                    await IngestSummary.updateLiveNotice({
+                      sessionID,
+                      live: liveNotice!,
+                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\n\n### Latest agent output\n${latestAgentText || "(agent is working; no text emitted yet)"}`,
+                    })
+                  } catch (error) {
+                    log.debug("live ingest transcript update failed", {
+                      sessionID,
+                      analysisSessionID,
+                      requestID: req.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                  }
+                })
                 const agentResult = await SessionPrompt.prompt({
                   sessionID: analysisSessionID,
                   agent: proxyAgent.name,
@@ -1737,7 +1775,16 @@ export const SessionRoutes = lazy(() =>
                   finalStatus = "processed"
                 }
               } finally {
+                unsubscribeLive?.()
                 Request.updateStatus({ id: req.id, status: finalStatus })
+                if (liveNotice) {
+                  await IngestSummary.updateLiveNotice({
+                    sessionID,
+                    live: liveNotice,
+                    completed: true,
+                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
+                  }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
+                }
                 log.info("captured request subagent finished", {
                   sessionID,
                   analysisSessionID: childSessionID,
@@ -1747,8 +1794,8 @@ export const SessionRoutes = lazy(() =>
                 await IngestSummary.notice(
                   sessionID,
                   finalStatus === "processed"
-                    ? `Extension request analysis completed: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; subagent task ${childSessionID ?? "session unavailable"} contains the detailed analysis.`
-                    : `Extension request analysis FAILED: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; ${childSessionID ? "inspect subagent task " + childSessionID : "the subagent could not be started"} and check CyberStrike logs. The request remains marked failed and was not silently treated as processed.`,
+                    ? `[PROCESSED] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}; subtask ${childSessionID ?? "session unavailable"}.`
+                    : `[FAILED] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}; ${childSessionID ? "inspect subtask " + childSessionID : "the subagent could not be started"} and check logs.`,
                 ).catch((error) => log.warn("parent ingest completion notice failed", { sessionID, requestID: req.id, finalStatus, error: String(error) }))
               }
             }, sessionID)
