@@ -8,7 +8,7 @@ type AnalysisStatus = "analyzing" | "processed" | "failed"
 
 type RequestAnalysis = {
   requestID: string
-  analysisSessionID: string
+  analysisSessionID?: string
   method: string
   url: string
   status: AnalysisStatus
@@ -67,7 +67,6 @@ export function CapturedRequestAnalysisPanel() {
         if (
           metadata?.kind !== "ingest-summary" ||
           !value?.requestID ||
-          !value.analysisSessionID ||
           !value.method ||
           !value.url
         ) continue
@@ -185,7 +184,8 @@ export function CapturedRequestAnalysisPanel() {
             <div class="flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                class="rounded-md border border-border-base px-2 py-1 text-11-medium hover:bg-surface-raised-base"
+                disabled={!analysisSessionID()}
+                class="rounded-md border border-border-base px-2 py-1 text-11-medium hover:bg-surface-raised-base disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => {
                   const id = analysisSessionID()
                   if (!id) return
@@ -287,7 +287,12 @@ export function CapturedRequestAnalysisPanel() {
                 when={childUserMessages().length > 0}
                 fallback={
                   <div class="rounded-lg border border-border-weak-base p-4 text-12-regular text-text-weak">
-                    The analysis session has started. Waiting for the first visible agent step…
+                    <Show
+                      when={selected()?.status === "failed" && !analysisSessionID()}
+                      fallback="The analysis session has started. Waiting for the first visible agent step…"
+                    >
+                      The agent session could not be created. This request was marked failed before analysis tools started.
+                    </Show>
                   </div>
                 }
               >
@@ -321,7 +326,11 @@ export function CapturedRequestAnalysisPanel() {
                 <div class="mt-3 rounded-lg border border-border-weak-base p-3 text-12-regular text-text-base">
                   Analysis {selected()?.status === "processed" ? "completed" : "failed"}.
                   <Show when={selected()?.status === "failed"}>
-                    <p class="mt-1 text-text-weak">Open the full session to inspect the final error or incomplete step.</p>
+                    <p class="mt-1 text-text-weak">
+                      {analysisSessionID()
+                        ? "Open the full session to inspect the final error or incomplete step."
+                        : "The agent session could not start; the request was marked failed before tool execution."}
+                    </p>
                   </Show>
                 </div>
               </Show>
