@@ -5,7 +5,7 @@ This file defines phase objectives, dependencies, canonical outputs, and complet
 - **Workflow authority:** the canonical recon command describes the suggested workflow. `recon_checkpoint` records progress and verifies useful artifacts; it must not block ordinary recon tools because an earlier phase is stale or incomplete. Scope enforcement and the explicit vulnerability-testing handoff remain enforced.
 - **Tool authority:** `.cyberstrike/skill/TOOLING_CATALOG.md` is a non-exhaustive reference for tool/API/CLI/helper candidates. It provides examples, not tool-to-phase assignments or mandatory ledgers.
 - **Technique authority:** load the relevant specialist skill for detailed testing procedures. A tool listed in a skill or catalog is a candidate, not proof it is installed, registered, enabled, suitable, or authorized.
-- **Do not duplicate state:** use `recon_checkpoint` as the phase progress record. Keep subdomain sources in `subdomain-sources.json` only when that detail helps; the file is optional and must not block the rest of recon.
+- **Do not duplicate state:** use `recon_checkpoint` as the phase progress record. Keep subdomain discovery simple: `subdomains.txt` is the only required inventory.
 
 ## Phase matrix
 
@@ -13,7 +13,7 @@ This file defines phase objectives, dependencies, canonical outputs, and complet
 |---|---|---|---|
 | `scope_validation` | Saved scope manifest and `scope.txt` | Preserve the authoritative policy/source, include/exclude rules, unsupported entries, decision, and ambiguity. Validate the canonical starting asset once during initial setup and reuse the saved decision while target/policy are unchanged. | Must precede active work. A workspace is not authorization. |
 | `workspace_setup` | Verified canonical workspace and its initialized run state | Confirm required directories and manifest/checkpoint exist; verify absolute workspace path. | Initialize once and resume the same workspace for the same program/root. Never guess an output directory. |
-| `asset_discovery` | `subdomains.txt`; optional `subdomain-sources.json` when provenance helps | Save the normalized, deduplicated host inventory. Preserve partial results and report source failures truthfully. A per-source ledger is useful but not required to continue. | Use suitable available sources; do not wait for every possible source or every root/source pair before moving on. |
+| `asset_discovery` | `subdomains.txt` | Save normalized, deduplicated hostnames immediately. Preserve partial results and continue when any source fails. | Use suitable available sources; do not wait for every source to finish before moving on. |
 | `live_hosts_ports` | `live-hosts.txt`, `ports.txt` when port checks are permitted | Preserve DNS/HTTP/TLS/service evidence, response status, timestamps, errors, and raw-versus-normalized distinction; verify counts and paths. | DNS or HTTP liveness does not prove scope or a vulnerability. Run port checks only when program policy allows. |
 | `url_collection` | `urls.txt` | Process every eligible in-scope host using suitable available crawling/API/history sources; retain per-input/source result states, deduplicate exact identities, and preserve meaningful parameter/method variants. | Never weaken request-level scope checks or send a multi-host list to a tool that accepts one URL. Reuse verified results when inputs and tool versions are unchanged. |
 | `directory_fuzzing` | Canonical path inventory/evidence in the permitted workspace | Record the selected source/wordlist and hash, target, method, request/rate settings, outcome, exclusions, and relevant response fingerprints. | Only if policy permits; keep rate/impact bounded. This phase is not a blanket requirement to run every directory tool. |
@@ -26,6 +26,6 @@ This file defines phase objectives, dependencies, canonical outputs, and complet
 
 ## Source and phase status
 
-Source-result status and phase status are separate. Keep source outcomes truthful, but optional per-source ledgers and stale phase state must not block ordinary recon. Verify useful canonical artifacts and continue from the available evidence.
+Source failures and stale phase state must not block ordinary recon. Verify the canonical inventory and continue from available evidence.
 
 When a capability is missing, select a suitable available alternative if one closes the same evidence gap. Otherwise record the precise unavailable/blocked reason and continue only with independent work permitted by the phase gate. Never invent results, weaken scope enforcement, or report a missing source as successful.
