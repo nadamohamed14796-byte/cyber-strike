@@ -27,8 +27,11 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
       })
       const graph = result.graph
       return {
-        title: "JavaScript correlation saved",
+        title: graph.sourceFiles.length || result.capturedAssetCount ? "JavaScript correlation saved" : "JavaScript correlation incomplete",
         output: [
+          "Collection status: " + (result.capturedAssetCount > 0 ? "captured assets persisted" : "NO captured JavaScript/source-map response bodies found; this is not a successful collection"),
+          "Persisted captured asset files: " + result.capturedAssetCount,
+          "Analysis status: " + (graph.sourceFiles.length > 0 ? "source records analyzed" : "no source records analyzed"),
           "Target workspace: " + result.workspacePath,
           "Graph JSON: " + result.graphPath,
           "Endpoint candidates JSON: " + result.endpointPath,
@@ -79,6 +82,9 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           observations: graph.observations.length,
           findings: graph.findings.length,
           edges: graph.edges.length,
+          captured_asset_files: result.capturedAssetCount,
+          collection_complete: result.capturedAssetCount > 0,
+          analysis_complete: graph.sourceFiles.length > 0,
         },
       }
     } catch (error) {
