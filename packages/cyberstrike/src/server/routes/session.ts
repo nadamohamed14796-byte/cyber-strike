@@ -1541,10 +1541,6 @@ export const SessionRoutes = lazy(() =>
                   requestID: req.id,
                   agent: proxyAgent.name,
                 })
-                await IngestSummary.notice(
-                  sessionID,
-                  `[ANALYZING] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}; live output is shown in the captured-request entry below; subtask ${analysisSessionID}.`,
-                ).catch((error) => log.warn("parent ingest start notice failed", { sessionID, requestID: req.id, error: String(error) }))
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
@@ -1784,12 +1780,6 @@ export const SessionRoutes = lazy(() =>
                   requestID: req.id,
                   status: finalStatus,
                 })
-                await IngestSummary.notice(
-                  sessionID,
-                  finalStatus === "processed"
-                    ? `[PROCESSED] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}; subtask ${childSessionID ?? "session unavailable"}.`
-                    : `[FAILED] ${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]} — request ${req.id}; ${childSessionID ? "inspect subtask " + childSessionID : "the subagent could not be started"} and check logs.`,
-                ).catch((error) => log.warn("parent ingest completion notice failed", { sessionID, requestID: req.id, finalStatus, error: String(error) }))
               }
             }, sessionID)
           }
