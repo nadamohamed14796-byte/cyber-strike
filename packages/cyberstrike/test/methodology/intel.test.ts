@@ -79,6 +79,43 @@ describe("Intel — CRUD", () => {
     })
   })
 
+  test("dedupes differently titled intel when the same redacted fingerprint is reported for the same asset", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        const fingerprint = "abcdef0123456789abcdef01"
+        const first = Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "configuration",
+            title: "Client-side API key exposed",
+            detail: "Source: app.js:12; fingerprint sha256:" + fingerprint,
+            asset: "app.example.com",
+            source: "javascript-analysis",
+            confidenceLevel: "low",
+            tags: ["javascript"],
+          },
+        })
+        const second = Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "configuration",
+            title: "Potential Google API key exposure",
+            detail: "Source: app.js:12; fingerprint sha256:" + fingerprint,
+            asset: "app.example.com",
+            source: "javascript-analysis",
+            confidenceLevel: "low",
+            tags: ["javascript"],
+          },
+        })
+        expect(second.id).toBe(first.id)
+        expect(second.duplicate).toBe(true)
+        await Session.remove(session.id)
+      },
+    })
+  })
+
   test("different assets are not deduped", async () => {
     await Instance.provide({
       directory: projectRoot,
