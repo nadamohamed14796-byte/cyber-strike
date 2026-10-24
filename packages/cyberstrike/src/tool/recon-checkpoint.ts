@@ -362,7 +362,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
                 throw new Error("captured index has an invalid schema or target identity")
               }
               for (const asset of index.assets) {
-                if (typeof asset?.file !== "string" || asset.file.includes("\\\\") || asset.file.split("/").some((part: string) => part === "..")) continue
+                if (typeof asset?.file !== "string" || asset.file.includes("\\") || asset.file.split("/").some((part: string) => part === "..")) continue
                 const candidate = path.resolve(realWorkspace, asset.file)
                 const relative = path.relative(realWorkspace, candidate)
                 if (!relative || relative === ".." || relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) continue
