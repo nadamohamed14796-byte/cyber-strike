@@ -175,7 +175,27 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const root = path.join(workspace.workspacePath, "javascript")
     const assetsDir = path.join(root, "assets")
     const manifestPath = path.join(root, "asset-manifest.json")
-    await fs.mkdir(assetsDir, { recursive: true })
+    try {
+      const workspaceRealPath = await fs.realpath(workspace.workspacePath)
+      await fs.mkdir(root, { recursive: true })
+      const rootInfo = await fs.lstat(root)
+      const rootRealPath = await fs.realpath(root)
+      if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory() || rootRealPath !== path.join(workspaceRealPath, "javascript")) {
+        throw new Error("javascript directory is not a real directory inside the canonical target workspace")
+      }
+      await fs.mkdir(assetsDir, { recursive: true })
+      const assetsInfo = await fs.lstat(assetsDir)
+      const assetsRealPath = await fs.realpath(assetsDir)
+      if (assetsInfo.isSymbolicLink() || !assetsInfo.isDirectory() || assetsRealPath !== path.join(rootRealPath, "assets")) {
+        throw new Error("javascript/assets is not a real directory inside the target JavaScript workspace")
+      }
+    } catch (error) {
+      return {
+        title: "JavaScript URL ingestion stopped",
+        output: "Refusing to read or write JavaScript artifacts outside the canonical target workspace: " + (error instanceof Error ? error.message : String(error)),
+        metadata: { error: "unsafe_asset_directory", workspace: workspace.workspacePath, manifest_path: manifestPath },
+      }
+    }
 
     let manifest: Manifest = { schemaVersion: 1, updatedAt: new Date().toISOString(), assets: [] }
     try {
