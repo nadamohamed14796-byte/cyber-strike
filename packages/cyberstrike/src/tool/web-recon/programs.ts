@@ -56,34 +56,51 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
   const queue: Array<{ url: string; response?: Awaited<ReturnType<typeof fetchScoped>> }> = [
     { url: foundAt, response: initialResponse },
   ]
+  let queueIndex = 0
   let fetchedSitemaps = 0
-  let outOfScopeReferences = 0
+  let failedSitemaps = 0
+  let skippedReferences = 0
 
   // Follow every distinct eligible sitemap document, including nested indexes.
   // A visited set handles cycles; scope checks, not an arbitrary count/depth cap,
   // decide which additional hosts and paths may be requested.
-  while (queue.length > 0) {
-    const item = queue.shift()!
+  while (queueIndex < queue.length) {
+    const item = queue[queueIndex++]!
     const sitemapURL = normalizeSitemapURL(item.url, origin)
-    if (!sitemapURL || visitedSitemaps.has(sitemapURL)) continue
+    if (!sitemapURL) {
+      skippedReferences++
+      continue
+    }
+    if (visitedSitemaps.has(sitemapURL)) continue
     visitedSitemaps.add(sitemapURL)
 
     if (!scopeCheck && new URL(sitemapURL).origin !== origin) {
-      outOfScopeReferences++
+      skippedReferences++
+      continue
+    }
+    if (!item.response && scopeCheck && !await scopeCheck(sitemapURL)) {
+      skippedReferences++
       continue
     }
 
     const response = item.response ?? await fetchScoped(sitemapURL, { timeout })
-    if (!response || response.status !== 200 || !response.text.includes("<")) continue
+    if (!response || response.status !== 200 || !response.text.includes("<")) {
+      failedSitemaps++
+      continue
+    }
     fetchedSitemaps++
 
     const locations = extractLocs(response.text)
     if (/<sitemapindex\b/i.test(response.text)) {
       for (const location of locations) {
         const childURL = normalizeSitemapURL(location, sitemapURL)
-        if (!childURL || queuedSitemaps.has(childURL) || visitedSitemaps.has(childURL)) continue
+        if (!childURL) {
+          skippedReferences++
+          continue
+        }
+        if (queuedSitemaps.has(childURL) || visitedSitemaps.has(childURL)) continue
         if (!scopeCheck && new URL(childURL).origin !== origin) {
-          outOfScopeReferences++
+          skippedReferences++
           continue
         }
         queuedSitemaps.add(childURL)
@@ -94,14 +111,17 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
 
     for (const location of locations) {
       const pageURL = normalizeSitemapURL(location, sitemapURL)
-      if (!pageURL) continue
+      if (!pageURL) {
+        skippedReferences++
+        continue
+      }
       if (scopeCheck) {
         if (!await scopeCheck(pageURL)) {
-          outOfScopeReferences++
+          skippedReferences++
           continue
         }
       } else if (new URL(pageURL).origin !== origin) {
-        outOfScopeReferences++
+        skippedReferences++
         continue
       }
       pages.add(pageURL)
@@ -111,8 +131,11 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
   output.push(`[+] Sitemap found: ${foundAt}`)
   output.push(`[+] Sitemap documents processed: ${fetchedSitemaps}`)
   output.push(`[+] Total in-scope URLs discovered: ${pages.size}`)
-  if (outOfScopeReferences > 0) {
-    output.push(`[*] Out-of-scope or unsupported references skipped: ${outOfScopeReferences}`)
+  if (failedSitemaps > 0) {
+    output.push(`[!] Sitemap documents that could not be fetched or parsed: ${failedSitemaps}`)
+  }
+  if (skippedReferences > 0) {
+    output.push(`[*] Out-of-scope or unsupported references skipped: ${skippedReferences}`)
   }
   for (const url of [...pages].sort()) output.push(`    ${url}`)
 
