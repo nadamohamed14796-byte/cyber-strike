@@ -128,9 +128,9 @@ When a request contains a target, program scope, scope file, domain/subdomain li
 
 Keep one authority per responsibility; do not add another inventory, source list, phase ledger, or helper merely to restate an existing contract.
 
-- Recon execution policy and phase order: `packages/cyberstrike/src/command/template/recon.txt`; enforced phase state and accepted artifacts: registered `recon_checkpoint` runtime/schema in `packages/cyberstrike/src/tool/recon-checkpoint.ts`.
+- Recon workflow guidance: `packages/cyberstrike/src/command/template/recon.txt`; progress tracking and artifact verification: registered `recon_checkpoint` runtime/schema in `packages/cyberstrike/src/tool/recon-checkpoint.ts`. Ordinary recon tool use is not blocked by stale or incomplete phase order.
 - Recon phase outputs and completion criteria: `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md`.
-- Shared tools, APIs, CLIs, helper scripts, preflight, and the per-root subdomain source-ledger format: `.cyberstrike/skill/TOOLING_CATALOG.md`.
+- Shared tools, APIs, CLIs, helper scripts, and preflight: `.cyberstrike/skill/TOOLING_CATALOG.md`. A per-source subdomain ledger is optional supporting evidence, not a gate.
 - Technique-specific procedures: load the relevant specialist `SKILL.md`; do not copy global tool/helper lists into skills.
 - Global public-research ingestion: `.cyberstrike/commands/update.md` and `packages/cyberstrike/src/research/sources.ts`. This is separate from target recon and its `subdomain-sources.json` ledger.
 - Target-specific observations and normalized inventories belong in the existing target workspace via the registered target tools. Preserve the one-workspace, canonical-artifact, resume, and verification rules above.
