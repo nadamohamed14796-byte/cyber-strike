@@ -1026,7 +1026,12 @@ function normalizeEndpointOrigin(value?: string | null): string {
   try { return new URL(value).origin.toLowerCase() } catch { return value.toLowerCase().replace(/\/+$/, "") }
 }
 
-function mergeCanonicalJavaScriptEndpoints(graphs: JavaScriptCorrelationGraph[]): JavaScriptEndpointCandidate[] {
+export function mergeCanonicalJavaScriptEndpoints(
+  graphs: Array<{
+    endpointCandidates: JavaScriptEndpointCandidate[]
+    requests: Array<{ id: string; method: string }>
+  }>,
+): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
   const capturedMethodByID = new Map(
     graphs.flatMap((graph) => graph.requests).map((request) => [request.id, request.method.trim().toUpperCase()] as const),
