@@ -250,9 +250,15 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
       output.push(`[+] Paths: ${pathCount}, Endpoints: ${total}`)
       output.push(`[+] Methods: ${Object.entries(methods).map(([m, c]) => `${m}:${c}`).join(", ")}`)
 
-      output.push("\n    Paths:")
-      for (const p of Object.keys(paths).slice(0, 30)) output.push(`    ${p}`)
-      if (pathCount > 30) output.push(`    ... and ${pathCount - 30} more`)
+      output.push("\n    Operations:")
+      for (const [endpointPath, item] of Object.entries(paths)) {
+        if (!item || typeof item !== "object") continue
+        for (const method of Object.keys(item)) {
+          if (HTTP_METHODS.has(method.toLowerCase())) {
+            output.push(`    ${method.toUpperCase()} ${endpointPath}`)
+          }
+        }
+      }
 
       findings.push({
         checkId: "WEB-OPENAPI-001",
