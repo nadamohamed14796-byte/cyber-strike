@@ -1550,6 +1550,14 @@ export const SessionRoutes = lazy(() =>
                   agent: proxyAgent.name,
                   model,
                   text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis output will appear here as it streams.\n`,
+                  requestAnalysis: {
+                    requestID: req.id,
+                    analysisSessionID,
+                    method: normalized.method,
+                    url: normalized.origin
+                      ? new URL(normalized.normalizedPath, normalized.origin).href
+                      : normalized.normalizedPath,
+                  },
                 })
                 // Mirror only the subagent's visible text output into this stable parent
                 // transcript entry. Tool internals and hidden reasoning are not copied.
@@ -1771,6 +1779,7 @@ export const SessionRoutes = lazy(() =>
                     sessionID,
                     live: liveNotice,
                     completed: true,
+                    status: finalStatus,
                     text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
                   }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
                 }
