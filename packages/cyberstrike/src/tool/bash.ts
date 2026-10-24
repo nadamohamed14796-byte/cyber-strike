@@ -909,7 +909,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   }
 }
 
-const DEFAULT_TIMEOUT = Flag.CYBERSTRIKE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS || 2 * 60 * 1000
+const DEFAULT_TIMEOUT = Flag.CYBERSTRIKE_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS
 
 export const log = Log.create({ service: "bash-tool" })
 
@@ -1018,8 +1018,8 @@ export const BashTool = Tool.define("bash", async () => {
     }),
     async execute(params, ctx) {
       const cwd = params.workdir || Instance.directory
-      if (params.timeout !== undefined && params.timeout < 0) {
-        throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
+      if (params.timeout !== undefined && params.timeout <= 0) {
+        throw new Error(`Invalid timeout value: ${params.timeout}. Provide a positive timeout or omit it for no automatic timeout.`)
       }
       const timeout = params.timeout ?? DEFAULT_TIMEOUT
       const tree = await parser().then((p) => p.parse(params.command))
@@ -1181,14 +1181,14 @@ export const BashTool = Tool.define("bash", async () => {
 
       ctx.abort.addEventListener("abort", abortHandler, { once: true })
 
-      const timeoutTimer = setTimeout(() => {
+      const timeoutTimer = timeout === undefined ? undefined : setTimeout(() => {
         timedOut = true
         void kill()
       }, timeout + 100)
 
       await new Promise<void>((resolve, reject) => {
         const cleanup = () => {
-          clearTimeout(timeoutTimer)
+          if (timeoutTimer) clearTimeout(timeoutTimer)
           ctx.abort.removeEventListener("abort", abortHandler)
         }
 
