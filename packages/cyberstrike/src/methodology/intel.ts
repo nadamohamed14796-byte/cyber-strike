@@ -92,7 +92,7 @@ export namespace Intel {
     }
   }): Entry & { duplicate: boolean; vrtChecksCreated: number } {
     // Dedup check
-    const existing = findDuplicate(input.sessionID, input.data.title, input.data.asset)
+    const existing = findDuplicate(input.sessionID, input.data.type, input.data.title, input.data.asset, input.data.detail)
     if (existing) return { ...existing, duplicate: true, vrtChecksCreated: 0 }
 
     const id = Identifier.ascending("intel_entry")
@@ -227,12 +227,21 @@ export namespace Intel {
     return get(sessionID).filter((e) => e.asset.toLowerCase().trim() === normalized)
   }
 
-  function findDuplicate(sessionID: string, title: string, asset: string): Entry | undefined {
+  function findDuplicate(sessionID: string, type: Type, title: string, asset: string, detail?: string): Entry | undefined {
     const normalized = title.toLowerCase().trim()
     const normalizedAsset = asset.toLowerCase().trim()
-    return get(sessionID).find(
-      (e) => e.title.toLowerCase().trim() === normalized && e.asset.toLowerCase().trim() === normalizedAsset,
-    )
+    const fingerprint = (value?: string) =>
+      value?.match(/(?:fingerprint(?:\s+sha256)?|sha256)\s*[:=]\s*(?:sha256:)?([a-f0-9]{20,64})/i)?.[1]?.toLowerCase()
+    const incomingFingerprint = fingerprint(detail)
+    return get(sessionID).find((entry) => {
+      if (entry.asset.toLowerCase().trim() !== normalizedAsset) return false
+      if (entry.title.toLowerCase().trim() === normalized) return true
+      // Different titles can describe the same exposed client-side key. A stable,
+      // redacted fingerprint plus the same asset and intel type is a stronger identity
+      // signal than title text, without merging unrelated findings by vague wording.
+      if (entry.type !== type || !incomingFingerprint) return false
+      return fingerprint(entry.detail) === incomingFingerprint
+    })
   }
 
   function rowToEntry(row: typeof IntelEntryTable.$inferSelect): Entry {
