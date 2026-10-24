@@ -1023,7 +1023,7 @@ function uniqueValues<T>(values: T[], key: (value: T) => string): T[] {
 
 function normalizeEndpointOrigin(value?: string | null): string {
   if (!value) return "*"
-  try { return new URL(value).origin.toLowerCase() } catch { return value.toLowerCase().replace(/\\/$/, "") }
+  try { return new URL(value).origin.toLowerCase() } catch { return value.toLowerCase().replace(/\/+$/, "") }
 }
 
 function mergeCanonicalJavaScriptEndpoints(graphs: JavaScriptCorrelationGraph[]): JavaScriptEndpointCandidate[] {
