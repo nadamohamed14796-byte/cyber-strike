@@ -85,7 +85,7 @@ export namespace IngestSummary {
 
   export interface RequestAnalysis {
     requestID: string
-    analysisSessionID: string
+    analysisSessionID?: string
     method: string
     url: string
     status: RequestAnalysisStatus
