@@ -147,7 +147,7 @@ export function CapturedRequestAnalysisPanel() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          class="absolute right-4 bottom-24 z-[80] rounded-lg border border-border-base bg-background-base px-4 py-2 text-12-medium text-text-base shadow-xl hover:bg-surface-raised-base"
+          class="absolute right-4 bottom-32 z-[80] rounded-lg border border-border-base bg-background-base px-4 py-2 text-12-medium text-text-base shadow-xl hover:bg-surface-raised-base"
         >
           {selected()?.status === "analyzing" ? "View live request analysis" : "View last request analysis"}
         </button>
@@ -155,7 +155,7 @@ export function CapturedRequestAnalysisPanel() {
       <Show when={selected() && open()}>
         <section
           aria-label="Captured request analysis"
-          class="absolute z-[80] right-3 top-14 bottom-24 w-[min(880px,calc(100%-24px))] min-h-[280px] overflow-hidden rounded-xl border border-border-base bg-background-base shadow-2xl flex flex-col"
+          class="absolute z-[80] right-3 top-14 bottom-32 w-[min(880px,calc(100%_-_24px))] min-h-[280px] overflow-hidden rounded-xl border border-border-base bg-background-base shadow-2xl flex flex-col"
         >
           <header class="flex items-start justify-between gap-3 border-b border-border-weak-base bg-background-stronger px-4 py-3">
             <div class="min-w-0">
