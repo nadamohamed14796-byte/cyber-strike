@@ -1555,15 +1555,18 @@ export const SessionRoutes = lazy(() =>
                   requestID: req.id,
                   agent: proxyAgent.name,
                 })
-                const before = IngestSummary.snapshot(sessionID)
-                // Render at dequeue so Observed Values includes observations accrued while waiting.
-                const promptText = buildPrompt()
+                // Publish the child session ID immediately. If prompt construction or a
+                // later setup step fails, the analysis panel can still open the session and
+                // inspect its error state instead of losing the link to the created child.
                 liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
                 await IngestSummary.updateLiveNotice({
                   sessionID,
                   live: liveNotice,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nAnalysis output will appear here as it streams.\n`,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nPreparing request context and analysis steps…\n`,
                 })
+                const before = IngestSummary.snapshot(sessionID)
+                // Render at dequeue so Observed Values includes observations accrued while waiting.
+                const promptText = buildPrompt()
                 // Mirror only the subagent's visible text output into this stable parent
                 // transcript entry. Tool internals and hidden reasoning are not copied.
                 // This lets the user watch the request being analyzed without opening a
