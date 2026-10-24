@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import { requiredPhasesForWebRecon } from "../../../src/tool/web-recon/phase"
+import { executionPhaseForWebRecon } from "../../../src/tool/web-recon/phase"
 
-test("read-only discovery programs are available during ordinary recon", () => {
+test("read-only discovery programs are not gated by checkpoint status", () => {
   for (const program of [
     "sitemap_scan",
     "robots_scan",
@@ -9,10 +9,10 @@ test("read-only discovery programs are available during ordinary recon", () => {
     "header_audit",
     "method_check",
     "graphql_probe",
+    "tech_detect",
   ]) {
-    expect(requiredPhasesForWebRecon(program)).toEqual(["url_collection"])
+    expect(executionPhaseForWebRecon(program)).toBe("url_collection")
   }
-  expect(requiredPhasesForWebRecon("tech_detect")).toEqual(["live_hosts_ports", "url_collection"])
 })
 
 test("active vulnerability-oriented web-recon programs remain opt-in", () => {
@@ -23,6 +23,6 @@ test("active vulnerability-oriented web-recon programs remain opt-in", () => {
     "full_recon",
     "session_scan",
   ]) {
-    expect(requiredPhasesForWebRecon(program)).toEqual(["vulnerability_testing"])
+    expect(executionPhaseForWebRecon(program)).toBe("vulnerability_testing")
   }
 })
