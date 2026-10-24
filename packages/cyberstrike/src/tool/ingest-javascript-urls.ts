@@ -81,6 +81,19 @@ function looksLikeJavaScript(body: string, contentType: string, url: string): bo
   return /(?:\b(?:function|const|let|var|import|export|class)\b|\b(?:fetch|axios)\s*\(|=>|sourceMappingURL)/.test(sample)
 }
 
+async function isSavedAssetPath(candidatePath: string, assetsDir: string): Promise<boolean> {
+  const lexicalRoot = path.resolve(assetsDir)
+  const candidate = path.resolve(candidatePath)
+  if (!candidate.startsWith(lexicalRoot + path.sep)) return false
+  try {
+    const assetsRoot = await fs.realpath(assetsDir)
+    const realCandidate = await fs.realpath(candidate)
+    return realCandidate.startsWith(assetsRoot + path.sep)
+  } catch {
+    return false
+  }
+}
+
 async function readBounded(response: Response, limit: number): Promise<Uint8Array> {
   if (!response.body) return new Uint8Array()
   const reader = response.body.getReader()
@@ -206,7 +219,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const byURL = new Map(manifest.assets.map((item) => [normalizeURL(item.url) ?? item.url, item]))
     const byHash = new Map<string, AssetRecord>()
     for (const item of manifest.assets) {
-      if (item.contentHash && item.localPath && await Bun.file(item.localPath).exists()) byHash.set(item.contentHash, item)
+      if (item.contentHash && item.localPath && await isSavedAssetPath(item.localPath, assetsDir)) {
+        byHash.set(item.contentHash, item)
+      }
     }
 
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
@@ -229,7 +244,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     for (const url of inputURLs) {
       const assetSource = sourceByURL.get(url) ?? params.source
       const prior = byURL.get(url)
-      if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
+      if (!params.force_refresh && prior?.contentHash && prior.localPath && await isSavedAssetPath(prior.localPath, assetsDir)) {
         const currentScope = await TargetMemory.checkURLScope(url)
         const finalScope = prior.finalURL ? await TargetMemory.checkURLScope(prior.finalURL) : currentScope
         if (!currentScope.allowed || !finalScope.allowed) {
