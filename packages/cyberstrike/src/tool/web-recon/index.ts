@@ -30,7 +30,7 @@ const PROGRAMS = {
   },
   full_recon: {
     description:
-      "Run all reconnaissance programs against a single target URL and return aggregated results — useful for quick standalone checks without hackbrowser",
+      "Run the combined web-recon suite against one target URL, including active vulnerability-oriented probes. Use only after an explicit request with the vulnerability_testing checkpoint active; use individual read-only discovery programs for recon-only runs.",
   },
   sitemap_scan: {
     description:
@@ -46,7 +46,7 @@ const PROGRAMS = {
   },
   graphql_probe: {
     description:
-      "Probe common GraphQL endpoints (/graphql, /api/graphql, /query, /v1/graphql, /gql) with {__typename}, test introspection",
+      "Discover common GraphQL endpoints with the read-only {__typename} query and schema introspection; scope-check each request and do not send mutations.",
   },
   tech_detect: {
     description:
@@ -66,7 +66,7 @@ const PROGRAMS = {
   },
   method_check: {
     description:
-      "Test TRACE (XST), PUT, DELETE methods on target. Check OPTIONS Allow header for dangerous method advertisement",
+      "Send OPTIONS only and record the server's Allow header. Never send TRACE, PUT, or DELETE; advertised methods are leads, not proof of exploitable behavior.",
   },
   open_redirect: {
     description:
