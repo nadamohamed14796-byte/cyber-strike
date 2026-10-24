@@ -1,4 +1,4 @@
-**Command arguments:** \`$ARGUMENTS\`
+**Command arguments:** `$ARGUMENTS`
 
 # CyberStrike Recon
 
@@ -10,16 +10,16 @@ Do the work instead of narrating a plan. Reuse the canonical target workspace an
 - Choose any suitable registered tool, local CLI, API, or helper at any checkpoint. Phase names, skills, and catalogs guide selection; they do not restrict tools. Do not install/run every candidate or let stale checkpoint records block useful recon.
 - Do not impose arbitrary time, result, source, or attempt caps. Preserve partial results, recover from genuine tool failures with suitable alternatives, and stop when useful sources are exhausted or a real blocker remains.
 - Maintain one canonical inventory per data type in the existing workspace. Merge/deduplicate results as they arrive; avoid temporary copies, per-tool files, per-host folders, and repetitive notes. Keep source details only when they affect provenance or interpretation.
-- Treat static content and scanner signals as leads, not findings. Keep vulnerability testing opt-in: do not run vulnerability scanners or \`session_scan\` unless the user explicitly requests testing and the checkpoint/scope/policy controls permit it.
+- Treat static content and scanner signals as leads, not findings. Keep vulnerability testing opt-in: do not run vulnerability scanners or `session_scan` unless the user explicitly requests testing and the checkpoint/scope/policy controls permit it.
 
 ## Workflow
 
 1. **Resume and scope.** Reuse the root workspace and checkpoint. Initialize only when missing. For a new, changed, or unresolved scope manifest, check the actual starting asset once; reuse a valid saved decision on resume.
-2. **Discover assets.** Start passive subdomain discovery immediately. Combine useful available sources such as certificate transparency, \`subfinder\`, Amass, assetfinder, and public APIs. Merge each result into one deduplicated \`subdomains.txt\`; a missing or failed source must not block other work.
-3. **Validate and collect URLs.** Resolve/check hosts using suitable DNS, HTTP, and TLS methods; save \`live-hosts.txt\`. Collect crawler/history/application URLs into \`urls.txt\`, then derive a deduplicated \`parameters.txt\` and relevant API, auth, redirect, and sensitive-file candidates.
-4. **Prioritize JavaScript.** Merge JavaScript and relevant source-map URLs from collectors, crawlers, HTML, other tools, and user-supplied links. Send all available URLs with their provenance to \`ingest_javascript_urls\`. It performs scope-checked GETs, rechecks redirects, saves bodies and the asset manifest under \`javascript/\`, and reuses/deduplicates content. Analyze each unique content version and available source maps as inert text. Merge endpoint, method, parameter, header/cookie, auth/role, feature, and redacted secret indicators into the canonical endpoint inventory. Deduplicate endpoint identity by origin + method + path template while merging meaningful parameter and source evidence.
+2. **Discover assets.** Start passive subdomain discovery immediately. Combine useful available sources such as certificate transparency, `subfinder`, Amass, assetfinder, and public APIs. Merge each result into one deduplicated `subdomains.txt`; a missing or failed source must not block other work.
+3. **Validate and collect URLs.** Resolve/check hosts using suitable DNS, HTTP, and TLS methods; save `live-hosts.txt`. Collect crawler/history/application URLs into `urls.txt`, then derive a deduplicated `parameters.txt` and relevant API, auth, redirect, and sensitive-file candidates.
+4. **Prioritize JavaScript.** Merge JavaScript and relevant source-map URLs from collectors, crawlers, HTML, other tools, and user-supplied links. Send all available URLs with their provenance to `ingest_javascript_urls`. It performs scope-checked GETs, rechecks redirects, saves bodies and the asset manifest under `javascript/`, and reuses/deduplicates content. Analyze each unique content version and available source maps as inert text. Merge endpoint, method, parameter, header/cookie, auth/role, feature, and redacted secret indicators into the canonical endpoint inventory. Deduplicate endpoint identity by origin + method + path template while merging meaningful parameter and source evidence.
 5. **Close relevant gaps.** Review exposed-file candidates and historical sensitive URLs. Use directory/parameter fuzzers, port scans, or other active recon only when policy and request-level controls allow it. Do not execute downloaded JavaScript or automatically turn static leads into vulnerability probes.
-6. **Report.** Update \`reports/recon-final.md\` with verified counts, actual artifact paths, completed/partial work, source failures, remaining gaps, and a resume point when needed. Never claim exhaustive coverage without evidence.
+6. **Report.** Update `reports/recon-final.md` with verified counts, actual artifact paths, completed/partial work, source failures, remaining gaps, and a resume point when needed. Never claim exhaustive coverage without evidence.
 
 This order is a workflow guide, not a tool allowlist. Use any suitable tool whenever it closes an evidence gap, and verify saved artifacts before marking work complete.
 
