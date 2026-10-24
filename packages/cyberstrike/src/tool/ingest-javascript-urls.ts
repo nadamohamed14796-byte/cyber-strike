@@ -16,7 +16,12 @@ const Parameters = z.object({
   urls: z.array(z.string().trim().min(1).max(8192)).min(1).max(MAX_URLS)
     .describe("JavaScript asset URLs from ANY source: the URL collector, crawler/HTML, source-map references, a URL inventory, or URLs manually supplied by the user. Pass the actual URLs, not local file paths."),
   source: z.string().trim().min(1).max(120).default("unspecified")
-    .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
+    .describe("Fallback provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
+  url_sources: z.array(z.object({
+    url: z.string().trim().min(1).max(8192),
+    source: z.string().trim().min(1).max(120),
+  })).max(MAX_URLS).default([])
+    .describe("Optional per-URL provenance overrides for resuming a mixed-source batch. Entries apply only to URLs also present in urls."),
   force_refresh: z.boolean().default(false)
     .describe("False reuses an already downloaded URL and its content hash. True re-fetches existing URLs to check for changed content."),
 })
@@ -136,7 +141,7 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in urls batches of at most 500 and identify their provenance in source. If metadata.pending_urls is nonempty, immediately continue with those URLs in batches of at most 500 until no pending URLs remain. The 64 MiB byte budget is per invocation, not a total-work cap.",
+    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in urls batches of at most 500. Use source as the fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, immediately continue with those URLs in batches of at most 500, pass matching metadata.pending_sources as url_sources, and repeat until no pending URLs remain. The 64 MiB byte budget is per invocation, not a total-work cap.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
@@ -207,6 +212,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, string>(inputURLs.map((url) => [url, params.source] as const))
+    for (const item of params.url_sources) {
+      const sourceURL = normalizeURL(item.url)
+      if (sourceURL && queuedURLs.has(sourceURL)) sourceByURL.set(sourceURL, item.source)
+    }
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
@@ -318,6 +327,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     await fs.rename(temporaryManifest, manifestPath)
 
     const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
+    const pendingSources = pendingURLs.map((url) => ({ url, source: sourceByURL.get(url) ?? params.source }))
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
     if (downloaded + reused > 0) {
@@ -357,7 +367,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Manifest: " + manifestPath,
         analysisSummary,
         ...(pendingURLs.length ? [
-          "Continue by passing metadata.pending_urls to ingest_javascript_urls in batches of at most " + MAX_URLS + " URLs. The byte budget applies per invocation, not to the total run.",
+          "Continue by passing metadata.pending_urls to ingest_javascript_urls in batches of at most " + MAX_URLS + " URLs, plus matching metadata.pending_sources as url_sources to preserve provenance. The byte budget applies per invocation, not to the total run.",
         ] : []),
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => record.url + " — " + record.status + ": " + record.error),
       ].join("\n"),
@@ -375,6 +385,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         received_bytes: receivedBytes,
         analysis_error: analysisError,
         pending_urls: pendingURLs,
+        pending_sources: pendingSources,
         byte_budget_reached: pendingURLs.length > 0,
       },
     }
