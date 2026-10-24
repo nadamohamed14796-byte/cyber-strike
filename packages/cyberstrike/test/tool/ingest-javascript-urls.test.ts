@@ -105,6 +105,86 @@ test("resumes a persisted JavaScript queue with an empty input list and preserve
   }
 })
 
+test("checkpoints completed assets before starting the next URL", async () => {
+  await using tmp = await tmpdir()
+  let signalSecondStarted!: () => void
+  let releaseSecond!: () => void
+  const secondStarted = new Promise<void>((resolve) => { signalSecondStarted = resolve })
+  const secondRelease = new Promise<void>((resolve) => { releaseSecond = resolve })
+  const javascript = 'const route = "/api/items";\nfetch(route);\n'
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      const pathname = new URL(request.url).pathname
+      if (pathname === "/second.js") {
+        signalSecondStarted()
+        await secondRelease
+      }
+      return new Response(javascript, {
+        status: 200,
+        headers: { "content-type": "application/javascript" },
+      })
+    },
+  })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const target = "http://127.0.0.1:" + server.port
+        const configured = await TargetMemory.configureScope(target, {
+          include: [target],
+          authorizationSource: "Local JavaScript progress-checkpoint fixture",
+          authorizationReference: "https://example.test/security-policy",
+        })
+        const canonicalTarget = configured.workspace.targetURL
+        const session = await Session.create({})
+        Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/",
+          keyHash: "ingest-javascript-progress-root",
+          origin: canonicalTarget,
+          scheme: "http",
+          host: "127.0.0.1",
+          pageUrl: canonicalTarget + "/",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: '<script src="/first.js"></script><script src="/second.js"></script>',
+          },
+        })
+        const firstURL = canonicalTarget + "/first.js"
+        const secondURL = canonicalTarget + "/second.js"
+        const manifestPath = path.join(configured.workspace.workspacePath, "javascript", "asset-manifest.json")
+        const tool = await IngestJavaScriptURLsTool.init()
+        const execution = tool.execute({
+          target_url: canonicalTarget,
+          urls: [firstURL, secondURL],
+          source: "collector",
+          url_sources: [],
+          force_refresh: false,
+        }, toolContext(session.id))
+
+        await secondStarted
+        const progress = JSON.parse(await fs.readFile(manifestPath, "utf8"))
+        expect(progress.pendingURLs).toEqual([secondURL])
+        expect(progress.assets.map((asset: { url: string }) => asset.url)).toContain(firstURL)
+        expect(progress.assets.find((asset: { url: string }) => asset.url === firstURL)?.status).toBe("downloaded")
+
+        releaseSecond()
+        const result = await execution
+        expect(result.metadata.pending_urls).toEqual([])
+      },
+    })
+  } finally {
+    releaseSecond()
+    server.stop(true)
+  }
+})
+
+
 test("does not overwrite a malformed JavaScript asset manifest", async () => {
   await using tmp = await tmpdir()
   const server = Bun.serve({
