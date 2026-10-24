@@ -1164,8 +1164,6 @@ export namespace JavaScriptCorrelation {
   }): Promise<BuildResult> {
     const rootSessionID = Session.root(input.sessionID)
     const targetURL = TargetMemory.normalize(input.targetURL).targetURL
-    const selectorURL = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
-    const selector = selectorURL ? selectorURL.origin + selectorURL.pathname : "all-assets"
     // Serialize all selectors for one target/session so concurrent per-URL runs cannot race the shared captured-asset index.
     const key = rootSessionID + "\0" + targetURL
     const previous = buildQueues.get(key)
