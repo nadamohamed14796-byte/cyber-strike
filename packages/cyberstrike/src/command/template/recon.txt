@@ -1,33 +1,76 @@
 **Command arguments:** `$ARGUMENTS`
 
-# CyberStrike Recon
+# CyberStrike Recon — Executable Instructions
 
-Do the reconnaissance work, do not narrate a plan. Use the existing canonical target workspace and saved scope. If the scope is already configured and unchanged, reuse it; do not repeatedly ask for confirmation or restart setup.
+Act on the user's target. Do not narrate a plan instead of working. Follow the numbered steps and the decision rules below. Reuse the existing target workspace, saved scope, inventories, and completed results.
 
-## Rules
+## Non-negotiable rules
 
-- Keep authorization intact. Every concrete target request must pass the runtime's persisted scope checks. Do not bypass a refusal or broaden scope.
-- Use the tools that best fit the current evidence and environment. Discover and combine available tools as useful; no fixed phase-to-tool allowlist and no requirement to run every tool in a catalog.
-- Do not impose arbitrary time limits, result caps, source counts, attempt counts, or early-stop rules on useful reconnaissance. Continue until the useful work is done, the available sources are exhausted, the user stops you, or a genuine blocker remains.
-- If a tool fails, preserve its partial results and try another suitable method. Do not repeat successful work without a reason.
-- Use checkpoint records to remember progress, not to block ordinary recon tools. Do not stop because an earlier phase status is stale or an optional ledger is incomplete. Keep vulnerability testing separate: do not run it unless the user explicitly requests it.
-- Save results directly into the existing target workspace. Maintain one normalized inventory per data type, merge and deduplicate results, and avoid temporary copies, per-tool files, per-host folders, and repetitive intel entries.
-- Keep bulk host/URL/parameter data in files. Use concise intel notes only for meaningful findings or phase summaries.
-- JavaScript is a priority: collect all reachable in-scope JavaScript assets, deduplicate by content/URL, analyze scripts and available source maps as inert text, and connect routes/endpoints, methods, parameters, headers, cookies, auth clues, and possible secrets. Redact secret values.
-- Do not mark a phase complete merely because a command ended. Record real results, partial work, errors, and what remains. Do not require verbose per-source bookkeeping when a useful normalized inventory is already saved.
+1. **Tools are chosen dynamically.** At every step, consider any registered/connected tool, suitable local CLI, API, or helper that can close the current evidence gap. The phase name, a scanner's category, an old checkpoint, a catalog example, or a skill's tool list is NOT a tool allowlist. Never reject a suitable tool merely because it is labelled for another phase.
+2. **A scanner is not a permission system.** Do not let a scanner's classification, recommendation, or output block unrelated tools or harmless local processing. A tool may be blocked only by an actual runtime permission, persisted scope decision, program policy, rate/impact limit, missing capability, or concrete execution failure. Explain which one applies. Do not bypass genuine scope or authorization controls.
+3. **Scope once at setup, enforce per request.** Reuse a valid unchanged saved scope decision. Run the starting-asset scope check only when scope is new, changed, or unresolved. Every actual network request and redirect must still pass the runtime's persisted scope enforcement. Never expand scope by inference.
+4. **No arbitrary stopping.** Do not impose arbitrary time limits, result caps, source counts, attempt counts, or early stops on useful recon. Continue until useful sources are exhausted, work is verified, the user stops, or a genuine blocker remains.
+5. **Preserve results.** Save partial results immediately, normalize and deduplicate into canonical inventories, and reuse verified work. Distinguish zero results from failure, unavailable, blocked by policy/scope, skipped as unnecessary, not applicable, and pending.
+6. **Testing boundary.** Recon tools can be used when suitable and permitted. Do not launch exploit-style, state-changing, or vulnerability-scanner testing automatically. Start the vulnerability-testing phase when the user explicitly requests vulnerability testing; first ensure endpoint inventory and the required policy/scope/rate/impact controls are satisfied. This boundary must not be used to block passive discovery, local analysis, or unrelated tools.
 
-## Workflow
+## Step-by-step workflow
 
-1. Reuse or initialize the canonical workspace and verify the saved scope once. Run the required starting-asset scope check only when the scope is new, changed, or unresolved.
-2. Start subdomain discovery immediately. In parallel where practical, use available passive sources such as certificate transparency/crt.sh, subfinder, assetfinder, Amass, Findomain, and suitable public APIs. Merge each result as it arrives into one deduplicated `subdomains.txt`; never wait for every source or stop because one tool is missing.
-3. Feed discovered hosts into available DNS/HTTP/TLS checks (for example dnsx, httpx, tlsx). Save one normalized `live-hosts.txt` and useful service metadata; do not repeat enumeration because a different phase label is active.
-4. Collect URLs from live hosts with suitable available crawlers/history sources (for example katana, gau, waybackurls, gospider, hakrawler, or waymore). Merge into one deduplicated `urls.txt`, then derive `parameters.txt`, API/auth/admin candidates, redirect candidates, and sensitive-file candidates locally.
-5. Prioritize JavaScript: merge every discovered `.js`/ `.mjs`/ `.cjs` and relevant source-map URL from the URL collector, crawled/history URLs, HTML, other tool output, and any URLs the user supplies. Pass the merged URL list to `ingest_javascript_urls` with source provenance. It fetches and saves actual response bodies under the target-local `javascript/assets/`, scope-checks every URL and redirect, reuses repeated URLs, and deduplicates identical content by SHA-256. Analyze each unique content version once, inspect source maps as inert data, and merge routes/endpoints, methods, parameters, request headers/cookies, auth clues, and redacted secret indicators into the endpoint inventory. Use suitable available analyzers such as subjs, SecretFinder, or other installed tools; tool names are examples, not requirements.
-6. Check relevant historical sensitive-file URLs and exposed-file candidates where appropriate. Use directory/parameter fuzzers, port scanners, nuclei templates, or other active checks only when the program policy permits that activity and each request passes scope/rate/impact controls. Keep exploit-style or state-changing vulnerability tests opt-in.
-7. Write/update `reports/recon-final.md` with actual counts, completed and partial work, useful findings, artifact paths, source failures, and remaining gaps.
+### Step 1 — Initialize or resume
+- Find the canonical target workspace. If it exists, reuse it; otherwise initialize one root workspace.
+- Read the persisted scope and checkpoint state. Verify the starting asset's saved scope decision.
+- **If scope is unchanged and a passing starting-asset decision exists:** reuse it.
+- **If scope is new, changed, missing, or unresolved:** configure only the exact user-confirmed scope, preserve exclusions, run the required starting-asset check once, and save the decision.
+- **If scope is genuinely ambiguous or an actual request is denied:** stop only the affected request, record the precise reason, and continue independent permitted work.
 
-The sequence is a practical guide, not a tool restriction. Use any suitable tool at any point when it helps close an evidence gap. Reuse existing results and continue from unfinished work.
+### Step 2 — Discover subdomains and assets
+- Start suitable passive sources immediately and in parallel when practical: certificate transparency/crt.sh, subfinder, assetfinder, Amass, Findomain, public APIs, and other available sources.
+- Choose based on real availability and coverage; examples are not mandatory tools.
+- **If a tool is missing or fails:** preserve any partial output and try another suitable source. Do not wait for every source or restart successful sources without cause.
+- Merge normalized names into one canonical `subdomains.txt`. Keep provenance in the existing source/artifact records; do not create a redundant per-source ledger just to satisfy an instruction.
 
-## Final response
+### Step 3 — Verify live hosts and services
+- Feed discovered candidates to suitable DNS, HTTP, TLS, and service checks.
+- Save one normalized `live-hosts.txt` and `ports.txt` when permitted.
+- **If DNS resolves but HTTP fails:** retain the DNS result and try the next relevant protocol/service check; do not label the host nonexistent.
+- **If a host or address is out of scope:** do not request it; record the scope result and continue with other candidates.
 
-Give a concise status, meaningful counts, the workspace path, key findings, artifact paths, and genuine blockers only. Never claim exhaustive coverage without evidence.
+### Step 4 — Collect URLs
+- Collect URLs from live hosts, crawlers, HTML, history/archive sources, sitemaps, documentation, and other useful available sources.
+- Merge and deduplicate into one `urls.txt`. Derive `parameters.txt` and relevant API/auth/admin/redirect/sensitive-file candidates from saved evidence.
+- **If one collector is unavailable or returns zero results:** try a different method when it can add coverage. Zero results are not the same as a failed run.
+- Keep meaningful method/parameter variants, but do not duplicate the same endpoint solely because different sources found it.
+
+### Step 5 — Collect and analyze JavaScript (priority)
+- Accept JavaScript URLs from every source: URL collectors, crawler/HTML output, source-map references, other tools, and URLs supplied directly by the user.
+- Merge the URLs with provenance and pass them to the registered JavaScript ingestion workflow. A URL is not a downloaded file: fetch the response body, record status/content hash, and save the actual body to the canonical target-local JavaScript asset directory.
+- Reuse existing downloads where valid and analyze each unique content hash once. Treat JavaScript and source maps as inert data; never execute them.
+- Extract route/path templates, HTTP methods, parameter names/locations, API base URLs, request/header/cookie/auth clues, GraphQL/WebSocket references, feature flags, source locations, and secret-like indicators. Do not save raw secret values; retain redacted indicators/fingerprints and locations.
+- Correlate findings with source URL/hash, captured request/response IDs, endpoints, assets, and evidence. Use one endpoint identity per normalized origin + method + path template; merge parameter and source evidence rather than creating duplicate endpoint rows.
+- **If download fails:** record status and reason; retry only when useful (for example, a transient failure or a valid alternate URL), and continue analyzing other assets.
+- **If a source map is missing, malformed, truncated, out of scope, or only partially embedded:** mark it pending/incomplete with the exact reason. Do not claim complete analysis.
+- Verify `javascript-analysis.md` and `endpoints.txt` exist and contain real output before completing the phase.
+
+### Step 6 — Check exposure and deepen discovery
+- Review relevant historical URLs and candidates for documentation, configuration, backups, debug/status pages, source maps, and sensitive files.
+- Use local parsing, API tools, browser/replay tools, fuzzers, port scanners, or other suitable capabilities when they answer a real evidence gap.
+- **Do not block a tool merely because it is called a scanner or belongs to a different phase.** Decide using its actual behavior and capability, not its name.
+- Before active network checks, honor the actual program policy, persisted scope, rate/impact controls, and the explicit testing boundary above. If an active technique is not permitted, record that specific limitation and continue with passive/local work.
+
+### Step 7 — Verify and report
+- Verify canonical artifact paths, file sizes, counts, deduplication, and relevant links between assets, JavaScript, requests, endpoints, and evidence.
+- Write/update `reports/recon-final.md` with actual counts, sources/tools used, completed and partial phases, useful leads, artifact paths, failures, and remaining gaps.
+- A phase is complete only when its applicable artifacts are saved and verified. Do not confuse “command exited” with “phase complete.”
+- Finish with a concise status and the canonical workspace path. State genuine blockers only; include the precise cause and next action.
+
+## Recovery decision rules
+
+- **Tool unavailable** → select a suitable alternative; if none exists, record `unavailable` and continue independent work.
+- **Tool execution failed** → preserve partial output, record the error, and try a materially different method.
+- **Zero results** → verify inputs/options, then try another source only if it may add coverage; record a genuine empty result distinctly.
+- **Scope/policy denied** → do not bypass the denial; skip only the affected action and continue permitted work.
+- **Checkpoint stale or earlier phase incomplete** → inspect the actual artifacts and resume/repair the missing work. Do not let stale phase bookkeeping block ordinary tools.
+- **Artifact missing or empty** → phase is not complete; regenerate it from existing evidence or rerun only the missing work.
+- **New evidence arrives** → update the relevant normalized inventory and rerun only dependent analysis whose inputs changed.
+- **Repeated evidence** → merge provenance and deduplicate; do not create extra files or notes just to record the same fact again.
+
+The workflow order is a default path, not a restriction on tool choice. Any suitable tool may be used at any point to resolve the current evidence gap, while scope and real authorization controls remain enforced.
