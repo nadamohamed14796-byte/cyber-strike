@@ -659,7 +659,7 @@ function normalizePassiveLookupDomain(value: string | null | undefined): string 
   return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain) ? domain : undefined
 }
 
-const TARGET_LIST_FLAGS = new Set(["-l", "-list", "--list", "-dl", "-il", "-targets", "--targets-file"])
+const TARGET_LIST_FLAGS = new Set(["-l", "-list", "--list", "-dl", "-il", "-df", "--domain-file", "-domains", "--domains-file", "-targets", "--targets-file"])
 
 async function readTargetListInputs(args: string[], cwd: string): Promise<{ present: boolean; targets: string[] }> {
   const files: string[] = []
@@ -786,7 +786,9 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
     if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
   }
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
-  const listedTargets = await readTargetListInputs(args, cwd)
+  const listedTargets = ["curl", "wget"].includes(scanner)
+    ? { present: false, targets: [] as string[] }
+    : await readTargetListInputs(args, cwd)
   if (listedTargets.present) targets = [...new Set([...targets, ...listedTargets.targets])]
 
   // Public read-only research APIs are contacted as providers, but authorization
