@@ -10,11 +10,6 @@ const REDIRECT_PARAMS = new Set([
   "rurl", "go",
 ])
 
-const MAX_ORIGINS = 10
-const MAX_CORS_PER_ORIGIN = 3
-const MAX_REDIRECT = 10
-const MAX_SCAN_MS = 300_000
-
 interface OriginBucket {
   apis: Set<string>
   pages: Set<string>
@@ -118,7 +113,6 @@ export async function sessionScan(
     }
   }
 
-  const deadline = Date.now() + MAX_SCAN_MS
   const { origins, redirectPages, templateCount } = classifyRequests(requests)
   const allFindings: Finding[] = []
   const lines: string[] = [
@@ -135,7 +129,7 @@ export async function sessionScan(
       lines.push(`[!] Skipping origin-root checks outside configured path scope: ${entry[0]}`)
       continue
     }
-    if (originEntries.length < MAX_ORIGINS) originEntries.push(entry)
+    originEntries.push(entry)
   }
   if (originEntries.length === 0) {
     return {
@@ -152,7 +146,7 @@ export async function sessionScan(
   lines.push(`\n=== PHASE 1: ORIGIN CHECKS (${originEntries.length}) ===`)
 
   for (const [origin, bucket] of originEntries) {
-    if (abort?.aborted || Date.now() > deadline) {
+    if (abort?.aborted) {
       lines.push(`[!] Scan interrupted — skipping remaining origins`)
       break
     }
@@ -179,11 +173,11 @@ export async function sessionScan(
   }
 
   // Phase 2: CORS on API endpoints (+ origin root fallback) + method_check on origin roots only
-  if (!abort?.aborted && Date.now() <= deadline) {
+  if (!abort?.aborted) {
     const corsTargets: string[] = []
     for (const [origin, bucket] of originEntries) {
       if (bucket.apis.size > 0) {
-        corsTargets.push(...[...bucket.apis].slice(0, MAX_CORS_PER_ORIGIN))
+        corsTargets.push(...[...bucket.apis])
       } else {
         corsTargets.push(origin + "/")
       }
@@ -224,14 +218,13 @@ export async function sessionScan(
   }
 
   // Phase 3: open redirect on pages with redirect-like query params
-  if (!abort?.aborted && Date.now() <= deadline) {
-    const redirSlice = redirectPages.slice(0, MAX_REDIRECT)
-    redirCheckCount = redirSlice.length
-    if (redirSlice.length > 0) {
-      lines.push(`\n=== PHASE 3: REDIRECT CHECKS (${redirSlice.length}) ===`)
+  if (!abort?.aborted) {
+    redirCheckCount = redirectPages.length
+    if (redirectPages.length > 0) {
+      lines.push(`\n=== PHASE 3: REDIRECT CHECKS (${redirectPages.length}) ===`)
 
-      for (const url of redirSlice) {
-        if (abort?.aborted || Date.now() > deadline) break
+      for (const url of redirectPages) {
+        if (abort?.aborted) break
         try {
           const result = await openRedirect(url, [], timeout, scopeFilter)
           if (result.findings.length > 0) {
@@ -261,8 +254,6 @@ export async function sessionScan(
         .join(", ")}`,
     )
   }
-
-  if (origins.size > MAX_ORIGINS) lines.push(`[*] Note: ${origins.size - MAX_ORIGINS} additional origin(s) not scanned (limit: ${MAX_ORIGINS})`)
 
   return { output: lines.join("\n"), findings: allFindings }
 }
