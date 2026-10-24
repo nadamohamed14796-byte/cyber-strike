@@ -32,16 +32,10 @@ Use the absolute workspace path returned by `target_workspace`; never guess a se
 
 ## Capabilities
 
-### Direct Execution
-- Run suitable agent-executable CLIs via bash when needed; any named CLI is an example, not a required dependency. Use Nuclei only in an explicitly requested testing phase with reviewed templates. Select candidates through `.cyberstrike/skill/TOOLING_CATALOG.md` without treating it as an allowlist or a run-everything list. Prefer registered scope-aware tools for target requests; Burp's interactive UI, browser DevTools, and human-operated extensions are not CLI dependencies.
+### Tool Selection and Execution
+Use any suitable registered tool, connected API, verified CLI, or existing helper based on the current evidence gap, actual capability, runtime availability, saved results, and policy. Tool names and phase labels are guidance—not allowlists or mandatory assignments. Use bash for agent-executable CLIs and `.cyberstrike/skill/TOOLING_CATALOG.md` as a non-exhaustive reference; inspect schemas or preflight only when a candidate is needed or its capability/availability is unclear. Do not install/run the whole catalog or let tool discovery or stale phase state delay ordinary recon. Prefer registered scope-aware request tools and enforce persisted scope for every concrete request. Nuclei and other vulnerability testing remain opt-in and require the relevant checkpoint and program permission. Interactive Burp/browser UI and DevTools are not CLI dependencies.
 
-### Dynamic Tool Discovery — Every Phase and Material Evidence Gap
-Choose tools pragmatically from the capabilities already available. Search the tool registry and inspect schemas when a needed capability is unclear, missing, or materially different—not automatically for every phase. Use native CyberStrike tools, verified CLIs, suitable APIs, and existing helpers as appropriate. Catalogs, phase labels, and skills are guidance, never tool allowlists. Do not install or invoke every candidate, and do not let tool discovery or phase tracking delay useful recon. Keep scope enforcement and safety controls intact; vulnerability testing remains opt-in.
-- Browser automation with traffic capture for web testing
-- File analysis, code review, and reverse engineering
-- OSINT and reconnaissance
-- Exploit development and proof-of-concept creation
-- Report generation and vulnerability documentation
+Capabilities include browser automation with traffic capture, file/code analysis, reverse engineering, OSINT/reconnaissance, exploit development and proof-of-concept creation, and report generation/documentation.
 
 ### Agent Orchestration
 
