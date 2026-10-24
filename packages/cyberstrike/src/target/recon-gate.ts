@@ -176,7 +176,32 @@ export function reconPhaseExecutionDecision(
   return { allowed: true, reason: "explicit vulnerability-testing checkpoint and prerequisites passed" }
 }
 
-/** Fail-closed runtime gate for active scanner and web-recon tools. */
+/**
+ * The runtime caller must check the concrete target against the persisted scope
+ * before using this manifest decision. Ordinary recon is allowed across checkpoint
+ * states; the manifest is a progress ledger, not a tool allowlist. Vulnerability
+ * testing alone requires a valid manifest and completed opt-in prerequisites.
+ */
+export function reconManifestExecutionDecision(
+  requiredPhase: ReconPhase,
+  run?: ReconRunManifest,
+): { allowed: boolean; reason: string } {
+  if (requiredPhase !== "vulnerability_testing") {
+    return {
+      allowed: true,
+      reason: "ordinary reconnaissance tools are governed by request-level scope checks, not checkpoint manifest state",
+    }
+  }
+  if (!run) {
+    return {
+      allowed: false,
+      reason: "Vulnerability testing requires a valid recon checkpoint manifest and completed scope, workspace, and endpoint handoff.",
+    }
+  }
+  return reconPhaseExecutionDecision(requiredPhase, run.phases)
+}
+
+/** Scope-aware callers invoke this after checking each concrete target URL. */
 export async function reconPhaseGate(
   workspace: Workspace,
   requiredPhase: ReconPhase,
@@ -191,31 +216,24 @@ export async function reconPhaseGate(
     root = parent
   }
   const manifestPath = path.join(root.workspacePath, "runs", "recon-" + reconRunID(root.id) + ".json")
+
+  // This function is called after concrete request scope has been checked by the
+  // scanner/web-recon caller. Do not let stale/missing progress state block passive
+  // collection, URL discovery, or other ordinary recon activities.
+  if (requiredPhase !== "vulnerability_testing") {
+    return { ...reconManifestExecutionDecision(requiredPhase), manifestPath }
+  }
+
   let run: ReconRunManifest
   try {
     run = parseReconRun(await fs.readFile(manifestPath, "utf-8"), root.id, root.targetURL)
   } catch (error) {
     return {
-      allowed: false,
+      ...reconManifestExecutionDecision(requiredPhase),
       reason: "No valid recon checkpoint manifest exists for the root target (" + (error instanceof Error ? error.message : String(error)) + ").",
       manifestPath,
     }
   }
-  if (run.phases.scope_validation.status !== "complete") {
-    return {
-      allowed: false,
-      reason: "Target scope validation must be completed before recon tools can run.",
-      manifestPath,
-    }
-  }
-  if (requiredPhase === "vulnerability_testing" && run.phases.vulnerability_testing.status !== "running") {
-    return {
-      allowed: false,
-      reason: "Vulnerability testing is opt-in. The recon handoff leaves this phase deferred; explicitly begin vulnerability_testing only after the user requests targeted testing.",
-      manifestPath,
-    }
-  }
-
-  const decision = reconPhaseExecutionDecision(requiredPhase, run.phases)
+  const decision = reconManifestExecutionDecision(requiredPhase, run)
   return { ...decision, manifestPath }
 }
