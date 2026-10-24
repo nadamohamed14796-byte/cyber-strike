@@ -538,9 +538,9 @@ export default function Page() {
           return Boolean(metadata?.requestAnalysis)
         }),
       )
-      // Keep a visible transcript fallback for sessions that consist only of captured
-      // requests, while avoiding a duplicate live-analysis notice in a normal chat.
-      return ordinary.length > 0 ? ordinary : all
+      // Captured-request notices are represented by the dedicated analysis panel,
+      // not as duplicate chat turns.
+      return ordinary
     },
     emptyUserMessages,
     { equals: same },
