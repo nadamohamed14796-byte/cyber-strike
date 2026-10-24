@@ -12,7 +12,20 @@ type FetchOptions = NonNullable<Parameters<typeof safeFetch>[1]>
 // sitemap_scan
 // ---------------------------------------------------------------------------
 
-const MAX_CHILD_SITEMAPS = 20
+function normalizeSitemapURL(value: string, baseURL: string): string | undefined {
+  try {
+    const url = new URL(value, baseURL)
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:") ||
+      url.username ||
+      url.password
+    ) return undefined
+    url.hash = ""
+    return url.href
+  } catch {
+    return undefined
+  }
+}
 
 export async function sitemapScan(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
   const fetchScoped = (url: string, options: FetchOptions = {}) =>
@@ -20,58 +33,90 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
   const findings: Finding[] = []
   const output: string[] = [`[*] Scanning sitemaps for ${target}`]
   const origin = new URL(target).origin
+  const candidates = [origin + "/sitemap.xml", origin + "/sitemap_index.xml"]
 
-  const candidates = ["/sitemap.xml", "/sitemap_index.xml"]
-  const pages = new Set<string>()
   let foundAt = ""
-
-  for (const path of candidates) {
-    const resp = await fetchScoped(origin + path, { timeout })
-    if (!resp || resp.status !== 200 || !resp.text.includes("<")) continue
-
-    foundAt = origin + path
-    const locs = extractLocs(resp.text)
-
-    if (/<sitemapindex/i.test(resp.text)) {
-      output.push(`[+] Sitemap index found: ${foundAt} (${locs.length} child sitemaps)`)
-      let fetched = 0
-      for (const child of locs.slice(0, MAX_CHILD_SITEMAPS)) {
-        let childUrl: URL
-        try {
-          childUrl = new URL(child, origin)
-        } catch {
-          continue
-        }
-        if (
-          (childUrl.protocol !== "http:" && childUrl.protocol !== "https:") ||
-          childUrl.origin !== origin ||
-          childUrl.username ||
-          childUrl.password
-        ) continue
-        const childResp = await fetchScoped(childUrl.href, { timeout })
-        if (!childResp || childResp.status !== 200) continue
-        for (const loc of extractLocs(childResp.text)) pages.add(loc)
-        fetched++
-      }
-      output.push(`[*] Fetched ${fetched} child sitemaps`)
-    } else {
-      output.push(`[+] Sitemap found: ${foundAt}`)
-      for (const loc of locs) pages.add(loc)
-    }
+  let initialResponse: Awaited<ReturnType<typeof fetchScoped>> | undefined
+  for (const candidate of candidates) {
+    const response = await fetchScoped(candidate, { timeout })
+    if (!response || response.status !== 200 || !response.text.includes("<")) continue
+    foundAt = candidate
+    initialResponse = response
     break
   }
 
-  if (pages.size === 0 && !foundAt) {
+  if (!foundAt || !initialResponse) {
     output.push("[-] No sitemap found")
     return { output: output.join("\n"), findings }
   }
 
-  output.push(`[+] Total URLs discovered: ${pages.size}`)
-  if (pages.size > 0) {
-    const sorted = [...pages].sort()
-    for (const url of sorted.slice(0, 50)) output.push(`    ${url}`)
-    if (sorted.length > 50) output.push(`    ... and ${sorted.length - 50} more`)
+  const pages = new Set<string>()
+  const queuedSitemaps = new Set<string>([foundAt])
+  const visitedSitemaps = new Set<string>()
+  const queue: Array<{ url: string; response?: Awaited<ReturnType<typeof fetchScoped>> }> = [
+    { url: foundAt, response: initialResponse },
+  ]
+  let fetchedSitemaps = 0
+  let outOfScopeReferences = 0
 
+  // Follow every distinct eligible sitemap document, including nested indexes.
+  // A visited set handles cycles; scope checks, not an arbitrary count/depth cap,
+  // decide which additional hosts and paths may be requested.
+  while (queue.length > 0) {
+    const item = queue.shift()!
+    const sitemapURL = normalizeSitemapURL(item.url, origin)
+    if (!sitemapURL || visitedSitemaps.has(sitemapURL)) continue
+    visitedSitemaps.add(sitemapURL)
+
+    if (!scopeCheck && new URL(sitemapURL).origin !== origin) {
+      outOfScopeReferences++
+      continue
+    }
+
+    const response = item.response ?? await fetchScoped(sitemapURL, { timeout })
+    if (!response || response.status !== 200 || !response.text.includes("<")) continue
+    fetchedSitemaps++
+
+    const locations = extractLocs(response.text)
+    if (/<sitemapindex\b/i.test(response.text)) {
+      for (const location of locations) {
+        const childURL = normalizeSitemapURL(location, sitemapURL)
+        if (!childURL || queuedSitemaps.has(childURL) || visitedSitemaps.has(childURL)) continue
+        if (!scopeCheck && new URL(childURL).origin !== origin) {
+          outOfScopeReferences++
+          continue
+        }
+        queuedSitemaps.add(childURL)
+        queue.push({ url: childURL })
+      }
+      continue
+    }
+
+    for (const location of locations) {
+      const pageURL = normalizeSitemapURL(location, sitemapURL)
+      if (!pageURL) continue
+      if (scopeCheck) {
+        if (!await scopeCheck(pageURL)) {
+          outOfScopeReferences++
+          continue
+        }
+      } else if (new URL(pageURL).origin !== origin) {
+        outOfScopeReferences++
+        continue
+      }
+      pages.add(pageURL)
+    }
+  }
+
+  output.push(`[+] Sitemap found: ${foundAt}`)
+  output.push(`[+] Sitemap documents processed: ${fetchedSitemaps}`)
+  output.push(`[+] Total in-scope URLs discovered: ${pages.size}`)
+  if (outOfScopeReferences > 0) {
+    output.push(`[*] Out-of-scope or unsupported references skipped: ${outOfScopeReferences}`)
+  }
+  for (const url of [...pages].sort()) output.push(`    ${url}`)
+
+  if (pages.size > 0) {
     findings.push({
       checkId: "WEB-SITEMAP-001",
       provider: "web-recon",
@@ -79,7 +124,7 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
       status: "FOUND",
       resource: foundAt,
       title: `Sitemap with ${pages.size} URLs`,
-      details: `Sitemap at ${foundAt} exposes ${pages.size} application URLs`,
+      details: `Sitemap at ${foundAt} exposes ${pages.size} in-scope application URLs across ${fetchedSitemaps} sitemap documents`,
       remediation: "Review sitemap for sensitive or admin URLs that should not be publicly indexed",
     })
   }
