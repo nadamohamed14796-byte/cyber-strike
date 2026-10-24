@@ -349,49 +349,44 @@ test("JavaScript and endpoint phases require non-skippable canonical handoff fil
 })
 
 
-test("recon tools are blocked when no checkpoint is actively running", () => {
+test("ordinary recon tools are allowed when no checkpoint is actively running", () => {
   const state = records("complete")
   const decision = reconPhaseExecutionDecision("url_collection", state)
-  expect(decision.allowed).toBe(false)
-  expect(decision.reason).toContain("expected exactly one active recon checkpoint, found 0")
+  expect(decision.allowed).toBe(true)
+  expect(decision.reason).toContain("not restricted by checkpoint phase")
 })
 
-test("normal tools may contribute to the active checkpoint regardless of their nominal phase", () => {
+test("ordinary recon tools are not restricted to the active checkpoint", () => {
   const state = records("complete")
   state.asset_discovery = { status: "running" }
   const decision = reconPhaseExecutionDecision("url_collection", state)
   expect(decision.allowed).toBe(true)
-  expect(decision.reason).toContain("active checkpoint asset_discovery")
-  expect(decision.reason).toContain("advisory, not a tool allowlist")
+  expect(decision.reason).toContain("not restricted by checkpoint phase")
 })
 
-test("normal tools can be selected at every active checkpoint regardless of nominal classification", () => {
-  for (const activePhase of phases.filter((phase) => phase !== "scope_validation")) {
+test("ordinary recon tools remain allowed with any checkpoint combination", () => {
+  for (const activePhase of phases) {
     const state = records("complete")
     state[activePhase] = { status: "running" }
-    const nominalToolPhase = activePhase === "asset_discovery" ? "url_collection" : "asset_discovery"
-    const decision = reconPhaseExecutionDecision(nominalToolPhase, state)
+    const decision = reconPhaseExecutionDecision("asset_discovery", state)
     expect(decision.allowed).toBe(true)
-    expect(decision.reason).toContain("active checkpoint " + activePhase)
   }
 })
 
-test("recon tool execution fails closed when multiple checkpoints are running", () => {
+test("ordinary recon tools are not blocked when multiple checkpoints are running", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
   state.asset_discovery = { status: "running" }
   const decision = reconPhaseExecutionDecision("url_collection", state)
-  expect(decision.allowed).toBe(false)
-  expect(decision.reason).toContain("expected exactly one active recon checkpoint, found 2")
+  expect(decision.allowed).toBe(true)
 })
 
-test("recon tool execution blocks when prerequisites of the active checkpoint are unresolved", () => {
+test("ordinary recon tools are not blocked by failed earlier phase status", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
   state.live_hosts_ports = { status: "failed", reason: "scanner failed" }
   const decision = reconPhaseExecutionDecision("asset_discovery", state)
-  expect(decision.allowed).toBe(false)
-  expect(decision.reason).toContain("live_hosts_ports=failed")
+  expect(decision.allowed).toBe(true)
 })
 
 test("vulnerability-testing tools remain blocked outside the explicit testing checkpoint", () => {
@@ -400,25 +395,24 @@ test("vulnerability-testing tools remain blocked outside the explicit testing ch
   const decision = reconPhaseExecutionDecision("vulnerability_testing", state)
   expect(decision.allowed).toBe(false)
   expect(decision.reason).toContain("Vulnerability testing is opt-in")
-  expect(decision.reason).toContain("active checkpoint is url_collection")
 })
 
-test("vulnerability-testing tools run only in the active vulnerability-testing checkpoint", () => {
+test("vulnerability-testing tools require an explicit testing checkpoint and completed handoff", () => {
   const state = records("complete")
   state.vulnerability_testing = { status: "running" }
   const decision = reconPhaseExecutionDecision("vulnerability_testing", state)
   expect(decision).toEqual({
     allowed: true,
-    reason: "scope and active checkpoint vulnerability_testing checks passed; nominal tool phase vulnerability_testing is advisory, not a tool allowlist",
+    reason: "explicit vulnerability-testing checkpoint and prerequisites passed",
   })
 })
 
-test("recon tool execution allows a non-matching tool phase when the active checkpoint prerequisites are resolved", () => {
+test("ordinary recon tool choice is independent of the active phase", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
   const decision = reconPhaseExecutionDecision("asset_discovery", state)
   expect(decision).toEqual({
     allowed: true,
-    reason: "scope and active checkpoint url_collection checks passed; nominal tool phase asset_discovery is advisory, not a tool allowlist",
+    reason: "ordinary reconnaissance tools are not restricted by checkpoint phase or prerequisite status",
   })
 })
