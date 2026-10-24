@@ -1315,6 +1315,10 @@ export const SessionRoutes = lazy(() =>
               path: normalized.normalizedPath,
               javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
             })
+            await IngestSummary.notice(
+              sessionID,
+              `Extension request already known (deduplicated): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request analysis was not queued again; new credential observations and JavaScript response versions were retained.`,
+            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
             c.status(202)
             return c.json({
               sessionID,
@@ -1375,6 +1379,10 @@ export const SessionRoutes = lazy(() =>
             // Request.add already persisted this capture inside its transaction.
             // Force a read-back correlation even if the helper's insert is now a no-op.
             await refreshJavaScriptCorrelation(javascriptCapture, true, isSourceMapResponse(undefined, normalized.normalizedPath))
+            await IngestSummary.notice(
+              sessionID,
+              `Extension request received (deduplicated race): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request analysis was not duplicated; captured evidence was retained.`,
+            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
             c.status(202)
             return c.json({
               sessionID,
@@ -1437,6 +1445,10 @@ export const SessionRoutes = lazy(() =>
             })
             log.info("prompt preview:\n" + buildPrompt())
             Request.updateStatus({ id: req.id, status: "processed" })
+            await IngestSummary.notice(
+              sessionID,
+              `Extension request captured (dry-run): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — normalized and stored; LLM analysis is disabled by CYBERSTRIKE_INGEST_DRY_RUN=true.`,
+            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
           } else {
             // Captured HTTP traffic always enters through the proxy orchestrator subagent.
             // Do not let an ingest payload redirect a browser request into the primary chat
@@ -1453,6 +1465,10 @@ export const SessionRoutes = lazy(() =>
               title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)}` ,
             })
             const childSessionID = childSession.id
+            await IngestSummary.notice(
+              sessionID,
+              `Extension request queued for independent analysis: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; child session ${childSessionID}. Analysis runs separately and will not take over this chat.`,
+            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, requestID: req.id, error: String(error) }))
             // Keep proxy work in its own child session while inheriting the parent's
             // pause/resume controls and queue accounting via the parentSessionID argument
             // at the end of this enqueue call. Sibling request analyses remain independent.
@@ -1644,6 +1660,12 @@ export const SessionRoutes = lazy(() =>
                 }
               } finally {
                 Request.updateStatus({ id: req.id, status: finalStatus })
+                await IngestSummary.notice(
+                  sessionID,
+                  finalStatus === "processed"
+                    ? `Extension request analysis completed: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; detailed reasoning and evidence are in child session ${childSessionID}.`
+                    : `Extension request analysis FAILED: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; open child session ${childSessionID} and check CyberStrike logs. The request remains marked failed and was not silently treated as processed.`,
+                ).catch((error) => log.warn("parent ingest completion notice failed", { sessionID, requestID: req.id, finalStatus, error: String(error) }))
               }
             }, sessionID)
           }
