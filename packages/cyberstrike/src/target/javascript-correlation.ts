@@ -1028,6 +1028,9 @@ function normalizeEndpointOrigin(value?: string | null): string {
 
 function mergeCanonicalJavaScriptEndpoints(graphs: JavaScriptCorrelationGraph[]): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
+  const capturedMethodByID = new Map(
+    graphs.flatMap((graph) => graph.requests).map((request) => [request.id, request.method.trim().toUpperCase()] as const),
+  )
   const routeKey = (endpoint: JavaScriptEndpointCandidate) =>
     normalizeEndpointOrigin(endpoint.origin) + "\0" + normalizedTemplateShape(endpoint.path)
   const keyOf = (endpoint: JavaScriptEndpointCandidate) =>
@@ -1083,14 +1086,17 @@ function mergeCanonicalJavaScriptEndpoints(graphs: JavaScriptCorrelationGraph[])
     for (const fallback of generic) {
       for (const endpoint of known) {
         endpoint.sourceFiles = uniqueStrings([...endpoint.sourceFiles, ...fallback.sourceFiles])
-        endpoint.observedRequestIDs = uniqueStrings([...endpoint.observedRequestIDs, ...fallback.observedRequestIDs])
+        const matchingRequestIDs = fallback.observedRequestIDs.filter(
+          (requestID) => capturedMethodByID.get(requestID) === endpoint.method?.trim().toUpperCase(),
+        )
+        endpoint.observedRequestIDs = uniqueStrings([...endpoint.observedRequestIDs, ...matchingRequestIDs])
         endpoint.pathParameters = uniqueStrings([...(endpoint.pathParameters ?? []), ...(fallback.pathParameters ?? [])])
         endpoint.queryParameters = uniqueStrings([...(endpoint.queryParameters ?? []), ...(fallback.queryParameters ?? [])])
         endpoint.bodyParameters = uniqueStrings([...(endpoint.bodyParameters ?? []), ...(fallback.bodyParameters ?? [])])
         endpoint.headerNames = uniqueStrings([...(endpoint.headerNames ?? []), ...(fallback.headerNames ?? [])])
         endpoint.authSignals = uniqueStrings([...(endpoint.authSignals ?? []), ...(fallback.authSignals ?? [])])
         endpoint.cookieSignals = uniqueStrings([...(endpoint.cookieSignals ?? []), ...(fallback.cookieSignals ?? [])])
-        endpoint.observedInTraffic ||= fallback.observedInTraffic
+        if (matchingRequestIDs.length) endpoint.observedInTraffic = true
         if (endpoint.observedInTraffic) endpoint.confidence = "observed"
       }
       removed.add(keyOf(fallback))
@@ -1429,7 +1435,8 @@ function renderCanonicalJavaScriptEndpointInventory(graph: JavaScriptCorrelation
       const inline = (value: string) => safeSummaryText(value).replace(/[|]/g, "/")
       const origin = normalizeEndpointOrigin(endpoint.origin)
       const method = endpoint.method?.trim().toUpperCase() || "UNKNOWN"
-      return method + " " + origin + normalizedTemplateShape(endpoint.path) +
+      const displayPath = endpoint.path.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/"
+      return method + " " + origin + displayPath +
         " — path_params=[" + (endpoint.pathParameters ?? []).map(inline).join(", ") + "]" +
         " — query_params=[" + (endpoint.queryParameters ?? []).map(inline).join(", ") + "]" +
         " — body_params=[" + (endpoint.bodyParameters ?? []).map(inline).join(", ") + "]" +
