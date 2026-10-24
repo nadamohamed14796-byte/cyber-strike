@@ -1509,9 +1509,25 @@ export const SessionRoutes = lazy(() =>
               let latestAgentText = ""
               const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
               try {
-                // Resolve runtime dependencies only when this request actually starts.
-                // If configuration or agent lookup fails, the request is marked failed
-                // by this worker instead of being left queued forever before enqueue.
+                // Mark this request as active and publish its analysis panel as soon as it
+                // reaches the head of the FIFO queue, before resolving tools or creating a
+                // child session. Startup failures are therefore visible in the same panel.
+                Request.updateStatus({ id: req.id, status: "processing" })
+                const noticeModel = body.model ?? (await SessionPrompt.lastModel(sessionID))
+                liveNotice = await IngestSummary.createLiveNotice({
+                  sessionID,
+                  agent: agentName,
+                  model: noticeModel,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the isolated analysis session…\n`,
+                  requestAnalysis: {
+                    requestID: req.id,
+                    method: normalized.method,
+                    url: normalized.origin
+                      ? new URL(normalized.normalizedPath, normalized.origin).href
+                      : normalized.normalizedPath,
+                  },
+                })
+                // Resolve runtime dependencies only after the active request is visible.
                 const proxyAgent = await Agent.get(agentName)
                 if (!proxyAgent || proxyAgent.mode === "primary") {
                   throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
@@ -1534,7 +1550,6 @@ export const SessionRoutes = lazy(() =>
                 })
                 const analysisSessionID = childSession.id
                 childSessionID = analysisSessionID
-                Request.updateStatus({ id: req.id, status: "processing" })
                 log.info("captured request subagent started", {
                   sessionID,
                   analysisSessionID,
@@ -1544,20 +1559,12 @@ export const SessionRoutes = lazy(() =>
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
-                const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
-                liveNotice = await IngestSummary.createLiveNotice({
+                const model = body.model ?? proxyAgent.model ?? noticeModel
+                liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
+                await IngestSummary.updateLiveNotice({
                   sessionID,
-                  agent: proxyAgent.name,
-                  model,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis output will appear here as it streams.\n`,
-                  requestAnalysis: {
-                    requestID: req.id,
-                    analysisSessionID,
-                    method: normalized.method,
-                    url: normalized.origin
-                      ? new URL(normalized.normalizedPath, normalized.origin).href
-                      : normalized.normalizedPath,
-                  },
+                  live: liveNotice,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nAnalysis output will appear here as it streams.\n`,
                 })
                 // Mirror only the subagent's visible text output into this stable parent
                 // transcript entry. Tool internals and hidden reasoning are not copied.
