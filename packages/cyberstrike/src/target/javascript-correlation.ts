@@ -860,6 +860,21 @@ export function correlateStaticJavaScriptEndpoints(
 /** Inventory local JavaScript and source-map files; never follow symlinks or execute their contents. */
 export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>, sourceBaseURL?: string): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
+  let rootInfo
+  try {
+    rootInfo = await fs.lstat(root)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return output
+    throw error
+  }
+  if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) {
+    throw new Error("Refusing to inventory JavaScript from a symbolic link or non-directory root.")
+  }
+  const resolvedRoot = path.resolve(root)
+  const realRoot = await fs.realpath(root)
+  if (realRoot !== resolvedRoot) {
+    throw new Error("Refusing to inventory JavaScript from a root that resolves outside its canonical workspace path.")
+  }
   const pendingDirectories = [root]
   while (pendingDirectories.length) {
     const directory = pendingDirectories.pop()!
