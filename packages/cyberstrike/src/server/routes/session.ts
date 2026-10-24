@@ -1506,24 +1506,12 @@ export const SessionRoutes = lazy(() =>
             }
             const config = await Config.get()
             const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
-            const childSession = await Session.create({
-              parentID: sessionID,
-              title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
-              permission: [
-                { permission: "todowrite", pattern: "*", action: "deny" },
-                { permission: "todoread", pattern: "*", action: "deny" },
-                ...(hasTaskPermission ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
-                ...(config.experimental?.primary_tools?.map((tool) => ({
-                  pattern: "*",
-                  action: "allow" as const,
-                  permission: tool,
-                })) ?? []),
-              ],
-            })
-            const childSessionID = childSession.id
+            // Do not create a subagent session for every queued request up front.
+            // Start the subagent only when this request reaches the head of the FIFO queue.
+            let childSessionID: string | undefined
             await IngestSummary.notice(
               sessionID,
-              `Extension request queued for independent analysis: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; child session ${childSessionID}. Analysis runs separately and will not take over this chat.`,
+              `Extension request queued for proxy-agent subtask: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}. It will start automatically when earlier requests finish.`,
             ).catch((error) => log.warn("parent ingest notice failed", { sessionID, requestID: req.id, error: String(error) }))
             // Serialize captured-request analyses on the owning parent session's queue, while
             // executing each analysis in its own child session. Enqueueing by child ID
@@ -1536,13 +1524,29 @@ export const SessionRoutes = lazy(() =>
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
               try {
+                const childSession = await Session.create({
+                  parentID: sessionID,
+                  title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
+                  permission: [
+                    { permission: "todowrite", pattern: "*", action: "deny" },
+                    { permission: "todoread", pattern: "*", action: "deny" },
+                    ...(hasTaskPermission ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
+                    ...(config.experimental?.primary_tools?.map((tool) => ({
+                      pattern: "*",
+                      action: "allow" as const,
+                      permission: tool,
+                    })) ?? []),
+                  ],
+                })
+                const analysisSessionID = childSession.id
+                analysisSessionID = analysisSessionID
                 Request.updateStatus({ id: req.id, status: "processing" })
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
                 const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
                 const agentResult = await SessionPrompt.prompt({
-                  sessionID: childSessionID,
+                  sessionID: analysisSessionID,
                   agent: proxyAgent.name,
                   model,
                   // Match TaskTool's subagent runtime: specialist delegation remains
@@ -1566,7 +1570,7 @@ export const SessionRoutes = lazy(() =>
                 const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
                 await IngestSummary.write({
                   // Keep completion chatter in the request child session, not the active parent transcript.
-                  sessionID: childSessionID,
+                  sessionID: analysisSessionID,
                   agent: agentName,
                   model,
                   source,
@@ -1588,7 +1592,7 @@ export const SessionRoutes = lazy(() =>
                         await TargetMemory.writeWorkspaceFile(scopeDecision.workspace, requestArtifact, JSON.stringify({
                           schemaVersion: 1,
                           requestID: req.id,
-                          childSessionID,
+                          analysisSessionID,
                           capturedAt: new Date().toISOString(),
                           targetURL: scopeDecision.workspace.targetURL,
                           request: {
@@ -1614,7 +1618,7 @@ export const SessionRoutes = lazy(() =>
                       } catch (error) {
                         log.warn("request artifact persistence failed", {
                           sessionID,
-                          childSessionID,
+                          analysisSessionID,
                           requestID: req.id,
                           targetID: scopeDecision.workspace.id,
                           error: error instanceof Error ? error.message : String(error),
@@ -1624,7 +1628,7 @@ export const SessionRoutes = lazy(() =>
                         "# Captured Request Observation",
                         "",
                         "- Request ID: " + req.id,
-                        "- Child analysis session: " + childSessionID,
+                        "- Child analysis session: " + analysisSessionID,
                         "- Method: " + normalized.method,
                         "- Origin: " + observedURL.origin,
                         "- Path: " + observedURL.pathname,
@@ -1650,7 +1654,7 @@ export const SessionRoutes = lazy(() =>
                     } else {
                       log.info("request evidence note skipped by persisted scope", {
                         sessionID,
-                        childSessionID,
+                        analysisSessionID,
                         requestID: req.id,
                         reason: scopeDecision.reason,
                       })
@@ -1659,7 +1663,7 @@ export const SessionRoutes = lazy(() =>
                     // A note failure must not erase the successfully completed request analysis.
                     log.warn("request evidence note persistence failed", {
                       sessionID,
-                      childSessionID,
+                      analysisSessionID,
                       requestID: req.id,
                       error: error instanceof Error ? error.message : String(error),
                     })
@@ -1678,12 +1682,12 @@ export const SessionRoutes = lazy(() =>
                     const scopeDecision = await TargetMemory.checkURLScope(observedURL)
                     if (scopeDecision.allowed && scopeDecision.workspace) {
                       const correlation = await JavaScriptCorrelation.build({
-                        sessionID: childSessionID,
+                        sessionID: analysisSessionID,
                         targetURL: scopeDecision.workspace.targetURL,
                       })
                       log.info("automatic JavaScript correlation completed", {
                         sessionID,
-                        childSessionID,
+                        analysisSessionID,
                         requestID: req.id,
                         targetID: scopeDecision.workspace.id,
                         sourceFiles: correlation.graph.sourceFiles.length,
@@ -1710,7 +1714,7 @@ export const SessionRoutes = lazy(() =>
                 if (agentIncomplete) {
                   log.warn("captured request analysis did not complete cleanly", {
                     sessionID,
-                    childSessionID,
+                    analysisSessionID,
                     requestID: req.id,
                     agent: agentName,
                     errorName:
@@ -1730,8 +1734,8 @@ export const SessionRoutes = lazy(() =>
                 await IngestSummary.notice(
                   sessionID,
                   finalStatus === "processed"
-                    ? `Extension request analysis completed: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; detailed reasoning and evidence are in child session ${childSessionID}.`
-                    : `Extension request analysis FAILED: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; open child session ${childSessionID} and check CyberStrike logs. The request remains marked failed and was not silently treated as processed.`,
+                    ? `Extension request analysis completed: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; subagent task ${childSessionID ?? "session unavailable"} contains the detailed analysis.`
+                    : `Extension request analysis FAILED: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request ${req.id}; ${childSessionID ? "inspect subagent task " + childSessionID : "the subagent could not be started"} and check CyberStrike logs. The request remains marked failed and was not silently treated as processed.`,
                 ).catch((error) => log.warn("parent ingest completion notice failed", { sessionID, requestID: req.id, finalStatus, error: String(error) }))
               }
             }, sessionID)
