@@ -366,17 +366,26 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let failed = 0
     let budgetDeferredURL: string | undefined
 
-    // Persist the full queue before network work begins. If the terminal or process
-    // stops mid-batch, the next invocation can safely retry the remaining inputs.
-    manifest = {
-      ...manifest,
-      updatedAt: new Date().toISOString(),
-      pendingURLs: inputURLs,
-      pendingSources: inputURLs.map((url) => ({ url, source: sourceByURL.get(url) ?? params.source })),
+    // Persist both the completed asset records and remaining work after each URL.
+    // A stopped process resumes from the first unfinished URL without re-fetching
+    // successful assets or losing source-map discoveries.
+    const persistProgress = async (pendingURLs: string[]) => {
+      manifest = {
+        ...manifest,
+        updatedAt: new Date().toISOString(),
+        assets: [...byURL.values()].sort((a, b) => a.url.localeCompare(b.url)),
+        pendingURLs,
+        pendingSources: pendingURLs.map((pendingURL) => ({
+          url: pendingURL,
+          source: sourceByURL.get(pendingURL) ?? params.source,
+        })),
+      }
+      await writeManifestAtomically(manifestPath, manifest)
     }
-    await writeManifestAtomically(manifestPath, manifest)
+    await persistProgress(inputURLs)
 
-    for (const url of inputURLs) {
+    for (let urlIndex = 0; urlIndex < inputURLs.length; urlIndex++) {
+      const url = inputURLs[urlIndex]!
       const assetSource = sourceByURL.get(url) ?? params.source
       const prior = byURL.get(url)
       if (
@@ -396,6 +405,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           records.push(record)
           byURL.set(url, record)
           skipped++
+          await persistProgress(inputURLs.slice(urlIndex + 1))
           continue
         }
         const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), ...assetSource.split(" | ")])].filter(Boolean).sort()
@@ -403,18 +413,21 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         records.push(record)
         byURL.set(url, record)
         reused++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       const result = await fetchScoped(url)
       if ("error" in result) {
         const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
@@ -422,6 +435,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
+        await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
       let bytes: Uint8Array
@@ -436,6 +450,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "per-invocation byte budget reached; retry this URL in a subsequent batch", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         budgetDeferredURL = url
+        await persistProgress(inputURLs.slice(urlIndex))
         break
       }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
@@ -466,7 +481,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
             source: sourceByURL.get(pendingURL) ?? params.source,
           })),
         }
-        await writeManifestAtomically(manifestPath, manifest)
+        await persistProgress(inputURLs.slice(urlIndex))
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
@@ -490,6 +505,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       byURL.set(url, record)
       if (existingContent) reused++
       else { downloaded++; downloadedBytes += bytes.byteLength }
+      await persistProgress(inputURLs.slice(urlIndex + 1))
     }
 
     const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
