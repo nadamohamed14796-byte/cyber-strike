@@ -1117,10 +1117,15 @@ function safeSummaryURL(input: string): string {
 }
 
 function safeSummaryText(input: string): string {
-  return input
+  const withoutURLValues = input.replace(/https?:\/\/[^\s"'<>]+/gi, (candidate) => {
+    let end = candidate.length
+    while (end > 0 && /[),.;\]]/.test(candidate[end - 1]!)) end--
+    return safeSummaryURL(candidate.slice(0, end)) + candidate.slice(end)
+  })
+  return withoutURLValues
     .replace(/Bearer\s+[-A-Za-z0-9._~+\/]+=*/gi, "Bearer [REDACTED]")
     .replace(/((?:token|secret|password|passwd|api[_-]?key|client[_-]?secret|authorization|signature|session[_-]?id)\s*[:=]\s*)["']?[^\s,;"']+/gi, "$1[REDACTED]")
-    .replace(/[\\r\\n]/g, " ")
+    .replace(/[\r\n]/g, " ")
 }
 
 async function readSafeWorkspaceText(workspacePath: string, relativePath: string): Promise<string> {
