@@ -762,7 +762,7 @@ export function scannerRequestScopeBlockReason(
     if (hasOption([
       "--resolve", "--connect-to", "--proxy", "--preproxy", "--proxy-header",
       "--interface", "--unix-socket", "--abstract-unix-socket", "--config",
-    ]) || values.some((value) => value === "-x" || /^-x.+/.test(value) || value === "-K" || /^-K.+/.test(value))) {
+    ]) || values.some((value) => /^-[^-]*x/.test(value) || /^-[^-]*K/.test(value))) {
       return "curl routing/configuration overrides can change the actual destination or request behavior after the URL scope check. Remove proxy, resolve/connect-to, interface, socket, and explicit config overrides; use a scope-aware request tool if they are essential."
     }
     if (hasHostOverride()) {
@@ -875,9 +875,10 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       : inlineMethod?.replace(/^(?:--request|--method)=/i, "").replace(/^-X/i, "").toUpperCase()
     const hasBody = args.some((value) => [
       "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--json",
-      "-F", "--form", "--form-string", "-T", "--upload-file", "--upload-file=",
+      "-F", "--form", "--form-string", "-T", "--upload-file",
     ].some((flag) => value === flag || value.startsWith(flag + "=")))
-    if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
+    const getMode = args.some((value) => value === "-G" || value === "--get")
+    if ((hasBody && !getMode) || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
   }
   if (scanner === "wget") {
     const explicitMethodIndex = args.findIndex((value) => value === "--method" || value.startsWith("--method="))
