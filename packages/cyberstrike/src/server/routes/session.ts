@@ -1539,7 +1539,7 @@ export const SessionRoutes = lazy(() =>
                   ],
                 })
                 const analysisSessionID = childSession.id
-                analysisSessionID = analysisSessionID
+                childSessionID = analysisSessionID
                 Request.updateStatus({ id: req.id, status: "processing" })
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
