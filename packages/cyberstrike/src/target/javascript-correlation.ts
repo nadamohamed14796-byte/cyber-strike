@@ -1403,7 +1403,7 @@ export namespace JavaScriptCorrelation {
     const explicitSourceMapURLs = new Set<string>(
       explicitJS ? collectExplicitJavaScriptSourceMapURLs(explicitJS, [
         ...sourceCaptureRows.map((capture) => ({
-          url: capture.source_url ?? requestURL(request)?.href,
+          url: capture.source_url,
           responseBody: capture.source_content,
         })),
         ...relevantRequests.map((request) => ({
@@ -1428,7 +1428,7 @@ export namespace JavaScriptCorrelation {
         id: capture.id,
         requestID: capture.request_id,
         captureID: capture.id,
-        url: capture.source_url,
+        url: capture.source_url ?? requestURL(request)?.href,
         origin: request.origin,
         pageURL: request.page_url,
         host: request.host,
@@ -1451,6 +1451,7 @@ export namespace JavaScriptCorrelation {
     const legacySourceInputs = legacySourceRequests.map((request) => ({
       id: request.id,
       requestID: request.id,
+      captureID: undefined,
       url: (request.origin ?? "") + request.normalized_path,
       origin: request.origin,
       pageURL: request.page_url,
