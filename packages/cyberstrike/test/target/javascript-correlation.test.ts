@@ -890,6 +890,8 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         const diskGraph = JSON.parse(await fs.readFile(result.graphPath, "utf-8"))
         const endpointInventory = JSON.parse(await fs.readFile(result.endpointPath, "utf-8"))
         const testerSurvey = JSON.parse(await fs.readFile(result.testerSurveyPath, "utf-8"))
+        const canonicalSummary = await fs.readFile(result.analysisSummaryPath, "utf-8")
+        const canonicalEndpoints = await fs.readFile(result.endpointInventoryPath, "utf-8")
         const mapReference = result.graph.sourceMapReferences?.find((item) => item.url === sourceMapURL)
         const mappedProfile = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/profile.ts")
         const mappedRender = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/render.ts")
@@ -912,7 +914,17 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         expect(diskGraph.sourceMapReferences.find((item: { url: string }) => item.url === sourceMapURL).status).toBe("analyzed")
         expect(endpointInventory.endpoints.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
         expect(testerSurvey.cases.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
-        for (const artifact of [JSON.stringify(diskGraph), JSON.stringify(endpointInventory), JSON.stringify(testerSurvey)]) {
+        expect(canonicalSummary).toContain("JavaScript Analysis Summary")
+        expect(canonicalSummary).toContain(bundleURL)
+        expect(canonicalSummary).toContain("SHA-256")
+        expect(canonicalSummary).toContain("Source-map status")
+        expect(canonicalSummary).not.toContain(rawSecret)
+        expect(canonicalSummary).not.toContain("document.body.innerHTML = value")
+        expect(canonicalEndpoints).toContain("BEGIN CYBERSTRIKE JAVASCRIPT ENDPOINTS")
+        expect(canonicalEndpoints).toContain("/api/profiles/")
+        expect(result.analysisSummaryPath).toBe(path.join(configured.workspace.workspacePath, "javascript-analysis.md"))
+        expect(result.endpointInventoryPath).toBe(path.join(configured.workspace.workspacePath, "endpoints.txt"))
+        for (const artifact of [JSON.stringify(diskGraph), JSON.stringify(endpointInventory), JSON.stringify(testerSurvey), canonicalSummary, canonicalEndpoints]) {
           expect(artifact).not.toContain(rawSecret)
           expect(artifact).not.toContain("document.body.innerHTML = value")
         }
