@@ -398,7 +398,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
                     if (candidate !== javascriptRoot) pending.push(candidate)
                     continue
                   }
-                  if (!entry.isFile() || !/\\.(?:m?js|cjs|map)$/i.test(entry.name)) continue
+                  if (!entry.isFile() || !/\.(?:m?js|cjs|map)$/i.test(entry.name)) continue
                   try {
                     const info = await fs.lstat(candidate)
                     if (info.isFile() && !info.isSymbolicLink() && info.size > 0) {
