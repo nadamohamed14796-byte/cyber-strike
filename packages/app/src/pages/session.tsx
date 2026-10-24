@@ -534,7 +534,7 @@ export default function Page() {
       const all = messages().filter((m) => m.role === "user") as UserMessage[]
       const ordinary = all.filter((message) =>
         !(sync.data.part[message.id] ?? []).some((part) => {
-          const metadata = part.metadata as unknown as { requestAnalysis?: unknown } | undefined
+          const metadata = (part as unknown as { metadata?: { requestAnalysis?: unknown } }).metadata
           return Boolean(metadata?.requestAnalysis)
         }),
       )
