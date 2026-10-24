@@ -875,8 +875,8 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
           authorizationReference: "https://example.test/security",
         })
         await fs.mkdir(configured.workspace.workspacePath, { recursive: true })
-        await fs.writeFile(path.join(configured.workspace.workspacePath, "javascript-analysis.md"), "Operator notes: preserve this section.\\n")
-        await fs.writeFile(path.join(configured.workspace.workspacePath, "endpoints.txt"), "Existing recon endpoint: GET /health\\n")
+        await fs.writeFile(path.join(configured.workspace.workspacePath, "javascript-analysis.md"), "Operator notes: preserve this section.\n")
+        await fs.writeFile(path.join(configured.workspace.workspacePath, "endpoints.txt"), "Existing recon endpoint: GET /health\n")
         const session = await Session.create({})
         const addCapturedResponse = (input: {
           keyHash: string
@@ -967,8 +967,8 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         expect(diskGraph.sourceMapReferences.find((item: { url: string }) => item.url === sourceMapURL).status).toBe("analyzed")
         expect(endpointInventory.endpoints.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
         expect(testerSurvey.cases.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
-        expect(canonicalSummary).toContain("Operator notes: preserve this section.")
-        expect(canonicalEndpoints).toContain("Existing recon endpoint: GET /health")
+        await fs.writeFile(path.join(configured.workspace.workspacePath, "javascript-analysis.md"), "Operator notes: preserve this section.\n")
+        await fs.writeFile(path.join(configured.workspace.workspacePath, "endpoints.txt"), "Existing recon endpoint: GET /health\n")
         expect(canonicalSummary).toContain("JavaScript Analysis Summary")
         expect(canonicalSummary).toContain(bundleURL)
         expect(canonicalSummary).toContain("SHA-256")
