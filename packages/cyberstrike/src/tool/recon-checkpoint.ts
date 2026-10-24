@@ -238,7 +238,7 @@ export function validateAssetDiscoveryLedger(
   return {
     valid: true,
     roots: roots.length,
-    sourcePairs: ledger.sources.length,
+    sourcePairs: sources.length,
     uniqueHosts: uniqueHosts.length,
     gaps,
   }
