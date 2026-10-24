@@ -1522,7 +1522,7 @@ export namespace JavaScriptCorrelation {
       assetCount: capturedAssetIndex.length,
       assets: capturedAssetIndex,
       note: "Raw assets are retained only for responses that passed the persisted target scope/session checks. Treat source contents as sensitive local evidence; never publish raw values in reports.",
-    }, null, 2) + "\\n")
+    }, null, 2) + "\n")
 
     const capturedSources = extractCapturedJavaScriptSources(
       capturedAssetInputs,
