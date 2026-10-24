@@ -261,3 +261,11 @@ test("ordinary recon tool choice is independent of the active phase", () => {
     reason: "ordinary reconnaissance tools are not restricted by checkpoint phase or prerequisite status",
   })
 })
+
+test("ordinary recon remains available when checkpoint state is missing or pending", () => {
+  const state = records("pending")
+  expect(reconPhaseExecutionDecision("asset_discovery", state).allowed).toBe(true)
+  expect(reconPhaseExecutionDecision("url_collection", state).allowed).toBe(true)
+  expect(reconPhaseExecutionDecision("javascript_analysis", state).allowed).toBe(true)
+  expect(reconPhaseExecutionDecision("vulnerability_testing", state).allowed).toBe(false)
+})
