@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
+import { reconPhaseGate } from "../../src/target/recon-gate"
 import { ReconCheckpointTool } from "../../src/tool/recon-checkpoint"
 import { tmpdir } from "../fixture/fixture"
 
@@ -92,6 +93,34 @@ test("user-confirmed exact scope without an external policy URL passes the recon
       } finally {
         await Instance.dispose()
       }
+    },
+  })
+})
+
+
+test("runtime gate permits ordinary recon after request scope checks even without a checkpoint manifest", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const configured = await TargetMemory.configureScope("https://program-root.example.test", {
+        include: ["https://authorized-app.example.net"],
+        authorizationSource: "Unit-test authorization fixture",
+        authorizationReference: "https://program.example.test/policy",
+      })
+
+      const authorization = await TargetMemory.checkURLScope("https://authorized-app.example.net/")
+      expect(authorization.allowed).toBe(true)
+      if (!authorization.workspace) throw new Error("scope-approved asset did not resolve to a workspace")
+
+      const ordinaryRecon = await reconPhaseGate(authorization.workspace, "url_collection")
+      expect(ordinaryRecon.allowed).toBe(true)
+      expect(ordinaryRecon.reason).toContain("request-level scope checks")
+
+      // No checkpoint manifest was created. High-impact testing must still fail closed.
+      const vulnerabilityTesting = await reconPhaseGate(configured.workspace, "vulnerability_testing")
+      expect(vulnerabilityTesting.allowed).toBe(false)
+      expect(vulnerabilityTesting.reason).toContain("No valid recon checkpoint manifest")
     },
   })
 })
