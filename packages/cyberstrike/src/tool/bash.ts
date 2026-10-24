@@ -717,6 +717,44 @@ async function readTargetListInputs(args: string[], cwd: string): Promise<{ pres
   return { present: true, targets: [...targets] }
 }
 
+/**
+ * Prevent command-line HTTP clients from following a redirect to a second URL
+ * without giving CyberStrike a chance to apply the persisted scope resolver.
+ * Requests that do not follow redirects remain eligible for the ordinary
+ * per-target scope check below.
+ */
+export function scannerRedirectScopeBlockReason(scannerInput: string, args: string[]): string | undefined {
+  const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
+  const values = args.map(stripOuterShellQuotes)
+  if (scanner === "curl") {
+    const followsRedirect = values.some((value) =>
+      value === "--location" ||
+      value === "--location-trusted" ||
+      value.startsWith("--location=") ||
+      /^-[^-]*L[A-Za-z]*$/.test(value),
+    )
+    if (followsRedirect) {
+      return "curl redirect-follow options can issue a second request outside the persisted scope. Remove -L/--location or use a scope-aware request pipeline that checks every redirect target."
+    }
+  }
+  if (scanner === "wget") {
+    const optionIndexes = values
+      .map((value, index) => ({ value, index }))
+      .filter(({ value }) => value === "--max-redirect" || value.startsWith("--max-redirect="))
+    if (optionIndexes.length !== 1) {
+      return "wget follows redirects by default. Set exactly one explicit --max-redirect=0 so no redirected request can bypass persisted-scope checking."
+    }
+    const option = optionIndexes[0]!
+    const value = option.value.startsWith("--max-redirect=")
+      ? option.value.slice("--max-redirect=".length)
+      : values[option.index + 1]
+    if (value !== "0") {
+      return "wget redirect following is blocked for generic shell mode. Set --max-redirect=0, or use a scope-aware request pipeline that checks every redirect target."
+    }
+  }
+  return undefined
+}
+
 async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
   const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
@@ -746,6 +784,10 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       !args.some((value) => /^https?:\/\//i.test(value))) return
   if (["hakrawler", "gospider"].includes(scanner)) {
     throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl cannot consult persisted scope before each request. Use the scope-aware browser/recon pipeline.")
+  }
+  const redirectReason = scannerRedirectScopeBlockReason(scanner, args)
+  if (redirectReason) {
+    throw new Error("Recon execution gate blocked " + scanner + ": " + redirectReason + " No network request was started.")
   }
   // These flags identify target-list modes for recon scanners. Do not apply this
   // generic check to curl/wget: curl's case-sensitive -L means "follow redirects",
