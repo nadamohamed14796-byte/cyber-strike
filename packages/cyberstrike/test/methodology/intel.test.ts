@@ -111,6 +111,19 @@ describe("Intel — CRUD", () => {
         })
         expect(second.id).toBe(first.id)
         expect(second.duplicate).toBe(true)
+        const differentFingerprint = Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "configuration",
+            title: "Different client-side key exposure",
+            detail: "Source: app.js:13; fingerprint sha256:0123456789abcdef01234567",
+            asset: "app.example.com",
+            source: "javascript-analysis",
+            confidenceLevel: "low",
+            tags: ["javascript"],
+          },
+        })
+        expect(differentFingerprint.id).not.toBe(first.id)
         await Session.remove(session.id)
       },
     })
