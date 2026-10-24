@@ -81,6 +81,65 @@ export namespace IngestSummary {
     })
   }
 
+  export interface LiveNotice {
+    messageID: string
+    partID: string
+    startedAt: number
+  }
+
+  /** Create one parent-transcript entry that can be updated as the subagent streams.
+   * Keeping one stable part per captured request makes the live analysis visible
+   * without flooding the transcript with a new message for every token. */
+  export async function createLiveNotice(input: {
+    sessionID: string
+    agent: string
+    model: { providerID: string; modelID: string }
+    text: string
+  }): Promise<LiveNotice> {
+    const startedAt = Date.now()
+    const messageID = Identifier.ascending("message")
+    const partID = Identifier.ascending("part")
+    await Session.updateMessage({
+      id: messageID,
+      role: "user",
+      sessionID: input.sessionID,
+      time: { created: startedAt },
+      agent: input.agent,
+      model: input.model,
+    })
+    await Session.updatePart({
+      id: partID,
+      messageID,
+      sessionID: input.sessionID,
+      type: "text",
+      text: input.text,
+      time: { start: startedAt },
+      metadata: { kind: KIND, notice: true, live: true },
+    })
+    return { messageID, partID, startedAt }
+  }
+
+  /** Update the same visible transcript entry while the captured request is analyzed. */
+  export async function updateLiveNotice(input: {
+    sessionID: string
+    live: LiveNotice
+    text: string
+    completed?: boolean
+  }): Promise<void> {
+    await Session.updatePart({
+      id: input.live.partID,
+      messageID: input.live.messageID,
+      sessionID: input.sessionID,
+      type: "text",
+      text: input.text,
+      time: {
+        start: input.live.startedAt,
+        ...(input.completed ? { end: Date.now() } : {}),
+      },
+      metadata: { kind: KIND, notice: true, live: !input.completed },
+    })
+  }
+
   export async function write(input: WriteInput): Promise<void> {
     const delta = formatDelta(input.before, input.after)
     if (!delta) return
