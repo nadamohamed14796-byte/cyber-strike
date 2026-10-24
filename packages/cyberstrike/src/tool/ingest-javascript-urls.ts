@@ -416,6 +416,24 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
+      // Cached reuse above costs no network bytes. Once the per-invocation
+      // byte budget is exhausted, defer the next network URL without fetching it.
+      if (receivedBytes >= MAX_BATCH_BYTES) {
+        const record: AssetRecord = {
+          url,
+          source: assetSource,
+          status: "skipped",
+          error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
+          fetchedAt: new Date().toISOString(),
+        }
+        records.push(record)
+        byURL.set(url, record)
+        skipped++
+        budgetDeferredURL = url
+        await persistProgress(inputURLs.slice(urlIndex))
+        break
+      }
+
       const result = await fetchScoped(url)
       if ("error" in result) {
         const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
@@ -438,9 +456,47 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await persistProgress(inputURLs.slice(urlIndex + 1))
         continue
       }
+
+      const batchRemaining = MAX_BATCH_BYTES - receivedBytes
+      if (Number.isFinite(declaredLength) && declaredLength > batchRemaining) {
+        const record: AssetRecord = {
+          url,
+          finalURL,
+          source: assetSource,
+          status: "skipped",
+          contentType,
+          bytes: declaredLength,
+          error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
+          fetchedAt: new Date().toISOString(),
+        }
+        records.push(record); byURL.set(url, record); skipped++
+        budgetDeferredURL = url
+        await persistProgress(inputURLs.slice(urlIndex))
+        break
+      }
+
       let bytes: Uint8Array
-      try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
-      catch (error) {
+      try {
+        bytes = await readBounded(response, Math.min(MAX_ASSET_BYTES, batchRemaining))
+      } catch (error) {
+        const limitIsBatchBudget = batchRemaining < MAX_ASSET_BYTES &&
+          error instanceof Error &&
+          error.message === "response exceeds the " + batchRemaining + " byte asset limit"
+        if (limitIsBatchBudget) {
+          const record: AssetRecord = {
+            url,
+            finalURL,
+            source: assetSource,
+            status: "skipped",
+            contentType,
+            error: "per-invocation byte budget reached; retry this URL in a subsequent batch",
+            fetchedAt: new Date().toISOString(),
+          }
+          records.push(record); byURL.set(url, record); skipped++
+          budgetDeferredURL = url
+          await persistProgress(inputURLs.slice(urlIndex))
+          break
+        }
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await persistProgress(inputURLs.slice(urlIndex + 1))
