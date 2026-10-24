@@ -1654,6 +1654,21 @@ export namespace JavaScriptCorrelation {
   }
 
   const buildQueues = new Map<string, Promise<BuildResult>>()
+  // Different asset selectors may be analyzed concurrently for the same target.
+  // Serialize the read/merge/write cycle for the two canonical root artifacts so
+  // one finished run cannot overwrite another run's newly merged endpoint rows.
+  const canonicalArtifactQueues = new Map<string, Promise<unknown>>()
+
+  async function serializeCanonicalArtifacts<T>(workspaceID: string, operation: () => Promise<T>): Promise<T> {
+    const previous = canonicalArtifactQueues.get(workspaceID)
+    const current = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(operation)
+    canonicalArtifactQueues.set(workspaceID, current)
+    try {
+      return await current
+    } finally {
+      if (canonicalArtifactQueues.get(workspaceID) === current) canonicalArtifactQueues.delete(workspaceID)
+    }
+  }
 
   export async function build(input: {
     sessionID: string
@@ -2568,7 +2583,10 @@ export namespace JavaScriptCorrelation {
         upsertByIdentity: true,
       })
     }
-    const canonicalArtifacts = await persistCanonicalJavaScriptArtifacts(workspace, graph, graphFilename)
+    const canonicalArtifacts = await serializeCanonicalArtifacts(
+      workspace.id,
+      () => persistCanonicalJavaScriptArtifacts(workspace, graph, graphFilename),
+    )
     return {
       graph,
       workspacePath: workspace.workspacePath,
