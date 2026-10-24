@@ -56,10 +56,12 @@ export function CapturedRequestAnalysisPanel() {
     for (const message of messages) {
       for (const part of sync.data.part[message.id] ?? []) {
         if (part.type !== "text") continue
-        const metadata = part.metadata as unknown as {
-          kind?: string
-          requestAnalysis?: RequestAnalysis
-        } | undefined
+        const metadata = (part as unknown as {
+          metadata?: {
+            kind?: string
+            requestAnalysis?: RequestAnalysis
+          }
+        }).metadata
         const value = metadata?.requestAnalysis
         if (
           metadata?.kind !== "ingest-summary" ||
