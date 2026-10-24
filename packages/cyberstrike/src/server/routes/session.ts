@@ -1500,12 +1500,6 @@ export const SessionRoutes = lazy(() =>
             // user chat/window: it is a bounded task owned by the active session.
             // Mirror TaskTool's permission and tool restrictions so proxy-agent can
             // delegate to specialists without inheriting primary-only tools.
-            const proxyAgent = await Agent.get(agentName)
-            if (!proxyAgent || proxyAgent.mode === "primary") {
-              throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
-            }
-            const config = await Config.get()
-            const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
             // Do not create a subagent session for every queued request up front.
             // Start the subagent only when this request reaches the head of the FIFO queue.
             let childSessionID: string | undefined
@@ -1524,6 +1518,15 @@ export const SessionRoutes = lazy(() =>
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
               try {
+                // Resolve runtime dependencies only when this request actually starts.
+                // If configuration or agent lookup fails, the request is marked failed
+                // by this worker instead of being left queued forever before enqueue.
+                const proxyAgent = await Agent.get(agentName)
+                if (!proxyAgent || proxyAgent.mode === "primary") {
+                  throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
+                }
+                const config = await Config.get()
+                const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
                 const childSession = await Session.create({
                   parentID: sessionID,
                   title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
