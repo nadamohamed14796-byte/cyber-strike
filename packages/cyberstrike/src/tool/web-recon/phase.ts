@@ -7,7 +7,6 @@ import type { ReconPhase } from "../../target/recon-gate"
  */
 export function executionPhaseForWebRecon(program: string): ReconPhase {
   if ([
-    "sensitive_files",
     "cors_check",
     "open_redirect",
     "full_recon",
