@@ -138,7 +138,7 @@ describe("Redirect scope enforcement for generic HTTP clients", () => {
     expect(scannerRequestScopeBlockReason("curl", ["-q", "-sSL", "https://example.com/asset.js"])).toContain("second request outside the persisted scope")
     expect(scannerRequestScopeBlockReason("curl", ["-q", "--location", "https://example.com/asset.js"])).toContain("scope-aware request pipeline")
     expect(scannerRequestScopeBlockReason("curl", ["-q", "--location-trusted", "https://example.com/asset.js"])).toContain("persisted scope")
-    expect(scannerRequestScopeBlockReason("curl", ["-q", "--resolve", "example.com:443:127.0.0.1", "https://example.com/asset.js"])).toContain("routing overrides")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "--resolve", "example.com:443:127.0.0.1", "https://example.com/asset.js"])).toContain("routing/configuration overrides")
     expect(scannerRequestScopeBlockReason("curl", ["-q", "-sxproxy", "https://example.com/asset.js"])).toContain("routing overrides")
     expect(scannerRequestScopeBlockReason("curl", ["-q", "-H", "Host: internal.example", "https://example.com/asset.js"])).toContain("Host header")
   })
