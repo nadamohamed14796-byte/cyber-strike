@@ -231,7 +231,7 @@ export namespace Intel {
     const normalized = title.toLowerCase().trim()
     const normalizedAsset = asset.toLowerCase().trim()
     const fingerprint = (value?: string) =>
-      value?.match(/(?:fingerprint(?:\\s+sha256)?|sha256)\\s*[:=]\\s*(?:sha256:)?([a-f0-9]{20,64})/i)?.[1]?.toLowerCase()
+      value?.match(/(?:fingerprint(?:\s+sha256)?|sha256)\s*[:=]\s*(?:sha256:)?([a-f0-9]{20,64})/i)?.[1]?.toLowerCase()
     const incomingFingerprint = fingerprint(detail)
     return get(sessionID).find((entry) => {
       if (entry.asset.toLowerCase().trim() !== normalizedAsset) return false
