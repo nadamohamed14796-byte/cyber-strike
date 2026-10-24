@@ -727,6 +727,9 @@ export function scannerRedirectScopeBlockReason(scannerInput: string, args: stri
   const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
   const values = args.map(stripOuterShellQuotes)
   if (scanner === "curl") {
+    if (values[0] !== "-q" && values[0] !== "--disable") {
+      return "curl may load ~/.curlrc, which can alter redirects and request behavior. Put -q (or --disable) first so the checked command is the effective command."
+    }
     const followsRedirect = values.some((value) =>
       value === "--location" ||
       value === "--location-trusted" ||
