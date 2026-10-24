@@ -41,6 +41,7 @@ export function CapturedRequestAnalysisPanel() {
   const sdk = useSDK()
   const sync = useSync()
   const [open, setOpen] = createSignal(false)
+  const [activeRequestID, setActiveRequestID] = createSignal<string>()
   const [request, setRequest] = createSignal<RequestRow>()
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
   const [requestLoadError, setRequestLoadError] = createSignal("")
@@ -79,7 +80,10 @@ export function CapturedRequestAnalysisPanel() {
     }
     return rows.sort((a, b) => a.messageID.localeCompare(b.messageID))
   })
-  const selected = createMemo(() => analyses().at(-1))
+  const latest = createMemo(() => analyses().at(-1))
+  const selected = createMemo(
+    () => analyses().find((item) => item.requestID === activeRequestID()) ?? latest(),
+  )
   const analysisSessionID = () => selected()?.analysisSessionID
   const childMessages = createMemo(() => {
     const id = analysisSessionID()
@@ -99,11 +103,12 @@ export function CapturedRequestAnalysisPanel() {
   // never create an analysis notice and therefore never open this panel.
   createEffect(() => {
     const sessionID = parentID()
-    const item = selected()
+    const item = latest()
     if (!sessionID || !item) return
     const key = sessionID + ":" + item.requestID
     if (key === seenKey) return
     seenKey = key
+    setActiveRequestID(item.requestID)
     if (item.status === "analyzing") setOpen(true)
   })
 
@@ -146,7 +151,10 @@ export function CapturedRequestAnalysisPanel() {
       <Show when={selected() && !open()}>
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setActiveRequestID(latest()?.requestID)
+            setOpen(true)
+          }}
           class="absolute right-4 bottom-32 z-[80] rounded-lg border border-border-base bg-background-base px-4 py-2 text-12-medium text-text-base shadow-xl hover:bg-surface-raised-base"
         >
           {selected()?.status === "analyzing" ? "View live request analysis" : "View last request analysis"}
@@ -194,6 +202,26 @@ export function CapturedRequestAnalysisPanel() {
               >×</button>
             </div>
           </header>
+
+          <div class="flex shrink-0 gap-2 overflow-x-auto border-b border-border-weak-base px-3 py-2">
+            <For each={analyses().slice().reverse()}>
+              {(item) => (
+                <button
+                  type="button"
+                  onClick={() => setActiveRequestID(item.requestID)}
+                  class="flex min-w-0 max-w-64 shrink-0 flex-col gap-1 rounded-md border px-3 py-2 text-left"
+                  classList={{
+                    "border-border-base bg-surface-raised-base": selected()?.requestID === item.requestID,
+                    "border-border-weak-base bg-transparent hover:bg-surface-base": selected()?.requestID !== item.requestID,
+                  }}
+                >
+                  <span class="text-10-semibold text-text-weaker">{item.method} · {item.status.toUpperCase()}</span>
+                  <span class="max-w-60 truncate text-11-medium text-text-base">{item.url}</span>
+                  <span class="text-10-regular text-text-weaker">{item.requestID}</span>
+                </button>
+              )}
+            </For>
+          </div>
 
           <div class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(240px,0.8fr)_minmax(0,1.7fr)]">
             <aside class="min-h-0 overflow-y-auto border-b border-border-weak-base p-3 md:border-b-0 md:border-r">
