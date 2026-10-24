@@ -3,23 +3,33 @@ import { Tool } from "./tool"
 import path from "path"
 import fs from "node:fs/promises"
 
-async function resolveScriptsDir(): Promise<string> {
-  // Release archives place scripts beside the compiled executable. Development
-  // checkouts keep them under packages/cyberstrike/data/scripts.
+async function resolveScriptsDir(): Promise<{ directory: string; searched: string[] }> {
+  // process.execPath can be a symlink (for example ~/.local/bin/cyberstrike).
+  // Release archives put data/scripts beside the real binary, so inspect both
+  // the invoked path and its canonical path before falling back to source layouts.
+  const executablePath = await fs.realpath(process.execPath).catch(() => process.execPath)
+  const home = process.env.HOME ?? process.env.USERPROFILE
+  const xdgDataHome = process.env.XDG_DATA_HOME || (home ? path.join(home, ".local", "share") : undefined)
   const candidates = [
+    path.join(path.dirname(executablePath), "data", "scripts"),
     path.join(path.dirname(process.execPath), "data", "scripts"),
     path.resolve(import.meta.dir, "../../data/scripts"),
     path.resolve(import.meta.dir, "data/scripts"),
+    ...(xdgDataHome ? [
+      path.join(xdgDataHome, "cyberstrike", "data", "scripts"),
+      path.join(xdgDataHome, "cyberstrike", "scripts"),
+    ] : []),
   ]
-  for (const candidate of candidates) {
+  const searched = [...new Set(candidates)]
+  for (const candidate of searched) {
     try {
       const info = await fs.stat(candidate)
-      if (info.isDirectory()) return candidate
+      if (info.isDirectory()) return { directory: candidate, searched }
     } catch {
       // Try the next supported layout.
     }
   }
-  return candidates[0]!
+  return { directory: searched[0]!, searched }
 }
 
 const AVAILABLE_SCRIPTS: Record<string, { description: string; args: string }> = {
@@ -70,15 +80,15 @@ export const AttackScriptTool = Tool.define("attack_script", {
     timeout_seconds: z.number().optional().default(120).describe("Maximum execution time in seconds (default: 120)"),
   }),
   async execute(params) {
-    const scriptsDir = await resolveScriptsDir()
+    const { directory: scriptsDir, searched: scriptDirectoriesSearched } = await resolveScriptsDir()
     const scriptPath = path.join(scriptsDir, `${params.script}.py`)
     const file = Bun.file(scriptPath)
     if (!(await file.exists())) {
       return {
         title: `attack_script: ${params.script}`,
-        output: `Script not found: ${params.script}.py\n\nAvailable scripts:\n${Object.entries(AVAILABLE_SCRIPTS)
+        output: "Script not found: " + params.script + ".py\nSearched script directories:\n" + scriptDirectoriesSearched.map((directory) => "  " + directory).join("\n") + "\n\nAvailable scripts:\n" + Object.entries(AVAILABLE_SCRIPTS)
           .map(([k, v]) => `  ${k}: ${v.description}\n    Usage: ${v.args}`)
-          .join("\n")}`,
+          .join("\n"),
         metadata: { script: params.script, exitCode: -1, hasStderr: false },
       }
     }
