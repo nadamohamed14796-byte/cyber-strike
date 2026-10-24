@@ -1509,16 +1509,20 @@ export const SessionRoutes = lazy(() =>
               let latestAgentText = ""
               const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
               try {
-                // Mark this request as active and publish its analysis panel as soon as it
-                // reaches the head of the FIFO queue, before resolving tools or creating a
-                // child session. Startup failures are therefore visible in the same panel.
+                // Mark the dequeued request active immediately so queue waiters never open panels.
                 Request.updateStatus({ id: req.id, status: "processing" })
-                const noticeModel = body.model ?? (await SessionPrompt.lastModel(sessionID))
+                // Preserve the normal model preference order while opening the panel before
+                // configuration/session startup, so those failures still have visible status.
+                const proxyAgent = await Agent.get(agentName)
+                if (!proxyAgent || proxyAgent.mode === "primary") {
+                  throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
+                }
+                const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
                 liveNotice = await IngestSummary.createLiveNotice({
                   sessionID,
-                  agent: agentName,
-                  model: noticeModel,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the isolated analysis session…\n`,
+                  agent: proxyAgent.name,
+                  model,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the isolated analysis session…\n`,
                   requestAnalysis: {
                     requestID: req.id,
                     method: normalized.method,
@@ -1527,11 +1531,6 @@ export const SessionRoutes = lazy(() =>
                       : normalized.normalizedPath,
                   },
                 })
-                // Resolve runtime dependencies only after the active request is visible.
-                const proxyAgent = await Agent.get(agentName)
-                if (!proxyAgent || proxyAgent.mode === "primary") {
-                  throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
-                }
                 const config = await Config.get()
                 const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
                 const childSession = await Session.create({
@@ -1559,7 +1558,6 @@ export const SessionRoutes = lazy(() =>
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
-                const model = body.model ?? proxyAgent.model ?? noticeModel
                 liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
                 await IngestSummary.updateLiveNotice({
                   sessionID,
@@ -1778,6 +1776,34 @@ export const SessionRoutes = lazy(() =>
                 } else {
                   finalStatus = "processed"
                 }
+              } catch (error) {
+                // If agent lookup itself fails, still create the same request panel when
+                // a parent/request model is available so the final failed state is visible.
+                if (!liveNotice) {
+                  try {
+                    const fallbackModel = body.model ?? (await SessionPrompt.lastModel(sessionID))
+                    liveNotice = await IngestSummary.createLiveNotice({
+                      sessionID,
+                      agent: agentName,
+                      model: fallbackModel,
+                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the isolated analysis session…\n`,
+                      requestAnalysis: {
+                        requestID: req.id,
+                        method: normalized.method,
+                        url: normalized.origin
+                          ? new URL(normalized.normalizedPath, normalized.origin).href
+                          : normalized.normalizedPath,
+                      },
+                    })
+                  } catch (noticeError) {
+                    log.warn("captured request startup notice failed", {
+                      sessionID,
+                      requestID: req.id,
+                      error: noticeError instanceof Error ? noticeError.message : String(noticeError),
+                    })
+                  }
+                }
+                throw error
               } finally {
                 unsubscribeLive?.()
                 Request.updateStatus({ id: req.id, status: finalStatus })
