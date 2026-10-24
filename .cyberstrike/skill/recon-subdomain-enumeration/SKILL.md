@@ -65,7 +65,7 @@ Prioritize authentication, API, staging/preview, admin, upload, billing, tenant,
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Select sources adaptively; inspect registered schemas and preflight only external commands that may actually be used. The catalog defines `host_inventory.py` and the canonical source-ledger/output contract. A listed candidate is not proof of installation, suitability, or authorization.
+Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the only tool/API/CLI/helper catalog. Select sources adaptively; inspect registered schemas and preflight only external commands that may actually be used. The catalog lists optional helpers and the simple canonical output contract. A listed candidate is not proof of installation, suitability, or authorization.
 
 For a candidate CLI, resolve tool_preflight.py from the installed skill/catalog root and invoke it by absolute path once per runtime/version. Do not assume `.cyberstrike/skill/scripts/` is relative to the target workspace. If the helper is unavailable, use `command -v` and the tool's documented version/help check. Review official docs and flags before use; apply program scope and rate limits independently of tool availability.
 
@@ -138,6 +138,6 @@ Keep each candidate with source, timestamp, DNS answers/CNAME chain, wildcard-DN
 
 ## CyberStrike output and completion
 
-Use the canonical output contract in `.cyberstrike/skill/TOOLING_CATALOG.md`. Persist `subdomains.txt` and `subdomain-sources.json` in the existing target workspace; retain per-root/source provenance, timestamps, terminal status, errors, reconciled counts, and reasons for unselected or unavailable sources. Normalize once and preserve all source attribution when hostnames deduplicate.
+Use the canonical output contract in `.cyberstrike/skill/TOOLING_CATALOG.md`. Persist one normalized, deduplicated `subdomains.txt` in the existing target workspace. Merge useful partial results immediately and continue to live-host discovery without waiting for every source.
 
-Do not create a second collector, a second tool inventory, or one file per provider. The agent selects and invokes suitable registered tools, reachable APIs, and available CLIs directly; `host_inventory.py` is an offline normalizer, not a source collector. Verify both canonical files and their matching counts before moving to DNS/live-host work. Distinguish a true zero-result source from a failed, blocked, unavailable, skipped, or pending source.
+Do not create a second collector, a second tool inventory, or one file per provider. The agent selects and invokes suitable registered tools, reachable APIs, and available CLIs directly; `host_inventory.py` is an offline normalizer, not a source collector. Verify `subdomains.txt` exists before moving to DNS/live-host work. Report meaningful source failures in the final summary without blocking the rest of recon.
