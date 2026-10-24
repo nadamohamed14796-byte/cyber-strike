@@ -88,7 +88,7 @@ export const AttackScriptTool = Tool.define("attack_script", {
         title: `attack_script: ${params.script}`,
         output: "Script not found: " + params.script + ".py\nSearched script directories:\n" + scriptDirectoriesSearched.map((directory) => "  " + directory).join("\n") + "\n\nAvailable scripts:\n" + Object.entries(AVAILABLE_SCRIPTS)
           .map(([k, v]) => `  ${k}: ${v.description}\n    Usage: ${v.args}`)
-          .join("\n")}`,
+          .join("\n"),
         metadata: { script: params.script, exitCode: -1, hasStderr: false },
       }
     }
