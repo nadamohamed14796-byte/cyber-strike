@@ -1152,6 +1152,7 @@ export namespace JavaScriptCorrelation {
     endpointPath: string
     testerSurveyPath: string
     noteID: string
+    capturedAssetCount: number
   }
 
   const buildQueues = new Map<string, Promise<BuildResult>>()
@@ -1163,9 +1164,8 @@ export namespace JavaScriptCorrelation {
   }): Promise<BuildResult> {
     const rootSessionID = Session.root(input.sessionID)
     const targetURL = TargetMemory.normalize(input.targetURL).targetURL
-    const selectorURL = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
-    const selector = selectorURL ? selectorURL.origin + selectorURL.pathname : "all-assets"
-    const key = rootSessionID + "\\0" + targetURL + "\\0" + selector
+    // Serialize all selectors for one target/session so concurrent per-URL runs cannot race the shared captured-asset index.
+    const key = rootSessionID + "\0" + targetURL
     const previous = buildQueues.get(key)
     const current = (previous ? previous.catch(() => undefined) : Promise.resolve(undefined)).then(() =>
       buildInternal(input),
@@ -1428,7 +1428,7 @@ export namespace JavaScriptCorrelation {
         id: capture.id,
         requestID: capture.request_id,
         captureID: capture.id,
-        url: capture.source_url,
+        url: capture.source_url ?? requestURL(request)?.href,
         origin: request.origin,
         pageURL: request.page_url,
         host: request.host,
@@ -1451,6 +1451,7 @@ export namespace JavaScriptCorrelation {
     const legacySourceInputs = legacySourceRequests.map((request) => ({
       id: request.id,
       requestID: request.id,
+      captureID: undefined,
       url: (request.origin ?? "") + request.normalized_path,
       origin: request.origin,
       pageURL: request.page_url,
@@ -1461,14 +1462,112 @@ export namespace JavaScriptCorrelation {
       responseContentType: request.response_content_type,
       responseBody: request.javascript_source ?? request.processed_response,
     }))
+    // Preserve the actual in-scope JavaScript and source-map response bodies in the
+    // target workspace. The graph stays redacted, while analysts can inspect the
+    // original assets locally and resume analysis without depending on transient DB rows.
+    // These inputs have already passed the persisted target-scope and session-tree checks.
+    const capturedAssetInputs = [...versionedSourceInputs, ...legacySourceInputs]
+    const capturedAssetIndexPath = "javascript/captured-index.json"
+    type CapturedAssetIndexEntry = {
+      url: string
+      requestID: string
+      captureID?: string
+      contentType: string | null
+      sha256: string
+      bytes: number
+      file: string
+    }
+    let capturedAssetIndex: CapturedAssetIndexEntry[] = []
+    try {
+      const indexInfo = await fs.lstat(path.join(workspace.workspacePath, capturedAssetIndexPath))
+      if (!indexInfo.isFile() || indexInfo.isSymbolicLink()) {
+        throw new Error("Captured JavaScript index is not a regular file; refusing to overwrite it.")
+      }
+      const previousIndex = JSON.parse(await fs.readFile(path.join(workspace.workspacePath, capturedAssetIndexPath), "utf-8"))
+      if (
+        previousIndex?.schemaVersion !== 1 ||
+        previousIndex?.targetURL !== workspace.targetURL ||
+        !Array.isArray(previousIndex.assets) ||
+        !previousIndex.assets.every((asset: CapturedAssetIndexEntry) =>
+          typeof asset?.file === "string" &&
+          typeof asset.url === "string" &&
+          typeof asset.requestID === "string" &&
+          typeof asset.sha256 === "string" &&
+          typeof asset.bytes === "number"
+        )
+      ) {
+        throw new Error("Captured JavaScript index has an invalid schema, asset record, or target identity; refusing to overwrite it.")
+      }
+      capturedAssetIndex = previousIndex.assets
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+    const capturedAssetByFile = new Map(capturedAssetIndex.map((asset) => [asset.file, asset]))
+    for (const item of capturedAssetInputs) {
+      const sourceURL = safeURL(item.url) ?? safeURL(item.origin)
+      if (!sourceURL || !isJavaScriptOrSourceMapResponse(item.responseContentType, sourceURL.pathname)) continue
+      const body = unwrapProcessedResponseBody(item.responseBody ?? "").body
+      if (!body.trim()) continue
+      const sha256 = createHash("sha256").update(body, "utf-8").digest("hex")
+      const extension = isSourceMapResponse(item.responseContentType, sourceURL.pathname) ? ".map" : ".js"
+      const relativeFile = "javascript/captured/" +
+        sha256.slice(0, 16) + "-" +
+        createHash("sha256").update(sourceURL.origin + sourceURL.pathname).digest("hex").slice(0, 8) +
+        extension
+      await TargetMemory.writeWorkspaceFile(workspace, relativeFile, body)
+      capturedAssetByFile.set(relativeFile, {
+        url: sourceURL.href,
+        requestID: item.requestID,
+        ...(item.captureID ? { captureID: item.captureID } : {}),
+        contentType: item.responseContentType ?? null,
+        sha256,
+        bytes: Buffer.byteLength(body, "utf-8"),
+        file: relativeFile,
+      })
+    }
+    capturedAssetIndex = [...capturedAssetByFile.values()].sort((left, right) => left.file.localeCompare(right.file))
+    await TargetMemory.writeWorkspaceFile(workspace, capturedAssetIndexPath, JSON.stringify({
+      schemaVersion: 1,
+      targetURL: workspace.targetURL,
+      updatedAt: new Date().toISOString(),
+      assetCount: capturedAssetIndex.length,
+      assets: capturedAssetIndex,
+      note: "Raw assets are retained only for responses that passed the persisted target scope/session checks. Treat source contents as sensitive local evidence; never publish raw values in reports.",
+    }, null, 2) + "\n")
+
     const capturedSources = extractCapturedJavaScriptSources(
-      [...versionedSourceInputs, ...legacySourceInputs],
+      capturedAssetInputs,
       analysisCache,
     )
     // Keep every distinct source location/URL for provenance. analysisCache is keyed by
     // content hash, so identical bytes are analyzed once but may produce multiple origin-aware
     // source records; this matters when the same bundle is served from different hosts.
-    const mergedSourceFiles = [...sourceFiles, ...capturedSources]
+    const capturedAssetByPath = new Map(capturedAssetIndex.map((asset) => [asset.file, asset]))
+    const localSourceIsPersistedCapture = (file: JavaScriptSourceFile): boolean => {
+      let relativeCapturePath: string | undefined
+      if (file.relativePath.startsWith("javascript/captured/")) {
+        relativeCapturePath = file.relativePath
+      } else if (file.sourceMapURL?.startsWith("local://javascript/captured/")) {
+        const localMapURL = safeURL(file.sourceMapURL)
+        if (localMapURL) relativeCapturePath = "javascript" + localMapURL.pathname
+      }
+      if (!relativeCapturePath) return false
+      const indexedAsset = capturedAssetByPath.get(relativeCapturePath)
+      if (!indexedAsset) return false
+      const indexedURL = safeURL(indexedAsset.url)
+      const canonicalURL = indexedURL ? indexedURL.origin + indexedURL.pathname : indexedAsset.url
+      // Prefer the request-linked record when the exact local raw asset and captured
+      // response have the same content hash and URL. Keep local-only files as fallback.
+      return capturedSources.some((source) =>
+        source.sha256 === file.sha256 &&
+        (source.sourceURL === canonicalURL || source.sourceMapURL === canonicalURL) &&
+        source.sourceMapSource === file.sourceMapSource
+      )
+    }
+    const mergedSourceFiles = [
+      ...sourceFiles.filter((file) => !localSourceIsPersistedCapture(file)),
+      ...capturedSources,
+    ]
     const sourceMapRecordsByURL = new Map<string, JavaScriptSourceFile[]>()
     for (const file of mergedSourceFiles) {
       if (!file.sourceMapURL || file.sourceMapSource || file.sourceMapInline) continue
@@ -1882,6 +1981,8 @@ export namespace JavaScriptCorrelation {
       "- Target: " + workspace.targetURL,
       "- Session: " + rootSessionID,
       "- JavaScript asset URLs: " + graph.javascriptAssets.length,
+      "- Captured JS/source-map files persisted: " + capturedAssetIndex.length,
+      "- Captured asset index: " + capturedAssetIndexPath,
       "- JavaScript/source-map records indexed: " + graph.sourceFiles.length,
       "- Static endpoint literals extracted: " + graph.sourceFiles.reduce((sum, file) => sum + file.endpointLiterals.length, 0),
       "- Source-map references: " + (graph.sourceMapReferences ?? []).length,
@@ -1902,6 +2003,9 @@ export namespace JavaScriptCorrelation {
       "- Recorded graph edges: " + graph.edges.length,
       "- Tester survey cases: " + testerCases.length,
       "- Tester survey artifact: " + testerSurveyRelativePath,
+      "",
+      "## Captured asset evidence (raw local files; treat as sensitive)",
+      ...(capturedAssetIndex.length ? capturedAssetIndex.map((asset) => "- " + asset.url + " — " + asset.file + " — SHA-256 " + asset.sha256 + " — " + asset.bytes + " bytes — request " + asset.requestID) : ["No captured JavaScript/source-map response bodies were persisted. Collection is incomplete unless local source files were independently supplied."]),
       "",
       "## Local JavaScript files",
       ...(graph.sourceFiles.length ? graph.sourceFiles.map((file) => "- " + file.relativePath + " — SHA-256 " + file.sha256 + " — " + file.bytes + " bytes — " + file.endpointLiterals.length + " static endpoint literal(s)" + (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : "")) : ["No local JavaScript/source-map source files found in the target workspace."]),
@@ -2069,6 +2173,6 @@ export namespace JavaScriptCorrelation {
         upsertByIdentity: true,
       })
     }
-    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, testerSurveyPath, noteID: note.note.id }
+    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, testerSurveyPath, noteID: note.note.id, capturedAssetCount: capturedAssetIndex.length }
   }
 }

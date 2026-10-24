@@ -14,7 +14,7 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
     "This performs no network requests and does not execute JavaScript. It reads only the current session and descendant-agent data, then persists a private target-local correlation snapshot and notes. Source-map files already captured in the session are parsed as data; embedded source code is analyzed in memory and is not persisted.",
     "Pass the authorized target URL. Optionally pass a JavaScript file URL to narrow source analysis to that captured file and only its directly referenced source maps; otherwise it considers captured JavaScript/source-map responses and JavaScript-like Intel assets associated with the target's session/workspace. The authoritative persisted scope and workspace-relationship checks decide which assets are eligible, including assets served from a separately hosted CDN.",
     "Same-host matches are labelled candidate relationships, not proof that a script issued a request. Foreign-key relationships from web_function/request_observation to a captured request are direct relationships.",
-    "Captured JavaScript response bodies are analyzed automatically. For additional source files, omit javascript_url and place an already-observed/captured file under the current target workspace's javascript/ directory, then run this tool. It recursively scans all regular .js/.mjs/.cjs and .map files there without following symlinks, parses source maps as data, and does not download or execute scripts. When javascript_url is supplied, source analysis is narrowed to that exact captured asset plus its directly referenced source maps, and ignores unrelated local files.",
+    "Captured JavaScript response bodies are analyzed automatically and the scope-checked raw JS/source-map response bodies are retained under javascript/captured/ with javascript/captured-index.json (sensitive local evidence; source maps may embed source code). For additional source files, omit javascript_url and place an already-observed/captured file under the current target workspace's javascript/ directory, then run this tool. It recursively scans all regular .js/.mjs/.cjs and .map files there without following symlinks, parses source maps as data, and does not download or execute scripts. When javascript_url is supplied, source analysis is narrowed to that exact captured asset plus its directly referenced source maps, and ignores unrelated local files.",
     "Do not provide URL credentials, session tokens, or other secrets. This tool does not replace the existing scope enforcement.",
   ].join("\n"),
   parameters: CorrelateJavaScriptParameters,
@@ -27,8 +27,11 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
       })
       const graph = result.graph
       return {
-        title: "JavaScript correlation saved",
+        title: graph.sourceFiles.length || result.capturedAssetCount ? "JavaScript correlation saved" : "JavaScript correlation incomplete",
         output: [
+          "Collection status: " + (result.capturedAssetCount > 0 ? "captured assets persisted" : "NO captured JavaScript/source-map response bodies found; this is not a successful collection"),
+          "Persisted captured asset files: " + result.capturedAssetCount,
+          "Analysis status: " + (graph.sourceFiles.length > 0 ? "source records analyzed" : "no source records analyzed"),
           "Target workspace: " + result.workspacePath,
           "Graph JSON: " + result.graphPath,
           "Endpoint candidates JSON: " + result.endpointPath,
@@ -79,6 +82,9 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           observations: graph.observations.length,
           findings: graph.findings.length,
           edges: graph.edges.length,
+          captured_asset_files: result.capturedAssetCount,
+          collection_complete: result.capturedAssetCount > 0,
+          analysis_complete: graph.sourceFiles.length > 0,
         },
       }
     } catch (error) {
