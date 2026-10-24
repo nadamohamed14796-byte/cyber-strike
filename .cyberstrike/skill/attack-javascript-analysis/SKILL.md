@@ -41,7 +41,7 @@ Treat output as candidate metadata. Redact token-like values before persisting, 
 Prioritize routes that connect to privileged actions, tenant/object identifiers, file transfers, authentication flows, remote URL fetches, billing/export operations, and hidden API versions. A useful chain is JavaScript clue → correlated live request → missing server-side control → controlled proof → impact. If the live request cannot be observed or safely tested, keep it as an unconfirmed lead.
 
 ## Output contract
-Save an endpoint/parameter inventory with asset, file hash, source, method, route template, parameters, headers, auth signals, role/tenant hints, sink/source, live-request correlation, confidence, redaction, and next skill. Keep one endpoint record with multiple parameter observations rather than duplicating the endpoint itself.
+Update the canonical root-level `javascript-analysis.md` with asset URLs/hashes, source-map status, analysis counts, redacted signal types, and unresolved gaps. Update root-level `endpoints.txt` with the endpoint/parameter inventory: asset, file hash, source, method, route template, parameters, headers, auth signals, role/tenant hints, sink/source, live-request correlation, confidence, redaction, and next skill. Keep one endpoint record with multiple parameter observations rather than duplicating the endpoint itself. Link detailed correlation graph JSON under `javascript/` and endpoint-candidate JSON under `endpoints/`; do not maintain a competing second inventory.
 
 ## False positives
 - Bundled third-party code or dead code is mistaken for the target's application logic.
