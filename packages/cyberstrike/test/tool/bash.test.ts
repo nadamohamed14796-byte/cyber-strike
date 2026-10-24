@@ -132,11 +132,12 @@ describe("Read-only passive-research API scope routing", () => {
 })
 
 describe("Redirect scope enforcement for generic HTTP clients", () => {
-  test("curl may fetch one URL but cannot follow redirects outside the scope resolver", () => {
-    expect(scannerRedirectScopeBlockReason("curl", ["-sS", "https://example.com/asset.js"])).toBeUndefined()
-    expect(scannerRedirectScopeBlockReason("curl", ["-sSL", "https://example.com/asset.js"])).toContain("second request outside the persisted scope")
-    expect(scannerRedirectScopeBlockReason("curl", ["--location", "https://example.com/asset.js"])).toContain("scope-aware request pipeline")
-    expect(scannerRedirectScopeBlockReason("curl", ["--location-trusted", "https://example.com/asset.js"])).toContain("persisted scope")
+  test("curl disables user config and cannot follow redirects outside the scope resolver", () => {
+    expect(scannerRedirectScopeBlockReason("curl", ["-sS", "https://example.com/asset.js"])).toContain("~/.curlrc")
+    expect(scannerRedirectScopeBlockReason("curl", ["-q", "-sS", "https://example.com/asset.js"])).toBeUndefined()
+    expect(scannerRedirectScopeBlockReason("curl", ["-q", "-sSL", "https://example.com/asset.js"])).toContain("second request outside the persisted scope")
+    expect(scannerRedirectScopeBlockReason("curl", ["-q", "--location", "https://example.com/asset.js"])).toContain("scope-aware request pipeline")
+    expect(scannerRedirectScopeBlockReason("curl", ["-q", "--location-trusted", "https://example.com/asset.js"])).toContain("persisted scope")
   })
 
   test("wget must explicitly disable automatic redirects in generic shell mode", () => {
