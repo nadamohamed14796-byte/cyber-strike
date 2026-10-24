@@ -371,10 +371,34 @@ async function runNormalize(
       client,
     })
   } catch (err) {
-    // Malformed request line (e.g. plain chat text) — let the caller fall
-    // through to the non-HTTP ingest branch.
-    log.debug("normalize parse failed", { error: (err as Error).message })
-    return null
+    // Provider/model initialization can fail before Normalize.run reaches its
+    // deterministic HTTP parser. Do not mistake that infrastructure failure for
+    // malformed extension traffic: retry with a no-op Tier 3 classifier so Tier
+    // 0/1/2 still normalize and persist the request without an LLM dependency.
+    log.warn("request normalization primary path failed; retrying deterministic fallback", {
+      sessionID,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    try {
+      return await Normalize.run({
+        sessionID,
+        raw: body.text,
+        scheme,
+        providerID: model.providerID,
+        modelID: model.modelID,
+        client: {
+          async classify() {
+            return { decisions: [], model: "deterministic-fallback" }
+          },
+        },
+      })
+    } catch (fallbackError) {
+      // Only a genuine parse/normalization failure reaches the plain-text path.
+      log.debug("normalize deterministic fallback failed", {
+        error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+      })
+      return null
+    }
   }
 }
 
@@ -1200,9 +1224,19 @@ export const SessionRoutes = lazy(() =>
         // branch. That fallback writes into the active text window and can hijack
         // the user's conversation when request normalization fails.
         if (!normalized && looksLikeHTTPRequest(body.text, Boolean(body.scheme || body.response))) {
+          await IngestSummary.notice(
+            sessionID,
+            "Extension request rejected before analysis: CyberStrike could not parse the captured HTTP request. The raw request was not sent to the parent agent; check the extension's request-line/headers format and server logs.",
+          ).catch((error) => log.warn("parent ingest rejection notice failed", { sessionID, error: String(error) }))
+          log.warn("captured HTTP request rejected before analysis", {
+            sessionID,
+            hasScheme: Boolean(body.scheme),
+            hasResponse: Boolean(body.response),
+            textLength: body.text.length,
+          })
           c.status(400)
           return c.json({
-            error: "Captured HTTP request could not be normalized; it was not sent to the parent chat session.",
+            error: "Captured HTTP request could not be parsed; it was not sent to the parent chat session.",
           })
         }
 
