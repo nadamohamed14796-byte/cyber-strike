@@ -73,7 +73,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
     "Lightweight progress tracking for reconnaissance, not a tool allowlist. Use status when helpful and begin/complete to record progress, but ordinary recon tools are not blocked by stale phase order or missing earlier phase records. If a phase is already running, resume it without beginning it again. Scope checks remain enforced by the runtime.",
     "Suggested workflow: scope_validation → workspace_setup → asset_discovery → live_hosts_ports → url_collection → directory_fuzzing → parameter_discovery → parameter_fuzzing → javascript_analysis → endpoint_inventory → reporting. This is progress guidance, not a gate on ordinary recon tools.",
     "A normal recon run defers vulnerability_testing and proceeds to reporting; only an explicit user request may begin testing after endpoint_inventory. Reopening testing invalidates reporting, which must be regenerated. Never launch scanners/session_scan automatically. Save wordlists/settings/results for directory and parameter phases; link JavaScript sources, request shapes, and correlation evidence for JavaScript analysis. Reporting requires the exact verified artifact reports/recon-final.md.",
-    "Keep useful phase records and verified artifact paths, but do not let a missing optional source ledger or stale ordinary phase status block reconnaissance. Scope validation and workspace setup remain required; JavaScript and endpoint inventories should be recorded when produced. Vulnerability testing remains opt-in and requires completed endpoint inventory.",
+    "Keep useful phase records and verified artifact paths, but do not let stale ordinary phase status block reconnaissance. Scope validation and workspace setup remain required; JavaScript and endpoint inventories should be recorded when produced. Vulnerability testing remains opt-in and requires completed endpoint inventory.",
     "This tool enforces phase order, not request authorization. Verify the saved scope; when it is new/changed or unresolved, call scope_check once for the actual starting asset with target_url selecting the canonical program-root workspace. Complete scope_validation only by supplying scope_validation_target with that exact absolute HTTP(S) asset URL; runtime rechecks and persists it, then revalidates it on resume. Do not check the root container merely because it identifies the workspace. Active-request tools still enforce persisted scope for every concrete request.",
   ].join("\n"),
   parameters: Parameters,
@@ -365,7 +365,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             }
           }
           // The canonical subdomains inventory is sufficient to record progress.
-          // The detailed per-source ledger is optional evidence, not a completion gate;
+          // Source-level detail is not a completion gate;
           // an incomplete source must not prevent the rest of recon from continuing.
         }
         run.phases[phase] = {
