@@ -13,8 +13,8 @@ const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
-  urls: z.array(z.string().trim().min(1).max(8192)).min(1).max(MAX_URLS)
-    .describe("JavaScript asset URLs from ANY source: the URL collector, crawler/HTML, source-map references, a URL inventory, or URLs manually supplied by the user. Pass the actual URLs, not local file paths."),
+  urls: z.array(z.string().trim().min(1).max(8192)).max(MAX_URLS).default([])
+    .describe("Optional JavaScript asset URLs from the URL collector, crawler/HTML, source-map references, a URL inventory, or the user. Pass actual URLs, not local file paths. Leave empty to resume the pending URL queue saved in the target manifest."),
   source: z.string().trim().min(1).max(120).default("unspecified")
     .describe("Fallback provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
   url_sources: z.array(z.object({
@@ -166,7 +166,7 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in urls batches of at most 500. Use source as the fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, immediately continue with those URLs in batches of at most 500, pass matching metadata.pending_sources as url_sources, and repeat until no pending URLs remain. The 64 MiB byte budget is per invocation, not a total-work cap.",
+    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Pass URLs in batches of at most 500; leaving urls empty resumes the pending queue saved in the manifest. Use source as fallback provenance and url_sources to retain per-URL origins in mixed batches. If metadata.pending_urls is nonempty, continue with those URLs in batches of at most 500 and pass matching metadata.pending_sources as url_sources until no pending URLs remain. The pending queue is persisted; the 64 MiB byte budget is per invocation, not a total-work cap.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, errors, and a persistent pending queue so interrupted batches can resume on the next invocation. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
@@ -306,6 +306,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     for (const url of inputURLs) {
       if (!sourceByURL.has(url)) sourceByURL.set(url, params.source)
     }
+    if (!inputURLs.length) {
+      return {
+        title: "JavaScript URL ingestion stopped",
+        output: "No input URLs were supplied and the target manifest has no pending URLs to resume.",
+        metadata: { error: "no_urls_or_pending_queue", manifest_path: manifestPath, workspace: workspace.workspacePath },
+      }
+    }
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
@@ -385,7 +392,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         if (!normalizedMapURL || queuedURLs.has(normalizedMapURL)) continue
         queuedURLs.add(normalizedMapURL)
         inputURLs.push(normalizedMapURL)
-        sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
+        sourceByURL.set(normalizedMapURL, ("sourceMappingURL from " + url).slice(0, 120))
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
