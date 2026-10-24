@@ -30,7 +30,7 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         const target = "http://127.0.0.1:" + server.port
         const workspace = await TargetMemory.ensure(target)
         await TargetMemory.configureScope(target, {
-          include: ["127.0.0.1"],
+          include: [target],
           exclude: [],
           authorizationSource: "Local unit-test fixture",
           authorizationReference: "https://example.test/security-policy",
