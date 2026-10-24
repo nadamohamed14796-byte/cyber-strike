@@ -819,7 +819,7 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
     async fn() {
       try {
         const targetURL = "https://app.example.test"
-        await TargetMemory.configureScope(targetURL, {
+        const configured = await TargetMemory.configureScope(targetURL, {
           include: ["app.example.test"],
           authorizationSource: "JavaScript correlation integration fixture",
           authorizationReference: "https://example.test/security",
