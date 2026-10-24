@@ -34,7 +34,7 @@ const PROGRAMS = {
   },
   sitemap_scan: {
     description:
-      "Fetch sitemap.xml and sitemapindex, extract all declared page URLs. Follows child sitemaps up to 20 deep",
+      "Fetch sitemap.xml and sitemapindex, follow nested indexes without a fixed count/depth cap, prevent cycles, and include only URLs permitted by the persisted scope resolver",
   },
   robots_scan: {
     description:
