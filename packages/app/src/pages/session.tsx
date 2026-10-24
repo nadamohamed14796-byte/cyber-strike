@@ -58,6 +58,7 @@ import { SessionPromptDock } from "@/pages/session/session-prompt-dock"
 import { SessionMobileTabs } from "@/pages/session/session-mobile-tabs"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
+import { CapturedRequestAnalysisPanel } from "@/pages/session/captured-request-analysis-panel"
 
 type HandoffSession = {
   prompt: string
@@ -529,7 +530,18 @@ export default function Page() {
 
   const emptyUserMessages: UserMessage[] = []
   const userMessages = createMemo(
-    () => messages().filter((m) => m.role === "user") as UserMessage[],
+    () => {
+      const all = messages().filter((m) => m.role === "user") as UserMessage[]
+      const ordinary = all.filter((message) =>
+        !(sync.data.part[message.id] ?? []).some((part) => {
+          const metadata = part.metadata as unknown as { requestAnalysis?: unknown } | undefined
+          return Boolean(metadata?.requestAnalysis)
+        }),
+      )
+      // Keep a visible transcript fallback for sessions that consist only of captured
+      // requests, while avoiding a duplicate live-analysis notice in a normal chat.
+      return ordinary.length > 0 ? ordinary : all
+    },
     emptyUserMessages,
     { equals: same },
   )
@@ -1558,6 +1570,7 @@ export default function Page() {
   return (
     <div class="relative bg-background-base size-full overflow-hidden flex flex-col">
       <SessionHeader />
+      <CapturedRequestAnalysisPanel />
       <div
         class="flex-1 min-h-0 flex"
         classList={{
