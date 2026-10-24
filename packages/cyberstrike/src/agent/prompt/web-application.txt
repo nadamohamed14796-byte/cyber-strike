@@ -53,7 +53,7 @@ When JavaScript response captures exist and the evidence is relevant, discover c
 
 Use only after the user explicitly requests targeted testing and the endpoint inventory is verified. It reads captured requests and runs active HTTP checks; it is not part of the default recon run.
 
-- `session_scan` performs origin-level technology fingerprinting, security-header/cookie review, sensitive-path discovery, CORS checks, safe HTTP-method inspection, and redirect checks. Limits: 10 origins, 3 CORS targets per origin, 10 redirect pages, and a 5-minute deadline. Template paths are skipped; use a focused program for those endpoints.
+- `session_scan` performs origin-level technology fingerprinting, security-header/cookie review, sensitive-path discovery, CORS checks, safe HTTP-method inspection, and redirect checks across all eligible captured origins, API endpoints, and redirect-like pages. It has no arbitrary total-origin, endpoint, or overall-time cap. Concrete requests must still pass persisted scope checks and each underlying program's request-level safeguards. Template paths need concrete authorized requests or a suitable focused check; do not count them as tested when skipped.
 - Standalone programs include `tech_detect`, `header_audit`, `sensitive_files`, `cors_check`, `method_check`, `open_redirect`, `sitemap_scan`, `robots_scan`, `openapi_scan`, and `graphql_probe`. `full_recon` runs the broader suite and must not be used as a default shortcut.
 - The targeted-testing section below owns the testing decision process. The canonical `/recon` workflow owns discovery order, workspace/authorization setup, crawling, checkpoints, and the final recon report; do not restate or create a second recon workflow here.
 
