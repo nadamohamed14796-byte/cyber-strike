@@ -1542,7 +1542,32 @@ export namespace JavaScriptCorrelation {
     // Keep every distinct source location/URL for provenance. analysisCache is keyed by
     // content hash, so identical bytes are analyzed once but may produce multiple origin-aware
     // source records; this matters when the same bundle is served from different hosts.
-    const mergedSourceFiles = [...sourceFiles, ...capturedSources]
+    const capturedAssetByPath = new Map(capturedAssetIndex.map((asset) => [asset.file, asset]))
+    const localSourceIsPersistedCapture = (file: JavaScriptSourceFile): boolean => {
+      let relativeCapturePath: string | undefined
+      if (file.relativePath.startsWith("javascript/captured/")) {
+        relativeCapturePath = file.relativePath
+      } else if (file.sourceMapURL?.startsWith("local://javascript/captured/")) {
+        const localMapURL = safeURL(file.sourceMapURL)
+        if (localMapURL) relativeCapturePath = "javascript" + localMapURL.pathname
+      }
+      if (!relativeCapturePath) return false
+      const indexedAsset = capturedAssetByPath.get(relativeCapturePath)
+      if (!indexedAsset) return false
+      const indexedURL = safeURL(indexedAsset.url)
+      const canonicalURL = indexedURL ? indexedURL.origin + indexedURL.pathname : indexedAsset.url
+      // Prefer the request-linked record when the exact local raw asset and captured
+      // response have the same content hash and URL. Keep local-only files as fallback.
+      return capturedSources.some((source) =>
+        source.sha256 === file.sha256 &&
+        (source.sourceURL === canonicalURL || source.sourceMapURL === canonicalURL) &&
+        source.sourceMapSource === file.sourceMapSource
+      )
+    }
+    const mergedSourceFiles = [
+      ...sourceFiles.filter((file) => !localSourceIsPersistedCapture(file)),
+      ...capturedSources,
+    ]
     const sourceMapRecordsByURL = new Map<string, JavaScriptSourceFile[]>()
     for (const file of mergedSourceFiles) {
       if (!file.sourceMapURL || file.sourceMapSource || file.sourceMapInline) continue
