@@ -6,9 +6,9 @@ import { TargetMemory } from "../target"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
-const MAX_URLS = 500
+const MAX_URLS = 500 // Per invocation; continue remaining URLs in subsequent calls.
 const MAX_ASSET_BYTES = 8 * 1024 * 1024
-const MAX_TOTAL_BYTES = 64 * 1024 * 1024
+const MAX_BATCH_BYTES = 64 * 1024 * 1024 // Per invocation only; never a lifetime collection cap.
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
@@ -121,7 +121,12 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
     const location = response.headers.get("location")
     if (!location) return { error: "redirect response has no Location header" }
     if (redirects === MAX_REDIRECTS) return { error: "redirect limit exceeded" }
-    const next = normalizeURL(new URL(location, current).toString())
+    let next: string | undefined
+    try {
+      next = normalizeURL(new URL(location, current).toString())
+    } catch {
+      return { error: "redirect destination is invalid" }
+    }
     if (!next) return { error: "redirect destination is not a credential-free HTTP(S) URL" }
     current = next
   }
@@ -131,7 +136,7 @@ async function fetchScoped(inputURL: string): Promise<{ response: Response; fina
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in the urls array and identify their provenance in source.",
+    "Input may come from the URL collector, crawlers, extracted HTML, source-map references, urls.txt, another tool, or links manually supplied by the user. Always pass all available URLs in urls batches of at most 500 and identify their provenance in source. If metadata.pending_urls is nonempty, immediately continue with those URLs in batches of at most 500 until no pending URLs remain. The 64 MiB byte budget is per invocation, not a total-work cap.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh only when checking whether a previously fetched URL changed.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
@@ -156,9 +161,42 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     let manifest: Manifest = { schemaVersion: 1, updatedAt: new Date().toISOString(), assets: [] }
     try {
-      const parsed = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Partial<Manifest>
-      if (parsed.schemaVersion === 1 && Array.isArray(parsed.assets)) manifest = parsed as Manifest
-    } catch { /* First run or unreadable prior manifest: begin a new manifest. */ }
+      const rawManifest = await fs.readFile(manifestPath, "utf8")
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(rawManifest)
+      } catch {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest is invalid JSON. It was preserved without overwrite; repair or back it up before retrying: " + manifestPath,
+          metadata: { error: "manifest_invalid_json", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+      const candidate = parsed as Partial<Manifest>
+      const validAssets = Array.isArray(candidate.assets) && candidate.assets.every((item) => {
+        if (!item || typeof item !== "object") return false
+        const asset = item as Partial<AssetRecord>
+        return typeof asset.url === "string" &&
+          typeof asset.source === "string" &&
+          ["downloaded", "reused", "skipped", "failed"].includes(asset.status as string)
+      })
+      if (candidate.schemaVersion !== 1 || !validAssets) {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest has an unsupported schema or invalid asset record. It was preserved without overwrite: " + manifestPath,
+          metadata: { error: "manifest_invalid_schema", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+      manifest = candidate as Manifest
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        return {
+          title: "JavaScript URL ingestion stopped",
+          output: "The existing asset manifest could not be read and was preserved: " + (error instanceof Error ? error.message : String(error)),
+          metadata: { error: "manifest_read_failed", manifest_path: manifestPath, workspace: workspace.workspacePath },
+        }
+      }
+    }
 
     const byURL = new Map(manifest.assets.map((item) => [normalizeURL(item.url) ?? item.url, item]))
     const byHash = new Map<string, AssetRecord>()
@@ -177,13 +215,26 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let downloaded = 0
     let skipped = 0
     let failed = 0
+    let budgetDeferredURL: string | undefined
 
     for (const url of inputURLs) {
       const assetSource = sourceByURL.get(url) ?? params.source
       const prior = byURL.get(url)
       if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
+        const currentScope = await TargetMemory.checkURLScope(url)
+        const finalScope = prior.finalURL ? await TargetMemory.checkURLScope(prior.finalURL) : currentScope
+        if (!currentScope.allowed || !finalScope.allowed) {
+          const reason = !currentScope.allowed
+            ? "cached asset is no longer in persisted scope: " + currentScope.reason
+            : "cached redirect destination is no longer in persisted scope: " + finalScope.reason
+          const record: AssetRecord = { ...prior, source: assetSource, status: "skipped", error: reason }
+          records.push(record)
+          byURL.set(url, record)
+          skipped++
+          continue
+        }
         const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), assetSource])].filter(Boolean).sort()
-        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
+        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused", error: undefined }
         records.push(record)
         byURL.set(url, record)
         reused++
@@ -215,12 +266,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         records.push(record); byURL.set(url, record); failed++
         continue
       }
-      receivedBytes += bytes.byteLength
-      if (receivedBytes > MAX_TOTAL_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "batch download budget exceeded", fetchedAt: new Date().toISOString() }
+      if (receivedBytes + bytes.byteLength > MAX_BATCH_BYTES) {
+        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "per-invocation byte budget reached; retry this URL in a subsequent batch", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
-        continue
+        budgetDeferredURL = url
+        break
       }
+      receivedBytes += bytes.byteLength
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       if (!looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
@@ -231,7 +283,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       // Every map goes through the same persisted-scope and redirect checks as any other URL.
       for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
         const normalizedMapURL = normalizeURL(mapURL)
-        if (!normalizedMapURL || queuedURLs.has(normalizedMapURL) || queuedURLs.size >= MAX_URLS) continue
+        if (!normalizedMapURL || queuedURLs.has(normalizedMapURL)) continue
         queuedURLs.add(normalizedMapURL)
         inputURLs.push(normalizedMapURL)
         sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
@@ -248,7 +300,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
-      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), params.source])].filter(Boolean).sort()
+      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), assetSource])].filter(Boolean).sort()
       const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
@@ -265,6 +317,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", "utf8")
     await fs.rename(temporaryManifest, manifestPath)
 
+    const pendingURLs = budgetDeferredURL ? inputURLs.slice(inputURLs.indexOf(budgetDeferredURL)) : []
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
     if (downloaded + reused > 0) {
@@ -284,11 +337,16 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
 
     return {
-      title: "JavaScript URL ingestion complete",
+      title: pendingURLs.length
+        ? "JavaScript URL ingestion paused — continue pending URLs"
+        : analysisError
+          ? "JavaScript assets fetched; correlation failed"
+          : "JavaScript URL ingestion complete",
       output: [
         "Workspace: " + workspace.workspacePath,
         "Input URLs: " + params.urls.length,
-        "Valid unique URLs: " + inputURLs.length,
+        "Valid unique URLs queued (including discovered source maps): " + inputURLs.length,
+        "Pending URLs for subsequent batches: " + pendingURLs.length,
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions: " + downloaded,
         "Reused URL/content records: " + reused,
@@ -298,6 +356,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
         analysisSummary,
+        ...(pendingURLs.length ? [
+          "Continue by passing metadata.pending_urls to ingest_javascript_urls in batches of at most " + MAX_URLS + " URLs. The byte budget applies per invocation, not to the total run.",
+        ] : []),
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => record.url + " — " + record.status + ": " + record.error),
       ].join("\n"),
       metadata: {
@@ -313,6 +374,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         downloaded_bytes: downloadedBytes,
         received_bytes: receivedBytes,
         analysis_error: analysisError,
+        pending_urls: pendingURLs,
+        byte_budget_reached: pendingURLs.length > 0,
       },
     }
   },
