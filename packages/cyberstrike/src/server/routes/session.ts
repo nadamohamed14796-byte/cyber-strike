@@ -28,6 +28,7 @@ import { WebObject } from "../../session/web/web-object"
 import { WebFunction } from "../../session/web/web-function"
 import { WebRetest } from "../../session/web/web-retest"
 import { Agent } from "../../agent/agent"
+import { Config } from "../../config/config"
 import { Provider } from "../../provider/provider"
 import { Snapshot } from "@/snapshot"
 import { Log } from "../../util/log"
@@ -1494,9 +1495,30 @@ export const SessionRoutes = lazy(() =>
             // later request and changed the parent session active status/model context.
             // Child sessions run independently while session-tree-aware tools continue to
             // read/write shared root request, credential, observation and target memory.
+            // Dispatch this capture as a real proxy-agent subtask. Subagents are
+            // backed by an internal child session in CyberStrike, but this is not a new
+            // user chat/window: it is a bounded task owned by the active session.
+            // Mirror TaskTool's permission and tool restrictions so proxy-agent can
+            // delegate to specialists without inheriting primary-only tools.
+            const proxyAgent = await Agent.get(agentName)
+            if (!proxyAgent || proxyAgent.mode === "primary") {
+              throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
+            }
+            const config = await Config.get()
+            const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
             const childSession = await Session.create({
               parentID: sessionID,
-              title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)}` ,
+              title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
+              permission: [
+                { permission: "todowrite", pattern: "*", action: "deny" },
+                { permission: "todoread", pattern: "*", action: "deny" },
+                ...(hasTaskPermission ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
+                ...(config.experimental?.primary_tools?.map((tool) => ({
+                  pattern: "*",
+                  action: "allow" as const,
+                  permission: tool,
+                })) ?? []),
+              ],
             })
             const childSessionID = childSession.id
             await IngestSummary.notice(
@@ -1518,10 +1540,19 @@ export const SessionRoutes = lazy(() =>
                 const before = IngestSummary.snapshot(sessionID)
                 // Render at dequeue so Observed Values includes observations accrued while waiting.
                 const promptText = buildPrompt()
+                const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
                 const agentResult = await SessionPrompt.prompt({
                   sessionID: childSessionID,
-                  agent: agentName,
-                  model: body.model,
+                  agent: proxyAgent.name,
+                  model,
+                  // Match TaskTool's subagent runtime: specialist delegation remains
+                  // available only when the proxy-agent's permission profile allows it.
+                  tools: {
+                    todowrite: false,
+                    todoread: false,
+                    ...(hasTaskPermission ? {} : { task: false }),
+                    ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
+                  },
                   excludeHistory: true,
                   parts: [{ type: "text", text: promptText }],
                 })
@@ -1533,7 +1564,6 @@ export const SessionRoutes = lazy(() =>
                 const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
                 const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
                 const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
-                const model = body.model ?? (await SessionPrompt.lastModel(childSessionID))
                 await IngestSummary.write({
                   // Keep completion chatter in the request child session, not the active parent transcript.
                   sessionID: childSessionID,
