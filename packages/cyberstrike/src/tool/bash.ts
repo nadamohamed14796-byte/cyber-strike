@@ -723,9 +723,14 @@ async function readTargetListInputs(args: string[], cwd: string): Promise<{ pres
  * Requests that do not follow redirects remain eligible for the ordinary
  * per-target scope check below.
  */
-export function scannerRedirectScopeBlockReason(scannerInput: string, args: string[]): string | undefined {
+export function scannerRedirectScopeBlockReason(
+  scannerInput: string,
+  args: string[],
+  launcherPrefix: string[] = [],
+): string | undefined {
   const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
   const values = args.map(stripOuterShellQuotes)
+  const prefix = launcherPrefix.map(stripOuterShellQuotes)
   if (scanner === "curl") {
     if (values[0] !== "-q" && values[0] !== "--disable") {
       return "curl may load ~/.curlrc, which can alter redirects and request behavior. Put -q (or --disable) first so the checked command is the effective command."
@@ -741,6 +746,11 @@ export function scannerRedirectScopeBlockReason(scannerInput: string, args: stri
     }
   }
   if (scanner === "wget") {
+    const configDisabled = prefix.some((value) => value.toLowerCase() === "env") &&
+      prefix.some((value) => value === "WGETRC=/dev/null")
+    if (!configDisabled && process.env.WGETRC !== "/dev/null") {
+      return "wget can load ~/.wgetrc settings that enable recursion or change request behavior. Invoke it as env WGETRC=/dev/null wget --max-redirect=0 ... so the checked command uses no user configuration."
+    }
     const optionIndexes = values
       .map((value, index) => ({ value, index }))
       .filter(({ value }) => value === "--max-redirect" || value.startsWith("--max-redirect="))
@@ -788,7 +798,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   if (["hakrawler", "gospider"].includes(scanner)) {
     throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl cannot consult persisted scope before each request. Use the scope-aware browser/recon pipeline.")
   }
-  const redirectReason = scannerRedirectScopeBlockReason(scanner, args)
+  const redirectReason = scannerRedirectScopeBlockReason(scanner, args, command.slice(0, scannerIndex))
   if (redirectReason) {
     throw new Error("Recon execution gate blocked " + scanner + ": " + redirectReason + " No network request was started.")
   }
