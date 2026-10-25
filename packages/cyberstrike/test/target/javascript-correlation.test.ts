@@ -8,7 +8,7 @@ import { Request } from "../../src/session/request"
 import { TargetMemory } from "../../src/target"
 import { JavaScriptCorrelation } from "../../src/target/javascript-correlation"
 import { tmpdir } from "../fixture/fixture"
-import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
+import { collectExplicitJavaScriptSourceMapURLs, correlateStaticJavaScriptEndpoints, createJavaScriptTesterCases, extractStaticJavaScriptEndpoints, extractJavaScriptSourceMapReferences, inventoryJavaScriptFiles, isJavaScriptOrSourceMapResponse, isSourceMapResponse, isJavaScriptAssetAllowed, matchesCapturedJavaScriptAsset, matchesEndpointPathTemplate, mergeStructuredJavaScriptEndpoints, mergeCanonicalJavaScriptEndpoints, type JavaScriptEndpointCandidate, type JavaScriptSourceFile, safeCorrelationResponsePreview, sanitizeJavaScriptSourceFileForPersistence, selectJavaScriptAssetsForCorrelation } from "../../src/target/javascript-correlation"
 
 test("extracts and deduplicates static endpoint literals from common JavaScript calls", () => {
   const tick = String.fromCharCode(96)
@@ -303,6 +303,56 @@ test("merges equivalent named route placeholders and unions all source evidence"
   expect(endpoints[0]?.observedRequestIDs).toContain("req-users")
   expect(endpoints[0]?.observedInTraffic).toBe(true)
 })
+
+test("canonical endpoint merge keeps captured request IDs attached to their actual HTTP method", () => {
+  const route = "/api/users/{id}"
+  const generic: JavaScriptEndpointCandidate = {
+    id: "endpoint:generic",
+    literal: route,
+    host: "api.example.test",
+    origin: "https://api.example.test",
+    path: route,
+    sourceFiles: ["javascript/routes.js"],
+    observedRequestIDs: ["req-get", "req-post"],
+    observedInTraffic: true,
+    confidence: "observed",
+  }
+  const get: JavaScriptEndpointCandidate = {
+    id: "endpoint:get",
+    literal: route,
+    host: "api.example.test",
+    origin: "https://api.example.test",
+    path: route,
+    method: "GET",
+    sourceFiles: ["javascript/get.js"],
+    observedRequestIDs: [],
+    observedInTraffic: false,
+    confidence: "candidate",
+  }
+  const post: JavaScriptEndpointCandidate = {
+    ...get,
+    id: "endpoint:post",
+    method: "POST",
+    sourceFiles: ["javascript/post.js"],
+  }
+  const requests = [
+    { id: "req-get", method: "GET" },
+    { id: "req-post", method: "POST" },
+  ]
+  const endpoints = mergeCanonicalJavaScriptEndpoints([
+    { endpointCandidates: [generic], requests },
+    { endpointCandidates: [get, post], requests },
+  ])
+  expect(endpoints).toHaveLength(2)
+  const getEndpoint = endpoints.find((endpoint) => endpoint.method === "GET")!
+  const postEndpoint = endpoints.find((endpoint) => endpoint.method === "POST")!
+  expect(getEndpoint.observedRequestIDs).toContain("req-get")
+  expect(getEndpoint.observedRequestIDs).not.toContain("req-post")
+  expect(postEndpoint.observedRequestIDs).toContain("req-post")
+  expect(postEndpoint.observedRequestIDs).not.toContain("req-get")
+  expect(endpoints.every((endpoint) => endpoint.sourceFiles.includes("javascript/routes.js"))).toBe(true)
+})
+
 
 test("generates an idempotent tester survey with request shape and resumable check progress", () => {
   const candidate = {
@@ -722,6 +772,21 @@ test("does not persist source-map JSON in generic response previews", () => {
 })
 
 
+test("refuses to inventory JavaScript through a root symlink", async () => {
+  const parent = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-js-root-symlink-"))
+  const outside = path.join(parent, "outside")
+  const root = path.join(parent, "javascript")
+  try {
+    await fs.mkdir(outside)
+    await fs.writeFile(path.join(outside, "app.js"), 'fetch("/api/private")')
+    await fs.symlink(outside, root, "dir")
+    await expect(inventoryJavaScriptFiles(root)).rejects.toThrow(/symbolic link|canonical workspace/i)
+  } finally {
+    await fs.rm(parent, { recursive: true, force: true })
+  }
+})
+
+
 test("inventories local .map and inline source maps and analyzes embedded sources without persisting source code", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-js-inventory-"))
   const javascriptDir = path.join(root, "javascript")
@@ -819,11 +884,14 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
     async fn() {
       try {
         const targetURL = "https://app.example.test"
-        await TargetMemory.configureScope(targetURL, {
+        const configured = await TargetMemory.configureScope(targetURL, {
           include: ["app.example.test"],
           authorizationSource: "JavaScript correlation integration fixture",
           authorizationReference: "https://example.test/security",
         })
+        await fs.mkdir(configured.workspace.workspacePath, { recursive: true })
+        await fs.writeFile(path.join(configured.workspace.workspacePath, "javascript-analysis.md"), "Operator notes: preserve this section.\n")
+        await fs.writeFile(path.join(configured.workspace.workspacePath, "endpoints.txt"), "Existing recon endpoint: GET /health\n")
         const session = await Session.create({})
         const addCapturedResponse = (input: {
           keyHash: string
@@ -890,6 +958,8 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         const diskGraph = JSON.parse(await fs.readFile(result.graphPath, "utf-8"))
         const endpointInventory = JSON.parse(await fs.readFile(result.endpointPath, "utf-8"))
         const testerSurvey = JSON.parse(await fs.readFile(result.testerSurveyPath, "utf-8"))
+        const canonicalSummary = await fs.readFile(result.analysisSummaryPath, "utf-8")
+        const canonicalEndpoints = await fs.readFile(result.endpointInventoryPath, "utf-8")
         const mapReference = result.graph.sourceMapReferences?.find((item) => item.url === sourceMapURL)
         const mappedProfile = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/profile.ts")
         const mappedRender = result.graph.sourceFiles.find((file) => file.sourceMapSource === "src/render.ts")
@@ -912,7 +982,19 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         expect(diskGraph.sourceMapReferences.find((item: { url: string }) => item.url === sourceMapURL).status).toBe("analyzed")
         expect(endpointInventory.endpoints.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
         expect(testerSurvey.cases.some((item: { path: string }) => item.path.startsWith("/api/profiles/"))).toBe(true)
-        for (const artifact of [JSON.stringify(diskGraph), JSON.stringify(endpointInventory), JSON.stringify(testerSurvey)]) {
+        expect(canonicalSummary).toContain("Operator notes: preserve this section.")
+        expect(canonicalEndpoints).toContain("Existing recon endpoint: GET /health")
+        expect(canonicalSummary).toContain("JavaScript Analysis Summary")
+        expect(canonicalSummary).toContain(bundleURL)
+        expect(canonicalSummary).toContain("SHA-256")
+        expect(canonicalSummary).toContain("Source-map status")
+        expect(canonicalSummary).not.toContain(rawSecret)
+        expect(canonicalSummary).not.toContain("document.body.innerHTML = value")
+        expect(canonicalEndpoints).toContain("BEGIN CYBERSTRIKE JAVASCRIPT ENDPOINTS")
+        expect(canonicalEndpoints).toContain("/api/profiles/")
+        expect(result.analysisSummaryPath).toBe(path.join(configured.workspace.workspacePath, "javascript-analysis.md"))
+        expect(result.endpointInventoryPath).toBe(path.join(configured.workspace.workspacePath, "endpoints.txt"))
+        for (const artifact of [JSON.stringify(diskGraph), JSON.stringify(endpointInventory), JSON.stringify(testerSurvey), canonicalSummary, canonicalEndpoints]) {
           expect(artifact).not.toContain(rawSecret)
           expect(artifact).not.toContain("document.body.innerHTML = value")
         }
