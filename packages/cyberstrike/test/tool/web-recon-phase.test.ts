@@ -1,17 +1,31 @@
 import { expect, test } from "bun:test"
-import { phaseForWebRecon } from "../../src/tool/web-recon/phase"
+import { executionPhaseForWebRecon } from "../../src/tool/web-recon/phase"
 
-test("technology detection has an advisory live-host phase label", () => {
-  expect(phaseForWebRecon("tech_detect")).toBe("live_hosts_ports")
-})
-
-test("sitemap, robots, and OpenAPI discovery use the URL-collection label", () => {
-  for (const program of ["sitemap_scan", "robots_scan", "openapi_scan"]) {
-    expect(phaseForWebRecon(program)).toBe("url_collection")
+test("read-only discovery programs are not gated by checkpoint status", () => {
+  for (const program of [
+    "sitemap_scan",
+    "robots_scan",
+    "openapi_scan",
+    "header_audit",
+    "method_check",
+    "graphql_probe",
+    "tech_detect",
+  ]) {
+    expect(executionPhaseForWebRecon(program)).toBe("url_collection")
   }
 })
 
-test("active web checks remain classified as vulnerability testing", () => {
-  expect(phaseForWebRecon("header_audit")).toBe("vulnerability_testing")
-  expect(phaseForWebRecon("sensitive_files")).toBe("vulnerability_testing")
+test("sensitive-file collection is ordinary read-only recon", () => {
+  expect(executionPhaseForWebRecon("sensitive_files")).toBe("url_collection")
+})
+
+test("active vulnerability-oriented web-recon programs remain opt-in", () => {
+  for (const program of [
+    "cors_check",
+    "open_redirect",
+    "full_recon",
+    "session_scan",
+  ]) {
+    expect(executionPhaseForWebRecon(program)).toBe("vulnerability_testing")
+  }
 })
