@@ -145,7 +145,7 @@ function redact(value?: string | null, max = 320): string | null {
     .replace(/\b(authorization|proxy-authorization|x-auth-token|x-access-token|x-csrf-token|cookie|set-cookie|x-api-key|api[_-]?(?:key|secret)|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|token|jwt|client[_-]?secret|webhook[_-]?secret|signing[_-]?key|encryption[_-]?key|private[_-]?key|secret[_-]?key|password|passwd|pwd|secret|session(?:[_-]?id)?|csrf(?:[_-]?token)?)\s*[:=]\s*[^\r\n,;]+/gi, "$1: [REDACTED]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[JWT REDACTED]")
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[EMAIL REDACTED]")
+    .replace(/[\r\n]/g, " ")
     .slice(0, max)
 }
 
@@ -529,7 +529,7 @@ export function extractCapturedJavaScriptSources(
     if (bytes < 1) continue
     const digest = createHash("sha256").update(body).digest("hex")
     const canonicalSourceURL = url.origin + url.pathname
-    const identity = canonicalSourceURL + "\\0" + digest
+    const identity = canonicalSourceURL + "\0" + digest
     const previousIndex = sourceIndexByURLAndHash.get(identity)
     if (previousIndex !== undefined) {
       const previous = output[previousIndex]!
@@ -661,7 +661,7 @@ export function mergeStructuredJavaScriptEndpoints(
 ): JavaScriptEndpointCandidate[] {
   const byKey = new Map<string, JavaScriptEndpointCandidate>()
   const routeKeyOf = (origin: string | null, route: string) =>
-    (origin?.toLowerCase() ?? "*") + "\\0" + normalizedTemplateShape(route)
+    (origin?.toLowerCase() ?? "*") + "\0" + normalizedTemplateShape(route)
   const normalizeMethod = (method?: string | null) => method?.trim().toUpperCase() || null
   const keyOf = (origin: string | null, route: string, method?: string | null) =>
     routeKeyOf(origin, route) + "\\0method:" + (normalizeMethod(method) ?? "*")
@@ -827,7 +827,7 @@ export function correlateStaticJavaScriptEndpoints(
       }
 
       for (const variant of variants.values()) {
-        const key = (variant.origin ?? "*") + "\\0" + normalizedTemplateShape(endpointPath)
+        const key = (variant.origin ?? "*") + "\0" + normalizedTemplateShape(endpointPath)
         let candidate = candidates.get(key)
         if (!candidate) {
           candidate = {
@@ -860,6 +860,21 @@ export function correlateStaticJavaScriptEndpoints(
 /** Inventory local JavaScript and source-map files; never follow symlinks or execute their contents. */
 export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>, sourceBaseURL?: string): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
+  let rootInfo
+  try {
+    rootInfo = await fs.lstat(root)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return output
+    throw error
+  }
+  if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) {
+    throw new Error("Refusing to inventory JavaScript from a symbolic link or non-directory root.")
+  }
+  const resolvedRoot = path.resolve(root)
+  const realRoot = await fs.realpath(root)
+  if (realRoot !== resolvedRoot) {
+    throw new Error("Refusing to inventory JavaScript from a root that resolves outside its canonical workspace path.")
+  }
   const pendingDirectories = [root]
   while (pendingDirectories.length) {
     const directory = pendingDirectories.pop()!
@@ -1009,6 +1024,503 @@ export interface JavaScriptCorrelationGraph {
 }
 
 
+
+const JAVASCRIPT_ANALYSIS_BEGIN = "<!-- BEGIN CYBERSTRIKE JAVASCRIPT ANALYSIS -->"
+const JAVASCRIPT_ANALYSIS_END = "<!-- END CYBERSTRIKE JAVASCRIPT ANALYSIS -->"
+const JAVASCRIPT_ENDPOINTS_BEGIN = "# BEGIN CYBERSTRIKE JAVASCRIPT ENDPOINTS"
+const JAVASCRIPT_ENDPOINTS_END = "# END CYBERSTRIKE JAVASCRIPT ENDPOINTS"
+
+function uniqueValues<T>(values: T[], key: (value: T) => string): T[] {
+  const output = new Map<string, T>()
+  for (const value of values) output.set(key(value), value)
+  return [...output.values()]
+}
+
+function normalizeEndpointOrigin(value?: string | null): string {
+  if (!value) return "*"
+  try { return new URL(value).origin.toLowerCase() } catch { return value.toLowerCase().replace(/\/+$/, "") }
+}
+
+export function mergeCanonicalJavaScriptEndpoints(
+  graphs: Array<{
+    endpointCandidates: JavaScriptEndpointCandidate[]
+    requests: Array<{ id: string; method: string }>
+  }>,
+): JavaScriptEndpointCandidate[] {
+  const byKey = new Map<string, JavaScriptEndpointCandidate>()
+  const capturedMethodByID = new Map(
+    graphs.flatMap((graph) => graph.requests).map((request) => [request.id, request.method.trim().toUpperCase()] as const),
+  )
+  const routeKey = (endpoint: JavaScriptEndpointCandidate) =>
+    normalizeEndpointOrigin(endpoint.origin) + "\0" + normalizedTemplateShape(endpoint.path)
+  const keyOf = (endpoint: JavaScriptEndpointCandidate) =>
+    routeKey(endpoint) + "\0" + (endpoint.method?.trim().toUpperCase() || "UNKNOWN")
+  const uniqueStrings = (values: string[]) => [...new Set(values.filter(Boolean))]
+
+  for (const endpoint of graphs.flatMap((graph) => graph.endpointCandidates ?? [])) {
+    const key = keyOf(endpoint)
+    const existing = byKey.get(key)
+    if (!existing) {
+      byKey.set(key, {
+        ...endpoint,
+        id: "endpoint:" + createHash("sha256").update(key).digest("hex").slice(0, 16),
+        sourceFiles: uniqueStrings(endpoint.sourceFiles ?? []),
+        observedRequestIDs: uniqueStrings(endpoint.observedRequestIDs ?? []),
+        pathParameters: uniqueStrings(endpoint.pathParameters ?? []),
+        queryParameters: uniqueStrings(endpoint.queryParameters ?? []),
+        bodyParameters: uniqueStrings(endpoint.bodyParameters ?? []),
+        headerNames: uniqueStrings(endpoint.headerNames ?? []),
+        authSignals: uniqueStrings(endpoint.authSignals ?? []),
+        cookieSignals: uniqueStrings(endpoint.cookieSignals ?? []),
+      })
+      continue
+    }
+    existing.sourceFiles = uniqueStrings([...existing.sourceFiles, ...endpoint.sourceFiles])
+    existing.observedRequestIDs = uniqueStrings([...existing.observedRequestIDs, ...endpoint.observedRequestIDs])
+    existing.pathParameters = uniqueStrings([...(existing.pathParameters ?? []), ...(endpoint.pathParameters ?? [])])
+    existing.queryParameters = uniqueStrings([...(existing.queryParameters ?? []), ...(endpoint.queryParameters ?? [])])
+    existing.bodyParameters = uniqueStrings([...(existing.bodyParameters ?? []), ...(endpoint.bodyParameters ?? [])])
+    existing.headerNames = uniqueStrings([...(existing.headerNames ?? []), ...(endpoint.headerNames ?? [])])
+    existing.authSignals = uniqueStrings([...(existing.authSignals ?? []), ...(endpoint.authSignals ?? [])])
+    existing.cookieSignals = uniqueStrings([...(existing.cookieSignals ?? []), ...(endpoint.cookieSignals ?? [])])
+    existing.observedInTraffic ||= endpoint.observedInTraffic
+    if (existing.observedInTraffic) existing.confidence = "observed"
+  }
+
+  // When later evidence establishes methods for a previously generic route,
+  // merge its parameter/source observations into those method-specific rows and
+  // remove the redundant UNKNOWN row for that same origin/path.
+  const rows = [...byKey.values()]
+  const byRoute = new Map<string, JavaScriptEndpointCandidate[]>()
+  for (const endpoint of rows) {
+    const route = routeKey(endpoint)
+    const siblings = byRoute.get(route) ?? []
+    siblings.push(endpoint)
+    byRoute.set(route, siblings)
+  }
+  const removed = new Set<string>()
+  for (const siblings of byRoute.values()) {
+    const known = siblings.filter((endpoint) => Boolean(endpoint.method?.trim()))
+    const generic = siblings.filter((endpoint) => !endpoint.method?.trim())
+    if (!known.length || !generic.length) continue
+    for (const fallback of generic) {
+      for (const endpoint of known) {
+        endpoint.sourceFiles = uniqueStrings([...endpoint.sourceFiles, ...fallback.sourceFiles])
+        const matchingRequestIDs = fallback.observedRequestIDs.filter(
+          (requestID) => capturedMethodByID.get(requestID) === endpoint.method?.trim().toUpperCase(),
+        )
+        endpoint.observedRequestIDs = uniqueStrings([...endpoint.observedRequestIDs, ...matchingRequestIDs])
+        endpoint.pathParameters = uniqueStrings([...(endpoint.pathParameters ?? []), ...(fallback.pathParameters ?? [])])
+        endpoint.queryParameters = uniqueStrings([...(endpoint.queryParameters ?? []), ...(fallback.queryParameters ?? [])])
+        endpoint.bodyParameters = uniqueStrings([...(endpoint.bodyParameters ?? []), ...(fallback.bodyParameters ?? [])])
+        endpoint.headerNames = uniqueStrings([...(endpoint.headerNames ?? []), ...(fallback.headerNames ?? [])])
+        endpoint.authSignals = uniqueStrings([...(endpoint.authSignals ?? []), ...(fallback.authSignals ?? [])])
+        endpoint.cookieSignals = uniqueStrings([...(endpoint.cookieSignals ?? []), ...(fallback.cookieSignals ?? [])])
+        if (matchingRequestIDs.length) endpoint.observedInTraffic = true
+        if (endpoint.observedInTraffic) endpoint.confidence = "observed"
+      }
+      removed.add(keyOf(fallback))
+    }
+  }
+  return rows
+    .filter((endpoint) => !removed.has(keyOf(endpoint)))
+    .sort((a, b) =>
+      normalizeEndpointOrigin(a.origin).localeCompare(normalizeEndpointOrigin(b.origin)) ||
+      (a.method ?? "UNKNOWN").localeCompare(b.method ?? "UNKNOWN") ||
+      normalizedTemplateShape(a.path).localeCompare(normalizedTemplateShape(b.path)),
+    )
+}
+
+function safeSummaryURL(input: string): string {
+  try {
+    const url = new URL(input)
+    const keys = [...new Set([...url.searchParams.keys()])]
+    // Keep the endpoint and parameter names, never signed/token-bearing query values.
+    return url.origin + url.pathname + (keys.length ? "?" + keys.map((key) => encodeURIComponent(key) + "=[value omitted]").join("&") : "")
+  } catch {
+    return input.replace(/[\r\n]/g, " ").slice(0, 500)
+  }
+}
+
+function safeSummaryText(input: string): string {
+  const withoutURLValues = input.replace(/https?:\/\/[^\s"'<>]+/gi, (candidate) => {
+    let end = candidate.length
+    while (end > 0 && /[),.;\]]/.test(candidate[end - 1]!)) end--
+    return safeSummaryURL(candidate.slice(0, end)) + candidate.slice(end)
+  })
+  return withoutURLValues
+    .replace(/Bearer\s+[-A-Za-z0-9._~+\/]+=*/gi, "Bearer [REDACTED]")
+    .replace(/((?:token|secret|password|passwd|api[_-]?key|client[_-]?secret|authorization|signature|session[_-]?id)\s*[:=]\s*)["']?[^\s,;"']+/gi, "$1[REDACTED]")
+    .replace(/[\r\n]/g, " ")
+}
+
+async function readSafeWorkspaceText(workspacePath: string, relativePath: string): Promise<string> {
+  const root = path.resolve(workspacePath)
+  const candidate = path.resolve(root, relativePath)
+  const relative = path.relative(root, candidate)
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Refusing to read an artifact outside the canonical target workspace.")
+  }
+  let info
+  try {
+    info = await fs.lstat(candidate)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return ""
+    throw error
+  }
+  if (info.isSymbolicLink() || !info.isFile()) {
+    throw new Error("Refusing to read a non-regular or symlinked workspace artifact: " + relativePath)
+  }
+  const rootReal = await fs.realpath(root)
+  const fileReal = await fs.realpath(candidate)
+  if (!fileReal.startsWith(rootReal + path.sep)) {
+    throw new Error("Refusing to read a workspace artifact that resolves outside the canonical target workspace: " + relativePath)
+  }
+  return await fs.readFile(candidate, "utf8")
+}
+
+function replaceManagedSection(existing: string, begin: string, end: string, generated: string): string {
+  const lines = existing.split(/\r?\n/)
+  const preserved: string[] = []
+  let inside = false
+  let sawBegin = false
+  let sawEnd = false
+  for (const line of lines) {
+    if (line === begin) {
+      if (inside) throw new Error("Existing generated artifact section is nested and cannot be safely updated.")
+      inside = true
+      sawBegin = true
+      continue
+    }
+    if (line === end) {
+      if (!inside) throw new Error("Existing generated artifact section has an unmatched end marker.")
+      inside = false
+      sawEnd = true
+      continue
+    }
+    if (!inside) preserved.push(line)
+  }
+  if (inside || sawBegin !== sawEnd) {
+    throw new Error("Existing generated artifact section is incomplete; refusing to overwrite the target artifact.")
+  }
+  const prefix = preserved.join("\n").trimEnd()
+  return (prefix ? prefix + "\n\n" : "") + generated.trimEnd() + "\n"
+}
+
+type CanonicalAssetManifest = {
+  schemaVersion?: number
+  assets?: Array<{
+    url: string
+    finalURL?: string
+    source?: string
+    status?: string
+    contentHash?: string
+    bytes?: number
+    error?: string
+    localPath?: string
+  }>
+  pendingURLs?: string[]
+}
+
+function readCorrelationGraph(value: unknown, targetURL: string): value is JavaScriptCorrelationGraph {
+  if (!value || typeof value !== "object") return false
+  const graph = value as Partial<JavaScriptCorrelationGraph>
+  return graph.schemaVersion === 2 &&
+    graph.targetURL === targetURL &&
+    typeof graph.createdAt === "string" &&
+    Array.isArray(graph.javascriptAssets) &&
+    Array.isArray(graph.sourceFiles) &&
+    Array.isArray(graph.endpointCandidates) &&
+    Boolean(graph.javascriptAnalysis) &&
+    Array.isArray(graph.javascriptAnalysis?.functions)
+}
+
+async function collectCorrelationGraphs(
+  workspacePath: string,
+  targetURL: string,
+  currentGraph: JavaScriptCorrelationGraph,
+  currentGraphFilename: string,
+): Promise<JavaScriptCorrelationGraph[]> {
+  const directory = path.join(workspacePath, "javascript")
+  let entries
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [currentGraph]
+    throw error
+  }
+  const found: JavaScriptCorrelationGraph[] = []
+  for (const entry of entries) {
+    if (!entry.isFile() || entry.name === currentGraphFilename || !entry.name.toLowerCase().endsWith(".json")) continue
+    try {
+      const raw = await readSafeWorkspaceText(workspacePath, path.posix.join("javascript", entry.name))
+      if (!raw) continue
+      const parsed: unknown = JSON.parse(raw)
+      if (readCorrelationGraph(parsed, targetURL)) found.push(parsed)
+    } catch {
+      // Non-correlation JSON and damaged old snapshots are ignored as sources;
+      // the current snapshot will still be included and canonical output reports its own gaps.
+    }
+  }
+  found.push(currentGraph)
+  return found.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+}
+
+function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCorrelationGraph {
+  if (!graphs.length) throw new Error("No JavaScript correlation graph was available to summarize.")
+  const latest = graphs[graphs.length - 1]!
+  const assets = new Map<string, JavaScriptCorrelationGraph["javascriptAssets"][number]>()
+  const sourceFiles = new Map<string, JavaScriptCorrelationGraph["sourceFiles"][number]>()
+  const sourceMaps = new Map<string, NonNullable<JavaScriptCorrelationGraph["sourceMapReferences"]>[number]>()
+  for (const graph of graphs) {
+    for (const asset of graph.javascriptAssets) {
+      const previous = assets.get(asset.url)
+      assets.set(asset.url, previous
+        ? { ...previous, ...asset, tags: [...new Set([...previous.tags, ...asset.tags])] }
+        : { ...asset, tags: [...asset.tags] })
+    }
+    for (const file of graph.sourceFiles) {
+      const key = file.relativePath + "\0" + file.sha256
+      const previous = sourceFiles.get(key)
+      sourceFiles.set(key, previous ? {
+        ...previous,
+        ...file,
+        sourceRequestIDs: [...new Set([...(previous.sourceRequestIDs ?? []), ...(file.sourceRequestIDs ?? [])])],
+        sourceCaptureIDs: [...new Set([...(previous.sourceCaptureIDs ?? []), ...(file.sourceCaptureIDs ?? [])])],
+        sourceMapURLs: [...new Set([...(previous.sourceMapURLs ?? []), ...(file.sourceMapURLs ?? [])])],
+      } : { ...file })
+    }
+    for (const reference of graph.sourceMapReferences ?? []) {
+      const previous = sourceMaps.get(reference.url)
+      sourceMaps.set(reference.url, previous ? {
+        ...previous,
+        ...reference,
+        sourceFiles: [...new Set([...previous.sourceFiles, ...reference.sourceFiles])],
+      } : { ...reference, sourceFiles: [...reference.sourceFiles] })
+    }
+  }
+  const mergeRecords = <T>(lists: T[][], key: (item: T) => string): T[] => uniqueValues(lists.flat(), key)
+  const functions = mergeRecords(graphs.map((g) => g.javascriptAnalysis.functions), (item) => [item.sourceFile, item.line, item.name].join("\0"))
+  const requestCandidates = mergeRecords(graphs.map((g) => g.javascriptAnalysis.requestCandidates), (item) => [item.sourceFile, item.sourceLine, item.method ?? "", item.urlTemplate].join("\0"))
+  const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\0"))
+  const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
+  const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\0"))
+  const uniqueObjects = <T>(items: T[], key: (item: T) => string) => uniqueValues(items, key)
+  return {
+    ...latest,
+    javascriptAssets: [...assets.values()].sort((a, b) => a.url.localeCompare(b.url)),
+    sourceFiles: [...sourceFiles.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath) || a.sha256.localeCompare(b.sha256)),
+    sourceMapReferences: [...sourceMaps.values()].sort((a, b) => a.url.localeCompare(b.url)),
+    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks },
+    endpointCandidates: mergeCanonicalJavaScriptEndpoints(graphs),
+    evidence: uniqueObjects(graphs.flatMap((g) => g.evidence), (x) => x.id),
+    requests: uniqueObjects(graphs.flatMap((g) => g.requests), (x) => x.id),
+    webFunctions: uniqueObjects(graphs.flatMap((g) => g.webFunctions), (x) => x.id),
+    observations: uniqueObjects(graphs.flatMap((g) => g.observations), (x) => x.id),
+    findings: uniqueObjects(graphs.flatMap((g) => g.findings), (x) => x.id),
+    edges: uniqueObjects(graphs.flatMap((g) => g.edges), (x) => [x.from, x.to, x.relation, x.evidence].join("\0")),
+    notes: [...new Set(graphs.flatMap((g) => g.notes))],
+  }
+}
+
+function renderCanonicalJavaScriptAnalysis(
+  graph: JavaScriptCorrelationGraph,
+  manifest?: CanonicalAssetManifest,
+  manifestWarning?: string,
+  graphCount = 1,
+): string {
+  const manifestAssets = (manifest?.assets ?? []).filter((item) => typeof item.url === "string")
+  const manifestByURL = new Map(manifestAssets.map((asset) => [asset.url, asset]))
+  const assets = new Map<string, JavaScriptCorrelationGraph["javascriptAssets"][number]>()
+  for (const asset of graph.javascriptAssets) assets.set(asset.url, asset)
+  for (const record of manifestAssets) {
+    if (!assets.has(record.url)) {
+      assets.set(record.url, {
+        intelEntryID: null,
+        url: record.url,
+        title: "Downloaded JavaScript/source-map asset",
+        discoveredBy: record.source ?? null,
+        confidence: "observed",
+        tags: [record.status ?? "asset-manifest"],
+      })
+    }
+  }
+  const sourceMapReferences = graph.sourceMapReferences ?? []
+  const incompleteMaps = sourceMapReferences.filter((item) => item.status !== "analyzed")
+  const failedAssets = manifestAssets.filter((item) => item.status === "failed")
+  const skippedAssets = manifestAssets.filter((item) => item.status === "skipped")
+  const localFiles = graph.sourceFiles
+  const lines = [
+    JAVASCRIPT_ANALYSIS_BEGIN,
+    "# JavaScript Analysis Summary",
+    "",
+    "- Target: " + safeSummaryURL(graph.targetURL),
+    "- Generated: " + graph.createdAt,
+    "- Correlation snapshots combined: " + graphCount,
+    "- Unique JavaScript/source-map URLs: " + assets.size,
+    "- Local source files/content versions: " + localFiles.length,
+    "- Source-map references: " + sourceMapReferences.length,
+    "- Source maps analyzed completely: " + sourceMapReferences.filter((item) => item.status === "analyzed").length,
+    "- Source maps unresolved/incomplete: " + incompleteMaps.length,
+    "- Embedded source entries analyzed: " + localFiles.filter((file) => Boolean(file.sourceMapSource)).length,
+    "- Static endpoint candidates (method-aware): " + graph.endpointCandidates.length,
+    "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((item) => item.observedInTraffic).length,
+    "- JavaScript function candidates: " + graph.javascriptAnalysis.functions.length,
+    "- Structured request candidates: " + graph.javascriptAnalysis.requestCandidates.length,
+    "- Secret-like assignments (fingerprints only): " + graph.javascriptAnalysis.secretCandidates.length,
+    "- Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
+    "- Static risk-sink candidates: " + graph.javascriptAnalysis.riskSignals.length,
+    "- Captured requests correlated: " + graph.requests.length,
+    "- Response evidence records: " + graph.evidence.length,
+    "- Failed asset fetches: " + failedAssets.length,
+    "- Skipped asset fetches: " + skippedAssets.length,
+    "- Pending URLs: " + (manifest?.pendingURLs?.length ?? 0),
+    ...(manifestWarning ? ["- Asset-manifest warning: " + safeSummaryText(manifestWarning)] : []),
+    "",
+    "## JavaScript/source-map URLs and hashes",
+    ...([...assets.values()].sort((a, b) => a.url.localeCompare(b.url)).map((asset) => {
+      const record = manifestByURL.get(asset.url)
+      return "- " + safeSummaryURL(asset.url) +
+        " — SHA-256: " + (record?.contentHash ?? "not recorded in asset manifest") +
+        " — status: " + (record?.status ?? "captured/indexed") +
+        " — source: " + safeSummaryText(record?.source ?? asset.discoveredBy ?? "unknown")
+    })),
+    ...(assets.size ? [] : ["- No JavaScript/source-map URL was recorded."]),
+    "",
+    "## Local source files/content versions",
+    ...(localFiles.length ? localFiles.map((file) =>
+      "- " + file.relativePath + " — SHA-256: " + file.sha256 + " — " + file.bytes +
+      " bytes — endpoint literals: " + file.endpointLiterals.length +
+      (file.sourceRequestIDs?.length ? " — captured request IDs: " + file.sourceRequestIDs.join(", ") : "") +
+      (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : ""),
+    ) : ["- No local source files were analyzed."]),
+    "",
+    "## Source-map status",
+    ...(sourceMapReferences.length ? sourceMapReferences.map((item) =>
+      "- " + safeSummaryURL(item.url) + " — " + item.status +
+      " — source files: " + item.sourceFiles.join(", ") +
+      " — " + safeSummaryText(item.note),
+    ) : ["- No external source-mapping references were found in the combined snapshots."]),
+    ...(manifest?.pendingURLs?.length ? ["", "## Pending URLs", ...manifest.pendingURLs.map((url) => "- " + safeSummaryURL(url))] : []),
+    ...(failedAssets.length ? ["", "## Failed asset fetches", ...failedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — failed; inspect the manifest error field locally.")] : []),
+    ...(skippedAssets.length ? ["", "## Skipped asset fetches", ...skippedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — skipped; inspect the manifest status/error locally.")] : []),
+    "",
+    "## Structured request candidates",
+    ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((item) =>
+      "- " + (item.method ?? "UNKNOWN") + " " + safeSummaryText(item.urlTemplate) +
+      " — source: " + item.sourceFile + ":" + item.sourceLine +
+      " — parameters: path=[" + item.pathParameters.join(", ") + "]; query=[" + item.queryParameters.join(", ") +
+      "]; body=[" + item.bodyParameters.join(", ") + "]; headers=[" + item.headerNames.join(", ") + "]" +
+      " — auth signals: [" + item.authSignals.join(", ") + "] — cookies: [" + item.cookieSignals.join(", ") + "]" +
+      " — captured request IDs: [" + item.observedRequestIDs.join(", ") + "]",
+    ) : ["- No structured request-call candidates were extracted."]),
+    "",
+    "## Secret-like candidates (fingerprints only; never raw values)",
+    ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) =>
+      "- " + item.kind + " — " + item.sourceFile + ":" + item.line +
+      " — fingerprint sha256:" + item.fingerprint + " — candidate only",
+    ) : ["- No secret-like assignments matched the static heuristics."]),
+    "",
+    "## Role/feature hints",
+    ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) =>
+      "- " + item.kind + " — " + safeSummaryText(item.value) + " — " + item.sourceFile + ":" + item.line,
+    ) : ["- No role/feature hints matched the static heuristics."]),
+    "",
+    "## Risk-sink candidates (not confirmed findings)",
+    ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) =>
+      "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — function: " +
+      (item.functionName ?? "unknown") + " — candidate only",
+    ) : ["- No configured static sink patterns matched."]),
+    "",
+    "## Coverage gaps and correlation notes",
+    ...(incompleteMaps.length ? incompleteMaps.map((item) => "- SOURCE MAP GAP: " + safeSummaryURL(item.url) + " — " + item.status + " — " + safeSummaryText(item.note)) : []),
+    ...(graph.notes.length ? graph.notes.map((note) => "- " + safeSummaryText(note)) : ["- No additional correlation notes."]),
+    ...(manifest?.pendingURLs?.length ? ["- NOT COMPLETE: pending URL ingestion must be resumed."] : []),
+    ...(failedAssets.length ? ["- NOT COMPLETE: one or more asset URLs failed to fetch."] : []),
+    ...(skippedAssets.length ? ["- NOT COMPLETE: one or more asset URLs were skipped."] : []),
+    "",
+    "Static candidates are leads, not findings. URL strings and same-host matches do not prove runtime calls or authorization defects.",
+    JAVASCRIPT_ANALYSIS_END,
+  ]
+  return lines.join("\n") + "\n"
+}
+
+function renderCanonicalJavaScriptEndpointInventory(graph: JavaScriptCorrelationGraph): string {
+  const endpoints = mergeCanonicalJavaScriptEndpoints([graph])
+  const lines = [
+    JAVASCRIPT_ENDPOINTS_BEGIN,
+    "# JavaScript-derived endpoints; identity is normalized origin + method + path template.",
+    "# Parameter/source/auth observations are merged per endpoint. Traffic overlap is not proof that the script issued a request.",
+    ...endpoints.map((endpoint) => {
+      const inline = (value: string) => safeSummaryText(value).replace(/[|]/g, "/")
+      const origin = normalizeEndpointOrigin(endpoint.origin)
+      const method = endpoint.method?.trim().toUpperCase() || "UNKNOWN"
+      const displayPath = endpoint.path.split(/[?#]/, 1)[0]!.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/"
+      return method + " " + origin + displayPath +
+        " — path_params=[" + (endpoint.pathParameters ?? []).map(inline).join(", ") + "]" +
+        " — query_params=[" + (endpoint.queryParameters ?? []).map(inline).join(", ") + "]" +
+        " — body_params=[" + (endpoint.bodyParameters ?? []).map(inline).join(", ") + "]" +
+        " — headers=[" + (endpoint.headerNames ?? []).map(inline).join(", ") + "]" +
+        " — auth=[" + (endpoint.authSignals ?? []).map(inline).join(", ") + "]" +
+        " — cookies=[" + (endpoint.cookieSignals ?? []).map(inline).join(", ") + "]" +
+        " — sources=[" + endpoint.sourceFiles.map(inline).join(", ") + "]" +
+        " — request_ids=[" + endpoint.observedRequestIDs.join(", ") + "]" +
+        " — traffic=" + (endpoint.observedInTraffic ? "observed" : "not-yet-observed") +
+        " — confidence=" + endpoint.confidence
+    }),
+    JAVASCRIPT_ENDPOINTS_END,
+  ]
+  return lines.join("\n") + "\n"
+}
+
+async function persistCanonicalJavaScriptArtifacts(
+  workspace: Parameters<typeof TargetMemory.writeWorkspaceFile>[0],
+  graph: JavaScriptCorrelationGraph,
+  currentGraphFilename: string,
+): Promise<{ analysisSummaryPath: string; endpointInventoryPath: string }> {
+  const graphs = await collectCorrelationGraphs(workspace.workspacePath, workspace.targetURL, graph, currentGraphFilename)
+  const combined = mergeGraphSnapshots(graphs)
+  let manifest: CanonicalAssetManifest | undefined
+  let manifestWarning: string | undefined
+  try {
+    const rawManifest = await readSafeWorkspaceText(workspace.workspacePath, path.posix.join("javascript", "asset-manifest.json"))
+    if (rawManifest) {
+      const parsed: unknown = JSON.parse(rawManifest)
+      if (!parsed || typeof parsed !== "object" || (parsed as { schemaVersion?: unknown }).schemaVersion !== 1 ||
+          !Array.isArray((parsed as { assets?: unknown }).assets)) {
+        manifestWarning = "existing asset manifest has an unsupported schema and was not used to infer coverage"
+      } else {
+        manifest = parsed as CanonicalAssetManifest
+      }
+    }
+  } catch (error) {
+    manifestWarning = error instanceof Error ? error.message : String(error)
+  }
+
+  const summaryPath = "javascript-analysis.md"
+  const endpointPath = "endpoints.txt"
+  const existingSummary = await readSafeWorkspaceText(workspace.workspacePath, summaryPath)
+  const existingEndpoints = await readSafeWorkspaceText(workspace.workspacePath, endpointPath)
+  const summary = replaceManagedSection(
+    existingSummary,
+    JAVASCRIPT_ANALYSIS_BEGIN,
+    JAVASCRIPT_ANALYSIS_END,
+    renderCanonicalJavaScriptAnalysis(combined, manifest, manifestWarning, graphs.length),
+  )
+  const endpoints = replaceManagedSection(
+    existingEndpoints,
+    JAVASCRIPT_ENDPOINTS_BEGIN,
+    JAVASCRIPT_ENDPOINTS_END,
+    renderCanonicalJavaScriptEndpointInventory(combined),
+  )
+  const analysisSummaryPath = await TargetMemory.writeWorkspaceFile(workspace, summaryPath, summary)
+  const endpointInventoryPath = await TargetMemory.writeWorkspaceFile(workspace, endpointPath, endpoints)
+  return { analysisSummaryPath, endpointInventoryPath }
+}
+
+
+
+
 export type JavaScriptTesterCheckStatus = "planned" | "in_progress" | "completed" | "blocked" | "not_applicable"
 export type JavaScriptTesterCaseStatus = "planned" | "in_progress" | "completed" | "blocked" | "stale"
 
@@ -1151,10 +1663,27 @@ export namespace JavaScriptCorrelation {
     graphPath: string
     endpointPath: string
     testerSurveyPath: string
+    analysisSummaryPath: string
+    endpointInventoryPath: string
     noteID: string
   }
 
   const buildQueues = new Map<string, Promise<BuildResult>>()
+  // Different asset selectors may be analyzed concurrently for the same target.
+  // Serialize the read/merge/write cycle for the two canonical root artifacts so
+  // one finished run cannot overwrite another run's newly merged endpoint rows.
+  const canonicalArtifactQueues = new Map<string, Promise<unknown>>()
+
+  async function serializeCanonicalArtifacts<T>(workspaceID: string, operation: () => Promise<T>): Promise<T> {
+    const previous = canonicalArtifactQueues.get(workspaceID)
+    const current = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(operation)
+    canonicalArtifactQueues.set(workspaceID, current)
+    try {
+      return await current
+    } finally {
+      if (canonicalArtifactQueues.get(workspaceID) === current) canonicalArtifactQueues.delete(workspaceID)
+    }
+  }
 
   export async function build(input: {
     sessionID: string
@@ -1165,7 +1694,7 @@ export namespace JavaScriptCorrelation {
     const targetURL = TargetMemory.normalize(input.targetURL).targetURL
     const selectorURL = input.javascriptURL ? safeURL(input.javascriptURL) : undefined
     const selector = selectorURL ? selectorURL.origin + selectorURL.pathname : "all-assets"
-    const key = rootSessionID + "\\0" + targetURL + "\\0" + selector
+    const key = rootSessionID + "\0" + targetURL + "\0" + selector
     const previous = buildQueues.get(key)
     const current = (previous ? previous.catch(() => undefined) : Promise.resolve(undefined)).then(() =>
       buildInternal(input),
@@ -2069,6 +2598,19 @@ export namespace JavaScriptCorrelation {
         upsertByIdentity: true,
       })
     }
-    return { graph, workspacePath: workspace.workspacePath, graphPath, endpointPath, testerSurveyPath, noteID: note.note.id }
+    const canonicalArtifacts = await serializeCanonicalArtifacts(
+      workspace.id,
+      () => persistCanonicalJavaScriptArtifacts(workspace, graph, graphFilename),
+    )
+    return {
+      graph,
+      workspacePath: workspace.workspacePath,
+      graphPath,
+      endpointPath,
+      testerSurveyPath,
+      analysisSummaryPath: canonicalArtifacts.analysisSummaryPath,
+      endpointInventoryPath: canonicalArtifacts.endpointInventoryPath,
+      noteID: note.note.id,
+    }
   }
 }
