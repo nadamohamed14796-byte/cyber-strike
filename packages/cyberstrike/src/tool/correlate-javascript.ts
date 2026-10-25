@@ -30,6 +30,8 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
         title: "JavaScript correlation saved",
         output: [
           "Target workspace: " + result.workspacePath,
+          "Canonical JavaScript summary: " + result.analysisSummaryPath,
+          "Canonical endpoint inventory: " + result.endpointInventoryPath,
           "Graph JSON: " + result.graphPath,
           "Endpoint candidates JSON: " + result.endpointPath,
           "Tester survey JSON: " + result.testerSurveyPath,
@@ -61,6 +63,8 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           graph_path: result.graphPath,
           endpoint_path: result.endpointPath,
           tester_survey_path: result.testerSurveyPath,
+          javascript_analysis_summary_path: result.analysisSummaryPath,
+          canonical_endpoint_inventory_path: result.endpointInventoryPath,
           endpoint_candidates: graph.endpointCandidates.length,
           observed_endpoint_candidates: graph.endpointCandidates.filter((endpoint) => endpoint.observedInTraffic).length,
           target_workspace: result.workspacePath,
