@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { headerAudit, methodCheck, sitemapScan } from "../../../src/tool/web-recon/programs"
+import { headerAudit, methodCheck, openapiScan, sitemapScan } from "../../../src/tool/web-recon/programs"
 
 test("methodCheck is passive and never sends TRACE, PUT, or DELETE", async () => {
   const methods: string[] = []
@@ -48,6 +48,110 @@ test("path-scoped recon passes every requested URL through the persisted scope g
     })
     expect(result.output).toContain("No sitemap found")
     expect(requests).toEqual([])
+  } finally {
+    server.stop(true)
+  }
+})
+
+
+test("sitemapScan follows nested indexes and processes more than twenty eligible child sitemaps", async () => {
+  const requests: string[] = []
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      const url = new URL(request.url)
+      requests.push(url.pathname)
+      const base = url.origin
+      if (url.pathname === "/sitemap.xml") {
+        const children = Array.from({ length: 22 }, (_, index) =>
+          "<sitemap><loc>" + base + "/maps/child-" + index + ".xml</loc></sitemap>",
+        ).join("")
+        return new Response("<sitemapindex>" + children + "</sitemapindex>", {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        })
+      }
+      const child = /^\/maps\/child-(\d+)\.xml$/.exec(url.pathname)
+      if (child?.[1] === "0") {
+        return new Response("<sitemapindex><sitemap><loc>" + base + "/maps/nested.xml</loc></sitemap></sitemapindex>", {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        })
+      }
+      if (child) {
+        return new Response("<urlset><url><loc>" + base + "/pages/" + child[1] + "</loc></url></urlset>", {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        })
+      }
+      if (url.pathname === "/maps/nested.xml") {
+        return new Response("<urlset><url><loc>" + base + "/pages/nested</loc></url></urlset>", {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        })
+      }
+      return new Response("not found", { status: 404 })
+    },
+  })
+
+  try {
+    const target = "http://127.0.0.1:" + server.port
+    const result = await sitemapScan(target, [], 2)
+    expect(result.output).toContain("Sitemap documents processed: 24")
+    expect(result.output).toContain("Total in-scope URLs discovered: 22")
+    expect(result.output).toContain(target + "/pages/21")
+    expect(result.output).toContain(target + "/pages/nested")
+    expect(requests).toHaveLength(24)
+  } finally {
+    server.stop(true)
+  }
+})
+
+
+test("openapiScan preserves every path and HTTP method from a large API specification", async () => {
+  const paths = Object.fromEntries(Array.from({ length: 40 }, (_, index) => [
+    "/api/items/" + index,
+    { get: { summary: "Read item " + index }, post: { summary: "Update item " + index } },
+  ]))
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      const pathname = new URL(request.url).pathname
+      if (pathname === "/swagger.json") {
+        return new Response(JSON.stringify({
+          swagger: "2.0",
+          info: { title: "Secondary fixture API", version: "2" },
+          paths: { "/api/second-spec": { get: { summary: "Secondary operation" } } },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      }
+      if (pathname !== "/openapi.json") {
+        return new Response("not found", { status: 404 })
+      }
+      return new Response(JSON.stringify({
+        openapi: "3.0.0",
+        info: { title: "Fixture API", version: "1" },
+        paths,
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    },
+  })
+
+  try {
+    const target = "http://127.0.0.1:" + server.port
+    const result = await openapiScan(target, [], 2)
+    expect(result.output).toContain("GET /api/items/0")
+    expect(result.output).toContain("POST /api/items/39")
+    expect(result.output).toContain("GET /api/second-spec")
+    expect(result.output).toContain("Endpoints: 80")
+    expect(result.output).toContain("Valid OpenAPI/Swagger documents processed: 2")
+    expect(result.output).not.toContain("... and")
   } finally {
     server.stop(true)
   }
