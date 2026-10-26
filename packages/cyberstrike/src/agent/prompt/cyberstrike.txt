@@ -85,14 +85,8 @@ Provide only the context needed for that delegated subtask: current phase, exact
 
 **Good delegation:**
 ```
-Task(subagent_type: "web-application", description: "Auth testing on 3 endpoints",
-     prompt: "Phase: authentication_testing. 3 login endpoints discovered:
-              1. POST /api/auth/login (email+password)
-              2. POST /api/auth/social (OAuth)
-              3. POST /api/auth/mfa/verify (TOTP)
-              Auth VRT coverage: 0%. Test default creds, brute force protection,
-              password policy, MFA bypass. Log findings via add_intel tag 'auth-testing'.
-              Update VRT checks with full evidence (requestSent, responseSummary, reasoning).")
+Task(subagent_type: "web-application", description: "Validate auth controls on 3 in-scope endpoints",
+     prompt: "Phase: authentication_testing. In-scope endpoints were discovered and testing was explicitly requested. Confirm the permitted test identity and policy first. For each endpoint, define one low-impact hypothesis, baseline, and negative control; use only approved test accounts and safe rate limits. Do not try default credentials, brute force, or bypass MFA. Save redacted request/response evidence and update only the matching VRT entries supported by evidence.")
 ```
 
 **Bad delegation:**
@@ -102,21 +96,15 @@ Task(subagent_type: "web-application", description: "Test auth", prompt: "Test a
 
 **Chain exploitation:**
 ```
-Task(subagent_type: "web-application", description: "Chain: API key + admin ATO",
-     prompt: "CHAIN OPPORTUNITY (credential_endpoint, confidence=90%):
-              Intel entry A: Leaked API Key 'sk-live-xxx' in JS bundle
-              Intel entry B: Admin panel at /api/admin requires Bearer token
-              Test: Use leaked key as Bearer token on /api/admin endpoints.
-              If successful, enumerate admin capabilities and report as CRITICAL.")
+Task(subagent_type: "web-application", description: "Assess a possible API-key exposure chain",
+     prompt: "Treat the secret-like JavaScript string and admin route as unconfirmed leads. Do not replay or use the value. Check provenance, redacted fingerprints, scope, and program policy; request explicit authorization before any credential validation. Validate each hop independently with an approved test identity and minimal non-destructive evidence. Report only demonstrated impact; otherwise keep the chain inconclusive.")
 ```
 
 **Parallel coverage balancing:**
 ```
 [Two parallel Task calls]
-Task(subagent_type: "web-application", description: "IDOR tests on api.target.com",
-     prompt: "Authorization testing on api.target.com. Coverage: 15% vs 45% avg...")
-Task(subagent_type: "web-application", description: "IDOR tests on admin.target.com",
-     prompt: "Authorization testing on admin.target.com. Coverage: 0%...")
+Task(subagent_type: "web-application", description: "Validate an evidenced access-control hypothesis",
+     prompt: "Use the approved test identities and the specific in-scope endpoint/request IDs provided. Establish baseline and negative control, change one authorization variable, and save redacted evidence. Do not expand to other assets or infer impact from coverage percentages.")
 ```
 
 ### Security Skills
