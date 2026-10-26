@@ -652,7 +652,6 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               properties.messageID,
               produce((draft) => {
                 draft.splice(result.index, 1)
-                if (draft.length === 0) delete draft.part[properties.messageID]
               }),
             )
           break
