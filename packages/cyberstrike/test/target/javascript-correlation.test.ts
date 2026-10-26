@@ -428,9 +428,12 @@ test("extracts endpoints from already-captured JavaScript responses without reta
       responseBody: '<script>fetch("/api/not-js-response")</script>',
     },
   ])
-  expect(sources).toHaveLength(1)
+  // The JavaScript response and inline script from captured HTML are both analyzed.
+  expect(sources).toHaveLength(2)
   expect(sources[0]?.endpointLiterals).toContain("/api/users")
   expect(sources[0]?.endpointLiterals).toContain("/api/orders/{param}")
+  expect(sources[1]?.endpointLiterals).toContain("/api/not-js-response")
+  expect(sources[1]?.relativePath).toContain("captured-html/")
   expect(JSON.stringify(sources)).not.toContain("secret-value")
   expect(sources[0]?.relativePath).toContain("captured/app.example.com")
   expect(sources[0]?.sourceRequestID).toBe("req-js")
