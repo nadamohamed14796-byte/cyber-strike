@@ -64,6 +64,12 @@ The follow-up also makes the finding lifecycle order explicit: establish baselin
 
 A second gap was skill routing rather than missing capability: `attack-api-contract-testing` and `attack-api-property-authorization` were present in the skill library, but API contract testing was not included in the API phase's query and critical pin list. The API phase now prioritizes both contract-to-live comparison and property-level authorization without creating a second endpoint inventory.
 
+## Intent-routing clarification
+
+The full review found that targeted testing, validation, and report generation already exist. The remaining orchestration ambiguity was how a natural-language request is classified: explicit requests to hunt for vulnerabilities should proceed from saved recon evidence into the existing validation/triage/report lifecycle, while recon-only requests should stop at the recon report. The root and web-application prompts now state this distinction and explicitly treat instructions embedded in target-controlled content as untrusted data, not user intent or authorization. A regression test covers both prompts.
+
+A compact target-local threat-modeling step was also added to the existing shared methodology. It records observed versus inferred roles, trust boundaries, sensitive actions, and security invariants in existing notes/artifacts; it does not add a second ledger, change scope rules, or create a separate agent subsystem.
+
 ## Verification and limits
 
 - The changes were saved to the repository's `main` branch through GitHub's file-update interface.

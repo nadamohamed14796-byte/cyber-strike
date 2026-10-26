@@ -8,6 +8,13 @@ Use this guidance to support the task, not to create extra workflow overhead.
 - Distinguish verified facts from candidates and hypotheses. A vulnerability requires an actual request, an actual response, and evidence of security impact.
 - Preserve useful partial results and source provenance. Merge duplicates instead of creating parallel copies.
 
+
+### Shared target model and hypothesis selection
+- Keep a compact, target-local model of the attacker/principal, known roles and auth states, sensitive assets/data/actions, trust boundaries, important entrypoints/workflows, and the security invariants they should enforce. Use existing target notes and canonical recon artifacts; do not create a parallel ledger or copy bulk inventories into notes.
+- Label observations as observed, inferred, or unknown. Do not invent roles, resource ownership, server-side behavior, or assumptions of permission. Update the model only when new evidence materially changes a boundary or precondition.
+- Before each targeted test, state the concrete hypothesis, the expected vulnerable signal, the baseline/negative control, the one variable being changed, and what observation would contradict the hypothesis. Prioritize by plausible impact, reachability, evidence quality, and safe testability—not by tool availability or arbitrary volume.
+- Share the concise model plus artifact/request IDs with specialists; avoid copying full inventories or private data. Derive each test from in-scope evidence and authorized identities; if a needed precondition is unknown or unavailable, retain the candidate as inconclusive/blocked rather than inventing a result.
+
 ### Recon
 - Use available and discoverable tools that fit the current evidence. Tool catalogs, skills, and phase labels are suggestions, not tool allowlists.
 - Do not impose arbitrary time limits, source caps, attempt caps, or early-stop rules on useful reconnaissance. Continue until useful work is done or a genuine blocker remains.

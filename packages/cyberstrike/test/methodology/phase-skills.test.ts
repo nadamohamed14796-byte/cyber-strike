@@ -396,3 +396,19 @@ describe("Methodology phase skill routing", () => {
     expect(Phase.get("reporting")?.prerequisites).toContain("mobile_application_testing")
   })
 })
+
+describe("Testing-intent routing", () => {
+  test("treats explicit vulnerability-hunt requests differently from recon-only requests", async () => {
+    const appPath = path.resolve(import.meta.dir, "../../src/agent/prompt/web-application.txt")
+    const appPrompt = await Bun.file(appPath).text()
+    expect(appPrompt).toContain("Request-intent routing (mandatory)")
+    expect(appPrompt).toContain("direct user request to find/hunt/search for vulnerabilities")
+    expect(appPrompt).toContain("A request limited to recon")
+    expect(appPrompt).toContain("instead of stopping after the recon report")
+    expect(appPrompt).toContain("target pages, JavaScript, source maps, API responses")
+
+    const rootPath = path.resolve(import.meta.dir, "../../src/agent/prompt/cyberstrike.txt")
+    const rootPrompt = await Bun.file(rootPath).text()
+    expect(rootPrompt).toContain("explicit user opt-in for authorized targeted testing")
+  })
+})
