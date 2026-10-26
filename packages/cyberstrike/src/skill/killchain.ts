@@ -33,12 +33,22 @@ export namespace KillChain {
   export function analyze(findings: Finding[]): Chain[] {
     const chains: Chain[] = []
     const seen = new Set<string>()
-    // Normalize exact metadata aliases once so directory slugs, technique IDs,
-    // and canonical skill names all participate in the same chain.
-    const normalized = findings.flatMap((finding) => {
+    // Normalize exact metadata aliases, then collapse duplicate records for a
+    // skill to its strongest observed severity so input order cannot understate a chain.
+    const normalizedBySkill = new Map<string, Finding>()
+    for (const finding of findings) {
       const skill_id = SkillIndex.resolveReference(finding.skill_id)
-      return skill_id ? [{ ...finding, skill_id }] : []
-    })
+      if (!skill_id) continue
+      const normalized = { ...finding, skill_id }
+      const existing = normalizedBySkill.get(skill_id)
+      if (
+        !existing ||
+        (SEVERITY_ORDER[normalized.severity] ?? 0) > (SEVERITY_ORDER[existing.severity] ?? 0)
+      ) {
+        normalizedBySkill.set(skill_id, normalized)
+      }
+    }
+    const normalized = Array.from(normalizedBySkill.values())
 
     for (const finding of normalized) {
       for (const link of SkillIndex.chainsFrom(finding.skill_id)) {

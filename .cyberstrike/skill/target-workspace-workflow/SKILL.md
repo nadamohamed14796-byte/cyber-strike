@@ -7,7 +7,7 @@ author: "CyberStrike"
 tags: [target-workspace, scope, persistence, recon, notes, evidence, artifact-management]
 tech_stack: [web, api, infrastructure]
 prerequisites:
-  - "Explicit authorization and the official program/customer scope policy"
+  - "Explicit authorization; prefer the official program/customer scope policy when supplied or available"
 chains_with:
   - attack-web-recon
   - attack-bb-methodology

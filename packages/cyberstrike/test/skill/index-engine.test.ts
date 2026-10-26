@@ -31,7 +31,7 @@ Skill body for ${name}.
   try {
     await addSkill(
       "aws-postexploit",
-      'tech_stack: ["aws"]\nchains_with: ["T1078.004", "T1552.005"]\nprerequisites: ["T1078.004", "T1552.005"]',
+      'tech_stack: ["aws"]\nchains_with: ["T1078.004", "T1078.004_cloud-accounts", "T1552.005"]\nprerequisites: ["T1078.004", "T1078.004_cloud-accounts", "T1552.005"]',
     )
     await addSkill(
       "T1078.004_cloud-accounts",
@@ -127,6 +127,15 @@ Skill body for ${name}.
         expect(aliasChains[0].combined_severity).toBe("high")
         expect(aliasChains[0].next_steps).toContain("T1552.005_cloud-instance-metadata-api")
         expect(aliasChains[0].next_steps).not.toContain("T1552.005")
+
+        const duplicateFindings: KillChain.Finding[] = [
+          { skill_id: "AWS-POSTEXPLOIT", severity: "low" },
+          { skill_id: "T1078.004", severity: "medium" },
+          { skill_id: "aws-postexploit", severity: "critical" },
+        ]
+        expect(KillChain.analyze(duplicateFindings)[0]?.combined_severity).toBe("critical")
+        expect(KillChain.analyze([...duplicateFindings].reverse())[0]?.combined_severity).toBe("critical")
+
         const aliasNextSteps = KillChain.nextSteps({ skill_id: "AWS-POSTEXPLOIT", severity: "high" })
         expect(aliasNextSteps).toContain("T1078.004_cloud-accounts")
         expect(aliasNextSteps).toContain("T1552.005_cloud-instance-metadata-api")

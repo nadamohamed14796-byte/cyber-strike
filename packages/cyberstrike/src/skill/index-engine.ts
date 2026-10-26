@@ -314,11 +314,22 @@ export namespace SkillIndex {
     const canonical = resolveInState(skillName, state)
     const entry = canonical ? state.entries.get(canonical) : undefined
     if (!entry) return []
-    return entry.chains_with.flatMap((reference) => {
+
+    // Different metadata aliases can name the same skill. Emit one canonical
+    // edge so downstream prompts and next-step lists cannot duplicate it.
+    const links = new Map<string, { target: string; boost?: string }>()
+    for (const reference of entry.chains_with) {
       const target = resolveInState(reference, state)
-      if (!target) return []
-      return [{ target, boost: entry.severity_boost[reference] ?? entry.severity_boost[target] }]
-    })
+      if (!target) continue
+      const boost = entry.severity_boost[reference] ?? entry.severity_boost[target]
+      const existing = links.get(target)
+      if (existing) {
+        existing.boost ??= boost
+        continue
+      }
+      links.set(target, { target, boost })
+    }
+    return Array.from(links.values())
   }
 
   export function prerequisitesFor(skillName: string): string[] {
@@ -328,6 +339,6 @@ export namespace SkillIndex {
     if (!entry) return []
     // Preserve unresolved values so callers can report them instead of silently
     // treating an incomplete catalogue reference as a satisfied prerequisite.
-    return entry.prerequisites.map((reference) => resolveInState(reference, state) ?? reference)
+    return Array.from(new Set(entry.prerequisites.map((reference) => resolveInState(reference, state) ?? reference)))
   }
 }
