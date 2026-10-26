@@ -6,7 +6,7 @@ version: "1.0.0"
 author: "CyberStrike contributors"
 tags: [javascript, source-maps, endpoints, api, frontend-security, secrets]
 tech_stack: [javascript, typescript, browser, rest, graphql, spa]
-chains_with: [attack-web-recon, attack-source-leak, attack-dom-xss, attack-prototype-pollution, attack-shadow-api, attack-triage-validation]
+chains_with: [attack-web-recon, attack-source-leak, attack-dom-xss, attack-prototype-pollution, attack-shadow-api, attack-api-contract-testing, attack-browser-boundary-security, attack-triage-validation]
 sources:
   - "https://github.com/uphiago/recon-skills"
   - "https://owasp.org/www-project-web-security-testing-guide/"
@@ -150,3 +150,16 @@ Install Node.js from https://nodejs.org/en/download/ and use each tool's officia
 
 ### Output contract
 Store file path, source URL, content hash, discovered route/method/parameter hints, auth/session clues, line or offset, and confidence. Deduplicate candidates without discarding distinct parameters. Never copy token values, secrets, or whole minified lines into shared notes.
+
+
+## Source-aware data-flow review (when source is available)
+
+Apply this deeper pass only when the authorized target includes readable application source, a repository checkout, or usable first-party bundles/source maps. Do not assume that a minified bundle is the server source.
+
+1. Map the relevant entry point and data source: URL/query/hash, form field, message event, API response, storage value, or user-controlled route.
+2. Follow the value through parsing, validation, encoding, sanitization, authorization checks, and transformations to its eventual sink or security decision. For APIs, trace route → middleware/identity → object/tenant filter → response or state change.
+3. Use an available AST/SAST tool such as Semgrep only when it is already usable and appropriate; a pattern match is a lead, not a finding. Inspect the actual source and control flow. Do not run untrusted build scripts, package lifecycle hooks, or application code merely to improve static coverage.
+4. Link each candidate to the source file/hash and line or offset, the affected route/operation, any correlated captured request, the required identity/preconditions, and the next smallest safe validation step.
+5. If a contract/spec file is present, route the operations into `attack-api-contract-testing`. If browser message handlers, service workers, cross-origin state, or opener/navigation relationships appear, route those cases into `attack-browser-boundary-security`. If source artifacts include lockfiles/manifests and source review is authorized, route dependency risks into `attack-dependency-cve-scanning`.
+
+Do not promote a static source/sink path to confirmed impact without showing reachability and a security boundary failure. Preserve unresolved paths as candidates with the exact missing evidence. Keep one canonical endpoint record and add source/sink and source-map observations to it rather than duplicating it.
