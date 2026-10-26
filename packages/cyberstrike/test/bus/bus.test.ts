@@ -16,6 +16,9 @@ describe("Bus.publish", () => {
         const event = BusEvent.define("test.bus.delivery", z.object({ value: z.string() }))
         const localCalls: string[] = []
         const globalCalls: unknown[] = []
+        const globalFailingListener = (input: { payload: { type: string } }) => {
+          if (input.payload.type === event.type) throw new Error("test global listener failure")
+        }
         const globalListener = (input: { payload: { type: string } }) => {
           if (input.payload.type === event.type) globalCalls.push(input)
         }
@@ -26,6 +29,7 @@ describe("Bus.publish", () => {
         const unsubscribeHealthy = Bus.subscribe(event, () => {
           localCalls.push("healthy")
         })
+        GlobalBus.on("event", globalFailingListener)
         GlobalBus.on("event", globalListener)
 
         try {
@@ -33,6 +37,7 @@ describe("Bus.publish", () => {
         } finally {
           unsubscribeFailing()
           unsubscribeHealthy()
+          GlobalBus.off("event", globalFailingListener)
           GlobalBus.off("event", globalListener)
         }
 
