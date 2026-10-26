@@ -12,7 +12,7 @@ import { ProjectTable } from "../project/project.sql"
 import { fn } from "../util/fn"
 import { Log } from "../util/log"
 import { BusEvent } from "@/bus/bus-event"
-import { emitSafe, GlobalBus } from "@/bus/global"
+import { emitSafe } from "@/bus/global"
 
 export namespace Worktree {
   const log = Log.create({ service: "worktree" })
