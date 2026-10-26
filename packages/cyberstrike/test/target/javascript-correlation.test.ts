@@ -160,6 +160,21 @@ test("merges JavaScript asset provenance across input, HTML, and source-map refe
   )).toEqual(["HTML", "collector", "crawler", "user-supplied"])
 })
 
+test("resolves relative and dynamic JavaScript module imports without fetching bare imports", async () => {
+  const { extractJavaScriptImportURLs } = await import("../../src/tool/ingest-javascript-urls")
+  const urls = extractJavaScriptImportURLs([
+    'import { load } from "./chunks/main.js"',
+    'export { shared } from "../shared.js"',
+    'import("./lazy.js")',
+    'import("react")',
+    'import("data:text/javascript,alert(1)")',
+  ].join("\n"), "https://app.example.com/assets/app.js")
+  expect(urls).toContain("https://app.example.com/assets/chunks/main.js")
+  expect(urls).toContain("https://app.example.com/shared.js")
+  expect(urls).toContain("https://app.example.com/assets/lazy.js")
+  expect(urls).toHaveLength(3)
+})
+
 test("resolves external script src URLs from HTML and ignores non-network schemes", async () => {
   const { extractHTMLScriptURLs } = await import("../../src/tool/ingest-javascript-urls")
   const urls = extractHTMLScriptURLs([
