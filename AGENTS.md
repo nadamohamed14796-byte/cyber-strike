@@ -113,25 +113,19 @@ const table = sqliteTable("session", {
 - Tests cannot run from repo root (guard: `do-not-run-tests-from-root`); run from package dirs like `packages/cyberstrike`.
 
 
-## Mandatory target workspace and artifact handling
+## Single workflow ownership
 
-When a request contains a target, program scope, scope file, domain/subdomain list, reconnaissance/hunting task, or target-specific output request, use the `target-workspace-workflow` skill and the structured target tools. This is required behavior, not optional advice.
+Use one source of truth for each responsibility. Keep shared behavior here rather than copying variants across prompts, commands, and skills.
 
-1. Before recon/testing, call `target_workspace(action="init", target_url="<stable root/program target>")`, then use only the absolute workspace path it returns for target-specific outputs. Workspace initialization is not authorization.
-2. Prefer the official program/customer policy when supplied or available; preserve its real HTTPS reference and exclusions, and never fabricate a reference. If the user explicitly confirms a complete supplied list/file, import that exact set as user-confirmed; if they confirm one exact asset, configure only that asset. Do not infer wildcards or sibling hosts, and explicit exclusions always win. If authorization remains ambiguous, invalid, or inconclusive, do not send active requests. Call `scope_check` once for the actual starting asset only when the manifest is new, changed, or unresolved; reuse a saved passing decision while the target, policy, and manifest remain unchanged. A follow-up user message/turn for the same workspace is a continuation, not a new run, and must not trigger another check. Do not manually re-check each discovered host, endpoint, request, phase, or delegated tester. Active request tools independently enforce the persisted scope for each exact request.
-3. Store technical observations tied to session evidence with `target_note`. Use `target_workspace(action="record_summary")` for verified run/scope/checkpoint summaries so `notes.md` is updated even before a target request is captured. Save inventories/logs/JSON/CSV/evidence references with `target_artifact`; for a local file, use `source_path` to copy it without loading every line into model context. Do not send target-specific data into generic project memory or the global research knowledge base.
-4. For large scope files, persist the original input beneath the root workspace and process the input directly using the existing checkpoint and normalized inventories. Keep discovered candidates and confirmed assets in the root inventories by default; create a nested child workspace only when the operator explicitly requests a separate investigation workspace for that specific authorized asset. Never create one workspace per candidate or host during ordinary recon.
-5. Never write target outputs to an invented folder such as /root/targets or the current shell directory by default. A failed/missing workspace or failed save is not success; report the exact failure and do not claim the artifact exists.
-6. Keep the root notes.md as a concise program summary. Store ordinary discovered assets, hosts, URLs, and endpoints in the root workspace inventories; only assets explicitly attached for an independent investigation get their own child workspace and child notes/evidence. Validate final artifact paths, sizes, counts, and run status before saying work is complete.
+1. **Runtime target workflow:** `packages/cyberstrike/src/agent/prompt/methodology/target-workflow.txt` is the single authority for scope, workspace, checkpoint/resume, tool choice, skill chaining, artifact handling, loop avoidance, and reporting. `packages/cyberstrike/src/session/prompt.ts` injects it for target-related work. Do not duplicate or override these rules in `cyberstrike.txt` or `common-methodology.txt`.
 
-## CyberStrike agent instruction ownership
+2. **Recon execution:** `packages/cyberstrike/src/command/template/recon.txt` owns the practical recon steps and checkpoint workflow. `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md` describes phase outputs; `packages/cyberstrike/src/tool/recon-checkpoint.ts` owns checkpoint behavior and schema. Phase lists and `.cyberstrike/skill/TOOLING_CATALOG.md` are references, not tool allowlists; if the catalog is absent, continue with registered-tool discovery.
 
-Keep one authority per responsibility; do not add another inventory, source list, phase ledger, or helper merely to restate an existing contract.
+3. **Message and event delivery:** `docs/agent-message-flow.md` documents the end-to-end contract. Event schemas live in `packages/cyberstrike/src/session/message-v2.ts`; persistence lives in `session/index.ts`; stream processing lives in `session/processor.ts`; bus dispatch lives in `src/bus`; client state updates live in `packages/app/src/context/global-sync/event-reducer.ts`. Keep generated SDK event types synchronized with the schemas; regenerate the JavaScript SDK with `./packages/sdk/js/script/build.ts`.
 
-- Recon workflow guidance: `packages/cyberstrike/src/command/template/recon.txt`; progress tracking and artifact verification: registered `recon_checkpoint` runtime/schema in `packages/cyberstrike/src/tool/recon-checkpoint.ts`. Ordinary recon tool use is not blocked by stale or incomplete phase order.
-- Recon phase outputs and completion criteria: `.cyberstrike/skill/RECON_PHASE_TOOL_MATRIX.md`.
-- Shared tools, APIs, CLIs, helper scripts, and preflight: `.cyberstrike/skill/TOOLING_CATALOG.md`. A per-source subdomain ledger is optional supporting evidence, not a gate.
-- Technique-specific procedures: load the relevant specialist `SKILL.md`; do not copy global tool/helper lists into skills.
-- Global public-research ingestion: `.cyberstrike/commands/update.md` and `packages/cyberstrike/src/research/sources.ts`.
-- Target-specific observations and normalized inventories belong in the existing target workspace via the registered target tools. Preserve the one-workspace, canonical-artifact, resume, and verification rules above.
+4. **Skills and chaining:** each specialist `SKILL.md` owns its technique-specific procedure. Load the next skill only when evidence creates a concrete need. Pass verified observations, evidence/artifact IDs, prerequisites, constraints, and unresolved questions between agents. Do not copy global tool lists into individual skills or create parallel chain/inventory ledgers.
+
+5. **Research ingestion:** `.cyberstrike/commands/update.md` and `packages/cyberstrike/src/research/sources.ts` own the global public-research ingestion workflow.
+
+6. **Artifacts:** use structured target tools and the existing canonical root workspace for target-specific notes, inventories, checkpoints, and files. Do not guess output paths, create a workspace per host, or claim success until saved paths and counts are verified.
 
