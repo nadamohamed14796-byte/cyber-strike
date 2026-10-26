@@ -70,12 +70,21 @@ export function parseAssetManifest(input: string): Manifest {
     !parsed ||
     typeof parsed !== "object" ||
     (parsed as Partial<Manifest>).schemaVersion !== 1 ||
+    typeof (parsed as Partial<Manifest>).updatedAt !== "string" ||
     !Array.isArray((parsed as Partial<Manifest>).assets)
   ) {
     throw new Error("Unsupported or malformed JavaScript asset manifest")
   }
   const manifest = parsed as Manifest
-  if (manifest.assets.some((item) => !item || typeof item.url !== "string" || typeof item.status !== "string")) {
+  const statuses = new Set<AssetRecord["status"]>(["pending", "downloaded", "reused", "skipped", "failed"])
+  if (manifest.assets.some((item) =>
+    !item ||
+    typeof item !== "object" ||
+    typeof item.url !== "string" ||
+    !normalizeURL(item.url) ||
+    typeof item.source !== "string" ||
+    !statuses.has(item.status),
+  )) {
     throw new Error("Malformed JavaScript asset manifest entries")
   }
   return manifest

@@ -150,6 +150,18 @@ test("rejects malformed JavaScript manifests instead of silently resetting resum
   })
 })
 
+test("rejects invalid status and URL values in JavaScript manifests", async () => {
+  const { parseAssetManifest } = await import("../../src/tool/ingest-javascript-urls")
+  const manifest = (asset: Record<string, unknown>) => JSON.stringify({
+    schemaVersion: 1,
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    assets: [{ url: "https://app.example.com/app.js", source: "crawler", status: "pending", ...asset }],
+  })
+  expect(() => parseAssetManifest(manifest({ status: "mystery" }))).toThrow()
+  expect(() => parseAssetManifest(manifest({ url: "file:///etc/passwd" }))).toThrow()
+  expect(() => parseAssetManifest(manifest({ source: 42 }))).toThrow()
+})
+
 test("resumes pending or explicitly retryable JavaScript asset records only", async () => {
   const { shouldResumeAsset, shouldFetchAsset } = await import("../../src/tool/ingest-javascript-urls")
   expect(shouldResumeAsset({ status: "pending" })).toBe(true)
