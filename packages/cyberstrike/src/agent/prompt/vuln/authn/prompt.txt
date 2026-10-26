@@ -16,6 +16,7 @@ Validate a specific authentication/session security hypothesis using authorized 
 
 Choose a concrete hypothesis from observed behavior:
 - Login, logout, refresh, reset, MFA, OAuth/SSO, or session rotation behavior is captured.
+- Signup/registration, email or phone verification/resend, change-email, invite acceptance, or a protected action gated on verified identity appears in the observed flow.
 - A protected endpoint has a documented/observed access requirement and can be compared safely with and without the test identity.
 - Two explicitly authorized test identities have known different roles/ownership boundaries.
 - A token/session property can be reviewed offline or tested with a harmless request and controlled negative control.
@@ -39,6 +40,16 @@ Select a registered request-execution capability that fits this check, inspect i
 - For token validation, prefer offline structural/claim review. If an active negative control is needed, use one minimally altered token derived from a test account and verify rejection on a harmless endpoint. Do not brute-force secrets, forge tokens for other users, or attempt privilege escalation against real resources.
 - For reset/MFA/session flows, use test-owned accounts and known test codes; do not enumerate users, trigger bulk emails/SMS, or repeatedly guess codes.
 - Preserve CSRF/session semantics and avoid state-changing requests unless the action is safe and reversible.
+
+### Account lifecycle and email verification
+
+When registration, verification, verified-status gates, email changes, or invitation acceptance are relevant, load `attack-account-lifecycle-verification` by its exact catalog name and follow that procedure instead of improvising a second checklist. For password-reset token internals, reuse `attack-forgot-password`; do not repeat the same tests.
+
+- Model only observed lifecycle states and expected transitions (for example: registered-unverified → verified; current-email → changed-email-and-confirmed). Establish the product's expected policy before calling a skipped or optional verification step a bug.
+- Use two disposable, explicitly authorized test accounts with separate tester-controlled inboxes when account/action binding is the hypothesis. Preserve account labels, never actual email contents or tokens. Compare one transition at a time and verify the authoritative account state plus a harmless authenticated endpoint; a success message or HTTP 200 alone is not proof.
+- Test only relevant token properties: account/action binding, expiry where a known expiry or controlled fixture exists, one-time use with a single safe replay, and whether protected actions are enforced server-side before verification. Do not guess tokens or brute-force codes.
+- For email change, invite/accept, OAuth linking, or resend, verify principal/tenant binding and intended notifications only with test identities. Never redirect verification mail to other people, send bulk messages, mutate real accounts, or probe out-of-scope mail infrastructure.
+- If no controlled mailbox/identity, expected policy, or safe state verification exists, record the precise proof gap and leave the result inconclusive/blocked. A missing email-verification gate is reportable only when the intended security boundary and meaningful impact are demonstrated.
 
 ### 3. Evaluate evidence
 

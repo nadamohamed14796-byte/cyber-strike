@@ -412,3 +412,31 @@ describe("Testing-intent routing", () => {
     expect(rootPrompt).toContain("explicit user opt-in for authorized targeted testing")
   })
 })
+
+describe("Account lifecycle verification skill routing", () => {
+  test("pins and discovers account lifecycle verification during authentication testing", async () => {
+    expect(PHASE_REQUIRED_SKILLS.authentication_testing).toContain("attack-account-lifecycle-verification")
+    expect(skillQueriesForPhase("authentication_testing")).toContain("attack-account-lifecycle-verification")
+    expect(skillQueriesForPhase("authentication_testing")).toContain("email verification")
+    expect(skillQueriesForPhase("authentication_testing")).toContain("unverified account")
+
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const skill = (await Skill.all()).find((entry) => entry.name === "attack-account-lifecycle-verification")
+        expect(skill, "account lifecycle verification must exist in the runtime catalog").toBeDefined()
+        expect(skill!.content).toContain("Email Verification")
+        expect(skill!.content).toContain("account/action binding")
+        expect(skill!.content).toContain("authoritative account state")
+        expect(skill!.content).toContain("inconclusive/blocked")
+        expect(skill!.content).toContain("tester-controlled inboxes")
+      },
+    })
+
+    const authnPath = path.resolve(import.meta.dir, "../../src/agent/prompt/vuln/authn/prompt.txt")
+    const authnPrompt = await Bun.file(authnPath).text()
+    expect(authnPrompt).toContain("Account lifecycle and email verification")
+    expect(authnPrompt).toContain("attack-account-lifecycle-verification")
+    expect(authnPrompt).toContain("Do not guess tokens or brute-force codes")
+  })
+})

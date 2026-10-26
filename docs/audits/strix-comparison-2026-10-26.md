@@ -70,6 +70,19 @@ The full review found that targeted testing, validation, and report generation a
 
 A compact target-local threat-modeling step was also added to the existing shared methodology. It records observed versus inferred roles, trust boundaries, sensitive actions, and security invariants in existing notes/artifacts; it does not add a second ledger, change scope rules, or create a separate agent subsystem.
 
+## Account-lifecycle testing gap found and addressed
+
+The deeper vulnerability-flow review found that CyberStrike already had strong password-reset and account-takeover skills, plus general authentication/session testing, but account registration and email-verification lifecycle checks were split across broad guidance rather than one focused, phase-pinned procedure. Strix's business-logic and function-authorization skills explicitly treat account lifecycle, invitations, and verification overrides as security-relevant state transitions; they helped identify the missing routing and test-state model.
+
+Added `.cyberstrike/skill/attack-account-lifecycle-verification/SKILL.md`, pinned and searchable in the authentication-testing phase, with explicit procedures for:
+- registration and email/phone verification state transitions;
+- verification token binding to the correct test account and action, known expiry, single-use behavior, and resend handling;
+- server-side enforcement of verified identity on protected actions;
+- changing email, invite acceptance, and identity-linking boundaries;
+- evidence thresholds, alternative explanations, safe test-account cleanup, and explicit inconclusive/blocked outcomes.
+
+The specialist prompt now routes observed account-lifecycle flows into this skill and reuses the existing password-reset skill instead of duplicating its checklist. Tests assert that the skill is present in the runtime catalog, pinned to the authentication phase, discoverable by query, and referenced by the specialist prompt. Testing remains limited to authorized test accounts and inboxes; there is no token guessing, OTP brute force, bulk messaging, or testing of real users' accounts.
+
 ## Verification and limits
 
 - The changes were saved to the repository's `main` branch through GitHub's file-update interface.

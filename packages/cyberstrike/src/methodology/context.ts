@@ -39,6 +39,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
   ],
   authentication_testing: [
     "wstg-athn", "wstg-idnt", "wstg-auth-session", "attack-auth-bypass", "attack-401-403-bypass", "attack-ato", "attack-mfa-bypass",
+    "attack-account-lifecycle-verification", "email verification", "account lifecycle", "change email", "registration confirmation", "unverified account",
     "attack-captcha-bypass", "attack-forgot-password", "attack-oauth", "attack-saml-sso",
     "authentication", "auth bypass", "login",
   ],
@@ -97,7 +98,7 @@ export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   scope_analysis: ["target-workspace-workflow", "attack-bb-methodology"],
   passive_recon: ["recon-subdomain-enumeration", "recon-asn-infrastructure", "attack-javascript-analysis"],
   active_recon: ["attack-web-recon", "recon-port-service-discovery", "attack-javascript-analysis"],
-  authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass"],
+  authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-account-lifecycle-verification"],
   session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
   input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
