@@ -28,6 +28,9 @@ export namespace SkillIndex {
     techIndex: Map<string, Set<string>>
     cweIndex: Map<string, Set<string>>
     categoryIndex: Map<string, Set<string>>
+    // Keep canonical names separate from aliases so a shared tag/tech stack
+    // cannot make a real skill name ambiguous.
+    nameIndex: Map<string, Set<string>>
     referenceIndex: Map<string, Set<string>>
   }
   const states = new Map<string, IndexState>()
@@ -38,6 +41,7 @@ export namespace SkillIndex {
     techIndex: new Map(),
     cweIndex: new Map(),
     categoryIndex: new Map(),
+    nameIndex: new Map(),
     referenceIndex: new Map(),
   })
   const current = () => states.get(Instance.directory) ?? emptyState()
@@ -52,8 +56,15 @@ export namespace SkillIndex {
   }
 
   function indexReferences(entry: Entry, state: IndexState) {
-    // Exact name aliases are case-insensitive; technique aliases are explicit IDs,
-    // never fuzzy substring/prefix matches.
+    // Canonical names have priority over aliases shared by multiple skills.
+    // Keep this index separate so a popular tech-stack tag (for example "aws")
+    // cannot make a real skill named "aws" unresolvable.
+    const nameKey = entry.name.trim().toLowerCase()
+    if (nameKey) {
+      if (!state.nameIndex.has(nameKey)) state.nameIndex.set(nameKey, new Set())
+      state.nameIndex.get(nameKey)!.add(entry.name)
+    }
+    // Technique aliases are explicit IDs, never fuzzy substring/prefix matches.
     addReference(state, entry.name, entry.name)
     addReference(state, entry.owasp_id, entry.name)
     // Imported catalogs commonly link controls by their directory slug, while
@@ -72,6 +83,11 @@ export namespace SkillIndex {
   function resolveInState(reference: string, state: IndexState): string | undefined {
     const normalized = reference.trim().toLowerCase()
     if (!normalized) return undefined
+
+    const canonicalNames = state.nameIndex.get(normalized)
+    if (canonicalNames?.size) {
+      return canonicalNames.size === 1 ? canonicalNames.values().next().value : undefined
+    }
 
     const resolveExact = (key: string) => {
       const candidates = state.referenceIndex.get(key)

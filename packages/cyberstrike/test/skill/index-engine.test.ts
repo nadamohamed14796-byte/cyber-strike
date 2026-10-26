@@ -29,6 +29,7 @@ Skill body for ${name}.
   }
 
   try {
+    await addSkill("aws", 'tags: ["cloud-provider"]')
     await addSkill(
       "aws-postexploit",
       'tech_stack: ["aws"]\nchains_with: ["T1078.004", "T1078.004_cloud-accounts", "T1552.005"]\nprerequisites: ["T1078.004", "T1078.004_cloud-accounts", "T1552.005"]',
@@ -83,6 +84,7 @@ Skill body for ${name}.
       fn: async () => {
         await SkillIndex.rebuild()
 
+        expect(SkillIndex.resolveReference("AWS")).toBe("aws")
         expect(SkillIndex.resolveReference("T1078.004")).toBe("T1078.004_cloud-accounts")
         expect(SkillIndex.resolveReference("T1552.005")).toBe("T1552.005_cloud-instance-metadata-api")
         expect(SkillIndex.resolveReference("AWS-POSTEXPLOIT")).toBe("aws-postexploit")
