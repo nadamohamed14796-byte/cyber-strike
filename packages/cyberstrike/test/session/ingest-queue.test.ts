@@ -312,19 +312,21 @@ describe("SessionQueueStatus", () => {
 
 
 describe("Extension ingest transcript visibility", () => {
-  test("writes intake and completion notices into the parent session transcript", async () => {
+  test("suppresses routine queue/completion chatter but keeps actionable parse errors", async () => {
     await withInstance(async () => {
       const session = await Session.create({ title: "extension-ingest-visibility-test" })
       await IngestSummary.notice(session.id, "Extension request queued for independent analysis: GET /profile")
       await IngestSummary.notice(session.id, "Extension request analysis completed: GET /profile")
+      await IngestSummary.notice(session.id, "Extension request rejected before analysis: invalid HTTP request format")
 
       const messages = await Session.messages({ sessionID: session.id })
       const text = messages.flatMap((message) => message.parts)
         .filter((part) => part.type === "text")
         .map((part) => part.text)
 
-      expect(text).toContain("Extension request queued for independent analysis: GET /profile")
-      expect(text).toContain("Extension request analysis completed: GET /profile")
+      expect(text).not.toContain("Extension request queued for independent analysis: GET /profile")
+      expect(text).not.toContain("Extension request analysis completed: GET /profile")
+      expect(text).toContain("Extension request rejected before analysis: invalid HTTP request format")
       await Session.remove(session.id)
     })
   })
