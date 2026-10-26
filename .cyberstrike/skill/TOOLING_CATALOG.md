@@ -39,8 +39,8 @@ Search the live connected-tool registry through `tool_search` at the start of a 
 | URL history / crawling | gau, waybackurls, waymore; katana for authorized crawling | hakrawler; `uro`/`anew` for local normalization/deduplication; first-party links and documentation | normalized URL, method/parameters when known, source, first-seen, collection status |
 | Content / directory / virtual-host discovery | ffuf, feroxbuster, dirsearch | context-appropriate wordlists; hakrawler for links | status, length, fingerprint, error/negative-control data; conservative rate |
 | Parameter discovery | Arjun, x8, ParamSpider | endpoint inventory and controlled request comparison | endpoint template, method, parameter, source; preserve auth/content-type context |
-| JavaScript / endpoint analysis | jsluice, xnLinkFinder, LinkFinder | local source-map review; retire.js for dependency clues | bundle hash, route, method/parameter, line/offset, confidence; use existing `js_endpoint_inventory.py` where suitable |
-| API / GraphQL / WebSocket | graphql-cop, Clairvoyance where schema discovery is permitted, websocat/wscat | kiterunner for route inventory; curl, Python requests, local API schemas | operation/field/route inventory, auth boundaries, controlled evidence |
+| JavaScript / endpoint analysis | jsluice, xnLinkFinder, LinkFinder | local source-map review; Semgrep/AST analysis when source is available; inspect browser-boundary patterns such as postMessage and service workers | bundle hash, route, method/parameter, source/sink, line/offset, capture correlation, confidence; use existing `js_endpoint_inventory.py` where suitable |
+| API contracts / GraphQL / WebSocket | OpenAPI/Swagger JSON or YAML, Postman exports, graphql-cop, Clairvoyance where schema discovery is permitted, websocat/wscat | kiterunner for route inventory; curl/Python requests and existing captured requests; see `attack-api-contract-testing` for safe spec-to-live coverage comparison | one endpoint identity per origin + method + route template; contract source/hash, declared security, observed status, and controlled auth-boundary evidence |
 | Template / CVE checks | nuclei with reviewed templates; cvemap for metadata | technology-specific checks and vendor advisories | template ID/version, matched request/response, scope, manual validation status |
 | XSS / client-side injection | dalfox for suitable authorized checks | browser-independent reflection/source-sink analysis; Semgrep for source | payload context, source/sink, minimal proof; alerts alone are not findings |
 | SQL injection | sqlmap or ghauri for explicitly authorized validation | controlled baseline/variant requests | minimal proof and response diff; no database dumping by default |
@@ -50,7 +50,7 @@ Search the live connected-tool registry through `tool_search` at the start of a 
 | TLS / headers / CORS / redirects | testssl.sh, curl, Python requests | httpx metadata; response diff helper | raw relevant headers with secrets redacted, redirect chain, baseline/variant, policy impact |
 | Race conditions | pytest and requests-racer in controlled fixtures | deterministic local harness | initial state, request ordering/timing, final controlled state; avoid repeated real-world mutations |
 | Secrets / exposed source | Gitleaks, TruffleHog, Nosey Parker, detect-secrets, whispers | local Git inspection; git-dumper only when explicitly authorized and permitted | detector, file/commit, redacted fingerprint; never print or use discovered secrets |
-| Source / dependencies / containers / IaC | Semgrep, Trivy, Checkov | vendor advisories, language-native tooling | rule/advisory, path/resource, version, remediation |
+| Source / dependencies / containers / IaC | Semgrep, Trivy, OSV-Scanner, Checkov when available | vendor advisories and language-native tooling; see `attack-dependency-cve-scanning` for lockfile-first, no-install triage | rule/advisory, path/resource, exact version, fixed version, direct/transitive status, DB freshness, reachability/deployment evidence, remediation |
 | Cloud / CI / platform review | Prowler, ScoutSuite, provider CLIs where authorized | Checkov, Trivy, Semgrep | identity/resource, least-privilege finding, source/config evidence; read-only first |
 | Subdomain takeover triage | subzy plus provider conditions from can-i-take-over-xyz | DNS/CNAME and provider documentation | dangling record and provider-specific evidence; never attempt to claim a real target |
 | Evidence / normalization / reporting | Python stdlib, jq | shared helpers below | reproducible evidence references, redaction, disposition, validation errors |
@@ -122,3 +122,10 @@ Prefer the project's official documentation/release page for installation and su
 ## Completion and truthful status
 
 For every phase, report selected method(s), availability/version, run status, artifact paths, accepted/deduplicated/rejected/failed counts where applicable, gaps, confidence, and next step. Distinguish not selected, unavailable, blocked, failed, zero-results, and successful. Missing or blocked sources are not successful empty results. Do not claim coverage, installation, execution, or confirmed vulnerability without supporting output.
+
+
+### Contract, browser, and supply-chain routing
+
+- If a permitted OpenAPI/Swagger contract or Postman collection is available, merge its operations into the existing endpoint inventory and route security-boundary differences to `attack-api-contract-testing`. Do not generate one inventory per spec/tool.
+- If JavaScript reveals cross-window messaging, service-worker caching, opener/navigation trust, or cross-origin state behavior, route only those evidence-matched leads to `attack-browser-boundary-security`; keep actual runtime traffic and source location attached.
+- Run dependency/CVE analysis only when an authorized source checkout or source artifacts provide reliable manifests/lockfiles. Prefer file-based read-only scanners already available; do not install or execute target dependencies just to scan them. Record advisory/database freshness and separate version match, deployment, reachability, and confirmed impact.
