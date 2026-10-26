@@ -8,22 +8,22 @@ export namespace Bus {
   const log = Log.create({ service: "bus" })
   type Subscription = (event: any) => void | Promise<void>
 
-function notify(subscribers: Subscription[], event: any, type: string) {
-  const pending: Promise<void>[] = []
-  for (const sub of [...subscribers]) {
-    try {
-      pending.push(
-        Promise.resolve(sub(event)).catch((error) => {
-          log.error("subscription handler failed", { type, error })
-        }),
-      )
-    } catch (error) {
-      // A broken local subscriber must not block other listeners or global delivery.
-      log.error("subscription handler failed", { type, error })
+  function notify(subscribers: Subscription[], event: any, type: string) {
+    const pending: Promise<void>[] = []
+    for (const sub of [...subscribers]) {
+      try {
+        pending.push(
+          Promise.resolve(sub(event)).catch((error) => {
+            log.error("subscription handler failed", { type, error })
+          }),
+        )
+      } catch (error) {
+        // A broken local subscriber must not block other listeners or global delivery.
+        log.error("subscription handler failed", { type, error })
+      }
     }
+    return Promise.all(pending)
   }
-  return Promise.all(pending)
-}
 
   export const InstanceDisposed = BusEvent.define(
     "server.instance.disposed",
