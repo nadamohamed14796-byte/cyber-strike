@@ -26,6 +26,7 @@ type AssetRecord = {
   sources?: string[]
   status: "pending" | "downloaded" | "reused" | "skipped" | "failed"
   pendingRefresh?: boolean
+  retryable?: boolean
   contentHash?: string
   localPath?: string
   contentType?: string
@@ -61,6 +62,10 @@ export function mergeAssetSources(...values: Array<string | string[] | undefined
     }
   }
   return [...merged].sort()
+}
+
+export function shouldResumeAsset(record: { status: AssetRecord["status"]; retryable?: boolean }): boolean {
+  return record.status === "pending" || record.retryable === true
 }
 
 function displayURL(input: string): string {
@@ -257,10 +262,11 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const markPending = (url: string, forceRefresh = false) => {
       const prior = byURL.get(url)
       const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? [])])
-      if (forceRefresh || !prior || prior.status === "pending" || prior.status === "failed" || prior.status === "skipped") {
+      if (forceRefresh || !prior || prior.status === "pending" || prior.status === "failed" || prior.status === "skipped" || prior.retryable === true) {
         byURL.set(url, {
           ...prior,
           url,
+          retryable: undefined,
           source: sources.join(" | "),
           sources,
           status: "pending",
@@ -278,7 +284,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
     for (const url of inputURLs) addSource(url, params.source)
     for (const item of manifest.assets) {
-      if (item.status !== "pending") continue
+      if (!shouldResumeAsset(item)) continue
       const url = normalizeURL(item.url)
       if (!url) continue
       for (const source of mergeAssetSources(item.sources, item.source)) addSource(url, source)
@@ -355,14 +361,29 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           await saveProgress(true)
           break
         }
-        const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = {
+          url,
+          source: assetSource,
+          status: "failed",
+          retryable: result.error.startsWith("fetch failed:"),
+          error: result.error,
+          fetchedAt: new Date().toISOString(),
+        }
         records.push(record); byURL.set(url, record); failed++
         await saveProgress()
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
+        const record: AssetRecord = {
+          url,
+          finalURL,
+          source: assetSource,
+          status: "failed",
+          retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+          error: "HTTP " + response.status,
+          fetchedAt: new Date().toISOString(),
+        }
         records.push(record); byURL.set(url, record); failed++
         await saveProgress()
         continue
@@ -400,7 +421,17 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           await saveProgress(true)
           break
         }
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: redactURLs(error instanceof Error ? error.message : String(error)), fetchedAt: new Date().toISOString() }
+        const readError = redactURLs(error instanceof Error ? error.message : String(error))
+        const record: AssetRecord = {
+          url,
+          finalURL,
+          source: assetSource,
+          status: "failed",
+          contentType,
+          retryable: !readError.includes("response exceeds the " + MAX_ASSET_BYTES + " byte asset limit"),
+          error: readError,
+          fetchedAt: new Date().toISOString(),
+        }
         records.push(record); byURL.set(url, record); failed++
         await saveProgress()
         continue
@@ -487,6 +518,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Input URLs: " + params.urls.length,
         "Unique URLs handled (supplied, resumed, and discovered): " + inputURLs.length,
         "Pending assets left for resume: " + [...byURL.values()].filter((record) => record.status === "pending").length,
+        "Retryable failures retained for the next run: " + [...byURL.values()].filter((record) => record.retryable === true).length,
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions: " + downloaded,
         "Reused URL/content records: " + reused,
@@ -505,6 +537,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         valid_unique_urls: inputURLs.length,
         queued_urls: inputURLs.length,
         pending_assets: [...byURL.values()].filter((record) => record.status === "pending").length,
+        retryable_failures: [...byURL.values()].filter((record) => record.retryable === true).length,
         invalid_urls: invalidCount,
         downloaded,
         reused,
