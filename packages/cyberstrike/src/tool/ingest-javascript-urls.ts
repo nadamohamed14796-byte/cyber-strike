@@ -14,7 +14,7 @@ const MAX_REDIRECTS = 5
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
   urls: z.array(z.string().trim().min(1).max(8192)).min(1).max(MAX_URLS)
-    .describe("JavaScript asset URLs from ANY source: the URL collector, crawler/HTML, source-map references, a URL inventory, or URLs manually supplied by the user. Pass the actual URLs, not local file paths."),
+    .describe("JavaScript asset URLs OR HTML page URLs from ANY source: URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths."),
   source: z.string().trim().min(1).max(120).default("unspecified")
     .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
   force_refresh: z.boolean().default(false)
