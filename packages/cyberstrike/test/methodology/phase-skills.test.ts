@@ -39,6 +39,20 @@ describe("Phase-critical skill pinning", () => {
     })
   })
 
+  test("triage skill includes explicit counterevidence closure and severity calibration", async () => {
+    await Instance.provide({
+      directory: path.resolve(import.meta.dir, "../.."),
+      fn: async () => {
+        const skill = (await Skill.all()).find((entry) => entry.name === "attack-triage-validation")
+        expect(skill, "attack-triage-validation must exist in the runtime catalog").toBeDefined()
+        expect(skill!.content).toContain("Counterevidence closure contract")
+        expect(skill!.content).toContain("specific control")
+        expect(skill!.content).toContain("Severity calibration")
+        expect(skill!.content).toContain("hypothetical chain")
+      },
+    })
+  })
+
   test("phase-critical skills remain present even when the optional shortlist limit is one", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
       name,
