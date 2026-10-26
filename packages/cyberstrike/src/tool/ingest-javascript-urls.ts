@@ -66,7 +66,7 @@ function isHTMLResponse(body: string, contentType: string, url: string): boolean
     /\.x?html?$/i.test(new URL(url).pathname) && /^\s*(?:<!doctype\s+html|<html\b|<head\b|<body\b)/i.test(body.slice(0, 4096))
 }
 
-function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
+export function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
   const output = new Set<string>()
   const baseMatch = /<base\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(body)
   let baseURL = pageURL
