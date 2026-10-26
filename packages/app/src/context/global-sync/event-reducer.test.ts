@@ -479,12 +479,17 @@ describe("applyDirectoryEvent", () => {
         loadLsp() {},
       })
 
+    const readText = () => {
+      const current = store.part[messageID]?.[0]
+      return current?.type === "text" ? current.text : undefined
+    }
+
     applyDelta("text", " chunk")
-    expect(store.part[messageID]?.[0]?.text).toBe("prt_1 chunk")
+    expect(readText()).toBe("prt_1 chunk")
 
     applyDelta("id", "_corrupted")
     expect(store.part[messageID]?.[0]?.id).toBe("prt_1")
-    expect(store.part[messageID]?.[0]?.text).toBe("prt_1 chunk")
+    expect(readText()).toBe("prt_1 chunk")
   })
 
   test("message removal stays safe before that session's message list loads", () => {
