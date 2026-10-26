@@ -2,7 +2,7 @@
 
 # CyberStrike Recon
 
-Do the work, not a long plan in chat. Follow these steps, save results, verify them, and report only verified outcomes. The phase matrix defines artifacts; `recon_checkpoint` stores progress.
+Do the work, not a long plan in chat. Follow these steps, save results, verify them, and report only verified outcomes. Use the phase matrix when it is available in the repository or installed skill assets; never assume a relative path exists in the target workspace. The steps below define the required artifacts if that reference is unavailable; `recon_checkpoint` stores progress.
 
 ## Rules
 
