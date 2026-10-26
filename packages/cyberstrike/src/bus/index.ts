@@ -2,7 +2,7 @@ import z from "zod"
 import { Log } from "../util/log"
 import { Instance } from "../project/instance"
 import { BusEvent } from "./bus-event"
-import { GlobalBus } from "./global"
+import { emitSafe } from "./global"
 
 export namespace Bus {
   const log = Log.create({ service: "bus" })
