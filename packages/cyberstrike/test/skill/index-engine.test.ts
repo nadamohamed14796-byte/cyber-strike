@@ -149,6 +149,24 @@ Skill body for ${name}.
           { skill_id: "AWS-POSTEXPLOIT", severity: "high" },
         ])
         expect(completedSkillSuggestions.some((item) => item.name === "aws-postexploit")).toBe(false)
+
+        try {
+          const byAlias = await SkillContext.load("T1078.004")
+          expect(byAlias).toContain("Skill body for T1078.004_cloud-accounts.")
+          expect(SkillContext.active()).toContain("T1078.004_cloud-accounts")
+          expect(SkillContext.isLoaded("T1078.004")).toBe(true)
+
+          const tokenCount = SkillContext.tokenCount()
+          const byCanonical = await SkillContext.load("T1078.004_cloud-accounts")
+          expect(byCanonical).toBe(byAlias)
+          expect(SkillContext.tokenCount()).toBe(tokenCount)
+          expect(SkillContext.active().filter((name) => name === "T1078.004_cloud-accounts")).toHaveLength(1)
+
+          expect(SkillContext.unload("T1078.004")).toBe(true)
+          expect(SkillContext.isLoaded("T1078.004_cloud-accounts")).toBe(false)
+        } finally {
+          SkillContext.clear()
+        }
       },
     })
   } finally {
