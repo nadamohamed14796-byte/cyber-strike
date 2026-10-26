@@ -95,6 +95,14 @@ export namespace SkillContext {
         .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
         .map((entry) => entry.name),
     )
+    // Findings already present in the input are completed context, not new
+    // skill-chain work to suggest again.
+    const observed = new Set(
+      findings.flatMap((finding) => {
+        const canonical = SkillIndex.resolveReference(finding.skill_id)
+        return canonical ? [canonical] : []
+      }),
+    )
 
     function addWithPrerequisites(
       name: string,
@@ -102,7 +110,7 @@ export namespace SkillContext {
       priority: Suggestion["priority"],
       visiting = new Set<string>(),
     ) {
-      if (active.has(name) || suggested.has(name) || visiting.has(name)) return
+      if (active.has(name) || observed.has(name) || suggested.has(name) || visiting.has(name)) return
       visiting.add(name)
 
       // Resolve and surface prerequisite skills before the skill that depends on
@@ -120,7 +128,7 @@ export namespace SkillContext {
       }
 
       visiting.delete(name)
-      if (active.has(name) || suggested.has(name)) return
+      if (active.has(name) || observed.has(name) || suggested.has(name)) return
       suggested.add(name)
       result.push({ name, reason, priority })
     }
