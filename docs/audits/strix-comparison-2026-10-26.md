@@ -100,3 +100,10 @@ The specialist prompt now routes observed account-lifecycle flows into this skil
 - [CyberStrike triage skill](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/.cyberstrike/skill/attack-triage-validation/SKILL.md)
 - [CyberStrike vulnerability-agent common prompt](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/packages/cyberstrike/src/agent/prompt/vuln/common-prompt.txt)
 - [CyberStrike phase/skill tests](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/packages/cyberstrike/test/methodology/phase-skills.test.ts)
+
+
+## Cross-family skill routing hardening
+
+A further review of the phase shortlist found a discoverability risk: several concrete vulnerability skills were present in the searchable catalog and phase queries, but only a small representative subset was pinned to survive a very small shortlist limit. The phase-critical set now also preserves specialist entry points for DOM XSS, NoSQL injection, SSTI, XXE, file uploads, deserialization, RCE, prototype pollution, file inclusion and request smuggling; race conditions, rate-limit/resource-consumption abuse and cache poisoning/deception; and GraphQL, gRPC, WebSockets, schema enumeration and CORS.
+
+These are **discovery pins, not an instruction to run every test**. The specialist must load only procedures relevant to the observed technology, actual request surface and concrete hypothesis; retain scope/policy and impact controls; and use the existing evidence, verification, triage and reporting lifecycle. This avoids both silent shortlist omissions and indiscriminate checklist execution.

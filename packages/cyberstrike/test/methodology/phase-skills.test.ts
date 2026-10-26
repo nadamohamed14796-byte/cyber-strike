@@ -140,6 +140,16 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("api_security")).toContain("attack-graphql")
     expect(skillQueriesForPhase("api_security")).toContain("attack-api-contract-testing")
     expect(PHASE_REQUIRED_SKILLS.api_security).toEqual(expect.arrayContaining(["attack-api-contract-testing", "attack-api-property-authorization"]))
+    expect(PHASE_REQUIRED_SKILLS.input_validation).toEqual(expect.arrayContaining([
+      "attack-dom-xss", "attack-nosqli", "attack-ssti", "attack-xxe", "attack-file-upload",
+      "attack-deserialization", "attack-rce", "attack-prototype-pollution", "attack-file-inclusion", "attack-request-smuggling",
+    ]))
+    expect(PHASE_REQUIRED_SKILLS.business_logic).toEqual(expect.arrayContaining([
+      "attack-race-condition", "attack-rate-limit-bypass", "attack-api-resource-consumption", "attack-cache-poison", "attack-cache-deception",
+    ]))
+    expect(PHASE_REQUIRED_SKILLS.api_security).toEqual(expect.arrayContaining([
+      "attack-graphql", "attack-grpc", "attack-websocket", "attack-schema-enumeration", "attack-cors",
+    ]))
     expect(skillQueriesForPhase("infrastructure")).toContain("attack-cloud-misconfig")
     expect(skillQueriesForPhase("reporting")).toContain("attack-report-writing")
     expect(Phase.get("mobile_application_testing")?.appliesTo).toContain("mobile")

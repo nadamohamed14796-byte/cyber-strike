@@ -101,10 +101,19 @@ export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   authentication_testing: ["attack-auth-bypass", "attack-ato", "attack-mfa-bypass", "attack-account-lifecycle-verification"],
   session_management: ["attack-session", "attack-jwt", "attack-csrf"],
   authorization_testing: ["attack-idor-automation", "attack-api-property-authorization", "attack-bfla"],
-  input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
-  business_logic: ["attack-business-logic"],
+  input_validation: [
+    "attack-xss", "attack-dom-xss", "attack-sqli", "attack-nosqli", "attack-ssrf", "attack-ssti", "attack-xxe",
+    "attack-file-upload", "attack-deserialization", "attack-rce", "attack-prototype-pollution", "attack-file-inclusion", "attack-request-smuggling",
+  ],
+  business_logic: [
+    "attack-business-logic", "attack-race-condition", "attack-rate-limit-bypass", "attack-api-resource-consumption",
+    "attack-cache-poison", "attack-cache-deception",
+  ],
   data_protection: ["attack-information-disclosure", "attack-source-leak"],
-  api_security: ["attack-shadow-api", "attack-bfla", "attack-api-contract-testing", "attack-api-property-authorization"],
+  api_security: [
+    "attack-shadow-api", "attack-bfla", "attack-api-contract-testing", "attack-api-property-authorization",
+    "attack-graphql", "attack-grpc", "attack-websocket", "attack-schema-enumeration", "attack-cors", "attack-rate-limit-bypass",
+  ],
   infrastructure: ["attack-cloud-misconfig"],
   reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
 }
