@@ -21,6 +21,7 @@ cwe_ids:
   - CWE-200
   - CWE-285
 chains_with:
+  - attack-api-contract-testing
   - attack-graphql
   - attack-grpc
   - attack-bfla
