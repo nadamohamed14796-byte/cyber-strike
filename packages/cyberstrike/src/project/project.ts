@@ -10,7 +10,7 @@ import { work } from "../util/queue"
 import { fn } from "@cyberstrike-io/util/fn"
 import { BusEvent } from "@/bus/bus-event"
 import { iife } from "@/util/iife"
-import { emitSafe, GlobalBus } from "@/bus/global"
+import { emitSafe } from "@/bus/global"
 import { existsSync } from "fs"
 import { git } from "../util/git"
 
