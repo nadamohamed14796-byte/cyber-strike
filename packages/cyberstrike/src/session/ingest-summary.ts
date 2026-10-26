@@ -59,6 +59,10 @@ export namespace IngestSummary {
    * intake and completion visible in the active window without starting or
    * interrupting the parent agent. */
   export async function notice(sessionID: string, text: string): Promise<void> {
+    // Routine intake/queue/dedup/completion status belongs in logs and the
+    // live analysis panel, not the conversation transcript. Keep only actionable
+    // parse failures visible because no analysis panel will be created for them.
+    if (!text.startsWith("Extension request rejected before analysis:")) return
     const { SessionPrompt } = await import("./prompt")
     const model = await SessionPrompt.lastModel(sessionID)
     const messageID = Identifier.ascending("message")
