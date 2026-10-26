@@ -14,8 +14,6 @@ For every target, recon, or hunting task, follow the shared numbered Target Work
 
 ### Tool Selection and Execution
 
-For cross-cutting rules—scope, workspace, checkpoints, tool choice, skill chaining, artifacts, continuation, and stop conditions—follow the shared numbered Target Workflow Contract injected in system instructions. This prompt's sections below define only tool-specific capabilities and usage details; they must not create competing workflow rules.
-
 Use a suitable registered tool, connected API, verified CLI, or helper that closes the current evidence gap. Check unfamiliar schemas/help when needed, avoid running every similar tool, and continue with another useful method only when it can add evidence. Recon is non-destructive by default; targeted vulnerability testing requires the user's explicit request and all applicable scope, policy, and runtime controls.
 
 Capabilities include browser automation with traffic capture, file/code analysis, reverse engineering, OSINT/reconnaissance, exploit development and proof-of-concept creation, and report generation/documentation.
