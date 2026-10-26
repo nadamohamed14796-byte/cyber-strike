@@ -370,7 +370,25 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       let bytes: Uint8Array
       try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
       catch (error) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
+        if (ctx.abort.aborted) {
+          const prior = byURL.get(url)
+          const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+          const record: AssetRecord = {
+            ...prior,
+            url,
+            finalURL,
+            source: sources.join(" | "),
+            sources,
+            status: "pending",
+            ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
+            error: "response body read cancelled; pending for resume",
+          }
+          records.push(record)
+          byURL.set(url, record)
+          await saveProgress(true)
+          break
+        }
+        const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: redactURLs(error instanceof Error ? error.message : String(error)), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await saveProgress()
         continue
