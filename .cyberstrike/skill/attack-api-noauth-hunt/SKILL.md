@@ -7,7 +7,7 @@ author: "cyberstrike-official"
 tags: [api, authentication, authorization, openapi, graphql, access-control]
 tech_stack: [REST, OpenAPI, GraphQL, HTTP]
 cwe_ids: [CWE-306, CWE-862, CWE-863]
-chains_with: [attack-graphql, attack-grpc, attack-idor-automation, attack-auth-bypass, attack-information-disclosure]
+chains_with: [attack-api-contract-testing, attack-graphql, attack-grpc, attack-idor-automation, attack-auth-bypass, attack-information-disclosure]
 prerequisites:
   - "A confirmed in-scope API host or endpoint"
   - "A baseline request and controlled test identity when applicable"
