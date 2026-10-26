@@ -24,7 +24,8 @@ type AssetRecord = {
   finalURL?: string
   source: string
   sources?: string[]
-  status: "downloaded" | "reused" | "skipped" | "failed"
+  status: "pending" | "downloaded" | "reused" | "skipped" | "failed"
+  pendingRefresh?: boolean
   contentHash?: string
   localPath?: string
   contentType?: string
@@ -204,6 +205,17 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (item.contentHash && item.localPath && await Bun.file(item.localPath).exists()) byHash.set(item.contentHash, item)
     }
 
+    const saveManifest = async () => {
+      manifest = {
+        schemaVersion: 1,
+        updatedAt: new Date().toISOString(),
+        assets: [...byURL.values()].sort((a, b) => a.url.localeCompare(b.url)),
+      }
+      const temporaryManifest = manifestPath + ".tmp"
+      await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", "utf8")
+      await fs.rename(temporaryManifest, manifestPath)
+    }
+
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, Set<string>>()
@@ -217,7 +229,41 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byURL.set(url, { ...prior, source: sources.join(" | "), sources })
       }
     }
+    const markPending = (url: string, forceRefresh = false) => {
+      const prior = byURL.get(url)
+      const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? [])])
+      if (forceRefresh || !prior || prior.status === "pending" || prior.status === "failed" || prior.status === "skipped") {
+        byURL.set(url, {
+          ...prior,
+          url,
+          source: sources.join(" | "),
+          sources,
+          status: "pending",
+          ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
+        })
+      }
+    }
+    const enqueueURL = (url: string, source: string) => {
+      addSource(url, source)
+      markPending(url, params.force_refresh)
+      if (queuedURLs.has(url)) return false
+      queuedURLs.add(url)
+      inputURLs.push(url)
+      return true
+    }
     for (const url of inputURLs) addSource(url, params.source)
+    for (const item of manifest.assets) {
+      if (item.status !== "pending") continue
+      const url = normalizeURL(item.url)
+      if (!url) continue
+      for (const source of mergeAssetSources(item.sources, item.source)) addSource(url, source)
+      if (!queuedURLs.has(url)) {
+        queuedURLs.add(url)
+        inputURLs.push(url)
+      }
+    }
+    for (const url of inputURLs) markPending(url, params.force_refresh)
+    await saveManifest()
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
@@ -230,24 +276,28 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     for (const url of inputURLs) {
       const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
       const prior = byURL.get(url)
-      if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
+      const forceRefresh = params.force_refresh || prior?.pendingRefresh === true
+      if (!forceRefresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
         const sources = mergeAssetSources(prior.sources, prior.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
         const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
         records.push(record)
         byURL.set(url, record)
         reused++
+        await saveManifest()
         continue
       }
       const result = await fetchScoped(url)
       if ("error" in result) {
         const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await saveManifest()
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await saveManifest()
         continue
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
@@ -255,6 +305,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
+        await saveManifest()
         continue
       }
       let bytes: Uint8Array
@@ -262,6 +313,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       catch (error) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
+        await saveManifest()
         continue
       }
       receivedBytes += bytes.byteLength
@@ -270,16 +322,15 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (!isHTML && !looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript, HTML with script elements, or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
+        await saveManifest()
         continue
       }
+      let queueChanged = false
       if (isHTML) {
         // Treat HTML as an inert container: local analysis extracts inline scripts,
         // while external script URLs re-enter this same scope-enforced fetch queue.
         for (const scriptURL of extractHTMLScriptURLs(body, finalURL)) {
-          addSource(scriptURL, "script src from " + url)
-          if (queuedURLs.has(scriptURL)) continue
-          queuedURLs.add(scriptURL)
-          inputURLs.push(scriptURL)
+          if (enqueueURL(scriptURL, "script src from " + url)) queueChanged = true
         }
       } else {
         // Feed external source-map links discovered inside each bundle into this same queue.
@@ -287,12 +338,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
           const normalizedMapURL = normalizeURL(mapURL)
           if (!normalizedMapURL) continue
-          addSource(normalizedMapURL, "sourceMappingURL from " + url)
-          if (queuedURLs.has(normalizedMapURL)) continue
-          queuedURLs.add(normalizedMapURL)
-          inputURLs.push(normalizedMapURL)
+          if (enqueueURL(normalizedMapURL, "sourceMappingURL from " + url)) queueChanged = true
         }
       }
+      if (queueChanged) await saveManifest()
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
       let localPath = existingContent?.localPath
@@ -310,16 +359,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       byURL.set(url, record)
       if (existingContent) reused++
       else { downloaded++; downloadedBytes += bytes.byteLength }
+      await saveManifest()
     }
 
-    manifest = {
-      schemaVersion: 1,
-      updatedAt: new Date().toISOString(),
-      assets: [...byURL.values()].sort((a, b) => a.url.localeCompare(b.url)),
-    }
-    const temporaryManifest = manifestPath + ".tmp"
-    await fs.writeFile(temporaryManifest, JSON.stringify(manifest, null, 2) + "\n", "utf8")
-    await fs.rename(temporaryManifest, manifestPath)
+    await saveManifest()
 
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
