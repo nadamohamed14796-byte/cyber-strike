@@ -88,6 +88,7 @@ export function applyDirectoryEvent(input: {
   directory: string
   loadLsp: () => void
   vcsCache?: VcsCache
+  repairMessage?: (sessionID: string, messageID: string, partID: string) => void
 }) {
   const event = input.event
   switch (event.type) {
@@ -275,9 +276,15 @@ export function applyDirectoryEvent(input: {
     case "message.part.delta": {
       const props = event.properties as { messageID: string; partID: string; field: string; delta: string }
       const parts = input.store.part[props.messageID]
-      if (!parts) break
+      if (!parts) {
+        input.repairMessage?.(props.sessionID, props.messageID, props.partID)
+        break
+      }
       const result = Binary.search(parts, props.partID, (p) => p.id)
-      if (!result.found) break
+      if (!result.found) {
+        input.repairMessage?.(props.sessionID, props.messageID, props.partID)
+        break
+      }
       input.setStore(
         "part",
         props.messageID,
