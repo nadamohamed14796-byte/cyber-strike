@@ -69,3 +69,18 @@ Merge results into the canonical endpoint inventory and existing report/findings
 ## Tool selection
 
 Search the connected-tool registry and available local tools for an appropriate JSON/YAML/Postman parser or use a small, reviewed local parser if needed. Do not assume a particular CLI is installed. A missing parser must not block independent recon; mark unsupported portions explicitly and continue with sources that can be processed.
+
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+### Tools and availability
+
+Choose a parser from the connected-tool registry or existing local environment based on the contract format. Check local availability with `command -v jq yq python3` and verify installed versions with `jq --version` or `yq --version` where applicable. These checks verify capabilities only; they do not fetch remote specs or prove endpoint security. Do not install unreviewed parsers or execute collection scripts.
+
+### Resources
+
+- OpenAPI Specification: https://spec.openapis.org/oas/latest.html
+- Postman collection format: https://learning.postman.com/docs/collections/collections-overview/
+- OWASP API Security: https://owasp.org/API-Security/
+
+If a parser or feature is unavailable, record that limitation and continue using other permitted evidence sources.
