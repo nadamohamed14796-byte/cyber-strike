@@ -140,20 +140,23 @@ async function readBounded(response: Response, limit: number): Promise<Uint8Arra
   return output
 }
 
-async function fetchScoped(inputURL: string): Promise<{ response: Response; finalURL: string } | { error: string }> {
+async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ response: Response; finalURL: string } | { error: string; aborted?: boolean }> {
   let current = inputURL
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+    if (abort.aborted) return { error: "fetch cancelled; URL remains pending for resume", aborted: true }
     const scope = await TargetMemory.checkURLScope(current)
+    if (abort.aborted) return { error: "fetch cancelled; URL remains pending for resume", aborted: true }
     if (!scope.allowed) return { error: "scope denied for " + current + ": " + scope.reason }
     let response: Response
     try {
       response = await fetch(current, {
         method: "GET",
         redirect: "manual",
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.any([abort, AbortSignal.timeout(20_000)]),
         headers: { Accept: "application/javascript, text/javascript, application/ecmascript, text/ecmascript, application/json;q=0.8, */*;q=0.1" },
       })
     } catch (error) {
+      if (abort.aborted) return { error: "fetch cancelled; URL remains pending for resume", aborted: true }
       return { error: "fetch failed: " + (error instanceof Error ? error.message : String(error)) }
     }
     if (![301, 302, 303, 307, 308].includes(response.status)) return { response, finalURL: current }
@@ -283,6 +286,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let failed = 0
 
     for (let index = 0; index < inputURLs.length; index++) {
+      if (ctx.abort.aborted) {
+        await saveProgress(true)
+        break
+      }
       const url = inputURLs[index]!
       const parsedURL = new URL(url)
       const activeAsset = parsedURL.origin + parsedURL.pathname
@@ -308,8 +315,25 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await saveProgress()
         continue
       }
-      const result = await fetchScoped(url)
+      const result = await fetchScoped(url, ctx.abort)
       if ("error" in result) {
+        if (result.aborted || ctx.abort.aborted) {
+          const prior = byURL.get(url)
+          const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+          const record: AssetRecord = {
+            ...prior,
+            url,
+            source: sources.join(" | "),
+            sources,
+            status: "pending",
+            ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
+            error: result.error,
+          }
+          records.push(record)
+          byURL.set(url, record)
+          await saveProgress(true)
+          break
+        }
         const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
         await saveProgress()
@@ -386,9 +410,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     await saveProgress(true)
 
-    let analysisSummary = "Analysis not run."
+    let analysisSummary = ctx.abort.aborted ? "Correlation not run because ingestion was interrupted; pending assets are saved for resume." : "Analysis not run."
     let analysisError: string | undefined
-    if (downloaded + reused > 0) {
+    if (!ctx.abort.aborted && downloaded + reused > 0) {
       ctx.metadata({
         title: "Correlating JavaScript and captured requests",
         metadata: {
@@ -414,7 +438,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
 
     return {
-      title: "JavaScript URL ingestion complete",
+      title: ctx.abort.aborted ? "JavaScript ingestion interrupted — pending work saved" : "JavaScript URL ingestion complete",
       output: [
         "Workspace: " + workspace.workspacePath,
         "Input URLs: " + params.urls.length,
@@ -446,6 +470,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         downloaded_bytes: downloadedBytes,
         received_bytes: receivedBytes,
         analysis_error: analysisError,
+        interrupted: ctx.abort.aborted,
       },
     }
   },
