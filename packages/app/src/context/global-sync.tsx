@@ -6,7 +6,7 @@ import {
   type ProviderListResponse,
   createCyberstrikeClient,
 } from "@cyberstrike-io/sdk/v2/client"
-import { createStore, produce, reconcile } from "solid-js/store"
+import { createStore, produce, reconcile, type SetStoreFunction, type Store } from "solid-js/store"
 import { useGlobalSDK } from "./global-sdk"
 import type { InitError } from "../pages/error"
 import {
@@ -77,6 +77,12 @@ function createGlobalSync() {
   const booting = new Map<string, Promise<void>>()
   const sessionLoads = new Map<string, Promise<void>>()
   const sessionMeta = new Map<string, { limit: number }>()
+  const messageRepairs = new Map<
+    string,
+    { dirty: boolean; cancelled: boolean; missingParts: Set<string> }
+  >()
+  const repairKey = (directory: string, sessionID: string, messageID: string) =>
+    [directory, sessionID, messageID].join("\0")
 
   const [projectCache, setProjectCache, , projectCacheReady] = persisted(
     Persist.global("globalSync.project", ["globalSync.project.v1"]),
@@ -126,6 +132,11 @@ function createGlobalSync() {
       queue.clear(directory)
       sessionMeta.delete(directory)
       sdkCache.delete(directory)
+      for (const [key, repair] of messageRepairs) {
+        if (!key.startsWith(directory + "\0")) continue
+        repair.cancelled = true
+        messageRepairs.delete(key)
+      }
     },
   })
 
@@ -138,6 +149,85 @@ function createGlobalSync() {
     })
     sdkCache.set(directory, sdk)
     return sdk
+  }
+
+  // A delta can arrive after reconnect before its part snapshot is restored.
+  // Fetch only missing parts and merge them; never overwrite newer local text.
+  const repairMessage = (
+    directory: string,
+    sessionID: string,
+    messageID: string,
+    partID: string,
+    store: Store<State>,
+    setStore: SetStoreFunction<State>,
+  ) => {
+    const key = repairKey(directory, sessionID, messageID)
+    const existing = messageRepairs.get(key)
+    if (existing) {
+      existing.missingParts.add(partID)
+      existing.dirty = true
+      return
+    }
+
+    const repair = { dirty: false, cancelled: false, missingParts: new Set([partID]) }
+    messageRepairs.set(key, repair)
+    void (async () => {
+      try {
+        while (!repair.cancelled) {
+          for (const id of repair.missingParts) {
+            if (store.part[messageID]?.some((part) => part.id === id)) repair.missingParts.delete(id)
+          }
+          if (repair.missingParts.size === 0) return
+
+          repair.dirty = false
+          const response = await sdkFor(directory).session.message(
+            { sessionID, messageID, directory },
+            { throwOnError: true },
+          )
+          if (repair.cancelled) return
+          if (repair.dirty) continue
+
+          const needed = new Set(
+            [...repair.missingParts].filter((id) => !store.part[messageID]?.some((part) => part.id === id)),
+          )
+          const recovered = response.data.parts.filter((part) => needed.has(part.id))
+          if (recovered.length === 0) {
+            console.warn("Could not recover missing streamed message part", {
+              directory,
+              sessionID,
+              messageID,
+              partIDs: [...needed],
+            })
+            return
+          }
+
+          setStore(
+            produce((draft) => {
+              const messages = draft.message[sessionID]
+              if (!messages) draft.message[sessionID] = [response.data.info]
+              else {
+                const message = Binary.search(messages, response.data.info.id, (item) => item.id)
+                if (!message.found) messages.splice(message.index, 0, response.data.info)
+              }
+              const parts = (draft.part[messageID] ??= [])
+              for (const part of recovered) {
+                const current = Binary.search(parts, part.id, (item) => item.id)
+                if (!current.found) parts.splice(current.index, 0, part)
+              }
+            }),
+          )
+        }
+      } catch (error) {
+        console.warn("Message-part recovery failed", {
+          directory,
+          sessionID,
+          messageID,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      } finally {
+        if (messageRepairs.get(key) === repair) messageRepairs.delete(key)
+      }
+    })()
   }
 
   createEffect(() => {
@@ -292,12 +382,45 @@ function createGlobalSync() {
       return
     }
 
+    if (event.type === "message.removed") {
+      const properties = event.properties as { sessionID: string; messageID: string }
+      const key = repairKey(directory, properties.sessionID, properties.messageID)
+      const repair = messageRepairs.get(key)
+      if (repair) {
+        repair.cancelled = true
+        messageRepairs.delete(key)
+      }
+    }
+    if (event.type === "message.part.updated") {
+      const part = (event.properties as { part: { sessionID: string; messageID: string; id: string } }).part
+      const repair = messageRepairs.get(repairKey(directory, part.sessionID, part.messageID))
+      if (repair?.missingParts.has(part.id)) repair.dirty = true
+    }
+    if (event.type === "message.part.delta") {
+      const properties = event.properties as { sessionID: string; messageID: string; partID: string }
+      const repair = messageRepairs.get(repairKey(directory, properties.sessionID, properties.messageID))
+      if (repair?.missingParts.has(properties.partID)) repair.dirty = true
+    }
+    if (event.type === "message.part.removed") {
+      const properties = event.properties as { sessionID: string; messageID: string; partID: string }
+      const repair = messageRepairs.get(repairKey(directory, properties.sessionID, properties.messageID))
+      if (repair?.missingParts.delete(properties.partID)) {
+        repair.dirty = true
+        if (repair.missingParts.size === 0) {
+          repair.cancelled = true
+          messageRepairs.delete(repairKey(directory, properties.sessionID, properties.messageID))
+        }
+      }
+    }
+
     applyDirectoryEvent({
       event,
       directory,
       store,
       setStore,
       push: queue.push,
+      repairMessage: (sessionID, messageID, partID) =>
+        repairMessage(directory, sessionID, messageID, partID, store, setStore),
       vcsCache: children.vcsCache.get(directory),
       loadLsp: () => {
         sdkFor(directory)
