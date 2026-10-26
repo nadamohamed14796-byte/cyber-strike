@@ -68,6 +68,14 @@ export function shouldResumeAsset(record: { status: AssetRecord["status"]; retry
   return record.status === "pending" || record.retryable === true
 }
 
+export function shouldFetchAsset(
+  record: { status: AssetRecord["status"]; retryable?: boolean } | undefined,
+  forceRefresh = false,
+): boolean {
+  if (forceRefresh || !record) return true
+  return record.status !== "skipped" && (record.status !== "failed" || record.retryable === true)
+}
+
 function displayURL(input: string): string {
   try {
     const url = new URL(input)
@@ -262,7 +270,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const markPending = (url: string, forceRefresh = false) => {
       const prior = byURL.get(url)
       const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? [])])
-      if (forceRefresh || !prior || prior.status === "pending" || prior.status === "failed" || prior.status === "skipped" || prior.retryable === true) {
+      if (forceRefresh || !prior || prior.status === "pending" || prior.retryable === true) {
         byURL.set(url, {
           ...prior,
           url,
@@ -303,6 +311,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let downloaded = 0
     let skipped = 0
     let failed = 0
+    let terminalNotRetried = 0
 
     for (let index = 0; index < inputURLs.length; index++) {
       if (ctx.abort.aborted) {
@@ -325,6 +334,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
       const prior = byURL.get(url)
       const forceRefresh = params.force_refresh || prior?.pendingRefresh === true
+      if (!shouldFetchAsset(prior, forceRefresh)) {
+        terminalNotRetried++
+        continue
+      }
       if (!forceRefresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
         ctx.metadata({
           title: "Reusing JavaScript asset — " + activeAsset,
@@ -519,6 +532,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Unique URLs handled (supplied, resumed, and discovered): " + inputURLs.length,
         "Pending assets left for resume: " + [...byURL.values()].filter((record) => record.status === "pending").length,
         "Retryable failures retained for the next run: " + [...byURL.values()].filter((record) => record.retryable === true).length,
+        "Permanent failures/skips not retried: " + terminalNotRetried,
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions: " + downloaded,
         "Reused URL/content records: " + reused,
@@ -538,6 +552,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         queued_urls: inputURLs.length,
         pending_assets: [...byURL.values()].filter((record) => record.status === "pending").length,
         retryable_failures: [...byURL.values()].filter((record) => record.retryable === true).length,
+        permanent_failures_not_retried: terminalNotRetried,
         invalid_urls: invalidCount,
         downloaded,
         reused,
