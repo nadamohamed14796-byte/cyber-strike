@@ -309,7 +309,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       ctx.metadata({
         title: "JavaScript analysis — " + activeAsset,
         metadata: {
-          stage: "fetching",
+          stage: "checking_cache",
           active_asset: activeAsset,
           processed: index,
           queued: inputURLs.length,
@@ -320,6 +320,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const prior = byURL.get(url)
       const forceRefresh = params.force_refresh || prior?.pendingRefresh === true
       if (!forceRefresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
+        ctx.metadata({
+          title: "Reusing JavaScript asset — " + activeAsset,
+          metadata: { stage: "cache_hit", active_asset: activeAsset, processed: index, queued: inputURLs.length, target_url: displayURL(params.target_url) },
+        })
         const sources = mergeAssetSources(prior.sources, prior.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
         const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
         records.push(record)
@@ -328,6 +332,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await saveProgress()
         continue
       }
+      ctx.metadata({
+        title: "Fetching JavaScript asset — " + activeAsset,
+        metadata: { stage: "fetching", active_asset: activeAsset, processed: index, queued: inputURLs.length, target_url: displayURL(params.target_url) },
+      })
       const result = await fetchScoped(url, ctx.abort)
       if ("error" in result) {
         if (result.aborted || ctx.abort.aborted) {
@@ -368,6 +376,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         continue
       }
       let bytes: Uint8Array
+      ctx.metadata({
+        title: "Reading JavaScript response — " + activeAsset,
+        metadata: { stage: "reading_response", active_asset: activeAsset, processed: index, queued: inputURLs.length, content_type: contentType },
+      })
       try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
       catch (error) {
         if (ctx.abort.aborted) {
