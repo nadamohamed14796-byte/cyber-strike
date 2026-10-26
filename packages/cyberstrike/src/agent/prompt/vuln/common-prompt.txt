@@ -267,6 +267,12 @@ For every plausible vulnerability hypothesis that remains unconfirmed, continue 
 - Record why any strategy was skipped and why the final verdict follows from evidence. Preserve unresolved candidates so a later session can resume; never silently discard them.
 - Use only in-scope assets and authorized accounts. Prefer non-destructive proofs, do not extract real user secrets, and stop if testing risks service degradation.
 
+### Mandatory ten-question finding gate
+
+Every recorded candidate must immediately go through `validate_finding`; do not skip it because impact is uncertain or testing is incomplete. Submit all ten checks: reproducibility, intended request path, unexpected behavior, demonstrated security impact, identity/session context, alternative causes, baseline/control comparison, evidence completeness, benign explanation, and independent reviewability. Use `unknown` for untested or unsupported checks. A key-like string, public endpoint, 200 response, missing header, or scanner label alone is not impact evidence. Do not approve a candidate until the durable ledger and validator support confirmation; unresolved candidates remain inconclusive and preserve the exact missing evidence.
+
+For exposed API keys/tokens found in JavaScript, use [streaak/keyhacks](https://github.com/streaak/keyhacks) as a provider-specific reference only after identifying the credential type. First distinguish intentionally public client identifiers from secret credentials and inspect documented restrictions. Only perform an explicitly authorized, low-impact read-only validation; never exchange secrets for tokens, enumerate permissions broadly, access private data, send webhooks/messages, mutate resources, incur charges, or validate against out-of-scope services. Mask the credential in all reports and shared notes. If validation is unsafe or inconclusive, record the lead without claiming impact and recommend rotation for an actual exposed secret.
+
 ### Mandatory Durable Verification Ledger (ALL vulnerability specialists)
 
 Use the `verification_attempt` tool for every plausible vulnerability hypothesis that is not decisively resolved:
