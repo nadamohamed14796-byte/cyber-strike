@@ -144,26 +144,33 @@ methodology, payloads, and procedures. Unload when done to free context.
 4. **Execute Targeted Tests**: Search for a suitable registered request-execution/comparison capability and inspect its schema. Use `http_replay` or `http_replay_raw` when available and suitable, or another verified scope-aware option. Preserve a benign baseline, controlled test, and safe comparison.
 5. **Confirm with Baseline Diff**: See Confirmation Protocol below before calling `report_vulnerability`
 
-### Confirmation Protocol (MANDATORY before report_vulnerability)
+### Candidate Evidence Gate and Finding Lifecycle (MANDATORY)
 
-You MUST satisfy all three gates before calling `report_vulnerability`:
+Follow this order because `validate_finding` and `triage_vulnerability` require the finding ID returned by `report_vulnerability`. The initial request comparison is evidence collection; it is not the final validation verdict.
 
-**Gate 1 — Baseline**
-Execute the request with a benign/unmodified parameter. Capture the response (status, body, key fields).
+**Gate 1 — Baseline/control**
+Establish the expected behavior using the current captured request/response as context. When a fresh baseline is needed, send a benign in-scope request with valid prerequisites and capture the status, relevant body/fields, identity, and state. A previously captured response alone is not a test.
 
-**Gate 2 — Exploit**
-Execute the attack payload. Capture the response.
+**Gate 2 — Controlled test**
+Run a safe, evidence-led mutation and change one meaningful variable at a time. Use valid test accounts, roles, ownership, object state, and input types where the hypothesis depends on them. For API contracts, distinguish declared operations from live operations and test only prioritized, authorized operations; a spec is route-coverage evidence, not exploit proof.
 
-**Gate 3 — Diff**
-Compare baseline vs exploit. A valid finding requires a MEASURABLE difference:
-- Access control: exploit returns data/action that baseline cannot access
-- Injection: exploit produces server-side execution evidence (error message, timing delta ≥200ms, OOB callback)
-- Business logic: exploit produces a state change that violates an invariant (e.g., negative balance accepted, price changed)
-- SSRF: exploit produces a connection to an internal host (verified via DNS/HTTP callback)
+**Gate 3 — Compare behavior and impact**
+Compare the test with the relevant baseline/control. Require a measurable, unexpected security-property failure, not merely a status code, banner, parser error, or generic response:
+- Access control: a protected object, field, or action is actually accessible to an identity that should not have it.
+- Injection: demonstrate execution or another security-relevant effect. A parser/error message alone is a lead; a timing claim needs repeated controlled comparison that rules out ordinary jitter, or independent corroboration.
+- Business logic: demonstrate a test-owned state change that violates a specific invariant, and inspect/restore controlled state where safe.
+- SSRF: use a permitted, controlled callback or equivalent evidence that demonstrates the server-side fetch; do not infer SSRF from a URL parameter alone.
 
-If the diff is "both return 200" or "both return the same error" — do NOT report. It is NOT a vulnerability.
+If there is no meaningful difference, do not create a confirmed finding. Diagnose invalid prerequisites and benign explanations before deciding that a hypothesis is disproven. A failed request or 401/403/404/429 alone does not prove absence.
 
-Include the baseline request/response, exploit request/response, and one-sentence diff in the `poc` field.
+**After the evidence gate**
+1. When a real security-impact signal is observed under valid prerequisites, call `report_vulnerability` to save it as a **pending candidate**; this does not mean it is confirmed or approved. Include the redacted baseline, test request/response references, and a one-sentence diff in `poc`.
+2. For the returned finding ID, use the exact durable ledger key `finding:<finding_id>` in `verification_attempt`. Preserve references to tests that were actually executed; do not fabricate attempts or re-run a state-changing test merely to duplicate evidence. Perform another minimal safe check only when required to resolve a material gap.
+3. Immediately call `validate_finding` with all ten checks, using `unknown` for unsupported checks. A confirmed verdict requires evidence, valid preconditions, reproducibility, and demonstrated impact; a false-positive verdict requires the durable evidence-backed contradictions defined by the validator.
+4. Approve through `triage_vulnerability` only after the latest validation is `confirmed` and the supplied similar-finding IDs match the complete current comparison set. Keep unresolved cases pending/inconclusive; do not promote them or mark coverage clean.
+5. If no candidate merits recording, continue only with materially different safe tests while evidence can change the conclusion. Record coverage once after the tests actually ran, and only as clean when the observed evidence supports that result.
+
+This ordering prevents a candidate record, a validation verdict, and final approval from being treated as the same event.
 
 ### Duplicate Handling
 

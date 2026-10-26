@@ -130,6 +130,8 @@ describe("Methodology phase skill routing", () => {
     expect(skillQueriesForPhase("input_validation")).toContain("attack-sqli")
     expect(skillQueriesForPhase("session_management")).toContain("attack-jwt")
     expect(skillQueriesForPhase("api_security")).toContain("attack-graphql")
+    expect(skillQueriesForPhase("api_security")).toContain("attack-api-contract-testing")
+    expect(PHASE_REQUIRED_SKILLS.api_security).toEqual(expect.arrayContaining(["attack-api-contract-testing", "attack-api-property-authorization"]))
     expect(skillQueriesForPhase("infrastructure")).toContain("attack-cloud-misconfig")
     expect(skillQueriesForPhase("reporting")).toContain("attack-report-writing")
     expect(Phase.get("mobile_application_testing")?.appliesTo).toContain("mobile")

@@ -60,6 +60,10 @@ The new wording uses CyberStrike's existing `validate_finding` and evidence life
 
 The additional Strix-inspired workflow closes a process gap rather than adding another subsystem: use source traces to identify the root cause, dynamic evidence to validate it when possible, a targeted regression test to prevent recurrence, and explicit status for proposed/applied/verified fixes. Existing CyberStrike validation, similarity comparison, triage, and coverage tools remain the source of truth.
 
+The follow-up also makes the finding lifecycle order explicit: establish baseline/test evidence first, record only a meaningful candidate, then run the ID-based durable verification ledger and ten-check validator before triage approval. This matches the implementation contract that validation and triage require a recorded finding ID; the candidate status is not a confirmed verdict.
+
+A second gap was skill routing rather than missing capability: `attack-api-contract-testing` and `attack-api-property-authorization` were present in the skill library, but API contract testing was not included in the API phase's query and critical pin list. The API phase now prioritizes both contract-to-live comparison and property-level authorization without creating a second endpoint inventory.
+
 ## Verification and limits
 
 - The changes were saved to the repository's `main` branch through GitHub's file-update interface.

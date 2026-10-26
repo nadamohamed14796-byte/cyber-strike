@@ -69,7 +69,7 @@ const PHASE_SKILL_QUERIES: Record<Phase.Id, string[]> = {
     "attack-ntlm-info", "attack-security-headers", "attack-metrics-exposure", "data protection", "sensitive data", "TLS",
   ],
   api_security: [
-    "community-tool-selection", "wstg-apit", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
+    "community-tool-selection", "wstg-apit", "attack-api-contract-testing", "wstg-authz-05", "wstg-logic-client-api", "attack-graphql", "attack-bfla", "attack-api-noauth-hunt", "attack-schema-enumeration",
     "attack-grpc", "attack-mass-assignment", "attack-nosqli", "attack-rate-limit-bypass",
     "attack-websocket", "attack-cors", "attack-api-property-authorization", "attack-api-resource-consumption", "attack-server-side-parameter-pollution", "attack-unsafe-api-consumption", "attack-firebase-supabase", "attack-mcp-security", "attack-rag-vector-security", "attack-shadow-api", "attack-security-headers", "attack-metrics-exposure", "attack-host-header", "attack-cache-poison", "attack-cache-deception",
     "attack-clickjacking", "attack-open-redirect", "attack-jwt", "llm-security",
@@ -103,7 +103,7 @@ export const PHASE_REQUIRED_SKILLS: Partial<Record<Phase.Id, string[]>> = {
   input_validation: ["attack-xss", "attack-sqli", "attack-ssrf"],
   business_logic: ["attack-business-logic"],
   data_protection: ["attack-information-disclosure", "attack-source-leak"],
-  api_security: ["attack-shadow-api", "attack-bfla"],
+  api_security: ["attack-shadow-api", "attack-bfla", "attack-api-contract-testing", "attack-api-property-authorization"],
   infrastructure: ["attack-cloud-misconfig"],
   reporting: ["attack-report-writing", "bug-bounty-evidence-workflow"],
 }
