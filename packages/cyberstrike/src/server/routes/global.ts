@@ -3,7 +3,7 @@ import { describeRoute, resolver, validator } from "hono-openapi"
 import { streamSSE } from "hono/streaming"
 import z from "zod"
 import { BusEvent } from "@/bus/bus-event"
-import { GlobalBus } from "@/bus/global"
+import { emitSafe, GlobalBus } from "@/bus/global"
 import { Instance } from "../../project/instance"
 import { Installation } from "@/installation"
 import { Log } from "../../util/log"
@@ -258,7 +258,7 @@ export const GlobalRoutes = lazy(() =>
       }),
       async (c) => {
         await Instance.disposeAll()
-        GlobalBus.emit("event", {
+        emitSafe({
           directory: "global",
           payload: {
             type: GlobalDisposedEvent.type,
