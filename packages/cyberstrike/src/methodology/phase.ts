@@ -272,6 +272,7 @@ export namespace Phase {
       { category: "XSS", path: "Cross-Site Scripting > Reflected > URL Parameter" },
       { category: "SQLi", path: "Injection > SQL Injection > Parameter Based" },
       { category: "SSRF", path: "Server-Side Request Forgery > Internal Service Access" },
+      { category: "SSTI", path: "Injection > Server-Side Template Injection" },
       { category: "Auth Bypass", path: "Authentication > Authentication Bypass > Direct Access" },
       { category: "Race Condition", path: "Business Logic > Race Condition > State Manipulation" },
       { category: "Info Disclosure", path: "Information Disclosure > Sensitive Data Exposure" },
