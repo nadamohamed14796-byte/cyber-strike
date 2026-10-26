@@ -98,6 +98,8 @@ export namespace IngestSummary {
     requestAnalysis: Omit<RequestAnalysis, "status">
   }
 
+  const activeLiveNotices = new Map<string, LiveNotice>()
+
   /** Create one parent-transcript entry that can be updated as the subagent streams.
    * Keeping one stable part per captured request makes the live analysis visible
    * without flooding the transcript with a new message for every token. */
@@ -109,6 +111,33 @@ export namespace IngestSummary {
     requestAnalysis: Omit<RequestAnalysis, "status">
   }): Promise<LiveNotice> {
     const startedAt = Date.now()
+    // Keep exactly one parent-chat analysis entry per session. The queue is
+    // sequential, so each newly active request replaces the previous entry
+    // instead of leaving a transcript full of completed request notices.
+    const previous = activeLiveNotices.get(input.sessionID)
+    if (previous) {
+      const live: LiveNotice = {
+        ...previous,
+        startedAt,
+        requestAnalysis: input.requestAnalysis,
+      }
+      await Session.updatePart({
+        id: live.partID,
+        messageID: live.messageID,
+        sessionID: input.sessionID,
+        type: "text",
+        text: input.text,
+        time: { start: startedAt },
+        metadata: {
+          kind: KIND,
+          notice: true,
+          live: true,
+          requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
+        },
+      })
+      activeLiveNotices.set(input.sessionID, live)
+      return live
+    }
     const messageID = Identifier.ascending("message")
     const partID = Identifier.ascending("part")
     await Session.updateMessage({
@@ -133,7 +162,9 @@ export namespace IngestSummary {
         requestAnalysis: { ...input.requestAnalysis, status: "analyzing" satisfies RequestAnalysisStatus },
       },
     })
-    return { messageID, partID, startedAt, requestAnalysis: input.requestAnalysis }
+    const live = { messageID, partID, startedAt, requestAnalysis: input.requestAnalysis }
+    activeLiveNotices.set(input.sessionID, live)
+    return live
   }
 
   /** Update the same visible transcript entry while the captured request is analyzed. */
