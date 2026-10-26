@@ -130,3 +130,55 @@ Before finalizing, verify counts against the saved ledgers, check links and scop
 ## Safety boundary
 
 Apply persisted request-level scope checks to every active request and redirect. Recon evidence never authorizes a new target or a higher-impact test. Do not use discovered credentials, access real users' data, perform destructive/business-impacting actions, or execute untrusted scripts. Use approved test identities, synthetic markers, reversible fixtures, and minimum sufficient proof.
+
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use CLI tools and existing local helpers the agent can invoke directly. Browser UI, browser extensions, and interactive proxy GUIs are not required dependencies. Check availability/version with the shared tool preflight helper or direct local checks before depending on an executable; do not install automatically.
+
+### Recommended tools
+- Python 3 standard library — deterministic normalization, JSON/JSONL parsing, stable fingerprints, and graph integrity checks
+- jq — inspect and merge JSON/JSONL ledgers when the local schema is known
+- ripgrep (rg) — locate canonical manifests, evidence IDs, and repeated root-cause patterns
+- Git — compare saved runs and confirm the precise changed artifacts
+
+### Agent-executable commands
+
+Run from the repository root or the explicitly identified target workspace; never guess the workspace path.
+
+```bash
+command -v python3 && python3 --version
+command -v jq && jq --version
+command -v rg && rg --version
+```
+
+For an existing JSONL ledger, validate parseability without rewriting source evidence:
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+path = Path("findings.jsonl")  # Replace with the verified existing ledger path.
+for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    if line.strip():
+        try:
+            json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"Invalid JSON on line {number}: {exc}")
+print("JSONL parse check passed")
+PY
+```
+
+Use the repository's existing manifest/ledger format and helpers if available. Do not create a second ledger merely to run this example; adapt the path only after verifying the actual canonical artifact.
+
+### Installation and verification
+- Prefer tools already installed and existing repository helpers.
+- If a tool is missing, record the capability gap and use a suitable available alternative; do not install dependencies automatically.
+- Review official documentation and supported output formats before adding a dependency.
+- Record tool version, input artifact, exit status, and output path when a check changes triage or reporting decisions.
+
+### Official resources
+- Python JSON documentation: https://docs.python.org/3/library/json.html
+- jq manual: https://jqlang.org/manual/
+- ripgrep guide: https://github.com/BurntSushi/ripgrep/blob/master/GUIDE.md
+- Git documentation: https://git-scm.com/docs
