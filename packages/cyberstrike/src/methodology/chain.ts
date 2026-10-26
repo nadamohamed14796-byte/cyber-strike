@@ -220,7 +220,7 @@ export namespace Chain {
         a,
         "RCE",
         "critical",
-        `Escalate SSTI in "${a.title}" to full RCE via template engine gadgets`,
+        `Safely validate whether SSTI in "${a.title}" can reach server-side code execution; treat RCE as unproven until separate impact evidence exists`,
         85,
       )
     }
@@ -340,7 +340,7 @@ export namespace Chain {
     for (const c of active.slice(0, 10)) {
       const confLabel = c.confidence >= 80 ? "HIGH" : c.confidence >= 60 ? "MED" : "LOW"
       lines.push(
-        `[${confLabel}-${c.confidence}%] ${c.pattern.toUpperCase()}: "${c.entryTitles[0]}" + "${c.entryTitles[1]}" -> ${c.expectedImpact}`,
+        `[${confLabel}-${c.confidence}%] ${c.pattern.toUpperCase()}: "${c.entryTitles[0]}"${c.entryTitles[1] && c.entryTitles[1] !== c.entryTitles[0] ? ` + "${c.entryTitles[1]}"` : ""} -> ${c.expectedImpact}`,
       )
       lines.push(`  Expected impact (unproven until tested): ${c.expectedImpact} | Candidate severity: ${c.severity}`)
       lines.push(`  Next test: ${c.testingPlan}`)
