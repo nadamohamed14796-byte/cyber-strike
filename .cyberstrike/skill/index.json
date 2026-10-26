@@ -43,6 +43,25 @@
       "category": "web-application"
     },
     {
+      "name": "attack-finding-correlation",
+      "description": "Correlate recon assets, endpoint observations, vulnerability candidates, evidence, and skill handoffs into one deduplicated, provenance-preserving graph.",
+      "verified": "unverified",
+      "tags": [
+        "correlation",
+        "aggregation",
+        "deduplication",
+        "evidence-graph",
+        "chaining",
+        "triage"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "files": [
+        "SKILL.md"
+      ],
+      "category": "triage"
+    },
+    {
       "name": "attack-firebase-supabase",
       "description": "Review Firebase and Supabase client-facing access rules, row-level policies, storage permissions, and tenant boundaries using synthetic fixtures.",
       "verified": "unverified",
