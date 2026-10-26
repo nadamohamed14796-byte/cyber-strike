@@ -1,0 +1,19 @@
+# Shared Target Workflow Contract
+
+Use these numbered rules for every target, recon, or hunting task. They are the single source of truth for scope, workspace, checkpoints, tool selection, skill chaining, artifacts, and completion.
+
+1. **Scope first, once when needed.** Reuse an unchanged saved scope decision. Call `scope_check` once for the actual starting asset only when the manifest/policy is new, changed, or unresolved. The exact user-confirmed asset or supplied complete list is sufficient provenance; do not demand repeated proof or confirm each row. Never infer wildcard/sibling assets. Saved exclusions always win, and active request tools must enforce scope for every concrete request and redirect.
+
+2. **One workspace; resume instead of restart.** Reuse the canonical root returned by `target_workspace`; initialize only when absent. Reuse its checkpoint and verified outputs. Do not create per-host workspaces, parallel runs, duplicate ledgers, or guessed paths. Only create a child workspace when the user explicitly requests a separate investigation.
+
+3. **Choose tools by capability and evidence gap.** Registered tools, connected APIs, verified CLIs, datasets, and helpers are all eligible when suitable and permitted. Phase labels, catalogs, and examples are guidance—not tool allowlists. Inspect an unfamiliar schema/help once per version. Do not run every similar tool or let stale phase state block useful work.
+
+4. **Use the right safety level.** Recon is non-destructive by default. Follow the practical flow: asset discovery → live hosts/services → URL and parameter collection → JavaScript collection/analysis → endpoint correlation → relevant sensitive-file checks → report. Vulnerability testing, scanners, exploit payloads, credential attacks, or state-changing tests require an explicit testing request plus scope, policy, and runtime controls.
+
+5. **Keep one canonical inventory per data type.** Merge partial results and deduplicate without losing provenance. Endpoint identity is origin + method + normalized path template; query parameters alone do not create duplicate endpoints. Prioritize JavaScript: correlate routes, methods, parameters, auth/header/cookie clues, and redacted secret fingerprints. Treat scripts as inert text; never execute them to inspect them.
+
+6. **Chain skills and delegate only from evidence.** Load a relevant skill only when observed technology or an evidence gap makes it useful, and verify that it loaded. Pass the next agent only the verified observation, evidence/artifact IDs, prerequisites, constraints, unresolved question, and next-step trigger. Confirm each chain hop independently. Parallelize independent work, but keep one owner for scope, checkpoints, and writes to each shared inventory.
+
+7. **Handle failure without looping.** Preserve partial results and exact errors. Try a different tool only when it can add value. Do not repeat the same failed action with the same inputs without new evidence or a changed hypothesis. Mark work as verified, empty, failed, blocked, unavailable, pending, or not run; never hide a failure as success. Continue while a concrete useful step remains, then stop.
+
+8. **Verify before reporting.** Use structured target tools for notes, checkpoints, and artifacts. Validate saved paths, counts, and run status. Distinguish discovered from in-scope, fetched, analyzed, inferred, tested, and confirmed. Keep the final report concise: verified results, artifact paths, counts, failures, limitations, and the exact resume point if work remains.
