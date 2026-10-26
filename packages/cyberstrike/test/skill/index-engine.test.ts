@@ -143,6 +143,12 @@ Skill body for ${name}.
         expect(chainSuggestions.find((item) => item.name === "T1078.004_cloud-accounts")?.reason).toBe(
           "prerequisite for aws-postexploit",
         )
+
+        const completedSkillSuggestions = SkillContext.suggest([
+          { skill_id: "target-workflow" },
+          { skill_id: "AWS-POSTEXPLOIT", severity: "high" },
+        ])
+        expect(completedSkillSuggestions.some((item) => item.name === "aws-postexploit")).toBe(false)
       },
     })
   } finally {
