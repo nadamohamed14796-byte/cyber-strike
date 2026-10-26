@@ -3,7 +3,7 @@ import { Context } from "../util/context"
 import { Project } from "./project"
 import { State } from "./state"
 import { iife } from "@/util/iife"
-import { emitSafe, GlobalBus } from "@/bus/global"
+import { emitSafe } from "@/bus/global"
 import { Filesystem } from "@/util/filesystem"
 
 interface Context {
