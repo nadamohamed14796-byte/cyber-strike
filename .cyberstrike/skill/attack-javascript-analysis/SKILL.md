@@ -18,6 +18,16 @@ sources:
 ## Goal
 Convert first-party JavaScript into validated leads for manual hunting. Do not treat a string, secret-like value, route fragment, or source-map comment as proof that an endpoint exists or a credential is usable.
 
+## Queue and chat behavior
+
+Treat every supplied JS URL, HTML container, local JS file, and discovered external script URL as an item in the target-local asset worklist. Deduplicate by canonical URL/content hash while preserving all source links. Process analysis sequentially with one active asset at a time; queued/waiting items are silent and must not create chat messages. The UI/transcript should show only the asset currently being analyzed, its current analysis steps, extracted evidence, and final status. Reuse the single live analysis entry for the next asset instead of appending one message per queued/completed asset. Keep queue counts and detailed per-asset state in the manifest/logs, not the chat.
+
+For every active asset, show a concise analysis record: source URL/local path, content hash, completeness/truncation, discovered endpoints and methods, parameter/auth clues, source-map status, correlated captured requests, evidence IDs, and the next safe validation step. Link each lead to its JS source and any matching request/response; do not finish the JS phase after extraction without handing these leads into recon and hunting.
+
+### Exposed credential candidates
+
+Use [streaak/keyhacks](https://github.com/streaak/keyhacks) as a reference to identify provider-specific validation expectations, not as a command list to run blindly. Distinguish intentionally public browser/client identifiers from secrets; preserve only masked values/fingerprints in findings. Validate only within explicitly authorized scope and only with low-impact, provider-approved read-only checks. Never exchange a secret for a token, enumerate permissions broadly, access private data, send messages/webhooks, mutate resources, incur charges, or test a service outside scope. If impact cannot be demonstrated safely, keep the candidate unconfirmed and explain what remains unknown.
+
 ## Workflow
 1. Accept JavaScript URLs and HTML page URLs from every available source: the URL collector, crawler output, HTML/script tags, source-map references, URL inventories, other tools, and URLs explicitly supplied by the user. An HTML page URL is valid input: ingest it as inert content, analyze inline executable script blocks, and enqueue external script `src` URLs through the same scope-enforced collector. Do not analyze JSON-LD/import-map/data-only script blocks as executable code, and do not require the URL to originate from hackbrowser. Merge all sources into the same persistent queue/manifest while retaining provenance.
 2. Use `ingest_javascript_urls` for the supplied URL batch. It enforces the persisted scope on each URL and redirect, downloads actual response bodies into the target-local `javascript/assets/` directory, and records content hashes and status in `javascript/asset-manifest.json`. Never treat a URL string as a downloaded file. Reuse an existing local artifact for repeated URLs; use content hashes to deduplicate identical bytes across different URLs. Only use `force_refresh` when checking whether remote content changed.
