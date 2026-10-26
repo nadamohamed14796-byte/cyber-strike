@@ -103,6 +103,26 @@ function isHTMLResponse(body: string, contentType: string, url: string): boolean
     /\.x?html?$/i.test(new URL(url).pathname) && /^\s*(?:<!doctype\s+html|<html\b|<head\b|<body\b)/i.test(body.slice(0, 4096))
 }
 
+export function extractJavaScriptImportURLs(body: string, assetURL: string): string[] {
+  const output = new Set<string>()
+  const patterns = [
+    /\bimport\s+(?:(?:[\w$*{},\s]+?)\s+from\s*)?["']([^"'\\\r\n]+)["']/g,
+    /\bexport\s+(?:[\w$*{},\s]+?)\s+from\s*["']([^"'\\\r\n]+)["']/g,
+    /\bimport\s*\(\s*["']([^"'\\\r\n]+)["']\s*\)/g,
+  ]
+  for (const pattern of patterns) {
+    for (const match of body.matchAll(pattern)) {
+      const specifier = (match[1] ?? "").trim()
+      if (!/^(?:\.{1,2}\/|\/|https?:\/\/|\/\/)/i.test(specifier)) continue
+      try {
+        const resolved = normalizeURL(new URL(specifier, assetURL).toString())
+        if (resolved) output.add(resolved)
+      } catch { /* Ignore non-URL or malformed module specifiers. */ }
+    }
+  }
+  return [...output]
+}
+
 export function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
   const output = new Set<string>()
   const baseMatch = /<base\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(body)
@@ -199,9 +219,9 @@ async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ resp
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Always pass all available URLs in the urls array and identify their provenance in source.",
+    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Always pass all available URLs in the urls array and identify their provenance in source.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
-    "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Each asset result is checkpointed in small batches; newly discovered script and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
+    "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports plus source-map references are discovered from each downloaded bundle and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
   ].join("\n"),
@@ -259,6 +279,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const sourceByURL = new Map<string, Set<string>>()
     const addSource = (url: string, source: string) => {
       const values = sourceByURL.get(url) ?? new Set(mergeAssetSources(byURL.get(url)?.sources, byURL.get(url)?.source))
+      const before = values.size
       for (const item of mergeAssetSources(source)) values.add(item)
       sourceByURL.set(url, values)
       const prior = byURL.get(url)
@@ -266,6 +287,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const sources = [...values].sort()
         byURL.set(url, { ...prior, source: sources.join(" | "), sources })
       }
+      return values.size > before
     }
     const markPending = (url: string, forceRefresh = false) => {
       const prior = byURL.get(url)
@@ -283,8 +305,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
     const enqueueURL = (url: string, source: string) => {
-      addSource(url, source)
-      if (queuedURLs.has(url)) return false
+      const sourceChanged = addSource(url, source)
+      if (queuedURLs.has(url)) return sourceChanged
       queuedURLs.add(url)
       inputURLs.push(url)
       markPending(url, params.force_refresh)
@@ -466,8 +488,11 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           if (enqueueURL(scriptURL, "script src from " + displayURL(url))) queueChanged = true
         }
       } else {
-        // Feed external source-map links discovered inside each bundle into this same queue.
-        // Every map goes through the same persisted-scope and redirect checks as any other URL.
+        // Discover module chunks and source maps as inert text, then route every
+        // candidate through the same scope-enforced queue.
+        for (const importURL of extractJavaScriptImportURLs(body, finalURL)) {
+          if (enqueueURL(importURL, "module import from " + displayURL(url))) queueChanged = true
+        }
         for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
           const normalizedMapURL = normalizeURL(mapURL)
           if (!normalizedMapURL) continue
