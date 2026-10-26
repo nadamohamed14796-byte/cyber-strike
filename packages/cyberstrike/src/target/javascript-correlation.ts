@@ -491,7 +491,7 @@ function extractInlineHTMLScripts(html: string): string[] {
   for (const match of html.matchAll(pattern)) {
     const attributes = match[1] ?? ""
     const type = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
-    const mime = (type?.[1] ?? type?.[2] ?? type?.[3] ?? "").trim().toLowerCase()
+    const mime = (type?.[1] ?? type?.[2] ?? type?.[3] ?? "").split(";", 1)[0]!.trim().toLowerCase()
     // JSON-LD, import maps, and framework data blobs are not executable JavaScript.
     if (mime && !["module", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript", "application/x-javascript"].includes(mime)) continue
     const body = (match[2] ?? "").trim()
