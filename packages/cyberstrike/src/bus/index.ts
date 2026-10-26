@@ -69,14 +69,10 @@ export namespace Bus {
       ...(state().subscriptions.get("*") ?? []),
     ]
     const pending = notify(subscribers, payload, def.type)
-    try {
-      GlobalBus.emit("event", {
-        directory: Instance.directory,
-        payload,
-      })
-    } catch (error) {
-      log.error("global event broadcast failed", { type: def.type, error })
-    }
+    emitSafe({
+      directory: Instance.directory,
+      payload,
+    })
     await pending
   }
 
