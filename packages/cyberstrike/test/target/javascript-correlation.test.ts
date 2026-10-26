@@ -128,6 +128,17 @@ test("persists secret fingerprints and source locations without raw values", asy
   expect(serialized).toContain("Secret-like values are never retained")
 })
 
+test("accepts JavaScript ingestion batches larger than 500 URLs", async () => {
+  const { IngestJavaScriptURLsTool } = await import("../../src/tool/ingest-javascript-urls")
+  const tool = await IngestJavaScriptURLsTool.init()
+  const urls = Array.from({ length: 501 }, (_, index) => "https://app.example.com/assets/" + index + ".js")
+  const parsed = tool.parameters.parse({
+    target_url: "https://app.example.com",
+    urls,
+  })
+  expect(parsed.urls).toHaveLength(501)
+})
+
 test("merges JavaScript asset provenance across input, HTML, and source-map references", async () => {
   const { mergeAssetSources } = await import("../../src/tool/ingest-javascript-urls")
   expect(mergeAssetSources(
