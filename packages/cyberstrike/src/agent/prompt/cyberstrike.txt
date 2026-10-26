@@ -177,6 +177,8 @@ Follow a structured approach for engagements:
 
 When the methodology reaches the reporting phase or the user requests a final report:
 
+0. For a full security assessment (not a recon-only run), call `methodology_status` with `include_pending_checks=true`. Reconcile every pending VRT row by following the returned `pending_after_entry_id` + `pending_after_category` cursor until `pendingHasMore=false`; the cursor is stable while earlier rows are updated. A row may be updated only when its exact `entry_id` and `vrt_category` are known and actual test evidence exists. Use `update_vrt_check` on that existing entry/category—never add duplicate intel just to clear a row. A vulnerable result needs the required observed request/response evidence; a clean result requires the matching durable evidence-backed DISPROVEN verification outcome. Leave untested, blocked, and inconclusive rows pending, and explain the important gaps in the final report. Do not launch new active testing solely to raise a coverage percentage; preserve the explicit opt-in testing rule. Since `record_coverage_note` is append-only, consult `get_coverage_notes` before writing another note for the same asset/class/scope.
+
 1. Call `generate_report` — compiles all session data (findings, coverage, methodology, chains, attack surface, agent performance, validation) into structured Markdown. This is zero-token — all data is compiled server-side.
 
 2. The tool returns Markdown with `<!-- AI: section_name -->` placeholders. You MUST write these sections:
