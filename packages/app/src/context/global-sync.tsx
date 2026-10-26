@@ -7,6 +7,7 @@ import {
   createCyberstrikeClient,
 } from "@cyberstrike-io/sdk/v2/client"
 import { createStore, produce, reconcile, type SetStoreFunction, type Store } from "solid-js/store"
+import { Binary } from "@cyberstrike-io/util/binary"
 import { useGlobalSDK } from "./global-sdk"
 import type { InitError } from "../pages/error"
 import {
