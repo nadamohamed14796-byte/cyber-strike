@@ -84,20 +84,14 @@ export namespace KillChain {
   }
 
   export function nextSteps(finding: Finding): string[] {
-    const entry = SkillIndex.get(finding.skill_id)
-    if (!entry) return []
+    const canonical = SkillIndex.resolveReference(finding.skill_id)
+    if (!canonical) return []
 
-    const steps: string[] = []
-    for (const chain of entry.chains_with) {
-      steps.push(chain)
-    }
-
+    const steps = SkillIndex.chainsFrom(canonical).map((link) => link.target)
     if (finding.tech_stack?.length) {
       const related = SkillIndex.byTechStack(finding.tech_stack)
       for (const skill of related) {
-        if (skill.name !== finding.skill_id && !steps.includes(skill.name)) {
-          steps.push(skill.name)
-        }
+        if (skill.name !== canonical && !steps.includes(skill.name)) steps.push(skill.name)
       }
     }
 
