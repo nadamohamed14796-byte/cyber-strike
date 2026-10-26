@@ -40,6 +40,15 @@ Use [streaak/keyhacks](https://github.com/streaak/keyhacks) as a reference to id
 9. Correlate extracted endpoints with actual network requests from the authorized browser session. An endpoint string may be dead code, a test route, a feature disabled in production, or a third-party URL.
 10. Route only evidence-matched items to specialist skills: object identifiers to IDOR/BOLA; untrusted HTML sinks to DOM XSS; URL-fetch features to SSRF; redirect parameters to open redirect; undocumented/versioned routes to shadow API review; and credential exposure to triage without using the value.
 
+
+## Source-assisted endpoint tracing
+
+When authorized application source code is available locally, connect high-value frontend discoveries to their server implementation instead of treating the JavaScript bundle as the whole picture. Search route registration, controllers/handlers, authentication and authorization middleware, request schemas/validation, and the business/data operation that consumes the input. Trace each candidate as:
+
+`frontend caller or route → HTTP method/path and input → server handler → authn/authz and validation → sensitive operation/sink`.
+
+Record file and line references, relevant code/content hashes, the role or state preconditions, and which links are directly observed versus inferred. Use the trace to propose one precise, low-impact test and a meaningful control; execute it only when the user explicitly requested testing and scope/policy/runtime controls allow it. Static reachability or a suspicious sink alone is not a confirmed vulnerability. Do not execute untrusted source just to inspect it, and never expose raw secret-like values in notes or reports.
+
 ## Practical local-only searches
 ```bash
 # Run inside a local copy of assets already collected from the authorized target.
