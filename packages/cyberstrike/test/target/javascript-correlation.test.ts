@@ -128,6 +128,41 @@ test("persists secret fingerprints and source locations without raw values", asy
   expect(serialized).toContain("Secret-like values are never retained")
 })
 
+test("extracts inline JavaScript from captured HTML response bodies", async () => {
+  const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
+  const sources = extractCapturedJavaScriptSources([{
+    id: "req-html-inline",
+    url: "https://app.example.com/account",
+    responseContentType: "text/html; charset=utf-8",
+    responseBody: [
+      "<html><head><script type=\"application/ld+json\">{\"name\":\"not-code\"}</script></head>",
+      "<body><script>fetch('/api/profile');</script>",
+      "<script type=\"module\">axios.post('/api/settings', {theme: 'dark'});</script></body></html>",
+    ].join(""),
+  }])
+  expect(sources).toHaveLength(2)
+  expect(sources.map((source) => source.endpointLiterals).flat()).toContain("/api/profile")
+  expect(sources.map((source) => source.endpointLiterals).flat()).toContain("/api/settings")
+  expect(sources.every((source) => source.sourceRequestID === "req-html-inline")).toBe(true)
+  expect(JSON.stringify(sources)).not.toContain("application/ld+json")
+})
+
+test("inventories inline JavaScript in local HTML files without executing it", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-inline-html-"))
+  try {
+    await fs.writeFile(path.join(root, "page.html"), [
+      "<script>fetch('/api/inline-html')</script>",
+      "<script type=\"application/json\">{\"not\":\"javascript\"}</script>",
+    ].join("\n"), "utf8")
+    const sources = await inventoryJavaScriptFiles(root)
+    expect(sources).toHaveLength(1)
+    expect(sources[0]?.endpointLiterals).toContain("/api/inline-html")
+    expect(sources[0]?.relativePath).toContain("page.html#inline-1")
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
 test("reuses analysis for the same JavaScript content hash", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const cache = new Map<string, any>()
