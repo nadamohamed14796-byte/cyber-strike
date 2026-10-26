@@ -855,7 +855,7 @@ export namespace SessionPrompt {
         const lines = [
           "# MCP Tools",
           `You have ${mcpLazyStats.available} tools available from MCP servers. These tools are NOT yet in your context.`,
-          "At each new checkpoint, search tools by its objective and evidence gap with `tool_search`; retry with synonyms or a broader limit if results are thin, then use `load_tools` for matching IDs. Tool-category examples never assign a required tool.",
+          "At each checkpoint, first reuse suitable tools already loaded or verified. Use `tool_search` only when the current objective has a real capability gap; retry with synonyms or a broader limit if results are thin, then use `load_tools` for matching IDs. Do not repeat unchanged searches or delay ordinary work for discovery. Tool-category examples are hints, not assignments.",
           "",
           "Available servers:",
         ]
@@ -900,7 +900,7 @@ export namespace SessionPrompt {
         const lines = [
           "# Skills",
           `You have ${allSkills.length} specialized security testing skills available. Use the \`skill\` tool to search, load, and manage them.`,
-          "Skills provide detailed testing procedures, payloads, and checklists. Load relevant skills before starting a test.",
+          "Skills provide detailed procedures and checklists. Before a test, load the best-fit specialist skill only when its procedure materially helps; reuse already loaded skills and do not search or load skills just to satisfy a checklist.",
           "",
           "Available categories:",
         ]
