@@ -332,6 +332,40 @@ describe("Extension ingest transcript visibility", () => {
   })
 })
 
+describe("Single live analysis transcript entry", () => {
+  test("reuses one parent transcript message for sequential captured requests", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "single-live-analysis-entry-test" })
+      const model = { providerID: "test-provider", modelID: "test-model" }
+      const first = await IngestSummary.createLiveNotice({
+        sessionID: session.id,
+        agent: "proxy-agent",
+        model,
+        text: "## Captured request — ANALYZING\\nRequest: GET /first",
+        requestAnalysis: { requestID: "request-first", method: "GET", url: "https://example.test/first" },
+      })
+      const second = await IngestSummary.createLiveNotice({
+        sessionID: session.id,
+        agent: "proxy-agent",
+        model,
+        text: "## Captured request — ANALYZING\\nRequest: GET /second",
+        requestAnalysis: { requestID: "request-second", method: "GET", url: "https://example.test/second" },
+      })
+
+      expect(second.messageID).toBe(first.messageID)
+      expect(second.partID).toBe(first.partID)
+      const messages = await Session.messages({ sessionID: session.id })
+      const texts = messages.flatMap((message) => message.parts)
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+      expect(texts).toHaveLength(1)
+      expect(texts[0]).toContain("GET /second")
+      expect(texts[0]).not.toContain("GET /first")
+      await Session.remove(session.id)
+    })
+  })
+})
+
 describe("Request processing outcome persistence", () => {
   test("stores failed separately from processed", async () => {
     await withInstance(async () => {
