@@ -128,6 +128,21 @@ test("persists secret fingerprints and source locations without raw values", asy
   expect(serialized).toContain("Secret-like values are never retained")
 })
 
+test("resolves external script src URLs from HTML and ignores non-network schemes", async () => {
+  const { extractHTMLScriptURLs } = await import("../../src/tool/ingest-javascript-urls")
+  const urls = extractHTMLScriptURLs([
+    '<base href="/app/">',
+    '<script src="../assets/app.js"></script>',
+    '<script src="//cdn.example.com/vendor.js"></script>',
+    '<script src="data:text/javascript,alert(1)"></script>',
+    '<script>fetch("/api/inline")</script>',
+  ].join(""), "https://app.example.com/page")
+  expect(urls).toContain("https://app.example.com/assets/app.js")
+  expect(urls).toContain("https://cdn.example.com/vendor.js")
+  expect(urls.some((url) => url.startsWith("data:"))).toBe(false)
+  expect(urls).toHaveLength(2)
+})
+
 test("extracts inline JavaScript from captured HTML response bodies", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const sources = extractCapturedJavaScriptSources([{
