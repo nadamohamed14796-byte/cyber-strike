@@ -245,10 +245,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     }
     const enqueueURL = (url: string, source: string) => {
       addSource(url, source)
-      markPending(url, params.force_refresh)
       if (queuedURLs.has(url)) return false
       queuedURLs.add(url)
       inputURLs.push(url)
+      markPending(url, params.force_refresh)
       return true
     }
     for (const url of inputURLs) addSource(url, params.source)
@@ -387,7 +387,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       output: [
         "Workspace: " + workspace.workspacePath,
         "Input URLs: " + params.urls.length,
-        "Valid unique URLs: " + inputURLs.length,
+        "Unique URLs handled (supplied, resumed, and discovered): " + inputURLs.length,
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions: " + downloaded,
         "Reused URL/content records: " + reused,
