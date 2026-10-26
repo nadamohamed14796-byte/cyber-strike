@@ -577,7 +577,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             }
           }
           setStore("part", produce((draft) => {
-            delete draft.part[event.properties.messageID]
+            delete draft[event.properties.messageID]
           }))
           break
         }
