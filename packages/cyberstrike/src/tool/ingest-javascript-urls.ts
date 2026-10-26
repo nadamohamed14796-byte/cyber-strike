@@ -396,11 +396,17 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           await saveProgress(true)
           break
         }
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const retryable = result.error.startsWith("fetch failed:")
         const record: AssetRecord = {
+          ...prior,
           url,
-          source: assetSource,
+          source: sources.join(" | "),
+          sources,
           status: "failed",
-          retryable: result.error.startsWith("fetch failed:"),
+          retryable,
+          pendingRefresh: retryable && prior?.pendingRefresh ? true : undefined,
           error: result.error,
           fetchedAt: new Date().toISOString(),
         }
@@ -410,12 +416,18 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       const { response, finalURL } = result
       if (!response.ok) {
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const retryable = response.status === 408 || response.status === 429 || response.status >= 500
         const record: AssetRecord = {
+          ...prior,
           url,
           finalURL,
-          source: assetSource,
+          source: sources.join(" | "),
+          sources,
           status: "failed",
-          retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+          retryable,
+          pendingRefresh: retryable && prior?.pendingRefresh ? true : undefined,
           error: "HTTP " + response.status,
           fetchedAt: new Date().toISOString(),
         }
@@ -426,7 +438,21 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
       const declaredLength = Number(response.headers.get("content-length") ?? "0")
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const record: AssetRecord = {
+          ...prior,
+          url,
+          finalURL,
+          source: sources.join(" | "),
+          sources,
+          status: "skipped",
+          retryable: undefined,
+          pendingRefresh: undefined,
+          contentType,
+          error: "declared response size exceeds the asset limit",
+          fetchedAt: new Date().toISOString(),
+        }
         records.push(record); byURL.set(url, record); skipped++
         await saveProgress()
         continue
@@ -457,13 +483,19 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           break
         }
         const readError = redactURLs(error instanceof Error ? error.message : String(error))
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const retryable = !readError.includes("response exceeds the " + MAX_ASSET_BYTES + " byte asset limit")
         const record: AssetRecord = {
+          ...prior,
           url,
           finalURL,
-          source: assetSource,
+          source: sources.join(" | "),
+          sources,
           status: "failed",
+          retryable,
+          pendingRefresh: retryable && prior?.pendingRefresh ? true : undefined,
           contentType,
-          retryable: !readError.includes("response exceeds the " + MAX_ASSET_BYTES + " byte asset limit"),
           error: readError,
           fetchedAt: new Date().toISOString(),
         }
@@ -475,7 +507,22 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       const isHTML = isHTMLResponse(body, contentType, finalURL)
       if (!isHTML && !looksLikeJavaScript(body, contentType, finalURL)) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript, HTML with script elements, or a version-3 source map", fetchedAt: new Date().toISOString() }
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const record: AssetRecord = {
+          ...prior,
+          url,
+          finalURL,
+          source: sources.join(" | "),
+          sources,
+          status: "skipped",
+          retryable: undefined,
+          pendingRefresh: undefined,
+          contentType,
+          bytes: bytes.byteLength,
+          error: "response does not look like JavaScript, HTML with script elements, or a version-3 source map",
+          fetchedAt: new Date().toISOString(),
+        }
         records.push(record); byURL.set(url, record); skipped++
         await saveProgress()
         continue
