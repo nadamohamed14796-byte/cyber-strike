@@ -296,6 +296,82 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
     }
 
+    const messageRepairs = new Map<
+      string,
+      { dirty: boolean; cancelled: boolean; missingParts: Set<string> }
+    >()
+    const repairKey = (sessionID: string, messageID: string) => [sessionID, messageID].join("\\0")
+
+    const repairMessage = (sessionID: string, messageID: string, partID: string) => {
+      const key = repairKey(sessionID, messageID)
+      const existing = messageRepairs.get(key)
+      if (existing) {
+        existing.missingParts.add(partID)
+        existing.dirty = true
+        return
+      }
+
+      const repair = { dirty: false, cancelled: false, missingParts: new Set([partID]) }
+      messageRepairs.set(key, repair)
+      void (async () => {
+        try {
+          while (!repair.cancelled) {
+            for (const id of repair.missingParts) {
+              if (store.part[messageID]?.some((part) => part.id === id)) repair.missingParts.delete(id)
+            }
+            if (repair.missingParts.size === 0) return
+
+            repair.dirty = false
+            const response = await sdk.client.session.message(
+              { sessionID, messageID },
+              { throwOnError: true },
+            )
+            if (repair.cancelled) return
+            if (repair.dirty) continue
+
+            const needed = new Set(
+              [...repair.missingParts].filter((id) => !store.part[messageID]?.some((part) => part.id === id)),
+            )
+            if (needed.size === 0) return
+            const recovered = response.data.parts.filter((part) => needed.has(part.id))
+            if (recovered.length === 0) {
+              Log.Default.error("Could not recover a missing streamed message part", {
+                sessionID,
+                messageID,
+                partIDs: [...needed],
+              })
+              return
+            }
+
+            setStore(
+              produce((draft) => {
+                const messages = draft.message[sessionID]
+                if (!messages) draft.message[sessionID] = [response.data.info]
+                else {
+                  const message = Binary.search(messages, response.data.info.id, (item) => item.id)
+                  if (!message.found) messages.splice(message.index, 0, response.data.info)
+                }
+
+                const parts = (draft.part[messageID] ??= [])
+                for (const part of recovered) {
+                  const current = Binary.search(parts, part.id, (item) => item.id)
+                  if (!current.found) parts.splice(current.index, 0, part)
+                }
+              }),
+            )
+          }
+        } catch (error) {
+          Log.Default.error("Message-part recovery failed", {
+            sessionID,
+            messageID,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        } finally {
+          if (messageRepairs.get(key) === repair) messageRepairs.delete(key)
+        }
+      })()
+    }
+
     sdk.event.listen((e) => {
       const event = e.details
       switch (event.type) {
@@ -482,20 +558,33 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
         case "message.removed": {
-          const messages = store.message[event.properties.sessionID]
-          const result = Binary.search(messages, event.properties.messageID, (m) => m.id)
-          if (result.found) {
-            setStore(
-              "message",
-              event.properties.sessionID,
-              produce((draft) => {
-                draft.splice(result.index, 1)
-              }),
-            )
+          const repair = messageRepairs.get(repairKey(event.properties.sessionID, event.properties.messageID))
+          if (repair) {
+            repair.cancelled = true
+            messageRepairs.delete(repairKey(event.properties.sessionID, event.properties.messageID))
           }
+          const messages = store.message[event.properties.sessionID]
+          if (messages) {
+            const result = Binary.search(messages, event.properties.messageID, (m) => m.id)
+            if (result.found) {
+              setStore(
+                "message",
+                event.properties.sessionID,
+                produce((draft) => {
+                  draft.splice(result.index, 1)
+                }),
+              )
+            }
+          }
+          setStore("part", produce((draft) => {
+            delete draft.part[event.properties.messageID]
+          }))
           break
         }
         case "message.part.updated": {
+          const updatedPart = event.properties.part
+          const repair = messageRepairs.get(repairKey(updatedPart.sessionID, updatedPart.messageID))
+          if (repair?.missingParts.has(updatedPart.id)) repair.dirty = true
           const parts = store.part[event.properties.part.messageID]
           if (!parts) {
             setStore("part", event.properties.part.messageID, [event.properties.part])
@@ -517,32 +606,53 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
 
         case "message.part.delta": {
-          const parts = store.part[event.properties.messageID]
-          if (!parts) break
-          const result = Binary.search(parts, event.properties.partID, (p) => p.id)
-          if (!result.found) break
+          const properties = event.properties
+          const repair = messageRepairs.get(repairKey(properties.sessionID, properties.messageID))
+          if (repair?.missingParts.has(properties.partID)) repair.dirty = true
+          const parts = store.part[properties.messageID]
+          if (!parts) {
+            repairMessage(properties.sessionID, properties.messageID, properties.partID)
+            break
+          }
+          const result = Binary.search(parts, properties.partID, (p) => p.id)
+          if (!result.found) {
+            repairMessage(properties.sessionID, properties.messageID, properties.partID)
+            break
+          }
           setStore(
             "part",
-            event.properties.messageID,
+            properties.messageID,
             produce((draft) => {
               const part = draft[result.index]
-              const field = event.properties.field as keyof typeof part
+              const field = properties.field as keyof typeof part
               const existing = part[field] as string | undefined
-              ;(part[field] as string) = (existing ?? "") + event.properties.delta
+              ;(part[field] as string) = (existing ?? "") + properties.delta
             }),
           )
           break
         }
 
         case "message.part.removed": {
-          const parts = store.part[event.properties.messageID]
-          const result = Binary.search(parts, event.properties.partID, (p) => p.id)
+          const properties = event.properties
+          const repairKeyValue = repairKey(properties.sessionID, properties.messageID)
+          const repair = messageRepairs.get(repairKeyValue)
+          if (repair?.missingParts.delete(properties.partID)) {
+            repair.dirty = true
+            if (repair.missingParts.size === 0) {
+              repair.cancelled = true
+              messageRepairs.delete(repairKeyValue)
+            }
+          }
+          const parts = store.part[properties.messageID]
+          if (!parts) break
+          const result = Binary.search(parts, properties.partID, (p) => p.id)
           if (result.found)
             setStore(
               "part",
-              event.properties.messageID,
+              properties.messageID,
               produce((draft) => {
                 draft.splice(result.index, 1)
+                if (draft.length === 0) delete draft.part[properties.messageID]
               }),
             )
           break
