@@ -33,29 +33,32 @@ export namespace KillChain {
   export function analyze(findings: Finding[]): Chain[] {
     const chains: Chain[] = []
     const seen = new Set<string>()
+    // Normalize exact metadata aliases once so directory slugs, technique IDs,
+    // and canonical skill names all participate in the same chain.
+    const normalized = findings.flatMap((finding) => {
+      const skill_id = SkillIndex.resolveReference(finding.skill_id)
+      return skill_id ? [{ ...finding, skill_id }] : []
+    })
 
-    for (const finding of findings) {
-      const entry = SkillIndex.get(finding.skill_id)
-      if (!entry) continue
-
-      for (const target of entry.chains_with) {
-        const partner = findings.find((f) => f.skill_id === target)
+    for (const finding of normalized) {
+      for (const link of SkillIndex.chainsFrom(finding.skill_id)) {
+        const partner = normalized.find((candidate) => candidate.skill_id === link.target)
         if (!partner) continue
 
-        const key = [finding.skill_id, target].sort().join("+")
+        const key = [finding.skill_id, link.target].sort().join("+")
         if (seen.has(key)) continue
         seen.add(key)
 
-        const boost = entry.severity_boost[target]
+        const boost = link.boost
         const combined = boost
-          ? (boost.match(/\((\w+)\)$/)?.[1]?.toLowerCase() ?? maxSeverity(finding.severity, partner.severity))
+          ? (boost.match(/\\((\\w+)\\)$/)?.[1]?.toLowerCase() ?? maxSeverity(finding.severity, partner.severity))
           : maxSeverity(finding.severity, partner.severity)
 
         chains.push({
-          skills: [finding.skill_id, target],
+          skills: [finding.skill_id, link.target],
           combined_severity: combined,
-          description: boost ?? `${finding.skill_id} + ${target}`,
-          next_steps: collectNextSteps([finding.skill_id, target], findings),
+          description: boost ?? `${finding.skill_id} + ${link.target}`,
+          next_steps: collectNextSteps([finding.skill_id, link.target], normalized),
         })
       }
     }
