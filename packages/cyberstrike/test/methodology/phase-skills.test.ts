@@ -48,7 +48,7 @@ describe("Phase-critical skill pinning", () => {
         expect(skill!.content).toContain("Counterevidence closure contract")
         expect(skill!.content).toContain("specific control")
         expect(skill!.content).toContain("Severity calibration")
-        expect(skill!.content).toContain("hypothetical chain")
+        expect(skill!.content).toContain("theoretical chain")
       },
     })
   })
