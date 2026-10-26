@@ -139,6 +139,14 @@ test("accepts JavaScript ingestion batches larger than 500 URLs", async () => {
   expect(parsed.urls).toHaveLength(501)
 })
 
+test("resumes pending or explicitly retryable JavaScript asset records only", async () => {
+  const { shouldResumeAsset } = await import("../../src/tool/ingest-javascript-urls")
+  expect(shouldResumeAsset({ status: "pending" })).toBe(true)
+  expect(shouldResumeAsset({ status: "failed", retryable: true })).toBe(true)
+  expect(shouldResumeAsset({ status: "failed", retryable: false })).toBe(false)
+  expect(shouldResumeAsset({ status: "skipped" })).toBe(false)
+})
+
 test("merges JavaScript asset provenance across input, HTML, and source-map references", async () => {
   const { mergeAssetSources } = await import("../../src/tool/ingest-javascript-urls")
   expect(mergeAssetSources(
