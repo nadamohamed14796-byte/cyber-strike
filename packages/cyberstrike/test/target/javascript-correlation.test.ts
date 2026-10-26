@@ -96,6 +96,7 @@ test("redacts sensitive JSON response preview values across key families and quo
       token: "generic-token-value-must-be-hidden",
       "x-auth-token": "auth-header-token-must-be-hidden",
       authorization: "Bearer multi word credential must be hidden",
+      contact_email: "researcher@example.com",
     }),
   })
   expect(preview).toContain("[REDACTED]")
@@ -104,6 +105,8 @@ test("redacts sensitive JSON response preview values across key families and quo
   expect(preview).not.toContain("generic-token-value-must-be-hidden")
   expect(preview).not.toContain("auth-header-token-must-be-hidden")
   expect(preview).not.toContain("multi word credential must be hidden")
+  expect(preview).not.toContain("researcher@example.com")
+  expect(preview).toContain("[EMAIL REDACTED]")
 })
 
 test("persists secret fingerprints and source locations without raw values", async () => {
