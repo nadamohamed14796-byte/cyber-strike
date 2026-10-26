@@ -12,7 +12,7 @@ import { ProjectTable } from "../project/project.sql"
 import { fn } from "../util/fn"
 import { Log } from "../util/log"
 import { BusEvent } from "@/bus/bus-event"
-import { GlobalBus } from "@/bus/global"
+import { emitSafe, GlobalBus } from "@/bus/global"
 
 export namespace Worktree {
   const log = Log.create({ service: "worktree" })
@@ -360,7 +360,7 @@ export namespace Worktree {
         if (populated.exitCode !== 0) {
           const message = errorText(populated) || "Failed to populate worktree"
           log.error("worktree checkout failed", { directory: info.directory, message })
-          GlobalBus.emit("event", {
+          emitSafe({
             directory: info.directory,
             payload: {
               type: Event.Failed.type,
@@ -381,7 +381,7 @@ export namespace Worktree {
           .catch((error) => {
             const message = error instanceof Error ? error.message : String(error)
             log.error("worktree bootstrap failed", { directory: info.directory, message })
-            GlobalBus.emit("event", {
+            emitSafe({
               directory: info.directory,
               payload: {
                 type: Event.Failed.type,
@@ -394,7 +394,7 @@ export namespace Worktree {
           })
         if (!booted) return
 
-        GlobalBus.emit("event", {
+        emitSafe({
           directory: info.directory,
           payload: {
             type: Event.Ready.type,
