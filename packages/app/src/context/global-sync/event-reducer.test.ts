@@ -431,6 +431,56 @@ describe("applyDirectoryEvent", () => {
     expect(store.question[sessionID]?.map((x) => x.id)).toEqual(["q_1", "q_3"])
   })
 
+  test("requests message recovery when a streamed delta arrives before its part", () => {
+    const [store, setStore] = createStore(baseState())
+    const repairs: Array<{ sessionID: string; messageID: string; partID: string }> = []
+
+    applyDirectoryEvent({
+      event: {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "ses_1",
+          messageID: "msg_1",
+          partID: "prt_1",
+          field: "text",
+          delta: "first chunk",
+        },
+      },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      repairMessage(sessionID, messageID, partID) {
+        repairs.push({ sessionID, messageID, partID })
+      },
+    })
+
+    expect(repairs).toEqual([{ sessionID: "ses_1", messageID: "msg_1", partID: "prt_1" }])
+    expect(store.part.msg_1).toBeUndefined()
+  })
+
+  test("message removal stays safe before that session's message list loads", () => {
+    const [store, setStore] = createStore(
+      baseState({
+        part: { msg_missing: [textPart("prt_1", "ses_1", "msg_missing")] },
+      }),
+    )
+
+    expect(() =>
+      applyDirectoryEvent({
+        event: { type: "message.removed", properties: { sessionID: "ses_1", messageID: "msg_missing" } },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      }),
+    ).not.toThrow()
+    expect(store.part.msg_missing).toBeUndefined()
+    expect(store.message.ses_1).toBeUndefined()
+  })
+
   test("updates vcs branch in store and cache", () => {
     const [store, setStore] = createStore(baseState())
     const [cacheStore, setCacheStore] = createStore({ value: undefined as State["vcs"] })
