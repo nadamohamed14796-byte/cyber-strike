@@ -83,6 +83,14 @@ function createGlobalSync() {
     { dirty: boolean; cancelled: boolean; missingParts: Set<string> }
   >()
   const repairKey = (directory: string, sessionID: string, messageID: string) =>
+
+  const cancelMessageRepairs = (prefix: string) => {
+    for (const [key, repair] of messageRepairs) {
+      if (!key.startsWith(prefix)) continue
+      repair.cancelled = true
+      messageRepairs.delete(key)
+    }
+  }
     [directory, sessionID, messageID].join("\0")
 
   const [projectCache, setProjectCache, , projectCacheReady] = persisted(
@@ -382,6 +390,15 @@ function createGlobalSync() {
         description: message || language.t("common.requestFailed"),
       })
       return
+    }
+
+    if (event.type === "session.deleted" || event.type === "session.updated") {
+      const info = (event.properties as {
+        info?: { id?: string; time?: { archived?: number } }
+      }).info
+      const sessionEnded =
+        event.type === "session.deleted" || info?.time?.archived !== undefined
+      if (info?.id && sessionEnded) cancelMessageRepairs(repairKey(directory, info.id, ""))
     }
 
     if (event.type === "message.removed") {

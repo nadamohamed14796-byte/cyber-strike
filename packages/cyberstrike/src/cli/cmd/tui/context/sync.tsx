@@ -302,6 +302,15 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
     >()
     const repairKey = (sessionID: string, messageID: string) => [sessionID, messageID].join("\\0")
 
+    const cancelMessageRepairsForSession = (sessionID: string) => {
+      const prefix = repairKey(sessionID, "")
+      for (const [key, repair] of messageRepairs) {
+        if (!key.startsWith(prefix)) continue
+        repair.cancelled = true
+        messageRepairs.delete(key)
+      }
+    }
+
     const repairMessage = (sessionID: string, messageID: string, partID: string) => {
       const key = repairKey(sessionID, messageID)
       const existing = messageRepairs.get(key)
@@ -472,6 +481,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
 
         case "session.deleted": {
+          cancelMessageRepairsForSession(event.properties.info.id)
           const result = Binary.search(store.session, event.properties.info.id, (s) => s.id)
           if (result.found) {
             setStore(
@@ -484,6 +494,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           break
         }
         case "session.updated": {
+          if (event.properties.info.time.archived !== undefined) {
+            cancelMessageRepairsForSession(event.properties.info.id)
+          }
           const result = Binary.search(store.session, event.properties.info.id, (s) => s.id)
           if (result.found) {
             setStore("session", result.index, reconcile(event.properties.info))
@@ -607,6 +620,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
 
         case "message.part.delta": {
           const properties = event.properties
+          // Deltas currently target text-bearing parts only.
+          if (properties.field !== "text") break
           const repair = messageRepairs.get(repairKey(properties.sessionID, properties.messageID))
           if (repair?.missingParts.has(properties.partID)) repair.dirty = true
           const parts = store.part[properties.messageID]
@@ -624,9 +639,8 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             properties.messageID,
             produce((draft) => {
               const part = draft[result.index]
-              const field = properties.field as keyof typeof part
-              const existing = part[field] as string | undefined
-              ;(part[field] as string) = (existing ?? "") + properties.delta
+              if (!("text" in part) || typeof part.text !== "string") return
+              part.text += properties.delta
             }),
           )
           break

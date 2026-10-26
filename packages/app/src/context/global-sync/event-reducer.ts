@@ -283,6 +283,9 @@ export function applyDirectoryEvent(input: {
         field: string
         delta: string
       }
+      // Deltas currently target text-bearing parts only. Ignore unknown fields
+      // rather than accidentally mutating part IDs or other metadata.
+      if (props.field !== "text") break
       const sessionID =
         props.sessionID ??
         Object.entries(input.store.message).find(([, messages]) => messages.some((message) => message.id === props.messageID))?.[0]
@@ -301,9 +304,8 @@ export function applyDirectoryEvent(input: {
         props.messageID,
         produce((draft) => {
           const part = draft[result.index]
-          const field = props.field as keyof typeof part
-          const existing = part[field] as string | undefined
-          ;(part[field] as string) = (existing ?? "") + props.delta
+          if (!("text" in part) || typeof part.text !== "string") return
+          part.text += props.delta
         }),
       )
       break

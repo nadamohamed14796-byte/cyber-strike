@@ -460,6 +460,33 @@ describe("applyDirectoryEvent", () => {
     expect(store.part.msg_1).toBeUndefined()
   })
 
+  test("applies only supported text deltas without mutating part metadata", () => {
+    const sessionID = "ses_1"
+    const messageID = "msg_1"
+    const part = textPart("prt_1", sessionID, messageID)
+    const [store, setStore] = createStore(baseState({ part: { [messageID]: [part] } }))
+
+    const applyDelta = (field: string, delta: string) =>
+      applyDirectoryEvent({
+        event: {
+          type: "message.part.delta",
+          properties: { sessionID, messageID, partID: part.id, field, delta },
+        },
+        store,
+        setStore,
+        push() {},
+        directory: "/tmp",
+        loadLsp() {},
+      })
+
+    applyDelta("text", " chunk")
+    expect(store.part[messageID]?.[0]?.text).toBe("prt_1 chunk")
+
+    applyDelta("id", "_corrupted")
+    expect(store.part[messageID]?.[0]?.id).toBe("prt_1")
+    expect(store.part[messageID]?.[0]?.text).toBe("prt_1 chunk")
+  })
+
   test("message removal stays safe before that session's message list loads", () => {
     const [store, setStore] = createStore(
       baseState({

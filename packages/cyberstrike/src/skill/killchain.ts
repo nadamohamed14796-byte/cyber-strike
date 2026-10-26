@@ -105,12 +105,17 @@ export namespace KillChain {
     const chains = analyze(findings)
     if (chains.length === 0) return "No kill chains detected from current findings."
 
-    const lines = ["## Kill Chain Analysis", ""]
+    const lines = [
+      "## Kill Chain Analysis",
+      "",
+      "These are pattern-based hypotheses, not confirmed vulnerabilities. Validate every link independently; combined severity is not report severity until terminal impact is proven.",
+      "",
+    ]
     for (const chain of chains) {
-      lines.push(`**${chain.combined_severity.toUpperCase()}:** ${chain.description}`)
-      lines.push(`  Skills: ${chain.skills.join(" → ")}`)
+      lines.push(`**Potential ${chain.combined_severity.toUpperCase()} chain (unverified):** ${chain.description}`)
+      lines.push(`  Candidate path: ${chain.skills.join(" → ")}`)
       if (chain.next_steps.length > 0) {
-        lines.push(`  Next steps: ${chain.next_steps.join(", ")}`)
+        lines.push(`  Candidate next-skill reviews (not automatically scheduled): ${chain.next_steps.join(", ")}`)
       }
       lines.push("")
     }
