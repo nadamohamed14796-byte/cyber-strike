@@ -70,13 +70,18 @@ export namespace KillChain {
 
   function collectNextSteps(used: string[], findings: Finding[]): string[] {
     const result = new Set<string>()
-    const tested = new Set(findings.map((f) => f.skill_id))
+    const tested = new Set(
+      findings.flatMap((finding) => {
+        const canonical = SkillIndex.resolveReference(finding.skill_id)
+        return canonical ? [canonical] : []
+      }),
+    )
 
     for (const skillId of used) {
-      const entry = SkillIndex.get(skillId)
-      if (!entry) continue
-      for (const chain of entry.chains_with) {
-        if (!tested.has(chain)) result.add(chain)
+      const canonical = SkillIndex.resolveReference(skillId)
+      if (!canonical) continue
+      for (const link of SkillIndex.chainsFrom(canonical)) {
+        if (!tested.has(link.target)) result.add(link.target)
       }
     }
 
