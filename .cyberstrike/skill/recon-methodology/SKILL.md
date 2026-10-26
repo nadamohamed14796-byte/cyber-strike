@@ -3,11 +3,11 @@ name: recon-methodology
 description: "Plan and execute evidence-led, scope-locked reconnaissance that produces a deduplicated, prioritized testing queue"
 version: "1.2.0"
 author: "CyberStrike contributors; consolidated with upstream attribution"
-tags: [recon, enumeration, osint, subdomain, asset-inventory, scope]
+tags: [recon, enumeration, osint, subdomain, asset-inventory, scope, infrastructure-lifecycle, api-contracts, dependency-risk]
 tech_stack: [dns, http, tls, javascript, api, cloud]
 prerequisites:
   - "Written authorization, scope rules, exclusions, and permitted testing intensity"
-chains_with: [attack-subdomain-takeover, attack-idor-automation, attack-triage-validation]
+chains_with: [attack-subdomain-takeover, attack-idor-automation, attack-api-contract-testing, attack-dependency-cve-scanning, attack-triage-validation]
 sources:
   - "https://github.com/elementalsouls/Claude-BugHunter/blob/main/skills/web2-recon/SKILL.md"
   - "https://github.com/uphiago/recon-skills/blob/main/meta/recon-playbook/SKILL.md"
@@ -60,6 +60,14 @@ For JavaScript assets, retain the asset URL and hash, source-map availability, e
 ### F. Technology and ownership signals
 
 Record framework, CDN, cloud provider, CMS, API style, authentication mechanism, and likely tenant boundaries only when evidence supports the inference. Keep confidence and evidence for each fingerprint; do not convert a banner, version string, or scanner guess into a vulnerability claim.
+
+### F.1 Infrastructure and dependency lifecycle
+
+Build a small relationship map from evidence already found: first-party hosts, CNAME destinations, storage/CDN bindings, API hosts and versions, external script/service origins, mail/DNS records when relevant, and source artifacts. Record the exact source and confidence for each relationship. Do not expand into a provider's shared infrastructure or treat an external destination as in scope just because a first-party asset references it.
+
+Classify each dependency as active, deprecated/legacy, orphan-suspected, or unknown. For an orphan-suspected hostname, use current DNS and provider-specific, read-only evidence; route to `attack-subdomain-takeover` only when the hostname is in scope. Never claim a resource, change DNS, publish content, or infer takeover from a CNAME/404 alone. For undocumented or version-drifted API surfaces, preserve version and observation context and route to `attack-shadow-api` or `attack-api-contract-testing`.
+
+When an explicitly authorized source checkout or source artifact contains manifests/lockfiles, route it to `attack-dependency-cve-scanning`. A package name seen in a bundle is not proof of an installed version; a CVE match is not proof that vulnerable code is reachable or deployed. Keep this as an evidence-linked risk inventory, not a new mandatory phase. Merge relationships into the existing target inventory/report instead of creating one file per discovered dependency.
 
 ### G. Authentication-aware coverage
 
