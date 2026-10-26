@@ -21,6 +21,17 @@ severity_boost:
 
 Find API routes where authentication, authorization, or operation-level controls are absent or inconsistently applied. Distinguish intentionally public endpoints from data or actions whose business context requires an authenticated principal.
 
+## Client-visible API keys and tokens
+
+When JavaScript or a public asset contains a key-like string, treat it as a lead, not an automatic vulnerability.
+
+1. Identify the provider and credential class from syntax and surrounding code; preserve only a masked value/fingerprint in shared notes.
+2. Decide whether the provider documents the value as a public client identifier (such as a browser-restricted maps, analytics, or publishable key) or as a secret/server credential. Public visibility alone does not prove impact.
+3. Consult [streaak/keyhacks](https://github.com/streaak/keyhacks) only as a provider-specific reference for a suitable validation signal. It is not an authorization mechanism and should not be blindly executed.
+4. Validate only when the engagement explicitly authorizes that provider/service and a provider-approved, low-impact read-only check exists. Prefer local metadata and existing captured evidence first. Do not exchange secrets for tokens, enumerate permissions broadly, access private data, create or modify resources, send messages/webhooks, trigger billing, or test unrelated accounts.
+5. Record the actual observation, provider response meaning, scope basis, masked evidence, and limits. A format match or successful response that does not demonstrate unauthorized capability is not impact proof.
+6. If the key is intentionally public or its restrictions/permissions cannot be safely established, keep it informational/unconfirmed and explain the missing evidence. If a real secret is exposed, recommend revocation/rotation without reproducing the raw value.
+
 ## Testing Methodology
 
 ### 1. Build the endpoint inventory
