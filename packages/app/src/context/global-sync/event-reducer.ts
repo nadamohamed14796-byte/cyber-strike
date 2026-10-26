@@ -274,15 +274,26 @@ export function applyDirectoryEvent(input: {
       break
     }
     case "message.part.delta": {
-      const props = event.properties as { messageID: string; partID: string; field: string; delta: string }
+      // sessionID exists in the runtime event. Some generated SDK variants omit it,
+      // so use the cached message owner as a safe fallback when available.
+      const props = event.properties as {
+        sessionID?: string
+        messageID: string
+        partID: string
+        field: string
+        delta: string
+      }
+      const sessionID =
+        props.sessionID ??
+        Object.entries(input.store.message).find(([, messages]) => messages.some((message) => message.id === props.messageID))?.[0]
       const parts = input.store.part[props.messageID]
       if (!parts) {
-        input.repairMessage?.(props.sessionID, props.messageID, props.partID)
+        if (sessionID) input.repairMessage?.(sessionID, props.messageID, props.partID)
         break
       }
       const result = Binary.search(parts, props.partID, (p) => p.id)
       if (!result.found) {
-        input.repairMessage?.(props.sessionID, props.messageID, props.partID)
+        if (sessionID) input.repairMessage?.(sessionID, props.messageID, props.partID)
         break
       }
       input.setStore(
