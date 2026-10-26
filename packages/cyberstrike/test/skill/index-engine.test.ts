@@ -4,6 +4,7 @@ import path from "node:path"
 import { Instance } from "../../src/project/instance"
 import { SkillIndex } from "../../src/skill/index-engine"
 import { SkillContext } from "../../src/skill/context"
+import { KillChain } from "../../src/skill/killchain"
 import { Skill } from "../../src/skill/skill"
 import { tmpdir } from "../fixture/fixture"
 
@@ -116,6 +117,14 @@ Skill body for ${name}.
           reason: "matches CWE: CWE-522",
           priority: "high",
         })
+
+        const aliasChains = KillChain.analyze([
+          { skill_id: "AWS-POSTEXPLOIT", severity: "high" },
+          { skill_id: "T1078.004", severity: "medium" },
+        ])
+        expect(aliasChains).toHaveLength(1)
+        expect(aliasChains[0].skills).toEqual(["aws-postexploit", "T1078.004_cloud-accounts"])
+        expect(aliasChains[0].combined_severity).toBe("high")
 
         const chainSuggestions = SkillContext.suggest([{ skill_id: "target-workflow" }])
         const prerequisiteIndex = chainSuggestions.findIndex(
