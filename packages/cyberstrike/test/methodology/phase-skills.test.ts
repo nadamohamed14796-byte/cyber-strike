@@ -53,6 +53,15 @@ describe("Phase-critical skill pinning", () => {
     })
   })
 
+  test("shared methodology keeps counterevidence and severity guardrails", async () => {
+    const promptPath = path.resolve(import.meta.dir, "../../src/agent/prompt/methodology/common-methodology.txt")
+    const prompt = await Bun.file(promptPath).text()
+    expect(prompt).toContain("Counterevidence and candidate closure")
+    expect(prompt).toContain("Rule out a candidate only when a specific control")
+    expect(prompt).toContain("Severity calibration")
+    expect(prompt).toContain("Do not raise severity for a secret-looking string")
+  })
+
   test("phase-critical skills remain present even when the optional shortlist limit is one", () => {
     const makeSkill = (name: string): SkillIndex.Entry => ({
       name,
