@@ -60,6 +60,32 @@ A finding can be recorded as a lead before all checks are resolved, but it must 
 
 Severity depends on demonstrated confidentiality, integrity, availability, privilege, or business impact and the program rubric. High confidence does not imply high severity; an unproven high-impact hypothesis is not a confirmed critical finding.
 
+
+## Counterevidence closure contract
+
+Before closing a candidate, explicitly answer both questions: what evidence supports the hypothesis, and what evidence could disprove it?
+
+- **Confirmed:** the intended path is reachable, the result is reproducible, and the evidence demonstrates a concrete security impact under stated attacker prerequisites. Preserve the minimal request/response or source trace that supports the conclusion.
+- **Ruled out / false positive:** name the specific control or benign behavior and cite the relevant file/line or observed request/response. Verify that the control runs on this exact reachable path, with the relevant arguments, before the sensitive operation; check that it cannot fail open and that alternate entrypoints do not bypass it.
+- **Inconclusive:** the candidate is plausible but evidence neither confirms impact nor identifies a control that rules it out. Keep it open with the exact missing proof, such as an unavailable role, unobservable server path, or ambiguous response.
+- **Blocked, not run, unavailable, or out of scope:** record the actual reason and any safe partial work. These are not successful tests and must not be converted to a false positive or a secure result.
+
+Do not close a candidate just because a well-known library is present, a sibling route is guarded, a request returned 401/403, a scanner was quiet, a tool failed, or the required test identity was unavailable. A control only counts when the evidence shows it applies before the relevant operation on the path being assessed. Use `validate_finding` and the existing evidence lifecycle; never create a parallel ledger or invent new runtime statuses to represent these ideas.
+
+## Severity calibration
+
+Calibrate severity only after reachability and counterevidence have been reviewed. Apply the target's program policy and rating taxonomy first, and record confidence separately from severity.
+
+| Rating | Evidence threshold (illustrative; program policy takes precedence) |
+| --- | --- |
+| Critical | Demonstrated broad or decisive impact, such as unauthenticated remote code execution, a complete authentication bypass, broad signing/control-plane credential compromise, or a cross-tenant isolation failure affecting sensitive data at scale. |
+| High | Demonstrated meaningful trust-boundary crossing, such as sensitive BOLA across users/tenants, privilege escalation, exploitable injection reaching real data, SSRF demonstrably reaching sensitive internal services, or a reachable secret proven to grant consequential access. |
+| Medium | Reproducible and meaningful but narrower impact, limited privilege/data scope, or substantial prerequisites that constrain exploitation. |
+| Low / informational | Hygiene or defense-in-depth gaps without demonstrated exploitation, such as missing headers or weak cookie attributes, unless the program's documented policy and context establish greater impact. |
+
+Do not infer high/critical severity from a theoretical chain, a decoded-but-unaccepted token, a secret-looking string, an exposed path with no sensitive content, or an HTTP status alone. Validate each chain link independently; one confirmed primitive does not prove the hypothetical combined impact. The rationale must state the affected actor/data/action, required privileges or user interaction, proof demonstrated, meaningful limits, and why the selected rating fits the program taxonomy.
+
+
 ## 5. Common false positives
 
 - HTTP 200 with a login page, generic shell, or soft-404 body.
