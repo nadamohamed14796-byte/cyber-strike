@@ -278,3 +278,26 @@ describe("Chain — Safety and confidence", () => {
     expect(result).toContain("unproven until tested")
   })
 })
+
+describe("Chain — Single-finding escalation", () => {
+  test("evaluates SSTI-to-RCE escalation even when only one intel entry exists", async () => {
+    await Instance.provide({ directory: projectRoot, fn: async () => {
+      const session = await Session.create({})
+      const entry = Intel.add({ sessionID: session.id, data: {
+        type: "endpoint", severity: "high", title: "POST /render",
+        detail: "Template rendering input; SSTI is only a candidate until the terminal capability is proven",
+        asset: "app.example.com", source: "test", confidenceLevel: "high", tags: ["ssti"],
+      }})
+      const check = Intel.getVrtChecks(session.id, entry.id).find((c) => c.category.toLowerCase().includes("ssti"))
+      if (check) Intel.updateVrtCheck(session.id, check.entryID, check.category, {
+        status: "tested_vulnerable", technique: "controlled test", testedBy: "test-agent",
+        evidence: { requestSent: "controlled harmless template expression" },
+      })
+      const candidate = Chain.detect(session.id).find((c) => c.pattern === "ssti_rce")
+      expect(candidate).toBeDefined()
+      expect(candidate?.entryIDs).toEqual([entry.id])
+      expect(candidate?.entryTitles).toEqual([entry.title])
+      await Session.remove(session.id)
+    }})
+  })
+})

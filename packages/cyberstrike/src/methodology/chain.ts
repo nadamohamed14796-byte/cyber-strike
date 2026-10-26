@@ -43,7 +43,7 @@ export namespace Chain {
 
   export function detect(sessionID: string): Candidate[] {
     const entries = Intel.get(sessionID)
-    if (entries.length < 2) return []
+    if (entries.length === 0) return []
 
     const checks = Intel.getVrtChecks(sessionID)
     const checkMap = new Map<string, Array<{ category: string; status: string }>>()
@@ -96,8 +96,8 @@ export namespace Chain {
       chains.push({
         id: Identifier.ascending("chain_candidate"),
         pattern,
-        entryIDs: [a.id, b.id],
-        entryTitles: [a.title, b.title],
+        entryIDs: [...new Set([a.id, b.id])],
+        entryTitles: [...new Set([a.title, b.title])],
         assets: [...new Set([a.asset, b.asset])],
         expectedImpact: impact,
         severity: sev,
