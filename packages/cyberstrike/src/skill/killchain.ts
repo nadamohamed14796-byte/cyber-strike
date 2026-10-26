@@ -51,7 +51,7 @@ export namespace KillChain {
 
         const boost = link.boost
         const combined = boost
-          ? (boost.match(/\\((\\w+)\\)$/)?.[1]?.toLowerCase() ?? maxSeverity(finding.severity, partner.severity))
+          ? (boost.match(/\((\w+)\)$/)?.[1]?.toLowerCase() ?? maxSeverity(finding.severity, partner.severity))
           : maxSeverity(finding.severity, partner.severity)
 
         chains.push({
