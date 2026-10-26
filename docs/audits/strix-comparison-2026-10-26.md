@@ -42,7 +42,8 @@ These are implementation/design observations, not a claim that every file in Str
 
 1. **Shared methodology:** `packages/cyberstrike/src/agent/prompt/methodology/common-methodology.txt` now includes a concise counterevidence/closure contract and severity-calibration rules so the guidance is present during ordinary work, not only after a specialist skill happens to be loaded.
 2. **Specialist triage:** `.cyberstrike/skill/attack-triage-validation/SKILL.md` now states the evidence required to confirm, rule out, or leave a candidate inconclusive; distinguishes blocked/not-run/out-of-scope outcomes; and adds an illustrative critical/high/medium/low severity rubric subordinate to the target program's policy.
-3. **Regression test:** `packages/cyberstrike/test/methodology/phase-skills.test.ts` now checks that the runtime-loaded triage skill includes the counterevidence and severity sections.
+3. **Specialist-agent prompt:** `packages/cyberstrike/src/agent/prompt/vuln/common-prompt.txt` now makes evidence-first severity calibration explicit for vulnerability-testing agents, not only the default orchestrator.
+4. **Regression tests:** `packages/cyberstrike/test/methodology/phase-skills.test.ts` checks the runtime-loaded triage skill, the shared methodology prompt, and the common vulnerability-agent prompt for these guardrails.
 
 The new wording uses CyberStrike's existing `validate_finding` and evidence lifecycle. It does not add a duplicate coverage ledger, duplicate finding statuses, or another orchestration prompt.
 
@@ -57,8 +58,8 @@ The new wording uses CyberStrike's existing `validate_finding` and evidence life
 ## Verification and limits
 
 - The changes were saved to the repository's `main` branch through GitHub's file-update interface.
-- A regression test was added, but passing CI is not asserted here until the corresponding workflow result is read back.
-- No local checkout or Bun execution was available in this review context. The final check therefore needs to distinguish verified remote file contents from tests that actually ran.
+- GitHub Actions results are reported against the exact commit under test; never infer success from a saved file or a run that is still pending.
+- No local checkout was available in this review context; tests/build/typecheck are validated through the repository's own CI workflows.
 - Repository-wide counts are based on the current recursive Git trees; counts can change as upstream content changes.
 
 ## Key source links
@@ -69,4 +70,5 @@ The new wording uses CyberStrike's existing `validate_finding` and evidence life
 - [Strix severity calibration skill](https://github.com/usestrix/strix/blob/main/strix/skills/analysis/severity_calibration.md)
 - [CyberStrike shared methodology](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/packages/cyberstrike/src/agent/prompt/methodology/common-methodology.txt)
 - [CyberStrike triage skill](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/.cyberstrike/skill/attack-triage-validation/SKILL.md)
+- [CyberStrike vulnerability-agent common prompt](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/packages/cyberstrike/src/agent/prompt/vuln/common-prompt.txt)
 - [CyberStrike phase/skill tests](https://github.com/nadamohamed14796-byte/cyber-strike/blob/main/packages/cyberstrike/test/methodology/phase-skills.test.ts)

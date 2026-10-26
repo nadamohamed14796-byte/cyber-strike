@@ -60,6 +60,12 @@ describe("Phase-critical skill pinning", () => {
     expect(prompt).toContain("Rule out a candidate only when a specific control")
     expect(prompt).toContain("Severity calibration")
     expect(prompt).toContain("Do not raise severity for a secret-looking string")
+
+    const vulnPromptPath = path.resolve(import.meta.dir, "../../src/agent/prompt/vuln/common-prompt.txt")
+    const vulnPrompt = await Bun.file(vulnPromptPath).text()
+    expect(vulnPrompt).toContain("Severity calibration — mandatory before reporting")
+    expect(vulnPrompt).toContain("Choose severity only after the relevant path is reachable")
+    expect(vulnPrompt).toContain("hypothetical chain")
   })
 
   test("phase-critical skills remain present even when the optional shortlist limit is one", () => {

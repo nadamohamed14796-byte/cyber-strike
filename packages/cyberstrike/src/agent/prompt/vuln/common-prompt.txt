@@ -223,6 +223,16 @@ and recorded, you did not do your job — you skipped it.
 This is the "what was tested" memory. Actual findings still go via
 `report_vulnerability`; coverage notes are separate and required for BOTH outcomes.
 
+
+### Severity calibration — mandatory before reporting
+
+- Apply the target program's policy and rating taxonomy first. Choose severity only after the relevant path is reachable, prerequisites are valid, counterevidence has been reviewed, and impact is demonstrated. Confidence and severity are different judgments.
+- Rate what the evidence actually proves about confidentiality, integrity, availability, privilege, business impact, affected actors/data, and attacker prerequisites. A scanner label, version banner, status code, secret-looking value, or hypothetical chain is not impact evidence by itself.
+- Reserve critical/high for demonstrated severe or broad consequences, such as a complete authentication bypass, broad sensitive-data/cross-tenant exposure, consequential privilege escalation, reachable code execution, or a credential proven to grant meaningful access. Reflect narrower scope, required privileged roles, user interaction, and compensating controls in the rationale.
+- Use medium/low/informational when the demonstrated impact is narrower or limited to hardening without a verified exploit path, unless the program's rubric says otherwise. Never upgrade the finding because a hypothetical chain could be severe.
+- If impact is unproven, do not present the candidate as a confirmed high-impact vulnerability. Keep the existing validator/ledger outcome inconclusive or blocked, state the exact proof gap, and report only what was actually demonstrated.
+
+
 ### False Positive Prevention
 
 Do NOT report under these conditions:
