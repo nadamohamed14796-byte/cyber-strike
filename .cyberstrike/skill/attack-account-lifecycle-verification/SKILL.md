@@ -115,6 +115,13 @@ Choose only checks supported by observed behavior and the expected policy:
 - For OAuth/OIDC/SAML linking, check provider subject/issuer/tenant and the provider's email-verification semantics. Never assume matching email text proves the same identity. Cross-reference `attack-oauth` or `attack-saml-sso` when the observed flow warrants deeper protocol testing.
 - Do not use another person's provider account or try to take over an existing third-party identity.
 
+### Email identity normalization and verification-session behavior
+
+- When the application treats email as a login or organization identifier, inspect its documented canonicalization policy. With owned test identities only, compare relevant case/domain/IDN forms and the same policy across registration, login, change-email, recovery, and identity linking. Do not assume provider-specific dot/plus rewriting is valid; a report requires demonstrated account collision, wrong-principal selection, or another meaningful policy violation.
+- If a trusted email domain grants a privileged role or organization membership, verify exact domain-boundary matching with an explicitly authorized test domain. A suffix such as `notexample.test` must not be treated as `example.test`; only test this with disposable identities and never attempt to claim a real privileged account.
+- A verification callback should prove mailbox ownership, not silently become an authentication bypass. Record the pre-click and post-click session/principal using harmless profile state; confirm the expected normal authentication step is still required unless the documented design explicitly states otherwise. Do not classify a change in UI state alone as account takeover.
+- Follow the same canonicalization and verification rules across login, reset, change-email, and external identity linking. Inconsistent normalization is only a candidate until it produces a reproducible identity collision or wrong-account binding.
+
 ## 5. Validate protected actions and chains
 
 - If a verification bypass appears to enable a privileged feature, billing action, profile change, data access, or account takeover, validate the minimum safe downstream effect with a test-owned fixture. A skipped UI step is not enough.
@@ -145,6 +152,30 @@ For a report, include the expected state transition, minimum redacted request/re
 ## 7. Remediation guidance
 
 Recommend server-side state-machine enforcement at every protected operation; cryptographically random, account- and action-bound challenges; appropriate expiry; atomic single-use consumption; revalidation of pending email changes; recipient/tenant binding for invitations; trusted canonical URL construction; protection of verification secrets from logs/referrers; and explicit session/notification policy. Prefer targeted regression tests for invalid account binding, replay, expired challenges, and unverified-state access.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+### Recommended tools
+
+- `curl --version`: verify an available HTTP client before replaying only observed, in-scope requests with test-owned identities.
+- `jq --version`: inspect redacted JSON state and compare account/status fields without dumping secrets.
+- `python3 --version` and `rg --version`: verify offline parsing and local source-search tools when source access is authorized.
+- `python3 .cyberstrike/skill/scripts/http_response_diff.py baseline-redacted.txt candidate-redacted.txt`: compare sanitized baseline and candidate responses offline. Keep tokens, full verification URLs, and inbox contents out of both files.
+
+### Resources
+
+- OWASP Email Validation and Verification Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Email_Validation_and_Verification_Cheat_Sheet.html
+- OWASP Web Security Testing Guide — User Registration Process: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management/02-User_Registration_Process/
+- OWASP Authentication Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+- OWASP Forgot Password Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
+
+### Helper-script contract
+
+Use CLI helpers only for saved, redacted artifacts or requests that already satisfy the target's persisted scope and program rules. Do not install or run a large tool catalog just to satisfy this skill. Do not fetch mail infrastructure, send notifications, or replay state-changing verification requests merely because a tool is available.
+
+### Handoff
+
+Return the exact skill name, asset and scope reference, test-account labels, baseline/candidate artifact IDs, commands actually executed, observed state transition, negative control, verdict/confidence, missing evidence, and cleanup status. State which tests were not run and why; never imply a skipped or unavailable test passed.
 
 ## References
 
