@@ -125,6 +125,8 @@ Skill body for ${name}.
         expect(aliasChains).toHaveLength(1)
         expect(aliasChains[0].skills).toEqual(["aws-postexploit", "T1078.004_cloud-accounts"])
         expect(aliasChains[0].combined_severity).toBe("high")
+        expect(aliasChains[0].next_steps).toContain("T1552.005_cloud-instance-metadata-api")
+        expect(aliasChains[0].next_steps).not.toContain("T1552.005")
         const aliasNextSteps = KillChain.nextSteps({ skill_id: "AWS-POSTEXPLOIT", severity: "high" })
         expect(aliasNextSteps).toContain("T1078.004_cloud-accounts")
         expect(aliasNextSteps).toContain("T1552.005_cloud-instance-metadata-api")
