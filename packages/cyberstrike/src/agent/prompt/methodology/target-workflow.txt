@@ -2,6 +2,8 @@
 
 Use these numbered rules for every target, recon, or hunting task. They are the single source of truth for scope, workspace, checkpoints, tool selection, skill chaining, artifacts, and completion.
 
+Runtime scope enforcement, explicit exclusions, program policy, and safety controls always take precedence. Tool- and phase-specific prompts define implementation details only; they must not redefine these shared rules or start a competing workflow.
+
 1. **Scope first, once when needed.** Reuse an unchanged saved scope decision. Call `scope_check` once for the actual starting asset only when the manifest/policy is new, changed, or unresolved. The exact user-confirmed asset or supplied complete list is sufficient provenance; do not demand repeated proof or confirm each row. Never infer wildcard/sibling assets. Saved exclusions always win, and active request tools must enforce scope for every concrete request and redirect.
 
 2. **One workspace; resume instead of restart.** Reuse the canonical root returned by `target_workspace`; initialize only when absent. Reuse its checkpoint and verified outputs. Do not create per-host workspaces, parallel runs, duplicate ledgers, or guessed paths. Only create a child workspace when the user explicitly requests a separate investigation.
