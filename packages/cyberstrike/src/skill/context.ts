@@ -16,26 +16,58 @@ export namespace SkillContext {
     return Math.ceil(text.length / 4)
   }
 
+  function findLoaded(name: string) {
+    const catalog = Skill.state()
+    const canonical = SkillIndex.resolveReference(name)
+    const normalized = (canonical ?? name).trim().toLocaleLowerCase("en-US")
+    for (const [id, entry] of loaded) {
+      if (
+        entry.directory === Instance.directory &&
+        entry.catalog === catalog &&
+        entry.name.trim().toLocaleLowerCase("en-US") === normalized
+      ) {
+        return { id, entry }
+      }
+    }
+    return undefined
+  }
+
   export async function load(name: string): Promise<string | undefined> {
-    const id = key(name)
-    // Catalog refreshes can race the asynchronous skill lookup. Never cache or
-    // return content from a catalog that is no longer the active project catalog.
+    // Build the exact alias index before resolving technique IDs, directory slugs,
+    // and case-insensitive names. Cache by the skill's canonical name so aliases
+    // cannot occupy multiple context slots or double-count tokens.
     for (let attempt = 0; attempt < 3; attempt++) {
       const catalog = Skill.state()
+      await SkillIndex.ensureBuilt()
+      if (Skill.state() !== catalog) continue
+
+      const canonical = SkillIndex.resolveReference(name) ?? name.trim()
+      const id = key(canonical)
       const cached = loaded.get(id)
       if (cached?.catalog === catalog) return cached.content
       if (cached) loaded.delete(id)
 
-      const skill = await Skill.get(name)
+      const skill = await Skill.get(canonical)
       if (Skill.state() !== catalog) continue
       if (!skill) {
         log.warn("skill not found for loading", { name })
         return undefined
       }
 
+      const canonicalID = key(skill.name)
+      const existing = loaded.get(canonicalID)
+      if (existing?.catalog === catalog) return existing.content
+      if (existing) loaded.delete(canonicalID)
+
       const tokens = estimateTokens(skill.content)
-      loaded.set(id, { name, directory: Instance.directory, catalog, content: skill.content, tokens })
-      log.info("skill loaded into context", { name, tokens })
+      loaded.set(canonicalID, {
+        name: skill.name,
+        directory: Instance.directory,
+        catalog,
+        content: skill.content,
+        tokens,
+      })
+      log.info("skill loaded into context", { name: skill.name, tokens })
       return skill.content
     }
 
@@ -43,20 +75,22 @@ export namespace SkillContext {
   }
 
   export function unload(name: string): boolean {
-    const id = key(name)
-    const had = loaded.has(id)
-    if (had) {
-      log.info("skill unloaded from context", { name, tokens: loaded.get(id)!.tokens })
-      loaded.delete(id)
-    }
-    return had
+    const existing = findLoaded(name)
+    if (!existing) return false
+    log.info("skill unloaded from context", { name: existing.entry.name, tokens: existing.entry.tokens })
+    loaded.delete(existing.id)
+    return true
   }
 
   export function active(): string[] {
     const catalog = Skill.state()
-    return Array.from(loaded.values())
-      .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
-      .map((entry) => entry.name)
+    return Array.from(
+      new Set(
+        Array.from(loaded.values())
+          .filter((entry) => entry.directory === Instance.directory && entry.catalog === catalog)
+          .map((entry) => entry.name),
+      ),
+    )
   }
 
   export function tokenCount(): number {
@@ -69,8 +103,7 @@ export namespace SkillContext {
   }
 
   export function isLoaded(name: string): boolean {
-    const entry = loaded.get(key(name))
-    return Boolean(entry && entry.catalog === Skill.state())
+    return Boolean(findLoaded(name))
   }
 
   export function clear() {
