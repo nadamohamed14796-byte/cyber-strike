@@ -65,6 +65,13 @@ describe("session.retry.delay", () => {
     expect(SessionRetry.delay(1, longError)).toBe(700000)
   })
 
+  test("rejects immediately when the signal is already aborted", async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(SessionRetry.sleep(0, controller.signal)).rejects.toThrow("Aborted")
+  })
+
   test("sleep caps delay to max 32-bit signed integer to avoid TimeoutOverflowWarning", async () => {
     const controller = new AbortController()
 
