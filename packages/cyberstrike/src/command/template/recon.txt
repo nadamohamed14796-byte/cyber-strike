@@ -13,6 +13,15 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 5. Recon clues are not findings. No vulnerability scanners, `session_scan`, exploit payloads, or targeted vulnerability tests unless the user explicitly requests testing and runtime/policy controls allow it.
 6. Checkpoint: call `recon_checkpoint(action="status", target_url=<canonical target URL>)` first; use the same `target_url` for every action (not a filesystem path). For each pending phase call `begin` with its `phase`; if already running, inspect artifacts and resume. After verifying outputs, call `complete` with summary, counts, and workspace-relative artifact paths. Use `block`, `fail`, or `unavailable` with a reason when needed. Only `vulnerability_testing` may be deferred: call `begin`, then `defer`. Fix checkpoint rejection reasons; never claim success without saved output.
 
+
+## Adaptive execution and delegation
+
+- When a real Task/delegation tool is available, parallelize only independent work that benefits from it. Give each worker a bounded input, the canonical root `target_url`, the same persisted scope constraints, a clear evidence/provenance contract, and one non-overlapping responsibility.
+- Keep one orchestrator responsible for scope, `recon_checkpoint`, and final inventory merging. Workers return verified observations, source/tool, counts, artifact paths, errors, and unresolved items; they must not create child workspaces, change scope, overwrite shared canonical inventories, or promote hypotheses to confirmed findings.
+- Continue useful independent work while workers run. Wait only when a next decision actually depends on their results. If delegation is unavailable, perform the task directly rather than stalling. Stop or redirect redundant work instead of running duplicate tools for activity.
+- Merge partial results into the existing canonical inventory, normalize and deduplicate once, and preserve provenance and failures. After worker completion, reconcile the checkpoint against the actual saved artifacts; a worker's message alone is not proof that an artifact exists.
+- Close each recon work item as verified-result, empty, failed, blocked, unavailable, or pending. For vulnerability hypotheses, use confirmed, ruled-out, inconclusive, blocked, or not-run; only the existing evidence/validation lifecycle may confirm a finding. During ordinary recon, keep hypotheses as leads and obey Rule 5.
+
 ## Workflow
 
 0. **Resume/scope/workspace:** reuse or initialize the canonical root workspace. Recover checkpoint and files first. Configure/check scope only when new, changed, or unresolved. Complete scope/workspace setup only after their checks pass. If authorization is unclear, don't send active requests.
