@@ -64,6 +64,23 @@ export function mergeAssetSources(...values: Array<string | string[] | undefined
   return [...merged].sort()
 }
 
+export function parseAssetManifest(input: string): Manifest {
+  const parsed: unknown = JSON.parse(input)
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    (parsed as Partial<Manifest>).schemaVersion !== 1 ||
+    !Array.isArray((parsed as Partial<Manifest>).assets)
+  ) {
+    throw new Error("Unsupported or malformed JavaScript asset manifest")
+  }
+  const manifest = parsed as Manifest
+  if (manifest.assets.some((item) => !item || typeof item.url !== "string" || typeof item.status !== "string")) {
+    throw new Error("Malformed JavaScript asset manifest entries")
+  }
+  return manifest
+}
+
 export function shouldResumeAsset(record: { status: AssetRecord["status"]; retryable?: boolean }): boolean {
   return record.status === "pending" || record.retryable === true
 }
@@ -244,9 +261,30 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     let manifest: Manifest = { schemaVersion: 1, updatedAt: new Date().toISOString(), assets: [] }
     try {
-      const parsed = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Partial<Manifest>
-      if (parsed.schemaVersion === 1 && Array.isArray(parsed.assets)) manifest = parsed as Manifest
-    } catch { /* First run or unreadable prior manifest: begin a new manifest. */ }
+      const rawManifest = await fs.readFile(manifestPath, "utf8")
+      try {
+        manifest = parseAssetManifest(rawManifest)
+      } catch (error) {
+        return {
+          title: "JavaScript ingestion stopped — manifest needs repair",
+          output: [
+            "The existing JavaScript asset manifest is invalid or uses an unsupported schema.",
+            "No URLs were fetched and the existing manifest was left untouched to protect pending work and provenance.",
+            "Manifest: " + manifestPath,
+            "Parser error: " + (error instanceof Error ? error.message : String(error)),
+          ].join("\n"),
+          metadata: { error: "manifest_invalid", manifest_path: manifestPath },
+        }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        return {
+          title: "JavaScript ingestion stopped — manifest unreadable",
+          output: "Could not read the existing JavaScript asset manifest. No URLs were fetched. Manifest: " + manifestPath,
+          metadata: { error: "manifest_unreadable", manifest_path: manifestPath },
+        }
+      }
+    }
 
     const byURL = new Map(manifest.assets.map((item) => [normalizeURL(item.url) ?? item.url, item]))
     const byHash = new Map<string, AssetRecord>()

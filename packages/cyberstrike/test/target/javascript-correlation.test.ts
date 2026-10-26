@@ -139,6 +139,17 @@ test("accepts JavaScript ingestion batches larger than 500 URLs", async () => {
   expect(parsed.urls).toHaveLength(501)
 })
 
+test("rejects malformed JavaScript manifests instead of silently resetting resumable state", async () => {
+  const { parseAssetManifest } = await import("../../src/tool/ingest-javascript-urls")
+  expect(() => parseAssetManifest("{broken json")).toThrow()
+  expect(() => parseAssetManifest(JSON.stringify({ schemaVersion: 2, assets: [] }))).toThrow()
+  expect(() => parseAssetManifest(JSON.stringify({ schemaVersion: 1, assets: [{ status: "pending" }] }))).toThrow()
+  expect(parseAssetManifest(JSON.stringify({ schemaVersion: 1, updatedAt: "2026-01-01T00:00:00.000Z", assets: [] }))).toMatchObject({
+    schemaVersion: 1,
+    assets: [],
+  })
+})
+
 test("resumes pending or explicitly retryable JavaScript asset records only", async () => {
   const { shouldResumeAsset, shouldFetchAsset } = await import("../../src/tool/ingest-javascript-urls")
   expect(shouldResumeAsset({ status: "pending" })).toBe(true)
