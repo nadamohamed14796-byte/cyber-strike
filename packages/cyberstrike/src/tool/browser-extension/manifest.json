@@ -2,12 +2,18 @@
   "manifest_version": 3,
   "name": "Cyberstrike",
   "version": "1.0.0",
-  "description": "Cyberstrike browser automation indicator",
+  "description": "Visual page indicator only; it does not start or stop CyberStrike browser automation.",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
