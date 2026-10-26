@@ -427,7 +427,7 @@ describe("Account lifecycle verification skill routing", () => {
         expect(skill, "account lifecycle verification must exist in the runtime catalog").toBeDefined()
         expect(skill!.content).toContain("Email Verification")
         expect(skill!.content).toContain("Token binding and action binding")
-        expect(skill!.content).toContain("authoritative account state")
+        expect(skill!.content).toContain("authoritative source")
         expect(skill!.content).toContain("inconclusive/blocked")
         expect(skill!.content).toContain("inboxes controlled by the tester")
       },
