@@ -6,9 +6,36 @@ import { Chain } from "../methodology/chain"
 import { Validation } from "../methodology/validation"
 import { Session } from "../session"
 
+type PendingCoverageItem = Intel.CoverageReport["untestedItems"][number]
+
+export function pendingCoveragePage(
+  items: PendingCoverageItem[],
+  cursor: { entryID?: string; category?: string },
+  limit: number,
+) {
+  const sorted = items.slice().sort((a, b) => {
+    if (a.entryID !== b.entryID) return a.entryID < b.entryID ? -1 : 1
+    if (a.vrtCategory !== b.vrtCategory) return a.vrtCategory < b.vrtCategory ? -1 : 1
+    return a.asset < b.asset ? -1 : a.asset > b.asset ? 1 : 0
+  })
+  const afterCursor = sorted.filter((item) => {
+    if (!cursor.entryID) return true
+    if (item.entryID !== cursor.entryID) return item.entryID > cursor.entryID
+    return item.vrtCategory > (cursor.category ?? "")
+  })
+  const rows = afterCursor.slice(0, limit)
+  const hasMore = afterCursor.length > rows.length
+  const last = rows[rows.length - 1]
+  return {
+    rows,
+    hasMore,
+    nextCursor: hasMore && last ? { entryID: last.entryID, category: last.vrtCategory } : undefined,
+  }
+}
+
 export const MethodologyStatusTool = Tool.define("methodology_status", {
   description:
-    "Get the current methodology state, coverage report, chain opportunities, and validation status. Use this to check progress, identify gaps, and decide what to test next. Shows which phases are complete, which have blocking violations, per-asset coverage, and detected vulnerability chains.",
+    "Get the current methodology state, coverage report, chain opportunities, and validation status. Use this to check progress, identify gaps, and decide what to test next. Shows which phases are complete, which have blocking violations, per-asset coverage, and detected vulnerability chains. When include_pending_checks=true, returns a cursor-stable page of exact pending VRT entry/category rows for final coverage reconciliation.",
   parameters: z.object({
     include_validation: z
       .boolean()
@@ -89,22 +116,14 @@ export const MethodologyStatusTool = Tool.define("methodology_status", {
     let nextPendingEntryID: string | undefined
     let nextPendingCategory: string | undefined
     if (params.include_pending_checks) {
-      const pending = coverage.untestedItems.slice().sort((a, b) => {
-        if (a.entryID !== b.entryID) return a.entryID < b.entryID ? -1 : 1
-        if (a.vrtCategory !== b.vrtCategory) return a.vrtCategory < b.vrtCategory ? -1 : 1
-        return a.asset < b.asset ? -1 : a.asset > b.asset ? 1 : 0
-      }).filter((item) => {
-        if (!params.pending_after_entry_id) return true
-        if (item.entryID !== params.pending_after_entry_id) return item.entryID > params.pending_after_entry_id
-        return item.vrtCategory > (params.pending_after_category ?? "")
-      })
-      pendingPage = pending.slice(0, params.pending_limit)
-      pendingHasMore = pending.length > pendingPage.length
-      const last = pendingPage[pendingPage.length - 1]
-      if (pendingHasMore && last) {
-        nextPendingEntryID = last.entryID
-        nextPendingCategory = last.vrtCategory
-      }
+      const page = pendingCoveragePage(coverage.untestedItems, {
+        entryID: params.pending_after_entry_id,
+        category: params.pending_after_category,
+      }, params.pending_limit)
+      pendingPage = page.rows
+      pendingHasMore = page.hasMore
+      nextPendingEntryID = page.nextCursor?.entryID
+      nextPendingCategory = page.nextCursor?.category
       sections.push("")
       sections.push(`## Pending VRT Checks (${pendingPage.length} shown; ${coverage.pendingChecks} total pending)`)
       for (const item of pendingPage) {
