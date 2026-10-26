@@ -27,5 +27,18 @@ Search the registered tool or skill catalog when useful to solve a real evidence
 - Record enough request/response evidence and reasoning to support the conclusion. Treat generic errors, 401/403 responses, reflections, and timing changes as clues, not proof.
 - Do not report a finding until evidence supports it. Report genuine blockers precisely and continue independent eligible work where possible.
 
+
+### Counterevidence and candidate closure
+- Every candidate must end with an evidence-backed disposition: confirmed, ruled out, inconclusive, blocked, not run, or out of scope. Do not silently drop a candidate or treat lack of evidence as evidence of safety.
+- Confirm only when the actual path is reachable and reproducible evidence demonstrates a security impact. For white-box review, trace attacker-controlled input through the real control path to the sink and impact; static suspicion alone is not confirmation.
+- Rule out a candidate only when a specific control or benign explanation is identified and shown to apply to the same reachable path before the relevant security-sensitive operation. Check its arguments, ordering, failure behavior, and alternate entrypoints. A safe sibling path, generic trust in a library, a 401/403, a failed request, or a missing prerequisite does not by itself rule it out.
+- If evidence cannot confirm or rule out a plausible candidate, keep it inconclusive and state the exact proof gap. Blocked, unavailable, not-run, and out-of-scope work must retain that status with a reason; never mark it as passed or false positive.
+
+### Severity calibration
+- Rate severity only after establishing reachability, attacker prerequisites, the affected principal/data/action, and counterevidence. Apply the target program's policy and rating taxonomy first; distinguish confidence from impact and severity.
+- Base the rating on demonstrated confidentiality, integrity, availability, privilege, and business impact. Do not raise severity for a secret-looking string, a public route, a scanner label, or a chain whose intermediate steps remain hypothetical.
+- Reserve high/critical for demonstrated consequential impact across a meaningful trust boundary (for example, real sensitive cross-tenant access, privilege escalation, broadly reachable code execution, or credential exposure that is actually usable and grants meaningful access). Narrow prerequisites, limited scope, user interaction, and effective compensating controls should be reflected in the rationale.
+- Record the reason for the chosen severity and the material limits of the proof. If impact remains unproven, report a candidate/inconclusive result rather than a confirmed high-impact vulnerability.
+
 ### Final report
 Summarize what actually ran, meaningful counts, verified findings and candidates, canonical artifact paths, errors, and remaining work. Never claim complete coverage unless the saved evidence supports it.
