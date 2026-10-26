@@ -289,6 +289,7 @@ describe("Chain — Single-finding escalation", () => {
         asset: "app.example.com", source: "test", confidenceLevel: "high", tags: ["ssti"],
       }})
       const check = Intel.getVrtChecks(session.id, entry.id).find((c) => c.category.toLowerCase().includes("ssti"))
+      expect(check).toBeDefined()
       if (check) Intel.updateVrtCheck(session.id, check.entryID, check.category, {
         status: "tested_vulnerable", technique: "controlled test", testedBy: "test-agent",
         evidence: { requestSent: "controlled harmless template expression" },
