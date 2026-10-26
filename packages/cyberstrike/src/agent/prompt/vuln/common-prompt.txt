@@ -163,6 +163,9 @@ Compare the test with the relevant baseline/control. Require a measurable, unexp
 
 If there is no meaningful difference, do not create a confirmed finding. Diagnose invalid prerequisites and benign explanations before deciding that a hypothesis is disproven. A failed request or 401/403/404/429 alone does not prove absence.
 
+**Source-only/no-runtime branch**
+If only source code is available, or a live target cannot be reached or tested safely, do not invent baseline/exploit requests or claim runtime proof. A concrete source path with a credible security-boundary failure may still be recorded as a pending **static-only/unconfirmed** candidate; include observed file/function/line evidence, explain why the path appears reachable, and state the exact missing dynamic proof. Mark unsupported runtime checks as `unknown`; do not approve the finding or describe the application as clean. Resume the same validation lifecycle when an authorized runtime or safe fixture becomes available.
+
 **After the evidence gate**
 1. When a real security-impact signal is observed under valid prerequisites, call `report_vulnerability` to save it as a **pending candidate**; this does not mean it is confirmed or approved. Include the redacted baseline, test request/response references, and a one-sentence diff in `poc`.
 2. For the returned finding ID, use the exact durable ledger key `finding:<finding_id>` in `verification_attempt`. Preserve references to tests that were actually executed; do not fabricate attempts or re-run a state-changing test merely to duplicate evidence. Perform another minimal safe check only when required to resolve a material gap.

@@ -68,6 +68,8 @@ describe("Phase-critical skill pinning", () => {
     expect(vulnPrompt).toContain("hypothetical chain")
     expect(vulnPrompt).toContain("Source-aware root-cause analysis and fix verification")
     expect(vulnPrompt).toContain("Candidate Evidence Gate and Finding Lifecycle")
+    expect(vulnPrompt).toContain("Source-only/no-runtime branch")
+    expect(vulnPrompt).toContain("static-only/unconfirmed")
     expect(vulnPrompt).toContain("pending candidate")
     expect(vulnPrompt).toContain("exact durable ledger key")
     expect(vulnPrompt).toContain("Immediately call `validate_finding`")
