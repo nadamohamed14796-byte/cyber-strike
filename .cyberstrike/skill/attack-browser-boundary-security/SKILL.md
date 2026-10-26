@@ -61,3 +61,18 @@ For every plausible finding, invoke `validate_finding` and follow the durable ve
 ## Output contract
 
 Merge into the existing target-local JavaScript/endpoint inventory and finding ledger. Retain the affected origin, asset URL/hash, source location, event origin/source logic or service-worker scope, relevant request/capture IDs, authorized test context, control comparison, observed impact, redacted evidence, confidence, limitations, and next safe step. Do not create a file per message handler or bundle.
+
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+### Tools and availability
+
+Use the existing tool registry and available local utilities; no single browser-testing CLI is mandatory. Check local capabilities with `command -v python3 node jq` and verify versions with `python3 --version` or `node --version`. Do not execute collected JavaScript, collection scripts, or package lifecycle hooks to test a browser boundary. Analyze the source and use only an already authorized, controlled test context.
+
+### Resources
+
+- MDN postMessage: https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+- MDN Service Workers: https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+- OWASP Web Security Testing Guide: https://owasp.org/www-project-web-security-testing-guide/
+
+Local tool availability is not authorization. If there is no controlled browser/test context, preserve the candidate and evidence gap without claiming a confirmed result.
