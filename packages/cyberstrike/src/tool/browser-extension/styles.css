@@ -1,7 +1,7 @@
 /* Cyberstrike browser control styles */
 
 /* Orange border around page */
-html {
+html.cyberstrike-indicator-active {
   border: 3px solid #f59e0b !important;
   box-sizing: border-box !important;
   min-height: 100vh;
@@ -47,6 +47,6 @@ html {
 }
 
 /* Push body content down to account for banner */
-body {
+html.cyberstrike-indicator-active body {
   margin-top: 40px !important;
 }
