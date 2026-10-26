@@ -54,10 +54,38 @@ function normalizeURL(input: string): string | undefined {
 
 function extensionFor(url: string, contentType: string): string {
   const pathname = new URL(url).pathname.toLowerCase()
+  if (/text\/html|application\/xhtml\+xml/.test(contentType) || /\.x?html?$/.test(pathname)) return ".html"
   if (pathname.endsWith(".map") || /source-map\+json|x-source-map/.test(contentType)) return ".map"
   if (pathname.endsWith(".mjs")) return ".mjs"
   if (pathname.endsWith(".cjs")) return ".cjs"
   return ".js"
+}
+
+function isHTMLResponse(body: string, contentType: string, url: string): boolean {
+  return /text\/html|application\/xhtml\+xml/i.test(contentType) ||
+    /\.x?html?$/i.test(new URL(url).pathname) && /^\s*(?:<!doctype\s+html|<html\b|<head\b|<body\b)/i.test(body.slice(0, 4096))
+}
+
+function extractHTMLScriptURLs(body: string, pageURL: string): string[] {
+  const output = new Set<string>()
+  const baseMatch = /<base\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(body)
+  let baseURL = pageURL
+  const baseValue = baseMatch?.[1] ?? baseMatch?.[2] ?? baseMatch?.[3]
+  if (baseValue) {
+    try { baseURL = new URL(baseValue, pageURL).toString() } catch { /* Keep the page URL as the base. */ }
+  }
+  const pattern = /<script\b([^>]*)>/gi
+  for (const match of body.matchAll(pattern)) {
+    const attributes = match[1] ?? ""
+    const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
+    const src = (srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3] ?? "").trim()
+    if (!src || /^(?:data:|blob:|javascript:)/i.test(src)) continue
+    try {
+      const resolved = normalizeURL(new URL(src, baseURL).toString())
+      if (resolved) output.add(resolved)
+    } catch { /* Ignore malformed script src values. */ }
+  }
+  return [...output]
 }
 
 function looksLikeJavaScript(body: string, contentType: string, url: string): boolean {
@@ -222,19 +250,31 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         continue
       }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
-      if (!looksLikeJavaScript(body, contentType, finalURL)) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript or a version-3 source map", fetchedAt: new Date().toISOString() }
+      const isHTML = isHTMLResponse(body, contentType, finalURL)
+      if (!isHTML && !looksLikeJavaScript(body, contentType, finalURL)) {
+        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript, HTML with script elements, or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
         continue
       }
-      // Feed external source-map links discovered inside each bundle into this same queue.
-      // Every map goes through the same persisted-scope and redirect checks as any other URL.
-      for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
-        const normalizedMapURL = normalizeURL(mapURL)
-        if (!normalizedMapURL || queuedURLs.has(normalizedMapURL) || queuedURLs.size >= MAX_URLS) continue
-        queuedURLs.add(normalizedMapURL)
-        inputURLs.push(normalizedMapURL)
-        sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
+      if (isHTML) {
+        // Treat HTML as an inert container: local analysis extracts inline scripts,
+        // while external script URLs re-enter this same scope-enforced fetch queue.
+        for (const scriptURL of extractHTMLScriptURLs(body, finalURL)) {
+          if (queuedURLs.has(scriptURL) || queuedURLs.size >= MAX_URLS) continue
+          queuedURLs.add(scriptURL)
+          inputURLs.push(scriptURL)
+          sourceByURL.set(scriptURL, "script src from " + url)
+        }
+      } else {
+        // Feed external source-map links discovered inside each bundle into this same queue.
+        // Every map goes through the same persisted-scope and redirect checks as any other URL.
+        for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
+          const normalizedMapURL = normalizeURL(mapURL)
+          if (!normalizedMapURL || queuedURLs.has(normalizedMapURL) || queuedURLs.size >= MAX_URLS) continue
+          queuedURLs.add(normalizedMapURL)
+          inputURLs.push(normalizedMapURL)
+          sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
+        }
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
