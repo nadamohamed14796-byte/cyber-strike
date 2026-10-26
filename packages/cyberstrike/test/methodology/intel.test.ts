@@ -4,9 +4,35 @@ import { Instance } from "../../src/project/instance"
 import { Session } from "../../src/session"
 import { Intel } from "../../src/methodology/intel"
 import { Log } from "../../src/util/log"
+import { pendingCoveragePage } from "../../src/tool/methodology-status"
 
 const projectRoot = path.join(__dirname, "../..")
 Log.init({ print: false })
+
+describe("methodology status pending coverage pagination", () => {
+  const items = [
+    { entryID: "entry-a", entryTitle: "Users", vrtCategory: "XSS", asset: "https://app.example.com" },
+    { entryID: "entry-a", entryTitle: "Users", vrtCategory: "AuthZ", asset: "https://app.example.com" },
+    { entryID: "entry-b", entryTitle: "Orders", vrtCategory: "IDOR", asset: "https://api.example.com" },
+  ]
+
+  test("uses a stable entry/category cursor without duplicate rows", () => {
+    const first = pendingCoveragePage(items, {}, 2)
+    expect(first.rows.map((item) => item.entryID + ":" + item.vrtCategory)).toEqual([
+      "entry-a:AuthZ",
+      "entry-a:XSS",
+    ])
+    expect(first.hasMore).toBe(true)
+    expect(first.nextCursor).toEqual({ entryID: "entry-a", category: "XSS" })
+
+    // Simulate resolving the first page before fetching the next page.
+    const remaining = items.filter((item) => item.entryID !== "entry-a")
+    const second = pendingCoveragePage(remaining, first.nextCursor!, 2)
+    expect(second.rows.map((item) => item.entryID + ":" + item.vrtCategory)).toEqual(["entry-b:IDOR"])
+    expect(second.hasMore).toBe(false)
+    expect(second.nextCursor).toBeUndefined()
+  })
+})
 
 describe("Intel — CRUD", () => {
   test("add creates entry and returns it", async () => {
