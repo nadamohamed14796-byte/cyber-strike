@@ -8,6 +8,23 @@ export namespace Bus {
   const log = Log.create({ service: "bus" })
   type Subscription = (event: any) => void | Promise<void>
 
+function notify(subscribers: Subscription[], event: any, type: string) {
+  const pending: Promise<void>[] = []
+  for (const sub of [...subscribers]) {
+    try {
+      pending.push(
+        Promise.resolve(sub(event)).catch((error) => {
+          log.error("subscription handler failed", { type, error })
+        }),
+      )
+    } catch (error) {
+      // A broken local subscriber must not block other listeners or global delivery.
+      log.error("subscription handler failed", { type, error })
+    }
+  }
+  return Promise.all(pending)
+}
+
   export const InstanceDisposed = BusEvent.define(
     "server.instance.disposed",
     z.object({
@@ -32,9 +49,7 @@ export namespace Bus {
           directory: Instance.directory,
         },
       }
-      for (const sub of [...wildcard]) {
-        sub(event)
-      }
+      await notify(wildcard, event, InstanceDisposed.type)
     },
   )
 
@@ -49,27 +64,20 @@ export namespace Bus {
     log.info("publishing", {
       type: def.type,
     })
-    const pending: Promise<void>[] = []
-    for (const key of [def.type, "*"]) {
-      const match = state().subscriptions.get(key)
-      for (const sub of [...(match ?? [])]) {
-        try {
-          pending.push(
-            Promise.resolve(sub(payload)).catch((error) => {
-              log.error("subscription handler failed", { type: def.type, error })
-            }),
-          )
-        } catch (error) {
-          // A broken in-process subscriber must not block delivery to the global event stream.
-          log.error("subscription handler failed", { type: def.type, error })
-        }
-      }
+    const subscribers = [
+      ...(state().subscriptions.get(def.type) ?? []),
+      ...(state().subscriptions.get("*") ?? []),
+    ]
+    const pending = notify(subscribers, payload, def.type)
+    try {
+      GlobalBus.emit("event", {
+        directory: Instance.directory,
+        payload,
+      })
+    } catch (error) {
+      log.error("global event broadcast failed", { type: def.type, error })
     }
-    GlobalBus.emit("event", {
-      directory: Instance.directory,
-      payload,
-    })
-    await Promise.all(pending)
+    await pending
   }
 
   export function subscribe<Definition extends BusEvent.Definition>(
