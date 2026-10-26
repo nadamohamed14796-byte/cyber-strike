@@ -129,8 +129,8 @@ export const MethodologyStatusTool = Tool.define("methodology_status", {
       for (const item of pendingPage) {
         sections.push(`- Entry ${item.entryID} | ${item.vrtCategory} | ${item.asset} | ${item.entryTitle}`)
       }
-      if (pendingHasMore && last) {
-        sections.push(`Next cursor: pending_after_entry_id=${last.entryID}; pending_after_category=${last.vrtCategory}`)
+      if (pendingHasMore && nextPendingEntryID && nextPendingCategory) {
+        sections.push(`Next cursor: pending_after_entry_id=${nextPendingEntryID}; pending_after_category=${nextPendingCategory}`)
       } else {
         sections.push("Pending-check listing complete.")
       }
