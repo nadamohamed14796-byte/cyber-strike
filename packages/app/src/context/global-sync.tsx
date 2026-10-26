@@ -190,6 +190,7 @@ function createGlobalSync() {
           const needed = new Set(
             [...repair.missingParts].filter((id) => !store.part[messageID]?.some((part) => part.id === id)),
           )
+          if (needed.size === 0) return
           const recovered = response.data.parts.filter((part) => needed.has(part.id))
           if (recovered.length === 0) {
             console.warn("Could not recover missing streamed message part", {
