@@ -6,7 +6,7 @@ import { GlobalBus } from "./global"
 
 export namespace Bus {
   const log = Log.create({ service: "bus" })
-  type Subscription = (event: any) => void
+  type Subscription = (event: any) => void | Promise<void>
 
   export const InstanceDisposed = BusEvent.define(
     "server.instance.disposed",
@@ -49,18 +49,27 @@ export namespace Bus {
     log.info("publishing", {
       type: def.type,
     })
-    const pending = []
+    const pending: Promise<void>[] = []
     for (const key of [def.type, "*"]) {
       const match = state().subscriptions.get(key)
-      for (const sub of match ?? []) {
-        pending.push(sub(payload))
+      for (const sub of [...(match ?? [])]) {
+        try {
+          pending.push(
+            Promise.resolve(sub(payload)).catch((error) => {
+              log.error("subscription handler failed", { type: def.type, error })
+            }),
+          )
+        } catch (error) {
+          // A broken in-process subscriber must not block delivery to the global event stream.
+          log.error("subscription handler failed", { type: def.type, error })
+        }
       }
     }
     GlobalBus.emit("event", {
       directory: Instance.directory,
       payload,
     })
-    return Promise.all(pending)
+    await Promise.all(pending)
   }
 
   export function subscribe<Definition extends BusEvent.Definition>(
