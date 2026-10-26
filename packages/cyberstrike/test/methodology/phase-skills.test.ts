@@ -426,10 +426,10 @@ describe("Account lifecycle verification skill routing", () => {
         const skill = (await Skill.all()).find((entry) => entry.name === "attack-account-lifecycle-verification")
         expect(skill, "account lifecycle verification must exist in the runtime catalog").toBeDefined()
         expect(skill!.content).toContain("Email Verification")
-        expect(skill!.content).toContain("account/action binding")
+        expect(skill!.content).toContain("Token binding and action binding")
         expect(skill!.content).toContain("authoritative account state")
         expect(skill!.content).toContain("inconclusive/blocked")
-        expect(skill!.content).toContain("tester-controlled inboxes")
+        expect(skill!.content).toContain("inboxes controlled by the tester")
       },
     })
 
