@@ -19,6 +19,9 @@ describe("Bus.publish", () => {
         const globalFailingListener = (input: { payload: { type: string } }) => {
           if (input.payload.type === event.type) throw new Error("test global listener failure")
         }
+        const globalRejectingListener = async (input: { payload: { type: string } }) => {
+          if (input.payload.type === event.type) throw new Error("test async global listener failure")
+        }
         const globalListener = (input: { payload: { type: string } }) => {
           if (input.payload.type === event.type) globalCalls.push(input)
         }
@@ -30,6 +33,7 @@ describe("Bus.publish", () => {
           localCalls.push("healthy")
         })
         GlobalBus.on("event", globalFailingListener)
+        GlobalBus.on("event", globalRejectingListener)
         GlobalBus.on("event", globalListener)
 
         try {
@@ -38,6 +42,7 @@ describe("Bus.publish", () => {
           unsubscribeFailing()
           unsubscribeHealthy()
           GlobalBus.off("event", globalFailingListener)
+          GlobalBus.off("event", globalRejectingListener)
           GlobalBus.off("event", globalListener)
         }
 
