@@ -428,7 +428,7 @@ describe("Account lifecycle verification skill routing", () => {
         expect(skill!.content).toContain("Email Verification")
         expect(skill!.content).toContain("Token binding and action binding")
         expect(skill!.content).toContain("authoritative source")
-        expect(skill!.content).toContain("inconclusive/blocked")
+        expect(skill!.content).toContain("Inconclusive/blocked")
         expect(skill!.content).toContain("inboxes controlled by the tester")
       },
     })
