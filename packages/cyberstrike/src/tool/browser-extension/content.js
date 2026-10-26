@@ -1,41 +1,52 @@
-// Cyberstrike browser control indicator
+// Small visual indicator only. This file does not start, stop, or control a CyberStrike crawl.
 ;(function () {
-  // Only run in top frame
   if (window !== window.top) return
 
-  // Create banner
-  const banner = document.createElement("div")
-  banner.id = "cyberstrike-banner"
-  banner.innerHTML = `
-    <span class="cyberstrike-text">"Cyberstrike" started debugging this browser</span>
-    <button class="cyberstrike-btn" id="cyberstrike-cancel">Cancel</button>
-  `
+  const bannerID = "cyberstrike-banner"
+  let observer
 
-  // Insert banner at document start
-  function insertBanner() {
-    if (document.body && !document.getElementById("cyberstrike-banner")) {
-      document.body.insertBefore(banner, document.body.firstChild)
-
-      // Handle cancel button
-      document.getElementById("cyberstrike-cancel").addEventListener("click", function () {
-        window.close()
-      })
-    }
+  function dismissBanner() {
+    document.getElementById(bannerID)?.remove()
+    document.documentElement?.classList.remove("cyberstrike-indicator-active")
+    observer?.disconnect()
   }
 
-  // Try immediately and on DOM ready
+  function insertBanner() {
+    if (!document.body || document.getElementById(bannerID)) return
+
+    const banner = document.createElement("div")
+    banner.id = bannerID
+
+    const label = document.createElement("span")
+    label.className = "cyberstrike-text"
+    label.textContent = "CyberStrike browser indicator is active on this page"
+
+    const dismiss = document.createElement("button")
+    dismiss.type = "button"
+    dismiss.className = "cyberstrike-btn"
+    dismiss.textContent = "Dismiss"
+    dismiss.setAttribute("aria-label", "Dismiss CyberStrike browser indicator")
+    dismiss.addEventListener("click", dismissBanner)
+
+    banner.append(label, dismiss)
+    document.body.insertBefore(banner, document.body.firstChild)
+    document.documentElement?.classList.add("cyberstrike-indicator-active")
+    observer?.disconnect()
+  }
+
   if (document.body) {
     insertBanner()
   } else {
-    document.addEventListener("DOMContentLoaded", insertBanner)
+    document.addEventListener("DOMContentLoaded", insertBanner, { once: true })
   }
 
-  // Also observe for body creation
-  const observer = new MutationObserver(function () {
-    if (document.body && !document.getElementById("cyberstrike-banner")) {
-      insertBanner()
-      observer.disconnect()
-    }
+  observer = new MutationObserver(() => {
+    if (!document.body) return
+    insertBanner()
+    observer?.disconnect()
   })
-  observer.observe(document.documentElement, { childList: true, subtree: true })
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, { childList: true, subtree: true })
+  }
 })()
