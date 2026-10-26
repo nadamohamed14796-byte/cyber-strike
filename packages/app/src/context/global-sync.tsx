@@ -33,7 +33,7 @@ import { estimateRootSessionTotal, loadRootSessionsWithFallback } from "./global
 import { applyDirectoryEvent, applyGlobalEvent } from "./global-sync/event-reducer"
 import { bootstrapDirectory, bootstrapGlobal } from "./global-sync/bootstrap"
 import { sanitizeProject } from "./global-sync/utils"
-import type { ProjectMeta } from "./global-sync/types"
+import type { ProjectMeta, State } from "./global-sync/types"
 import { SESSION_RECENT_LIMIT } from "./global-sync/types"
 
 type GlobalStore = {
