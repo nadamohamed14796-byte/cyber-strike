@@ -57,3 +57,12 @@ Use tester-owned identities, synthetic data, reversible fixtures, and minimum su
 - Agentic Bug Hunter: https://github.com/AmesianX/claude-bughunter
 - Superagent Security Skills: https://github.com/superagent-ai/skills
 - UseOSINT Skills: https://github.com/useosint/skills
+
+
+## Cross-skill aggregation and feedback loop
+
+Use .cyberstrike/skill/attack-finding-correlation/SKILL.md as the shared integration contract after new evidence arrives from recon, JavaScript analysis, endpoint discovery, specialist validation, or variant analysis. It owns the cross-source identity rules, evidence graph, canonical grouping, and incremental merge logic; individual skills remain responsible for their own technical proof criteria.
+
+The loop is: **observe → correlate → select one evidence-backed handoff → validate with controls → merge result → recompute next handoff**. Do not fan out to every related skill by default. Keep each candidate edge tied to an observed signal and prerequisite; record blocked, inconclusive, and not-run states distinctly. Merge repeated observations and same-root-cause instances without discarding method, auth context, tenant/object boundary, parameter location, API version, evidence provenance, or materially different impact.
+
+The correlation layer must never turn a possible chain into confirmed impact or increase severity just because more links were hypothesized. Confirm each necessary link independently, preserve contradictory evidence, and group sibling routes under one finding when root cause, remediation, and impact are materially the same. Reopen prior rejected leads only when new evidence changes the tested boundary or invalidates the previous explanation.
