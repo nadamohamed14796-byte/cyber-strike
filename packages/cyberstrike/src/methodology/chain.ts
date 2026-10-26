@@ -218,10 +218,10 @@ export namespace Chain {
         "ssti_rce",
         a,
         a,
-        "RCE",
-        "critical",
+        "POTENTIAL_SERVER_SIDE_CODE_EXECUTION",
+        "high",
         `Safely validate whether SSTI in "${a.title}" can reach server-side code execution; treat RCE as unproven until separate impact evidence exists`,
-        85,
+        60,
       )
     }
 
