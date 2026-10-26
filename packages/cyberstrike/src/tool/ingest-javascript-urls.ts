@@ -216,6 +216,15 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       await fs.rename(temporaryManifest, manifestPath)
     }
 
+    let unsavedProgress = 0
+    const saveProgress = async (force = false) => {
+      unsavedProgress++
+      if (force || unsavedProgress >= 10) {
+        await saveManifest()
+        unsavedProgress = 0
+      }
+    }
+
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, Set<string>>()
@@ -263,7 +272,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
     for (const url of inputURLs) markPending(url, params.force_refresh)
-    await saveManifest()
+    await saveProgress(true)
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
@@ -273,7 +282,20 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let skipped = 0
     let failed = 0
 
-    for (const url of inputURLs) {
+    for (let index = 0; index < inputURLs.length; index++) {
+      const url = inputURLs[index]!
+      const parsedURL = new URL(url)
+      const activeAsset = parsedURL.origin + parsedURL.pathname
+      ctx.metadata({
+        title: "JavaScript analysis — " + activeAsset,
+        metadata: {
+          stage: "fetching",
+          active_asset: activeAsset,
+          processed: index,
+          queued: inputURLs.length,
+          target_url: params.target_url,
+        },
+      })
       const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
       const prior = byURL.get(url)
       const forceRefresh = params.force_refresh || prior?.pendingRefresh === true
@@ -283,21 +305,21 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         records.push(record)
         byURL.set(url, record)
         reused++
-        await saveManifest()
+        await saveProgress()
         continue
       }
       const result = await fetchScoped(url)
       if ("error" in result) {
         const record: AssetRecord = { url, source: assetSource, status: "failed", error: result.error, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
-        await saveManifest()
+        await saveProgress()
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", error: "HTTP " + response.status, fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
-        await saveManifest()
+        await saveProgress()
         continue
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
@@ -305,7 +327,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, error: "declared response size exceeds the asset limit", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
-        await saveManifest()
+        await saveProgress()
         continue
       }
       let bytes: Uint8Array
@@ -313,7 +335,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       catch (error) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "failed", contentType, error: error instanceof Error ? error.message : String(error), fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); failed++
-        await saveManifest()
+        await saveProgress()
         continue
       }
       receivedBytes += bytes.byteLength
@@ -322,7 +344,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (!isHTML && !looksLikeJavaScript(body, contentType, finalURL)) {
         const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "response does not look like JavaScript, HTML with script elements, or a version-3 source map", fetchedAt: new Date().toISOString() }
         records.push(record); byURL.set(url, record); skipped++
-        await saveManifest()
+        await saveProgress()
         continue
       }
       let queueChanged = false
@@ -341,7 +363,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           if (enqueueURL(normalizedMapURL, "sourceMappingURL from " + url)) queueChanged = true
         }
       }
-      if (queueChanged) await saveManifest()
+      if (queueChanged) await saveProgress(true)
       const contentHash = createHash("sha256").update(bytes).digest("hex")
       const existingContent = byHash.get(contentHash)
       let localPath = existingContent?.localPath
@@ -359,14 +381,23 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       byURL.set(url, record)
       if (existingContent) reused++
       else { downloaded++; downloadedBytes += bytes.byteLength }
-      await saveManifest()
+      await saveProgress()
     }
 
-    await saveManifest()
+    await saveProgress(true)
 
     let analysisSummary = "Analysis not run."
     let analysisError: string | undefined
     if (downloaded + reused > 0) {
+      ctx.metadata({
+        title: "Correlating JavaScript and captured requests",
+        metadata: {
+          stage: "correlation",
+          processed: inputURLs.length,
+          queued: inputURLs.length,
+          target_url: params.target_url,
+        },
+      })
       try {
         const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: params.target_url })
         analysisSummary = [
@@ -388,6 +419,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Workspace: " + workspace.workspacePath,
         "Input URLs: " + params.urls.length,
         "Unique URLs handled (supplied, resumed, and discovered): " + inputURLs.length,
+        "Pending assets left for resume: " + [...byURL.values()].filter((record) => record.status === "pending").length,
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions: " + downloaded,
         "Reused URL/content records: " + reused,
@@ -404,6 +436,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         workspace: workspace.workspacePath,
         input_urls: params.urls.length,
         valid_unique_urls: inputURLs.length,
+        queued_urls: inputURLs.length,
+        pending_assets: [...byURL.values()].filter((record) => record.status === "pending").length,
         invalid_urls: invalidCount,
         downloaded,
         reused,
