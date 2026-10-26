@@ -484,6 +484,22 @@ function extractInlineSourceMapContent(source: string): string | undefined {
   }
 }
 
+/** Extract executable inline script blocks from captured/local HTML as inert source text. */
+function extractInlineHTMLScripts(html: string): string[] {
+  const output: string[] = []
+  const pattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
+  for (const match of html.matchAll(pattern)) {
+    const attributes = match[1] ?? ""
+    const type = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attributes)
+    const mime = (type?.[1] ?? type?.[2] ?? type?.[3] ?? "").trim().toLowerCase()
+    // JSON-LD, import maps, and framework data blobs are not executable JavaScript.
+    if (mime && !["module", "text/javascript", "application/javascript", "text/ecmascript", "application/ecmascript", "application/x-javascript"].includes(mime)) continue
+    const body = (match[2] ?? "").trim()
+    if (body) output.push(body)
+  }
+  return output
+}
+
 export function extractCapturedJavaScriptSources(
   requests: Array<{
     id: string
@@ -524,6 +540,36 @@ export function extractCapturedJavaScriptSources(
     const isJavaScript =
       /(?:java|ecma)script|x-javascript/i.test(request.responseContentType ?? "") ||
       /\.(?:m?js|cjs)$/i.test(url.pathname)
+    const isHTML =
+      /(?:text\/html|application\/xhtml\+xml)/i.test(request.responseContentType ?? "") ||
+      /\.x?html?$/i.test(url.pathname)
+    if (isHTML) {
+      const inlineScripts = extractInlineHTMLScripts(body)
+      inlineScripts.forEach((script, index) => {
+        const bytes = Buffer.byteLength(script, "utf-8")
+        if (bytes < 1) return
+        const digest = createHash("sha256").update(script).digest("hex")
+        const canonicalSourceURL = url!.origin + url!.pathname
+        const basename = (url!.pathname.split("/").filter(Boolean).pop() || "captured.html").replace(/[^a-z0-9._-]/gi, "_").slice(0, 80)
+          + ".inline-" + (index + 1) + ".js"
+        const analysis = analysisCache?.get(digest) ?? analyzeJavaScriptSource(script)
+        analysisCache?.set(digest, analysis)
+        output.push({
+          relativePath: "captured-html/" + basename,
+          basename,
+          sha256: digest,
+          bytes,
+          endpointLiterals: extractStaticJavaScriptEndpoints(script),
+          sourceURL: canonicalSourceURL,
+          sourceRequestID: request.requestID ?? request.id,
+          sourceRequestIDs: [request.requestID ?? request.id],
+          ...(request.captureID ? { sourceCaptureID: request.captureID, sourceCaptureIDs: [request.captureID] } : {}),
+          captureTruncated: unwrapped.truncated,
+          analysis,
+        })
+      })
+      continue
+    }
     if (!isJavaScript && !isSourceMap) continue
     const bytes = Buffer.byteLength(body, "utf-8")
     if (bytes < 1) continue
@@ -877,11 +923,33 @@ export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map
         pendingDirectories.push(fullPath)
         continue
       }
-      if (!entry.isFile() || !/\.(?:m?js|cjs|map)$/i.test(entry.name)) continue
+      if (!entry.isFile() || !/\.(?:m?js|cjs|map|html?|xhtml)$/i.test(entry.name)) continue
       const content = await fs.readFile(fullPath, "utf-8")
       const digest = createHash("sha256").update(content).digest("hex")
       const sourceBytes = Buffer.byteLength(content, "utf-8")
       const workspaceRelativePath = path.relative(path.dirname(root), fullPath).split(path.sep).join("/")
+      if (/\.(?:html?|xhtml)$/i.test(entry.name)) {
+        const inlineScripts = extractInlineHTMLScripts(content)
+        inlineScripts.forEach((script, index) => {
+          const scriptDigest = createHash("sha256").update(script).digest("hex")
+          let analysis = analysisCache?.get(scriptDigest)
+          if (!analysis) {
+            analysis = analyzeJavaScriptSource(script)
+            analysisCache?.set(scriptDigest, analysis)
+          }
+          const basename = entry.name.replace(/\.(?:html?|xhtml)$/i, "") + ".inline-" + (index + 1) + ".js"
+          output.push({
+            relativePath: workspaceRelativePath + "#inline-" + (index + 1),
+            basename,
+            sha256: scriptDigest,
+            bytes: Buffer.byteLength(script, "utf-8"),
+            endpointLiterals: extractStaticJavaScriptEndpoints(script),
+            sourceURL: sourceBaseURL ? safeURL(sourceBaseURL)?.origin : undefined,
+            analysis,
+          })
+        })
+        continue
+      }
       if (/\.map$/i.test(entry.name)) {
         output.push(...sourceMapFilesFromContent({
           content,
