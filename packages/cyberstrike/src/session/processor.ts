@@ -16,6 +16,7 @@ import { SessionCompaction } from "./compaction"
 import { PermissionNext } from "@/permission/next"
 import { Question } from "@/question"
 import { Truncate } from "@/tool/truncation"
+import { toolSig } from "./stuck/signals"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -159,7 +160,7 @@ export namespace SessionProcessor {
                           p.type === "tool" &&
                           p.tool === value.toolName &&
                           p.state.status !== "pending" &&
-                          JSON.stringify(p.state.input) === JSON.stringify(value.input),
+                          toolSig(p.tool, p.state.input) === toolSig(value.toolName, value.input),
                       )
                     ) {
                       const agent = await Agent.get(input.assistantMessage.agent)
