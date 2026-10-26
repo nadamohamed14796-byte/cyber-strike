@@ -4,9 +4,11 @@
 
 ## The chain contract
 
+The built-in chain detector is a hypothesis generator, not a vulnerability oracle. A detected pattern, high confidence score, severity label, or two records on related hosts does not establish exploitability. Scores are prioritization hints, not calibrated probabilities. Keep chain confidence separate from finding confidence and impact severity.
+
 For every proposed link, record: observed trigger; prerequisite; actor/identity; asset/route; relevant security boundary; test-controlled fixture; expected next signal; disconfirming control; evidence path; stop/cleanup condition. Execute the next specialist skill only when its triggering signal was actually observed and the target is authorized for that test. If one link remains theoretical, keep it out of confirmed impact.
 
-A chain is confirmed only when every reported step is independently reproducible and the end state is relevant. A lower-severity precursor may be reportable on its own, but do not inflate it using a hypothetical downstream effect. Avoid duplicate reports for one root cause; separate findings only where controls, impact, or remediation materially differ.
+A chain is confirmed only when every reported step is independently reproducible and the end state is relevant. Recheck asset relationship and authorization for every hop; shared naming or a broad shared suffix is not enough. Credentials, tokens, source-map strings, route names, and scanner hints remain candidates until a permitted test establishes validity and effective access. Never test exposed credentials against unrelated real users or services. A same-finding escalation (for example, SSTI to code execution) still needs separate evidence of the terminal capability; do not infer RCE from SSTI alone. A lower-severity precursor may be reportable on its own, but do not inflate it using a hypothetical downstream effect. Avoid duplicate reports for one root cause; separate findings only where controls, impact, or remediation materially differ.
 
 ## Signal-to-skill routes
 
@@ -31,6 +33,16 @@ A chain is confirmed only when every reported step is independently reproducible
 | CMS/framework/version is fingerprinted | Matching specialist/CVE review | Product/build/backport confidence, reachable vulnerable component, and safe prerequisite proof |
 | Service/ASN/origin is newly discovered | Recon attribution/service review | Ownership confidence, freshness, exact scope inclusion, and safe probing authorization |
 | Imported skill/extension has an unclear source or broad capabilities | skill-supply-chain-audit; MCP/CI review if a concrete tool or workflow boundary is involved | Claimed purpose vs actual files/capabilities, provenance, static data-flow evidence, and safe quarantine decision |
+
+## Chain lifecycle and deduplication
+
+1. **Propose:** preserve source entry IDs, evidence references, assets, and the relationship suggesting the next hop. Keep inferred links hypothetical.
+2. **Plan:** identify prerequisites, controlled principal/data, expected signal, baseline, negative control, impact boundary, and cleanup before testing.
+3. **Validate one hop at a time:** delegate only the next relevant specialist skill after its prerequisite signal is observed. A blocked hop does not invalidate an independently confirmed precursor.
+4. **Confirm terminal impact:** verify the actual principal, object/tenant, data or action reached, and persistence/state change where relevant. Never upgrade severity from theoretical impact.
+5. **Close:** record confirmed, disproven, inconclusive, blocked, not run, or out of scope. Reopen only when a meaningful prerequisite, asset, role, state, or version changes.
+
+Deduplicate using root cause + affected boundary/operation + impact, not title similarity alone. Keep a chain as a separate report only when it demonstrates materially distinct impact or remediation; otherwise link it to the primary finding. Never let a chain candidate overwrite a finding's own verification state.
 
 ## Request comparison rules
 

@@ -41,6 +41,13 @@ Search the registered tool or skill catalog when useful to solve a real evidence
 - Rule out a candidate only when a specific control or benign explanation is identified and shown to apply to the same reachable path before the relevant security-sensitive operation. Check its arguments, ordering, failure behavior, and alternate entrypoints. A safe sibling path, generic trust in a library, a 401/403, a failed request, or a missing prerequisite does not by itself rule it out.
 - If evidence cannot confirm or rule out a plausible candidate, keep it inconclusive and state the exact proof gap. Blocked, unavailable, not-run, and out-of-scope work must retain that status with a reason; never mark it as passed or false positive.
 
+### Vulnerability chaining and specialist handoff
+- Treat chain-detector output as hypotheses only. For every hop, state source evidence, prerequisite, actor/role, asset and trust boundary, expected signal, baseline, negative control, terminal impact, and cleanup.
+- Load only the specialist skill for the next evidenced hop; do not execute the entire chain catalogue. Re-evaluate scope and policy for each asset and action.
+- Verify each hop independently. A candidate credential, endpoint name, redirect, reflected value, scanner hint, or broad shared-domain relationship is not proof of the next step. Confirm a chain only when the full path and terminal security impact are reproducible.
+- Keep candidate confidence, vulnerability confidence, and impact severity separate. Do not raise severity for a hypothetical chain. Preserve confirmed precursor findings even when later hops are blocked or disproven.
+- Deduplicate reports by root cause, affected boundary/operation, and material impact/remediation. Link related findings when distinct; do not create multiple reports for one underlying defect.
+
 ### Severity calibration
 - Rate severity only after establishing reachability, attacker prerequisites, the affected principal/data/action, and counterevidence. Apply the target program's policy and rating taxonomy first; distinguish confidence from impact and severity.
 - Base the rating on demonstrated confidentiality, integrity, availability, privilege, and business impact. Do not raise severity for a secret-looking string, a public route, a scanner label, or a chain whose intermediate steps remain hypothetical.

@@ -1,4 +1,4 @@
-import { Database, eq, and } from "../storage/db"
+import { Database, eq } from "../storage/db"
 import { ChainCandidateTable } from "./methodology.sql"
 import { Identifier } from "../id/id"
 import { Intel } from "./intel"
@@ -57,13 +57,25 @@ export namespace Chain {
         (c) => c.category.toLowerCase().includes(cat.toLowerCase()) && c.status === "tested_vulnerable",
       )
 
+    const hostname = (asset: string) => {
+      try {
+        return new URL(asset.includes("://") ? asset : `https://${asset}`).hostname.toLowerCase().replace(/\.$/, "")
+      } catch {
+        return asset.toLowerCase().replace(/^https?:\/\//, "").split(/[/:?#]/, 1)[0].replace(/\.$/, "")
+      }
+    }
+    // Avoid naive last-two-label matching (e.g. unrelated hosts under co.uk).
+    const TWO_PART_SUFFIXES = new Set(["co.uk","org.uk","ac.uk","gov.uk","com.au","net.au","org.au","edu.au","co.nz","org.nz","com.br","com.mx","com.ar","co.jp","co.kr","com.sg","com.tr","com.cn","com.hk","co.in","firm.in","net.in","org.in"])
+    const registrableDomain = (asset: string) => {
+      const labels = hostname(asset).split(".").filter(Boolean)
+      if (labels.length < 2) return labels.join(".")
+      const lastTwo = labels.slice(-2).join(".")
+      return labels.slice(-(TWO_PART_SUFFIXES.has(lastTwo) ? 3 : 2)).join(".")
+    }
     const sameAssetOrRelated = (a: Intel.Entry, b: Intel.Entry) => {
-      const aa = a.asset.toLowerCase()
-      const ba = b.asset.toLowerCase()
-      if (aa === ba) return true
-      const domainA = aa.split(".").slice(-2).join(".")
-      const domainB = ba.split(".").slice(-2).join(".")
-      return domainA === domainB
+      const aa = hostname(a.asset)
+      const ba = hostname(b.asset)
+      return !!aa && !!ba && (aa === ba || registrableDomain(aa) === registrableDomain(ba))
     }
 
     const chains: Candidate[] = []
@@ -105,14 +117,16 @@ export namespace Chain {
       for (const ep of endpoints) {
         if (!sameAssetOrRelated(cred, ep)) continue
         if (ep.severity === "info") continue
-        const conf = cred.status === "exploited" ? 90 : cred.confidenceLevel === "confirmed" ? 85 : 65
+        // A credential-shaped string is not proof of validity or effective access.
+        const credentialVerified = cred.status === "exploited"
+        const conf = credentialVerified ? 85 : cred.confidenceLevel === "confirmed" ? 45 : 30
         addChain(
           "credential_endpoint",
           cred,
           ep,
-          "ACCOUNT_TAKEOVER",
-          "critical",
-          `Use credential "${cred.title}" to authenticate against "${ep.title}"`,
+          "POTENTIAL_ACCOUNT_ACCESS",
+          credentialVerified ? "high" : "medium",
+          `In an authorized test account, verify whether "${cred.title}" is valid and whether it grants access to "${ep.title}". Do not try exposed credentials against unrelated users or services; record the actual principal and permissions.`,
           conf,
         )
       }
@@ -258,7 +272,7 @@ export namespace Chain {
   export function save(sessionID: string, chains: Candidate[]): void {
     // Load existing to preserve status
     const existing = load(sessionID)
-    const existingMap = new Map(existing.map((c) => [`${c.pattern}:${c.entryIDs.sort().join("+")}`, c]))
+    const existingMap = new Map(existing.map((c) => [`${c.pattern}:${[...c.entryIDs].sort().join("+")}`, c]))
 
     Database.use((db) => {
       // Clear old chains for this session
@@ -266,7 +280,7 @@ export namespace Chain {
 
       const now = Date.now()
       for (const chain of chains) {
-        const key = `${chain.pattern}:${chain.entryIDs.sort().join("+")}`
+        const key = `${chain.pattern}:${[...chain.entryIDs].sort().join("+")}`
         const prev = existingMap.get(key)
 
         db.insert(ChainCandidateTable)
@@ -322,13 +336,14 @@ export namespace Chain {
     const active = chains.filter((c) => c.status === "detected" || c.status === "testing")
     if (active.length === 0) return ""
 
-    const lines: string[] = [`## Chain Opportunities (${active.length} detected)`]
+    const lines: string[] = [`## Chain Hypotheses (${active.length} candidates; not confirmed findings)`, "Treat each item as a lead only. Validate every link independently, use an authorized controlled fixture, record a baseline and disconfirming control, and confirm terminal impact before changing finding severity or reporting a chain."]
     for (const c of active.slice(0, 10)) {
       const confLabel = c.confidence >= 80 ? "HIGH" : c.confidence >= 60 ? "MED" : "LOW"
       lines.push(
         `[${confLabel}-${c.confidence}%] ${c.pattern.toUpperCase()}: "${c.entryTitles[0]}" + "${c.entryTitles[1]}" -> ${c.expectedImpact}`,
       )
-      lines.push(`  Test: ${c.testingPlan}`)
+      lines.push(`  Expected impact (unproven until tested): ${c.expectedImpact} | Candidate severity: ${c.severity}`)
+      lines.push(`  Next test: ${c.testingPlan}`)
       lines.push(`  Entries: ${c.entryIDs.join(", ")} | Assets: ${c.assets.join(", ")}`)
     }
     return lines.join("\n")

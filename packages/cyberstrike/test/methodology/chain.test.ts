@@ -63,7 +63,7 @@ describe("Chain — Detection", () => {
         const credentialChain = chains.find((c) => c.pattern === "credential_endpoint")
         expect(credentialChain).toBeDefined()
         if (credentialChain) {
-          expect(credentialChain.expectedImpact).toContain("ACCOUNT_TAKEOVER")
+          expect(credentialChain.expectedImpact).toContain("POTENTIAL_ACCOUNT_ACCESS")
         }
 
         await Session.remove(session.id)
@@ -246,5 +246,35 @@ describe("Chain — Format", () => {
     expect(result.length).toBeGreaterThan(0)
     expect(result).toContain("Chain")
     expect(result).toContain("CREDENTIAL_ENDPOINT")
+  })
+})
+
+describe("Chain — Safety and confidence", () => {
+  test("credential discovery remains a hypothesis until validity and access are demonstrated", async () => {
+    await Instance.provide({ directory: projectRoot, fn: async () => {
+      const session = await Session.create({})
+      Intel.add({ sessionID: session.id, data: { type: "credential", severity: "high", title: "Possible API key in JavaScript", detail: "A key-shaped string was found in a public script; validity has not been checked", asset: "app.example.com", source: "test", confidenceLevel: "confirmed", tags: ["credential"] } })
+      Intel.add({ sessionID: session.id, data: { type: "endpoint", severity: "medium", title: "GET /api/account", detail: "Account endpoint", asset: "api.example.com", source: "test", confidenceLevel: "high", tags: ["endpoint"] } })
+      const candidate = Chain.detect(session.id).find((c) => c.pattern === "credential_endpoint")
+      expect(candidate).toBeDefined()
+      expect(candidate?.confidence).toBeLessThan(60)
+      expect(candidate?.expectedImpact).toContain("POTENTIAL")
+      expect(candidate?.testingPlan).toContain("authorized test account")
+      await Session.remove(session.id)
+    }})
+  })
+  test("does not relate unrelated registrable domains sharing a two-label suffix", async () => {
+    await Instance.provide({ directory: projectRoot, fn: async () => {
+      const session = await Session.create({})
+      Intel.add({ sessionID: session.id, data: { type: "credential", severity: "high", title: "Credential candidate", detail: "Unverified credential-shaped string", asset: "victim.co.uk", source: "test", confidenceLevel: "high", tags: ["credential"] } })
+      Intel.add({ sessionID: session.id, data: { type: "endpoint", severity: "medium", title: "GET /admin", detail: "Admin endpoint", asset: "other.co.uk", source: "test", confidenceLevel: "high", tags: ["endpoint"] } })
+      expect(Chain.detect(session.id).some((c) => c.pattern === "credential_endpoint")).toBe(false)
+      await Session.remove(session.id)
+    }})
+  })
+  test("prompt labels detected chains as hypotheses, not confirmed findings", () => {
+    const result = Chain.formatForPrompt([{ id: "chain-1", pattern: "credential_endpoint", entryIDs: ["a","b"], entryTitles: ["Credential candidate","API endpoint"], assets: ["example.com"], expectedImpact: "POTENTIAL_ACCOUNT_ACCESS", severity: "medium", testingPlan: "Verify only with authorized test account", status: "detected", confidence: 30, detectedAt: Date.now() }])
+    expect(result).toContain("not confirmed findings")
+    expect(result).toContain("unproven until tested")
   })
 })
