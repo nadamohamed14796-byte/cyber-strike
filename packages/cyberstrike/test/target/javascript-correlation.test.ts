@@ -128,6 +128,15 @@ test("persists secret fingerprints and source locations without raw values", asy
   expect(serialized).toContain("Secret-like values are never retained")
 })
 
+test("merges JavaScript asset provenance across input, HTML, and source-map references", async () => {
+  const { mergeAssetSources } = await import("../../src/tool/ingest-javascript-urls")
+  expect(mergeAssetSources(
+    ["collector", "crawler"],
+    ["crawler", "user-supplied"],
+    "HTML | collector",
+  )).toEqual(["HTML", "collector", "crawler", "user-supplied"])
+})
+
 test("resolves external script src URLs from HTML and ignores non-network schemes", async () => {
   const { extractHTMLScriptURLs } = await import("../../src/tool/ingest-javascript-urls")
   const urls = extractHTMLScriptURLs([
