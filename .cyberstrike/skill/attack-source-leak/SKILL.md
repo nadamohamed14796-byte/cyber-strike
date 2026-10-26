@@ -23,6 +23,7 @@ cwe_ids:
   - CWE-538
   - CWE-540
 chains_with:
+  - attack-dependency-cve-scanning
   - attack-information-disclosure
   - attack-wordpress
   - recon-methodology
