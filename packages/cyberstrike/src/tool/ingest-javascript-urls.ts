@@ -63,6 +63,19 @@ export function mergeAssetSources(...values: Array<string | string[] | undefined
   return [...merged].sort()
 }
 
+function displayURL(input: string): string {
+  try {
+    const url = new URL(input)
+    return url.origin + url.pathname + (url.search ? "?[query redacted]" : "")
+  } catch {
+    return "[invalid URL]"
+  }
+}
+
+function redactURLs(input: string): string {
+  return input.replace(/https?:\/\/[^\s"'<>]+/gi, (url) => displayURL(url))
+}
+
 function extensionFor(url: string, contentType: string): string {
   const pathname = new URL(url).pathname.toLowerCase()
   if (/text\/html|application\/xhtml\+xml/.test(contentType) || /\.x?html?$/.test(pathname)) return ".html"
@@ -146,7 +159,7 @@ async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ resp
     if (abort.aborted) return { error: "fetch cancelled; URL remains pending for resume", aborted: true }
     const scope = await TargetMemory.checkURLScope(current)
     if (abort.aborted) return { error: "fetch cancelled; URL remains pending for resume", aborted: true }
-    if (!scope.allowed) return { error: "scope denied for " + current + ": " + scope.reason }
+    if (!scope.allowed) return { error: "scope denied for " + displayURL(current) + ": " + redactURLs(scope.reason) }
     let response: Response
     try {
       response = await fetch(current, {
@@ -157,7 +170,7 @@ async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ resp
       })
     } catch (error) {
       if (abort.aborted) return { error: "fetch cancelled; URL remains pending for resume", aborted: true }
-      return { error: "fetch failed: " + (error instanceof Error ? error.message : String(error)) }
+      return { error: "fetch failed: " + redactURLs(error instanceof Error ? error.message : String(error)) }
     }
     if (![301, 302, 303, 307, 308].includes(response.status)) return { response, finalURL: current }
     const location = response.headers.get("location")
@@ -300,7 +313,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           active_asset: activeAsset,
           processed: index,
           queued: inputURLs.length,
-          target_url: params.target_url,
+          target_url: displayURL(params.target_url),
         },
       })
       const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
@@ -376,7 +389,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         // Treat HTML as an inert container: local analysis extracts inline scripts,
         // while external script URLs re-enter this same scope-enforced fetch queue.
         for (const scriptURL of extractHTMLScriptURLs(body, finalURL)) {
-          if (enqueueURL(scriptURL, "script src from " + url)) queueChanged = true
+          if (enqueueURL(scriptURL, "script src from " + displayURL(url))) queueChanged = true
         }
       } else {
         // Feed external source-map links discovered inside each bundle into this same queue.
@@ -384,7 +397,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
           const normalizedMapURL = normalizeURL(mapURL)
           if (!normalizedMapURL) continue
-          if (enqueueURL(normalizedMapURL, "sourceMappingURL from " + url)) queueChanged = true
+          if (enqueueURL(normalizedMapURL, "sourceMappingURL from " + displayURL(url))) queueChanged = true
         }
       }
       if (queueChanged) await saveProgress(true)
@@ -419,7 +432,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           stage: "correlation",
           processed: inputURLs.length,
           queued: inputURLs.length,
-          target_url: params.target_url,
+          target_url: displayURL(params.target_url),
         },
       })
       try {
@@ -453,7 +466,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
         analysisSummary,
-        ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => record.url + " — " + record.status + ": " + record.error),
+        ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => displayURL(record.url) + " — " + record.status + ": " + redactURLs(record.error ?? "")),
       ].join("\n"),
       metadata: {
         manifest_path: manifestPath,
