@@ -83,6 +83,7 @@ function createGlobalSync() {
     { dirty: boolean; cancelled: boolean; missingParts: Set<string> }
   >()
   const repairKey = (directory: string, sessionID: string, messageID: string) =>
+    [directory, sessionID, messageID].join("\0")
 
   const cancelMessageRepairs = (prefix: string) => {
     for (const [key, repair] of messageRepairs) {
@@ -91,7 +92,6 @@ function createGlobalSync() {
       messageRepairs.delete(key)
     }
   }
-    [directory, sessionID, messageID].join("\0")
 
   const [projectCache, setProjectCache, , projectCacheReady] = persisted(
     Persist.global("globalSync.project", ["globalSync.project.v1"]),
