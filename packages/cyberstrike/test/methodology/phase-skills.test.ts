@@ -66,6 +66,10 @@ describe("Phase-critical skill pinning", () => {
     expect(vulnPrompt).toContain("Severity calibration — mandatory before reporting")
     expect(vulnPrompt).toContain("Choose severity only after the relevant path is reachable")
     expect(vulnPrompt).toContain("hypothetical chain")
+    expect(vulnPrompt).toContain("Source-aware root-cause analysis and fix verification")
+    expect(vulnPrompt).toContain("Use static analysis to prioritize, dynamic evidence to confirm")
+    expect(vulnPrompt).toContain("Include a regression test recommendation")
+    expect(vulnPrompt).toContain("proposed, applied-but-not-tested, or verified")
   })
 
   test("phase-critical skills remain present even when the optional shortlist limit is one", () => {

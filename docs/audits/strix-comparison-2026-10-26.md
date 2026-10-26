@@ -44,6 +44,7 @@ These are implementation/design observations, not a claim that every file in Str
 2. **Specialist triage:** `.cyberstrike/skill/attack-triage-validation/SKILL.md` now states the evidence required to confirm, rule out, or leave a candidate inconclusive; distinguishes blocked/not-run/out-of-scope outcomes; and adds an illustrative critical/high/medium/low severity rubric subordinate to the target program's policy.
 3. **Specialist-agent prompt:** `packages/cyberstrike/src/agent/prompt/vuln/common-prompt.txt` now makes evidence-first severity calibration explicit for vulnerability-testing agents, not only the default orchestrator.
 4. **Regression tests:** `packages/cyberstrike/test/methodology/phase-skills.test.ts` checks the runtime-loaded triage skill, the shared methodology prompt, and the common vulnerability-agent prompt for these guardrails.
+5. **Source-aware vulnerability lifecycle:** `packages/cyberstrike/src/agent/prompt/vuln/common-prompt.txt` now connects source/data-flow analysis to dynamic confirmation, root-cause remediation, regression-test design, and honest fix/retest status. The guidance is conditional on source/tool availability and does not claim static findings are confirmed.
 
 The new wording uses CyberStrike's existing `validate_finding` and evidence lifecycle. It does not add a duplicate coverage ledger, duplicate finding statuses, or another orchestration prompt.
 
@@ -54,6 +55,10 @@ The new wording uses CyberStrike's existing `validate_finding` and evidence life
 - **Quick/standard/deep fixed testing recipes:** the user's recon requirements prioritize useful unbounded discovery, resume support and adaptive tool choice. Scan recipes must not silently turn into result, host or time caps.
 - **Strix's separate coverage ledger:** CyberStrike already has durable phase checkpoints, methodology coverage, validation gates and cursor-based reconciliation. A parallel ledger would risk conflicting sources of truth.
 - **Per-tool skill duplication:** CyberStrike already has shared tool-selection/catalog guidance and specialist recon skills. More tool-specific documents should be added only when they fill a demonstrated tool-usage gap, not to inflate skill count.
+
+## Vulnerability-handling follow-up
+
+The additional Strix-inspired workflow closes a process gap rather than adding another subsystem: use source traces to identify the root cause, dynamic evidence to validate it when possible, a targeted regression test to prevent recurrence, and explicit status for proposed/applied/verified fixes. Existing CyberStrike validation, similarity comparison, triage, and coverage tools remain the source of truth.
 
 ## Verification and limits
 
