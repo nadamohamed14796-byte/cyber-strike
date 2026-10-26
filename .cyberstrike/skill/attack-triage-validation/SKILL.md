@@ -20,19 +20,22 @@ sources:
 
 Use this gate before classifying or reporting a suspected vulnerability. A scanner alert, unusual response, stack trace, missing header, or HTTP 200 is a lead—not a confirmed finding. Conclusions must match evidence and program acceptance criteria.
 
-## 2. Seven-question gate
+## 2. Mandatory ten-question gate
 
-Answer all seven for each candidate:
+For every candidate finding, use CyberStrike's `validate_finding` tool and submit exactly one evidence-backed status for each of its ten checks. Do not replace this with a short informal checklist or skip it because the finding looks obvious. Use `unknown` whenever a test or evidence is missing; unknown is not a failure and is not proof of a false positive.
 
-1. **In scope?** Is the exact asset and test type permitted?
-2. **Reproducible?** Can the behavior be repeated from a known starting state?
-3. **Security boundary?** Which identity, role, tenant, origin, parser, or trust boundary is violated?
-4. **Expected behavior?** What should a secure implementation do, and what supports that expectation?
-5. **Observed behavior?** What response or controlled state change proves the difference?
-6. **Attacker capability and impact?** What can the tested actor actually access or change?
-7. **Alternatives excluded?** Were cache effects, stale sessions, ownership confusion, soft-404s, and tool artifacts considered?
+1. **Reproducible:** Can another tester repeat the behavior with documented steps?
+2. **Request path:** Does the request reach the intended endpoint and code path?
+3. **Unexpected behavior:** Is there concrete evidence that behavior differs from expected secure behavior?
+4. **Security impact:** Is there a demonstrated consequence beyond unusual behavior or harmless information?
+5. **Identity context:** Were roles, sessions, ownership, permissions, and test data verified?
+6. **Alternative causes:** Were cache, CDN/WAF, environment, stale state, races, and tool artifacts reasonably excluded?
+7. **Control comparison:** Is there a baseline/negative control that isolates the behavior?
+8. **Evidence complete:** Is evidence attributable, minimal, reproducible, and independently reviewable?
+9. **Benign behavior ruled out:** Does evidence rule out an intended/benign explanation? Mark fail only when evidence supports that explanation; otherwise use unknown.
+10. **Reviewable:** Are limitations and reproduction steps clear enough for another reviewer?
 
-If an answer is unknown, mark the candidate inconclusive and gather only the evidence needed to resolve it. If disproven, record the negative result.
+A finding can be recorded as a lead before all checks are resolved, but it must remain `new / inconclusive / needs review` until the validator's evidence and durable-ledger requirements support a verdict. Do not approve or inflate severity from a key-looking string, HTTP status, scanner label, public endpoint, or theoretical impact alone.
 
 ## 3. Validation procedure
 
