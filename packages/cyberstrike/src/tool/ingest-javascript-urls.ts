@@ -6,14 +6,12 @@ import { TargetMemory } from "../target"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
-const MAX_URLS = 500
-const MAX_ASSET_BYTES = 8 * 1024 * 1024
-const MAX_TOTAL_BYTES = 64 * 1024 * 1024
+const MAX_ASSET_BYTES = 32 * 1024 * 1024
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
-  urls: z.array(z.string().trim().min(1).max(8192)).min(1).max(MAX_URLS)
+  urls: z.array(z.string().trim().min(1).max(8192)).min(1)
     .describe("JavaScript asset URLs OR HTML page URLs from ANY source: URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths."),
   source: z.string().trim().min(1).max(120).default("unspecified")
     .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
@@ -50,6 +48,18 @@ function normalizeURL(input: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+export function mergeAssetSources(...values: Array<string | string[] | undefined>): string[] {
+  const merged = new Set<string>()
+  for (const value of values) {
+    const items = Array.isArray(value) ? value : typeof value === "string" ? value.split(" | ") : []
+    for (const item of items) {
+      const source = item.trim()
+      if (source) merged.add(source)
+    }
+  }
+  return [...merged].sort()
 }
 
 function extensionFor(url: string, contentType: string): string {
@@ -196,7 +206,18 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
-    const sourceByURL = new Map<string, string>(inputURLs.map((url) => [url, params.source] as const))
+    const sourceByURL = new Map<string, Set<string>>()
+    const addSource = (url: string, source: string) => {
+      const values = sourceByURL.get(url) ?? new Set(mergeAssetSources(byURL.get(url)?.sources, byURL.get(url)?.source))
+      for (const item of mergeAssetSources(source)) values.add(item)
+      sourceByURL.set(url, values)
+      const prior = byURL.get(url)
+      if (prior) {
+        const sources = [...values].sort()
+        byURL.set(url, { ...prior, source: sources.join(" | "), sources })
+      }
+    }
+    for (const url of inputURLs) addSource(url, params.source)
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
@@ -207,10 +228,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let failed = 0
 
     for (const url of inputURLs) {
-      const assetSource = sourceByURL.get(url) ?? params.source
+      const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
       const prior = byURL.get(url)
       if (!params.force_refresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
-        const sources = [...new Set([...(prior.sources ?? prior.source.split(" | ")), assetSource])].filter(Boolean).sort()
+        const sources = mergeAssetSources(prior.sources, prior.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
         const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
         records.push(record)
         byURL.set(url, record)
@@ -244,11 +265,6 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         continue
       }
       receivedBytes += bytes.byteLength
-      if (receivedBytes > MAX_TOTAL_BYTES) {
-        const record: AssetRecord = { url, finalURL, source: assetSource, status: "skipped", contentType, bytes: bytes.byteLength, error: "batch download budget exceeded", fetchedAt: new Date().toISOString() }
-        records.push(record); byURL.set(url, record); skipped++
-        continue
-      }
       const body = new TextDecoder("utf-8", { fatal: false }).decode(bytes)
       const isHTML = isHTMLResponse(body, contentType, finalURL)
       if (!isHTML && !looksLikeJavaScript(body, contentType, finalURL)) {
@@ -260,20 +276,21 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         // Treat HTML as an inert container: local analysis extracts inline scripts,
         // while external script URLs re-enter this same scope-enforced fetch queue.
         for (const scriptURL of extractHTMLScriptURLs(body, finalURL)) {
-          if (queuedURLs.has(scriptURL) || queuedURLs.size >= MAX_URLS) continue
+          addSource(scriptURL, "script src from " + url)
+          if (queuedURLs.has(scriptURL)) continue
           queuedURLs.add(scriptURL)
           inputURLs.push(scriptURL)
-          sourceByURL.set(scriptURL, "script src from " + url)
         }
       } else {
         // Feed external source-map links discovered inside each bundle into this same queue.
         // Every map goes through the same persisted-scope and redirect checks as any other URL.
         for (const mapURL of extractJavaScriptSourceMapReferences(body, finalURL)) {
           const normalizedMapURL = normalizeURL(mapURL)
-          if (!normalizedMapURL || queuedURLs.has(normalizedMapURL) || queuedURLs.size >= MAX_URLS) continue
+          if (!normalizedMapURL) continue
+          addSource(normalizedMapURL, "sourceMappingURL from " + url)
+          if (queuedURLs.has(normalizedMapURL)) continue
           queuedURLs.add(normalizedMapURL)
           inputURLs.push(normalizedMapURL)
-          sourceByURL.set(normalizedMapURL, "sourceMappingURL from " + url)
         }
       }
       const contentHash = createHash("sha256").update(bytes).digest("hex")
@@ -287,8 +304,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         })
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
-      const priorSources = byURL.get(url)?.sources ?? (byURL.get(url)?.source ? [byURL.get(url)!.source] : [])
-      const sources = [...new Set([...priorSources.flatMap((value) => value.split(" | ")), params.source])].filter(Boolean).sort()
+      const sources = mergeAssetSources(byURL.get(url)?.sources, byURL.get(url)?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
       const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
