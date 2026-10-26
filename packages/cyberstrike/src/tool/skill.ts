@@ -203,13 +203,21 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (params.action === "chain") {
         if (!params.findings?.length) throw new Error("Findings required for chain analysis")
-        const summary = KillChain.summary(params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })))
+        const allowedSkills = new Set(accessibleSkills.map((skill) => skill.name))
+        const summary = KillChain.summary(
+          params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })),
+          allowedSkills,
+        )
         return { title: "Kill Chain Analysis", output: summary, metadata: {} as { name?: string; dir?: string } }
       }
 
       if (params.action === "suggest") {
         if (!params.findings?.length) throw new Error("Findings required for suggestions")
-        const suggestions = SkillContext.suggest(params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })))
+        const allowedSkills = new Set(accessibleSkills.map((skill) => skill.name))
+        const suggestions = SkillContext.suggest(
+          params.findings.map((finding) => ({ ...finding, severity: finding.severity ?? "medium" })),
+          allowedSkills,
+        )
         if (suggestions.length === 0)
           return {
             title: "No suggestions",

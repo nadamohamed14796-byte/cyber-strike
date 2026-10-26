@@ -136,6 +136,24 @@ Skill body for ${name}.
         expect(KillChain.analyze(duplicateFindings)[0]?.combined_severity).toBe("critical")
         expect(KillChain.analyze([...duplicateFindings].reverse())[0]?.combined_severity).toBe("critical")
 
+        const restrictedSkills = new Set(["aws-postexploit", "T1078.004_cloud-accounts"])
+        const restrictedChain = KillChain.summary(
+          [
+            { skill_id: "AWS-POSTEXPLOIT", severity: "high" },
+            { skill_id: "T1078.004", severity: "medium" },
+          ],
+          restrictedSkills,
+        )
+        expect(restrictedChain).toContain("aws-postexploit")
+        expect(restrictedChain).not.toContain("T1552.005_cloud-instance-metadata-api")
+        expect(restrictedChain).not.toContain("T1552.005")
+
+        const restrictedSuggestions = SkillContext.suggest(
+          [{ skill_id: "target-workflow" }],
+          new Set(["target-workflow"]),
+        )
+        expect(restrictedSuggestions).toEqual([])
+
         const aliasNextSteps = KillChain.nextSteps({ skill_id: "AWS-POSTEXPLOIT", severity: "high" })
         expect(aliasNextSteps).toContain("T1078.004_cloud-accounts")
         expect(aliasNextSteps).toContain("T1552.005_cloud-instance-metadata-api")

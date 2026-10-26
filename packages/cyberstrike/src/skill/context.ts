@@ -119,8 +119,23 @@ export namespace SkillContext {
 
   export function suggest(
     findings: Array<{ skill_id: string; severity?: string; cwe_id?: string; tech_stack?: string[] }>,
+    allowedSkills?: ReadonlySet<string>,
   ): Suggestion[] {
     const result: Suggestion[] = []
+    const allowed = allowedSkills
+      ? new Set(Array.from(allowedSkills).flatMap((name) => {
+          const canonical = SkillIndex.resolveReference(name)
+          return canonical ? [canonical] : []
+        }))
+      : undefined
+    // An allowlist is supplied by the skill tool's agent permission context.
+    // Never use a denied or unresolved finding as a source of chain suggestions.
+    const candidates = allowed
+      ? findings.filter((finding) => {
+          const canonical = SkillIndex.resolveReference(finding.skill_id)
+          return canonical !== undefined && allowed.has(canonical)
+        })
+      : findings
     const suggested = new Set<string>()
     const catalog = Skill.state()
     const active = new Set(
@@ -131,7 +146,7 @@ export namespace SkillContext {
     // Findings already present in the input are completed context, not new
     // skill-chain work to suggest again.
     const observed = new Set(
-      findings.flatMap((finding) => {
+      candidates.flatMap((finding) => {
         const canonical = SkillIndex.resolveReference(finding.skill_id)
         return canonical ? [canonical] : []
       }),
@@ -143,6 +158,9 @@ export namespace SkillContext {
       priority: Suggestion["priority"],
       visiting = new Set<string>(),
     ) {
+      const canonical = SkillIndex.resolveReference(name) ?? name
+      if (allowed && !allowed.has(canonical)) return
+      name = canonical
       if (active.has(name) || observed.has(name) || suggested.has(name) || visiting.has(name)) return
       visiting.add(name)
 
@@ -151,7 +169,12 @@ export namespace SkillContext {
       // prerequisite (such as credentials) exists.
       for (const reference of SkillIndex.prerequisitesFor(name)) {
         const prerequisite = SkillIndex.resolveReference(reference)
-        if (!prerequisite || active.has(prerequisite) || suggested.has(prerequisite)) continue
+        if (
+          !prerequisite ||
+          (allowed && !allowed.has(prerequisite)) ||
+          active.has(prerequisite) ||
+          suggested.has(prerequisite)
+        ) continue
         addWithPrerequisites(
           prerequisite,
           `prerequisite for ${name}`,
@@ -166,7 +189,7 @@ export namespace SkillContext {
       result.push({ name, reason, priority })
     }
 
-    for (const finding of findings) {
+    for (const finding of candidates) {
       const severity = finding.severity?.toLowerCase()
       const priority: Suggestion["priority"] =
         severity === "critical" || severity === "high" ? "high" : severity === "medium" ? "medium" : "low"

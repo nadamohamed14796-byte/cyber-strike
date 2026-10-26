@@ -30,7 +30,18 @@ export namespace KillChain {
     return (SEVERITY_ORDER[a] ?? 0) >= (SEVERITY_ORDER[b] ?? 0) ? a : b
   }
 
-  export function analyze(findings: Finding[]): Chain[] {
+  function canonicalAllowlist(names?: ReadonlySet<string>): Set<string> | undefined {
+    if (!names) return undefined
+    return new Set(
+      Array.from(names).flatMap((name) => {
+        const canonical = SkillIndex.resolveReference(name)
+        return canonical ? [canonical] : []
+      }),
+    )
+  }
+
+  export function analyze(findings: Finding[], allowedSkills?: ReadonlySet<string>): Chain[] {
+    const allowed = canonicalAllowlist(allowedSkills)
     const chains: Chain[] = []
     const seen = new Set<string>()
     // Normalize exact metadata aliases, then collapse duplicate records for a
@@ -38,7 +49,7 @@ export namespace KillChain {
     const normalizedBySkill = new Map<string, Finding>()
     for (const finding of findings) {
       const skill_id = SkillIndex.resolveReference(finding.skill_id)
-      if (!skill_id) continue
+      if (!skill_id || (allowed && !allowed.has(skill_id))) continue
       const normalized = { ...finding, skill_id }
       const existing = normalizedBySkill.get(skill_id)
       if (
@@ -52,6 +63,7 @@ export namespace KillChain {
 
     for (const finding of normalized) {
       for (const link of SkillIndex.chainsFrom(finding.skill_id)) {
+        if (allowed && !allowed.has(link.target)) continue
         const partner = normalized.find((candidate) => candidate.skill_id === link.target)
         if (!partner) continue
 
@@ -68,7 +80,7 @@ export namespace KillChain {
           skills: [finding.skill_id, link.target],
           combined_severity: combined,
           description: boost ?? `${finding.skill_id} + ${link.target}`,
-          next_steps: collectNextSteps([finding.skill_id, link.target], normalized),
+          next_steps: collectNextSteps([finding.skill_id, link.target], normalized, allowed),
         })
       }
     }
@@ -78,7 +90,7 @@ export namespace KillChain {
     )
   }
 
-  function collectNextSteps(used: string[], findings: Finding[]): string[] {
+  function collectNextSteps(used: string[], findings: Finding[], allowed?: ReadonlySet<string>): string[] {
     const result = new Set<string>()
     const tested = new Set(
       findings.flatMap((finding) => {
@@ -91,30 +103,35 @@ export namespace KillChain {
       const canonical = SkillIndex.resolveReference(skillId)
       if (!canonical) continue
       for (const link of SkillIndex.chainsFrom(canonical)) {
-        if (!tested.has(link.target)) result.add(link.target)
+        if ((!allowed || allowed.has(link.target)) && !tested.has(link.target)) result.add(link.target)
       }
     }
 
     return Array.from(result)
   }
 
-  export function nextSteps(finding: Finding): string[] {
+  export function nextSteps(finding: Finding, allowedSkills?: ReadonlySet<string>): string[] {
+    const allowed = canonicalAllowlist(allowedSkills)
     const canonical = SkillIndex.resolveReference(finding.skill_id)
-    if (!canonical) return []
+    if (!canonical || (allowed && !allowed.has(canonical))) return []
 
-    const steps = SkillIndex.chainsFrom(canonical).map((link) => link.target)
+    const steps = SkillIndex.chainsFrom(canonical)
+      .map((link) => link.target)
+      .filter((target) => !allowed || allowed.has(target))
     if (finding.tech_stack?.length) {
       const related = SkillIndex.byTechStack(finding.tech_stack)
       for (const skill of related) {
-        if (skill.name !== canonical && !steps.includes(skill.name)) steps.push(skill.name)
+        if ((!allowed || allowed.has(skill.name)) && skill.name !== canonical && !steps.includes(skill.name)) {
+          steps.push(skill.name)
+        }
       }
     }
 
     return steps
   }
 
-  export function summary(findings: Finding[]): string {
-    const chains = analyze(findings)
+  export function summary(findings: Finding[], allowedSkills?: ReadonlySet<string>): string {
+    const chains = analyze(findings, allowedSkills)
     if (chains.length === 0) return "No kill chains detected from current findings."
 
     const lines = [
