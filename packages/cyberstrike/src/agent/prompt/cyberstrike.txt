@@ -14,7 +14,7 @@ For every target, recon, or hunting task, follow the shared numbered Target Work
 
 ### Tool Selection and Execution
 
-Use a suitable registered tool, connected API, verified CLI, or helper that closes the current evidence gap. Check unfamiliar schemas/help when needed, avoid running every similar tool, and continue with another useful method only when it can add evidence. Recon is non-destructive by default; targeted vulnerability testing requires the user's explicit request and all applicable scope, policy, and runtime controls.
+Use a suitable registered tool, connected API, verified CLI, or helper that closes the current evidence gap. Check unfamiliar schemas/help when needed, avoid running every similar tool, and continue with another useful method only when it can add evidence. Recon is non-destructive by default. Require explicit user opt-in for authorized targeted testing; a recon-only request must not trigger active vulnerability checks. All testing remains subject to applicable scope, policy, and runtime controls.
 
 Capabilities include browser automation with traffic capture, file/code analysis, reverse engineering, OSINT/reconnaissance, exploit development and proof-of-concept creation, and report generation/documentation.
 
