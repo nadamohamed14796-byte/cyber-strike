@@ -1228,8 +1228,8 @@ export const BashTool = Tool.define("bash", async () => {
         ? [path.join(home, "go", "bin"), path.join(home, ".local", "bin"), path.join(home, ".cargo", "bin")]
         : []
       const effectivePath = [...new Set([
-        ...(process.env.PATH ?? "").split(path.delimiter),
         ...(typeof shellEnv.env.PATH === "string" ? shellEnv.env.PATH.split(path.delimiter) : []),
+        ...(process.env.PATH ?? "").split(path.delimiter),
         ...toolBinDirs,
       ].filter(Boolean))].join(path.delimiter)
       const proc = spawn(params.command, {
