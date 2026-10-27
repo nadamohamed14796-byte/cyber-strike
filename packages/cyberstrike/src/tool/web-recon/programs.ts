@@ -12,7 +12,20 @@ type FetchOptions = NonNullable<Parameters<typeof safeFetch>[1]>
 // sitemap_scan
 // ---------------------------------------------------------------------------
 
-const MAX_CHILD_SITEMAPS = 20
+function normalizeSitemapURL(value: string, baseURL: string): string | undefined {
+  try {
+    const url = new URL(value, baseURL)
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:") ||
+      url.username ||
+      url.password
+    ) return undefined
+    url.hash = ""
+    return url.href
+  } catch {
+    return undefined
+  }
+}
 
 export async function sitemapScan(target: string, _args: string[], timeout: number, scopeCheck?: ScopeCheck): Promise<WebReconResult> {
   const fetchScoped = (url: string, options: FetchOptions = {}) =>
@@ -20,58 +33,113 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
   const findings: Finding[] = []
   const output: string[] = [`[*] Scanning sitemaps for ${target}`]
   const origin = new URL(target).origin
+  const candidates = [origin + "/sitemap.xml", origin + "/sitemap_index.xml"]
 
-  const candidates = ["/sitemap.xml", "/sitemap_index.xml"]
-  const pages = new Set<string>()
   let foundAt = ""
-
-  for (const path of candidates) {
-    const resp = await fetchScoped(origin + path, { timeout })
-    if (!resp || resp.status !== 200 || !resp.text.includes("<")) continue
-
-    foundAt = origin + path
-    const locs = extractLocs(resp.text)
-
-    if (/<sitemapindex/i.test(resp.text)) {
-      output.push(`[+] Sitemap index found: ${foundAt} (${locs.length} child sitemaps)`)
-      let fetched = 0
-      for (const child of locs.slice(0, MAX_CHILD_SITEMAPS)) {
-        let childUrl: URL
-        try {
-          childUrl = new URL(child, origin)
-        } catch {
-          continue
-        }
-        if (
-          (childUrl.protocol !== "http:" && childUrl.protocol !== "https:") ||
-          childUrl.origin !== origin ||
-          childUrl.username ||
-          childUrl.password
-        ) continue
-        const childResp = await fetchScoped(childUrl.href, { timeout })
-        if (!childResp || childResp.status !== 200) continue
-        for (const loc of extractLocs(childResp.text)) pages.add(loc)
-        fetched++
-      }
-      output.push(`[*] Fetched ${fetched} child sitemaps`)
-    } else {
-      output.push(`[+] Sitemap found: ${foundAt}`)
-      for (const loc of locs) pages.add(loc)
-    }
+  let initialResponse: Awaited<ReturnType<typeof fetchScoped>> | undefined
+  for (const candidate of candidates) {
+    const response = await fetchScoped(candidate, { timeout })
+    if (!response || response.status !== 200 || !response.text.includes("<")) continue
+    foundAt = candidate
+    initialResponse = response
     break
   }
 
-  if (pages.size === 0 && !foundAt) {
+  if (!foundAt || !initialResponse) {
     output.push("[-] No sitemap found")
     return { output: output.join("\n"), findings }
   }
 
-  output.push(`[+] Total URLs discovered: ${pages.size}`)
-  if (pages.size > 0) {
-    const sorted = [...pages].sort()
-    for (const url of sorted.slice(0, 50)) output.push(`    ${url}`)
-    if (sorted.length > 50) output.push(`    ... and ${sorted.length - 50} more`)
+  const pages = new Set<string>()
+  const queuedSitemaps = new Set<string>([foundAt])
+  const visitedSitemaps = new Set<string>()
+  const queue: Array<{ url: string; response?: Awaited<ReturnType<typeof fetchScoped>> }> = [
+    { url: foundAt, response: initialResponse },
+  ]
+  let queueIndex = 0
+  let fetchedSitemaps = 0
+  let failedSitemaps = 0
+  let skippedReferences = 0
 
+  // Follow every distinct eligible sitemap document, including nested indexes.
+  // A visited set handles cycles; scope checks, not an arbitrary count/depth cap,
+  // decide which additional hosts and paths may be requested.
+  while (queueIndex < queue.length) {
+    const item = queue[queueIndex++]!
+    const sitemapURL = normalizeSitemapURL(item.url, origin)
+    if (!sitemapURL) {
+      skippedReferences++
+      continue
+    }
+    if (visitedSitemaps.has(sitemapURL)) continue
+    visitedSitemaps.add(sitemapURL)
+
+    if (!scopeCheck && new URL(sitemapURL).origin !== origin) {
+      skippedReferences++
+      continue
+    }
+    if (!item.response && scopeCheck && !await scopeCheck(sitemapURL)) {
+      skippedReferences++
+      continue
+    }
+
+    const response = item.response ?? await fetchScoped(sitemapURL, { timeout })
+    if (!response || response.status !== 200 || !response.text.includes("<")) {
+      failedSitemaps++
+      continue
+    }
+    fetchedSitemaps++
+
+    const locations = extractLocs(response.text)
+    if (/<sitemapindex\b/i.test(response.text)) {
+      for (const location of locations) {
+        const childURL = normalizeSitemapURL(location, sitemapURL)
+        if (!childURL) {
+          skippedReferences++
+          continue
+        }
+        if (queuedSitemaps.has(childURL) || visitedSitemaps.has(childURL)) continue
+        if (!scopeCheck && new URL(childURL).origin !== origin) {
+          skippedReferences++
+          continue
+        }
+        queuedSitemaps.add(childURL)
+        queue.push({ url: childURL })
+      }
+      continue
+    }
+
+    for (const location of locations) {
+      const pageURL = normalizeSitemapURL(location, sitemapURL)
+      if (!pageURL) {
+        skippedReferences++
+        continue
+      }
+      if (scopeCheck) {
+        if (!await scopeCheck(pageURL)) {
+          skippedReferences++
+          continue
+        }
+      } else if (new URL(pageURL).origin !== origin) {
+        skippedReferences++
+        continue
+      }
+      pages.add(pageURL)
+    }
+  }
+
+  output.push(`[+] Sitemap found: ${foundAt}`)
+  output.push(`[+] Sitemap documents processed: ${fetchedSitemaps}`)
+  output.push(`[+] Total in-scope URLs discovered: ${pages.size}`)
+  if (failedSitemaps > 0) {
+    output.push(`[!] Sitemap documents that could not be fetched or parsed: ${failedSitemaps}`)
+  }
+  if (skippedReferences > 0) {
+    output.push(`[*] Out-of-scope or unsupported references skipped: ${skippedReferences}`)
+  }
+  for (const url of [...pages].sort()) output.push(`    ${url}`)
+
+  if (pages.size > 0) {
     findings.push({
       checkId: "WEB-SITEMAP-001",
       provider: "web-recon",
@@ -79,7 +147,7 @@ export async function sitemapScan(target: string, _args: string[], timeout: numb
       status: "FOUND",
       resource: foundAt,
       title: `Sitemap with ${pages.size} URLs`,
-      details: `Sitemap at ${foundAt} exposes ${pages.size} application URLs`,
+      details: `Sitemap at ${foundAt} exposes ${pages.size} in-scope application URLs across ${fetchedSitemaps} sitemap documents`,
       remediation: "Review sitemap for sensitive or admin URLs that should not be publicly indexed",
     })
   }
@@ -171,6 +239,7 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
   const findings: Finding[] = []
   const output: string[] = [`[*] Probing for OpenAPI/Swagger specs at ${target}`]
   const origin = new URL(target).origin
+  let specsFound = 0
 
   for (const path of SPEC_CANDIDATES) {
     const resp = await fetchScoped(origin + path, { timeout })
@@ -183,6 +252,7 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
       continue
     }
     if (!spec.openapi && !spec.swagger) continue
+    specsFound++
 
     const version = (spec.openapi || spec.swagger) as string
     const specUrl = origin + path
@@ -205,9 +275,15 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
       output.push(`[+] Paths: ${pathCount}, Endpoints: ${total}`)
       output.push(`[+] Methods: ${Object.entries(methods).map(([m, c]) => `${m}:${c}`).join(", ")}`)
 
-      output.push("\n    Paths:")
-      for (const p of Object.keys(paths).slice(0, 30)) output.push(`    ${p}`)
-      if (pathCount > 30) output.push(`    ... and ${pathCount - 30} more`)
+      output.push("\n    Operations:")
+      for (const [endpointPath, item] of Object.entries(paths)) {
+        if (!item || typeof item !== "object") continue
+        for (const method of Object.keys(item)) {
+          if (HTTP_METHODS.has(method.toLowerCase())) {
+            output.push(`    ${method.toUpperCase()} ${endpointPath}`)
+          }
+        }
+      }
 
       findings.push({
         checkId: "WEB-OPENAPI-001",
@@ -233,10 +309,13 @@ export async function openapiScan(target: string, _args: string[], timeout: numb
       output.push(`\n[+] Auth schemes: ${Object.keys(secDefs as object).join(", ")}`)
     }
 
-    return { output: output.join("\n"), findings }
   }
 
-  output.push("[-] No OpenAPI/Swagger spec found at standard paths")
+  if (specsFound === 0) {
+    output.push("[-] No OpenAPI/Swagger spec found at standard paths")
+  } else {
+    output.push(`[*] Valid OpenAPI/Swagger documents processed: ${specsFound}`)
+  }
   return { output: output.join("\n"), findings }
 }
 
