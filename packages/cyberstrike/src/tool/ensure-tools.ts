@@ -2,31 +2,31 @@ import z from "zod"
 import { Tool } from "./tool"
 
 const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; description: string }> = {
-  nmap: { check: "nmap", install: "brew install nmap || apt-get install -y nmap", description: "Network scanner" },
+  nmap: { check: "nmap", install: "if command -v brew >/dev/null 2>&1; then brew install nmap; else apt-get update && apt-get install -y nmap; fi", description: "Network scanner" },
   nuclei: {
     check: "nuclei",
-    install: "go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
     description: "Vulnerability scanner",
   },
-  ffuf: { check: "ffuf", install: "go install github.com/ffuf/ffuf/v2@latest", description: "Web fuzzer" },
+  ffuf: { check: "ffuf", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/ffuf/ffuf/v2@latest", description: "Web fuzzer" },
   httpx: {
     check: "httpx",
-    install: "go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest",
     description: "HTTP toolkit",
   },
   subfinder: {
     check: "subfinder",
-    install: "go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest",
     description: "Subdomain discovery",
   },
   amass: {
     check: "amass",
-    install: "go install -v github.com/owasp-amass/amass/v4/...@master",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install -v github.com/owasp-amass/amass/v4/...@master",
     description: "Attack surface mapping",
   },
   assetfinder: {
     check: "assetfinder",
-    install: "go install github.com/tomnomnom/assetfinder@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/tomnomnom/assetfinder@latest",
     description: "Passive subdomain discovery",
   },
   sublist3r: {
@@ -41,31 +41,31 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
   },
   waybackurls: {
     check: "waybackurls",
-    install: "go install github.com/tomnomnom/waybackurls@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/tomnomnom/waybackurls@latest",
     description: "Wayback Machine URL fetcher",
   },
-  gau: { check: "gau", install: "go install github.com/lc/gau/v2/cmd/gau@latest", description: "URL aggregator" },
+  gau: { check: "gau", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/lc/gau/v2/cmd/gau@latest", description: "URL aggregator" },
   hakrawler: {
     check: "hakrawler",
-    install: "go install github.com/hakluke/hakrawler@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/hakluke/hakrawler@latest",
     description: "Web crawler",
   },
   katana: {
     check: "katana",
-    install: "go install github.com/projectdiscovery/katana/cmd/katana@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/projectdiscovery/katana/cmd/katana@latest",
     description: "Next-gen crawler",
   },
-  dalfox: { check: "dalfox", install: "go install github.com/hahwul/dalfox/v2@latest", description: "XSS scanner" },
+  dalfox: { check: "dalfox", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/hahwul/dalfox/v2@latest", description: "XSS scanner" },
   sqlmap: { check: "sqlmap", install: "pip3 install sqlmap", description: "SQL injection tool" },
   nikto: {
     check: "nikto",
-    install: "brew install nikto || apt-get install -y nikto",
+    install: "if command -v brew >/dev/null 2>&1; then brew install nikto; else apt-get update && apt-get install -y nikto; fi",
     description: "Web server scanner",
   },
   wpscan: { check: "wpscan", install: "gem install wpscan || brew install wpscan", description: "WordPress scanner" },
   gospider: {
     check: "gospider",
-    install: "go install github.com/jaeles-project/gospider@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/jaeles-project/gospider@latest",
     description: "Web spidering",
   },
   arjun: { check: "arjun", install: "pip3 install arjun", description: "Parameter discovery" },
@@ -75,7 +75,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
   nosqlmap: { check: "nosqlmap", install: "pip3 install nosqlmap", description: "NoSQL injection" },
   crlfuzz: {
     check: "crlfuzz",
-    install: "go install github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest",
+    install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest",
     description: "CRLF injection scanner",
   },
   gitdumper: { check: "git-dumper", install: "pip3 install git-dumper", description: "Git repository dumper" },
