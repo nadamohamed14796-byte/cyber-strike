@@ -801,6 +801,22 @@ export function scannerRequestScopeBlockReason(
   return undefined
 }
 
+/** Parse explicit port lists and ranges so persisted scope is checked for every port. */
+export function parseScopedPortSpec(spec: string): number[] | undefined {
+  const value = spec.trim()
+  if (!value) return undefined
+  const ports = new Set<number>()
+  for (const part of value.split(",")) {
+    const match = /^(\d+)(?:-(\d+))?$/.exec(part.trim())
+    if (!match) return undefined
+    const start = Number(match[1])
+    const end = Number(match[2] ?? match[1])
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end > 65535 || start > end) return undefined
+    for (let port = start; port <= end; port++) ports.add(port)
+  }
+  return ports.size ? [...ports].sort((a, b) => a - b) : undefined
+}
+
 async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
   const scannerIndex = scannerExecutableIndex(command)
   if (scannerIndex < 0) {
@@ -861,12 +877,12 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   if (["nmap", "masscan", "naabu"].includes(scanner)) {
     const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
     const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
-    if (!portSpec || !/^\d+(?:,\d+)*$/.test(portSpec)) {
-      throw new Error("Recon execution gate blocked " + scanner + ": an explicit comma-separated port list is required; ranges, all-port defaults, and unbounded scans are not allowed by this gate.")
-    }
-    portScanPorts = [...new Set(portSpec.split(",").map(Number))]
-    if (!portScanPorts.length || portScanPorts.some((port) => !Number.isInteger(port) || port < 1 || port > 65535)) {
-      throw new Error("Recon execution gate blocked " + scanner + ": port list must contain valid ports from 1 to 65535.")
+    if (portSpec) {
+      const parsedPorts = parseScopedPortSpec(portSpec)
+      if (!parsedPorts) {
+        throw new Error("Recon execution gate blocked " + scanner + ": invalid port expression. Use valid ports, comma-separated lists, and ranges (for example 80,443,8000-8100).")
+      }
+      portScanPorts = parsedPorts
     }
   }
   // Tool choice is not restricted by a phase allowlist. Request safety and
@@ -1123,7 +1139,6 @@ export const BashTool = Tool.define("bash", async () => {
       if (!Instance.containsPath(cwd)) directories.add(cwd)
       const patterns = new Set<string>()
       const always = new Set<string>()
-      const scannerInvocationKeys = new Map<string, string>()
 
       for (const node of tree.rootNode.descendantsOfType("command")) {
         if (!node) continue
@@ -1145,17 +1160,6 @@ export const BashTool = Tool.define("bash", async () => {
             continue
           }
           command.push(child.text)
-        }
-
-        // Avoid repeating an identical scanner/source in one shell call, even if the
-        // second command writes to another output path. Run once, then reuse its artifact.
-        const scannerKey = reconScannerInvocationKey(command)
-        if (scannerKey) {
-          const previousCommand = scannerInvocationKeys.get(scannerKey)
-          if (previousCommand) {
-            throw new Error("Duplicate recon scanner invocation in one bash call. This scan has the same tool, target inputs, and options as an earlier command; changing only the output path does not justify repeating it. Reuse the first output or change the inputs/options for a genuinely distinct collection pass. First command: " + previousCommand.slice(0, 240))
-          }
-          scannerInvocationKeys.set(scannerKey, commandText)
         }
 
         // Apply request safety and persisted target-scope checks before known scanner binaries start.
