@@ -39,6 +39,7 @@ import { GmailService } from "../gmail-service"
 import { buildHackbrowserWorkerEnvironment } from "../hackbrowser-subprocess/worker-environment"
 import { Network } from "../network/network"
 import { TargetMemory } from "../target"
+import { checkMatch } from "../target/scope-match"
 import type {
   WorkerOptions,
   WorkerMessage,
@@ -564,8 +565,14 @@ export async function launchHackbrowser(opts: LauncherOptions): Promise<KickOffR
     throw new Error(`hackbrowser refused target "${opts.target}": ${authorization.reason}. Configure the official target scope first.`)
   }
   const savedScope = authorization.scope
-  if (opts.scope?.some((entry) => !savedScope.scopeItems.includes(entry.trim().toLowerCase()))) {
-    throw new Error("hackbrowser scope override is not an exact subset of the persisted authorization scope.")
+  // Allow a narrowed list of concrete discovered hosts when each host is
+  // covered by a persisted wildcard/CIDR entry; literal-entry equality was
+  // incorrectly rejecting valid descendants of an authorized wildcard.
+  if (opts.scope?.some((entry) => {
+    const candidate = entry.trim()
+    return !candidate || !savedScope.scopeItems.some((scopeItem) => checkMatch(candidate, scopeItem).matches)
+  })) {
+    throw new Error("hackbrowser requested scope contains a host outside the persisted authorization scope.")
   }
   if (savedScope.scopeItems.some((entry) => entry.startsWith("*.")) && savedScope.excludedItems.length > 0) {
     throw new Error("hackbrowser cannot safely enforce excluded hostnames inside a wildcard scope; narrow the saved scope first.")
