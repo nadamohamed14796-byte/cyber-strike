@@ -1788,8 +1788,8 @@ export namespace JavaScriptCorrelation {
     if (!workspace) {
       throw new Error("No existing target workspace matches this target. Initialize it with target_workspace first.")
     }
-    if (!TargetMemory.isObservedInSession(rootSessionID, workspace.targetURL)) {
-      throw new Error("The target was not observed in this session tree. Refusing to correlate unrelated target data.")
+    if (!TargetMemory.isObservedOrAncestorInSession(rootSessionID, workspace.targetURL)) {
+      throw new Error("The target or one of its registered descendant workspaces was not observed in this session tree. Refusing to correlate unrelated target data.")
     }
 
     // Scope decisions are cached by origin/path because authorization can depend on
