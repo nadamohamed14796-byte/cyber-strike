@@ -129,3 +129,81 @@ test("enforces the aggregate response-body budget while streaming and preserves 
     server.stop(true)
   }
 }, 60_000)
+
+
+test("merges source-map provenance from every bundle while keeping the display label bounded", async () => {
+  await using tmp = await tmpdir()
+  const requests: string[] = []
+  const javascript = 'const route = "/api/profile";\nfetch(route);\n//# sourceMappingURL=/shared.js.map\n'
+  const sourceMap = JSON.stringify({ version: 3, sources: ["src/profile.ts"], names: [], mappings: "AAAA" })
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      const pathname = new URL(request.url).pathname
+      requests.push(pathname)
+      if (pathname === "/shared.js.map") {
+        return new Response(sourceMap, { status: 200, headers: { "content-type": "application/json" } })
+      }
+      if (["/app-one.js", "/app-two.js", "/app-three.js", "/app-four.js"].includes(pathname)) {
+        return new Response(javascript, { status: 200, headers: { "content-type": "application/javascript" } })
+      }
+      return new Response("not found", { status: 404 })
+    },
+  })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const target = "http://127.0.0.1:" + server.port
+        const configured = await TargetMemory.configureScope(target, {
+          include: [target],
+          authorizationSource: "Local shared source-map provenance fixture",
+          authorizationReference: "https://example.test/security-policy",
+        })
+        const canonicalTarget = configured.workspace.targetURL
+        const session = await Session.create({})
+        Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/",
+          keyHash: "ingest-javascript-shared-map-root",
+          origin: canonicalTarget,
+          scheme: "http",
+          host: "127.0.0.1",
+          pageUrl: canonicalTarget + "/",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: '<script src="/app-one.js"></script><script src="/app-two.js"></script><script src="/app-three.js"></script><script src="/app-four.js"></script>',
+          },
+        })
+
+        const tool = await IngestJavaScriptURLsTool.init()
+        const result = await tool.execute({
+          target_url: canonicalTarget,
+          urls: ["/app-one.js", "/app-two.js", "/app-three.js", "/app-four.js"].map((route) => canonicalTarget + route),
+          source: "collector",
+          force_refresh: false,
+        }, toolContext(session.id))
+
+        expect(requests.filter((pathname) => pathname === "/shared.js.map")).toHaveLength(1)
+        expect((result.metadata as Record<string, unknown>).pending_assets).toBe(0)
+        const manifestPath = path.join(configured.workspace.workspacePath, "javascript", "asset-manifest.json")
+        const savedManifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+          assets: Array<{ url: string; source: string; sources?: string[] }>
+        }
+        const mapRecord = savedManifest.assets.find((asset) => asset.url === canonicalTarget + "/shared.js.map")
+        expect(mapRecord).toBeDefined()
+        for (const name of ["app-one.js", "app-two.js", "app-three.js", "app-four.js"]) {
+          expect(mapRecord?.sources).toContain("sourceMappingURL from " + canonicalTarget + "/" + name)
+        }
+        expect(mapRecord?.sources).toHaveLength(4)
+        expect(mapRecord?.source.length).toBeLessThanOrEqual(120)
+      },
+    })
+  } finally {
+    server.stop(true)
+  }
+}, 30_000)
