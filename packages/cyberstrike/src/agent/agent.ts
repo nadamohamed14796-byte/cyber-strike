@@ -56,6 +56,7 @@ import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 import { SkillIndex } from "../skill/index-engine"
+import { Log } from "../util/log"
 
 // ============================================================================
 // Skill injection for vulnerability testing sub-agents
@@ -125,19 +126,26 @@ async function loadVulnAgent(
     }),
   )
   const skillBlocks: string[] = []
+  const unavailableSkillNames: string[] = []
   for (let i = 0; i < skillNames.length; i++) {
     const skill = skills[i]
-    // Production startup must never silently omit a required methodology skill.
-    // Isolated tests intentionally skip the built-in catalog, so permit only that
-    // test context to construct agents without embedded built-in skill text. The
-    // runtime skill tool still reports genuinely missing skills as errors.
-    // Isolated tests intentionally skip the built-in catalog to keep their
-    // per-instance skill fixtures independent. Outside that context, required
-    // methodology references are validated strictly and cannot disappear silently.
-    if (!skill && Skill.isCatalogIsolationContext()) continue
-    assertEmbeddedSkillAvailable(description, skillNames[i], skill)
+    // A missing packaged/catalog skill must not make the entire CLI fail to start.
+    // Keep the specialized agent available and let its base prompt plus runtime skill
+    // discovery handle the task. Collect missing references so one warning can point
+    // maintainers to the packaging/catalog problem without crashing startup.
+    if (!skill) {
+      if (!Skill.isCatalogIsolationContext()) unavailableSkillNames.push(skillNames[i])
+      continue
+    }
     const content = stripDefensiveSections(skill.content)
     if (content) skillBlocks.push(`<skill name="${skillNames[i]}">\n${content}\n</skill>`)
+  }
+
+  if (unavailableSkillNames.length > 0) {
+    Log.create({ service: "agent" }).warn("vulnerability agent started without some embedded skills; check the installed skill catalog", {
+      agent: shortDesc,
+      missing: [...new Set(unavailableSkillNames)],
+    })
   }
 
   const skillSection =
