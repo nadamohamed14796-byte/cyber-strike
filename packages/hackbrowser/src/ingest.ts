@@ -123,7 +123,7 @@ export async function sendIngest(
 
     if (!res.ok) {
       const responseBody = await res.text().catch(() => "")
-      const retryable = res.status === 429 || res.status >= 500
+      const retryable = res.status === 408 || res.status === 425 || res.status === 429 || res.status >= 500
       log.error("ingest server error", {
         status: res.status,
         retryable,
