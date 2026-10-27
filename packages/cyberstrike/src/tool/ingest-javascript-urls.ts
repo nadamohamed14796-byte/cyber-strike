@@ -66,6 +66,17 @@ export function mergeAssetSources(...values: Array<string | string[] | undefined
   return [...merged].sort()
 }
 
+// The complete provenance remains in sources[]. Keep the display label bounded.
+export function mergeAssetSourceLabel(sources: string[]): string {
+  const selected: string[] = []
+  for (const source of [...sources].sort()) {
+    const candidate = [...selected, source].join(" | ")
+    if (candidate.length <= 120) selected.push(source)
+    if (selected.join(" | ").length >= 120) break
+  }
+  return selected.length ? selected.join(" | ") : (sources[0]?.slice(0, 120) || "unspecified")
+}
+
 export function parseAssetManifest(input: string): Manifest {
   const parsed: unknown = JSON.parse(input)
   if (
@@ -335,7 +346,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const prior = byURL.get(url)
       if (prior) {
         const sources = [...values].sort()
-        byURL.set(url, { ...prior, source: sources.join(" | "), sources })
+        byURL.set(url, { ...prior, source: mergeAssetSourceLabel(sources), sources })
       }
       return values.size > before
     }
@@ -347,7 +358,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           retryable: undefined,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "pending",
           ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
@@ -417,7 +428,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           target_url: displayURL(params.target_url),
         },
       })
-      const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
+      const assetSource = mergeAssetSourceLabel([...(sourceByURL.get(url) ?? new Set([params.source]))])
       const prior = byURL.get(url)
       const forceRefresh = params.force_refresh || prior?.pendingRefresh === true
       if (!shouldFetchAsset(prior, forceRefresh)) {
@@ -430,7 +441,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           metadata: { stage: "cache_hit", active_asset: activeAsset, processed: index, queued: inputURLs.length, target_url: displayURL(params.target_url) },
         })
         const sources = mergeAssetSources(prior.sources, prior.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
+        const record: AssetRecord = { ...prior, source: mergeAssetSourceLabel(sources), sources, status: "reused" }
         records.push(record)
         byURL.set(url, record)
         reused++
@@ -449,7 +460,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           const record: AssetRecord = {
             ...prior,
             url,
-            source: sources.join(" | "),
+            source: mergeAssetSourceLabel(sources),
             sources,
             status: "pending",
             ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
@@ -466,7 +477,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const record: AssetRecord = {
           ...prior,
           url,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "failed",
           retryable,
@@ -487,7 +498,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "failed",
           retryable,
@@ -508,7 +519,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "skipped",
           retryable: undefined,
@@ -532,7 +543,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "pending",
           retryable: undefined,
@@ -563,7 +574,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
             ...prior,
             url,
             finalURL,
-            source: sources.join(" | "),
+            source: mergeAssetSourceLabel(sources),
             sources,
             status: "pending",
             retryable: undefined,
@@ -583,7 +594,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
             ...prior,
             url,
             finalURL,
-            source: sources.join(" | "),
+            source: mergeAssetSourceLabel(sources),
             sources,
             status: "pending",
             ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
@@ -602,7 +613,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "failed",
           retryable,
@@ -625,7 +636,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "skipped",
           retryable: undefined,
@@ -671,7 +682,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const sources = mergeAssetSources(byURL.get(url)?.sources, byURL.get(url)?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-      const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const record: AssetRecord = { url, finalURL, source: mergeAssetSourceLabel(sources), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
       if (existingContent) reused++
