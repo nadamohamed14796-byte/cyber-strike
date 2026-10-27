@@ -2507,6 +2507,10 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
   if (!browserDied) await contexts[0]?.page.waitForTimeout(2000).catch(() => {})
 
   await drainPageCaptures(captureQueues, captureHandlers, new Map(), null, null, true)
+  const undeliveredCaptureCount = [...captureQueues.values()].reduce((total, queue) => total + queue.length, 0)
+  if (undeliveredCaptureCount > 0) {
+    log.error("multi-credential crawl finished with undelivered captures", { pending: undeliveredCaptureCount })
+  }
 
   log.info("multi-credential crawl done", {
     pagesExplored,
@@ -2546,9 +2550,12 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
     capturedEndpoints: globalState.capturedEndpoints.size,
     pagesExplored,
     totalSteps: globalState.totalSteps,
-    errors: browserDied
-      ? [`Browser died: ${health.reason}. Captured ${globalState.capturedEndpoints.size} endpoints before failure.`]
-      : [],
+    errors: [
+      ...(browserDied ? [`Browser died: ${health.reason}. Captured ${globalState.capturedEndpoints.size} endpoints before failure.`] : []),
+      ...(undeliveredCaptureCount > 0
+        ? [`${undeliveredCaptureCount} captured request(s) were not acknowledged by CyberStrike; their analysis did not run. See ingest delivery logs.`]
+        : []),
+    ],
     usage: usageAcc,
   }
 }
@@ -2673,12 +2680,23 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       } else {
         await browser.close().catch(() => {})
       }
+      await drainCaptureQueue(
+        captureQueue,
+        (captured) => handleCapture(captured),
+        "single-credential",
+        { finalDrain: true },
+      )
       return {
         sessionID: dryRun ? "" : sessionID!,
         capturedEndpoints: 0,
         pagesExplored: 0,
         totalSteps: 0,
-        errors: [`Initial navigation failed: ${initNavErr.message}`],
+        errors: [
+          `Initial navigation failed: ${initNavErr.message}`,
+          ...(captureQueue.length > 0
+            ? [`${captureQueue.length} captured request(s) were not acknowledged by CyberStrike; their analysis did not run.`]
+            : []),
+        ],
         usage: usageAcc,
       }
     }
@@ -3068,14 +3086,25 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       await browser.close().catch(() => {})
     }
 
+    // Catch requests that completed while the browser was closing, then expose any
+    // delivery backlog to the caller instead of reporting a clean successful crawl.
+    await drainCaptureQueue(
+      captureQueue,
+      (captured) => handleCapture(captured),
+      "single-credential",
+      { finalDrain: true },
+    )
     return {
       sessionID: dryRun ? "" : sessionID!,
       capturedEndpoints: globalState.capturedEndpoints.size,
       pagesExplored,
       totalSteps: globalState.totalSteps,
-      errors: browserDied
-        ? [`Browser died: ${health.reason}. Captured ${globalState.capturedEndpoints.size} endpoints before failure.`]
-        : [],
+      errors: [
+        ...(browserDied ? [`Browser died: ${health.reason}. Captured ${globalState.capturedEndpoints.size} endpoints before failure.`] : []),
+        ...(captureQueue.length > 0
+          ? [`${captureQueue.length} captured request(s) were not acknowledged by CyberStrike; their analysis did not run. See ingest delivery logs.`]
+          : []),
+      ],
       usage: usageAcc,
     }
   } finally {
