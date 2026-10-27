@@ -3,8 +3,6 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
 import { Tool } from "../tool"
-import { reconPhaseGate, type ReconPhase } from "../../target/recon-gate"
-import { executionPhaseForWebRecon } from "./phase"
 import { TargetMemory, type Workspace } from "../../target"
 import type { ScopeCheck } from "./shared"
 import type { Finding, WebReconResult } from "./shared"
@@ -535,8 +533,6 @@ export const WebReconTool = Tool.define("web_recon", {
         const sessionScopeCheck: ScopeCheck = async (url) => {
           const decision = await TargetMemory.checkURLScope(url)
           if (!decision.allowed || !decision.workspace) return false
-          const gate = await reconPhaseGate(decision.workspace, "vulnerability_testing")
-          if (!gate.allowed) return false
           sessionScopeWorkspaceIDs.add(decision.workspace.id)
           return true
         }
@@ -568,18 +564,9 @@ export const WebReconTool = Tool.define("web_recon", {
       // for each host just because it matches a wildcard. The scope decision above
       // remains authoritative for the requested URL and active tools enforce scope.
 
-      const requiredPhase = executionPhaseForWebRecon(program)
-      const gate = await reconPhaseGate(targetWorkspace!, requiredPhase)
-      if (!gate.allowed) {
-        return fail([
-          "[-] Recon phase gate blocked " + program + ".",
-          gate.reason,
-          "Checkpoint manifest: " + gate.manifestPath,
-          "No network probes were sent by this program.",
-          "Use recon_checkpoint to resume the ordered phases and explicitly begin " + requiredPhase + " after prerequisites are verified.",
-        ].join("\n"))
-      }
-
+      // Checkpoint state is workflow metadata, not a tool-availability allowlist.
+      // Persisted per-URL scope checks and the explicit web_recon permission below
+      // remain authoritative for every request.
       await ctx.ask({
         permission: "web_recon",
         patterns: [params.target],
