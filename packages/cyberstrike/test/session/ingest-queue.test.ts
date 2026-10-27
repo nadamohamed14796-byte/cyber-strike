@@ -366,6 +366,40 @@ describe("Single live analysis transcript entry", () => {
   })
 })
 
+describe("Request pending recovery query", () => {
+  test("returns queued and interrupted processing rows but excludes terminal rows", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-pending-recovery-test" })
+      const create = (path: string, keyHash: string) => {
+        const item = Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: path,
+          origin: "https://example.test",
+          keyHash,
+        })
+        if (!item) throw new Error(`request fixture was not inserted: ${path}`)
+        return item
+      }
+      const queued = create("/queued", "pending-queued-key")
+      const processing = create("/processing", "pending-processing-key")
+      const processed = create("/processed", "pending-processed-key")
+      const failed = create("/failed", "pending-failed-key")
+
+      Request.updateStatus({ id: processing.id, status: "processing" })
+      Request.updateStatus({ id: processed.id, status: "processed" })
+      Request.updateStatus({ id: failed.id, status: "failed" })
+
+      const pending = Request.pending().map((item) => item.id)
+      expect(pending).toContain(queued.id)
+      expect(pending).toContain(processing.id)
+      expect(pending).not.toContain(processed.id)
+      expect(pending).not.toContain(failed.id)
+      await Session.remove(session.id)
+    })
+  })
+})
+
 describe("Request processing outcome persistence", () => {
   test("stores failed separately from processed", async () => {
     await withInstance(async () => {
