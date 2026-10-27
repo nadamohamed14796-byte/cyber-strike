@@ -849,47 +849,8 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       throw new Error("Recon execution gate blocked " + scanner + ": port list must contain valid ports from 1 to 65535.")
     }
   }
-  let phase = SCANNER_NOMINAL_PHASES[scanner]!
-  // Route ffuf into the correct recon checkpoint based on its URL placeholder.
-  // Body/mutating ffuf requests remain active testing, not discovery.
-  if (scanner === "ffuf") {
-    const urlIndex = args.findIndex((value) => ["-u", "--url"].includes(value.toLowerCase()))
-    const url = urlIndex >= 0 ? args[urlIndex + 1] ?? "" : ""
-    const methodIndex = args.findIndex((value) => ["-x", "--request"].includes(value.toLowerCase()))
-    const explicitMethod = methodIndex >= 0 ? args[methodIndex + 1]?.toUpperCase() : undefined
-    const hasBody = args.some((value) => ["-d", "--data", "--data-raw", "--data-binary", "-F", "--form"].includes(value))
-    if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
-    else if (url.includes("?") && /FUZZ/i.test(url.slice(url.indexOf("?")))) phase = "parameter_fuzzing"
-    else phase = "directory_fuzzing"
-  }
-  // Plain retrieval belongs to URL collection; mutating/non-safe HTTP methods
-  // are active vulnerability testing and must wait for the final inventory gate.
-  if (scanner === "curl") {
-    const methodIndex = args.findIndex((value) => ["-x", "--request", "--method"].includes(value.toLowerCase()))
-    const inlineMethod = args.find((value) => /^-X(?:GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS|TRACE|CONNECT)$/i.test(value))
-      ?? args.find((value) => /^(?:--request|--method)=/i.test(value))
-    const explicitMethod = methodIndex >= 0
-      ? args[methodIndex + 1]?.toUpperCase()
-      : inlineMethod?.replace(/^(?:--request|--method)=/i, "").replace(/^-X/i, "").toUpperCase()
-    const hasBody = args.some((value) => [
-      "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--json",
-      "-F", "--form", "--form-string", "-T", "--upload-file",
-    ].some((flag) => value === flag || value.startsWith(flag + "=")))
-    const getMode = args.some((value) => value === "-G" || value === "--get")
-    if ((hasBody && !getMode) || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
-  }
-  if (scanner === "wget") {
-    const explicitMethodIndex = args.findIndex((value) => value === "--method" || value.startsWith("--method="))
-    const explicitMethod = explicitMethodIndex >= 0
-      ? (args[explicitMethodIndex]!.includes("=")
-        ? args[explicitMethodIndex]!.slice(args[explicitMethodIndex]!.indexOf("=") + 1)
-        : args[explicitMethodIndex + 1])?.toUpperCase()
-      : undefined
-    const hasBody = args.some((value) => [
-      "--body-data", "--body-file", "--post-data", "--post-file",
-    ].some((flag) => value === flag || value.startsWith(flag + "=")))
-    if (hasBody || (explicitMethod && !["GET", "HEAD"].includes(explicitMethod))) phase = "vulnerability_testing"
-  }
+  // Tool choice is not restricted by a phase allowlist. Request safety and
+  // persisted target-scope validation below remain in force.
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
   const listedTargets = ["curl", "wget"].includes(scanner)
     ? { present: false, targets: [] as string[] }
@@ -911,7 +872,6 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
           const subjectScope = await TargetMemory.checkURLScope(lookup.targetURL)
           if (subjectScope.allowed && subjectScope.workspace) {
             targets = [lookup.targetURL]
-            phase = lookup.phase
           }
         }
       }
