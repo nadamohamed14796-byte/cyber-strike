@@ -224,7 +224,7 @@ describe("Recon scanner deduplication", () => {
     expect(wrappedFirst).toBe(wrappedDuplicate)
   })
 
-  test("installed active testing tools are recognized by the scope/phase gate", () => {
+  test("installed active testing tools are recognized for scope validation", () => {
     for (const scanner of ["x8", "arjun", "commix", "ssrfmap", "nosqlmap", "crlfuzz", "git-dumper", "sqlmap", "dalfox", "wpscan"]) {
       expect(reconScannerInvocationKey([scanner, "-u", "https://example.com"])).toBeDefined()
     }
