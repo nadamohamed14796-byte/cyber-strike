@@ -59,6 +59,7 @@ import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
 import { RepeatDetector } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
+import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
 
 // @ts-ignore
 globalThis.AI_SDK_LOG_WARNINGS = false
@@ -773,6 +774,7 @@ export namespace SessionPrompt {
 
       // Build system prompt, adding structured output instruction if needed
       const system = [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())]
+      system.push(TODO_EXECUTION_PROMPT)
       const format = lastUser.format ?? { type: "text" }
       if (format.type === "json_schema") {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
