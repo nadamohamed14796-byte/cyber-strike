@@ -37,7 +37,14 @@ export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly str
 }
 
 export const RECON_PHASE_REQUIRED_FLAT_ARTIFACTS: Partial<Record<ReconPhase, readonly string[]>> = {
-  // These are the two canonical handoff files consumed by endpoint_inventory and final reporting.
+  // Canonical inventories must exist and be non-empty before a phase can be marked complete.
+  // A verified zero-result run must write an explicit status/reason rather than an empty file.
+  asset_discovery: ["subdomains.txt"],
+  live_hosts_ports: ["live-hosts.txt"],
+  url_collection: ["urls.txt"],
+  parameter_discovery: ["parameters.txt"],
+  parameter_fuzzing: ["parameter-tests.md"],
+  // These are the canonical handoff files consumed by endpoint_inventory and final reporting.
   javascript_analysis: ["javascript-analysis.md", "endpoints.txt"],
   endpoint_inventory: ["endpoints.txt"],
 }
