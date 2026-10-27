@@ -95,7 +95,30 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
     for (const name of params.tools) {
       const spec = TOOL_INSTALL_MAP[name]
       if (!spec) {
-        results.push({ tool: name, installed: false, action: `Unknown tool: ${name}` })
+        // Safe fallback: install a same-named package only from the configured OS
+        // package repository. Never interpret model-provided names as shell syntax.
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9+.-]{0,99}$/.test(name)) {
+          results.push({ tool: name, installed: false, action: "No trusted install recipe; invalid package name" })
+          continue
+        }
+        const already = Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; command -v -- "${name}"`])
+        if (already.exitCode === 0) {
+          results.push({ tool: name, installed: true, action: `Already installed: ${already.stdout.toString().trim()}` })
+          continue
+        }
+        const packageManager = Bun.spawnSync(["sh", "-lc", "command -v apt-get"])
+        if (packageManager.exitCode !== 0) {
+          results.push({ tool: name, installed: false, action: "No trusted install recipe for this tool and apt-get is unavailable" })
+          continue
+        }
+        const installUnknown = Bun.spawnSync(["sh", "-lc", `apt-get update && apt-get install -y -- "${name}"`], { timeout: 180_000 })
+        const verifyUnknown = Bun.spawnSync(["sh", "-lc", `command -v -- "${name}"`])
+        if (installUnknown.exitCode === 0 && verifyUnknown.exitCode === 0) {
+          results.push({ tool: name, installed: true, action: `Installed from configured OS package repository: ${verifyUnknown.stdout.toString().trim()}` })
+        } else {
+          const detail = installUnknown.stderr.toString().trim().slice(0, 200) || installUnknown.stdout.toString().trim().slice(-200)
+          results.push({ tool: name, installed: false, action: detail ? `No verified install: ${detail}` : "No trusted install recipe or matching executable after package installation" })
+        }
         continue
       }
 
