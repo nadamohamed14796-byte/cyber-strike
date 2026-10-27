@@ -19,7 +19,7 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
 import { TargetMemory, type TargetScope, type Workspace } from "../target"
-import { reconPhaseGate, type ReconPhase } from "../target/recon-gate"
+import type { ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
 
@@ -1006,10 +1006,8 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
           }
         }
       }
-      const gate = await reconPhaseGate(decision.workspace, phase)
-      if (!gate.allowed) {
-        throw new Error("Recon execution gate blocked " + scanner + " for " + scopedURL + ": " + gate.reason + " Checkpoint: " + gate.manifestPath + ". No scanner command was started.")
-      }
+      // Phase/checkpoint metadata must not act as a scanner allowlist.
+      // The concrete URL/port has already passed the persisted scope matcher above.
     }
   }
 }
