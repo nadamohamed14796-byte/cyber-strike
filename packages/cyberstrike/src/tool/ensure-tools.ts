@@ -58,7 +58,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     description: "Next-gen crawler",
   },
   dalfox: { check: "dalfox", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/hahwul/dalfox/v2@latest", description: "XSS scanner" },
-  sqlmap: { check: "sqlmap", install: "apt-get update && apt-get install -y sqlmap || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH="$PATH:$HOME/.local/bin"; pipx install sqlmap)", description: "SQL injection tool" },
+  sqlmap: { check: "sqlmap", install: "apt-get update && apt-get install -y sqlmap || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install sqlmap)", description: "SQL injection tool" },
   nikto: {
     check: "nikto",
     install: "if command -v brew >/dev/null 2>&1; then brew install nikto; else apt-get update && apt-get install -y nikto; fi",
@@ -72,7 +72,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
   },
   arjun: { check: "arjun", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install arjun", description: "Parameter discovery" },
   paramspider: { check: "paramspider", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install paramspider", description: "Parameter mining" },
-  commix: { check: "commix", install: "apt-get update && apt-get install -y commix || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH="$PATH:$HOME/.local/bin"; pipx install commix)", description: "Command injection" },
+  commix: { check: "commix", install: "apt-get update && apt-get install -y commix || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install commix)", description: "Command injection" },
   ssrfmap: { check: "ssrfmap", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install ssrfmap", description: "SSRF exploitation" },
   nosqlmap: { check: "nosqlmap", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install nosqlmap", description: "NoSQL injection" },
   crlfuzz: {
