@@ -101,7 +101,7 @@ export function validateCanonicalInventoryContent(phase: ReconPhase, content: st
           return { valid: false, reason: "inventory contains an invalid URL/host row: " + line, entries: 0 }
         }
         if (phase === "live_hosts_ports" && (url.pathname !== "/" || url.search || url.hash)) {
-          return { valid: false, reason: "live-hosts.txt must contain only a hostname or host:port, not a URL path/query/fragment: " + line, entries: 0 }
+          return { valid: false, reason: "live-hosts.txt must contain only a hostname or host:port, not a URL path/query/fragment", entries: 0 }
         }
         normalized = phase === "live_hosts_ports"
           ? url.hostname.toLowerCase() + (url.port ? ":" + url.port : "")
