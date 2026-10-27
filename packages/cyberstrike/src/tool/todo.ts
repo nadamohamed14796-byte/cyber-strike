@@ -3,6 +3,23 @@ import { Tool } from "./tool"
 import DESCRIPTION_WRITE from "./todowrite.txt"
 import { Todo } from "../session/todo"
 
+export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) {
+  const next = incoming.map((todo) => {
+    const prior = previous.find((item) => item.content.trim() === todo.content.trim())
+    if (prior?.status === "in_progress" && todo.status === "pending") {
+      return { ...todo, status: "in_progress" }
+    }
+    return todo
+  })
+  const hasTodo = (content: string) => next.some((todo) => todo.content.trim() === content.trim())
+  const preserved = previous.filter(
+    (todo) =>
+      (todo.status === "pending" || todo.status === "in_progress") &&
+      !hasTodo(todo.content),
+  )
+  return { todos: [...next, ...preserved], preserved }
+}
+
 function nextTodo(todos: Todo.Info[]) {
   const active = todos.filter((todo) => todo.status === "pending" || todo.status === "in_progress")
   const inProgress = active.find((todo) => todo.status === "in_progress")
@@ -33,16 +50,9 @@ export const TodoWriteTool = Tool.define("todowrite", {
     })
 
     const previous = await Todo.get(ctx.sessionID)
-    const nextTodos = [...params.todos]
-    const hasTodo = (content: string) => nextTodos.some((todo) => todo.content.trim() === content.trim())
-    const preserved = previous.filter(
-      (todo) =>
-        (todo.status === "pending" || todo.status === "in_progress") &&
-        !hasTodo(todo.content),
-    )
     // An update is a full snapshot. Preserve unfinished work unless the agent
     // explicitly keeps it or marks it cancelled; omission must not erase work.
-    nextTodos.push(...preserved)
+    const { todos: nextTodos, preserved } = mergeTodoSnapshot(previous, params.todos)
 
     const activeCount = nextTodos.filter((x) => x.status === "pending" || x.status === "in_progress").length
     if (activeCount > 25) {
