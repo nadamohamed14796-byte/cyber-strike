@@ -288,6 +288,16 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         if (status === "complete" && !params.summary?.trim()) {
           return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
         }
+        if (status === "complete") {
+          const unresolved = unresolvedReconPrerequisites(phase, run.phases)
+          if (unresolved.length > 0) {
+            return {
+              title: "Recon checkpoint rejected",
+              output: "Cannot complete " + phase + " while required earlier phases remain unresolved: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", ") + ". Finish each phase or record it as unavailable/deferred with a concrete reason; ordinary recon tools remain usable while progress is repaired.",
+              metadata: { saved: false, reason: "phase_prerequisites_unresolved", phase, unresolved },
+            }
+          }
+        }
         if (status === "complete" && phase === "scope_validation") {
           // Scope validation proves the official policy is saved on the canonical
           // program workspace. The root URL itself need not be in scope: the program
