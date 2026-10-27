@@ -39,6 +39,7 @@ type TargetWorkspaceMetadata = {
   found?: boolean
   attached?: boolean
   saved?: boolean
+  reason?: string
   target_id?: string
   target_url?: string
   workspace?: string
