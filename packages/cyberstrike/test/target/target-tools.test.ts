@@ -415,6 +415,15 @@ test("asset discovery does not create a child workspace unless explicitly reques
         expect(result.metadata.reason).toBe("separate_workspace_not_requested")
         expect((await TargetMemory.list()).filter((item) => item.parentTargetID === init.metadata.target_id)).toHaveLength(0)
         expect(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8")).toContain('"url": "https://api.example.com"')
+
+        // A later scope/asset reconciliation must not erase passively observed inventory entries.
+        await TargetMemory.configureScope("https://example.com", {
+          include: ["example.com", "*.example.com"],
+          authorizationSource: "Root inventory regression test",
+          authorizationReference: "https://example.com/security",
+        })
+        const reconciledRegistry = JSON.parse(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8"))
+        expect(reconciledRegistry.observations.some((item: { url: string }) => item.url === "https://api.example.com")).toBe(true)
       } finally {
         await Instance.dispose()
       }
