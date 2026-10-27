@@ -1311,7 +1311,6 @@ export namespace TargetMemory {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
     }
-    const observations = Array.isArray(previousRegistry.observations) ? previousRegistry.observations : []
     const registry = {
       ...previousRegistry,
       schemaVersion: 2, parentTargetID: parent.id, targetURL: parent.targetURL,
