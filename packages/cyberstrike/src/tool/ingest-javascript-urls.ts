@@ -13,8 +13,8 @@ const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
-  urls: z.array(z.string().trim().min(1).max(8192)).min(1)
-    .describe("JavaScript asset URLs OR HTML page URLs from ANY source: URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths."),
+  urls: z.array(z.string().trim().min(1).max(8192)).default([])
+    .describe("Optional JavaScript asset or HTML page URLs from the URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths. Leave empty to resume pending/retryable URLs saved in the existing target manifest."),
   source: z.string().trim().min(1).max(120).default("unspecified")
     .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
   force_refresh: z.boolean().default(false)
@@ -247,7 +247,7 @@ async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ resp
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Always pass all available URLs in the urls array and identify their provenance in source.",
+    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Pass new URLs when available; `urls: []` resumes eligible pending/retryable work from the existing asset manifest without requiring the original URL list.",
     "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. Each response is limited to 32 MiB and total response bodies are limited to 64 MiB per invocation while streaming; work deferred by the batch budget remains pending for the next invocation.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports plus source-map references are discovered from each downloaded bundle and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
@@ -323,6 +323,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
 
+    const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, Set<string>>()
@@ -372,9 +373,17 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         inputURLs.push(url)
       }
     }
+    if (inputURLs.length === 0) {
+      return {
+        title: "JavaScript ingestion has no work to resume",
+        output: invalidCount
+          ? "No valid HTTP(S) URLs were supplied, and the target manifest has no pending or retryable assets to resume."
+          : "No URLs were supplied and the target manifest has no pending or retryable assets to resume.",
+        metadata: { error: "no_urls_or_pending_queue", manifest_path: manifestPath, workspace: workspace.workspacePath, invalid_urls: invalidCount },
+      }
+    }
     for (const url of inputURLs) markPending(url, params.force_refresh)
     await saveProgress(true)
-    const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
     let receivedBytes = 0
