@@ -81,12 +81,23 @@ export function buildIngestPayload(
   return payload
 }
 
+export class IngestDeliveryError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+    readonly status?: number,
+  ) {
+    super(message)
+    this.name = "IngestDeliveryError"
+  }
+}
+
 export async function sendIngest(
   captured: CapturedRequest,
   serverUrl: string,
   sessionID: string | undefined,
   credentialId: string | undefined,
-): Promise<{ sessionID: string } | null> {
+): Promise<{ sessionID: string }> {
   const payload = buildIngestPayload(captured, sessionID, credentialId)
   const body = JSON.stringify(payload)
 
@@ -111,16 +122,30 @@ export async function sendIngest(
     })
 
     if (!res.ok) {
-      log.error("ingest server error", { status: res.status, body: await res.text().catch(() => "") })
-      return null
+      const responseBody = await res.text().catch(() => "")
+      const retryable = res.status === 429 || res.status >= 500
+      log.error("ingest server error", {
+        status: res.status,
+        retryable,
+        body: responseBody.slice(0, 1200),
+      })
+      throw new IngestDeliveryError(
+        `Ingest server rejected capture with HTTP ${res.status}`,
+        retryable,
+        res.status,
+      )
     }
 
     const data = (await res.json()) as { sessionID?: string }
-    log.debug("ingest accepted", { sessionID: data.sessionID ?? sessionID })
-    return data as { sessionID: string }
+    if (!data.sessionID) {
+      throw new IngestDeliveryError("Ingest server returned success without a sessionID", true, res.status)
+    }
+    log.debug("ingest accepted", { sessionID: data.sessionID })
+    return { sessionID: data.sessionID }
   } catch (err) {
+    if (err instanceof IngestDeliveryError) throw err
     log.error("ingest network error", { err: String(err) })
-    return null
+    throw new IngestDeliveryError(`Ingest network error: ${err instanceof Error ? err.message : String(err)}`, true)
   } finally {
     clearTimeout(timer)
   }
