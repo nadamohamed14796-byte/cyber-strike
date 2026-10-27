@@ -1227,8 +1227,9 @@ export const BashTool = Tool.define("bash", async () => {
       const toolBinDirs = home
         ? [path.join(home, "go", "bin"), path.join(home, ".local", "bin"), path.join(home, ".cargo", "bin")]
         : []
+      const shellEnvPath = (shellEnv.env as { PATH?: string }).PATH
       const effectivePath = [...new Set([
-        ...(typeof shellEnv.env.PATH === "string" ? shellEnv.env.PATH.split(path.delimiter) : []),
+        ...(typeof shellEnvPath === "string" ? shellEnvPath.split(path.delimiter) : []),
         ...(process.env.PATH ?? "").split(path.delimiter),
         ...toolBinDirs,
       ].filter(Boolean))].join(path.delimiter)
