@@ -822,9 +822,11 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
     if (shellWrappers.has(executable)) {
       const commandFlag = command.findIndex((value, index) => index > executableIndex && ["-c", "-lc", "-ec"].includes(stripOuterShellQuotes(value)))
       const payload = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
-      const wrappedScanner = payload ? await findWrappedScanner(payload) : undefined
-      if (wrappedScanner) {
-        throw new Error("Recon wrapper detected " + wrappedScanner + " inside a shell payload. Pass the scanner invocation directly (not through bash -c) so its complete arguments can be scope-checked before execution.")
+      const wrappedInvocation = payload ? await findWrappedScannerInvocation(payload) : undefined
+      if (wrappedInvocation?.length) {
+        // Apply the same complete target/port/redirect checks to the nested
+        // scanner rather than blocking the shell wrapper by tool identity.
+        await assertScannerReconGate(wrappedInvocation, payload, cwd)
       }
     }
     return
@@ -1027,7 +1029,7 @@ function commandTokens(node: BashCommandNode): string[] {
 }
 
 /** Parse shell payloads as shell code, not regex text, so quoted arguments don't trigger false positives. */
-export async function findWrappedScanner(payload: string): Promise<string | undefined> {
+export async function findWrappedScannerInvocation(payload: string): Promise<string[] | undefined> {
   const pending = [payload]
   const seen = new Set<string>()
   const parserInstance = await parser()
@@ -1043,14 +1045,17 @@ export async function findWrappedScanner(payload: string): Promise<string | unde
       if (!node) continue
       const command = commandTokens(node)
       const scannerIndex = scannerExecutableIndex(command)
-      if (scannerIndex >= 0) return path.basename(stripOuterShellQuotes(command[scannerIndex]!)).toLowerCase()
+      if (scannerIndex >= 0) return command.slice(scannerIndex)
 
       const executableIndex = commandExecutableIndex(command)
       if (executableIndex < 0) continue
-      // Also inspect non-shell launchers such as xargs/find/env inside a shell
-      // payload, not only when they are the top-level BashTool command.
       const indirectlyLaunched = await scannerLaunchedByWrapper(command, executableIndex)
-      if (indirectlyLaunched) return indirectlyLaunched
+      if (indirectlyLaunched) {
+        const nestedIndex = command.findIndex((value) =>
+          path.basename(stripOuterShellQuotes(value)).toLowerCase() === indirectlyLaunched,
+        )
+        if (nestedIndex >= 0) return command.slice(nestedIndex)
+      }
       const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
       if (!SHELL_WRAPPERS.has(executable)) continue
       const commandFlag = command.findIndex((value, index) =>
@@ -1061,6 +1066,12 @@ export async function findWrappedScanner(payload: string): Promise<string | unde
     }
   }
   return undefined
+}
+
+export async function findWrappedScanner(payload: string): Promise<string | undefined> {
+  const invocation = await findWrappedScannerInvocation(payload)
+  if (!invocation?.length) return undefined
+  return path.basename(stripOuterShellQuotes(invocation[0]!)).toLowerCase()
 }
 
 // TODO: we may wanna rename this tool so it works better on other shells
