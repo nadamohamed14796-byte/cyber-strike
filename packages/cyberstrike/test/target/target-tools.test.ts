@@ -87,6 +87,7 @@ test("target workspace tool initializes, configures scope, and nests authorized 
         parent_target_url: "https://example.com",
         asset_url: "https://api.example.com",
         asset_type: "api",
+        create_child_workspace: true,
       }, {} as never)
       expect(child.metadata.attached).toBe(true)
       expect(child.metadata.workspace).toContain(path.join("assets", ""))
@@ -388,6 +389,32 @@ test("user-confirmed incremental scope extension cannot override an explicit exc
         const notes = await fs.readFile(path.join(init.metadata.workspace!, "notes.md"), "utf-8")
         expect(notes).toContain("Scope confirmation conflicts with a saved exclusion")
         expect(notes).toContain("admin.example.test")
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
+
+test("asset discovery does not create a child workspace unless explicitly requested", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const init = await tool.execute({ action: "init", target_url: "https://example.com" }, {} as never)
+        const rootPath = init.metadata.workspace!
+        const result = await tool.execute({
+          action: "attach_asset",
+          parent_target_url: "https://example.com",
+          asset_url: "https://api.example.com",
+          asset_type: "api",
+        }, {} as never)
+        expect(result.metadata.attached).toBe(false)
+        expect(result.metadata.reason).toBe("separate_workspace_not_requested")
+        expect((await TargetMemory.list()).filter((item) => item.parentTargetID === init.metadata.target_id)).toHaveLength(0)
+        expect(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8")).not.toContain("api.example.com")
       } finally {
         await Instance.dispose()
       }
