@@ -1,7 +1,7 @@
 import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import z from "zod"
-import { Database, eq, and, isNull, asc } from "../storage/db"
+import { Database, eq, and, isNull, asc, or } from "../storage/db"
 import { RequestJavaScriptCaptureTable, RequestTable } from "./session.sql"
 import { Identifier } from "../id/id"
 import { createHash } from "crypto"
@@ -313,15 +313,8 @@ export namespace Request {
     return { requestID: request.id, captured: inserted.length > 0, contentHash }
   }
 
-  export function get(sessionID: string): Info[] {
-    const rows = Database.use((db) =>
-      // ORDER BY id ASC = ingest order. id is an ascending identifier (Identifier.ascending),
-      // so it sorts in creation/ingest order. Required because, without an explicit order,
-      // SQLite's row order is undefined and the request_keyhash_idx unique index makes it
-      // scan by (session_id, key_hash) — reordering the list away from ingest order in the UI.
-      db.select().from(RequestTable).where(eq(RequestTable.session_id, sessionID)).orderBy(asc(RequestTable.id)).all(),
-    )
-    return rows.map((row) => ({
+  function rowToInfo(row: typeof RequestTable.$inferSelect): Info {
+    return {
       id: row.id,
       session_id: row.session_id,
       credential_id: row.credential_id ?? undefined,
@@ -344,8 +337,6 @@ export namespace Request {
       canonical_path: row.canonical_path ?? undefined,
       template_id: row.template_id ?? undefined,
       norm_source: (row.norm_source as Info["norm_source"]) ?? undefined,
-      // Protocol/operation surfaced so the UI can label GraphQL/RPC endpoints
-      // (multiple operations share one /graphql path; the operation distinguishes them).
       protocol: row.protocol ?? undefined,
       operation: row.operation ?? undefined,
       op_key_hash: row.op_key_hash ?? undefined,
@@ -356,7 +347,32 @@ export namespace Request {
       response_size: row.response_size ?? undefined,
       processed_response: row.processed_response ?? undefined,
       time: { created: row.time_created, updated: row.time_updated },
-    }))
+    }
+  }
+
+  export function get(sessionID: string): Info[] {
+    const rows = Database.use((db) =>
+      // ORDER BY id ASC = ingest order. Keep request order stable for UI consumers.
+      db.select().from(RequestTable).where(eq(RequestTable.session_id, sessionID)).orderBy(asc(RequestTable.id)).all(),
+    )
+    return rows.map(rowToInfo)
+  }
+
+  /**
+   * Return only persisted requests whose analysis has not reached a terminal state.
+   * Filtering in SQLite avoids loading full request/response bodies for every historical
+   * request when a target has a large captured-traffic inventory.
+   */
+  export function pending(): Info[] {
+    const rows = Database.use((db) =>
+      db
+        .select()
+        .from(RequestTable)
+        .where(or(eq(RequestTable.status, "queued"), eq(RequestTable.status, "processing")))
+        .orderBy(asc(RequestTable.time_created), asc(RequestTable.id))
+        .all(),
+    )
+    return rows.map(rowToInfo)
   }
 
   /**
