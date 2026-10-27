@@ -279,9 +279,9 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-rl", "5", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-fs fqdn")
   })
 
-  test("requires explicit bounded crawl depth and a workspace-local output file", () => {
+  test("does not require a depth flag but keeps output workspace-local", () => {
     const noDepth = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/workspace/example/urls/katana.jsonl"]
-    expect(katanaScopeBlockReason(noDepth, "https://example.com", baseScope, "/workspace/example")).toContain("explicit Katana depth")
+    expect(katanaScopeBlockReason(noDepth, "https://example.com", baseScope, "/workspace/example")).toBeUndefined()
     const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"]
     expect(katanaScopeBlockReason(noOutput, "https://example.com", baseScope, "/workspace/example")).toContain("raw results")
     const deeperCrawl = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "8", "-j", "-ncb", "-o", "/workspace/example/urls/katana.jsonl"]
