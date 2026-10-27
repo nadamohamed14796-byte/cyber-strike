@@ -351,25 +351,42 @@ async function runNormalize(
   dryRun: boolean,
 ): Promise<Normalize.RunResult | null> {
   const scheme = body.scheme ?? inferScheme(body.text)
-  const model = body.model ?? (await SessionPrompt.lastModel(sessionID))
 
-  // Dry-run uses a no-op classifier so Tier 3 never reaches the LLM. Tier 1
-  // still resolves the common cases; ambiguous segments fall back to literal.
-  const client = dryRun
+  // Browser-extension captures must still be normalized and persisted when this
+  // session has no model history and the provider has no default model configured.
+  // Resolve model metadata defensively; when unavailable, use the deterministic
+  // Tier 1/2 path instead of failing the whole ingest before a request row exists.
+  let model = body.model
+  if (!model) {
+    try {
+      model = await SessionPrompt.lastModel(sessionID)
+    } catch (err) {
+      log.warn("no model available during request normalization; using deterministic fallback", {
+        sessionID,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  // Dry-run and missing-model fallback keep normalization offline. Tier 1/2
+  // still resolve common paths; ambiguous segments remain literal until a model
+  // is available, but the captured request can still be stored for later review.
+  const client = dryRun || !model
     ? {
         async classify() {
-          return { decisions: [], model: "dry-run" }
+          return { decisions: [], model: dryRun ? "dry-run" : "no-model-fallback" }
         },
       }
     : undefined
+  const normalizeModel = model ?? { providerID: "", modelID: "" }
 
   try {
     return await Normalize.run({
       sessionID,
       raw: body.text,
       scheme,
-      providerID: model.providerID,
-      modelID: model.modelID,
+      providerID: normalizeModel.providerID,
+      modelID: normalizeModel.modelID,
       client,
     })
   } catch (err) {
@@ -386,8 +403,8 @@ async function runNormalize(
         sessionID,
         raw: body.text,
         scheme,
-        providerID: model.providerID,
-        modelID: model.modelID,
+        providerID: normalizeModel.providerID,
+        modelID: normalizeModel.modelID,
         client: {
           async classify() {
             return { decisions: [], model: "deterministic-fallback" }
