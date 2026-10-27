@@ -1,7 +1,7 @@
 import z from "zod"
 import { Tool } from "./tool"
 
-const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; description: string }> = {
+const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; description: string; verify?: string }> = {
   nmap: { check: "nmap", install: "if command -v brew >/dev/null 2>&1; then brew install nmap; else apt-get update && apt-get install -y nmap; fi", description: "Network scanner" },
   nuclei: {
     check: "nuclei",
@@ -11,8 +11,10 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
   ffuf: { check: "ffuf", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/ffuf/ffuf/v2@latest", description: "Web fuzzer" },
   httpx: {
     check: "httpx",
+    // Reject a same-named but incompatible Python HTTPX CLI.
+    verify: "httpx -version",
     install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest",
-    description: "HTTP toolkit",
+    description: "ProjectDiscovery HTTP toolkit",
   },
   subfinder: {
     check: "subfinder",
@@ -56,7 +58,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     description: "Next-gen crawler",
   },
   dalfox: { check: "dalfox", install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/hahwul/dalfox/v2@latest", description: "XSS scanner" },
-  sqlmap: { check: "sqlmap", install: "pip3 install sqlmap", description: "SQL injection tool" },
+  sqlmap: { check: "sqlmap", install: "apt-get update && apt-get install -y sqlmap || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH="$PATH:$HOME/.local/bin"; pipx install sqlmap)", description: "SQL injection tool" },
   nikto: {
     check: "nikto",
     install: "if command -v brew >/dev/null 2>&1; then brew install nikto; else apt-get update && apt-get install -y nikto; fi",
@@ -68,17 +70,17 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
     install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/jaeles-project/gospider@latest",
     description: "Web spidering",
   },
-  arjun: { check: "arjun", install: "pip3 install arjun", description: "Parameter discovery" },
-  paramspider: { check: "paramspider", install: "pip3 install paramspider", description: "Parameter mining" },
-  commix: { check: "commix", install: "pip3 install commix", description: "Command injection" },
-  ssrfmap: { check: "ssrfmap", install: "pip3 install ssrfmap", description: "SSRF exploitation" },
-  nosqlmap: { check: "nosqlmap", install: "pip3 install nosqlmap", description: "NoSQL injection" },
+  arjun: { check: "arjun", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install arjun", description: "Parameter discovery" },
+  paramspider: { check: "paramspider", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install paramspider", description: "Parameter mining" },
+  commix: { check: "commix", install: "apt-get update && apt-get install -y commix || (if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH="$PATH:$HOME/.local/bin"; pipx install commix)", description: "Command injection" },
+  ssrfmap: { check: "ssrfmap", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install ssrfmap", description: "SSRF exploitation" },
+  nosqlmap: { check: "nosqlmap", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install nosqlmap", description: "NoSQL injection" },
   crlfuzz: {
     check: "crlfuzz",
     install: "command -v go >/dev/null 2>&1 || (apt-get update && apt-get install -y golang-go); go install github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest",
     description: "CRLF injection scanner",
   },
-  gitdumper: { check: "git-dumper", install: "pip3 install git-dumper", description: "Git repository dumper" },
+  gitdumper: { check: "git-dumper", install: "if ! command -v pipx >/dev/null 2>&1; then apt-get update && apt-get install -y pipx || exit $?; fi; export PATH=\"$PATH:$HOME/.local/bin\"; pipx install git-dumper", description: "Git repository dumper" },
 }
 
 export const EnsureToolsTool = Tool.define("ensure_tools", {
@@ -125,15 +127,21 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
       // Check if installed
       const check = Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; command -v ${spec.check}`])
       if (check.exitCode === 0) {
-        results.push({ tool: name, installed: true, action: `Already installed: ${check.stdout.toString().trim()}` })
-        continue
+        const executable = check.stdout.toString().trim()
+        const identity = spec.verify ? Bun.spawnSync(["sh", "-lc", spec.verify + " >/dev/null 2>&1"]) : undefined
+        if (!identity || identity.exitCode === 0) {
+          results.push({ tool: name, installed: true, action: `Already installed and verified: ${executable}` })
+          continue
+        }
+        // Same-named but incompatible CLI (notably httpx) is not usable.
       }
 
       // Try to install
       const install = Bun.spawnSync(["sh", "-lc", `${spec.install}; status=$?; export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; exit $status`], { timeout: 180_000 })
       // Installation exit status alone is not proof that the command is usable.
       const verify = Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; command -v ${spec.check}`])
-      if (install.exitCode === 0 && verify.exitCode === 0) {
+      const identity = spec.verify ? Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; ${spec.verify} >/dev/null 2>&1`]) : undefined
+      if (install.exitCode === 0 && verify.exitCode === 0 && (!identity || identity.exitCode === 0)) {
         results.push({ tool: name, installed: true, action: `Installed and verified: ${verify.stdout.toString().trim()}` })
       } else {
         const stderr = install.stderr.toString().trim().slice(0, 200)
