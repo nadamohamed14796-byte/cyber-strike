@@ -23,6 +23,7 @@ const Parameters = z.object({
   parent_target_url: z.string().optional(),
   asset_url: z.string().optional(),
   asset_type: z.enum(["subdomain", "application", "api", "host"]).optional(),
+  create_child_workspace: z.boolean().optional().describe("Must be true only when the operator explicitly asks for a separate investigation workspace. Defaults to false; discovered hosts stay in the root inventory."),
   summary_title: z.string().max(180).optional(),
   summary_content: z.string().max(100_000).optional(),
   summary_kind: z.enum(["manual", "research", "lesson"]).optional(),
@@ -483,6 +484,18 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
     }
 
     if (params.action === "attach_asset") {
+      if (params.create_child_workspace !== true) {
+        return {
+          title: "Asset stays in root inventory",
+          output: [
+            "No child workspace was created.",
+            "Ordinary discovery must keep discovered hosts/assets in the existing root workspace inventory.",
+            "Save or merge the asset into the root assets/registry.json or the relevant canonical inventory with target_artifact.",
+            "Set create_child_workspace=true only when the operator explicitly requests a separate investigation workspace for this specific asset.",
+          ].join("\\n"),
+          metadata: { attached: false, saved: false, reason: "separate_workspace_not_requested", target_url: params.parent_target_url } as TargetWorkspaceMetadata,
+        }
+      }
       const result = await TargetMemory.attachAsset(
         required(params.parent_target_url, "parent_target_url"),
         required(params.asset_url, "asset_url"),
