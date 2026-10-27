@@ -646,7 +646,7 @@ export function passiveResearchLookup(
   // requiring example.com itself to be in scope. This URL is only a scope
   // subject; curl still contacts the public passive-research provider above.
   const rawSubject = subject.trim()
-  const wildcardLookup = /^(?:\\*|%25?|%2a)\\./i.test(rawSubject)
+  const wildcardLookup = /^(?:\\*|%|%2a)\\./i.test(rawSubject)
   const scopeHost = wildcardLookup ? "cyberstrike-scope-check." + domain : domain
   return { targetURL: "https://" + scopeHost + "/", phase }
 }
