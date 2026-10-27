@@ -3,6 +3,7 @@ import { stream } from "hono/streaming"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 import { Session } from "../../session"
+import { Instance } from "../../project/instance"
 import { Bus } from "../../bus"
 import { NamedError } from "@cyberstrike-io/util/error"
 import { MessageV2 } from "../../session/message-v2"
@@ -402,6 +403,458 @@ async function runNormalize(
     }
   }
 }
+
+type CapturedRequestAnalysisInput = {
+  sessionID: string
+  req: Request.Info
+  model?: Provider.Model
+  buildPrompt: () => string
+}
+
+/**
+ * Run persisted captured-request work through the same analysis path regardless
+ * of whether the request arrived now or was restored after a process restart.
+ */
+async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Promise<void> {
+  const sessionID = input.sessionID
+  const req = input.req
+  const normalized = {
+    method: req.method,
+    origin: req.origin,
+    normalizedPath: req.normalized_path,
+  }
+  const body = { model: input.model }
+  const buildPrompt = input.buildPrompt
+  const agentName = "proxy-agent"
+  const source = `${normalized.method} ${normalized.normalizedPath}`
+  const truncatedRawRequest = req.raw_request ?? `${req.method} ${req.normalized_path} HTTP/1.1`
+  let childSessionID: string | undefined
+              // A request becomes processed only after agent processing and summary
+              // persistence both complete. Failed work stays visible and is not auto-replayed.
+              let finalStatus: "processed" | "failed" = "failed"
+              let liveNotice: IngestSummary.LiveNotice | undefined
+              let unsubscribeLive: (() => void) | undefined
+              let latestAgentText = ""
+              const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
+              try {
+                // Mark the dequeued request active immediately so queue waiters never open panels.
+                Request.updateStatus({ id: req.id, status: "processing" })
+                // Preserve the normal model preference order while opening the panel before
+                // configuration/session startup, so those failures still have visible status.
+                const proxyAgent = await Agent.get(agentName)
+                if (!proxyAgent || proxyAgent.mode === "primary") {
+                  throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
+                }
+                const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
+                liveNotice = await IngestSummary.createLiveNotice({
+                  sessionID,
+                  agent: proxyAgent.name,
+                  model,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the isolated analysis session…\n`,
+                  requestAnalysis: {
+                    requestID: req.id,
+                    method: normalized.method,
+                    url: normalized.origin
+                      ? new URL(normalized.normalizedPath, normalized.origin).href
+                      : normalized.normalizedPath,
+                  },
+                })
+                const config = await Config.get()
+                const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
+                const childSession = await Session.create({
+                  parentID: sessionID,
+                  title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
+                  permission: [
+                    { permission: "todowrite", pattern: "*", action: "deny" },
+                    { permission: "todoread", pattern: "*", action: "deny" },
+                    ...(hasTaskPermission ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
+                    ...(config.experimental?.primary_tools?.map((tool) => ({
+                      pattern: "*",
+                      action: "allow" as const,
+                      permission: tool,
+                    })) ?? []),
+                  ],
+                })
+                const analysisSessionID = childSession.id
+                childSessionID = analysisSessionID
+                log.info("captured request subagent started", {
+                  sessionID,
+                  analysisSessionID,
+                  requestID: req.id,
+                  agent: proxyAgent.name,
+                })
+                // Publish the child session ID immediately. If prompt construction or a
+                // later setup step fails, the analysis panel can still open the session and
+                // inspect its error state instead of losing the link to the created child.
+                liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
+                await IngestSummary.updateLiveNotice({
+                  sessionID,
+                  live: liveNotice,
+                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nPreparing request context and analysis steps…\n`,
+                })
+                const before = IngestSummary.snapshot(sessionID)
+                // Render at dequeue so Observed Values includes observations accrued while waiting.
+                const promptText = buildPrompt()
+                // Mirror only the subagent's visible text output into this stable parent
+                // transcript entry. Tool internals and hidden reasoning are not copied.
+                // This lets the user watch the request being analyzed without opening a
+                // separate chat window or creating one parent message per token.
+                unsubscribeLive = Bus.subscribe(MessageV2.Event.PartUpdated, async (event) => {
+                  const part = event.properties.part
+                  if (part.sessionID !== analysisSessionID || part.type !== "text" || part.synthetic) return
+                  try {
+                    const message = await MessageV2.get({
+                      sessionID: analysisSessionID,
+                      messageID: part.messageID,
+                    })
+                    if (message.info.role !== "assistant") return
+                    latestAgentText = part.text.slice(-6000)
+                    await IngestSummary.updateLiveNotice({
+                      sessionID,
+                      live: liveNotice!,
+                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\n\n### Latest agent output\n${latestAgentText || "(agent is working; no text emitted yet)"}`,
+                    })
+                  } catch (error) {
+                    log.debug("live ingest transcript update failed", {
+                      sessionID,
+                      analysisSessionID,
+                      requestID: req.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                  }
+                })
+                const agentResult = await SessionPrompt.prompt({
+                  sessionID: analysisSessionID,
+                  agent: proxyAgent.name,
+                  model,
+                  // Match TaskTool's subagent runtime: specialist delegation remains
+                  // available only when the proxy-agent's permission profile allows it.
+                  tools: {
+                    todowrite: false,
+                    todoread: false,
+                    ...(hasTaskPermission ? {} : { task: false }),
+                    ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
+                  },
+                  excludeHistory: true,
+                  parts: [{ type: "text", text: promptText }],
+                })
+                // SessionPrompt.prompt can resolve with an assistant message carrying
+                // an error, stuck-abort, or step-cap marker instead of throwing.
+                // Do not turn those incomplete runs into a successful ingest status.
+                const agentInfo = agentResult.info
+                const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
+                const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
+                const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
+                const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
+                await IngestSummary.write({
+                  // Keep completion chatter in the request child session, not the active parent transcript.
+                  sessionID: analysisSessionID,
+                  agent: agentName,
+                  model,
+                  source,
+                  before,
+                  after: IngestSummary.snapshot(sessionID),
+                })
+
+                // Persist a target-local evidence artifact for every captured request.
+                // This private artifact preserves the exact captured request for reproduction;
+                // shared/exported evidence must be separately redacted before leaving the workspace.
+                if (normalized.origin) {
+                  try {
+                    const observedURL = new URL(normalized.normalizedPath, normalized.origin)
+                    const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
+                    if (scopeDecision.allowed && scopeDecision.workspace) {
+                      const queryNames = [...new Set([...observedURL.searchParams.keys()])].sort()
+                      const requestArtifact = "requests/" + req.id.replace(/[^a-zA-Z0-9_-]/g, "_") + ".json"
+                      try {
+                        await TargetMemory.writeWorkspaceFile(scopeDecision.workspace, requestArtifact, JSON.stringify({
+                          schemaVersion: 1,
+                          requestID: req.id,
+                          analysisSessionID,
+                          capturedAt: new Date().toISOString(),
+                          targetURL: scopeDecision.workspace.targetURL,
+                          request: {
+                            method: normalized.method,
+                            origin: observedURL.origin,
+                            path: observedURL.pathname,
+                            queryParameterNames: queryNames,
+                            rawRequest: truncatedRawRequest,
+                          },
+                          response: {
+                            status: req.response_status ?? null,
+                            contentType: req.response_content_type ?? null,
+                            size: req.response_size ?? null,
+                            redactedPreview: safeCorrelationResponsePreview({
+                              id: req.id,
+                              normalizedPath: normalized.normalizedPath,
+                              responseContentType: req.response_content_type,
+                              processedResponse: req.processed_response,
+                            }),
+                          },
+                          evidencePolicy: "Private target-local original preserving exact request values for authorized reproduction. Create a separate redacted copy before sharing, reporting publicly, or sending to an external service.",
+                        }, null, 2) + "\n")
+                      } catch (error) {
+                        log.warn("request artifact persistence failed", {
+                          sessionID,
+                          analysisSessionID,
+                          requestID: req.id,
+                          targetID: scopeDecision.workspace.id,
+                          error: error instanceof Error ? error.message : String(error),
+                        })
+                      }
+                      const requestNoteContent = [
+                        "# Captured Request Observation",
+                        "",
+                        "- Request ID: " + req.id,
+                        "- Child analysis session: " + analysisSessionID,
+                        "- Method: " + normalized.method,
+                        "- Origin: " + observedURL.origin,
+                        "- Path: " + observedURL.pathname,
+                        "- Query parameter names: " + (queryNames.length ? queryNames.join(", ") : "none"),
+                        "- Response status: " + (req.response_status ?? "unknown"),
+                        "- Response content type: " + (req.response_content_type ?? "unknown"),
+                        "- Response size: " + (req.response_size ?? "unknown"),
+                        "",
+                        "Interpretation: observed request/response metadata only; this is not a vulnerability finding and does not prove an access-control or input-validation flaw. Unknowns: authorization context, expected behavior, response semantics, and security impact unless the child analysis establishes them.\n" +
+                        "Next analysis: inspect the private target-local request artifact (it retains exact captured request values) and canonical request by ID; correlate the exact origin/method/path with the endpoint inventory and JavaScript candidates; compare an authorized baseline/control where appropriate; record concrete evidence and a negative result if behavior is expected. Never infer impact from status code, missing headers, parameter presence, or unusual response alone. Do not share the raw artifact; create a separately redacted copy first.\n" +
+                        "The full captured request/response remains in the request store under the Request ID. Private target-local request artifact (contains exact request values): " + requestArtifact + ". The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
+                      ].join("\n")
+                      await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
+                        kind: "evidence",
+                        title: ("Captured request " + normalized.method + " " + normalized.normalizedPath.split("?")[0]).slice(0, 180),
+                        content: requestNoteContent,
+                        source: "extension-request:" + req.id,
+                        sourceURL: observedURL.origin + observedURL.pathname,
+                        status: "observed",
+                        tags: ["extension-request", "request-observation", normalized.method.toLowerCase()],
+                        upsertByIdentity: true,
+                      })
+                    } else {
+                      log.info("request evidence note skipped by persisted scope", {
+                        sessionID,
+                        analysisSessionID,
+                        requestID: req.id,
+                        reason: scopeDecision.reason,
+                      })
+                    }
+                  } catch (error) {
+                    // A note failure must not erase the successfully completed request analysis.
+                    log.warn("request evidence note persistence failed", {
+                      sessionID,
+                      analysisSessionID,
+                      requestID: req.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                  }
+                }
+
+                // JavaScript response captures automatically refresh the target's static
+                // analysis/correlation graph after the request agent finishes. The builder
+                // reads only already-captured, in-scope traffic and persists redacted metadata.
+                const isJavaScriptOrSourceMap =
+                  Boolean(req.processed_response?.trim()) &&
+                  isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath)
+                if (isJavaScriptOrSourceMap && normalized.origin) {
+                  try {
+                    const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
+                    const scopeDecision = await TargetMemory.checkURLScope(observedURL)
+                    if (scopeDecision.allowed && scopeDecision.workspace) {
+                      const correlation = await JavaScriptCorrelation.build({
+                        sessionID: analysisSessionID,
+                        targetURL: scopeDecision.workspace.targetURL,
+                      })
+                      log.info("automatic JavaScript correlation completed", {
+                        sessionID,
+                        analysisSessionID,
+                        requestID: req.id,
+                        targetID: scopeDecision.workspace.id,
+                        sourceFiles: correlation.graph.sourceFiles.length,
+                        endpointCandidates: correlation.graph.endpointCandidates.length,
+                        graphPath: correlation.graphPath,
+                      })
+                    } else {
+                      log.info("automatic JavaScript correlation skipped by persisted scope", {
+                        sessionID,
+                        requestID: req.id,
+                        reason: scopeDecision.reason,
+                      })
+                    }
+                  } catch (error) {
+                    // Correlation is a follow-up analysis, not the request-agent result.
+                    // Preserve the request's successful status and leave a diagnostic log.
+                    log.warn("automatic JavaScript correlation failed", {
+                      sessionID,
+                      requestID: req.id,
+                      error: error instanceof Error ? error.message : String(error),
+                    })
+                  }
+                }
+                if (agentIncomplete) {
+                  log.warn("captured request analysis did not complete cleanly", {
+                    sessionID,
+                    analysisSessionID,
+                    requestID: req.id,
+                    agent: agentName,
+                    errorName:
+                      agentError && typeof agentError === "object" && "name" in agentError
+                        ? String(agentError.name)
+                        : agentError
+                          ? "error"
+                          : undefined,
+                    stuckAborted: agentStuck,
+                    stepCapped: agentCapped,
+                  })
+                } else {
+                  finalStatus = "processed"
+                }
+              } catch (error) {
+                // If agent lookup itself fails, still create the same request panel when
+                // a parent/request model is available so the final failed state is visible.
+                if (!liveNotice) {
+                  try {
+                    const fallbackModel = body.model ?? (await SessionPrompt.lastModel(sessionID))
+                    liveNotice = await IngestSummary.createLiveNotice({
+                      sessionID,
+                      agent: agentName,
+                      model: fallbackModel,
+                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the isolated analysis session…\n`,
+                      requestAnalysis: {
+                        requestID: req.id,
+                        method: normalized.method,
+                        url: normalized.origin
+                          ? new URL(normalized.normalizedPath, normalized.origin).href
+                          : normalized.normalizedPath,
+                      },
+                    })
+                  } catch (noticeError) {
+                    log.warn("captured request startup notice failed", {
+                      sessionID,
+                      requestID: req.id,
+                      error: noticeError instanceof Error ? noticeError.message : String(noticeError),
+                    })
+                  }
+                }
+                throw error
+              } finally {
+                unsubscribeLive?.()
+                Request.updateStatus({ id: req.id, status: finalStatus })
+                if (liveNotice) {
+                  await IngestSummary.updateLiveNotice({
+                    sessionID,
+                    live: liveNotice,
+                    completed: true,
+                    status: finalStatus,
+                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
+                  }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
+                }
+                log.info("captured request subagent finished", {
+                  sessionID,
+                  analysisSessionID: childSessionID,
+                  requestID: req.id,
+                  status: finalStatus,
+                })
+              }
+}
+
+function buildPersistedRequestPrompt(sessionID: string, req: Request.Info): string {
+  const coverage = CoverageNote.wideBlock(sessionID, req.origin)
+  const visitedBy = resolveVisitedBy({
+    sessionID,
+    keyHash: req.key_hash,
+    captureVisitedBy: req.page_visited_by,
+  })
+  const rawRequest =
+    req.raw_request ??
+    `${req.method} ${req.normalized_path} HTTP/1.1${req.origin ? `\nHost: ${new URL(req.origin).host}` : ""}`
+  const base = buildPromptWithCredentialContext(
+    rawRequest,
+    req.credential_id,
+    req.processed_response,
+    {
+      triggerElement: req.trigger_element,
+      elementRoles: req.element_roles,
+      pageUrl: req.page_url,
+      pageVisitedBy: visitedBy,
+      uiContext: req.ui_context,
+    },
+    req.protocol && req.operation ? { protocol: req.protocol, operation: req.operation } : undefined,
+    Observation.endpointTree(sessionID, req.key_hash),
+    {
+      requestID: req.id,
+      method: req.method,
+      origin: req.origin,
+      path: req.normalized_path,
+      responseStatus: req.response_status,
+    },
+  )
+  return coverage ? `${coverage}\n\n${base}` : base
+}
+
+const requestRecoveryState = Instance.state(() => ({
+  started: false,
+  scheduled: new Set<string>(),
+}))
+
+/**
+ * Recover only unfinished request analyses. Failed and completed rows remain
+ * terminal, while processing rows are treated as interrupted work after restart.
+ * The state is scoped to the current project Instance.
+ */
+export function recoverPendingRequests(): void {
+  const state = requestRecoveryState()
+  if (state.started) return
+  state.started = true
+
+  let pending: Request.Info[]
+  try {
+    pending = Request.pending()
+  } catch (error) {
+    state.started = false
+    log.error("captured request recovery could not read pending rows", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return
+  }
+
+  let scheduled = 0
+  let failures = 0
+  for (const request of pending) {
+    if (state.scheduled.has(request.id)) continue
+    try {
+      if (request.status === "processing") {
+        Request.updateStatus({ id: request.id, status: "queued" })
+      }
+      const resumable = { ...request, status: "queued" as const }
+      IngestQueue.enqueue(
+        request.session_id,
+        () =>
+          analyzeCapturedRequest({
+            sessionID: request.session_id,
+            req: resumable,
+            buildPrompt: () => buildPersistedRequestPrompt(request.session_id, resumable),
+          }),
+        request.session_id,
+      )
+      state.scheduled.add(request.id)
+      scheduled++
+    } catch (error) {
+      failures++
+      log.error("captured request recovery failed to schedule row", {
+        sessionID: request.session_id,
+        requestID: request.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  if (failures > 0) state.started = false
+  log.info("captured request recovery pass completed", {
+    pending: pending.length,
+    scheduled,
+    failedToSchedule: failures,
+  })
+}
+
 
 export const SessionRoutes = lazy(() =>
   new Hono()
@@ -1488,345 +1941,11 @@ export const SessionRoutes = lazy(() =>
             // Captured HTTP traffic always enters through the proxy orchestrator subagent.
             // Do not let an ingest payload redirect a browser request into the primary chat
             // agent or an unrelated specialist; plain-text ingest retains its explicit agent option.
-            const agentName = "proxy-agent"
-            const source = `${normalized.method} ${normalized.normalizedPath}`
-            // Each captured request is a bounded proxy-agent subtask owned by the active
-            // session, not a new user chat/window. CyberStrike backs subagents with an
-            // internal child session, but we create it only when the request reaches the
-            // head of the parent's FIFO queue so queued requests do not open idle sessions.
-            // Mirror TaskTool's permission/tool restrictions so proxy-agent can delegate
-            // to specialists without inheriting primary-only tools.
-            let childSessionID: string | undefined
-            // Keep queue bookkeeping out of the conversation transcript.
-            // The request is shown to the user only when its analysis actually starts.
-
-            IngestQueue.enqueue(sessionID, async () => {
-              // A request becomes processed only after agent processing and summary
-              // persistence both complete. Failed work stays visible and is not auto-replayed.
-              let finalStatus: "processed" | "failed" = "failed"
-              let liveNotice: IngestSummary.LiveNotice | undefined
-              let unsubscribeLive: (() => void) | undefined
-              let latestAgentText = ""
-              const requestLabel = `${normalized.method} ${normalized.origin ?? ""}${normalized.normalizedPath.split("?")[0]}`
-              try {
-                // Mark the dequeued request active immediately so queue waiters never open panels.
-                Request.updateStatus({ id: req.id, status: "processing" })
-                // Preserve the normal model preference order while opening the panel before
-                // configuration/session startup, so those failures still have visible status.
-                const proxyAgent = await Agent.get(agentName)
-                if (!proxyAgent || proxyAgent.mode === "primary") {
-                  throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
-                }
-                const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
-                liveNotice = await IngestSummary.createLiveNotice({
-                  sessionID,
-                  agent: proxyAgent.name,
-                  model,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nPreparing the isolated analysis session…\n`,
-                  requestAnalysis: {
-                    requestID: req.id,
-                    method: normalized.method,
-                    url: normalized.origin
-                      ? new URL(normalized.normalizedPath, normalized.origin).href
-                      : normalized.normalizedPath,
-                  },
-                })
-                const config = await Config.get()
-                const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
-                const childSession = await Session.create({
-                  parentID: sessionID,
-                  title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
-                  permission: [
-                    { permission: "todowrite", pattern: "*", action: "deny" },
-                    { permission: "todoread", pattern: "*", action: "deny" },
-                    ...(hasTaskPermission ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
-                    ...(config.experimental?.primary_tools?.map((tool) => ({
-                      pattern: "*",
-                      action: "allow" as const,
-                      permission: tool,
-                    })) ?? []),
-                  ],
-                })
-                const analysisSessionID = childSession.id
-                childSessionID = analysisSessionID
-                log.info("captured request subagent started", {
-                  sessionID,
-                  analysisSessionID,
-                  requestID: req.id,
-                  agent: proxyAgent.name,
-                })
-                // Publish the child session ID immediately. If prompt construction or a
-                // later setup step fails, the analysis panel can still open the session and
-                // inspect its error state instead of losing the link to the created child.
-                liveNotice.requestAnalysis.analysisSessionID = analysisSessionID
-                await IngestSummary.updateLiveNotice({
-                  sessionID,
-                  live: liveNotice,
-                  text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\nAnalysis session: ${analysisSessionID}\nPreparing request context and analysis steps…\n`,
-                })
-                const before = IngestSummary.snapshot(sessionID)
-                // Render at dequeue so Observed Values includes observations accrued while waiting.
-                const promptText = buildPrompt()
-                // Mirror only the subagent's visible text output into this stable parent
-                // transcript entry. Tool internals and hidden reasoning are not copied.
-                // This lets the user watch the request being analyzed without opening a
-                // separate chat window or creating one parent message per token.
-                unsubscribeLive = Bus.subscribe(MessageV2.Event.PartUpdated, async (event) => {
-                  const part = event.properties.part
-                  if (part.sessionID !== analysisSessionID || part.type !== "text" || part.synthetic) return
-                  try {
-                    const message = await MessageV2.get({
-                      sessionID: analysisSessionID,
-                      messageID: part.messageID,
-                    })
-                    if (message.info.role !== "assistant") return
-                    latestAgentText = part.text.slice(-6000)
-                    await IngestSummary.updateLiveNotice({
-                      sessionID,
-                      live: liveNotice!,
-                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${proxyAgent.name}\n\n### Latest agent output\n${latestAgentText || "(agent is working; no text emitted yet)"}`,
-                    })
-                  } catch (error) {
-                    log.debug("live ingest transcript update failed", {
-                      sessionID,
-                      analysisSessionID,
-                      requestID: req.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    })
-                  }
-                })
-                const agentResult = await SessionPrompt.prompt({
-                  sessionID: analysisSessionID,
-                  agent: proxyAgent.name,
-                  model,
-                  // Match TaskTool's subagent runtime: specialist delegation remains
-                  // available only when the proxy-agent's permission profile allows it.
-                  tools: {
-                    todowrite: false,
-                    todoread: false,
-                    ...(hasTaskPermission ? {} : { task: false }),
-                    ...Object.fromEntries((config.experimental?.primary_tools ?? []).map((tool) => [tool, false])),
-                  },
-                  excludeHistory: true,
-                  parts: [{ type: "text", text: promptText }],
-                })
-                // SessionPrompt.prompt can resolve with an assistant message carrying
-                // an error, stuck-abort, or step-cap marker instead of throwing.
-                // Do not turn those incomplete runs into a successful ingest status.
-                const agentInfo = agentResult.info
-                const agentError = agentInfo.role === "assistant" ? agentInfo.error : undefined
-                const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
-                const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
-                const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
-                await IngestSummary.write({
-                  // Keep completion chatter in the request child session, not the active parent transcript.
-                  sessionID: analysisSessionID,
-                  agent: agentName,
-                  model,
-                  source,
-                  before,
-                  after: IngestSummary.snapshot(sessionID),
-                })
-
-                // Persist a target-local evidence artifact for every captured request.
-                // This private artifact preserves the exact captured request for reproduction;
-                // shared/exported evidence must be separately redacted before leaving the workspace.
-                if (normalized.origin) {
-                  try {
-                    const observedURL = new URL(normalized.normalizedPath, normalized.origin)
-                    const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
-                    if (scopeDecision.allowed && scopeDecision.workspace) {
-                      const queryNames = [...new Set([...observedURL.searchParams.keys()])].sort()
-                      const requestArtifact = "requests/" + req.id.replace(/[^a-zA-Z0-9_-]/g, "_") + ".json"
-                      try {
-                        await TargetMemory.writeWorkspaceFile(scopeDecision.workspace, requestArtifact, JSON.stringify({
-                          schemaVersion: 1,
-                          requestID: req.id,
-                          analysisSessionID,
-                          capturedAt: new Date().toISOString(),
-                          targetURL: scopeDecision.workspace.targetURL,
-                          request: {
-                            method: normalized.method,
-                            origin: observedURL.origin,
-                            path: observedURL.pathname,
-                            queryParameterNames: queryNames,
-                            rawRequest: truncatedRawRequest,
-                          },
-                          response: {
-                            status: req.response_status ?? null,
-                            contentType: req.response_content_type ?? null,
-                            size: req.response_size ?? null,
-                            redactedPreview: safeCorrelationResponsePreview({
-                              id: req.id,
-                              normalizedPath: normalized.normalizedPath,
-                              responseContentType: req.response_content_type,
-                              processedResponse: req.processed_response,
-                            }),
-                          },
-                          evidencePolicy: "Private target-local original preserving exact request values for authorized reproduction. Create a separate redacted copy before sharing, reporting publicly, or sending to an external service.",
-                        }, null, 2) + "\n")
-                      } catch (error) {
-                        log.warn("request artifact persistence failed", {
-                          sessionID,
-                          analysisSessionID,
-                          requestID: req.id,
-                          targetID: scopeDecision.workspace.id,
-                          error: error instanceof Error ? error.message : String(error),
-                        })
-                      }
-                      const requestNoteContent = [
-                        "# Captured Request Observation",
-                        "",
-                        "- Request ID: " + req.id,
-                        "- Child analysis session: " + analysisSessionID,
-                        "- Method: " + normalized.method,
-                        "- Origin: " + observedURL.origin,
-                        "- Path: " + observedURL.pathname,
-                        "- Query parameter names: " + (queryNames.length ? queryNames.join(", ") : "none"),
-                        "- Response status: " + (req.response_status ?? "unknown"),
-                        "- Response content type: " + (req.response_content_type ?? "unknown"),
-                        "- Response size: " + (req.response_size ?? "unknown"),
-                        "",
-                        "Interpretation: observed request/response metadata only; this is not a vulnerability finding and does not prove an access-control or input-validation flaw. Unknowns: authorization context, expected behavior, response semantics, and security impact unless the child analysis establishes them.\n" +
-                        "Next analysis: inspect the private target-local request artifact (it retains exact captured request values) and canonical request by ID; correlate the exact origin/method/path with the endpoint inventory and JavaScript candidates; compare an authorized baseline/control where appropriate; record concrete evidence and a negative result if behavior is expected. Never infer impact from status code, missing headers, parameter presence, or unusual response alone. Do not share the raw artifact; create a separately redacted copy first.\n" +
-                        "The full captured request/response remains in the request store under the Request ID. Private target-local request artifact (contains exact request values): " + requestArtifact + ". The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
-                      ].join("\n")
-                      await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
-                        kind: "evidence",
-                        title: ("Captured request " + normalized.method + " " + normalized.normalizedPath.split("?")[0]).slice(0, 180),
-                        content: requestNoteContent,
-                        source: "extension-request:" + req.id,
-                        sourceURL: observedURL.origin + observedURL.pathname,
-                        status: "observed",
-                        tags: ["extension-request", "request-observation", normalized.method.toLowerCase()],
-                        upsertByIdentity: true,
-                      })
-                    } else {
-                      log.info("request evidence note skipped by persisted scope", {
-                        sessionID,
-                        analysisSessionID,
-                        requestID: req.id,
-                        reason: scopeDecision.reason,
-                      })
-                    }
-                  } catch (error) {
-                    // A note failure must not erase the successfully completed request analysis.
-                    log.warn("request evidence note persistence failed", {
-                      sessionID,
-                      analysisSessionID,
-                      requestID: req.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    })
-                  }
-                }
-
-                // JavaScript response captures automatically refresh the target's static
-                // analysis/correlation graph after the request agent finishes. The builder
-                // reads only already-captured, in-scope traffic and persists redacted metadata.
-                const isJavaScriptOrSourceMap =
-                  Boolean(req.processed_response?.trim()) &&
-                  isJavaScriptOrSourceMapResponse(req.response_content_type, normalized.normalizedPath)
-                if (isJavaScriptOrSourceMap && normalized.origin) {
-                  try {
-                    const observedURL = new URL(normalized.normalizedPath, normalized.origin).href
-                    const scopeDecision = await TargetMemory.checkURLScope(observedURL)
-                    if (scopeDecision.allowed && scopeDecision.workspace) {
-                      const correlation = await JavaScriptCorrelation.build({
-                        sessionID: analysisSessionID,
-                        targetURL: scopeDecision.workspace.targetURL,
-                      })
-                      log.info("automatic JavaScript correlation completed", {
-                        sessionID,
-                        analysisSessionID,
-                        requestID: req.id,
-                        targetID: scopeDecision.workspace.id,
-                        sourceFiles: correlation.graph.sourceFiles.length,
-                        endpointCandidates: correlation.graph.endpointCandidates.length,
-                        graphPath: correlation.graphPath,
-                      })
-                    } else {
-                      log.info("automatic JavaScript correlation skipped by persisted scope", {
-                        sessionID,
-                        requestID: req.id,
-                        reason: scopeDecision.reason,
-                      })
-                    }
-                  } catch (error) {
-                    // Correlation is a follow-up analysis, not the request-agent result.
-                    // Preserve the request's successful status and leave a diagnostic log.
-                    log.warn("automatic JavaScript correlation failed", {
-                      sessionID,
-                      requestID: req.id,
-                      error: error instanceof Error ? error.message : String(error),
-                    })
-                  }
-                }
-                if (agentIncomplete) {
-                  log.warn("captured request analysis did not complete cleanly", {
-                    sessionID,
-                    analysisSessionID,
-                    requestID: req.id,
-                    agent: agentName,
-                    errorName:
-                      agentError && typeof agentError === "object" && "name" in agentError
-                        ? String(agentError.name)
-                        : agentError
-                          ? "error"
-                          : undefined,
-                    stuckAborted: agentStuck,
-                    stepCapped: agentCapped,
-                  })
-                } else {
-                  finalStatus = "processed"
-                }
-              } catch (error) {
-                // If agent lookup itself fails, still create the same request panel when
-                // a parent/request model is available so the final failed state is visible.
-                if (!liveNotice) {
-                  try {
-                    const fallbackModel = body.model ?? (await SessionPrompt.lastModel(sessionID))
-                    liveNotice = await IngestSummary.createLiveNotice({
-                      sessionID,
-                      agent: agentName,
-                      model: fallbackModel,
-                      text: `## Captured request — ANALYZING\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: ${agentName}\nPreparing the isolated analysis session…\n`,
-                      requestAnalysis: {
-                        requestID: req.id,
-                        method: normalized.method,
-                        url: normalized.origin
-                          ? new URL(normalized.normalizedPath, normalized.origin).href
-                          : normalized.normalizedPath,
-                      },
-                    })
-                  } catch (noticeError) {
-                    log.warn("captured request startup notice failed", {
-                      sessionID,
-                      requestID: req.id,
-                      error: noticeError instanceof Error ? noticeError.message : String(noticeError),
-                    })
-                  }
-                }
-                throw error
-              } finally {
-                unsubscribeLive?.()
-                Request.updateStatus({ id: req.id, status: finalStatus })
-                if (liveNotice) {
-                  await IngestSummary.updateLiveNotice({
-                    sessionID,
-                    live: liveNotice,
-                    completed: true,
-                    status: finalStatus,
-                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
-                  }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
-                }
-                log.info("captured request subagent finished", {
-                  sessionID,
-                  analysisSessionID: childSessionID,
-                  requestID: req.id,
-                  status: finalStatus,
-                })
-              }
-            }, sessionID)
+            IngestQueue.enqueue(
+              sessionID,
+              () => analyzeCapturedRequest({ sessionID, req, model: body.model, buildPrompt }),
+              sessionID,
+            )
           }
         } else {
           // Non-HTTP request (plain text message)
