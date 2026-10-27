@@ -877,13 +877,14 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   if (["nmap", "masscan", "naabu"].includes(scanner)) {
     const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
     const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
-    if (portSpec) {
-      const parsedPorts = parseScopedPortSpec(portSpec)
-      if (!parsedPorts) {
-        throw new Error("Recon execution gate blocked " + scanner + ": invalid port expression. Use valid ports, comma-separated lists, and ranges (for example 80,443,8000-8100).")
-      }
-      portScanPorts = parsedPorts
+    if (!portSpec) {
+      throw new Error("Recon execution gate blocked " + scanner + ": specify ports so every requested port can be checked against persisted scope.")
     }
+    const parsedPorts = parseScopedPortSpec(portSpec)
+    if (!parsedPorts) {
+      throw new Error("Recon execution gate blocked " + scanner + ": invalid port expression. Use valid ports, comma-separated lists, and ranges (for example 80,443,8000-8100).")
+    }
+    portScanPorts = parsedPorts
   }
   // Tool choice is not restricted by a phase allowlist. Request safety and
   // persisted target-scope validation below remain in force.
