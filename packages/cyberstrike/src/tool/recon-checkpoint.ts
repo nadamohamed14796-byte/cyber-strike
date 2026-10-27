@@ -6,6 +6,7 @@ import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE } from "../target"
 import {
   RECON_PHASES as PHASES,
   invalidateReconDownstreamPhases,
+  unresolvedReconPrerequisites,
   initialReconRun as initialRun,
   parseReconRun as parseRun,
   reconRunID,
