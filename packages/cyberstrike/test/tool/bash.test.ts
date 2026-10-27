@@ -280,7 +280,7 @@ describe("Katana scope policy", () => {
   })
 
   test("requires explicit bounded crawl depth and a workspace-local output file", () => {
-    const noDepth = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/tmp/katana.txt"]
+    const noDepth = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-o", "/workspace/example/urls/katana.jsonl"]
     expect(katanaScopeBlockReason(noDepth, "https://example.com", baseScope, "/workspace/example")).toContain("explicit Katana depth")
     const noOutput = ["-u", "https://example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-j", "-ncb"]
     expect(katanaScopeBlockReason(noOutput, "https://example.com", baseScope, "/workspace/example")).toContain("raw results")
@@ -297,9 +297,9 @@ describe("Katana scope policy", () => {
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-u", "https://api.example.com", "-fs", "fqdn", "-rl", "5", "-d", "3", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("Duplicate flags")
   })
 
-  test("requires explicit non-clobbering output and rejects scope-broadening flags", () => {
+  test("allows reuse of safe output paths and rejects scope-broadening flags", () => {
     const withoutNoClobber = safeArgs.filter((arg) => arg !== "-ncb")
-    expect(katanaScopeBlockReason(withoutNoClobber, "https://example.com", baseScope, workspacePath)).toContain("no-clobber")
+    expect(katanaScopeBlockReason(withoutNoClobber, "https://example.com", baseScope, workspacePath)).toBeUndefined()
     expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
     expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope, workspacePath)).toContain("scope overrides")
   })
