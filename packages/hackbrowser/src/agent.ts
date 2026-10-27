@@ -2507,18 +2507,6 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
   if (!browserDied) await contexts[0]?.page.waitForTimeout(2000).catch(() => {})
 
   await drainPageCaptures(captureQueues, captureHandlers, new Map(), null, null, true)
-  const undeliveredCaptureCount = [...captureQueues.values()].reduce((total, queue) => total + queue.length, 0)
-  if (undeliveredCaptureCount > 0) {
-    log.error("multi-credential crawl finished with undelivered captures", { pending: undeliveredCaptureCount })
-  }
-
-  log.info("multi-credential crawl done", {
-    pagesExplored,
-    credentials: contexts.map((c) => c.id),
-    totalSteps: globalState.totalSteps,
-    capturedEndpoints: globalState.capturedEndpoints.size,
-    browserDied,
-  })
 
   // Panel done event — one per context so each tab shows its own summary.
   if (!browserDied) {
@@ -2540,10 +2528,35 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
 
   if (!config.headless && browser.isConnected()) {
     log.info("crawl complete — browser stays open, close the window to finish")
-    await waitForBrowserClose(browser, config.signal)
+    // Continue delivering captures caused by manual browser interaction after the
+    // crawler itself finishes. The same queue lock makes interval/page drains safe.
+    const postCrawlDrain = setInterval(() => {
+      void drainPageCaptures(captureQueues, captureHandlers, new Map(), null, null)
+    }, 500)
+    try {
+      await waitForBrowserClose(browser, config.signal)
+    } finally {
+      clearInterval(postCrawlDrain)
+    }
   } else if (!browserDied) {
     await browser.close().catch(() => {})
   }
+
+  // Drain once more after browser shutdown so late responses are delivered.
+  await drainPageCaptures(captureQueues, captureHandlers, new Map(), null, null, true)
+  const undeliveredCaptureCount = [...captureQueues.values()].reduce((total, queue) => total + queue.length, 0)
+  if (undeliveredCaptureCount > 0) {
+    log.error("multi-credential crawl finished with undelivered captures", { pending: undeliveredCaptureCount })
+  }
+
+  log.info("multi-credential crawl done", {
+    pagesExplored,
+    credentials: contexts.map((c) => c.id),
+    totalSteps: globalState.totalSteps,
+    capturedEndpoints: globalState.capturedEndpoints.size,
+    browserDied,
+    undeliveredCaptures: undeliveredCaptureCount,
+  })
 
   return {
     sessionID: dryRun ? "" : sessionId,
