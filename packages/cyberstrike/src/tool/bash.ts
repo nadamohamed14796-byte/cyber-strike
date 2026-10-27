@@ -19,6 +19,7 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
 import { TargetMemory, type TargetScope, type Workspace } from "../target"
+import type { ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
 
@@ -1320,7 +1321,7 @@ export const BashTool = Tool.define("bash", async () => {
       }
 
       return {
-        title: params.description,
+        title: params.description ?? "Run shell command",
         metadata: {
           output: output.length > MAX_METADATA_LENGTH ? output.slice(0, MAX_METADATA_LENGTH) + "\n\n..." : output,
           exit: proc.exitCode,
