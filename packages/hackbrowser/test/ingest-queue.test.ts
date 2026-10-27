@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { drainCaptureQueue } from "../src/capture-queue.ts"
+import { drainCaptureQueue, permanentlyRejectedCaptureCount } from "../src/capture-queue.ts"
 import { IngestDeliveryError } from "../src/ingest.ts"
 import type { CapturedRequest } from "../src/types.ts"
 
@@ -98,6 +98,7 @@ describe("drainCaptureQueue", () => {
 
     expect(result.pending).toBe(0)
     expect(result.rejected).toBe(1)
+    expect(permanentlyRejectedCaptureCount(queue)).toBe(1)
     expect(delivered).toEqual(["/good"])
     expect(queue).toHaveLength(0)
   })
