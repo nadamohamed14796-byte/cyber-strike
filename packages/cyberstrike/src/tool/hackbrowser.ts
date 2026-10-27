@@ -13,6 +13,7 @@ import { launchHackbrowser } from "./hackbrowser-launcher"
 import { AuthVault, normalizeAuthOrigin } from "../auth-vault"
 import { GmailService } from "../gmail-service"
 import { TargetMemory } from "../target"
+import { checkMatch } from "../target/scope-match"
 
 const DESCRIPTION = `Crawl a web application autonomously and capture HTTP requests with UI context.
 
@@ -94,10 +95,17 @@ export const HackbrowserTool = Tool.define<typeof HackBrowserParameters, Tool.Me
       }
     }
     const persistedScope = authorization.scope
-    if (args.scope?.some((entry) => !persistedScope.scopeItems.includes(entry.trim().toLowerCase()))) {
+    // A caller may narrow a persisted wildcard/CIDR scope to concrete discovered
+    // hosts. Compare each requested host with the canonical matcher rather than
+    // requiring literal equality with the manifest entry (which incorrectly
+    // rejects valid hosts such as app.example.com under *.example.com).
+    if (args.scope?.some((entry) => {
+      const candidate = entry.trim()
+      return !candidate || !persistedScope.scopeItems.some((scopeItem) => checkMatch(candidate, scopeItem).matches)
+    })) {
       return {
-        title: "Hackbrowser refused — scope override exceeds authorization",
-        output: "The requested crawler scope is not an exact subset of the persisted authorization entries. Update the target scope explicitly instead of widening it in a tool call.",
+        title: "Hackbrowser refused — requested crawl scope is outside authorization",
+        output: "At least one requested crawler host is outside the persisted target scope. Use only hosts covered by the configured scope.",
         metadata: { started: false, reason: "scope_override_denied" },
       }
     }
