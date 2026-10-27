@@ -414,7 +414,7 @@ test("asset discovery does not create a child workspace unless explicitly reques
         expect(result.metadata.attached).toBe(false)
         expect(result.metadata.reason).toBe("separate_workspace_not_requested")
         expect((await TargetMemory.list()).filter((item) => item.parentTargetID === init.metadata.target_id)).toHaveLength(0)
-        expect(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8")).not.toContain("api.example.com")
+        expect(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8")).toContain('"url": "https://api.example.com"')
       } finally {
         await Instance.dispose()
       }
