@@ -826,7 +826,28 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
     const executableIndex = commandExecutableIndex(command)
     const launchedScanner = executableIndex >= 0 ? await scannerLaunchedByWrapper(command, executableIndex) : undefined
     if (launchedScanner) {
-      throw new Error("Recon execution gate blocked " + launchedScanner + " launched indirectly via a command wrapper. Target-list/executor wrappers cannot enforce per-request scope; invoke a scanner directly with explicit authorized inputs, or use the scope-aware request pipeline.")
+      // Wrapper commands need their own target extraction before execution. Do not
+      // reject based on tool identity alone; continue only when the nested scanner
+      // can be identified and its concrete target can be checked below.
+      const wrapperArgs = command.slice(executableIndex + 1)
+      const nestedScannerIndex = wrapperArgs.findIndex((value) =>
+        path.basename(stripOuterShellQuotes(value)).toLowerCase() === launchedScanner,
+      )
+      if (nestedScannerIndex >= 0) {
+        const nested = wrapperArgs.slice(nestedScannerIndex)
+        const nestedTargets = scannerTargets(nested, commandText)
+        if (!nestedTargets.length) {
+          throw new Error("Recon scope check could not identify a concrete target for wrapped " + launchedScanner + ". Pass explicit in-scope host(s) or use a readable target list.")
+        }
+        for (const target of nestedTargets) {
+          const decision = await TargetMemory.checkURLScope(target)
+          if (!decision.allowed || !decision.workspace) {
+            throw new Error("Recon scope check rejected wrapped " + launchedScanner + " target " + target + ": " + decision.reason)
+          }
+        }
+        return
+      }
+      throw new Error("Recon scope check could not identify the wrapped " + launchedScanner + " command. Run it directly with explicit in-scope targets.")
     }
     // Inspect only payloads of an actual shell executable, including simple
     // launcher-prefixed forms such as "sudo bash -lc ...". Never search arbitrary
@@ -838,7 +859,16 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       const payload = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
       const wrappedScanner = payload ? await findWrappedScanner(payload) : undefined
       if (wrappedScanner) {
-        throw new Error("Recon execution gate blocked an indirect/wrapped " + wrappedScanner + " invocation. Run the scanner as a direct command so target scope and phase prerequisites can be checked.")
+        const nestedTargets = scannerTargets([wrappedScanner], payload)
+        if (!nestedTargets.length) {
+          throw new Error("Recon scope check could not identify a concrete target for wrapped " + wrappedScanner + ". Pass explicit in-scope host(s) or a readable target list.")
+        }
+        for (const target of nestedTargets) {
+          const decision = await TargetMemory.checkURLScope(target)
+          if (!decision.allowed || !decision.workspace) {
+            throw new Error("Recon scope check rejected wrapped " + wrappedScanner + " target " + target + ": " + decision.reason)
+          }
+        }
       }
     }
     return
@@ -847,9 +877,9 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   const args = command.slice(scannerIndex + 1)
   if (args.some((value) => ["--help", "-h", "--version", "-version", "-V"].includes(value)) &&
       !args.some((value) => /^https?:\/\//i.test(value))) return
-  if (["hakrawler", "gospider"].includes(scanner)) {
-    throw new Error("Recon execution gate blocked " + scanner + " in generic shell mode because its crawl cannot consult persisted scope before each request. Use the scope-aware browser/recon pipeline.")
-  }
+  // Do not blanket-disable a scanner because of its name. Every explicit input
+  // still has to pass persisted scope checks below; redirect-capable clients
+  // remain subject to the request-scope checks in scannerRequestScopeBlockReason.
   const redirectReason = scannerRequestScopeBlockReason(scanner, args, command.slice(0, scannerIndex))
   if (redirectReason) {
     throw new Error("Recon execution gate blocked " + scanner + ": " + redirectReason + " No network request was started.")
