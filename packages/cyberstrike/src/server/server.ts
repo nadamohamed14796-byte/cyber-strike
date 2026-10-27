@@ -21,7 +21,7 @@ import { Flag } from "../flag/flag"
 import { Command } from "../command"
 import { Global } from "../global"
 import { ProjectRoutes } from "./routes/project"
-import { SessionRoutes } from "./routes/session"
+import { SessionRoutes, recoverPendingRequests } from "./routes/session"
 import { PtyRoutes } from "./routes/pty"
 import { McpRoutes } from "./routes/mcp"
 import { BoltRoutes } from "./routes/bolt"
@@ -255,6 +255,7 @@ export namespace Server {
             directory,
             init: InstanceBootstrap,
             async fn() {
+              recoverPendingRequests()
               return next()
             },
           })
