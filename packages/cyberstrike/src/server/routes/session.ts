@@ -446,10 +446,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
                 }
                 const configuredAgentModel = proxyAgent.model
-                  ? {
-                      providerID: proxyAgent.model.providerID,
-                      modelID: "modelID" in proxyAgent.model ? proxyAgent.model.modelID : proxyAgent.model.id,
-                    }
+                  ? { providerID: proxyAgent.model.providerID, modelID: proxyAgent.model.modelID }
                   : undefined
                 const model = body.model ?? configuredAgentModel ?? (await SessionPrompt.lastModel(sessionID))
                 liveNotice = await IngestSummary.createLiveNotice({
