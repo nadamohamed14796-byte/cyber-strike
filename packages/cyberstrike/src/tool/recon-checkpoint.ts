@@ -66,20 +66,54 @@ const CANONICAL_INVENTORY_PHASES = new Set<ReconPhase>([
  * Explicit zero-result/incomplete markers allow truthful empty or partial runs.
  */
 export function validateCanonicalInventoryContent(phase: ReconPhase, content: string): { valid: boolean; reason?: string; entries: number } {
-  if (!CANONICAL_INVENTORY_PHASES.has(phase)) return { valid: Boolean(content.trim()), reason: content.trim() ? undefined : "artifact is empty", entries: 0 }
+  if (!CANONICAL_INVENTORY_PHASES.has(phase)) {
+    return { valid: Boolean(content.trim()), reason: content.trim() ? undefined : "artifact is empty", entries: 0 }
+  }
+
   const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
   const statusLine = /^(?:status\s*:\s*)?(?:zero[- ]results?|no (?:results|assets|hosts|urls|parameters) found|incomplete\s*:|partial\s*:)/i
+  const statuses = lines.filter((line) => statusLine.test(line))
   const dataLines = lines.filter((line) => !statusLine.test(line))
-  const failureOnly = dataLines.filter((line) => /^(?:\[?failed\]?(?:\b|:|\s|$)|error\b|fatal\b|timeout\b|timed out\b|no input\b|usage:|command not found\b)/i.test(line))
-  if (dataLines.length === 0 && !lines.some((line) => statusLine.test(line))) {
+  const failureLine = /^(?:\[?failed\]?(?:\b|:|\s|$)|error\b|fatal\b|timeout\b|timed out\b|no input\b|usage:|command not found\b|\{.*"(?:error|failed|exception)".*\})/i
+  if (dataLines.some((line) => failureLine.test(line))) {
+    return { valid: false, reason: "inventory contains tool failure/error lines; keep those in raw logs and only successful normalized records in the canonical file", entries: 0 }
+  }
+  if (dataLines.length === 0 && statuses.length === 0) {
     return { valid: false, reason: "inventory contains no data rows or explicit zero-result/incomplete status", entries: 0 }
   }
-  if (dataLines.length > 0 && failureOnly.length === dataLines.length) {
-    return { valid: false, reason: "inventory contains only tool failures/errors, not discovered assets", entries: 0 }
+  if (statuses.length > 0 && dataLines.length > 0) {
+    return { valid: false, reason: "inventory mixes status markers with data rows; use data rows only or a single explicit zero-result/incomplete status", entries: 0 }
+  }
+
+  const seen = new Set<string>()
+  for (const line of dataLines) {
+    let normalized = line
+    if (phase === "asset_discovery") {
+      const host = line.replace(/^\*\./, "").replace(/\.$/, "").toLowerCase()
+      if (host.includes("://") || host.includes("/") || host.includes(" ") || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))+$/.test(host)) {
+        return { valid: false, reason: "subdomains.txt contains a non-hostname row: " + line, entries: 0 }
+      }
+      normalized = host
+    } else if (phase === "live_hosts_ports" || phase === "url_collection") {
+      try {
+        const url = new URL(line.startsWith("http://") || line.startsWith("https://") ? line : "https://" + line)
+        if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password || (phase === "url_collection" && !/^https?:\/\//i.test(line))) {
+          return { valid: false, reason: "inventory contains an invalid URL/host row: " + line, entries: 0 }
+        }
+        normalized = phase === "live_hosts_ports"
+          ? url.hostname.toLowerCase() + (url.port ? ":" + url.port : "")
+          : url.toString()
+      } catch {
+        return { valid: false, reason: "inventory contains an invalid URL/host row: " + line, entries: 0 }
+      }
+    }
+    if (seen.has(normalized)) {
+      return { valid: false, reason: "inventory contains duplicate normalized entries; deduplicate the canonical list before completion", entries: 0 }
+    }
+    seen.add(normalized)
   }
   return { valid: true, entries: dataLines.length }
 }
-
 export type ReconBeginDisposition = "start" | "resume_existing" | "already_resolved"
 
 export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhase): ReconBeginDisposition {
