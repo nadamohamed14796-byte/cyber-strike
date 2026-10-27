@@ -1221,12 +1221,24 @@ export const BashTool = Tool.define("bash", async () => {
       }
 
       const shellEnv = await Plugin.trigger("shell.env", { cwd }, { env: {} })
+      // Match ensure_tools verification paths during real command execution.
+      // Otherwise a Go/pipx/Cargo tool can be reported installed but remain unlaunchable.
+      const home = process.env.HOME
+      const toolBinDirs = home
+        ? [path.join(home, "go", "bin"), path.join(home, ".local", "bin"), path.join(home, ".cargo", "bin")]
+        : []
+      const effectivePath = [...new Set([
+        ...(process.env.PATH ?? "").split(path.delimiter),
+        ...(typeof shellEnv.env.PATH === "string" ? shellEnv.env.PATH.split(path.delimiter) : []),
+        ...toolBinDirs,
+      ].filter(Boolean))].join(path.delimiter)
       const proc = spawn(params.command, {
         shell,
         cwd,
         env: {
           ...process.env,
           ...shellEnv.env,
+          PATH: effectivePath,
         },
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
