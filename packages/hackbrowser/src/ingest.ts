@@ -27,13 +27,19 @@ export async function initSession(
   targetUrl: string,
   credentialId: string | undefined,
 ): Promise<string | null> {
-  const payload: IngestPayload = {
-    text: `[hackbrowser] Session started for ${targetUrl}`,
-    ...(credentialId ? { credential_id: credentialId } : {}),
+  // Session creation is not an ingest event: sending a synthetic text message to
+  // /session/ingest enqueues a pointless proxy-agent run before any traffic exists.
+  // Use the dedicated endpoint and keep a useful target label in the session list.
+  let targetLabel = targetUrl
+  try {
+    targetLabel = new URL(targetUrl).host || targetUrl
+  } catch {}
+  const payload = {
+    title: `[hackbrowser] ${targetLabel}${credentialId ? ` (${credentialId})` : ""}`,
   }
 
   try {
-    const res = await fetch(`${serverUrl}/session/ingest`, {
+    const res = await fetch(`${serverUrl}/session`, {
       method: "POST",
       headers: { Authorization: authHeader, "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -44,14 +50,14 @@ export async function initSession(
       return null
     }
 
-    const data = (await res.json()) as { sessionID?: string }
-    if (!data.sessionID) {
-      log.error("initSession: no sessionID in response")
+    const data = (await res.json()) as { id?: string }
+    if (!data.id) {
+      log.error("initSession: no session id in response")
       return null
     }
 
-    log.info("session created", { sessionID: data.sessionID })
-    return data.sessionID
+    log.info("session created", { sessionID: data.id })
+    return data.id
   } catch (err) {
     log.error("initSession network error", { err: String(err) })
     return null
