@@ -220,7 +220,7 @@ export async function reconPhaseGate(
   if (run.phases.scope_validation.status !== "complete") {
     return {
       allowed: false,
-      reason: "Target scope validation must be completed before recon tools can run.",
+      reason: "Target scope validation must be completed before vulnerability testing can run. Ordinary reconnaissance tools are not blocked by this testing checkpoint.",
       manifestPath,
     }
   }
