@@ -1297,7 +1297,23 @@ export namespace TargetMemory {
 
   async function syncAssetRegistry(parent: Workspace): Promise<void> {
     const assets = children(parent.id)
+    const registryPath = path.join(parent.workspacePath, "assets", "registry.json")
+    let previousRegistry: Record<string, unknown> = {}
+    try {
+      const info = await fs.lstat(registryPath)
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("Asset registry is not a regular file.")
+      }
+      const parsed: unknown = JSON.parse(await fs.readFile(registryPath, "utf-8"))
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        previousRegistry = parsed as Record<string, unknown>
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+    }
+    const observations = Array.isArray(previousRegistry.observations) ? previousRegistry.observations : []
     const registry = {
+      ...previousRegistry,
       schemaVersion: 2, parentTargetID: parent.id, targetURL: parent.targetURL,
       updatedAt: new Date().toISOString(),
       assets: assets.map((asset) => ({
