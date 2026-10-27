@@ -407,7 +407,7 @@ async function runNormalize(
 type CapturedRequestAnalysisInput = {
   sessionID: string
   req: Request.Info
-  model?: Provider.Model
+  model?: { providerID: string; modelID: string }
   buildPrompt: () => string
 }
 
@@ -445,7 +445,13 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 if (!proxyAgent || proxyAgent.mode === "primary") {
                   throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
                 }
-                const model = body.model ?? proxyAgent.model ?? (await SessionPrompt.lastModel(sessionID))
+                const configuredAgentModel = proxyAgent.model
+                  ? {
+                      providerID: proxyAgent.model.providerID,
+                      modelID: "modelID" in proxyAgent.model ? proxyAgent.model.modelID : proxyAgent.model.id,
+                    }
+                  : undefined
+                const model = body.model ?? configuredAgentModel ?? (await SessionPrompt.lastModel(sessionID))
                 liveNotice = await IngestSummary.createLiveNotice({
                   sessionID,
                   agent: proxyAgent.name,
@@ -757,7 +763,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
 }
 
 function buildPersistedRequestPrompt(sessionID: string, req: Request.Info): string {
-  const coverage = CoverageNote.wideBlock(sessionID, req.origin)
+  const coverage = CoverageNote.wideBlock(sessionID, req.origin ?? "")
   const visitedBy = resolveVisitedBy({
     sessionID,
     keyHash: req.key_hash,
@@ -778,7 +784,7 @@ function buildPersistedRequestPrompt(sessionID: string, req: Request.Info): stri
       uiContext: req.ui_context,
     },
     req.protocol && req.operation ? { protocol: req.protocol, operation: req.operation } : undefined,
-    Observation.endpointTree(sessionID, req.key_hash),
+    req.key_hash ? Observation.endpointTree(sessionID, req.key_hash) : undefined,
     {
       requestID: req.id,
       method: req.method,
