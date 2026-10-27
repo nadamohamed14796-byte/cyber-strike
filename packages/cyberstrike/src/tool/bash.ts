@@ -315,24 +315,22 @@ export function katanaScopeBlockReason(args: string[], targetURL: string, scopeI
     return "Run Katana with '-fs fqdn' so it follows URLs on each explicitly supplied hostname only."
   }
 
+  // Rate and depth are operator/tool choices, not authorization gates. Validate
+  // them only when explicitly supplied; do not silently impose a rate ceiling or
+  // a mandatory crawl depth on otherwise in-scope work.
   const rateIndex = normalizedArgs.findIndex((arg) => ["-rl", "--rate-limit"].includes(arg))
-  const rate = rateIndex >= 0 ? Number(stripOuterShellQuotes(args[rateIndex + 1] ?? "")) : NaN
-  if (!Number.isInteger(rate) || rate < 1 || rate > 10) {
-    return "Set Katana's explicit '-rl 5' (allowed range 1-10) to avoid unbounded default request rates."
+  if (rateIndex >= 0) {
+    const rate = Number(stripOuterShellQuotes(args[rateIndex + 1] ?? ""))
+    if (!Number.isInteger(rate) || rate < 1) {
+      return "Katana rate limit must be a positive integer when supplied."
+    }
   }
   const depthIndex = normalizedArgs.findIndex((arg) => ["-d", "--depth"].includes(arg))
-  if (depthIndex < 0) {
-    return "Set an explicit Katana depth (for example '-d 3'); increase it when the observed application has deeper eligible paths. There is no hard-coded maximum depth."
-  }
-  const depth = Number(stripOuterShellQuotes(args[depthIndex + 1] ?? ""))
-  if (!Number.isSafeInteger(depth) || depth < 1) {
-    return "Katana depth must be a positive safe integer. Choose enough depth for the target; do not treat the example depth as a discovery cap."
-  }
-  if (!normalizedArgs.some((arg) => ["-j", "-json", "-jsonl"].includes(arg))) {
-    return "Use Katana JSONL output ('-j') so URL source and request metadata remain available for deduplication and triage."
-  }
-  if (!normalizedArgs.some((arg) => ["-ncb", "-no-clobber"].includes(arg))) {
-    return "Use the no-clobber flag '-ncb' to prevent a concurrent or retried crawl from overwriting an existing evidence artifact."
+  if (depthIndex >= 0) {
+    const depth = Number(stripOuterShellQuotes(args[depthIndex + 1] ?? ""))
+    if (!Number.isSafeInteger(depth) || depth < 1) {
+      return "Katana depth must be a positive safe integer when supplied."
+    }
   }
 
   let target: URL
