@@ -836,7 +836,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
         await assertScannerReconGate(nested, commandText, cwd)
         return
       }
-      throw new Error("Recon scope check could not identify the wrapped " + launchedScanner + " command. Run it directly with explicit in-scope targets.")
+      throw new Error("Cannot verify the target for wrapped " + launchedScanner + " command. Run it directly with explicit in-scope targets.")
     }
     // Inspect only payloads of an actual shell executable, including simple
     // launcher-prefixed forms such as "sudo bash -lc ...". Never search arbitrary
@@ -864,7 +864,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   // remain subject to the request-scope checks in scannerRequestScopeBlockReason.
   const redirectReason = scannerRequestScopeBlockReason(scanner, args, command.slice(0, scannerIndex))
   if (redirectReason) {
-    throw new Error("Recon execution gate blocked " + scanner + ": " + redirectReason + " No network request was started.")
+    throw new Error("Cannot run " + scanner + ": " + redirectReason + " No network request was started.")
   }
   // These flags identify target-list modes for recon scanners. Do not apply this
   // generic check to curl/wget: curl's case-sensitive -L means "follow redirects",
@@ -875,14 +875,14 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   if (["nmap", "masscan", "naabu"].includes(scanner)) {
     const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
     const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
-    if (!portSpec) {
-      throw new Error("Recon execution gate blocked " + scanner + ": specify ports so every requested port can be checked against persisted scope.")
+    // Port selection belongs to the scanner/operator, not a generic execution
+    // gate. When ports are explicit, validate each one against persisted scope;
+    // when omitted, preserve the scanner's own defaults and still scope-check
+    // the concrete target before the command starts.
+    if (portSpec) {
+      const parsedPorts = parseScopedPortSpec(portSpec)
+      if (parsedPorts) portScanPorts = parsedPorts
     }
-    const parsedPorts = parseScopedPortSpec(portSpec)
-    if (!parsedPorts) {
-      throw new Error("Recon execution gate blocked " + scanner + ": invalid port expression. Use valid ports, comma-separated lists, and ranges (for example 80,443,8000-8100).")
-    }
-    portScanPorts = parsedPorts
   }
   // Tool choice is not restricted by a phase allowlist. Request safety and
   // persisted target-scope validation below remain in force.
@@ -913,7 +913,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
     }
   }
   if (!targets.length) {
-    throw new Error("Recon execution gate blocked " + scanner + ": pass explicit target URL/host(s) or a readable target list so every concrete entry can be checked against persisted scope.")
+    throw new Error("Cannot run " + scanner + ": pass explicit target URL/host(s) or a readable target list so every concrete entry can be checked against persisted scope.")
   }
   const workspaceScopes = new Map<string, Promise<TargetScope[]>>()
   const scopesForWorkspace = (start: Workspace): Promise<TargetScope[]> => {
@@ -949,7 +949,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || parsed.username || parsed.password) throw new Error("unsupported URL")
       url = parsed.toString()
     } catch {
-      throw new Error("Recon execution gate blocked " + scanner + ": could not normalize target " + target)
+      throw new Error("Cannot run " + scanner + ": could not normalize target " + target)
     }
     const targetURLs = portScanPorts
       ? portScanPorts.map((port) => {
@@ -966,18 +966,18 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
     for (const scopedURL of targetURLs) {
       const decision = await TargetMemory.checkURLScope(scopedURL)
       if (!decision.allowed || !decision.workspace) {
-        throw new Error("Recon execution gate blocked " + scanner + " for " + scopedURL + ": persisted scope rejected the target/port (" + decision.reason + "). No scanner command was started.")
+        throw new Error("Cannot run " + scanner + " for " + scopedURL + ": persisted scope rejected the target/port (" + decision.reason + "). No command was started.")
       }
       if (scanner === "katana") {
         let scopes: TargetScope[]
         try {
           scopes = await scopesForWorkspace(decision.workspace)
         } catch (error) {
-          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": unable to verify all inherited scope layers (" + (error instanceof Error ? error.message : String(error)) + "). No crawler command was started.")
+          throw new Error("Cannot run katana for " + scopedURL + ": unable to verify all inherited scope layers (" + (error instanceof Error ? error.message : String(error)) + "). No command was started.")
         }
         const reason = katanaScopeBlockReason(args, scopedURL, scopes, decision.workspace.workspacePath)
         if (reason) {
-          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use an explicit in-scope URL, preserve the FQDN crawl boundary, and save output inside the target workspace's urls/ directory. No crawler command was started.")
+          throw new Error("Cannot run katana for " + scopedURL + ": " + reason + " Use an explicit in-scope URL, preserve the FQDN crawl boundary, and save output inside the target workspace's urls/ directory. No command was started.")
         }
         const outputFlagIndex = args.findIndex((arg) => ["-o", "-output"].includes(stripOuterShellQuotes(arg).toLowerCase()))
         const outputPath = path.resolve(stripOuterShellQuotes(args[outputFlagIndex + 1]!))
@@ -990,7 +990,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
             throw new Error("the target workspace urls/ directory is missing, unsafe, or resolves outside the canonical workspace")
           }
         } catch (error) {
-          throw new Error("Recon execution gate blocked katana because its URL artifact directory is not safe: " + (error instanceof Error ? error.message : String(error)) + ". No crawler command was started.")
+          throw new Error("Cannot run katana because its URL artifact directory is not safe: " + (error instanceof Error ? error.message : String(error)) + ". No command was started.")
         }
         try {
           const outputInfo = await fs.lstat(outputPath)
@@ -1001,7 +1001,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
           }
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-            throw new Error("Recon execution gate blocked katana because its output path is unsafe or cannot be checked: " + outputPath + " (" + (error instanceof Error ? error.message : String(error)) + "). No crawler command was started.")
+            throw new Error("Cannot run katana because its output path is unsafe or cannot be checked: " + outputPath + " (" + (error instanceof Error ? error.message : String(error)) + "). No command was started.")
           }
         }
       }
