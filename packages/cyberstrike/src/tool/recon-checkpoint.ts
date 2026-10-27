@@ -119,11 +119,11 @@ export function validateCanonicalInventoryContent(phase: ReconPhase, content: st
 }
 export type ReconBeginDisposition = "start" | "resume_existing" | "already_resolved"
 
-export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhase): ReconBeginDisposition {
+export function reconBeginDisposition(status: ReconPhaseStatus, _phase: ReconPhase): ReconBeginDisposition {
   if (status === "running") return "resume_existing"
-  if (status === "complete" || (status === "unavailable" && phase !== "scope_validation" && phase !== "workspace_setup")) {
-    return "already_resolved"
-  }
+  // "Unavailable" is not a permanent success: tools may be installed or a
+  // different method may become available on resume. "Deferred" is also reopenable.
+  if (status === "complete") return "already_resolved"
   return "start"
 }
 
@@ -272,11 +272,11 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           }
         }
         run.phases[phase] = { ...record, status: "running", startedAt: record.startedAt ?? new Date().toISOString(), finishedAt: undefined, reason: undefined, summary: params.summary ?? record.summary }
-        if (phase === "vulnerability_testing" && record.status === "deferred") {
+        if (record.status === "unavailable" || record.status === "deferred") {
           invalidateReconDownstreamPhases(
             phase,
             run.phases,
-            "Regenerate this downstream checkpoint after vulnerability_testing was explicitly reopened.",
+            "Revalidate downstream phases because " + phase + " was reopened after being " + record.status + ".",
           )
         }
         run.currentPhase = phase
