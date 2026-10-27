@@ -2281,6 +2281,20 @@ export namespace JavaScriptCorrelation {
           confidence: item.row.confidence_level ?? null,
           tags: (item.row.tags as string[] | null) ?? [],
         })),
+        // A captured JavaScript response is direct evidence of an asset even when
+        // no IntelEntry was created for its observed descendant workspace. Keep
+        // it in the graph so policy-root correlation doesn't silently lose scripts.
+        ...capturedSources
+          .filter((file) => file.sourceURL && /\.(?:m?js|cjs)(?:[?#]|$)/i.test(file.sourceURL))
+          .filter((file) => !assets.some((asset) => asset.url.origin + asset.url.pathname === file.sourceURL!.split(/[?#]/, 1)[0]))
+          .map((file) => ({
+            intelEntryID: null,
+            url: file.sourceURL!.split(/[?#]/, 1)[0]!,
+            title: file.basename,
+            discoveredBy: "captured JavaScript response",
+            confidence: "observed",
+            tags: ["javascript", "observed", "captured-response"],
+          })),
         ...sourceMapReferences
           .filter((item) => item.status !== "out-of-scope")
           .filter((item) => !assets.some((asset) => asset.url.origin + asset.url.pathname === item.url))
