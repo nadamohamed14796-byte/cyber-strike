@@ -7,7 +7,7 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 ## Rules
 
 1. Follow the shared Target Workflow Contract for scope, workspace, tool choice, safety, caps, failure handling, and completion. This template defines recon-specific phases and outputs; it must not create competing global rules.
-2. Checkpoint mechanics: call `recon_checkpoint(action="status", target_url=<canonical target URL>)` first; use the same `target_url` for every action (not a filesystem path). For each pending phase call `begin` with its `phase`; if already running, inspect artifacts and resume. After verifying outputs, call `complete` with summary, counts, and workspace-relative artifact paths. Use `block`, `fail`, or `unavailable` with a reason when needed. Only `vulnerability_testing` may be deferred: call `begin`, then `defer`. Fix checkpoint rejection reasons; never claim success without saved output.
+2. Keep progress tracking lightweight. Reuse the existing workspace and checkpoint when available; update phase status when useful, but never let a phase label, stale checkpoint, rejected `begin`, or already-resolved marker stop ordinary reconnaissance or force you to repeat work. Checkpoint errors affect the progress record, not whether a suitable ordinary recon tool may run. Persist and verify results in the canonical workspace. Only targeted vulnerability testing remains opt-in and requires authorization, policy, and endpoint evidence.
 
 
 ## Adaptive execution and delegation
@@ -20,7 +20,7 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 
 ## Workflow
 
-0. **Resume setup:** recover the existing workspace, checkpoint, and verified artifacts first. Follow the shared Target Workflow Contract for scope/workspace setup; do not begin collection until its required gates pass.
+0. **Resume setup:** reuse the existing workspace and verified artifacts. Confirm the saved scope manifest is configured; each active request must still pass request-level scope enforcement. Do not rerun completed work without a concrete reason.
 
 1. **`asset_discovery`:** enumerate seed subdomains using useful passive sources (CT, `subfinder`, Amass, assetfinder, APIs). Merge normalized unique hosts into root `subdomains.txt`; preserve partial results and source failures.
 
@@ -42,7 +42,7 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 
 10. **`reporting`:** create/update root `reports/recon-final.md` from saved artifacts/checkpoints. Verify artifact paths and counts. Distinguish discovered, in-scope, fetched, analyzed, inferred, tested, confirmed, failed, and unresolved. Include source failures, limitations, and the exact resume point. Never claim exhaustive coverage without evidence.
 
-Use the matrix/checkpoint rules rather than guessing. The sequence controls progress, not tool choice. Don't skip work silently or repeat completed work just to increase activity.
+Use the sequence as a convenient checklist, not a lock. Choose tools from the current evidence gap and actual availability, including tools commonly associated with another phase. Do not call a tool merely to satisfy a phase, and do not stop useful work because a checkpoint is stale or rejects a progress update. Keep scope enforcement, non-destructive defaults, and explicit opt-in for vulnerability testing.
 
 ## Final response
 
