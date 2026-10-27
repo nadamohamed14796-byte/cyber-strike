@@ -638,7 +638,17 @@ export function passiveResearchLookup(
 
   const domain = normalizePassiveLookupDomain(subject)
   if (!domain) return undefined
-  return { targetURL: "https://" + domain + "/", phase }
+
+  // A wildcard CT/archive query (for example %.example.com or
+  // *.example.com/*) describes authorized subdomains, not the apex domain.
+  // Scope-check a concrete synthetic child so a policy containing only
+  // *.example.com can authorize the passive lookup without accidentally
+  // requiring example.com itself to be in scope. This URL is only a scope
+  // subject; curl still contacts the public passive-research provider above.
+  const rawSubject = subject.trim()
+  const wildcardLookup = /^(?:\\*|%25?|%2a)\\./i.test(rawSubject)
+  const scopeHost = wildcardLookup ? "cyberstrike-scope-check." + domain : domain
+  return { targetURL: "https://" + scopeHost + "/", phase }
 }
 
 function normalizePassiveLookupDomain(value: string | null | undefined): string | undefined {
@@ -1096,7 +1106,8 @@ export const BashTool = Tool.define("bash", async () => {
         .string()
         .describe(
           "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
-        ),
+        )
+        .optional(),
     }),
     async execute(params, ctx) {
       const cwd = params.workdir || Instance.directory
