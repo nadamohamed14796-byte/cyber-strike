@@ -74,14 +74,29 @@ export namespace IngestQueue {
       tracked.pending++
       publish(id)
     }
+    log.info("ingest task enqueued", {
+      sessionID,
+      trackedSessionIDs: trackedIDs,
+      pending: s.pending,
+      paused: s.paused,
+    })
 
     const next = s.chain
       // A child ingest inherits pause/resume from its owning parent session.
       // Re-check after every wake-up because a pause can race with resume.
       .then(async () => {
         while (trackedIDs.some((id) => state()[id]?.paused)) {
+          log.info("ingest task waiting for queue resume", {
+            sessionID,
+            trackedSessionIDs: trackedIDs,
+          })
           await waitIfAnyPaused(trackedIDs)
         }
+        log.info("ingest task started", {
+          sessionID,
+          trackedSessionIDs: trackedIDs,
+          pending: s.pending,
+        })
         return task()
       })
       .then(
@@ -95,6 +110,12 @@ export namespace IngestQueue {
           publish(id)
           maybeCleanup(id)
         }
+        log.info("ingest task settled", {
+          sessionID,
+          trackedSessionIDs: trackedIDs,
+          pending: state()[sessionID]?.pending ?? 0,
+          paused: state()[sessionID]?.paused ?? false,
+        })
       })
 
     s.chain = next
