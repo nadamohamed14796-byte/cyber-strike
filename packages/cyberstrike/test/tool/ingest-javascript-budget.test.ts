@@ -207,3 +207,50 @@ test("merges source-map provenance from every bundle while keeping the display l
     server.stop(true)
   }
 }, 30_000)
+
+
+test("does not overwrite a malformed JavaScript asset manifest", async () => {
+  await using tmp = await tmpdir()
+  let networkRequests = 0
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch() {
+      networkRequests++
+      return new Response("unexpected request", { status: 200 })
+    },
+  })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const target = "http://127.0.0.1:" + server.port
+        const configured = await TargetMemory.configureScope(target, {
+          include: [target],
+          authorizationSource: "Local invalid-manifest test fixture",
+          authorizationReference: "https://example.test/security-policy",
+        })
+        const javascriptRoot = path.join(configured.workspace.workspacePath, "javascript")
+        await fs.mkdir(path.join(javascriptRoot, "assets"), { recursive: true })
+        const manifestPath = path.join(javascriptRoot, "asset-manifest.json")
+        const original = '{"schemaVersion":1, this is intentionally invalid'
+        await fs.writeFile(manifestPath, original)
+
+        const tool = await IngestJavaScriptURLsTool.init()
+        const result = await tool.execute({
+          target_url: configured.workspace.targetURL,
+          urls: [configured.workspace.targetURL + "/assets/app.js"],
+          source: "test",
+          force_refresh: false,
+        }, toolContext("ses_invalid_javascript_manifest"))
+
+        expect((result.metadata as Record<string, unknown>).error).toBe("manifest_invalid")
+        expect(networkRequests).toBe(0)
+        expect(await fs.readFile(manifestPath, "utf8")).toBe(original)
+      },
+    })
+  } finally {
+    server.stop(true)
+  }
+}, 10_000)
