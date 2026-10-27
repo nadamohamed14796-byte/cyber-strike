@@ -199,7 +199,7 @@ test("canonical inventories reject empty, failure-only, and log-shaped output", 
   expect(validateCanonicalInventoryContent("live_hosts_ports", "").valid).toBe(false)
   expect(validateCanonicalInventoryContent("live_hosts_ports", "[FAILED] https://example.com").valid).toBe(false)
   expect(validateCanonicalInventoryContent("url_collection", "ERROR: command not found").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("url_collection", "https://example.com/a\\nhttps://example.com/b")).toEqual({
+  expect(validateCanonicalInventoryContent("url_collection", "https://example.com/a\nhttps://example.com/b")).toEqual({
     valid: true,
     entries: 2,
   })
