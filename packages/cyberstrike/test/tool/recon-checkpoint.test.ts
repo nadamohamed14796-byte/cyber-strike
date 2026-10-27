@@ -183,6 +183,17 @@ test("vulnerability testing artifacts must be saved in a testing, findings, or e
 })
 
 
+test("core discovery phases require canonical root inventories", () => {
+  expect(missingRequiredReconArtifacts("asset_discovery", ["assets/subdomains-raw.txt"])).toEqual(["subdomains.txt"])
+  expect(missingRequiredReconArtifacts("asset_discovery", ["subdomains.txt"])).toEqual([])
+  expect(missingRequiredReconArtifacts("live_hosts_ports", ["recon/raw/httpx-output.txt"])).toEqual(["live-hosts.txt"])
+  expect(missingRequiredReconArtifacts("live_hosts_ports", ["live-hosts.txt"])).toEqual([])
+  expect(missingRequiredReconArtifacts("url_collection", ["urls/raw/katana.txt"])).toEqual(["urls.txt"])
+  expect(missingRequiredReconArtifacts("url_collection", ["urls.txt"])).toEqual([])
+  expect(missingRequiredReconArtifacts("parameter_discovery", ["parameters/observed.txt"])).toEqual(["parameters.txt"])
+  expect(missingRequiredReconArtifacts("parameter_discovery", ["parameters.txt"])).toEqual([])
+})
+
 test("JavaScript and endpoint phases require non-skippable canonical handoff files", () => {
   expect(missingRequiredReconArtifacts("javascript_analysis", ["javascript/graph.json", "endpoints/candidates.json"])).toEqual([
     "javascript-analysis.md",
