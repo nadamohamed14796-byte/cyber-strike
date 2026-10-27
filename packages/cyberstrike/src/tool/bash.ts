@@ -835,16 +835,10 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       )
       if (nestedScannerIndex >= 0) {
         const nested = wrapperArgs.slice(nestedScannerIndex)
-        const nestedTargets = scannerTargets(nested, commandText)
-        if (!nestedTargets.length) {
-          throw new Error("Recon scope check could not identify a concrete target for wrapped " + launchedScanner + ". Pass explicit in-scope host(s) or use a readable target list.")
-        }
-        for (const target of nestedTargets) {
-          const decision = await TargetMemory.checkURLScope(target)
-          if (!decision.allowed || !decision.workspace) {
-            throw new Error("Recon scope check rejected wrapped " + launchedScanner + " target " + target + ": " + decision.reason)
-          }
-        }
+        // Re-run the complete scanner gate on the extracted invocation so port
+        // restrictions, redirect handling, target-list parsing, and every target
+        // check are identical to a direct scanner invocation.
+        await assertScannerReconGate(nested, commandText, cwd)
         return
       }
       throw new Error("Recon scope check could not identify the wrapped " + launchedScanner + " command. Run it directly with explicit in-scope targets.")
@@ -859,16 +853,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
       const payload = commandFlag >= 0 ? stripOuterShellQuotes(command[commandFlag + 1] ?? "") : ""
       const wrappedScanner = payload ? await findWrappedScanner(payload) : undefined
       if (wrappedScanner) {
-        const nestedTargets = scannerTargets([wrappedScanner], payload)
-        if (!nestedTargets.length) {
-          throw new Error("Recon scope check could not identify a concrete target for wrapped " + wrappedScanner + ". Pass explicit in-scope host(s) or a readable target list.")
-        }
-        for (const target of nestedTargets) {
-          const decision = await TargetMemory.checkURLScope(target)
-          if (!decision.allowed || !decision.workspace) {
-            throw new Error("Recon scope check rejected wrapped " + wrappedScanner + " target " + target + ": " + decision.reason)
-          }
-        }
+        throw new Error("Recon wrapper detected " + wrappedScanner + " inside a shell payload. Pass the scanner invocation directly (not through bash -c) so its complete arguments can be scope-checked before execution.")
       }
     }
     return
