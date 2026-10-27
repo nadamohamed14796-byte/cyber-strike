@@ -19,7 +19,6 @@ import { BashArity } from "@/permission/arity"
 import { Truncate } from "./truncation"
 import { Plugin } from "@/plugin"
 import { TargetMemory, type TargetScope, type Workspace } from "../target"
-import type { ReconPhase } from "../target/recon-gate"
 
 const MAX_METADATA_LENGTH = 30_000
 
@@ -41,46 +40,18 @@ function isBinaryBuffer(buf: Buffer): boolean {
 }
 
 /**
- * Classify scanner intent, not tool availability.
- * Ordinary recon is not phase-gated; persisted scope is checked per target below.
- * Only vulnerability-testing commands require the explicit testing checkpoint.
+ * Known network/recon executables for target-aware request validation.
+ * This registry identifies commands to inspect; it is not a phase allowlist.
  */
-const SCANNER_NOMINAL_PHASES: Record<string, ReconPhase> = {
-  subfinder: "asset_discovery",
-  amass: "asset_discovery",
-  assetfinder: "asset_discovery",
-  sublist3r: "asset_discovery",
-  nmap: "live_hosts_ports",
-  masscan: "live_hosts_ports",
-  naabu: "live_hosts_ports",
-  httpx: "live_hosts_ports",
-  dnsx: "live_hosts_ports",
-  katana: "url_collection",
-  gau: "url_collection",
-  waybackurls: "url_collection",
-  hakrawler: "url_collection",
-  gospider: "url_collection",
-  paramspider: "parameter_discovery",
-  curl: "url_collection",
-  wget: "url_collection",
-  arjun: "parameter_fuzzing",
-  x8: "parameter_fuzzing",
-  nuclei: "vulnerability_testing",
-  commix: "vulnerability_testing",
-  ssrfmap: "vulnerability_testing",
-  nosqlmap: "vulnerability_testing",
-  crlfuzz: "vulnerability_testing",
-  "git-dumper": "vulnerability_testing",
-  ffuf: "directory_fuzzing",
-  feroxbuster: "directory_fuzzing",
-  gobuster: "directory_fuzzing",
-  dirsearch: "directory_fuzzing",
-  dirb: "directory_fuzzing",
-  nikto: "vulnerability_testing",
-  sqlmap: "vulnerability_testing",
-  dalfox: "vulnerability_testing",
-  wpscan: "vulnerability_testing",
-}
+const SCANNER_TOOL_NAMES = new Set([
+  "subfinder", "amass", "assetfinder", "sublist3r",
+  "nmap", "masscan", "naabu", "httpx", "dnsx",
+  "katana", "gau", "waybackurls", "hakrawler", "gospider",
+  "paramspider", "curl", "wget", "arjun", "x8",
+  "nuclei", "commix", "ssrfmap", "nosqlmap", "crlfuzz", "git-dumper",
+  "ffuf", "feroxbuster", "gobuster", "dirsearch", "dirb",
+  "nikto", "sqlmap", "dalfox", "wpscan",
+])
 function commandExecutableIndex(command: string[]): number {
   const optionWithValue: Record<string, Set<string>> = {
     sudo: new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-R", "--chroot", "-r", "--role", "-t", "--type", "-T", "--command-timeout", "-U", "--other-user"]),
@@ -146,7 +117,7 @@ function scannerExecutableIndex(command: string[]): number {
   const executableIndex = commandExecutableIndex(command)
   if (executableIndex < 0) return -1
   const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
-  return SCANNER_NOMINAL_PHASES[executable] === undefined ? -1 : executableIndex
+  return SCANNER_TOOL_NAMES.has(executable) ? executableIndex : -1
 }
 
 const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-file", "-out"])
