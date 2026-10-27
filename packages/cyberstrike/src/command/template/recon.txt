@@ -9,6 +9,13 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 1. Follow the shared Target Workflow Contract for scope, workspace, tool choice, safety, caps, failure handling, and completion. This template defines recon-specific phases and outputs; it must not create competing global rules.
 2. Keep progress tracking lightweight. Reuse the existing workspace and checkpoint when available; update phase status when useful, but never let a phase label, stale checkpoint, rejected `begin`, or already-resolved marker stop ordinary reconnaissance or force you to repeat work. Checkpoint errors affect the progress record, not whether a suitable ordinary recon tool may run. Persist and verify results in the canonical workspace. Only targeted vulnerability testing remains opt-in and requires authorization, policy, and endpoint evidence.
 
+## Completion and resume contract
+
+- You may run any useful ordinary recon tool when its evidence is relevant; phase labels do not restrict tool choice. However, **never mark a later phase complete while an earlier required phase is pending, running, blocked, or failed**. Resolve it or mark it unavailable/deferred with a specific, evidence-based reason. A rejected completion is a real unfinished item: fix the named prerequisite/artifact problem instead of ignoring the rejection and reporting success.
+- Do not mark a method unavailable solely because a preferred binary is missing. Check the verified installer catalog with `ensure_tools` when that method would materially improve coverage; verify installation, then continue. If unavailable, use a materially different installed method when useful and record exactly what remains uncovered.
+- `unavailable` and `deferred` are resumable, not permanent success. When reopened, downstream phase checkpoints are invalidated; re-check their artifacts and regenerate stale handoffs/reports before finishing.
+- Before each phase completion, reconcile the actual sources attempted, raw output files, canonical merged inventory, and errors. A planned command, a tool call, a non-empty file, or an agent's verbal claim is not proof that the method succeeded. Continue while a concrete useful step remains, and report exact pending items if execution must pause.
+
 ## Adaptive execution and delegation
 
 - When a real Task/delegation tool is available, parallelize only independent work that benefits from it. Give each worker a bounded input, the canonical root `target_url`, the same persisted scope constraints, a clear evidence/provenance contract, and one non-overlapping responsibility.
