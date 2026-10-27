@@ -1,6 +1,7 @@
 import { chromium, type Page, type BrowserContext } from "playwright"
 import * as Stealth from "./stealth.ts"
 import { Log } from "./log.ts"
+import { drainCaptureQueue } from "./capture-queue.ts"
 import type {
   AgentConfig,
   CapturedRequest,
@@ -386,7 +387,9 @@ function logScope(targetUrl: string, patterns: readonly string[], userProvided: 
 type CaptureFn = (captured: CapturedRequest) => Promise<void>
 
 function createIngestHandler(serverUrl: string, sessionID: string, credentialId: string | undefined): CaptureFn {
-  return (captured) => sendIngest(captured, serverUrl, sessionID, credentialId).then(() => {})
+  return async (captured) => {
+    await sendIngest(captured, serverUrl, sessionID, credentialId)
+  }
 }
 
 function createDryRunHandler(): CaptureFn {
@@ -1992,22 +1995,34 @@ async function drainPageCaptures(
   availability: Map<string, string[]>,
   pageUrl: string | null,
   pageVisitedBy: string[] | null,
+  finalDrain = false,
 ): Promise<void> {
   for (const [ctxId, queue] of captureQueues) {
     const handler = captureHandlers.get(ctxId)
     if (!handler) continue
-    while (queue.length > 0) {
-      const captured = queue.shift()!
-      // Enrich: trigger_element → availability Map lookup → element_roles
-      if (captured.triggerElement && availability.size > 0) {
-        const mapKey = captured.triggerElement.replace(":", "::")
-        const roles = availability.get(mapKey)
-        captured.elementRoles = roles ? [...new Set(roles)] : null
-      }
-      // Enrich: page context
-      if (pageUrl) captured.pageUrl = pageUrl
-      if (pageVisitedBy) captured.pageVisitedBy = pageVisitedBy
-      await handler(captured)
+    const result = await drainCaptureQueue(
+      queue,
+      async (captured) => {
+        // Enrich: trigger_element → availability Map lookup → element_roles
+        if (captured.triggerElement && availability.size > 0) {
+          const mapKey = captured.triggerElement.replace(":", "::")
+          const roles = availability.get(mapKey)
+          captured.elementRoles = roles ? [...new Set(roles)] : null
+        }
+        // Enrich: page context
+        if (pageUrl) captured.pageUrl = pageUrl
+        if (pageVisitedBy) captured.pageVisitedBy = pageVisitedBy
+        await handler(captured)
+      },
+      `multi-credential:${ctxId}`,
+      { finalDrain },
+    )
+    if (result.pending > 0) {
+      log.warn("captured requests remain queued after drain", {
+        credential: ctxId,
+        pending: result.pending,
+        finalDrain,
+      })
     }
   }
 }
@@ -2491,7 +2506,7 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
   )
   if (!browserDied) await contexts[0]?.page.waitForTimeout(2000).catch(() => {})
 
-  await drainPageCaptures(captureQueues, captureHandlers, new Map(), null, null)
+  await drainPageCaptures(captureQueues, captureHandlers, new Map(), null, null, true)
 
   log.info("multi-credential crawl done", {
     pagesExplored,
@@ -2638,12 +2653,10 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
     ? createDryRunHandler()
     : createIngestHandler(serverUrl, sessionID!, credentialId)
 
-  // Background drain every 500ms
-  const drainInterval = setInterval(async () => {
-    while (captureQueue.length > 0) {
-      const captured = captureQueue.shift()!
-      await handleCapture(captured)
-    }
+  // Background drain every 500ms. The shared drain lock prevents overlapping ticks;
+  // the queue head is removed only after the backend acknowledges the capture.
+  const drainInterval = setInterval(() => {
+    void drainCaptureQueue(captureQueue, (captured) => handleCapture(captured), "single-credential")
   }, 500)
 
   try {
@@ -3001,10 +3014,12 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
     )
     if (!browserDied) await page.waitForTimeout(2000).catch(() => {})
 
-    while (captureQueue.length > 0) {
-      const captured = captureQueue.shift()!
-      await handleCapture(captured)
-    }
+    await drainCaptureQueue(
+      captureQueue,
+      (captured) => handleCapture(captured),
+      "single-credential",
+      { finalDrain: true },
+    )
 
     log.info("done", {
       pagesExplored,
@@ -3027,23 +3042,28 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
       })
       await page.waitForTimeout(600).catch(() => {})
       // Second drain pass — catch captures that arrived during csEmit/panel wait
-      while (captureQueue.length > 0) {
-        const captured = captureQueue.shift()!
-        await handleCapture(captured)
-      }
+      await drainCaptureQueue(
+        captureQueue,
+        (captured) => handleCapture(captured),
+        "single-credential",
+        { finalDrain: true },
+      )
     }
 
     if (!config.headless && browser.isConnected()) {
       log.info("crawl complete — browser stays open, close the window to finish")
       // Keep draining captures during manual browsing
-      const postCrawlDrain = setInterval(async () => {
-        while (captureQueue.length > 0) {
-          const captured = captureQueue.shift()!
-          await handleCapture(captured)
-        }
+      const postCrawlDrain = setInterval(() => {
+        void drainCaptureQueue(captureQueue, (captured) => handleCapture(captured), "single-credential")
       }, 500)
       await waitForBrowserClose(browser, config.signal)
       clearInterval(postCrawlDrain)
+      await drainCaptureQueue(
+        captureQueue,
+        (captured) => handleCapture(captured),
+        "single-credential",
+        { finalDrain: true },
+      )
     } else if (!browserDied) {
       await browser.close().catch(() => {})
     }
