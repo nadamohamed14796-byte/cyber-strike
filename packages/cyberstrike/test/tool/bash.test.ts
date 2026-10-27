@@ -131,7 +131,7 @@ describe("Read-only passive-research API scope routing", () => {
     expect(passiveResearchLookup(url, ["-q", "-H", "X-API-Key: $OTX_API_KEY"])).toBeUndefined()
     expect(passiveResearchLookup(new URL("https://unlisted-provider.example/api"), ["-q", "-s"])).toBeUndefined()
     expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com"), ["-q", "-s"])).toEqual({
-      targetURL: "https://cyberstrike-scope-check.example.com/",
+      targetURL: "https://example.com/",
       phase: "asset_discovery",
     })
     expect(passiveResearchLookup(new URL("https://unlisted-provider.example/search?domain=example.com&host=api.example.com"), ["-q", "-s"])).toBeUndefined()
