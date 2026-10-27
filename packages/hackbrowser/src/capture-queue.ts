@@ -12,6 +12,12 @@ export type CaptureDrainResult = {
 }
 
 const activeDrains = new WeakMap<CapturedRequest[], Promise<CaptureDrainResult>>()
+const rejectedTotals = new WeakMap<CapturedRequest[], number>()
+
+/** Number of permanent backend rejections observed for this queue over its lifetime. */
+export function permanentlyRejectedCaptureCount(queue: CapturedRequest[]): number {
+  return rejectedTotals.get(queue) ?? 0
+}
 
 /**
  * Deliver captured requests in FIFO order without losing the queue head before
@@ -53,6 +59,7 @@ export async function drainCaptureQueue(
         if (error instanceof IngestDeliveryError && !error.retryable) {
           queue.shift()
           rejected++
+          rejectedTotals.set(queue, (rejectedTotals.get(queue) ?? 0) + 1)
           log.error("captured request was permanently rejected; continuing with later requests", {
             queue: label,
             status: error.status ?? null,
