@@ -376,26 +376,6 @@ export namespace Request {
   }
 
   /**
-   * Return persisted requests whose analysis has not reached a terminal state.
-   * "processing" is included because it may be left behind when the process exits.
-   */
-  export function pending(): Info[] {
-    const sessionIDs = Database.use((db) =>
-      db
-        .select({ session_id: RequestTable.session_id, status: RequestTable.status })
-        .from(RequestTable)
-        .all()
-        .filter((row) => row.status === "queued" || row.status === "processing")
-        .map((row) => row.session_id),
-    )
-    const uniqueSessionIDs = [...new Set(sessionIDs)]
-    return uniqueSessionIDs
-      .flatMap((sessionID) => get(sessionID))
-      .filter((item) => item.status === "queued" || item.status === "processing")
-      .sort((a, b) => a.time.created - b.time.created || a.id.localeCompare(b.id))
-  }
-
-  /**
    * Two-stage dedup at the TEMPLATE level. Same endpoint shape (normalized
    * template) hit twice — even with different concrete paths like
    * `/users/1` vs `/users/2` — must collapse to one row so proxy-agent only
