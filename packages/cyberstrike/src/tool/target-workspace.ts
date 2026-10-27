@@ -488,13 +488,30 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
       if (params.create_child_workspace !== true) {
         const parentURL = required(params.parent_target_url, "parent_target_url")
         const assetURL = required(params.asset_url, "asset_url")
-        const parent = await TargetMemory.get(parentURL)
+        let parent = await TargetMemory.get(parentURL)
         if (!parent) {
           return {
             title: "Asset not recorded: root workspace missing",
             output: "No child workspace was created and no inventory was changed. Initialize or open the canonical root workspace first.",
             metadata: { attached: false, saved: false, reason: "workspace_missing", target_url: parentURL } as TargetWorkspaceMetadata,
           }
+        }
+        // Observed candidates always belong to the canonical program/root inventory,
+        // even if the caller has the URL of an already-created child asset.
+        const knownTargets = new Map(TargetMemory.list().map((item) => [item.id, item]))
+        const visited = new Set<string>()
+        while (parent.parentTargetID) {
+          if (visited.has(parent.id)) throw new Error("Target workspace ancestry contains a cycle; observed asset was not saved.")
+          visited.add(parent.id)
+          const ancestor = knownTargets.get(parent.parentTargetID)
+          if (!ancestor) {
+            return {
+              title: "Asset not recorded: root workspace missing",
+              output: "The selected asset has an incomplete parent chain. No inventory was changed; reopen or repair the canonical root workspace first.",
+              metadata: { attached: false, saved: false, reason: "root_workspace_missing", target_url: parentURL } as TargetWorkspaceMetadata,
+            }
+          }
+          parent = ancestor
         }
         let candidate: URL
         try { candidate = new URL(assetURL) } catch { throw new Error("Asset URL must be an absolute HTTP(S) URL.") }
