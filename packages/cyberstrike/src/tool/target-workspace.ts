@@ -108,7 +108,25 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
   parameters: Parameters,
   async execute(params, ctx) {
     if (params.action === "init") {
-      const workspace = await TargetMemory.ensure(required(params.target_url, "target_url"))
+      const requestedURL = required(params.target_url, "target_url")
+      let workspace = await TargetMemory.get(requestedURL)
+      if (!workspace && params.create_child_workspace !== true) {
+        // When a requested host is already covered by the canonical program scope,
+        // reuse that workspace. Do not create a full child tree just to initialize
+        // or inspect one discovered host; child workspaces require explicit intent.
+        const decision = await TargetMemory.checkURLScope(requestedURL)
+        if (decision.workspace) {
+          if (!decision.allowed) {
+            return {
+              title: "Target not initialized: existing scope does not authorize this URL",
+              output: "No child workspace was created. The URL maps to an existing workspace, but the saved scope decision is: " + decision.reason + ". Reuse the canonical workspace and do not treat this URL as authorized.",
+              metadata: { initialized: false, found: true, saved: false, reason: "scope_denied", target_id: decision.workspace.id, target_url: requestedURL, workspace: decision.workspace.workspacePath, scope_configured: decision.scope?.status === "configured" } as TargetWorkspaceMetadata,
+            }
+          }
+          workspace = decision.workspace
+        }
+      }
+      workspace ??= await TargetMemory.ensure(requestedURL)
       const scope = await TargetMemory.getScope(workspace.targetURL)
       const requiredFiles = [
         path.join(workspace.workspacePath, "target.json"),
