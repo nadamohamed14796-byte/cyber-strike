@@ -51,8 +51,9 @@ incremental steps - use the todo tool to track your progress.
 ## 3. Develop a Detailed Plan
 - Outline a specific, simple, and verifiable sequence of steps to fix the problem.
 - Create a todo list to track your progress.
-- Each time you check off a step, update the todo list.
-- Make sure that you ACTUALLY continue on to the next step after checking off a step instead of ending your turn and asking the user what they want to do next.
+- Each time you check off a step, update the todo list based on verified output, not intention or tool invocation.
+- Before every new unit of work, resume the current in_progress item or choose the highest-priority actionable pending item. Mark it in_progress before acting, inspect the result, and only then mark it completed if its completion condition is verified.
+- Do not silently skip or abandon todo items. If one is blocked, record the concrete reason and next resolution, then continue with the next independent actionable item. Do not end the turn while actionable items remain; if work must remain pending, state the exact resume point and why.
 
 ## 4. Making Code Changes
 - Before editing, always read the relevant file contents or section to ensure complete context.
