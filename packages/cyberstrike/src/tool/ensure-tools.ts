@@ -100,7 +100,7 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
       }
 
       // Check if installed
-      const check = Bun.spawnSync(["sh", "-lc", `command -v ${spec.check}`])
+      const check = Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; command -v ${spec.check}`])
       if (check.exitCode === 0) {
         results.push({ tool: name, installed: true, action: `Already installed: ${check.stdout.toString().trim()}` })
         continue
