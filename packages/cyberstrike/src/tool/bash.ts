@@ -444,7 +444,7 @@ export async function scannerLaunchedByWrapper(command: string[], executableInde
   const scannerName = (value: string | undefined) => {
     if (!value) return undefined
     const name = path.basename(stripOuterShellQuotes(value)).toLowerCase()
-    return SCANNER_NOMINAL_PHASES[name] === undefined ? undefined : name
+    return SCANNER_TOOL_NAMES.has(name) ? name : undefined
   }
   const shellPayload = async (argv: string[], start: number) => {
     const wrapperName = path.basename(stripOuterShellQuotes(argv[start] ?? "")).toLowerCase()
