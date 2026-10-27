@@ -1136,7 +1136,7 @@ export const BashTool = Tool.define("bash", async () => {
           scannerInvocationKeys.set(scannerKey, commandText)
         }
 
-        // Enforce target scope + durable phase gates before known recon/scanner binaries start.
+        // Apply request safety and persisted target-scope checks before known scanner binaries start.
         await assertScannerReconGate(command, commandText, cwd)
 
         // not an exhaustive list, but covers most common cases
