@@ -41,6 +41,18 @@ Create a canonical scope list. Normalize case, schemes, trailing dots, ports, wi
 ### Step 2 — Passive discovery
 Use approved sources such as certificate transparency, DNS history, archives, public code search, and program-provided asset lists. Deduplicate hostnames while retaining provenance.
 
+#### Iterative asset expansion (Strix-inspired)
+
+Do not treat one subdomain-enumeration pass as the finished attack surface. Combine independent sources and pivot on evidence:
+
+1. Collect certificate-transparency results (for example, `crt.sh`), subdomain enumerator output, approved passive-DNS results, and already observed in-scope names. Keep each source's raw output, exit status, and provenance.
+2. Resolve eligible hostnames and retain A/AAAA/CNAME chains. On live in-scope TLS endpoints, extract certificate CN/SAN names and fingerprint metadata where the selected tool supports it. PTR results, shared certificates, and shared IPs are correlation leads, not ownership proof.
+3. Normalize and deduplicate new candidates; scope-check every concrete hostname/URL before any active request. Feed only newly eligible names into the next useful passive/DNS/TLS pass.
+4. Continue while the candidate set grows or a materially different useful source remains untried. Stop when two consecutive eligible passes add no new candidates or the useful sources are exhausted. A deterministic failure requires a different source/method or a recorded blocker, not the same unchanged retry loop.
+5. Keep counts distinct: raw candidates, unique normalized names, scope-eligible names, DNS-resolved names, HTTP/TLS-live hosts, and verified services. Never promote historical-only, wildcard-DNS, CDN, shared-hosting, or third-party provider names to confirmed target assets without evidence.
+
+Use ASN/IP-range expansion only when the provided scope and attribution explicitly support it; do not broaden the scope merely because an IP or certificate is related.
+
 ### Step 3 — DNS and host validation
 Resolve candidate names in batches. Separate unresolved names, aliases, wildcard DNS, parked domains, and confirmed records. DNS resolution alone does not prove ownership or scope eligibility.
 
