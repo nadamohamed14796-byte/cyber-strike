@@ -480,3 +480,43 @@ test("observations from a child asset are saved in the canonical root inventory"
     },
   })
 })
+
+
+test("initializing a discovered host reuses the root unless a child workspace is explicitly requested", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const root = await tool.execute({ action: "init", target_url: "https://example.com" }, {} as never)
+        const rootPath = root.metadata.workspace!
+        await TargetMemory.configureScope("https://example.com", {
+          include: ["example.com", "*.example.com"],
+          authorizationSource: "Workspace initialization regression test",
+          authorizationReference: "https://example.com/security",
+        })
+
+        const reused = await tool.execute({
+          action: "init",
+          target_url: "https://api.example.com",
+        }, {} as never)
+        expect(reused.metadata.initialized).toBe(true)
+        expect(reused.metadata.workspace).toBe(rootPath)
+        expect((await TargetMemory.list()).filter((item) => item.parentTargetID === root.metadata.target_id)).toHaveLength(0)
+
+        const explicit = await tool.execute({
+          action: "init",
+          target_url: "https://api.example.com",
+          create_child_workspace: true,
+        }, {} as never)
+        expect(explicit.metadata.initialized).toBe(true)
+        expect(explicit.metadata.workspace).not.toBe(rootPath)
+        expect(explicit.metadata.workspace).toContain(path.join("assets", ""))
+        expect((await TargetMemory.list()).filter((item) => item.parentTargetID === root.metadata.target_id)).toHaveLength(1)
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
