@@ -977,7 +977,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
         }
         const reason = katanaScopeBlockReason(args, scopedURL, scopes, decision.workspace.workspacePath)
         if (reason) {
-          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use one explicit -u URL per authorized host, -fs fqdn, -rl 5, -d 3, and one stable absolute scratch -o path under that workspace's urls/ directory. Reuse it sequentially after normalizing and removing prior scratch output; do not create a new path per retry. No crawler command was started.")
+          throw new Error("Recon execution gate blocked katana for " + scopedURL + ": " + reason + " Use an explicit in-scope URL, preserve the FQDN crawl boundary, and save output inside the target workspace's urls/ directory. No crawler command was started.")
         }
         const outputFlagIndex = args.findIndex((arg) => ["-o", "-output"].includes(stripOuterShellQuotes(arg).toLowerCase()))
         const outputPath = path.resolve(stripOuterShellQuotes(args[outputFlagIndex + 1]!))
@@ -993,11 +993,15 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
           throw new Error("Recon execution gate blocked katana because its URL artifact directory is not safe: " + (error instanceof Error ? error.message : String(error)) + ". No crawler command was started.")
         }
         try {
-          await fs.lstat(outputPath)
-          throw new Error("output file already exists")
+          const outputInfo = await fs.lstat(outputPath)
+          // Reuse an existing regular artifact path; only reject links/non-files
+          // that could redirect writes outside the validated workspace.
+          if (outputInfo.isSymbolicLink() || !outputInfo.isFile()) {
+            throw new Error("output path exists but is not a regular file")
+          }
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-            throw new Error("Recon execution gate blocked katana because its output path already exists or cannot be checked: " + outputPath + ". If the file exists, inspect and normalize it first; remove it only after the normalized results are saved and verified, unless it is worth retaining as evidence. If the path cannot be inspected, fix that filesystem error rather than choosing another filename. Reuse the same stable scratch path for sequential attempts instead of creating a new file per retry. No crawler command was started.")
+            throw new Error("Recon execution gate blocked katana because its output path is unsafe or cannot be checked: " + outputPath + " (" + (error instanceof Error ? error.message : String(error)) + "). No crawler command was started.")
           }
         }
       }
