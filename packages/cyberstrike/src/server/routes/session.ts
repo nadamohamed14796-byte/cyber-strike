@@ -369,12 +369,13 @@ async function runNormalize(
   }
 
   // Dry-run and missing-model fallback keep normalization offline. Tier 1/2
-  // still resolve common paths; ambiguous segments remain literal until a model
-  // is available, but the captured request can still be stored for later review.
+  // still resolve common paths. If Tier 3 is needed, fail that tier explicitly:
+  // returning an empty "successful" classification would pollute the template
+  // cache with unresolved literal paths.
   const client = dryRun || !model
     ? {
         async classify() {
-          return { decisions: [], model: dryRun ? "dry-run" : "no-model-fallback" }
+          throw new Error(dryRun ? "dry-run disables Tier 3 classification" : "no model available for Tier 3 classification")
         },
       }
     : undefined
@@ -407,7 +408,7 @@ async function runNormalize(
         modelID: normalizeModel.modelID,
         client: {
           async classify() {
-            return { decisions: [], model: "deterministic-fallback" }
+            throw new Error("deterministic fallback disables Tier 3 classification")
           },
         },
       })
