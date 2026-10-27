@@ -485,15 +485,57 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
 
     if (params.action === "attach_asset") {
       if (params.create_child_workspace !== true) {
+        const parentURL = required(params.parent_target_url, "parent_target_url")
+        const assetURL = required(params.asset_url, "asset_url")
+        const parent = await TargetMemory.get(parentURL)
+        if (!parent) {
+          return {
+            title: "Asset not recorded: root workspace missing",
+            output: "No child workspace was created and no inventory was changed. Initialize or open the canonical root workspace first.",
+            metadata: { attached: false, saved: false, reason: "workspace_missing", target_url: parentURL } as TargetWorkspaceMetadata,
+          }
+        }
+        let candidate: URL
+        try { candidate = new URL(assetURL) } catch { throw new Error("Asset URL must be an absolute HTTP(S) URL.") }
+        if ((candidate.protocol !== "http:" && candidate.protocol !== "https:") || candidate.username || candidate.password) {
+          throw new Error("Asset URL must be a credential-free HTTP(S) URL.")
+        }
+        const observedURL = candidate.origin
+        const registryPath = path.join(parent.workspacePath, "assets", "registry.json")
+        let registry: { schemaVersion?: number; parentTargetID?: string; targetURL?: string; updatedAt?: string; assets?: unknown[]; observations?: Array<{ url: string; type?: string; observedAt?: string; status?: string }> } = {}
+        try {
+          const info = await fs.lstat(registryPath)
+          if (!info.isFile() || info.isSymbolicLink()) throw new Error("Asset registry is not a regular file.")
+          registry = JSON.parse(await fs.readFile(registryPath, "utf-8"))
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
+        }
+        const observations = Array.isArray(registry.observations) ? registry.observations : []
+        const existing = observations.find((item) => item.url === observedURL)
+        const nextObservations = existing
+          ? observations.map((item) => item.url === observedURL ? { ...item, type: params.asset_type ?? item.type, status: "observed" } : item)
+          : [...observations, { url: observedURL, type: params.asset_type ?? "host", observedAt: new Date().toISOString(), status: "observed" }]
+        registry = {
+          ...registry,
+          schemaVersion: registry.schemaVersion ?? 2,
+          parentTargetID: parent.id,
+          targetURL: parent.targetURL,
+          updatedAt: new Date().toISOString(),
+          assets: Array.isArray(registry.assets) ? registry.assets : [],
+          observations: nextObservations,
+        }
+        await TargetMemory.writeWorkspaceFile(parent, "assets/registry.json", JSON.stringify(registry, null, 2) + "\n")
         return {
-          title: "Asset stays in root inventory",
+          title: "Asset added to root inventory",
           output: [
             "No child workspace was created.",
-            "Ordinary discovery must keep discovered hosts/assets in the existing root workspace inventory.",
-            "Save or merge the asset into the root assets/registry.json or the relevant canonical inventory with target_artifact.",
-            "Set create_child_workspace=true only when the operator explicitly requests a separate investigation workspace for this specific asset.",
-          ].join("\\n"),
-          metadata: { attached: false, saved: false, reason: "separate_workspace_not_requested", target_url: params.parent_target_url } as TargetWorkspaceMetadata,
+            "Root workspace: " + parent.workspacePath,
+            "Observed asset: " + observedURL,
+            "Inventory: " + registryPath,
+            "Status: observed candidate only; this does not grant authorization.",
+            "A separate workspace is created only when create_child_workspace=true is explicitly requested.",
+          ].join("\n"),
+          metadata: { attached: false, saved: true, target_id: parent.id, target_url: parent.targetURL, workspace: parent.workspacePath, asset_type: params.asset_type ?? "host" } as TargetWorkspaceMetadata,
         }
       }
       const result = await TargetMemory.attachAsset(
