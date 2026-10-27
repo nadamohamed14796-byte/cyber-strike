@@ -1804,9 +1804,12 @@ export namespace JavaScriptCorrelation {
       scopeDecisionCache.set(key, decision)
       return decision
     }
-    const targetScopeDecision = await scopeDecisionFor(workspace.targetURL)
-    if (!targetScopeDecision.allowed || targetScopeDecision.workspace?.id !== workspace.id) {
-      throw new Error("Target workspace does not pass its persisted active-scope gate: " + targetScopeDecision.reason)
+    // The canonical workspace may be a program/policy container whose URL is not
+    // itself in scope. Require its persisted authorization manifest, then enforce
+    // scope on every concrete script, response, and endpoint below.
+    const rootScope = await TargetMemory.getScope(workspace.targetURL)
+    if (!rootScope || rootScope.status !== "configured" || rootScope.scopeItems.length === 0) {
+      throw new Error("Target workspace has no configured, non-empty persisted scope manifest.")
     }
 
     // Correlation may include the selected workspace and its descendants only.
