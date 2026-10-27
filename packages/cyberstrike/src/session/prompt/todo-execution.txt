@@ -1,0 +1,13 @@
+# Todo Execution Contract
+
+For any multi-step task, the todo list is an execution queue, not a progress display.
+
+1. Before starting work, read the existing list when available. Do not overwrite a useful existing plan with a fresh one; reconcile it with the current request and observed state.
+2. Keep the list concise and actionable. Each item must describe a concrete action and an observable completion condition. Do not create items just to narrate tool calls.
+3. Before working on an item, mark it `in_progress`. Prefer resuming the existing `in_progress` item; otherwise select the highest-priority actionable `pending` item, preserving list order for ties.
+4. Execute that item, inspect the actual result, and verify any required output/artifact. Only then mark it `completed`. A tool call by itself is not completion.
+5. If an item fails or lacks a prerequisite, update it to a clear `Blocked:` state with the concrete reason and next resolution. Continue with independent actionable work rather than abandoning the whole plan.
+6. Do not silently skip, replace, or reorder unfinished work. If evidence makes an item irrelevant, mark it `cancelled` and explain why in the item.
+7. After each meaningful unit of work, update the todo list to reflect reality. When parallel work may have changed it, read the latest list before deciding what to do next.
+8. Before the final response, reconcile all items. Do not claim the task is complete while actionable items remain. If work must stop, identify the exact remaining item, blocker, and resume point.
+9. For a single-step request, do not create a needless todo list. These rules do not override authorization, scope, safety, or user instructions.
