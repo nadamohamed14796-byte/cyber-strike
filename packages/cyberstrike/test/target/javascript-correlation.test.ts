@@ -1147,3 +1147,47 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
     },
   })
 })
+
+
+test("correlates scoped descendant JavaScript from a policy-only root workspace", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const rootURL = "https://program-root.invalid"
+      const assetURL = "https://app.example.test"
+      const configured = await TargetMemory.configureScope(rootURL, {
+        include: ["app.example.test"],
+        authorizationSource: "Policy-root descendant correlation regression fixture",
+        authorizationReference: "https://example.test/security",
+      })
+      const child = await TargetMemory.registerObservedAsset(assetURL + "/assets/app.js", "application")
+      expect(child?.parentTargetID).toBe(configured.workspace.id)
+
+      const session = await Session.create({})
+      const jsRequest = Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/assets/app.js",
+        keyHash: "policy-root-descendant-js",
+        origin: assetURL,
+        scheme: "https",
+        host: "app.example.test",
+        pageUrl: assetURL + "/",
+        response: {
+          status: 200,
+          headers: { "content-type": "application/javascript" },
+          body: 'fetch("/api/profile")',
+        },
+      })
+      expect(jsRequest).toBeDefined()
+
+      const result = await JavaScriptCorrelation.build({
+        sessionID: session.id,
+        targetURL: rootURL,
+      })
+      expect(result.graph.javascriptAssets.some((asset) => asset.url === assetURL + "/assets/app.js")).toBe(true)
+      expect(result.graph.endpointCandidates.some((endpoint) => endpoint.path === "/api/profile")).toBe(true)
+    },
+  })
+})
