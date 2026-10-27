@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, parseScopedPortSpec } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -38,6 +38,21 @@ describe("tool.bash", () => {
         expect(result.metadata.output).toContain("test")
       },
     })
+  })
+})
+
+describe("Scoped port expression parsing", () => {
+  test("accepts single ports, comma-separated lists, ranges, and mixed expressions", () => {
+    expect(parseScopedPortSpec("80")).toEqual([80])
+    expect(parseScopedPortSpec("80,443")).toEqual([80, 443])
+    expect(parseScopedPortSpec("8000-8002")).toEqual([8000, 8001, 8002])
+    expect(parseScopedPortSpec("443,80-81,80")).toEqual([80, 81, 443])
+  })
+
+  test("rejects malformed, reversed, or out-of-range ports", () => {
+    for (const value of ["", "0", "65536", "90-80", "80,,443", "80-70000", "all", "-"]) {
+      expect(parseScopedPortSpec(value)).toBeUndefined()
+    }
   })
 })
 
