@@ -220,6 +220,28 @@ export function scannerTargets(command: string[], commandText: string): string[]
     const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h)=(.+)$/)
     if (inline) addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
   }
+  // Port scanners commonly accept the target as a positional final argument
+  // (for example: nmap -p 80,443 host.example). Previously only URL/target flags
+  // were recognized, so a valid explicit target was rejected as "no targets".
+  if (["nmap", "masscan", "naabu"].includes(scannerName)) {
+    const optionsWithValues = new Set([
+      "-p", "--ports", "-port", "-iL", "--include-file", "-oN", "-oX",
+      "-oG", "-oA", "--top-ports", "-T", "--min-rate", "--max-rate",
+      "--max-retries", "--host-timeout", "--scan-delay", "--source-port",
+    ])
+    let positionalTarget: string | undefined
+    for (let i = 1; i < command.length; i++) {
+      const token = stripOuterShellQuotes(command[i]!).trim()
+      if (!token) continue
+      if (optionsWithValues.has(token)) {
+        i++
+        continue
+      }
+      if (token.startsWith("-")) continue
+      positionalTarget = token
+    }
+    if (positionalTarget) addTargetValue(positionalTarget, false)
+  }
   // waybackurls consumes hosts on stdin instead of argv. Permit only literal
   // hostnames from its immediately enclosing pipeline; every extracted host
   // still passes the same persisted scope check before the source request starts.
