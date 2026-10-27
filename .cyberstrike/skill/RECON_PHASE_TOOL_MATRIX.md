@@ -25,4 +25,4 @@ At every checkpoint, choose any suitable available tool based on the evidence ga
 
 Source failures and stale phase state must not block ordinary recon. Verify the canonical inventory and continue from available evidence.
 
-When a capability is missing, select a suitable available alternative if one closes the same evidence gap. Otherwise record the precise unavailable/blocked reason and continue only with independent work permitted by the phase gate. Never invent results, weaken scope enforcement, or report a missing source as successful.
+When a capability is missing, select a suitable available alternative if one closes the same evidence gap. Phase/checkpoint state must never block ordinary tool execution or tool selection: run any suitable available tool at any recon phase, then record its evidence under the appropriate phase and reconcile progress afterward. Record a precise unavailable/blocked reason only when the capability is genuinely unavailable or a concrete runtime, authorization, scope, or policy check rejects that action. Never invent results, weaken scope enforcement, or report a missing source as successful.
