@@ -535,7 +535,7 @@ export const TargetWorkspaceTool = Tool.define("target_workspace", {
             "Status: observed candidate only; this does not grant authorization.",
             "A separate workspace is created only when create_child_workspace=true is explicitly requested.",
           ].join("\n"),
-          metadata: { attached: false, saved: true, target_id: parent.id, target_url: parent.targetURL, workspace: parent.workspacePath, asset_type: params.asset_type ?? "host" } as TargetWorkspaceMetadata,
+          metadata: { attached: false, saved: true, reason: "separate_workspace_not_requested", target_id: parent.id, target_url: parent.targetURL, workspace: parent.workspacePath, asset_type: params.asset_type ?? "host" } as TargetWorkspaceMetadata,
         }
       }
       const result = await TargetMemory.attachAsset(
