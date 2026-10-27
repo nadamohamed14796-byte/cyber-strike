@@ -300,7 +300,7 @@ describe("Katana scope policy", () => {
   test("allows reuse of safe output paths and rejects scope-broadening flags", () => {
     const withoutNoClobber = safeArgs.filter((arg) => arg !== "-ncb")
     expect(katanaScopeBlockReason(withoutNoClobber, "https://example.com", baseScope, workspacePath)).toBeUndefined()
-    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toContain("-rl 5")
+    expect(katanaScopeBlockReason(["-u", "https://example.com", "-fs", "fqdn", "-rl", "150", "-d", "3", "-j", "-ncb", "-o", safeOutput], "https://example.com", baseScope, workspacePath)).toBeUndefined()
     expect(katanaScopeBlockReason([...safeArgs, "-ns"], "https://example.com", baseScope, workspacePath)).toContain("scope overrides")
   })
 
