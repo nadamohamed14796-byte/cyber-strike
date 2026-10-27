@@ -32,12 +32,28 @@ export const TargetNoteTool = Tool.define<typeof TargetNoteParameters, Tool.Meta
   async execute(params, ctx) {
     try {
       const sessionID = Session.root(ctx.sessionID)
-      const workspace = await TargetMemory.get(params.target_url)
-      if (!workspace) {
-        return { title: "Target note not saved", output: "No existing workspace matches this target. Create/open the target workspace explicitly first.", metadata: { saved: false, reason: "workspace_missing" } }
+      const requestedTarget = params.target_url
+      let workspace = await TargetMemory.get(requestedTarget)
+
+      // A program/root workspace may own scoped child hosts without a separate
+      // workspace for every subdomain. When the requested URL is an observed,
+      // in-scope child, resolve it through the persisted scope matcher and store
+      // the note in the matched canonical workspace instead of failing an exact
+      // workspace-URL lookup or creating a duplicate nested workspace.
+      const observedRequestedTarget = TargetMemory.isObservedInSession(sessionID, requestedTarget)
+      if (!workspace && observedRequestedTarget) {
+        try {
+          const decision = await TargetMemory.checkURLScope(requestedTarget)
+          if (decision.allowed && decision.workspace) workspace = decision.workspace
+        } catch {
+          // Keep the safe failure below when scope cannot be established.
+        }
       }
-      if (!TargetMemory.isObservedInSession(sessionID, workspace.targetURL)) {
-        return { title: "Target note not saved", output: "The target host/path was not found in observed requests or Intel for this session tree. No note was written to avoid cross-target contamination.", metadata: { saved: false, reason: "target_not_observed" } }
+      if (!workspace) {
+        return { title: "Target note not saved", output: "No existing workspace matches this target, and no observed in-scope workspace could be resolved. Open the canonical target workspace or verify the saved scope first.", metadata: { saved: false, reason: "workspace_missing" } }
+      }
+      if (!observedRequestedTarget && !TargetMemory.isObservedInSession(sessionID, workspace.targetURL)) {
+        return { title: "Target note not saved", output: "The requested target and its canonical workspace were not observed in this session tree's requests or Intel. No note was written to avoid cross-target contamination.", metadata: { saved: false, reason: "target_not_observed" } }
       }
       if ((params.status === "confirmed" || params.status === "disproven") && !params.evidence?.trim()) {
         return { title: "Target note not saved", output: "Confirmed/disproven notes require concrete evidence. Use observed or unverified if evidence is incomplete.", metadata: { saved: false, reason: "evidence_required" } }
