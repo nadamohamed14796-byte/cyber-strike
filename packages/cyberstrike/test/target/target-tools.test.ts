@@ -430,3 +430,53 @@ test("asset discovery does not create a child workspace unless explicitly reques
     },
   })
 })
+
+
+test("observations from a child asset are saved in the canonical root inventory", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      try {
+        const tool = await TargetWorkspaceTool.init()
+        const init = await tool.execute({ action: "init", target_url: "https://example.com" }, {} as never)
+        const rootPath = init.metadata.workspace!
+        await TargetMemory.configureScope("https://example.com", {
+          include: ["example.com", "*.example.com"],
+          authorizationSource: "Root inventory regression test",
+          authorizationReference: "https://example.com/security",
+        })
+
+        const child = await tool.execute({
+          action: "attach_asset",
+          parent_target_url: "https://example.com",
+          asset_url: "https://api.example.com",
+          asset_type: "api",
+          create_child_workspace: true,
+        }, {} as never)
+        expect(child.metadata.attached).toBe(true)
+
+        const observed = await tool.execute({
+          action: "attach_asset",
+          parent_target_url: "https://api.example.com",
+          asset_url: "https://v2.api.example.com/v1/users",
+          asset_type: "api",
+        }, {} as never)
+        expect(observed.metadata.saved).toBe(true)
+        expect(observed.metadata.workspace).toBe(rootPath)
+
+        const rootRegistry = JSON.parse(await fs.readFile(path.join(rootPath, "assets", "registry.json"), "utf-8"))
+        expect(rootRegistry.observations.some((item: { url: string }) => item.url === "https://v2.api.example.com")).toBe(true)
+
+        const childWorkspace = await TargetMemory.get("https://api.example.com")
+        expect(childWorkspace).not.toBeNull()
+        expect(TargetMemory.children(childWorkspace!.id)).toHaveLength(0)
+        const childRegistryPath = path.join(childWorkspace!.workspacePath, "assets", "registry.json")
+        const childRegistry = JSON.parse(await fs.readFile(childRegistryPath, "utf-8"))
+        expect(childRegistry.observations ?? []).toHaveLength(0)
+      } finally {
+        await Instance.dispose()
+      }
+    },
+  })
+})
