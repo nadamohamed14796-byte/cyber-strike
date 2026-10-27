@@ -7,12 +7,14 @@ import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../
 import { Tool } from "./tool"
 
 const MAX_ASSET_BYTES = 32 * 1024 * 1024
+// Bound aggregate response-body bytes per invocation. Pending URLs remain in the manifest for resume.
+const MAX_BATCH_BYTES = 64 * 1024 * 1024
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
-  urls: z.array(z.string().trim().min(1).max(8192)).min(1)
-    .describe("JavaScript asset URLs OR HTML page URLs from ANY source: URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths."),
+  urls: z.array(z.string().trim().min(1).max(8192)).default([])
+    .describe("Optional JavaScript asset or HTML page URLs from the URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths. Leave empty to resume pending/retryable URLs saved in the existing target manifest."),
   source: z.string().trim().min(1).max(120).default("unspecified")
     .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
   force_refresh: z.boolean().default(false)
@@ -62,6 +64,17 @@ export function mergeAssetSources(...values: Array<string | string[] | undefined
     }
   }
   return [...merged].sort()
+}
+
+// The complete provenance remains in sources[]. Keep the display label bounded.
+export function mergeAssetSourceLabel(sources: string[]): string {
+  const selected: string[] = []
+  for (const source of [...sources].sort()) {
+    const candidate = [...selected, source].join(" | ")
+    if (candidate.length <= 120) selected.push(source)
+    if (selected.join(" | ").length >= 120) break
+  }
+  return selected.length ? selected.join(" | ") : (sources[0]?.slice(0, 120) || "unspecified")
 }
 
 export function parseAssetManifest(input: string): Manifest {
@@ -245,8 +258,8 @@ async function fetchScoped(inputURL: string, abort: AbortSignal): Promise<{ resp
 export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Metadata>("ingest_javascript_urls", {
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
-    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Always pass all available URLs in the urls array and identify their provenance in source.",
-    "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are bounded, GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session.",
+    "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Pass new URLs when available; `urls: []` resumes eligible pending/retryable work from the existing asset manifest without requiring the original URL list.",
+    "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. Each response is limited to 32 MiB and total response bodies are limited to 64 MiB per invocation while streaming; work deferred by the batch budget remains pending for the next invocation.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports plus source-map references are discovered from each downloaded bundle and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
@@ -321,6 +334,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
 
+    const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, Set<string>>()
@@ -332,7 +346,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       const prior = byURL.get(url)
       if (prior) {
         const sources = [...values].sort()
-        byURL.set(url, { ...prior, source: sources.join(" | "), sources })
+        byURL.set(url, { ...prior, source: mergeAssetSourceLabel(sources), sources })
       }
       return values.size > before
     }
@@ -344,7 +358,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           retryable: undefined,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "pending",
           ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
@@ -370,9 +384,17 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         inputURLs.push(url)
       }
     }
+    if (inputURLs.length === 0) {
+      return {
+        title: "JavaScript ingestion has no work to resume",
+        output: invalidCount
+          ? "No valid HTTP(S) URLs were supplied, and the target manifest has no pending or retryable assets to resume."
+          : "No URLs were supplied and the target manifest has no pending or retryable assets to resume.",
+        metadata: { error: "no_urls_or_pending_queue", manifest_path: manifestPath, workspace: workspace.workspacePath, invalid_urls: invalidCount },
+      }
+    }
     for (const url of inputURLs) markPending(url, params.force_refresh)
     await saveProgress(true)
-    const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const records: AssetRecord[] = []
     let downloadedBytes = 0
     let receivedBytes = 0
@@ -384,6 +406,12 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     for (let index = 0; index < inputURLs.length; index++) {
       if (ctx.abort.aborted) {
+        await saveProgress(true)
+        break
+      }
+      // Do not fetch another response once this invocation's aggregate body budget is exhausted.
+      // All remaining eligible URLs were marked pending above, so the next invocation resumes them.
+      if (receivedBytes >= MAX_BATCH_BYTES) {
         await saveProgress(true)
         break
       }
@@ -400,7 +428,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           target_url: displayURL(params.target_url),
         },
       })
-      const assetSource = [...(sourceByURL.get(url) ?? new Set([params.source]))].sort().join(" | ")
+      const assetSource = mergeAssetSourceLabel([...(sourceByURL.get(url) ?? new Set([params.source]))])
       const prior = byURL.get(url)
       const forceRefresh = params.force_refresh || prior?.pendingRefresh === true
       if (!shouldFetchAsset(prior, forceRefresh)) {
@@ -413,7 +441,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           metadata: { stage: "cache_hit", active_asset: activeAsset, processed: index, queued: inputURLs.length, target_url: displayURL(params.target_url) },
         })
         const sources = mergeAssetSources(prior.sources, prior.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const record: AssetRecord = { ...prior, source: sources.join(" | "), sources, status: "reused" }
+        const record: AssetRecord = { ...prior, source: mergeAssetSourceLabel(sources), sources, status: "reused" }
         records.push(record)
         byURL.set(url, record)
         reused++
@@ -432,7 +460,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           const record: AssetRecord = {
             ...prior,
             url,
-            source: sources.join(" | "),
+            source: mergeAssetSourceLabel(sources),
             sources,
             status: "pending",
             ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
@@ -449,7 +477,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const record: AssetRecord = {
           ...prior,
           url,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "failed",
           retryable,
@@ -470,7 +498,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "failed",
           retryable,
@@ -491,7 +519,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "skipped",
           retryable: undefined,
@@ -504,13 +532,61 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await saveProgress()
         continue
       }
+      const batchRemaining = MAX_BATCH_BYTES - receivedBytes
+      if (batchRemaining <= 0 || (Number.isFinite(declaredLength) && declaredLength > batchRemaining)) {
+        // Do not classify a response as permanently skipped just because this invocation ran
+        // out of aggregate budget. It must remain pending so a later invocation can fetch it.
+        await response.body?.cancel("JavaScript batch byte budget exhausted").catch(() => {})
+        const prior = byURL.get(url)
+        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+        const record: AssetRecord = {
+          ...prior,
+          url,
+          finalURL,
+          source: mergeAssetSourceLabel(sources),
+          sources,
+          status: "pending",
+          retryable: undefined,
+          ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : { pendingRefresh: undefined }),
+          contentType,
+          error: "per-invocation byte budget reached; pending for resume",
+        }
+        records.push(record)
+        byURL.set(url, record)
+        await saveProgress(true)
+        break
+      }
       let bytes: Uint8Array
       ctx.metadata({
         title: "Reading JavaScript response — " + activeAsset,
         metadata: { stage: "reading_response", active_asset: activeAsset, processed: index, queued: inputURLs.length, content_type: contentType },
       })
-      try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
+      try { bytes = await readBounded(response, Math.min(MAX_ASSET_BYTES, batchRemaining)) }
       catch (error) {
+        const batchBudgetExceeded =
+          batchRemaining < MAX_ASSET_BYTES &&
+          error instanceof Error &&
+          error.message === "response exceeds the " + batchRemaining + " byte asset limit"
+        if (batchBudgetExceeded && !ctx.abort.aborted) {
+          const prior = byURL.get(url)
+          const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
+          const record: AssetRecord = {
+            ...prior,
+            url,
+            finalURL,
+            source: mergeAssetSourceLabel(sources),
+            sources,
+            status: "pending",
+            retryable: undefined,
+            ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : { pendingRefresh: undefined }),
+            contentType,
+            error: "per-invocation byte budget reached while reading response; pending for resume",
+          }
+          records.push(record)
+          byURL.set(url, record)
+          await saveProgress(true)
+          break
+        }
         if (ctx.abort.aborted) {
           const prior = byURL.get(url)
           const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
@@ -518,7 +594,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
             ...prior,
             url,
             finalURL,
-            source: sources.join(" | "),
+            source: mergeAssetSourceLabel(sources),
             sources,
             status: "pending",
             ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : {}),
@@ -537,7 +613,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "failed",
           retryable,
@@ -560,7 +636,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           finalURL,
-          source: sources.join(" | "),
+          source: mergeAssetSourceLabel(sources),
           sources,
           status: "skipped",
           retryable: undefined,
@@ -606,7 +682,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const sources = mergeAssetSources(byURL.get(url)?.sources, byURL.get(url)?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-      const record: AssetRecord = { url, finalURL, source: sources.join(" | "), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const record: AssetRecord = { url, finalURL, source: mergeAssetSourceLabel(sources), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
       if (existingContent) reused++

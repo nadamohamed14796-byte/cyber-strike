@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
-import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerTargets } from "../../src/tool/bash"
+import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets } from "../../src/tool/bash"
 import type { TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
@@ -130,6 +130,31 @@ describe("Read-only passive-research API scope routing", () => {
     expect(passiveResearchLookup(new URL("https://crt.sh/?q=%.example.com&output=json"), ["-q", "-d@payload.json"])).toBeUndefined()
   })
 })
+
+describe("Redirect scope enforcement for generic HTTP clients", () => {
+  test("curl disables user config, prevents redirects, and rejects destination overrides", () => {
+    expect(scannerRequestScopeBlockReason("curl", ["-sS", "https://example.com/asset.js"])).toContain("~/.curlrc")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "-sS", "https://example.com/asset.js"])).toBeUndefined()
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "-sSL", "https://example.com/asset.js"])).toContain("second request outside the persisted scope")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "--location", "https://example.com/asset.js"])).toContain("scope-aware request pipeline")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "--location-trusted", "https://example.com/asset.js"])).toContain("persisted scope")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "--resolve", "example.com:443:127.0.0.1", "https://example.com/asset.js"])).toContain("routing/configuration overrides")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "-sxproxy", "https://example.com/asset.js"])).toContain("routing/configuration overrides")
+    expect(scannerRequestScopeBlockReason("curl", ["-q", "-H", "Host: internal.example", "https://example.com/asset.js"])).toContain("HTTP Host header")
+  })
+
+  test("wget disables user config and automatic redirects in generic shell mode", () => {
+    expect(scannerRequestScopeBlockReason("wget", ["https://example.com/asset.js"])).toContain("~/.wgetrc")
+    const noConfig = ["env", "WGETRC=/dev/null"]
+    expect(scannerRequestScopeBlockReason("wget", ["--max-redirect=0", "https://example.com/asset.js"], noConfig)).toBeUndefined()
+    expect(scannerRequestScopeBlockReason("wget", ["--max-redirect", "0", "https://example.com/asset.js"], noConfig)).toBeUndefined()
+    expect(scannerRequestScopeBlockReason("wget", ["--max-redirect=1", "https://example.com/asset.js"], noConfig)).toContain("redirect following is blocked")
+    expect(scannerRequestScopeBlockReason("wget", ["--max-redirect=0", "--max-redirect=5", "https://example.com/asset.js"], noConfig)).toContain("exactly one explicit")
+    expect(scannerRequestScopeBlockReason("wget", ["--max-redirect=0", "--recursive", "https://example.com/asset.js"], noConfig)).toContain("unchecked follow-up requests")
+    expect(scannerRequestScopeBlockReason("wget", ["--max-redirect=0", "-i", "urls.txt", "https://example.com/asset.js"], noConfig)).toContain("unchecked follow-up requests")
+  })
+})
+
 
 describe("Indirect scanner wrapper policy", () => {
   test("blocks actual xargs/parallel/find execution wrappers, not scanner names in search arguments", async () => {
