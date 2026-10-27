@@ -54,6 +54,32 @@ export function missingRequiredReconArtifacts(phase: ReconPhase, reportedPaths: 
   return [...(RECON_PHASE_REQUIRED_FLAT_ARTIFACTS[phase] ?? [])].filter((required) => !normalized.has(required))
 }
 
+const CANONICAL_INVENTORY_PHASES = new Set<ReconPhase>([
+  "asset_discovery",
+  "live_hosts_ports",
+  "url_collection",
+  "parameter_discovery",
+])
+
+/**
+ * Reject tool logs/error messages masquerading as canonical inventories.
+ * Explicit zero-result/incomplete markers allow truthful empty or partial runs.
+ */
+export function validateCanonicalInventoryContent(phase: ReconPhase, content: string): { valid: boolean; reason?: string; entries: number } {
+  if (!CANONICAL_INVENTORY_PHASES.has(phase)) return { valid: Boolean(content.trim()), reason: content.trim() ? undefined : "artifact is empty", entries: 0 }
+  const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
+  const statusLine = /^(?:status\s*:\s*)?(?:zero[- ]results?|no (?:results|assets|hosts|urls|parameters) found|incomplete\s*:|partial\s*:)/i
+  const dataLines = lines.filter((line) => !statusLine.test(line))
+  const failureOnly = dataLines.filter((line) => /^(?:\[?failed\]?|error|fatal|timeout|timed out|no input|usage:|command not found)\b/i.test(line))
+  if (dataLines.length === 0 && !lines.some((line) => statusLine.test(line))) {
+    return { valid: false, reason: "inventory contains no data rows or explicit zero-result/incomplete status", entries: 0 }
+  }
+  if (dataLines.length > 0 && failureOnly.length === dataLines.length) {
+    return { valid: false, reason: "inventory contains only tool failures/errors, not discovered assets", entries: 0 }
+  }
+  return { valid: true, entries: dataLines.length }
+}
+
 export type ReconBeginDisposition = "start" | "resume_existing" | "already_resolved"
 
 export function reconBeginDisposition(status: ReconPhaseStatus, phase: ReconPhase): ReconBeginDisposition {
@@ -433,6 +459,16 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
                   title: "Recon checkpoint rejected",
                   output: "Cannot complete " + phase + ": canonical artifact is empty: " + required + ". Record verified counts or an explicit zero-result/incomplete status.",
                   metadata: { saved: false, reason: "canonical_artifact_empty", phase, artifact: required },
+                }
+              }
+              if (required === "subdomains.txt" || required === "live-hosts.txt" || required === "urls.txt" || required === "parameters.txt") {
+                const inventory = validateCanonicalInventoryContent(phase, content)
+                if (!inventory.valid) {
+                  return {
+                    title: "Recon checkpoint rejected",
+                    output: "Cannot complete " + phase + ": " + required + " is not a valid canonical inventory: " + inventory.reason + ". Preserve raw tool output separately, repair the merged inventory, or explicitly record a verified zero-result/incomplete state.",
+                    metadata: { saved: false, reason: "canonical_inventory_invalid", phase, artifact: required, entries: inventory.entries },
+                  }
                 }
               }
             } catch (error) {
