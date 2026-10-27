@@ -70,7 +70,7 @@ export function validateCanonicalInventoryContent(phase: ReconPhase, content: st
   const lines = content.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"))
   const statusLine = /^(?:status\s*:\s*)?(?:zero[- ]results?|no (?:results|assets|hosts|urls|parameters) found|incomplete\s*:|partial\s*:)/i
   const dataLines = lines.filter((line) => !statusLine.test(line))
-  const failureOnly = dataLines.filter((line) => /^(?:\\[?failed\\]?(?:\\b|:|\\s|$)|error\\b|fatal\\b|timeout\\b|timed out\\b|no input\\b|usage:|command not found\\b)/i.test(line))
+  const failureOnly = dataLines.filter((line) => /^(?:\[?failed\]?(?:\b|:|\s|$)|error\b|fatal\b|timeout\b|timed out\b|no input\b|usage:|command not found\b)/i.test(line))
   if (dataLines.length === 0 && !lines.some((line) => statusLine.test(line))) {
     return { valid: false, reason: "inventory contains no data rows or explicit zero-result/incomplete status", entries: 0 }
   }
