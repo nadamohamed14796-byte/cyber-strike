@@ -169,6 +169,7 @@ describe("applyDirectoryEvent", () => {
         part: { [message.id]: [textPart("prt_1", "ses_1", message.id)] },
         session_diff: { ses_1: [] },
         todo: { ses_1: [] },
+        vulnerability: { ses_1: [{ id: "vuln_1" } as State["vulnerability"][string][number]] },
         permission: { ses_1: [] },
         question: { ses_1: [] },
         session_status: { ses_1: { type: "busy" } },
@@ -190,6 +191,7 @@ describe("applyDirectoryEvent", () => {
     expect(store.part[message.id]).toBeUndefined()
     expect(store.session_diff.ses_1).toBeUndefined()
     expect(store.todo.ses_1).toBeUndefined()
+    expect(store.vulnerability.ses_1).toBeUndefined()
     expect(store.permission.ses_1).toBeUndefined()
     expect(store.question.ses_1).toBeUndefined()
     expect(store.session_status.ses_1).toBeUndefined()

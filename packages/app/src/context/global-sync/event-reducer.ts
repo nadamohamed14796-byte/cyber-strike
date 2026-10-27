@@ -46,6 +46,7 @@ function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<St
     store.message[sessionID] !== undefined ||
     store.session_diff[sessionID] !== undefined ||
     store.todo[sessionID] !== undefined ||
+    store.vulnerability[sessionID] !== undefined ||
     store.permission[sessionID] !== undefined ||
     store.question[sessionID] !== undefined ||
     store.session_status[sessionID] !== undefined ||
@@ -68,6 +69,7 @@ function cleanupSessionCaches(store: Store<State>, setStore: SetStoreFunction<St
       delete draft.message[sessionID]
       delete draft.session_diff[sessionID]
       delete draft.todo[sessionID]
+      delete draft.vulnerability[sessionID]
       delete draft.permission[sessionID]
       delete draft.question[sessionID]
       delete draft.session_status[sessionID]
@@ -274,21 +276,17 @@ export function applyDirectoryEvent(input: {
       break
     }
     case "message.part.delta": {
-      // sessionID exists in the runtime event. Some generated SDK variants omit it,
-      // so use the cached message owner as a safe fallback when available.
       const props = event.properties as {
-        sessionID?: string
+        sessionID: string
         messageID: string
         partID: string
         field: string
         delta: string
       }
-      // Deltas currently target text-bearing parts only. Ignore unknown fields
-      // rather than accidentally mutating part IDs or other metadata.
+      // The runtime schema and generated SDK both require sessionID. Deltas target
+      // text-bearing parts only; ignore unknown fields rather than mutating metadata.
       if (props.field !== "text") break
-      const sessionID =
-        props.sessionID ??
-        Object.entries(input.store.message).find(([, messages]) => messages.some((message) => message.id === props.messageID))?.[0]
+      const sessionID = props.sessionID
       const parts = input.store.part[props.messageID]
       if (!parts) {
         if (sessionID) input.repairMessage?.(sessionID, props.messageID, props.partID)

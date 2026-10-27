@@ -6,12 +6,8 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 
 ## Rules
 
-1. Keep the original CyberStrike scope rules. Check the starting asset once for a new/changed/unresolved target or policy; reuse saved scope on resume. Each real request and redirect must still pass request-level scope enforcement.
-2. Choose any suitable available tool/API/CLI/helper. Check its current schema when needed. Phases are not a tool allowlist; don't run every similar tool.
-3. No arbitrary source/host/URL/result/time caps. Merge partial results as they arrive. On failure, try a useful alternative or record the exact blocker. Never invent results.
-4. Use one canonical root workspace and one inventory per data type. No per-host workspaces, temporary copies, or per-tool inventories. Resume unfinished work; don't repeat verified work without new evidence.
-5. Recon clues are not findings. No vulnerability scanners, `session_scan`, exploit payloads, or targeted vulnerability tests unless the user explicitly requests testing and runtime/policy controls allow it.
-6. Checkpoint: call `recon_checkpoint(action="status", target_url=<canonical target URL>)` first; use the same `target_url` for every action (not a filesystem path). For each pending phase call `begin` with its `phase`; if already running, inspect artifacts and resume. After verifying outputs, call `complete` with summary, counts, and workspace-relative artifact paths. Use `block`, `fail`, or `unavailable` with a reason when needed. Only `vulnerability_testing` may be deferred: call `begin`, then `defer`. Fix checkpoint rejection reasons; never claim success without saved output.
+1. Follow the shared Target Workflow Contract for scope, workspace, tool choice, safety, caps, failure handling, and completion. This template defines recon-specific phases and outputs; it must not create competing global rules.
+2. Checkpoint mechanics: call `recon_checkpoint(action="status", target_url=<canonical target URL>)` first; use the same `target_url` for every action (not a filesystem path). For each pending phase call `begin` with its `phase`; if already running, inspect artifacts and resume. After verifying outputs, call `complete` with summary, counts, and workspace-relative artifact paths. Use `block`, `fail`, or `unavailable` with a reason when needed. Only `vulnerability_testing` may be deferred: call `begin`, then `defer`. Fix checkpoint rejection reasons; never claim success without saved output.
 
 
 ## Adaptive execution and delegation
@@ -24,7 +20,7 @@ Do the work, not a long plan in chat. Follow these steps, save results, verify t
 
 ## Workflow
 
-0. **Resume/scope/workspace:** reuse or initialize the canonical root workspace. Recover checkpoint and files first. Configure/check scope only when new, changed, or unresolved. Complete scope/workspace setup only after their checks pass. If authorization is unclear, don't send active requests.
+0. **Resume setup:** recover the existing workspace, checkpoint, and verified artifacts first. Follow the shared Target Workflow Contract for scope/workspace setup; do not begin collection until its required gates pass.
 
 1. **`asset_discovery`:** enumerate seed subdomains using useful passive sources (CT, `subfinder`, Amass, assetfinder, APIs). Merge normalized unique hosts into root `subdomains.txt`; preserve partial results and source failures.
 

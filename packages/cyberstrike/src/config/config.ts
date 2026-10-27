@@ -26,7 +26,7 @@ import { Installation } from "@/installation"
 import { ConfigMarkdown } from "./markdown"
 import { constants, existsSync } from "fs"
 import { Bus } from "@/bus"
-import { GlobalBus } from "@/bus/global"
+import { emitSafe } from "@/bus/global"
 import { Event } from "../server/event"
 import { PackageRegistry } from "@/bun/registry"
 import { proxied } from "@/util/proxied"
@@ -1727,7 +1727,7 @@ export namespace Config {
     void Instance.disposeAll()
       .catch(() => undefined)
       .finally(() => {
-        GlobalBus.emit("event", {
+        emitSafe({
           directory: "global",
           payload: {
             type: Event.Disposed.type,

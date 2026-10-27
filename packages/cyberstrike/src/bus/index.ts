@@ -2,11 +2,28 @@ import z from "zod"
 import { Log } from "../util/log"
 import { Instance } from "../project/instance"
 import { BusEvent } from "./bus-event"
-import { GlobalBus } from "./global"
+import { emitSafe } from "./global"
 
 export namespace Bus {
   const log = Log.create({ service: "bus" })
-  type Subscription = (event: any) => void
+  type Subscription = (event: any) => void | Promise<void>
+
+  function notify(subscribers: Subscription[], event: any, type: string) {
+    const pending: Promise<void>[] = []
+    for (const sub of [...subscribers]) {
+      try {
+        pending.push(
+          Promise.resolve(sub(event)).catch((error) => {
+            log.error("subscription handler failed", { type, error })
+          }),
+        )
+      } catch (error) {
+        // A broken local subscriber must not block other listeners or global delivery.
+        log.error("subscription handler failed", { type, error })
+      }
+    }
+    return Promise.all(pending)
+  }
 
   export const InstanceDisposed = BusEvent.define(
     "server.instance.disposed",
@@ -32,9 +49,7 @@ export namespace Bus {
           directory: Instance.directory,
         },
       }
-      for (const sub of [...wildcard]) {
-        sub(event)
-      }
+      await notify(wildcard, event, InstanceDisposed.type)
     },
   )
 
@@ -49,18 +64,16 @@ export namespace Bus {
     log.info("publishing", {
       type: def.type,
     })
-    const pending = []
-    for (const key of [def.type, "*"]) {
-      const match = state().subscriptions.get(key)
-      for (const sub of match ?? []) {
-        pending.push(sub(payload))
-      }
-    }
-    GlobalBus.emit("event", {
+    const subscribers = [
+      ...(state().subscriptions.get(def.type) ?? []),
+      ...(state().subscriptions.get("*") ?? []),
+    ]
+    const pending = notify(subscribers, payload, def.type)
+    emitSafe({
       directory: Instance.directory,
       payload,
     })
-    return Promise.all(pending)
+    await pending
   }
 
   export function subscribe<Definition extends BusEvent.Definition>(

@@ -10,7 +10,7 @@ import { work } from "../util/queue"
 import { fn } from "@cyberstrike-io/util/fn"
 import { BusEvent } from "@/bus/bus-event"
 import { iife } from "@/util/iife"
-import { GlobalBus } from "@/bus/global"
+import { emitSafe } from "@/bus/global"
 import { existsSync } from "fs"
 import { git } from "../util/git"
 
@@ -252,7 +252,7 @@ export namespace Project {
     Database.use((db) =>
       db.insert(ProjectTable).values(insert).onConflictDoUpdate({ target: ProjectTable.id, set: updateSet }).run(),
     )
-    GlobalBus.emit("event", {
+    emitSafe({
       payload: {
         type: Event.Updated.type,
         properties: result,
@@ -365,7 +365,7 @@ export namespace Project {
       )
       if (!result) throw new Error(`Project not found: ${input.projectID}`)
       const data = fromRow(result)
-      GlobalBus.emit("event", {
+      emitSafe({
         payload: {
           type: Event.Updated.type,
           properties: data,
@@ -404,7 +404,7 @@ export namespace Project {
     )
     if (!result) throw new Error(`Project not found: ${id}`)
     const data = fromRow(result)
-    GlobalBus.emit("event", {
+    emitSafe({
       payload: {
         type: Event.Updated.type,
         properties: data,
@@ -427,7 +427,7 @@ export namespace Project {
     )
     if (!result) throw new Error(`Project not found: ${id}`)
     const data = fromRow(result)
-    GlobalBus.emit("event", {
+    emitSafe({
       payload: {
         type: Event.Updated.type,
         properties: data,

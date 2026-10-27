@@ -16,13 +16,11 @@ Use this guidance to support the task, not to create extra workflow overhead.
 - Share the concise model plus artifact/request IDs with specialists; avoid copying full inventories or private data. Derive each test from in-scope evidence and authorized identities; if a needed precondition is unknown or unavailable, retain the candidate as inconclusive/blocked rather than inventing a result.
 
 ### Recon
-- Use available and discoverable tools that fit the current evidence. Tool catalogs, skills, and phase labels are suggestions, not tool allowlists.
-- Do not impose arbitrary time limits, source caps, attempt caps, or early-stop rules on useful reconnaissance. Continue until useful work is done or a genuine blocker remains.
-- Do not let stale phase state, optional source ledgers, coverage percentages, skill loading, or routine status checks block ordinary recon. Checkpoint state records progress; it does not choose the tools.
-- Reuse saved scope and workspace state when unchanged. Never bypass runtime scope enforcement for a concrete request.
-- Follow the practical sequence: subdomains, live hosts/services, URLs/parameters, JavaScript collection and analysis, endpoint correlation, relevant sensitive-file checks, final report.
-- Prioritize JavaScript analysis and connect script evidence to routes, methods, parameters, headers, cookies, authentication clues, and possible secrets. Redact secret values in reports.
-- Do not run vulnerability scanners, exploit attempts, credential attacks, or state-changing tests during recon unless the user explicitly requests targeted testing.
+
+- Follow the shared Target Workflow Contract for scope, workspace, checkpoints, phase sequence, tools, and canonical artifacts. Do not create a second recon process.
+- Choose suitable tools for the current evidence gap; phase labels and catalogs are not allowlists. Resume verified work and avoid repeated calls without new evidence.
+- Recon is non-destructive by default. Do not run vulnerability scanners, exploit attempts, credential attacks, or state-changing tests unless the user explicitly requests targeted testing and runtime policy controls allow it.
+- Prioritize JavaScript collection and analysis, correlating extracted routes, methods, parameters, auth/header/cookie clues, and redacted secret fingerprints. Treat static indicators as leads until validated.
 
 ### Tool and skill discovery
 Search the registered tool or skill catalog when useful to solve a real evidence gap, a capability is missing, or the target reveals a new technology. Load only relevant definitions. Reuse successful discoveries; do not repeat catalog searches or load skills merely to satisfy a checklist. If a tool is unavailable or fails, preserve its output and try a suitable alternative when that helps.
