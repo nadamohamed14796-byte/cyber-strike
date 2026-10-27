@@ -207,12 +207,21 @@ test("canonical inventories reject empty, failure-only, and log-shaped output", 
   expect(validateCanonicalInventoryContent("parameter_discovery", "incomplete: source timed out").valid).toBe(true)
 })
 
+test("completion prerequisites keep phases from silently skipping unfinished work", () => {
+  const state = records("complete")
+  state.directory_fuzzing = { status: "pending" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("directory_fuzzing")
+  state.directory_fuzzing = { status: "unavailable", reason: "No eligible path-discovery method was available" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
+})
+
 test("canonical inventories reject malformed rows, mixed errors, and duplicates", () => {
   expect(validateCanonicalInventoryContent("asset_discovery", "good.example.com\nERROR: resolver failed").valid).toBe(false)
   expect(validateCanonicalInventoryContent("asset_discovery", "not a hostname").valid).toBe(false)
   expect(validateCanonicalInventoryContent("url_collection", "not-a-url").valid).toBe(false)
   expect(validateCanonicalInventoryContent("url_collection", "https://example.com\nhttps://example.com/").valid).toBe(false)
   expect(validateCanonicalInventoryContent("live_hosts_ports", "example.com\nexample.com").valid).toBe(false)
+  expect(validateCanonicalInventoryContent("live_hosts_ports", "https://example.com/admin").valid).toBe(false)
   expect(validateCanonicalInventoryContent("live_hosts_ports", "https://example.com\nstatus: zero-results").valid).toBe(false)
 })
 
