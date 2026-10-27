@@ -32,27 +32,43 @@ export const TodoWriteTool = Tool.define("todowrite", {
       metadata: {},
     })
 
-    const activeCount = params.todos.filter((x) => x.status === "pending" || x.status === "in_progress").length
+    const previous = await Todo.get(ctx.sessionID)
+    const nextTodos = [...params.todos]
+    const hasTodo = (content: string) => nextTodos.some((todo) => todo.content.trim() === content.trim())
+    const preserved = previous.filter(
+      (todo) =>
+        (todo.status === "pending" || todo.status === "in_progress") &&
+        !hasTodo(todo.content),
+    )
+    // An update is a full snapshot. Preserve unfinished work unless the agent
+    // explicitly keeps it or marks it cancelled; omission must not erase work.
+    nextTodos.push(...preserved)
+
+    const activeCount = nextTodos.filter((x) => x.status === "pending" || x.status === "in_progress").length
     if (activeCount > 25) {
       return {
         title: "error",
         output:
-          "Cannot have more than 25 active (pending/in_progress) todos. Consolidate related items or complete/cancel existing ones first.",
+          "Cannot have more than 25 active (pending/in_progress) todos. Consolidate related items or explicitly cancel completed/irrelevant work first.",
         metadata: {
-          todos: params.todos,
+          todos: nextTodos,
         },
       }
     }
 
     await Todo.update({
       sessionID: ctx.sessionID,
-      todos: params.todos,
+      todos: nextTodos,
     })
     return {
-      title: `${params.todos.filter((x) => x.status !== "completed").length} todos`,
-      output: JSON.stringify(params.todos, null, 2) + "\n\n" + nextTodoHint(params.todos),
+      title: `${nextTodos.filter((x) => x.status === "pending" || x.status === "in_progress").length} active todos`,
+      output:
+        JSON.stringify(nextTodos, null, 2) +
+        (preserved.length ? "\n\nPreserved unfinished items omitted from this update: " + preserved.map((todo) => todo.content).join(" | ") : "") +
+        "\n\n" +
+        nextTodoHint(nextTodos),
       metadata: {
-        todos: params.todos,
+        todos: nextTodos,
       },
     }
   },
