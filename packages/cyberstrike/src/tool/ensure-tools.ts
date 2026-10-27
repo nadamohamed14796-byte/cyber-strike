@@ -83,7 +83,7 @@ const TOOL_INSTALL_MAP: Record<string, { check: string; install: string; descrip
 
 export const EnsureToolsTool = Tool.define("ensure_tools", {
   description:
-    "Check only the explicitly selected security-tool candidates and install selected missing binaries when necessary. This tool does not define required tools for any phase: choose candidates dynamically from the current evidence gap and verified available alternatives, and pass only the candidates that are genuinely needed. ONLY call this when the user has explicitly requested a pentest, vulnerability scan, or active security testing. NEVER call this for passive questions, code review, tech stack inquiries, or informational requests.",
+    "On an explicitly requested authorized pentest, recon run, vulnerability scan, or active security test, use this whenever a useful tool is missing before abandoning that method. Select only tools justified by the current evidence gap; this is not a fixed phase checklist. Install from the predefined trusted recipes, then verify the executable is actually available on PATH and report any missing prerequisite or failure. If a tool is not in the catalog, do not guess or execute an untrusted install command: report that no verified recipe exists and continue with an installed equivalent where possible. Never install tools for passive questions, code review, or informational requests.",
   parameters: z.object({
     tools: z
       .array(z.string())
@@ -100,19 +100,23 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
       }
 
       // Check if installed
-      const check = Bun.spawnSync(["which", spec.check])
+      const check = Bun.spawnSync(["sh", "-lc", `command -v ${spec.check}`])
       if (check.exitCode === 0) {
         results.push({ tool: name, installed: true, action: `Already installed: ${check.stdout.toString().trim()}` })
         continue
       }
 
       // Try to install
-      const install = Bun.spawnSync(["sh", "-c", spec.install], { timeout: 120_000 })
-      if (install.exitCode === 0) {
-        results.push({ tool: name, installed: true, action: `Installed successfully` })
+      const install = Bun.spawnSync(["sh", "-lc", `${spec.install}; status=$?; export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; exit $status`], { timeout: 180_000 })
+      // Installation exit status alone is not proof that the command is usable.
+      const verify = Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; command -v ${spec.check}`])
+      if (install.exitCode === 0 && verify.exitCode === 0) {
+        results.push({ tool: name, installed: true, action: `Installed and verified: ${verify.stdout.toString().trim()}` })
       } else {
         const stderr = install.stderr.toString().trim().slice(0, 200)
-        results.push({ tool: name, installed: false, action: `Install failed: ${stderr}` })
+        const stdout = install.stdout.toString().trim().slice(-200)
+        const reason = install.exitCode !== 0 ? (stderr || stdout || `installer exited ${install.exitCode}`) : `installer completed but ${spec.check} is still not on PATH`
+        results.push({ tool: name, installed: false, action: `Install failed: ${reason}` })
       }
     }
 
