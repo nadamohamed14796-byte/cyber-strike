@@ -113,7 +113,7 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
           results.push({ tool: name, installed: false, action: "No trusted install recipe for this tool and apt-get is unavailable" })
           continue
         }
-        const installUnknown = Bun.spawnSync(["sh", "-lc", `apt-get update && apt-get install -y -- "${name}"`], { timeout: 180_000 })
+        const installUnknown = Bun.spawnSync(["sh", "-lc", `apt-get update && apt-get install -y -- "${name}"`], { timeout: 600_000 })
         const verifyUnknown = Bun.spawnSync(["sh", "-lc", `command -v "${name}"`])
         if (installUnknown.exitCode === 0 && verifyUnknown.exitCode === 0) {
           results.push({ tool: name, installed: true, action: `Installed from configured OS package repository: ${verifyUnknown.stdout.toString().trim()}` })
@@ -128,7 +128,7 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
       const check = Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; command -v ${spec.check}`])
       if (check.exitCode === 0) {
         const executable = check.stdout.toString().trim()
-        const identity = spec.verify ? Bun.spawnSync(["sh", "-lc", spec.verify + " >/dev/null 2>&1"]) : undefined
+        const identity = spec.verify ? Bun.spawnSync(["sh", "-lc", `export PATH="$PATH:$HOME/go/bin:$HOME/.local/bin:$HOME/.cargo/bin"; ${spec.verify} >/dev/null 2>&1`]) : undefined
         if (!identity || identity.exitCode === 0) {
           results.push({ tool: name, installed: true, action: `Already installed and verified: ${executable}` })
           continue
