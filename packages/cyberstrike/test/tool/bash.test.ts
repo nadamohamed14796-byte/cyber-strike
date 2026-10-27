@@ -71,6 +71,17 @@ describe("Scope-aware URL source input extraction", () => {
     expect(scannerTargets(["subfinder", "-d", "*.example.com,example.net", "-silent"], "subfinder -d '*.example.com,example.net' -silent")).toEqual(expect.arrayContaining(["https://example.com", "https://example.net"]))
   })
 
+  test("extracts positional host targets from port scanners", () => {
+    expect(scannerTargets(
+      ["nmap", "-p", "22,80,443", "ubiquiti.example.com", "--max-retries", "2"],
+      "nmap -p 22,80,443 ubiquiti.example.com --max-retries 2",
+    )).toContain("https://ubiquiti.example.com")
+    expect(scannerTargets(
+      ["nmap", "-p", "80,443", "194.209.94.9", "-T4"],
+      "nmap -p 80,443 194.209.94.9 -T4",
+    )).toContain("https://194.209.94.9")
+  })
+
   test("does not infer a target from a file name when a source reads a list from disk", () => {
     expect(scannerTargets(["waybackurls"], "cat domains.txt | waybackurls")).toEqual([])
   })
