@@ -56,7 +56,7 @@ Use states truthfully:
 - **completed**: the stated result/artifact exists and has been checked.
 - **cancelled**: no longer relevant, duplicate, out of scope, or superseded; record the reason.
 
-Do not mark a todo complete merely because a tool was called. Verify the actual result. Do not let the todo list replace target-local manual notes, evidence artifacts, the verification ledger, or the finding validation record.
+Do not mark a todo complete merely because a tool was called. Verify the actual result and required artifact first. For each active item, follow this execution loop: select the highest-priority actionable pending item; mark it in_progress before starting; perform the stated action; inspect the returned result and artifact; then mark completed only when the completion condition is demonstrably satisfied. If blocked, rewrite the item to start with `Blocked:` and state the concrete cause plus the next safe resolution; do not leave it silently in_progress. Then continue to the next independent actionable item instead of stopping the whole plan. Do not silently skip, replace, or reorder an item; when evidence makes it irrelevant, cancel it with the reason. Before the final response, reconcile every active item as completed, cancelled with reason, or explicitly pending/blocked with a precise resume point. Do not let the todo list replace target-local manual notes, evidence artifacts, the verification ledger, or the finding validation record.
 
 ## When NOT to use this tool
 
