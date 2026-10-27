@@ -38,13 +38,22 @@ test("recon run identity is stable across session resumes", () => {
 test("begin resumes running phases and does not restart resolved work", () => {
   expect(reconBeginDisposition("running", "url_collection")).toBe("resume_existing")
   expect(reconBeginDisposition("complete", "url_collection")).toBe("already_resolved")
-  expect(reconBeginDisposition("unavailable", "url_collection")).toBe("already_resolved")
+  expect(reconBeginDisposition("unavailable", "url_collection")).toBe("start")
   expect(reconBeginDisposition("unavailable", "scope_validation")).toBe("start")
   expect(reconBeginDisposition("unavailable", "workspace_setup")).toBe("start")
   expect(reconBeginDisposition("pending", "url_collection")).toBe("start")
   expect(reconBeginDisposition("failed", "url_collection")).toBe("start")
   expect(reconBeginDisposition("blocked", "url_collection")).toBe("start")
   expect(reconBeginDisposition("deferred", "vulnerability_testing")).toBe("start")
+})
+
+test("reopening unavailable work invalidates downstream completion", () => {
+  const state = records("complete")
+  state.url_collection = { status: "unavailable", reason: "crawler unavailable" }
+  const invalidated = invalidateReconDownstreamPhases("url_collection", state, "source/tool availability changed")
+  expect(invalidated).toContain("javascript_analysis")
+  expect(state.javascript_analysis.status).toBe("pending")
+  expect(state.reporting.status).toBe("pending")
 })
 
 test("recon phases cannot skip pending prerequisites", () => {
