@@ -108,6 +108,21 @@ test("enforces the aggregate response-body budget while streaming and preserves 
         expect(statusFor(urls[0])?.status).toBe("skipped")
         expect(statusFor(urls[1])?.status).toBe("skipped")
         expect(statusFor(urls[2])?.status).toBe("pending")
+
+        // The next invocation can resume the persisted pending URL without re-supplying
+        // the original list. Completed/skipped assets must not be fetched again.
+        const resumed = await tool.execute({
+          target_url: canonicalTarget,
+          urls: [],
+          source: "unit-test-resume",
+          force_refresh: false,
+        }, toolContext(session.id))
+        expect((resumed.metadata as Record<string, unknown>).pending_assets).toBe(0)
+        expect(requested).toEqual(["/assets/one.js", "/assets/two.js", "/assets/three.js"])
+        const resumedManifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+          assets: Array<{ url: string; status: string }>
+        }
+        expect(resumedManifest.assets.find((item) => item.url === urls[2])?.status).toBe("skipped")
       },
     })
   } finally {
