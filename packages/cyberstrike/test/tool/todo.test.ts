@@ -74,7 +74,7 @@ test("completed recon checklist entries survive todo history trimming", () => {
   const general = Array.from({ length: 8 }, (_, index) => item("Old task " + index, "completed"))
   const trimmed = trimTodoHistory([...recon, ...general, item("Current task", "in_progress", "high")])
 
-  expect(trimmed.filter((todo) => /^\\[recon:[a-z_]+\\]/.test(todo.content))).toHaveLength(reconPhases.length)
-  expect(trimmed.filter((todo) => todo.status === "completed" && !/^\\[recon:[a-z_]+\\]/.test(todo.content))).toHaveLength(5)
+  expect(trimmed.filter((todo) => /^\[recon:[a-z_]+\]/.test(todo.content))).toHaveLength(reconPhases.length)
+  expect(trimmed.filter((todo) => todo.status === "completed" && !/^\[recon:[a-z_]+\]/.test(todo.content))).toHaveLength(5)
   expect(trimmed[0]).toEqual(item("Current task", "in_progress", "high"))
 })
