@@ -110,13 +110,13 @@ export function reconcileReconTodoChecklist(
   const known = new Set(RECON_TODO_CHECKLIST.map((item) => item.phase))
   const previousByPhase = new Map<ReconPhase, Todo.Info>()
   for (const todo of previous) {
-    const match = /^\\[recon:([a-z_]+)\\]/.exec(todo.content.trim())
+    const match = /^\[recon:([a-z_]+)\]/.exec(todo.content.trim())
     if (!match || !known.has(match[1] as ReconPhase)) continue
     const phase = match[1] as ReconPhase
     if (!previousByPhase.has(phase)) previousByPhase.set(phase, todo)
   }
   const other = previous.filter((todo) => {
-    const match = /^\\[recon:([a-z_]+)\\]/.exec(todo.content.trim())
+    const match = /^\[recon:([a-z_]+)\]/.exec(todo.content.trim())
     return !match || !known.has(match[1] as ReconPhase)
   })
   const visibleOptional = new Set<ReconPhase>([...includeOptional, ...previousByPhase.keys()])
