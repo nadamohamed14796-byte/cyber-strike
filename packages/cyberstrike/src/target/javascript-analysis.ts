@@ -417,7 +417,9 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
         const lineStart = source.lastIndexOf("\n", index - 1) + 1
         const lineEndIndex = source.indexOf("\n", index)
         const lineText = source.slice(lineStart, lineEndIndex < 0 ? source.length : lineEndIndex)
-        if (new RegExp("(?:@(?:click|submit|change|keyup|keydown)|v-on:(?:click|submit|change)|ng-(?:click|submit))\\s*=\\s*[\\"']\\s*" + escapeRegexLiteral(fn.name) + "\\b", "i").test(lineText)) {
+        const hasTemplateEventAttribute = /(?:@(?:click|submit|change|keyup|keydown)|v-on:(?:click|submit|change)|ng-(?:click|submit))\s*=/.test(lineText)
+        const referencesFunction = new RegExp("\\b" + escapeRegexLiteral(fn.name) + "\\b", "i").test(lineText)
+        if (hasTemplateEventAttribute && referencesFunction) {
           kind = "ui-event-binding"
         }
       }
