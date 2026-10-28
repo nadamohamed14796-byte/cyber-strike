@@ -34,7 +34,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     "  suggest - Get next-step skill suggestions from findings, including prerequisite ordering",
     "  list    - Show a page of available skills or currently loaded skills",
     "",
-    'Use "search" to narrow the catalog; list/search support limit and offset pagination. Never load every skill or treat chains_with as automatic testing authorization.'
+    'Use "search" to narrow the skills available to this agent; list/search support limit and offset pagination. Never load every skill or treat chains_with as automatic testing authorization.'
   ].join("\n")
 
   const parameters = z.object({
