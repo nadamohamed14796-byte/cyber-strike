@@ -443,6 +443,12 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       authSignals.push("credentialed-request")
       cookieSignals.push("credentialed-request-may-send-cookies")
     }
+    // Relative HTTP routes are same-origin in browser bundles. Unless the code
+    // explicitly opts out of fetch credentials, browser defaults may attach cookies.
+    // Keep this as an unconfirmed clue—not proof that a cookie exists or is accepted.
+    if (!endpoint.origin && !/\bcredentials\s*:\s*["']omit["']/i.test(all)) {
+      cookieSignals.push("relative-route-may-use-same-origin-cookies")
+    }
     if (/\bdocument\.cookie\b/i.test(all)) cookieSignals.push("document-cookie-access")
     if (/\bCookie\b|\bcookie\s*:/i.test(all)) cookieSignals.push("cookie-header-signal")
     endpoint.queryParameters.push(
@@ -521,7 +527,8 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const mayUseBrowserCredentials = request.cookieSignals.some((signal) =>
       signal === "credentialed-request-may-send-cookies" ||
       signal === "cookie-header-signal" ||
-      signal === "document-cookie-access",
+      signal === "document-cookie-access" ||
+      signal === "relative-route-may-use-same-origin-cookies",
     )
     if (!mayUseBrowserCredentials) continue
     const kind = "csrf-review-state-changing-cookie-request"
