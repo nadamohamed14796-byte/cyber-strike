@@ -132,7 +132,7 @@ export function reconcileReconTodoChecklist(
             ? "in_progress"
             : "pending"
       return {
-        content: item.content.replace(/^(\\[recon:[a-z_]+\\])\\s*/, "$1 " + (index + 1) + ". "),
+        content: item.content.replace(/^(\[recon:[a-z_]+\])\s*/, "$1 " + (index + 1) + ". "),
         status: item.phase === currentPhase && phaseStatus === "running" ? "in_progress" : status,
         priority: item.priority,
       }
