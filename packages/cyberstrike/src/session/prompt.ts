@@ -343,8 +343,9 @@ export namespace SessionPrompt {
     // see only ONE generation, so a weak model that re-emits the SAME (tool,args)
     // once per turn across many turns evades both (observed: qwen re-emitting an
     // identical record_coverage_note ~26× → failure-to-terminate). Count each
-    // signature over the whole subagent run; a byte-identical repeat past the limit
-    // forces wrap-up (nudge) then aborts (backstop). Different args never collide
+    // signature over the whole prompt run, including primary and subagent agents; a
+    // byte-identical repeat past the limit forces wrap-up (nudge) then aborts
+    // (backstop). Different args never collide
     // because toolSig includes the args, so legitimate probing is unaffected.
     const repeatDetector = new RepeatDetector(3)
     while (true) {
