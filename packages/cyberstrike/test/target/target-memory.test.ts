@@ -349,6 +349,7 @@ test("refuses symlinked generated workspace outputs", async () => {
       ).rejects.toThrow(/active project/i)
       const outsideFile = path.join(tmp.path, "outside-output.json")
       const outputLink = path.join(workspace.workspacePath, "javascript", "graph.json")
+      await fs.mkdir(path.dirname(outputLink), { recursive: true })
       await fs.writeFile(outsideFile, "original", "utf-8")
       await fs.symlink(outsideFile, outputLink)
 
