@@ -1446,8 +1446,12 @@ function renderCanonicalJavaScriptAnalysis(
   }
   const sourceMapReferences = graph.sourceMapReferences ?? []
   const incompleteMaps = sourceMapReferences.filter((item) => item.status !== "analyzed")
+  const downloadedAssets = manifestAssets.filter((item) => item.status === "downloaded")
+  const reusedAssets = manifestAssets.filter((item) => item.status === "reused")
   const failedAssets = manifestAssets.filter((item) => item.status === "failed")
   const skippedAssets = manifestAssets.filter((item) => item.status === "skipped")
+  const pendingAssets = manifestAssets.filter((item) => item.status === "pending")
+  const inventoryGaps = graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:"))
   const localFiles = graph.sourceFiles
   const lines = [
     JAVASCRIPT_ANALYSIS_BEGIN,
@@ -1457,8 +1461,10 @@ function renderCanonicalJavaScriptAnalysis(
     "- Generated: " + graph.createdAt,
     "- Correlation snapshots combined: " + graphCount,
     "- Unique JavaScript/source-map URLs: " + assets.size,
+    "- Asset statuses: downloaded=" + downloadedAssets.length + ", reused/cache-hit=" + reusedAssets.length +
+      ", failed=" + failedAssets.length + ", skipped=" + skippedAssets.length + ", pending=" + pendingAssets.length,
     "- Local source files/content versions: " + localFiles.length,
-    "- Local JavaScript inventory gaps: " + graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")).length,
+    "- Local JavaScript inventory gaps: " + inventoryGaps.length,
     "- Source-map references: " + sourceMapReferences.length,
     "- Source maps analyzed completely: " + sourceMapReferences.filter((item) => item.status === "analyzed").length,
     "- Source maps unresolved/incomplete: " + incompleteMaps.length,
@@ -1496,6 +1502,12 @@ function renderCanonicalJavaScriptAnalysis(
       (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : ""),
     ) : ["- No local source files were analyzed."]),
     "",
+    "## Function and call-site inventory",
+    ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) =>
+      "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
+      safeSummaryText(fn.sourceFile) + ":" + fn.line,
+    ) : ["- No named function candidates were extracted."]),
+    "",
     "## Source-map status",
     ...(sourceMapReferences.length ? sourceMapReferences.map((item) =>
       "- " + safeSummaryURL(item.url) + " — " + item.status +
@@ -1506,7 +1518,7 @@ function renderCanonicalJavaScriptAnalysis(
     ...(failedAssets.length ? ["", "## Failed asset fetches", ...failedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — failed; inspect the manifest error field locally.")] : []),
     ...(skippedAssets.length ? ["", "## Skipped asset fetches", ...skippedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — skipped; inspect the manifest status/error locally.")] : []),
     "",
-    "## Structured request candidates",
+    "## API and request intelligence",
     ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((item) =>
       "- " + (item.method ?? "UNKNOWN") + " " + safeSummaryText(item.urlTemplate) +
       " — function: " + (item.sourceFunction ?? "unknown") +
@@ -1517,18 +1529,32 @@ function renderCanonicalJavaScriptAnalysis(
       " — captured request IDs: [" + item.observedRequestIDs.join(", ") + "]",
     ) : ["- No structured request-call candidates were extracted."]),
     "",
+
+    "## Roles, permissions, tenants and feature flags",
+    ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) =>
+      "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.value) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line,
+    ) : ["- No role/feature hints matched the static heuristics."]),
+    "",
+    "## Application features and integrations (candidate intelligence)",
+    ...((graph.javascriptAnalysis.applicationHints ?? []).length
+      ? (graph.javascriptAnalysis.applicationHints ?? []).map((item) =>
+          "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.value) + " — " +
+          safeSummaryText(item.sourceFile) + ":" + item.line + " — candidate only",
+        )
+      : ["- No application/integration hints matched the current static rules."]),
+    "",
+    "## Security review leads (not confirmed findings)",
+    ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) =>
+      "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line + " — function: " +
+      safeSummaryText(item.functionName ?? "unknown") + " — candidate only",
+    ) : ["- No configured static risk patterns matched."]),
+    "",
     "## Secret-like candidates (fingerprints only; never raw values)",
     ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) =>
-      "- " + item.kind + " — " + item.sourceFile + ":" + item.line +
+      "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line +
       " — fingerprint sha256:" + item.fingerprint + " — candidate only",
     ) : ["- No secret-like assignments matched the static heuristics."]),
     "",
-    "## Role/feature hints",
-    ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) =>
-      "- " + item.kind + " — " + safeSummaryText(item.value) + " — " + item.sourceFile + ":" + item.line,
-    ) : ["- No role/feature hints matched the static heuristics."]),
-    "",
-    "## Risk-sink candidates (not confirmed findings)",
     ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) =>
       "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — function: " +
       (item.functionName ?? "unknown") + " — candidate only",
@@ -1537,12 +1563,14 @@ function renderCanonicalJavaScriptAnalysis(
     "## Coverage gaps and correlation notes",
     ...(incompleteMaps.length ? incompleteMaps.map((item) => "- SOURCE MAP GAP: " + safeSummaryURL(item.url) + " — " + item.status + " — " + safeSummaryText(item.note)) : []),
     ...(graph.notes.length ? graph.notes.map((note) => "- " + safeSummaryText(note)) : ["- No additional correlation notes."]),
-    ...(graph.notes.some((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:"))
-      ? ["- NOT COMPLETE: one or more local JavaScript files/directories could not be fully read or analyzed; the exact gaps are listed above."]
-      : []),
-    ...(manifest?.pendingURLs?.length ? ["- NOT COMPLETE: pending URL ingestion must be resumed."] : []),
+    ...(inventoryGaps.length ? ["- NOT COMPLETE: one or more local JavaScript files/directories could not be fully read or analyzed; the exact gaps are listed above."] : []),
+    ...(manifest?.pendingURLs?.length || pendingAssets.length ? ["- NOT COMPLETE: pending URL ingestion must be resumed."] : []),
     ...(failedAssets.length ? ["- NOT COMPLETE: one or more asset URLs failed to fetch."] : []),
-    ...(skippedAssets.length ? ["- NOT COMPLETE: one or more asset URLs were skipped."] : []),
+    ...(skippedAssets.length ? ["- REVIEW REQUIRED: one or more URLs were skipped; inspect their recorded content type/status before calling coverage complete."] : []),
+    ...(incompleteMaps.length ? ["- REVIEW REQUIRED: one or more referenced source maps remain unresolved or incomplete."] : []),
+    ...(!inventoryGaps.length && !manifest?.pendingURLs?.length && !pendingAssets.length && !failedAssets.length && !skippedAssets.length && !incompleteMaps.length && !manifestWarning
+      ? ["- No known gaps are recorded in the current saved artifacts. Confirm collection_complete=true and analysis_complete=true in the ingestion result before claiming exhaustive coverage."]
+      : []),
     "",
     "Static candidates are leads, not findings. URL strings and same-host matches do not prove runtime calls or authorization defects.",
     JAVASCRIPT_ANALYSIS_END,
