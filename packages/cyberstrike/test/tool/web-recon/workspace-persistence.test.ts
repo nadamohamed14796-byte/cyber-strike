@@ -69,6 +69,7 @@ test("web_recon persists results and synchronizes target notes in the canonical 
         expect((await checkpoint("begin", "url_collection")).metadata.saved).toBe(true)
         const legacyCompletedAt = "2026-10-22T17:00:00.000Z"
         const legacyPath = path.join(workspace.workspacePath, "recon", "header_audit-2026-10-22T17-00-00-000Z.json")
+        await fs.mkdir(path.dirname(legacyPath), { recursive: true })
         await fs.writeFile(legacyPath, JSON.stringify({
           schemaVersion: 1,
           recordType: "web-recon-result",
