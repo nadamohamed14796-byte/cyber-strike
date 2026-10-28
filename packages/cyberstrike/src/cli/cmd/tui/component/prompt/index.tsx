@@ -571,12 +571,22 @@ export function Prompt(props: PromptProps) {
       promptModelWarning()
       return
     }
-    const sessionID = props.sessionID
-      ? props.sessionID
-      : await (async () => {
-          const sessionID = await sdk.client.session.create({}).then((x) => x.data!.id)
-          return sessionID
-        })()
+    const sessionID = props.sessionID ?? await (async () => {
+      try {
+        const response = await sdk.client.session.create({})
+        if (!response.data?.id) throw new Error("The server did not return a session ID.")
+        return response.data.id
+      } catch (error) {
+        toast.show({
+          variant: "error",
+          message: `Could not create a session. Your draft is still in the editor. ${submissionFailureMessage(error)}`,
+          duration: 8000,
+        })
+        renderer.requestRender()
+        return undefined
+      }
+    })()
+    if (!sessionID) return
     const messageID = Identifier.ascending("message")
     let inputText = store.prompt.input
 
