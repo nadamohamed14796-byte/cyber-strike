@@ -656,7 +656,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     { kind: "token-verification-or-validation", pattern: /\b(?:jwt\s*\.\s*verify|verifyJwt|verifyToken|validateToken|validateJwt|crypto\s*\.\s*subtle\s*\.\s*verify)\b/gi },
     { kind: "token-expiry-or-lifetime", pattern: /\b(?:expiresIn|expiresAt|expiry|expiration|tokenTtl|tokenTTL|clockTolerance|notBefore|issuedAt|\bexp\b|\bnbf\b|\biat\b)\b/gi },
     { kind: "sql-statement-candidate", pattern: /\b(SELECT|INSERT\s+INTO|UPDATE\s+[A-Za-z_][\w.]*\s+SET|DELETE\s+FROM)\b/gi, capture: 1 },
-    { kind: "data-layer-operation-candidate", pattern: /\b(\$queryRaw|\$executeRaw|query|execute|prepare|findUnique|findMany|findFirst|createMany|updateMany|deleteMany|select|insert|update|delete)\s*\(/gi, capture: 1 },
+    { kind: "data-layer-operation-candidate", pattern: /(\$queryRaw|\$executeRaw|\b(?:query|execute|prepare|findUnique|findMany|findFirst|createMany|updateMany|deleteMany|select|insert|update|delete)\b)\s*\(/gi, capture: 1 },
     { kind: "email-delivery-flow", pattern: /\b(?:sendEmail|sendMail|sendVerification|resendVerification|mailer|emailService|emailProvider|emailTemplate)\b/gi },
   ]
   for (const rule of workflowRules) {
