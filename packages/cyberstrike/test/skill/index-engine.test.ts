@@ -317,3 +317,56 @@ test("community tool selection skill is discovered, searchable, retrievable, and
     else process.env.CYBERSTRIKE_TEST_HOME = previousTestHome
   }
 }, 60000)
+
+
+test("skill search normalizes slugs and indexes routing metadata", async () => {
+  await using tmp = await tmpdir({ git: true })
+  const priorTestHome = process.env.CYBERSTRIKE_TEST_HOME
+  process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+
+  const addSkill = async (name: string, metadata: string) => {
+    const dir = path.join(tmp.path, ".cyberstrike", "skill", name)
+    await fs.mkdir(dir, { recursive: true })
+    await Bun.write(
+      path.join(dir, "SKILL.md"),
+      `---\nname: ${name}\ndescription: ${name} test skill\n${metadata}\n---\nDetailed skill body.\n`,
+    )
+  }
+
+  try {
+    await addSkill(
+      "attack-javascript-analysis",
+      [
+        'category: "client-side"',
+        "tags: [javascript, source-maps, endpoint-discovery]",
+        "tech_stack: [browser, javascript]",
+        'cwe_ids: ["CWE-79"]',
+        "chains_with: [attack-xss]",
+        "prerequisites: [attack-web-recon]",
+      ].join("\\n"),
+    )
+    await addSkill("attack-xss", "category: input-validation\\ntags: [xss, javascript]")
+    await addSkill("attack-web-recon", "category: recon\\ntags: [web, endpoints]")
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        await SkillIndex.rebuild()
+
+        expect(SkillIndex.search("JavaScript analysis", Infinity).map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+        expect(SkillIndex.search("source maps", Infinity).map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+        expect(SkillIndex.search("client side", Infinity).map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+        expect(SkillIndex.search("CWE-79", Infinity).map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+        expect(SkillIndex.search("attack-xss", Infinity).map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+      },
+    })
+  } finally {
+    if (priorTestHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = priorTestHome
+  }
+})
