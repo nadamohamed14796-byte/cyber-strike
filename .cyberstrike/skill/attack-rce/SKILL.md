@@ -4,12 +4,7 @@ description: "Assess suspected server-side command or code execution through bou
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - rce
-  - command-injection
-  - code-injection
-  - execution
-  - validation
+tags: [rce, command-injection, code-injection, execution, validation, remote-code-execution, process-execution, server-side, os-command, code-execution]
 tech_stack:
   - web
   - linux
