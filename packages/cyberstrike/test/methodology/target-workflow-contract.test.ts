@@ -16,7 +16,7 @@ test("target workflow defines autonomous recon handoffs, one workspace, and evid
   expect(contract).toContain("subdomains.txt, live-hosts.txt, urls.txt, parameters.txt, endpoints.txt")
   expect(contract).toContain("reports/recon-final.md")
   expect(contract).toContain("Generate or update reports/recon-final.md")
-  expect(contract).toContain("automatically synchronizes a compact ordered `[recon:phase_id]` checklist")
+  expect(contract).toContain("automatically synchronizes a compact ordered checklist in the todo UI")
   expect(contract).toContain("runs/tmp/<phase>/")
   expect(contract).toContain("within 55 minutes")
   expect(contract).toContain("Never delete captured JavaScript/source-map bodies")
