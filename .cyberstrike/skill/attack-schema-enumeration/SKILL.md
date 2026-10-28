@@ -1,16 +1,10 @@
 ---
 name: attack-schema-enumeration
 description: "Assess API schema discoverability and verify whether introspection, documentation, or operation metadata exposes an actual restricted capability."
-category: "web-application"
+category: "api-security"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - api
-  - schema
-  - graphql
-  - openapi
-  - introspection
-  - authorization
+tags: [api, schema, graphql, openapi, introspection, authorization, schema-enumeration, api-discovery, swagger, graphql-introspection, endpoint-discovery, api-security]
 tech_stack:
   - graphql
   - rest-api
