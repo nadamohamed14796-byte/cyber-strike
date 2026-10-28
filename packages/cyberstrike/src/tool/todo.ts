@@ -20,8 +20,13 @@ export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) 
   return { todos: [...next, ...preserved], preserved }
 }
 
-function nextTodo(todos: Todo.Info[]) {
+export function nextTodo(todos: Todo.Info[]) {
   const active = todos.filter((todo) => todo.status === "pending" || todo.status === "in_progress")
+  const recon = active.filter((todo) => /^\\[recon:[a-z_]+\\]/.test(todo.content.trim()))
+  const inProgressRecon = recon.find((todo) => todo.status === "in_progress")
+  if (inProgressRecon) return inProgressRecon
+  const nextRecon = recon.find((todo) => todo.status === "pending")
+  if (nextRecon) return nextRecon
   const inProgress = active.find((todo) => todo.status === "in_progress")
   if (inProgress) return inProgress
   const rank: Record<string, number> = { high: 0, medium: 1, low: 2 }
