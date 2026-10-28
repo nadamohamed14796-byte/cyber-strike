@@ -1159,7 +1159,7 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         )).toBe(true)
         expect(mappedProfile?.analysis?.requests.some((request) => request.path.startsWith("/api/profiles/") && request.pathParameters.length > 0)).toBe(true)
         expect(result.graph.javascriptAnalysis.workflowSignals?.some((item) =>
-          item.kind === "email-verification-flow" && item.functionName === "verifyEmailToken" && item.sourceFile === "src/profile.ts",
+          item.kind === "email-verification-flow" && item.functionName === "verifyEmailToken" && item.sourceFile === mappedProfile?.relativePath,
         )).toBe(true)
         expect(result.graph.javascriptAnalysis.requestCandidates.some((item) =>
           item.sourceFunction === "verifyEmailToken" && item.method === "POST" && item.path === "/api/auth/email/verify" && item.bodyParameters.includes("token"),
