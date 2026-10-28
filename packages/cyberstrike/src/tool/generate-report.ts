@@ -529,7 +529,7 @@ function formatMethodologySection(state: Methodology.State, targetScoped = false
 
 function formatChains(chains: Chain.Candidate[]): string {
   const active = chains.filter((c) => c.status !== "disproven")
-  if (active.length === 0) return "## Vulnerability Chains\n\nNo chain opportunities detected."
+  if (active.length === 0) return "## Chain Hypotheses\\n\\nNo chain opportunities detected."
 
   const sorted = [...active].sort((a, b) => {
     const statusOrder = { confirmed: 0, testing: 1, detected: 2 } as Record<string, number>
@@ -540,19 +540,26 @@ function formatChains(chains: Chain.Candidate[]): string {
   })
 
   const lines: string[] = [
-    `## Vulnerability Chains (${active.length} detected)`,
+    `## Chain Hypotheses (${active.length}; not counted as confirmed findings)`,
     "",
-    "| Pattern | Entries | Impact | Severity | Confidence | Status |",
-    "|---------|---------|--------|----------|------------|--------|",
+    "Detected/testing chains are hypotheses. Candidate severity and possible impact are not reportable finding severity until each hop and combined impact are validated.",
+    "",
+    "| Chain ID | Pattern | Information / Findings | Potential Impact | Candidate Severity | Confidence | Status |",
+    "|----------|---------|------------------------|------------------|--------------------|------------|--------|",
   ]
 
   for (const c of sorted) {
     lines.push(
-      `| ${c.pattern} | ${c.entryTitles.join(" + ")} | ${c.expectedImpact} | ${c.severity} | ${c.confidence}% | ${c.status} |`,
+      `| ${c.id} | ${c.pattern} | ${c.entryTitles.join(" + ")} | ${c.expectedImpact} | ${c.severity} | ${c.confidence}% | ${c.status} |`,
     )
+    for (const link of c.findingLinks ?? []) {
+      lines.push(
+        `| ↳ ${link.id} | ${link.relation} | ${link.sourceFindingID} → ${link.targetFindingID} | Explicit finding link; combined impact still requires validation | — | — | linked |`,
+      )
+    }
   }
 
-  return lines.join("\n")
+  return lines.join("\\n")
 }
 
 function formatAttackSurface(intel: Intel.Entry[], requests: Request.Info[], assets: string[]): string {
