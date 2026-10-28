@@ -4,12 +4,7 @@ description: "Validate NoSQL query and operator injection by comparing scalar an
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - nosqli
-  - mongodb
-  - operator-injection
-  - authentication
-  - api
+tags: [nosqli, mongodb, operator-injection, authentication, api, nosql-injection, json-query, document-database, input-validation]
 tech_stack:
   - web
   - rest-api
