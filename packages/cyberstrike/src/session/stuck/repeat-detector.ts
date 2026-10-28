@@ -5,7 +5,7 @@
 // that re-emits the same (tool, args) exactly ONCE per turn across many turns —
 // the classic failure-to-terminate (observed: qwen re-emitting an identical
 // record_coverage_note ~26×). This detector accumulates tool-call signatures over
-// the whole subagent run and reacts once any signature repeats past a limit.
+// the whole prompt run and reacts once any signature repeats past a limit.
 //
 // Pure + deterministic (no IO), so it is unit-testable without mocks. One instance
 // per prompt run, including primary and subagent agents. Signatures are
