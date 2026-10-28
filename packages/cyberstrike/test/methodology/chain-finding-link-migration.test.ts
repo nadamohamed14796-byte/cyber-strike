@@ -9,7 +9,7 @@ function migrationSQL() {
   )
 }
 
-test("chain finding link migration enforces real foreign keys and idempotent directed edges", () => {
+test("chain finding link migration enforces foreign keys and rejects duplicate directed edges", () => {
   const sqlite = new BunDatabase(":memory:")
   try {
     sqlite.run("PRAGMA foreign_keys = ON")
