@@ -5,6 +5,7 @@ import z from "zod"
 import { Installation } from "../installation"
 import { Flag } from "../flag/flag"
 import { lazy } from "@/util/lazy"
+import { shouldRefreshModels } from "./models-refresh"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -147,7 +148,9 @@ export namespace ModelsDev {
       },
       signal: AbortSignal.timeout(10 * 1000),
     }).catch((e) => {
-      log.error("Failed to fetch models.dev", {
+      // Refresh is best-effort: the cached file or bundled build snapshot remains usable offline.
+      // Keep network outages out of the error channel so routine startup doesn't look broken.
+      log.debug("Could not refresh models.dev; continuing with cached or bundled metadata", {
         error: e,
       })
     })
@@ -158,7 +161,7 @@ export namespace ModelsDev {
   }
 }
 
-if (!Flag.CYBERSTRIKE_DISABLE_MODELS_FETCH && !process.argv.includes("--get-yargs-completions")) {
+if (shouldRefreshModels(process.argv, Flag.CYBERSTRIKE_DISABLE_MODELS_FETCH)) {
   ModelsDev.refresh()
   setInterval(
     async () => {
