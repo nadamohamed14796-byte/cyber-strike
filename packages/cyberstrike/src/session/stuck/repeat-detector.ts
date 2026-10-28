@@ -119,3 +119,36 @@ export class EmptyContinuationDetector {
     this.nudged = false
   }
 }
+
+
+/**
+ * A sequence of different failing tool calls can evade exact-signature repetition
+ * checks. Count only turns containing failed target/work operations and no successful
+ * target/work progress; reads and context-management calls do not trip this guard.
+ */
+export class FailedToolStreakDetector {
+  private streak = 0
+  private nudged = false
+
+  constructor(private readonly limit: number = 4) {
+    if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError("limit must be a positive safe integer")
+  }
+
+  observe(toolCalls: { tool: string; succeeded?: boolean }[]): RepeatVerdict {
+    if (toolCalls.some((call) => call.succeeded === true && isProgressTool(call.tool))) {
+      this.reset()
+      return "ok"
+    }
+    if (!toolCalls.some((call) => call.succeeded === false && isProgressTool(call.tool))) return "ok"
+    this.streak++
+    if (this.streak < this.limit) return "ok"
+    if (this.nudged) return "abort"
+    this.nudged = true
+    return "nudge"
+  }
+
+  reset(): void {
+    this.streak = 0
+    this.nudged = false
+  }
+}
