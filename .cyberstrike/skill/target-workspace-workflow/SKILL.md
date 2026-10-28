@@ -1,13 +1,13 @@
 ---
 name: target-workspace-workflow
-description: Keep target scope and recon artifacts in one canonical program workspace.
+description: "Keep authorized target scope, recon outputs, notes, evidence, and reports in one canonical target workspace"
 category: methodology
-version: "1.1.0"
+version: "1.0.0"
 author: CyberStrike
-tags: [target-workspace, scope, persistence, recon, evidence, artifact-management]
+tags: [target-workspace, scope, persistence, recon, notes, evidence, artifact-management]
 tech_stack: [web, api, infrastructure]
 prerequisites:
-  - Explicit authorization; prefer official program scope policy when supplied or available
+  - "Explicit authorization; prefer the official program/customer scope policy when supplied or available"
 chains_with:
   - attack-web-recon
   - attack-bb-methodology
@@ -18,6 +18,14 @@ chains_with:
 # Target Workspace
 
 The shared Target Workflow Contract is the authority for authorization semantics, inheritance, and automatic execution. This skill defines only the workspace operations and file-persistence rules.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use the Target Workflow Contract for scope inheritance, tool selection/installation, and end-to-end sequencing. This skill owns only workspace setup and persistence. Do not create a separate output per tool or target.
+
+Use `python3 .cyberstrike/skill/scripts/tool_preflight.py --help` only to inspect the helper; if unavailable, verify the selected executable with `command -v` plus its documented version/help check. If the selected CLI is missing, use `ensure_tools` for that exact CLI and verify installation before choosing another method.
+
+Official resources: https://owasp.org/www-project-web-security-testing-guide/ and the selected tool's official upstream documentation.
 
 ## Initialize and configure
 
