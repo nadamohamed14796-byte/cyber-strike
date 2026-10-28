@@ -212,7 +212,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       rawContent = params.content!
     }
 
-    const content = rawContent.endsWith("\n") ? rawContent : rawContent + "\n"
+    const content = rawContent
     await TargetMemory.writeWorkspaceFile(workspace, relativePath, content)
     return {
       title: "Target artifact saved",
