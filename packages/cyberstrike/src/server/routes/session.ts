@@ -34,6 +34,7 @@ import { Provider } from "../../provider/provider"
 import { Snapshot } from "@/snapshot"
 import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
+import { proxyAnalyzerTaskPermission } from "../../session/captured-request-permission"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
 import { TargetMemory } from "../../target"
@@ -464,6 +465,16 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 if (!proxyAgent || proxyAgent.mode === "primary") {
                   throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
                 }
+                // A mere task rule is not enough: PermissionNext is ordered and later
+                // rules (including user overrides) decide whether this exact child can run.
+                // Fail visibly instead of letting a request appear processed when the
+                // required proxy-analyzer delegation is disabled or awaiting approval.
+                const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
+                if (taskPermission !== "allow") {
+                  throw new Error(
+                    `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
+                  )
+                }
                 const configuredAgentModel = proxyAgent.model
                   ? { providerID: proxyAgent.model.providerID, modelID: proxyAgent.model.modelID }
                   : undefined
@@ -482,7 +493,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   },
                 })
                 const config = await Config.get()
-                const hasTaskPermission = proxyAgent.permission.some((rule) => rule.permission === "task")
+                const hasTaskPermission = taskPermission === "allow"
                 const childSession = await Session.create({
                   parentID: sessionID,
                   title: `Captured request - ${normalized.method} ${normalized.normalizedPath.split("?")[0]!.slice(0, 100)} (@${proxyAgent.name} subagent)`,
