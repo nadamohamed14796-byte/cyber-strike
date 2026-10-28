@@ -55,7 +55,8 @@ async function scopeFingerprintForWorkspace(start: Workspace, expectedRootID: st
 function scopeEntryURL(entry: string): string | undefined {
   let value = entry.trim().replace(/^(?:url|domain|wildcard|api|ip address|cidr)\s*:\s*/i, "")
   if (!value || /^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return undefined
-  if (value.startsWith("*.")) value = value.slice(2)
+  if (/^https?:\/\/\*\./i.test(value)) value = value.replace(/^(https?:\/\/)\*\./i, "$1")
+  else if (value.startsWith("*.")) value = value.slice(2)
   if (!value || /[*{}]/.test(value)) return undefined
   try {
     const url = new URL(/^https?:\/\//i.test(value) ? value : "https://" + value)
@@ -67,31 +68,23 @@ function scopeEntryURL(entry: string): string | undefined {
   }
 }
 
-/** Reuse an explicitly saved asset, or choose the first concrete asset authorized by the saved policy. */
-async function findAuthorizedScopeStart(workspace: Workspace, scope: TargetScope, preferred?: string) {
-  const candidates = preferred !== undefined
-    ? [preferred]
-    : [...new Set([workspace.targetURL, ...scope.scopeItems.map(scopeEntryURL).filter((item): item is string => Boolean(item))])]
+/** Choose a concrete URL authorized by the persisted scope; this is setup convenience, not a policy grant. */
+async function findAuthorizedScopeStart(workspace: Workspace, scope: TargetScope) {
+  const candidates = [...new Set([workspace.targetURL, ...scope.scopeItems.map(scopeEntryURL).filter((item): item is string => Boolean(item))])]
   for (const candidate of candidates) {
     let url: URL
     try {
       url = new URL(candidate)
     } catch {
-      if (preferred !== undefined) return undefined
       continue
     }
-    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
-      if (preferred !== undefined) return undefined
-      continue
-    }
-    let decision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>>
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) continue
     try {
-      decision = await TargetMemory.checkURLScope(url.href)
-    } catch (error) {
-      if (preferred !== undefined) throw error
-      continue
+      const decision = await TargetMemory.checkURLScope(url.href)
+      if (decision.allowed && decision.workspace) return { target: url.href, decision }
+    } catch {
+      // An unparseable/unresolvable policy entry is not a usable starting asset.
     }
-    if (preferred !== undefined || (decision.allowed && decision.workspace)) return { target: url.href, decision }
   }
   return undefined
 }
