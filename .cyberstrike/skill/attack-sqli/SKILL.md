@@ -4,12 +4,7 @@ description: "Validate SQL injection in scoped application inputs through contro
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - sqli
-  - injection
-  - database
-  - api
-  - validation
+tags: [sqli, injection, database, api, validation, sql-injection, query-manipulation, blind-sqli, error-based-sqli, time-based-sqli, input-validation]
 tech_stack:
   - web
   - rest-api
