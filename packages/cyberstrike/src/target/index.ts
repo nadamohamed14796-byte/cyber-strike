@@ -34,6 +34,10 @@ const TARGET_DIRECTORIES = [
 ] as const
 
 const INITIAL_TARGET_DIRECTORIES = ["scope", "assets", "runs"] as const
+// Prune legacy empty placeholders only on the first workspace open in this process.
+// Re-check known paths on every open, but never race a normal artifact write by
+// repeatedly deleting an empty directory that another tool just created.
+const prunedArtifactDirectoryWorkspaces = new Set<string>()
 
 export const USER_CONFIRMED_SCOPE_SOURCE = "User-confirmed in conversation"
 
@@ -693,7 +697,7 @@ async function syncTargetNotesMarkdown(workspace: Workspace): Promise<void> {
   })
 }
 
-async function pruneEmptyArtifactDirectories(workspace: Workspace): Promise<void> {
+async function pruneEmptyArtifactDirectories(workspace: Workspace, removeEmptyPlaceholders: boolean): Promise<void> {
   for (const directory of TARGET_DIRECTORIES) {
     const candidate = path.join(workspace.workspacePath, directory)
     try {
@@ -703,7 +707,7 @@ async function pruneEmptyArtifactDirectories(workspace: Workspace): Promise<void
       if (info.isSymbolicLink() || !info.isDirectory()) {
         throw new Error("Unsafe target workspace artifact directory: " + candidate)
       }
-      if ((INITIAL_TARGET_DIRECTORIES as readonly string[]).includes(directory)) continue
+      if (!removeEmptyPlaceholders || (INITIAL_TARGET_DIRECTORIES as readonly string[]).includes(directory)) continue
       // Remove only empty legacy placeholders. Any folder containing user evidence
       // remains intact; subsequent writes recreate a needed folder safely.
       await fs.rmdir(candidate)
@@ -720,7 +724,8 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
   for (const directory of INITIAL_TARGET_DIRECTORIES) {
     await ensureSafeDirectoryPath(root, path.join(workspace.relativePath, directory))
   }
-  await pruneEmptyArtifactDirectories(workspace)
+  await pruneEmptyArtifactDirectories(workspace, !prunedArtifactDirectoryWorkspaces.has(workspace.id))
+  prunedArtifactDirectoryWorkspaces.add(workspace.id)
   // target.json is retained for compatibility; workspace.json is the canonical
   // manifest consumed by the target workflow and carries stable identity fields.
   await createIfMissing(
