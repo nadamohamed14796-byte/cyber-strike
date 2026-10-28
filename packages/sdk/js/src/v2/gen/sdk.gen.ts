@@ -1533,7 +1533,6 @@ export class Session extends HeyApiClient {
     parameters: {
       sessionID: string
       requestID: string
-      directory?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1544,7 +1543,6 @@ export class Session extends HeyApiClient {
           args: [
             { in: "path", key: "sessionID" },
             { in: "path", key: "requestID" },
-            { in: "query", key: "directory" },
           ],
         },
       ],
