@@ -86,7 +86,6 @@ test("user-confirmed exact scope without an external policy URL passes the recon
           target_url: root.workspace.targetURL,
           phase: "scope_validation",
           summary: "The operator explicitly confirmed the exact application and the confirmation provenance is persisted.",
-          scope_validation_target: "https://authorized-app.example.net/",
         }, ctx)
         expect(complete.metadata.saved).toBe(true)
       } finally {
