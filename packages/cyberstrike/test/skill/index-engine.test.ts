@@ -343,10 +343,10 @@ test("skill search normalizes slugs and indexes routing metadata", async () => {
         'cwe_ids: ["CWE-79"]',
         "chains_with: [attack-xss]",
         "prerequisites: [attack-web-recon]",
-      ].join("\\n"),
+      ].join("\n"),
     )
-    await addSkill("attack-xss", "category: input-validation\\ntags: [xss, javascript]")
-    await addSkill("attack-web-recon", "category: recon\\ntags: [web, endpoints]")
+    await addSkill("attack-xss", "category: input-validation\ntags: [xss, javascript]")
+    await addSkill("attack-web-recon", "category: recon\ntags: [web, endpoints]")
 
     await Instance.provide({
       directory: tmp.path,
