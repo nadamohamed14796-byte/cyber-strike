@@ -125,6 +125,81 @@ test("processes the complete JavaScript worklist beyond the former 64 MiB aggreg
 }, 60_000)
 
 
+test("automatically retries one transient JavaScript HTTP failure in the same invocation", async () => {
+  await using tmp = await tmpdir()
+  let attempts = 0
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch() {
+      attempts++
+      if (attempts === 1) return new Response("temporarily unavailable", { status: 503 })
+      return new Response('function loadProfile() { return fetch("/api/profile") }', {
+        status: 200,
+        headers: { "content-type": "application/javascript" },
+      })
+    },
+  })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const target = "http://127.0.0.1:" + server.port
+        const configured = await TargetMemory.configureScope(target, {
+          include: [target],
+          authorizationSource: "Local transient JavaScript retry fixture",
+          authorizationReference: "https://example.test/security-policy",
+        })
+        const session = await Session.create({})
+        Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/",
+          keyHash: "ingest-javascript-transient-retry-root",
+          origin: configured.workspace.targetURL,
+          scheme: "http",
+          host: "127.0.0.1",
+          pageUrl: configured.workspace.targetURL + "/",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html><body>local retry fixture</body></html>",
+          },
+        })
+
+        const tool = await IngestJavaScriptURLsTool.init()
+        const url = configured.workspace.targetURL + "/flaky.js"
+        const result = await tool.execute({
+          target_url: configured.workspace.targetURL,
+          urls: [url],
+          source: "unit-test-transient-retry",
+          force_refresh: false,
+        }, toolContext(session.id))
+
+        expect(attempts).toBe(2)
+        const metadata = result.metadata as Record<string, unknown>
+        expect(metadata.downloaded).toBe(1)
+        expect(metadata.worklist_settled).toBe(1)
+        expect(metadata.worklist_available).toBe(1)
+        expect(metadata.worklist_pending).toBe(0)
+        expect(metadata.worklist_retryable_failures).toBe(0)
+        expect(metadata.collection_complete).toBe(true)
+        const manifestPath = path.join(configured.workspace.workspacePath, "javascript", "asset-manifest.json")
+        const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+          assets: Array<{ url: string; status: string; retryable?: boolean }>
+        }
+        expect(manifest.assets.find((asset) => asset.url === url)?.status).toBe("downloaded")
+        expect(manifest.assets.find((asset) => asset.url === url)?.retryable).toBeUndefined()
+        await Session.remove(session.id)
+      },
+    })
+  } finally {
+    server.stop(true)
+  }
+}, 30_000)
+
+
 test("merges source-map provenance from every bundle while keeping the display label bounded", async () => {
   await using tmp = await tmpdir()
   const requests: string[] = []
