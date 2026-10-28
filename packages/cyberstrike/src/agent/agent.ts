@@ -571,6 +571,8 @@ export namespace Agent {
             web_get_detail: "allow",
             web_get_request_detail: "allow",
             correlate_javascript: "allow",
+            // The orchestrator performs scope-enforced JavaScript/HTML/source-map intake.
+            ingest_javascript_urls: "allow",
             web_get_vulnerabilities: "allow",
             web_get_vuln_detail: "allow",
             triage_vulnerability: "allow",
