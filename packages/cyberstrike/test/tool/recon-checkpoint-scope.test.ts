@@ -1,7 +1,9 @@
 import { expect, test } from "bun:test"
+import fs from "node:fs/promises"
+import path from "node:path"
 import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
-import { ReconCheckpointTool } from "../../src/tool/recon-checkpoint"
+import { ReconCheckpointTool, reconRunID } from "../../src/tool/recon-checkpoint"
 import { tmpdir } from "../fixture/fixture"
 
 test("program-root scope can authorize a separate domain without requiring the root hostname itself in scope", async () => {
@@ -88,6 +90,25 @@ test("user-confirmed exact scope without an external policy URL passes the recon
           summary: "The operator explicitly confirmed the exact application and the confirmation provenance is persisted.",
         }, ctx)
         expect(complete.metadata.saved).toBe(true)
+
+        const runPath = path.join(root.workspace.workspacePath, "runs", "recon-" + reconRunID(root.workspace.id) + ".json")
+        const firstResume = await tool.execute({ action: "status", target_url: root.workspace.targetURL }, ctx)
+        let phases = firstResume.metadata.phases as Record<string, { status: string; scopeValidationTarget?: string; scopeFingerprint?: string }>
+        expect(phases.scope_validation.status).toBe("complete")
+        expect(phases.scope_validation.scopeValidationTarget).toBe("https://authorized-app.example.net/")
+        expect(phases.scope_validation.scopeFingerprint).toBeTruthy()
+
+        // Simulate an older checkpoint written before target/fingerprint fields existed.
+        const legacy = JSON.parse(await fs.readFile(runPath, "utf-8"))
+        delete legacy.phases.scope_validation.scopeValidationTarget
+        delete legacy.phases.scope_validation.scopeFingerprint
+        await TargetMemory.writeWorkspaceFile(root.workspace, path.join("runs", path.basename(runPath)), JSON.stringify(legacy, null, 2) + "\n")
+
+        const resumed = await tool.execute({ action: "status", target_url: root.workspace.targetURL }, ctx)
+        phases = resumed.metadata.phases as Record<string, { status: string; scopeValidationTarget?: string; scopeFingerprint?: string }>
+        expect(phases.scope_validation.status).toBe("complete")
+        expect(phases.scope_validation.scopeValidationTarget).toBe("https://authorized-app.example.net/")
+        expect(phases.scope_validation.scopeFingerprint).toBeTruthy()
       } finally {
         await Instance.dispose()
       }
