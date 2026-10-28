@@ -8,7 +8,8 @@
 // the whole subagent run and reacts once any signature repeats past a limit.
 //
 // Pure + deterministic (no IO), so it is unit-testable without mocks. One instance
-// per subagent run. Signatures are `toolSig(tool, input)` values (see signals.ts):
+// per prompt run, including primary and subagent agents. Signatures are
+// `toolSig(tool, input)` values (see signals.ts):
 // byte-identical (tool, args) collide; different args do not, so legitimate probing
 // (e.g. id=1, id=2, id=3) never trips it.
 
