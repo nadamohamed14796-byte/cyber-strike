@@ -62,6 +62,8 @@ import { HackbrowserTool } from "./hackbrowser"
 import { AuthManagerTool } from "./auth-manager"
 import { GmailTool } from "./gmail"
 import { AddIntelTool } from "./intel"
+import { ChainLinkTool } from "./chain-link"
+import { ValidateChainTool } from "./validate-chain"
 import { UpdateVrtCheckTool } from "./vrt-check"
 import { RecordCoverageNoteTool, GetCoverageNotesTool } from "./coverage-note"
 import { ScopeCheckTool } from "./scope-check"
@@ -223,6 +225,8 @@ export namespace ToolRegistry {
       GmailTool,
       // Methodology Engine Tools — intelligence, coverage, chain detection
       AddIntelTool,
+      ChainLinkTool,
+      ValidateChainTool,
       UpdateVrtCheckTool,
       RecordCoverageNoteTool,
       GetCoverageNotesTool,

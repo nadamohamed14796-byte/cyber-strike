@@ -528,28 +528,39 @@ function formatMethodologySection(state: Methodology.State, targetScoped = false
 }
 
 function formatChains(chains: Chain.Candidate[]): string {
-  const active = chains.filter((c) => c.status !== "disproven")
-  if (active.length === 0) return "## Vulnerability Chains\n\nNo chain opportunities detected."
+  if (chains.length === 0) return "## Chain Hypotheses\n\nNo chain opportunities detected."
 
-  const sorted = [...active].sort((a, b) => {
-    const statusOrder = { confirmed: 0, testing: 1, detected: 2 } as Record<string, number>
-    const sa = statusOrder[a.status] ?? 3
-    const sb = statusOrder[b.status] ?? 3
+  const sorted = [...chains].sort((a, b) => {
+    const statusOrder = { confirmed: 0, testing: 1, detected: 2, disproven: 3 } as Record<string, number>
+    const sa = statusOrder[a.status] ?? 4
+    const sb = statusOrder[b.status] ?? 4
     if (sa !== sb) return sa - sb
     return b.confidence - a.confidence
   })
 
   const lines: string[] = [
-    `## Vulnerability Chains (${active.length} detected)`,
+    `## Chain Hypotheses and Validation (${chains.length})`,
     "",
-    "| Pattern | Entries | Impact | Severity | Confidence | Status |",
-    "|---------|---------|--------|----------|------------|--------|",
+    "A detected/testing chain is a hypothesis, not a confirmed vulnerability. Candidate severity is not reportable finding severity until the combined attack path and impact have been validated.",
+    "",
+    "| Chain ID | Pattern | Information / Findings | Potential Impact | Candidate Severity | Confidence | Status | Combined Finding |",
+    "|----------|---------|------------------------|------------------|--------------------|------------|--------|------------------|",
   ]
 
   for (const c of sorted) {
     lines.push(
-      `| ${c.pattern} | ${c.entryTitles.join(" + ")} | ${c.expectedImpact} | ${c.severity} | ${c.confidence}% | ${c.status} |`,
+      `| ${c.id} | ${c.pattern} | ${c.entryTitles.join(" + ")} | ${c.expectedImpact} | ${c.severity} | ${c.confidence}% | ${c.status} | ${c.validation?.combinedFindingID ?? "—"} |`,
     )
+    for (const link of c.findingLinks ?? []) {
+      lines.push(
+        `| ↳ ${link.id} | ${link.relation} | ${link.sourceFindingID} → ${link.targetFindingID} | Explicit finding link; each hop and combined impact require validation | — | — | linked | — |`,
+      )
+    }
+    if (c.validation) {
+      lines.push(
+        `| Validation ${c.validation.id} | ${c.validation.outcome} | By ${c.validation.validatedBy} | Latest chain-validation evidence recorded | — | — | ${new Date(c.validation.validatedAt).toISOString()} | ${c.validation.combinedFindingID ?? "—"} |`,
+      )
+    }
   }
 
   return lines.join("\n")

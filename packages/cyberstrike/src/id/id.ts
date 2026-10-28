@@ -27,6 +27,8 @@ export namespace Identifier {
     vrt_check: "vrc",
     methodology_phase: "mph",
     chain_candidate: "chn",
+    chain_finding_link: "cfl",
+    chain_validation: "cvn",
     agent_performance: "apf",
     validation_violation: "vvl",
     verification_attempt: "vat",

@@ -247,6 +247,53 @@ describe("Chain — Format", () => {
     expect(result).toContain("Chain")
     expect(result).toContain("CREDENTIAL_ENDPOINT")
   })
+
+  test("formatForPrompt separates evidence-backed terminal chains from legacy status strings", () => {
+    const common: Omit<Chain.Candidate, "id" | "status" | "validation"> = {
+      pattern: "information_amplification",
+      entryIDs: ["info-a", "info-b"],
+      entryTitles: ["Internal configuration", "API schema"],
+      assets: ["example.com"],
+      expectedImpact: "POTENTIAL_INTERNAL_API_OR_SERVICE_EXPOSURE",
+      severity: "high",
+      testingPlan: "Validate actual reachability and impact",
+      confidence: 40,
+      detectedAt: Date.now(),
+    }
+    const result = Chain.formatForPrompt([
+      {
+        ...common,
+        id: "confirmed-chain",
+        status: "confirmed",
+        validation: {
+          id: "cvn-confirmed",
+          outcome: "confirmed",
+          combinedFindingID: "vul-combined",
+          evidence: "Combined impact evidence was observed with controls.",
+          validatedBy: "test",
+          validatedAt: 100,
+        },
+      },
+      { ...common, id: "legacy-confirmed", status: "confirmed" },
+      {
+        ...common,
+        id: "disproven-chain",
+        status: "disproven",
+        validation: {
+          id: "cvn-disproven",
+          outcome: "disproven",
+          evidence: "A negative control disproved the combined impact.",
+          validatedBy: "test",
+          validatedAt: 200,
+        },
+      },
+    ])
+
+    expect(result).toContain("1 evidence-backed confirmed")
+    expect(result).toContain("Combined finding: vul-combined")
+    expect(result).toContain("CONFIRMED STATUS — VALIDATION RECORD MISSING")
+    expect(result).toContain("[DISPROVEN] chain_id=disproven-chain")
+  })
 })
 
 describe("Chain — Safety and confidence", () => {
@@ -302,6 +349,103 @@ describe("Chain — Single-finding escalation", () => {
       expect(candidate?.severity).toBe("high")
       expect(candidate?.confidence).toBeLessThanOrEqual(60)
       expect(candidate?.testingPlan).toContain("RCE as unproven")
+      await Session.remove(session.id)
+    }})
+  })
+})
+
+
+describe("Chain — Informational signal amplification", () => {
+  test("chains INFO configuration and API-schema observations into a higher-impact hypothesis", async () => {
+    await Instance.provide({ directory: projectRoot, fn: async () => {
+      const session = await Session.create({})
+      Intel.add({ sessionID: session.id, data: {
+        type: "configuration",
+        severity: "info",
+        title: "Internal service configuration disclosed",
+        detail: "Deployment metadata names internal-api.staging.example.com",
+        asset: "app.example.com",
+        source: "test",
+        confidenceLevel: "high",
+        tags: ["information-disclosure", "internal-service"],
+      }})
+      Intel.add({ sessionID: session.id, data: {
+        type: "api_schema",
+        severity: "info",
+        title: "OpenAPI schema lists internal routes",
+        detail: "Public schema includes route descriptions for internal user management",
+        asset: "app.example.com",
+        source: "test",
+        confidenceLevel: "high",
+        tags: ["api-schema", "route-disclosure"],
+      }})
+
+      const chain = Chain.detect(session.id).find((item) => item.pattern === "information_amplification")
+      expect(chain).toBeDefined()
+      expect(chain?.expectedImpact).toBe("POTENTIAL_INTERNAL_API_OR_SERVICE_EXPOSURE")
+      expect(chain?.severity).toBe("high")
+      expect(chain?.status).toBe("detected")
+      expect(chain?.confidence).toBeLessThan(50)
+      expect(chain?.testingPlan).toContain("do not treat names or paths alone as impact")
+      await Session.remove(session.id)
+    }})
+  })
+
+  test("chains INFO identity-boundary and sensitive-data signals without auto-confirming IDOR", async () => {
+    await Instance.provide({ directory: projectRoot, fn: async () => {
+      const session = await Session.create({})
+      Intel.add({ sessionID: session.id, data: {
+        type: "business_rule",
+        severity: "info",
+        title: "Workspace ownership rule documented",
+        detail: "Profile records are associated with a tenant and workspace owner",
+        asset: "app.example.com",
+        source: "test",
+        confidenceLevel: "high",
+        tags: ["tenant", "authorization"],
+      }})
+      Intel.add({ sessionID: session.id, data: {
+        type: "sensitive_data",
+        severity: "info",
+        title: "Customer profile fields described",
+        detail: "Profile documentation mentions email address and phone number",
+        asset: "app.example.com",
+        source: "test",
+        confidenceLevel: "high",
+        tags: ["customer-data"],
+      }})
+
+      const chain = Chain.detect(session.id).find((item) => item.pattern === "information_amplification")
+      expect(chain).toBeDefined()
+      expect(chain?.expectedImpact).toBe("POTENTIAL_CROSS_TENANT_OR_PRIVATE_DATA_ACCESS")
+      expect(chain?.status).toBe("detected")
+      expect(chain?.testingPlan).toContain("baseline and negative control")
+      await Session.remove(session.id)
+    }})
+  })
+
+  test("does not chain generic INFO entries with no complementary relationship", async () => {
+    await Instance.provide({ directory: projectRoot, fn: async () => {
+      const session = await Session.create({})
+      Intel.add({ sessionID: session.id, data: {
+        type: "technology",
+        severity: "info",
+        title: "Frontend framework identified",
+        detail: "The site references a common frontend framework",
+        asset: "app.example.com",
+        source: "test",
+        confidenceLevel: "high",
+      }})
+      Intel.add({ sessionID: session.id, data: {
+        type: "technology",
+        severity: "info",
+        title: "Analytics library identified",
+        detail: "The site references a common analytics library",
+        asset: "app.example.com",
+        source: "test",
+        confidenceLevel: "high",
+      }})
+      expect(Chain.detect(session.id).some((item) => item.pattern === "information_amplification")).toBe(false)
       await Session.remove(session.id)
     }})
   })
