@@ -279,7 +279,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         const outlinePrerequisites = SkillIndex.prerequisitesFor(skill.name).flatMap((reference) => {
           const resolved = SkillIndex.resolveReference(reference)
           if (resolved) return accessibleNames.has(resolved) ? [resolved] : []
-          return /\\s/.test(reference.trim()) ? [reference] : []
+          return /\s/.test(reference.trim()) ? [reference] : []
         })
         const headings = skill.content
           .split(/\r?\n/)
@@ -414,7 +414,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           return [`  <prerequisite skill="${escapeXmlAttribute(resolved)}" status="${loaded ? "loaded" : "not-loaded"}" />`]
         }
         // Human-readable prerequisites are real-world conditions, not skill links.
-        if (/\\s/.test(reference.trim())) {
+        if (/\s/.test(reference.trim())) {
           return [`  <prerequisite condition="${escapeXmlAttribute(reference)}" status="verify-independently" />`]
         }
         omittedPrerequisiteCount++
