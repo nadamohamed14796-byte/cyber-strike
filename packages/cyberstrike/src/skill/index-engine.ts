@@ -203,27 +203,80 @@ export namespace SkillIndex {
     return Array.from(current().entries.values())
   }
 
+  function normalizeSearchText(value: string): string {
+    return value
+      .toLocaleLowerCase("en-US")
+      .replace(/[_/.-]+/g, " ")
+      .replace(/[^a-z0-9 ]+/g, " ")
+      .replace(/\\s+/g, " ")
+      .trim()
+  }
+
   export function search(query: string, limit = 50): Entry[] {
     const state = current()
-    const q = query.toLowerCase().trim()
+    const q = normalizeSearchText(query)
     if (!q) return []
+    const queryTokens = [...new Set(q.split(" ").filter((token) => token.length > 1))]
     const scored: Array<{ entry: Entry; score: number }> = []
+
     for (const entry of state.entries.values()) {
+      // Search all routing metadata, not just the display name and description.
+      // This lets an agent find skills by category, tags, technology, CWE, and
+      // explicit prerequisites/chain partners using natural-language queries.
+      const fields = [
+        entry.name,
+        entry.description,
+        entry.category ?? "",
+        entry.owasp_id ?? "",
+        ...entry.tags,
+        ...entry.tech_stack,
+        ...entry.cwe_ids,
+        ...entry.chains_with,
+        ...entry.prerequisites,
+      ].map(normalizeSearchText).filter(Boolean)
+      const name = normalizeSearchText(entry.name)
+      const tags = entry.tags.map(normalizeSearchText).filter(Boolean)
+      const category = normalizeSearchText(entry.category ?? "")
+      const tech = entry.tech_stack.map(normalizeSearchText).filter(Boolean)
+      const cwes = entry.cwe_ids.map(normalizeSearchText).filter(Boolean)
+      const chains = entry.chains_with.map(normalizeSearchText).filter(Boolean)
+      const prerequisites = entry.prerequisites.map(normalizeSearchText).filter(Boolean)
+
       let score = 0
-      if (entry.name.toLowerCase() === q) score += 100
-      else if (entry.name.toLowerCase().startsWith(q)) score += 50
-      else if (entry.name.toLowerCase().includes(q)) score += 20
-      if (entry.tags.some((t) => t.toLowerCase() === q)) score += 40
-      else if (entry.tags.some((t) => t.toLowerCase().includes(q))) score += 15
-      if (entry.owasp_id?.toLowerCase().includes(q)) score += 30
-      if (entry.category?.toLowerCase().includes(q)) score += 10
-      if (entry.description.toLowerCase().includes(q)) score += 5
+      if (name === q) score += 140
+      else if (name.startsWith(q)) score += 80
+      else if (name.includes(q)) score += 45
+      if (tags.includes(q)) score += 110
+      else if (tags.some((tag) => tag.includes(q))) score += 35
+      if (category === q) score += 65
+      else if (category && category.includes(q)) score += 25
+      if (tech.includes(q)) score += 70
+      else if (tech.some((value) => value.includes(q))) score += 25
+      if (cwes.includes(q)) score += 90
+      else if (cwes.some((value) => value.includes(q))) score += 25
+      if (chains.includes(q)) score += 45
+      else if (chains.some((value) => value.includes(q))) score += 20
+      if (prerequisites.includes(q)) score += 45
+      else if (prerequisites.some((value) => value.includes(q))) score += 20
+      if (normalizeSearchText(entry.owasp_id ?? "").includes(q)) score += 45
+      if (normalizeSearchText(entry.description).includes(q)) score += 15
+
+      // Multiword queries such as "JavaScript analysis" should match the
+      // canonical slug "attack-javascript-analysis" and equivalent tags.
+      const matchedTokens = queryTokens.filter((token) => fields.some((field) => field.includes(token)))
+      const tokenThreshold = queryTokens.length <= 1 ? 1 : Math.ceil(queryTokens.length * 0.67)
+      if (matchedTokens.length >= tokenThreshold) {
+        score += matchedTokens.length * 6
+      } else if (score === 0) {
+        continue
+      }
       if (score > 0) scored.push({ entry, score })
     }
+
     return scored
       .sort((a, b) => b.score - a.score || a.entry.name.localeCompare(b.entry.name))
       .slice(0, limit)
-      .map((s) => s.entry)
+      .map((item) => item.entry)
   }
 
   export function byTechStack(stack: string[], limit = 50): Entry[] {
