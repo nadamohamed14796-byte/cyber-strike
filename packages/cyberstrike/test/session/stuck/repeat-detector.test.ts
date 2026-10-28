@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { EmptyContinuationDetector, FailedToolStreakDetector, ReadOnlyRepeatDetector, RepeatDetector } from "../../../src/session/stuck/repeat-detector"
+import { EmptyContinuationDetector, FailedToolStreakDetector, ReadOnlyRepeatDetector, RepeatDetector, toolCallSucceeded } from "../../../src/session/stuck/repeat-detector"
 
 describe("RepeatDetector — cross-turn identical-call loop", () => {
   test("same signature reaching the limit across steps → nudge, then abort", () => {
@@ -139,5 +139,40 @@ describe("FailedToolStreakDetector — distinct failed calls without progress", 
     const detector = new FailedToolStreakDetector(2)
     expect(detector.observe([{ tool: "methodology_status", succeeded: false }])).toBe("ok")
     expect(detector.observe([{ tool: "memory_read", succeeded: false }])).toBe("ok")
+  })
+})
+
+
+describe("toolCallSucceeded — normalized tool outcomes", () => {
+  test("requires a completed tool part", () => {
+    expect(toolCallSucceeded({ status: "running", tool: "bash", metadata: { exit: 0 } })).toBe(false)
+    expect(toolCallSucceeded({ status: "error", tool: "bash", metadata: { exit: 0 } })).toBe(false)
+  })
+
+  test("honors bash exit and common explicit failure flags", () => {
+    expect(toolCallSucceeded({ status: "completed", tool: "bash", metadata: { exit: 0 } })).toBe(true)
+    expect(toolCallSucceeded({ status: "completed", tool: "bash", metadata: { exit: 2 } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "target_note", metadata: { saved: false } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "tool", metadata: { error: true } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "tool", metadata: { error: "workspace missing" } })).toBe(false)
+  })
+
+  test("recognizes tool-specific boolean error markers", () => {
+    expect(toolCallSucceeded({ status: "completed", tool: "correlate_javascript", metadata: { correlation_error: true } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "validate_finding", metadata: { validation_error: true } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "recon_checkpoint", metadata: { request_blocked: true } })).toBe(false)
+  })
+
+  test("handles negative process exit sentinels but preserves grep no-match semantics", () => {
+    expect(toolCallSucceeded({ status: "completed", tool: "attack_script", metadata: { exitCode: -1 } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "ebpf", metadata: { exitCode: 1 } })).toBe(false)
+    expect(toolCallSucceeded({ status: "completed", tool: "attack_script", metadata: { exitCode: 0 } })).toBe(true)
+    // grep documents exit code 1 as "no matches", not an execution failure.
+    expect(toolCallSucceeded({ status: "completed", tool: "grep", metadata: { exitCode: 1 } })).toBe(true)
+  })
+
+  test("does not mistake diagnostic metadata for failure", () => {
+    expect(toolCallSucceeded({ status: "completed", tool: "correlate_javascript", metadata: { sourceFiles: 0, notes: ["no assets captured"] } })).toBe(true)
+    expect(toolCallSucceeded({ status: "completed", tool: "tool", metadata: { reason: "no_matches" } })).toBe(true)
   })
 })
