@@ -363,6 +363,12 @@ test("skill search normalizes slugs and indexes routing metadata", async () => {
           .toContain("attack-javascript-analysis")
         expect(SkillIndex.search("attack-xss", Infinity).map((entry) => entry.name))
           .toContain("attack-javascript-analysis")
+        expect(SkillIndex.byCategory("client side").map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+        expect(SkillIndex.byTag("source maps").map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
+        expect(SkillIndex.byTechStack("JavaScript").map((entry) => entry.name))
+          .toContain("attack-javascript-analysis")
       },
     })
   } finally {
