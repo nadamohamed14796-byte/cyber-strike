@@ -1025,7 +1025,15 @@ export namespace SessionPrompt {
         const stepParts = await MessageV2.parts(processor.message.id)
         const toolCalls = stepParts
           .filter((p) => p.type === "tool")
-          .map((p) => ({ tool: p.tool, input: p.state.status !== "pending" ? p.state.input : undefined }))
+          .map((p) => ({
+            tool: p.tool,
+            input: p.state.status !== "pending" ? p.state.input : undefined,
+            // A failed or rejected tool call must not reset no-progress detection.
+            succeeded: p.state.status === "completed" &&
+              (p.state.metadata.exit === undefined || p.state.metadata.exit === 0) &&
+              p.state.metadata.saved !== false &&
+              p.state.metadata.error !== true,
+          }))
 
         // The coarse no-progress heuristic is limited to native subagents; it was
         // disabled after measured false positives. Identical-call detection below is
