@@ -1606,8 +1606,11 @@ function renderCanonicalJavaScriptAnalysis(
     "",
     "## Local source files/content versions",
     ...(localFiles.length ? localFiles.map((file) =>
-      "- " + file.relativePath + " — SHA-256: " + file.sha256 + " — " + file.bytes +
+      "- " + file.relativePath +
+      (file.sourceMapSource ? " — mapped source: " + safeSummaryText(file.sourceMapSource) : "") +
+      " — SHA-256: " + file.sha256 + " — " + file.bytes +
       " bytes — endpoint literals: " + file.endpointLiterals.length +
+      (file.sourceURL ? " — asset URL: " + safeSummaryURL(file.sourceURL) : "") +
       (file.sourceRequestIDs?.length ? " — captured request IDs: " + file.sourceRequestIDs.join(", ") : "") +
       (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : ""),
     ) : ["- No local source files were analyzed."]),
@@ -1628,6 +1631,7 @@ function renderCanonicalJavaScriptAnalysis(
           const callSites = fn.callSites ?? []
           return "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
             safeSummaryText(fn.sourceFile) + ":" + fn.line +
+            (sourceAsset?.sourceMapSource ? " — mapped source: " + safeSummaryText(sourceAsset.sourceMapSource) : "") +
             (sourceAsset?.sourceURL ? " — asset URL: " + safeSummaryURL(sourceAsset.sourceURL) : "") +
             (callSites.length ? " — candidate references: " + callSites.map((site) => site.kind + "@" + site.line).join(", ") : " — no UI/event/callback references matched")
         }) : ["- No named function candidates were extracted."]),
