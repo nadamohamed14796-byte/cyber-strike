@@ -1,8 +1,8 @@
 ---
 name: community-tool-selection
-description: Choose and verify an exact tool for a concrete evidence gap without duplicating the tool catalog.
+description: Choose and verify a fit-for-purpose external tool, API, dataset, or local helper without duplicating the canonical tool catalog.
 category: information-gathering
-version: "1.1.0"
+version: "1.0.0"
 author: cyberstrike-official
 tags:
   - tool-selection
@@ -32,6 +32,14 @@ Use this skill only when the current evidence gap genuinely requires a tool, CLI
 4. Inspect actual output, errors, and artifacts after invocation. Retry only after a material correction; do not run equivalent tools just to increase counts.
 5. Preserve source/tool/version, input, outcome, counts, error status, canonical path, and limitations. Merge results into the existing target inventory; do not create an output file per tool.
 6. Installation is not authorization. Every request respects the saved scope, exclusions, policy, rate/impact controls, and explicit testing permissions.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use the Target Workflow Contract for exact-tool selection, installation, verification, and recovery. Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the one shared capability reference; do not duplicate its tool list here.
+
+For a selected CLI, verify with `command -v TOOL` and the CLI's documented `--version`/help syntax. If it is missing, call `ensure_tools` for that exact CLI. For uncatalogued tools, review official upstream instructions and pass the verified package-manager method, package, executable, HTTPS source, and version/help arguments; do not silently substitute a different tool.
+
+Official resources: https://owasp.org/www-project-web-security-testing-guide/ and the selected tool's official upstream documentation.
 
 ## Route by evidence
 
