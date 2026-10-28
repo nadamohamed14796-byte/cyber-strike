@@ -1136,7 +1136,9 @@ export namespace SessionPrompt {
       }
       continue
     }
-    SessionCompaction.prune({ sessionID })
+    void SessionCompaction.prune({ sessionID }).catch((error) => {
+      log.warn("session output pruning failed", { sessionID, error })
+    })
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
       const queued = state()[sessionID]?.callbacks ?? []
