@@ -46,6 +46,8 @@ export interface JavaScriptSourceAnalysis {
   secretCandidates: JavaScriptSecretCandidate[]
   roleHints: JavaScriptRoleHint[]
   riskSignals: JavaScriptRiskSignal[]
+  /** Broad product, protocol, integration, and configuration clues independent of vulnerability classes. */
+  applicationHints: JavaScriptApplicationHint[]
   notes: string[]
 }
 
@@ -556,6 +558,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       }
   return {
     functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
+    applicationHints: [...applicationHints.values()],
     notes: [
       "Static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
