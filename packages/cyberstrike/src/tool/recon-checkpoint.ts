@@ -92,11 +92,11 @@ const RECON_TODO_CHECKLIST: Array<{ phase: ReconPhase; content: string; priority
   { phase: "live_hosts_ports", content: "[recon:live_hosts_ports] Validate live hosts and permitted services", priority: "high" },
   { phase: "url_collection", content: "[recon:url_collection] Collect and merge URLs", priority: "high" },
   { phase: "javascript_analysis", content: "[recon:javascript_analysis] Collect and analyze all JavaScript and source maps", priority: "high" },
-  { phase: "parameter_discovery", content: "[recon:parameter_discovery] Merge parameter evidence", priority: "medium" },
-  { phase: "directory_fuzzing", content: "[recon:directory_fuzzing] Discover permitted paths and merge new URLs", priority: "medium" },
+  { phase: "parameter_discovery", content: "[recon:parameter_discovery] Merge parameter evidence", priority: "high" },
+  { phase: "directory_fuzzing", content: "[recon:directory_fuzzing] Discover permitted paths and merge new URLs", priority: "high" },
   { phase: "endpoint_inventory", content: "[recon:endpoint_inventory] Verify one merged endpoint inventory", priority: "high" },
-  { phase: "parameter_fuzzing", content: "[recon:parameter_fuzzing] Run explicitly requested parameter tests", priority: "low", optional: true },
-  { phase: "vulnerability_testing", content: "[recon:vulnerability_testing] Validate requested vulnerability hypotheses", priority: "low", optional: true },
+  { phase: "parameter_fuzzing", content: "[recon:parameter_fuzzing] Run explicitly requested parameter tests", priority: "high", optional: true },
+  { phase: "vulnerability_testing", content: "[recon:vulnerability_testing] Validate requested vulnerability hypotheses", priority: "high", optional: true },
   { phase: "reporting", content: "[recon:reporting] Verify the final report and remaining gaps", priority: "high" },
 ]
 
