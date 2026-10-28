@@ -39,7 +39,7 @@ Use this skill only when the current evidence gap genuinely requires a tool, CLI
 
 Use the Target Workflow Contract for exact-tool selection, installation, verification, and recovery. Use `.cyberstrike/skill/TOOLING_CATALOG.md` as the one shared capability reference; do not duplicate its tool list here.
 
-For a selected CLI, verify with `command -v TOOL` and the CLI's documented `--version`/help syntax. If it is missing, call `ensure_tools` for that exact CLI. For uncatalogued tools, review official upstream instructions and pass the verified package-manager method, package, executable, HTTPS source, and version/help arguments; do not silently substitute a different tool.
+When `tool_preflight.py` is available, resolve it from the installed skill/catalog root and invoke it by absolute path. Otherwise verify a selected CLI with `command -v TOOL` and its documented `--version`/help syntax. If it is missing, call `ensure_tools` for that exact CLI. For uncatalogued tools, review official upstream instructions and pass the verified package-manager method, package, executable, HTTPS source, and version/help arguments; do not silently substitute a different tool.
 
 Official resources: https://owasp.org/www-project-web-security-testing-guide/ and the selected tool's official upstream documentation.
 
