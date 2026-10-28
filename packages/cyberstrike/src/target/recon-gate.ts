@@ -156,7 +156,17 @@ export function invalidateReconDownstreamPhases(
 ): ReconPhase[] {
   const index = RECON_PHASES.indexOf(phase)
   const downstream = RECON_PHASES.slice(index + 1)
-  for (const item of downstream) phases[item] = { status: "pending", reason }
+  for (const item of downstream) {
+    // Mark downstream results stale without dropping their evidence links/counts.
+    // Their artifacts may still be useful while the corresponding phases are rerun.
+    phases[item] = {
+      ...phases[item],
+      status: "pending",
+      startedAt: undefined,
+      finishedAt: undefined,
+      reason,
+    }
+  }
   return downstream
 }
 
