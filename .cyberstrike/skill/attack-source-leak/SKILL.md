@@ -4,13 +4,7 @@ description: "Assess exposed source repositories, source maps, backups, archives
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - source-code
-  - source-map
-  - backup
-  - git-exposure
-  - secrets
-  - information-disclosure
+tags: [source-code, source-map, backup, git-exposure, secrets, information-disclosure, source-code-exposure, source-maps, debug-artifacts, hardcoded-secrets, repository-leak]
 tech_stack:
   - web
   - javascript
