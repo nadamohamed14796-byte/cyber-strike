@@ -4,12 +4,7 @@ description: "Assess unintended disclosure of sensitive application, infrastruct
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - information-disclosure
-  - sensitive-data
-  - errors
-  - metadata
-  - privacy
+tags: [information-disclosure, sensitive-data, errors, metadata, privacy, sensitive-data-exposure, verbose-errors, metadata-exposure, debug-output]
 tech_stack:
   - web
   - rest-api
