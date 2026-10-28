@@ -28,9 +28,9 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
     else if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
     else if (/^\d+(?:\.\d+){3}\/.+$/.test(item) || (item.includes("/") && item.includes(":"))) cidrs.push(item)
     else if (/^[^:/]+:\d{1,5}$/.test(item)) hostPorts.push(item)
-    else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2))
+    else if (item.startsWith("*.")) wildcardDomains.add(item.slice(2).toLowerCase().replace(/\.$/, ""))
     else if (item.includes("*") || /\{[^{}]+\}/.test(item)) wildcardPatterns.push(item)
-    else exactHosts.add(item)
+    else exactHosts.add(item.toLowerCase().replace(/\.$/, ""))
   }
   const compiled = { exactHosts, wildcardDomains, cidrs, urlPatterns, hostPorts, typedEntries, wildcardPatterns }
   compiledScopeItemsCache.set(items, compiled)
