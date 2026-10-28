@@ -69,41 +69,58 @@ export namespace Truncate {
     const maxLines = options.maxLines ?? MAX_LINES
     const maxBytes = options.maxBytes ?? MAX_BYTES
     const direction = options.direction ?? "head"
-    const lines = text.split("\n")
-    const totalBytes = Buffer.byteLength(text, "utf-8")
+    const totalBytes = Buffer.byteLength(text)
 
-    if (lines.length <= maxLines && totalBytes <= maxBytes) {
+    // Count lines without split("\n"): splitting a multi-megabyte tool result
+    // allocates an array and a string entry for every line before truncation.
+    let totalLines = 1
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) totalLines++
+    }
+
+    if (totalLines <= maxLines && totalBytes <= maxBytes) {
       return { content: text, truncated: false }
     }
 
     const out: string[] = []
-    let i = 0
     let bytes = 0
     let hitBytes = false
 
     if (direction === "head") {
-      for (i = 0; i < lines.length && i < maxLines; i++) {
-        const size = Buffer.byteLength(lines[i], "utf-8") + (i > 0 ? 1 : 0)
+      let lineStart = 0
+      while (lineStart <= text.length && out.length < maxLines) {
+        const newline = text.indexOf("\n", lineStart)
+        const lineEnd = newline === -1 ? text.length : newline
+        const line = text.slice(lineStart, lineEnd)
+        const size = Buffer.byteLength(line, "utf-8") + (out.length > 0 ? 1 : 0)
         if (bytes + size > maxBytes) {
           hitBytes = true
           break
         }
-        out.push(lines[i])
+        out.push(line)
         bytes += size
+        if (newline === -1) break
+        lineStart = newline + 1
       }
     } else {
-      for (i = lines.length - 1; i >= 0 && out.length < maxLines; i--) {
-        const size = Buffer.byteLength(lines[i], "utf-8") + (out.length > 0 ? 1 : 0)
+      let lineEnd = text.length
+      while (lineEnd >= 0 && out.length < maxLines) {
+        const newline = text.lastIndexOf("\n", lineEnd - 1)
+        const lineStart = newline + 1
+        const line = text.slice(lineStart, lineEnd)
+        const size = Buffer.byteLength(line, "utf-8") + (out.length > 0 ? 1 : 0)
         if (bytes + size > maxBytes) {
           hitBytes = true
           break
         }
-        out.unshift(lines[i])
+        out.unshift(line)
         bytes += size
+        if (newline === -1) break
+        lineEnd = newline
       }
     }
 
-    const removed = hitBytes ? totalBytes - bytes : lines.length - out.length
+    const removed = hitBytes ? totalBytes - bytes : totalLines - out.length
     const unit = hitBytes ? "bytes" : "lines"
     const preview = out.join("\n")
 
