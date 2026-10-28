@@ -12,7 +12,7 @@ For every target, recon, or hunting task, follow the shared numbered Target Work
 
 ## Capabilities
 
-Tool choice, exact-CLI installation, scope, autonomous sequencing, and recovery are governed by the Target Workflow Contract above. Do not duplicate those rules here: follow the contract, inspect real schemas/output, and keep all active requests subject to persisted scope and explicit testing authorization.
+Tool choice, exact-CLI installation, scope, autonomous sequencing, and recovery are governed by the Target Workflow Contract above. Do not duplicate those rules here: follow the contract, inspect real schemas/output, and require explicit user opt-in for authorized targeted testing. Keep all active requests subject to persisted scope and program policy.
 
 Capabilities include browser automation with traffic capture, file/code analysis, reverse engineering, OSINT/reconnaissance, exploit development and proof-of-concept creation, and report generation/documentation.
 
