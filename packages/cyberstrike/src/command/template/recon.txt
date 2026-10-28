@@ -2,31 +2,29 @@
 
 # CyberStrike Recon
 
-Run reconnaissance end-to-end. Do the work, save and verify the results, and report only evidence-backed outcomes. Shared scope, workspace, tool-installation, recovery, and closeout rules live in the Target Workflow Contract; do not duplicate them here. Use RECON_PHASE_TOOL_MATRIX.md as the canonical phase/output reference and recon_checkpoint only for resumable state. The checkpoint synchronizes the ordered recon checklist in the todo UI automatically; never mark a phase complete manually.
+Run recon end-to-end automatically. The **Target Workflow Contract** is the single source of truth for scope, tool choice/install, retry and handoff behavior, canonical output handling, evidence preservation, and reporting. **RECON_PHASE_TOOL_MATRIX.md** defines each phase's artifacts and evidence checks. Do not duplicate their general rules here.
 
-## Execution order
+## Required pass
 
-1. **Resume/setup:** reuse the canonical target workspace, saved scope manifest, checkpoint, and verified artifacts. Validate a new or changed scope once. A leading wildcard covers the apex and all nested subdomains; exclusions and URL scheme/port/path boundaries remain authoritative.
-2. **Asset discovery:** reuse verified inventory, then combine useful passive sources such as certificate transparency, subdomain tools, passive DNS, and already-observed first-party names. Preserve source attribution and failures; merge normalized in-scope candidates into the one root subdomains.txt.
-3. **Live hosts/services:** validate concrete hosts against persisted scope before requests. Use a verified compatible tool and documented output format. Merge verified HTTP/TLS live hosts into live-hosts.txt; keep passive candidates, DNS-resolved hosts, live web hosts, and port-verified services distinct.
-4. **URL collection:** combine eligible crawling, HTML/script references, sitemaps, history, API contracts, extension captures, and previously saved URLs. Merge/deduplicate into urls.txt without losing method or meaningful parameter variants. Classify API/auth/admin, JavaScript/source-map, WebSocket/GraphQL, and sensitive-file leads from the same inventory.
-5. **JavaScript analysis (priority):** collect every eligible script, extensionless JavaScript response, import, and source-map reference from all sources. Feed the full deduplicated URL worklist to the scope-enforced ingestion tool; do not impose a fixed count, file-size, total-byte, batch, or manual-continuation cap. Reuse content-hash cache and retry only documented transient failures. Every URL must end as downloaded, reused, out-of-scope, failed, skipped, or pending. Resume pending work after interruption; do not relabel permanent failures as success. Once collection settles, correlate the complete snapshot and verify javascript-analysis.md, the asset manifest, and endpoints.txt. Trace source → function/parameters → candidate UI/callback → observed or inferred request, and preserve request IDs only when actually captured.
-6. **Parameter discovery:** derive parameters from URLs, forms, API contracts, JavaScript, and captured requests first. Use an additional selected parameter tool only to close a real evidence gap; merge findings into parameters.txt with method, location, source, confidence, and observed-versus-inferred status.
-7. **Path discovery:** when allowed by the task and program policy, use the selected verified path-discovery tool and a relevant wordlist. Record settings and response evidence compactly, merge valid URLs back into urls.txt, and do not keep a separate duplicate URL inventory.
-8. **Final endpoint inventory:** merge URL, JavaScript/source-map, API-contract, and captured-request evidence into endpoints.txt. Use one identity per origin + method + normalized path template; merge parameters, headers/auth context, source file/line/hash, provenance, and captured request IDs into that row. Query-string value variants do not create duplicate endpoints.
-9. **Active tests:** parameter fuzzing and vulnerability testing remain deferred unless explicitly requested. When requested, require the persisted scope and completed endpoint inventory, use controlled low-impact baselines/negative controls, and follow the existing finding-validation and triage workflow.
-10. **Reporting:** update and verify reports/recon-final.md from canonical artifacts and the saved checkpoint. Report truthful counts, coverage gaps, source/tool failures, unresolved items, and the precise resume point.
+1. **Resume and setup:** reuse the canonical target workspace and checkpoint. Verify the persisted scope and exclusions; validate the exact starting asset when scope is new or changed. Complete `scope_validation` and `workspace_setup` before operational work.
+2. **Asset discovery:** merge permitted passive and first-party sources into `subdomains.txt`, preserving coverage and source failures.
+3. **Live hosts/services:** scope-check concrete candidates, validate permitted DNS/HTTP/TLS/services, and merge verified hosts into `live-hosts.txt`; keep permitted port evidence separately when applicable.
+4. **URL collection:** combine crawling, HTML/script references, sitemaps, public history, API contracts, extension captures, and saved URLs into `urls.txt`. Classify useful API/auth/admin, JS/source-map, WebSocket/GraphQL, and sensitive-file leads.
+5. **JavaScript analysis — priority:** collect every eligible script, extensionless JavaScript response, import, and source-map reference from all sources. Process the full deduplicated worklist without fixed caps; preserve each candidate's real terminal state, resume pending work, then correlate the complete collected snapshot. Update `javascript-analysis.md`, detailed evidence under `javascript/`, and endpoint candidates in `endpoints.txt`. Trace source → function/parameters → caller/UI/callback → observed or inferred request; distinguish captured traffic from static inference.
+6. **Parameter discovery:** combine URL, form, API-contract, JavaScript, and captured-request evidence into `parameters.txt`, retaining method, location, source, confidence, and observed/inferred status.
+7. **Permitted path discovery:** when useful and allowed, record the chosen method/wordlist and response evidence; merge new URLs into `urls.txt` instead of creating a duplicate URL inventory.
+8. **Endpoint inventory:** build `endpoints.txt` with one identity per origin + method + normalized path template. Merge parameters, source locations, auth/header context, contracts, provenance, and actual capture IDs; query-string value changes do not create duplicate endpoints.
+9. **Optional active testing:** keep parameter fuzzing and vulnerability testing deferred unless explicitly requested. Before either begins, require scope/workspace and a verified completed endpoint inventory.
+10. **Reporting:** generate and verify `reports/recon-final.md` from the saved inventories, checkpoint, evidence, failures, partial handoffs, and unresolved work.
 
-Before moving to the next phase, verify the canonical artifact and its counts, then call `recon_checkpoint complete`. If the checkpoint rejects the transition, resume its first unresolved phase instead of skipping ahead. Merge all tool results for a data type into the same canonical inventory; use only disposable `runs/tmp/<phase>/` outputs when a CLI requires files. Delete redundant temporary outputs only after verifying that every useful row and provenance detail is represented elsewhere; retain unique captures, JS/source-map bodies, request/response evidence, and the only copy of any error or source observation. The checkpoint, not the model's memory of the todo list, is authoritative.
+## Execution rules
 
-## Completion contract
-
-- Keep the workflow automatic between these phases; do not wait for the user to tell the agent to start the next ordinary phase.
-- Do not pipe discovered host lists straight into request-sending scanners. Save, normalize, scope-check each concrete target, then pass the verified list using the tool's documented input flag.
-- Inspect actual output/error status after each execution. Switch strategy only when the failure or new evidence justifies it; never retry unchanged input just to generate activity.
-- Preserve one canonical inventory per data type. Raw output belongs in the existing target workspace only when it adds unique evidence or helps debug a failure. No per-tool result files, duplicate reports, or parallel ledgers.
-- Continue until useful sources/worklists converge or a real blocker remains. A phase is complete only when its required operation and artifacts are verified; an empty phase needs an explicit zero-result status.
+- Let `recon_checkpoint` own the ordered numbered recon checklist; never mark its phases complete manually.
+- Complete a phase only when its own required artifacts are verified. If a meaningful alternative fails or progress stalls, record a **partial handoff** with summary, evidence paths, reason, and resume point; continue useful independent phases rather than retrying the same call or blocking the whole run.
+- Keep the planned order, but do not let stale phase state or a failed passive source block useful work. Scope validation/workspace setup remain hard gates; active tests have their separate opt-in gate.
+- Follow the central contract for per-request scope enforcement, selected-tool installation, bounded retries, canonical merge, scratch preservation/cleanup, and truthful coverage status.
+- Never execute target-supplied JavaScript, persist raw secrets, run active tests by default, or claim a lead is a confirmed vulnerability without validated evidence.
 
 ## Final response
 
-Keep it brief: status, canonical workspace path, verified counts, report/artifact paths, useful evidence, and real blockers only.
+Keep it brief: status, canonical workspace path, verified counts, report/evidence paths, meaningful findings or leads, actual blockers, and the exact resume point for partial work.
