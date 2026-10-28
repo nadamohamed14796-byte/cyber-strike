@@ -405,7 +405,7 @@ async function persistWebReconResultUnlocked(input: {
 }): Promise<string> {
   const { workspace, filename, program, requestedTarget, completedAt, sessionID, messageID, result } = input
   const absolutePath = path.join(workspace.workspacePath, filename)
-  // New session scans live in recon/ with the other workflow result ledger.
+  // New session scans live in findings/ with other test evidence.
   // Read legacy scans/ records once so their history is preserved during migration.
   const legacyDirectory = program === "session_scan" ? "scans" : "recon"
   const legacyFiles = await loadLegacyWebReconArtifacts(workspace, legacyDirectory)
