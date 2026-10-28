@@ -4,7 +4,7 @@ description: "Validate reflected, stored, and template-driven cross-site scripti
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags: [- xss, cross-site-scripting, html-injection, reflected-xss, stored-xss, dom-xss, client-side, browser, output-encoding]
+tags: [xss, cross-site-scripting, html-injection, reflected-xss, stored-xss, dom-xss, client-side, browser, output-encoding]
 tech_stack:
   - web
   - javascript
