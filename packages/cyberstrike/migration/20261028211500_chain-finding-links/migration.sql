@@ -20,3 +20,13 @@ CREATE INDEX IF NOT EXISTS chain_finding_link_source_idx ON chain_finding_link(s
 CREATE INDEX IF NOT EXISTS chain_finding_link_target_idx ON chain_finding_link(target_vulnerability_id);
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS chain_finding_link_edge_idx ON chain_finding_link(chain_candidate_id, source_vulnerability_id, target_vulnerability_id, relation);
+--> statement-breakpoint
+CREATE TRIGGER IF NOT EXISTS chain_finding_link_session_guard
+BEFORE INSERT ON chain_finding_link
+WHEN
+  COALESCE((SELECT session_id FROM chain_candidate WHERE id = NEW.chain_candidate_id), '') <> NEW.session_id
+  OR COALESCE((SELECT session_id FROM vulnerability WHERE id = NEW.source_vulnerability_id), '') <> NEW.session_id
+  OR COALESCE((SELECT session_id FROM vulnerability WHERE id = NEW.target_vulnerability_id), '') <> NEW.session_id
+BEGIN
+  SELECT RAISE(ABORT, 'chain finding links must reference rows from the same session');
+END;
