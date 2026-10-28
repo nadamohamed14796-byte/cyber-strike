@@ -669,6 +669,33 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           // Source-level detail is not a completion gate;
           // an incomplete source must not prevent the rest of recon from continuing.
         }
+        if (status === "complete") {
+          const realWorkspace = await fs.realpath(workspace.workspacePath)
+          const scratchRoot = path.join(realWorkspace, "runs", "tmp")
+          const scratchPhase = path.join(scratchRoot, phase)
+          try {
+            const rootInfo = await fs.lstat(scratchRoot)
+            if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
+              return { title: "Recon checklist not complete", output: "Cannot complete " + phase + ": the scratch output directory is not a safe workspace-local directory. Inspect and preserve its contents before proceeding.", metadata: { saved: false, reason: "unsafe_phase_scratch_directory", phase } }
+            }
+            const phaseInfo = await fs.lstat(scratchPhase)
+            if (!phaseInfo.isDirectory() || phaseInfo.isSymbolicLink()) {
+              return { title: "Recon checklist not complete", output: "Cannot complete " + phase + ": the phase scratch path is not a regular directory. Inspect it without following symlinks.", metadata: { saved: false, reason: "unsafe_phase_scratch_path", phase } }
+            }
+            const leftovers = await fs.readdir(scratchPhase)
+            if (leftovers.length > 0) {
+              return {
+                title: "Recon checklist not complete",
+                output: "Cannot complete " + phase + ": temporary tool outputs remain in runs/tmp/" + phase + "/ (" + leftovers.slice(0, 12).join(", ") + "). Merge and verify their useful records into the canonical artifacts, move any unique evidence to its permanent evidence area, then remove only proven-redundant scratch files and retry complete. CyberStrike does not delete these files automatically.",
+                metadata: { saved: false, reason: "phase_scratch_not_reconciled", phase, leftovers: leftovers.length },
+              }
+            }
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+              return { title: "Recon checklist not complete", output: "Cannot verify phase scratch cleanup: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "phase_scratch_check_failed", phase } }
+            }
+          }
+        }
         run.phases[phase] = {
           ...record,
           status,
