@@ -51,6 +51,51 @@ async function scopeFingerprintForWorkspace(start: Workspace, expectedRootID: st
   return reconScopeFingerprint(scopes)
 }
 
+/** Turn a saved, supported scope entry into one concrete URL candidate for initial checkpoint setup. */
+function scopeEntryURL(entry: string): string | undefined {
+  let value = entry.trim().replace(/^(?:url|domain|wildcard|api|ip address|cidr)\s*:\s*/i, "")
+  if (!value || /^\d{1,3}(?:\.\d{1,3}){3}\/\d{1,2}$/.test(value) || /^\[?[0-9a-f:.]+\]?\/\d{1,3}$/i.test(value)) return undefined
+  if (value.startsWith("*.")) value = value.slice(2)
+  if (!value || /[*{}]/.test(value)) return undefined
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : "https://" + value)
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return undefined
+    if (url.pathname.endsWith("/*")) url.pathname = url.pathname.slice(0, -1)
+    return url.href
+  } catch {
+    return undefined
+  }
+}
+
+/** Reuse an explicitly saved asset, or choose the first concrete asset authorized by the saved policy. */
+async function findAuthorizedScopeStart(workspace: Workspace, scope: TargetScope, preferred?: string) {
+  const candidates = preferred !== undefined
+    ? [preferred]
+    : [...new Set([workspace.targetURL, ...scope.scopeItems.map(scopeEntryURL).filter((item): item is string => Boolean(item))])]
+  for (const candidate of candidates) {
+    let url: URL
+    try {
+      url = new URL(candidate)
+    } catch {
+      if (preferred !== undefined) return undefined
+      continue
+    }
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
+      if (preferred !== undefined) return undefined
+      continue
+    }
+    let decision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>>
+    try {
+      decision = await TargetMemory.checkURLScope(url.href)
+    } catch (error) {
+      if (preferred !== undefined) throw error
+      continue
+    }
+    if (preferred !== undefined || (decision.allowed && decision.workspace)) return { target: url.href, decision }
+  }
+  return undefined
+}
+
 export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly string[]>> = {
   asset_discovery: ["assets"],
   live_hosts_ports: ["recon"],
@@ -159,7 +204,7 @@ export function reconBeginDisposition(status: ReconPhaseStatus, _phase: ReconPha
 const Parameters = z.object({
   action: z.enum(["status", "begin", "complete", "block", "fail", "unavailable", "defer"]),
   target_url: z.string().min(1).describe("Exact existing root or asset workspace URL"),
-  scope_validation_target: z.string().min(1).optional().describe("Absolute HTTP(S) URL of the actual starting asset that passed scope_check; required when completing scope_validation. The program-root workspace URL may be only a policy container."),
+  scope_validation_target: z.string().min(1).optional().describe("Optional absolute HTTP(S) starting asset. If omitted, use the root URL when authorized, otherwise select a concrete authorized URL from the persisted scope. Saved scope is reused on resume; active requests still enforce scope independently."),
   phase: z.enum(PHASES).optional(),
   summary: z.string().max(4000).optional(),
   reason: z.string().max(2000).optional(),
@@ -172,7 +217,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
     "Tracks the canonical recon run, phase status, prerequisites, and artifact checks; it is not a tool allowlist. Ordinary recon tools may run whenever useful, even if an earlier phase record is stale or missing. If a phase is already running, resume it.",
     "Use status to recover progress and begin/complete/block/fail/unavailable/defer to record outcomes. Follow prerequisites for checkpoint transitions, but do not use phase state to restrict ordinary tool selection. For directory/parameter work, save useful wordlists, settings, and results. Record JavaScript correlation artifacts and verify the exact reports/recon-final.md path before reporting completion.",
     "A normal recon run completes verified endpoint inventory and reporting, while vulnerability_testing stays deferred unless the user explicitly requests testing. Testing requires completed endpoint_inventory; refresh the report after testing. Never launch scanners/session_scan automatically.",
-    "Scope and workspace setup remain required. For new, changed, or unresolved scope, call scope_check once for the actual starting asset, with target_url selecting the canonical root workspace and scope_validation_target set to that exact asset URL. Reuse a valid saved decision on resume; active-request tools independently enforce scope.",
+    "Scope and workspace setup remain required. Configure and validate new, changed, or unresolved scope once, then persist and reuse that decision on resume. For a program-root policy container, automatically select a concrete authorized URL from the saved manifest when scope_validation_target is omitted; do not prompt the user to re-enter the same scope. Active-request tools independently enforce every concrete URL and redirect.",
   ].join("\n"),
   parameters: Parameters,
   async execute(params, ctx) {
@@ -207,33 +252,47 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       // current owner up to date without creating a duplicate run for this target.
       run.sessionID = sessionID
 
-      // A prior "complete" flag is not authorization evidence by itself. Older
-      // checkpoints did not persist the actual asset checked, and saved scope can
-      // change between runs. Revalidate the recorded starting asset before trusting
-      // this checkpoint or allowing any later phase to proceed.
+      // Reuse the saved authorization decision without asking the operator to repeat scope.
+      // Only invalidate it when the persisted authorization chain actually changed or
+      // the recorded asset is no longer authorized. Older checkpoints are migrated in place.
       if (run.phases.scope_validation.status === "complete") {
-        const validatedTarget = run.phases.scope_validation.scopeValidationTarget
-        const savedFingerprint = run.phases.scope_validation.scopeFingerprint
+        const scopeValidation = run.phases.scope_validation
+        const savedFingerprint = scopeValidation.scopeFingerprint
+        let validatedTarget = scopeValidation.scopeValidationTarget
         let invalidationReason: string | undefined
-        if (!validatedTarget) {
-          invalidationReason = "The saved scope_validation checkpoint has no recorded starting asset; scope must be checked again."
-        } else {
-          try {
-            const decision = await TargetMemory.checkURLScope(validatedTarget)
-            if (!decision.allowed || !decision.workspace) {
-              invalidationReason = "The previously validated starting asset no longer passes persisted scope: " + decision.reason
-            } else {
-              const currentFingerprint = await scopeFingerprintForWorkspace(decision.workspace, workspace.id)
-              if (!savedFingerprint) {
-                invalidationReason = "The saved scope_validation checkpoint predates scope fingerprinting; revalidate it once before resuming."
-              } else if (currentFingerprint !== savedFingerprint) {
-                invalidationReason = "The persisted authorization scope or exclusions changed since this recon run was validated; revalidate scope and downstream phases."
+        try {
+          const persistedScope = await TargetMemory.getScope(workspace.targetURL)
+          if (!persistedScope || persistedScope.status !== "configured" || persistedScope.scopeItems.length === 0) {
+            invalidationReason = "The persisted authorization scope is missing or unconfigured."
+          } else {
+            if (!validatedTarget) {
+              const recovered = await findAuthorizedScopeStart(workspace, persistedScope)
+              if (recovered) validatedTarget = recovered.target
+              else invalidationReason = "The saved checkpoint has no starting asset and no concrete authorized URL could be recovered from the persisted scope."
+            }
+            if (!invalidationReason && validatedTarget) {
+              const decision = await TargetMemory.checkURLScope(validatedTarget)
+              if (!decision.allowed || !decision.workspace) {
+                invalidationReason = "The previously validated starting asset no longer passes persisted scope: " + decision.reason
+              } else {
+                const currentFingerprint = await scopeFingerprintForWorkspace(decision.workspace, workspace.id)
+                if (savedFingerprint && currentFingerprint !== savedFingerprint) {
+                  invalidationReason = "The persisted authorization scope or exclusions changed since this recon run was validated; revalidate scope and downstream phases."
+                } else if (!savedFingerprint || validatedTarget !== scopeValidation.scopeValidationTarget) {
+                  run.phases.scope_validation = {
+                    ...scopeValidation,
+                    scopeValidationTarget: validatedTarget,
+                    scopeFingerprint: currentFingerprint,
+                  }
+                  run.updatedAt = new Date().toISOString()
+                  await TargetMemory.writeWorkspaceFile(workspace, relativePath, JSON.stringify(run, null, 2) + "\n")
+                }
               }
             }
-          } catch (error) {
-            invalidationReason = "The previously validated starting asset's authorization chain could not be revalidated: " +
-              (error instanceof Error ? error.message : String(error))
           }
+        } catch (error) {
+          invalidationReason = "The previously validated starting asset's authorization chain could not be revalidated: " +
+            (error instanceof Error ? error.message : String(error))
         }
         if (invalidationReason) {
           run.phases.scope_validation = {
@@ -360,22 +419,28 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation: configure a non-empty scope manifest with saved authorization provenance. An explicit user-confirmed exact asset is a valid provenance source and does not require a separate policy URL. The root workspace URL itself does not have to be in scope.", metadata: { saved: false, reason: "scope_manifest_unconfigured" } }
           }
           const validationTarget = params.scope_validation_target?.trim()
-          if (!validationTarget) {
-            return { title: "Scope validation rejected", output: "Cannot complete scope_validation without scope_validation_target: provide the exact absolute HTTP(S) URL that passed scope_check. The program-root workspace URL may be only a policy container.", metadata: { saved: false, reason: "scope_validation_target_required" } }
-          }
           let parsedValidationTarget: URL
-          try {
-            parsedValidationTarget = new URL(validationTarget)
-            if ((parsedValidationTarget.protocol !== "http:" && parsedValidationTarget.protocol !== "https:") ||
-                parsedValidationTarget.username || parsedValidationTarget.password) throw new Error("target must be a credential-free absolute HTTP(S) URL")
-          } catch (error) {
-            return { title: "Scope validation rejected", output: "scope_validation_target is invalid: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_validation_target_invalid" } }
-          }
           let targetDecision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>>
-          try {
-            targetDecision = await TargetMemory.checkURLScope(parsedValidationTarget.href)
-          } catch (error) {
-            return { title: "Scope validation rejected", output: "The starting asset scope check failed: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_validation_check_failed" } }
+          if (validationTarget) {
+            try {
+              parsedValidationTarget = new URL(validationTarget)
+              if ((parsedValidationTarget.protocol !== "http:" && parsedValidationTarget.protocol !== "https:") ||
+                  parsedValidationTarget.username || parsedValidationTarget.password) throw new Error("target must be a credential-free absolute HTTP(S) URL")
+            } catch (error) {
+              return { title: "Scope validation rejected", output: "scope_validation_target is invalid: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_validation_target_invalid" } }
+            }
+            try {
+              targetDecision = await TargetMemory.checkURLScope(parsedValidationTarget.href)
+            } catch (error) {
+              return { title: "Scope validation rejected", output: "The starting asset scope check failed: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "scope_validation_check_failed" } }
+            }
+          } else {
+            const recovered = await findAuthorizedScopeStart(workspace, scope)
+            if (!recovered) {
+              return { title: "Scope validation needs a concrete asset", output: "No concrete authorized starting URL could be selected from the persisted scope. Add an exact in-scope asset to the saved manifest; the same scope does not need to be re-entered.", metadata: { saved: false, reason: "scope_validation_target_unresolved" } }
+            }
+            parsedValidationTarget = new URL(recovered.target)
+            targetDecision = recovered.decision
           }
           if (!targetDecision.allowed || !targetDecision.workspace) {
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the starting asset is not authorized by the persisted manifest: " + targetDecision.reason, metadata: { saved: false, reason: "scope_validation_target_out_of_scope", target: parsedValidationTarget.href } }
@@ -400,7 +465,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
               return { title: "Workspace setup rejected", output: "Cannot mark workspace_setup complete; required workspace file is missing or unsafe: " + relative + " (" + (error instanceof Error ? error.message : String(error)) + ")", metadata: { saved: false, reason: "workspace_integrity_failed", file: relative } }
             }
           }
-          for (const relative of ["scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints", "testing", "findings", "evidence", "reports", "scans", "runs", "logs", "sessions", "research"]) {
+          for (const relative of ["scope", "assets", "runs"]) {
             const candidate = path.join(workspace.workspacePath, relative)
             try {
               const info = await fs.lstat(candidate)
