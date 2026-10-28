@@ -4,12 +4,7 @@ description: "Validate session issuance, binding, renewal, fixation, and revocat
 category: "identity"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - session
-  - cookies
-  - authentication
-  - revocation
-  - web
+tags: [- session, session-management, cookies, session-fixation, session-invalidation, logout, authentication]
 tech_stack:
   - web
   - mobile
