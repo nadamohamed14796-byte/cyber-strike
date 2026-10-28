@@ -4,7 +4,7 @@ description: "Validate authentication-control failures across login, recovery, f
 category: "identity"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags: [- authentication, auth-bypass, authentication, login, authorization, identity, 401-403, access-control]
+tags: [authentication, auth-bypass, login, authorization, identity, 401-403, access-control]
 tech_stack:
   - web
   - rest-api
