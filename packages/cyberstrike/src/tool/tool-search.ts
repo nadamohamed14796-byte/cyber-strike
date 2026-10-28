@@ -76,7 +76,14 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
 
 export const LoadToolsTool = Tool.define("load_tools", async () => {
   return {
-    description: [\n      "Load selected connected-tool definitions into context so they can be used.",\n      "Use tool_search to discover candidates, then load only the exact IDs whose documented capabilities fit the current task.",\n      "Do not load or run every candidate. Do not treat tool names, search ranking, or catalog examples as proof of suitability.",\n      "Inspect loaded full schemas and verify real inputs, outputs, and side effects before invocation; the loaded definitions become available in the next turn.",\n      "Load additional tools only when new evidence creates a new need. Keep context use practical without imposing a fixed number of tools per checkpoint.",\n    ].join("\n"),\n    parameters: z.object({
+    description: [
+      "Load selected connected-tool definitions into context so they can be used.",
+      "Use tool_search to discover candidates, then load only the exact IDs whose documented capabilities fit the current task.",
+      "Do not load or run every candidate. Do not treat tool names, search ranking, or catalog examples as proof of suitability.",
+      "Inspect loaded full schemas and verify real inputs, outputs, and side effects before invocation; the loaded definitions become available in the next turn.",
+      "Load additional tools only when new evidence creates a new need. Keep context use practical without imposing a fixed number of tools per checkpoint.",
+    ].join("\n"),
+    parameters: z.object({
       tool_ids: z.array(z.string()).describe("Tool IDs to load (from tool_search results)"),
     }),
     async execute(params, _ctx) {
