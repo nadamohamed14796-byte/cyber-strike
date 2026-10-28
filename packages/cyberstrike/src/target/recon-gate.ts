@@ -205,10 +205,13 @@ export function reconPhaseExecutionDecision(
   }
 
   // Active parameter fuzzing and vulnerability testing are opt-in and must follow the endpoint inventory.
+  const phaseLabel = requiredPhase === "vulnerability_testing" ? "vulnerability-testing" : requiredPhase
   if (phases[requiredPhase].status !== "running") {
     return {
       allowed: false,
-      reason: requiredPhase + " is opt-in; explicitly begin " + requiredPhase + " only after endpoint_inventory is complete and the user has requested active testing.",
+      reason: requiredPhase === "vulnerability_testing"
+        ? "Vulnerability testing is opt-in; explicitly begin vulnerability-testing only after endpoint_inventory is complete and the user has requested active testing."
+        : phaseLabel + " is opt-in; explicitly begin " + phaseLabel + " only after endpoint_inventory is complete and the user has requested active testing.",
     }
   }
   if (phases.scope_validation.status !== "complete" ||
@@ -216,10 +219,10 @@ export function reconPhaseExecutionDecision(
       phases.endpoint_inventory.status !== "complete") {
     return {
       allowed: false,
-      reason: requiredPhase + " requires completed scope validation, workspace setup, and endpoint inventory.",
+      reason: phaseLabel + " requires completed scope validation, workspace setup, and endpoint inventory.",
     }
   }
-  return { allowed: true, reason: "explicit " + requiredPhase + " checkpoint and prerequisites passed" }
+  return { allowed: true, reason: "explicit " + phaseLabel + " checkpoint and prerequisites passed" }
 }
 
 /** Checkpoint gate for explicit vulnerability-testing tools.
