@@ -648,7 +648,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   // or token values are retained in this inventory.
   const workflowSignals = new Map<string, JavaScriptWorkflowSignal>()
   const workflowRules: Array<{ kind: string; pattern: RegExp; capture?: number }> = [
-    { kind: "email-verification-flow", pattern: /\b(?:verifyEmail|verify_email|emailVerification|email_verification|verificationCode|verificationToken|emailToken|confirmEmail|confirm_email|sendVerificationEmail|resendVerification|magicLink|activationToken|emailVerified|email_verified)\b/gi },
+    { kind: "email-verification-flow", pattern: /\b(?:verifyEmailToken|verifyEmailAddress|confirmEmailToken|verify_email_token|verifyEmail|verify_email|emailVerification|email_verification|verificationCode|verificationToken|emailToken|confirmEmail|confirm_email|sendVerificationEmail|resendVerification|magicLink|activationToken|emailVerified|email_verified)\b/gi },
     { kind: "account-recovery-flow", pattern: /\b(?:forgotPassword|forgot_password|passwordReset|password_reset|resetPassword|reset_password|recoveryCode|recoveryToken|resetToken)\b/gi },
     { kind: "one-time-code-or-mfa-flow", pattern: /\b(?:\bOTP\b|oneTimePassword|one_time_password|verificationCode|securityCode|TOTP|MFA|WebAuthn|passkeyChallenge)\b/gi },
     { kind: "token-creation-or-signing", pattern: /\b(?:jwt\s*\.\s*sign|signJwt|createJwt|generateJwt|createToken|generateToken|mintToken|issueToken|signToken|createHmac|crypto\s*\.\s*subtle\s*\.\s*sign)\b/gi },
