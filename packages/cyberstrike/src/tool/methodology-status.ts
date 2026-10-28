@@ -35,7 +35,7 @@ export function pendingCoveragePage(
 
 export const MethodologyStatusTool = Tool.define("methodology_status", {
   description:
-    "Get the current methodology state, coverage report, chain opportunities, and validation status. Use this to check progress, identify gaps, and decide what to test next. Shows which phases are complete, which have blocking violations, per-asset coverage, and detected vulnerability chains. When include_pending_checks=true, returns a cursor-stable page of exact pending VRT entry/category rows for final coverage reconciliation.",
+    "Get the current methodology state, coverage report, chain opportunities, and validation status. Use this to check progress, identify gaps, and decide what to test next. Shows which phases are complete, which have blocking violations, per-asset coverage, and detected/validated chain hypotheses. Use `chain_link` to record real finding relationships and `validate_chain` only after combined impact has been tested; a chain remains a hypothesis until that evidence-backed lifecycle completes. When include_pending_checks=true, returns a cursor-stable page of exact pending VRT entry/category rows for final coverage reconciliation.",
   parameters: z.object({
     include_validation: z
       .boolean()
