@@ -7,11 +7,57 @@ import { TargetMemory } from "../target"
 import { Tool } from "./tool"
 import { assertExternalDirectory } from "./external-directory"
 
+// Logical area names remain accepted for existing callers, but new outputs are grouped
+// into a small, predictable set of physical folders.
 const AREAS = [
   "root", "scope", "assets", "recon", "urls", "directories", "parameters", "requests", "javascript", "endpoints",
   "testing", "findings", "evidence", "reports", "scans", "runs", "logs",
   "sessions", "research",
 ] as const
+
+const AREA_DIRECTORY: Record<(typeof AREAS)[number], string | null> = {
+  root: null,
+  scope: "scope",
+  assets: "assets",
+  recon: "recon",
+  urls: "recon",
+  directories: "recon",
+  parameters: "recon",
+  requests: "recon",
+  javascript: "javascript",
+  endpoints: "endpoints",
+  testing: "findings",
+  findings: "findings",
+  evidence: "findings",
+  reports: "reports",
+  scans: "recon",
+  runs: "runs",
+  logs: "recon",
+  sessions: "recon",
+  research: "recon",
+}
+
+const AREA_FILENAME_PREFIX: Partial<Record<(typeof AREAS)[number], string>> = {
+  urls: "urls",
+  directories: "directories",
+  parameters: "parameters",
+  requests: "requests",
+  endpoints: "endpoints",
+  testing: "testing",
+  evidence: "evidence",
+  scans: "scans",
+  logs: "logs",
+  sessions: "sessions",
+  research: "research",
+}
+
+function canonicalArtifactPath(area: (typeof AREAS)[number], filename: string): string {
+  const directory = AREA_DIRECTORY[area]
+  if (!directory) return filename
+  const prefix = AREA_FILENAME_PREFIX[area]
+  const canonicalFilename = prefix ? prefix + "-" + filename : filename
+  return directory + "/" + canonicalFilename
+}
 
 type TargetArtifactMetadata = {
   saved: boolean
@@ -29,7 +75,7 @@ type TargetArtifactMetadata = {
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Exact existing target workspace URL. Use the root target for parent inventory and the child origin for per-asset artifacts."),
-  area: z.enum(AREAS).describe("Use root only for canonical top-level inventories required by recon_checkpoint; otherwise use the matching target-local artifact directory. Do not replace authoritative manifests/index files."),
+  area: z.enum(AREAS).describe("Choose the closest logical area. Files are grouped into a small physical layout: root for canonical inventories, scope/, assets/, runs/, recon/ for general recon outputs, javascript/ and endpoints/ for JavaScript correlation, findings/ for testing/evidence, and reports/. Legacy logical areas are accepted and mapped into these folders with a filename prefix. Do not replace authoritative manifests/index files."),
   filename: z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/).describe("Simple filename only, not a path. Reuse the canonical inventory filename; do not suffix or number a duplicate current inventory."),
   content: z.string().max(2_000_000).optional().describe("Complete UTF-8 text/JSON/CSV content, maximum 2 MB. For an existing canonical inventory, first inspect and merge its current contents and provenance. Provide this OR source_path."),
   source_path: z.string().min(1).optional().describe("Absolute path to an existing user-provided text file on disk. Copies it into the target workspace without returning its contents to the model; files up to 32 MB. Provide this OR content."),
@@ -42,10 +88,10 @@ const Parameters = z.object({
 export const TargetArtifactTool = Tool.define("target_artifact", {
   description: [
     "Persist and update target artifacts only inside the exact existing target workspace; return the absolute path.",
-    "Use for canonical recon inventories, live-host results, URL/endpoint inventories, JavaScript analysis, request/response references, essential raw evidence, and the final report.",
+    "Persist canonical target artifacts in one workspace. Use root for canonical inventories; scope/ for authorization; assets/ for the consolidated asset registry; runs/ for checkpoints; recon/ for live-host, URL, parameter, directory, request, scan, and tool outputs; javascript/ and endpoints/ for JS assets/correlation; findings/ for tester surveys, validation evidence, and finding records; reports/ for final reports.",
     "The workspace must already exist in the current project. This tool never silently creates another directory or guesses a target path. Call target_workspace first.",
     "Provide exactly one input: content (up to 2 MB) or source_path (an absolute, existing regular text file up to 32 MB). source_path copies the file into the workspace without returning its contents to the model and reports its SHA-256 hash.",
-    "Use area=root only for canonical top-level inventories accepted by recon_checkpoint; this writes directly to the workspace root. Put detailed evidence in its matching area and keep the final recon report at reports/recon-final.md. Read and merge any existing canonical inventory, then overwrite the same filename intentionally rather than creating a duplicate.",
+    "Logical areas such as urls, parameters, directories, requests, scans, logs, sessions, research, testing, and evidence remain accepted for compatibility but are saved under the compact folders with a descriptive filename prefix. Read and merge existing canonical inventories, then update the same filename intentionally instead of creating duplicate copies.",
     "Only known artifact areas and safe single-file names are accepted. Generated identity/scope/registry/index files are reserved. Exact evidence is preserved in this private target workspace; do not copy raw secrets into Git commits or global research.",
     "For binary or outputs larger than 32 MB, configure the external tool to write to the exact workspace path returned by target_workspace, verify it, normalize it into the canonical inventory, and remove temporary output unless that raw file must be retained as evidence. Do not use the shell current directory or /root/targets implicitly.",
   ].join("\n"),
@@ -75,7 +121,7 @@ export const TargetArtifactTool = Tool.define("target_artifact", {
       }
     }
 
-    const relativePath = params.area === "root" ? filename : params.area + "/" + filename
+    const relativePath = canonicalArtifactPath(params.area, filename)
     const filePath = path.join(workspace.workspacePath, relativePath)
     const exists = await Bun.file(filePath).exists()
     if (exists && !params.overwrite) {
