@@ -175,20 +175,21 @@ test("legacy manifests migrate to require parameter discovery and revalidate dow
 })
 
 
-test("JavaScript correlation artifacts can be checkpointed in their canonical areas", () => {
+test("JavaScript correlation artifacts can be checkpointed in the compact target folders", () => {
   const areas = RECON_PHASE_ARTIFACT_AREAS.javascript_analysis
-  expect(areas).toEqual(["javascript", "endpoints", "testing"])
+  expect(areas).toEqual(["javascript", "endpoints", "findings", "testing"])
   expect(areas?.some((area) => "javascript/example-graph.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "endpoints/example-candidates.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "findings/tester-survey-example.json".startsWith(area + "/"))).toBe(true)
+  // Legacy workspaces remain resumable while new surveys use findings/.
   expect(areas?.some((area) => "testing/tester-survey-example.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "reports/example.md".startsWith(area + "/"))).toBe(false)
 })
 
-test("vulnerability testing artifacts must be saved in a testing, findings, or evidence area", () => {
+test("vulnerability testing artifacts must be saved under findings/ while legacy paths remain readable", () => {
   const areas = RECON_PHASE_ARTIFACT_AREAS.vulnerability_testing
-  expect(areas).toEqual(["testing", "findings", "evidence"])
+  expect(areas).toEqual(["findings", "testing", "evidence"])
   expect(areas?.some((area) => "findings/issue-1.json".startsWith(area + "/"))).toBe(true)
-  expect(areas?.some((area) => "evidence/request-1.txt".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "reports/random.md".startsWith(area + "/"))).toBe(false)
 })
 
