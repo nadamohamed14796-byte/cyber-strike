@@ -1,7 +1,7 @@
 import { chromium, type Page, type BrowserContext } from "playwright"
 import * as Stealth from "./stealth.ts"
 import { Log } from "./log.ts"
-import { drainCaptureQueue, permanentlyRejectedCaptureCount } from "./capture-queue.ts"
+import { drainCaptureQueue, permanentlyRejectedCaptureCount, permanentlyRejectedCaptureDetails } from "./capture-queue.ts"
 import type {
   AgentConfig,
   CapturedRequest,
@@ -2549,10 +2549,17 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
     (total, queue) => total + permanentlyRejectedCaptureCount(queue),
     0,
   )
+  const rejectedCaptureSamples = [...captureQueues.entries()]
+    .flatMap(([queueID, queue]) => permanentlyRejectedCaptureDetails(queue).map((detail) => ({
+      queue: String(queueID).slice(0, 80),
+      ...detail,
+    })))
+    .slice(-10)
   if (undeliveredCaptureCount > 0 || permanentlyRejectedCount > 0) {
     log.error("multi-credential crawl finished with capture delivery errors", {
       undelivered: undeliveredCaptureCount,
       permanentlyRejected: permanentlyRejectedCount,
+      rejectedCaptureSamples,
     })
   }
 
@@ -2576,8 +2583,11 @@ async function runMultiCredential(config: AgentConfig, credentials: CredentialCo
         ? [`${undeliveredCaptureCount} captured request(s) were not acknowledged by CyberStrike; their analysis did not run. See ingest delivery logs.`]
         : []),
       ...(permanentlyRejectedCount > 0
-        ? [`${permanentlyRejectedCount} captured request(s) were permanently rejected by CyberStrike and not analyzed. See ingest delivery logs for HTTP status details.`]
+        ? [`${permanentlyRejectedCount} captured request(s) were permanently rejected by CyberStrike and not analyzed. See redacted rejection samples for HTTP status and request paths.`]
         : []),
+      ...rejectedCaptureSamples.map((detail) =>
+        `Rejected capture: ${detail.request} — HTTP ${detail.status ?? "unknown"}: ${detail.reason}`,
+      ),
     ],
     usage: usageAcc,
   }
@@ -2720,7 +2730,12 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
             ? [`${captureQueue.length} captured request(s) were not acknowledged by CyberStrike; their analysis did not run.`]
             : []),
           ...(permanentlyRejectedCaptureCount(captureQueue) > 0
-            ? [`${permanentlyRejectedCaptureCount(captureQueue)} captured request(s) were permanently rejected by CyberStrike and not analyzed.`]
+            ? [
+                `${permanentlyRejectedCaptureCount(captureQueue)} captured request(s) were permanently rejected by CyberStrike and not analyzed.`,
+                ...permanentlyRejectedCaptureDetails(captureQueue).slice(-5).map((detail) =>
+                  `Rejected capture: ${detail.request} — HTTP ${detail.status ?? "unknown"}: ${detail.reason}`,
+                ),
+              ]
             : []),
         ],
         usage: usageAcc,
@@ -3131,7 +3146,12 @@ export async function run(config: AgentConfig): Promise<CrawlResult> {
           ? [`${captureQueue.length} captured request(s) were not acknowledged by CyberStrike; their analysis did not run. See ingest delivery logs.`]
           : []),
         ...(permanentlyRejectedCaptureCount(captureQueue) > 0
-          ? [`${permanentlyRejectedCaptureCount(captureQueue)} captured request(s) were permanently rejected by CyberStrike and not analyzed. See ingest delivery logs for HTTP status details.`]
+          ? [
+              `${permanentlyRejectedCaptureCount(captureQueue)} captured request(s) were permanently rejected by CyberStrike and not analyzed.`,
+              ...permanentlyRejectedCaptureDetails(captureQueue).slice(-5).map((detail) =>
+                `Rejected capture: ${detail.request} — HTTP ${detail.status ?? "unknown"}: ${detail.reason}`,
+              ),
+            ]
           : []),
       ],
       usage: usageAcc,
