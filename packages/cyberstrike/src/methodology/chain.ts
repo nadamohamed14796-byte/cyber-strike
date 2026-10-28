@@ -419,10 +419,12 @@ export namespace Chain {
         }
       }
 
-      // Remove only hypotheses that disappeared; linked edges cascade with that candidate.
+      // Drop only stale, untouched detections. Keep any chain that entered testing
+      // or has explicit finding links/validation so reconciliation cannot erase the audit trail.
       for (const prev of existing) {
         const key = `${prev.pattern}:${[...prev.entryIDs].sort().join("+")}`
-        if (!activeKeys.has(key)) {
+        const hasEvidenceTrail = prev.status !== "detected" || Boolean(prev.findingLinks?.length) || Boolean(prev.validation)
+        if (!activeKeys.has(key) && !hasEvidenceTrail) {
           db.delete(ChainCandidateTable).where(eq(ChainCandidateTable.id, prev.id)).run()
         }
       }
