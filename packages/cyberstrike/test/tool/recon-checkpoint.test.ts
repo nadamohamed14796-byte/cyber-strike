@@ -121,6 +121,7 @@ test("begin resumes running phases and does not restart resolved work", () => {
   expect(reconBeginDisposition("pending", "url_collection")).toBe("start")
   expect(reconBeginDisposition("failed", "url_collection")).toBe("start")
   expect(reconBeginDisposition("blocked", "url_collection")).toBe("start")
+  expect(reconBeginDisposition("partial", "javascript_analysis")).toBe("start")
   expect(reconBeginDisposition("deferred", "vulnerability_testing")).toBe("start")
 })
 
