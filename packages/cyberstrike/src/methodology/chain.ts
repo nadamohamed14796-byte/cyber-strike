@@ -755,10 +755,41 @@ export namespace Chain {
   // --- Prompt Formatting ---
 
   export function formatForPrompt(chains: Candidate[]): string {
-    const active = chains.filter((c) => c.status === "detected" || c.status === "testing")
-    if (active.length === 0) return ""
+    if (chains.length === 0) return ""
 
-    const lines: string[] = [`## Chain Hypotheses (${active.length} candidates; not confirmed findings)`, "Treat each item as a lead only. Validate every link independently, use an authorized controlled fixture, record a baseline and disconfirming control, and confirm terminal impact before changing finding severity or reporting a chain."]
+    const active = chains.filter((c) => c.status === "detected" || c.status === "testing")
+    const confirmed = chains.filter((c) => c.status === "confirmed")
+    const disproven = chains.filter((c) => c.status === "disproven")
+    const evidenceBackedConfirmed = confirmed.filter(
+      (c) => c.validation?.outcome === "confirmed" && Boolean(c.validation.combinedFindingID),
+    )
+
+    const lines: string[] = [
+      `## Chain Lifecycle (${active.length} active, ${evidenceBackedConfirmed.length} evidence-backed confirmed, ${disproven.length} disproven)`,
+      "A status string alone is not proof of combined impact. Only count a chain as evidence-backed confirmed when the durable chain-validation record is confirmed and references a combined finding; the combined finding and each explicitly linked hop must also pass the normal validation/triage lifecycle.",
+    ]
+
+    for (const c of confirmed) {
+      const verified = c.validation?.outcome === "confirmed" && Boolean(c.validation.combinedFindingID)
+      lines.push(
+        `[${verified ? "CONFIRMED" : "CONFIRMED STATUS — VALIDATION RECORD MISSING"}] chain_id=${c.id} | ${c.pattern.toUpperCase()} | Combined finding: ${c.validation?.combinedFindingID ?? "none"} | validation record: ${c.validation?.id ?? "missing"}`,
+      )
+    }
+
+    for (const c of disproven) {
+      const verified = c.validation?.outcome === "disproven" && Boolean(c.validation.evidence)
+      lines.push(
+        `[${verified ? "DISPROVEN" : "DISPROVEN STATUS — EVIDENCE RECORD MISSING"}] chain_id=${c.id} | ${c.pattern.toUpperCase()} | validation record: ${c.validation?.id ?? "missing"}`,
+      )
+    }
+
+    if (active.length === 0) return lines.join("\n")
+
+    lines.push(
+      "",
+      `## Active Chain Hypotheses (${active.length}; not confirmed findings)`,
+      "Treat each item as a lead only. Validate every link independently, use an authorized controlled fixture, record a baseline and disconfirming control, and confirm terminal impact before changing finding severity or reporting a chain.",
+    )
     for (const c of active.slice(0, 10)) {
       const confLabel = c.confidence >= 80 ? "HIGH" : c.confidence >= 60 ? "MED" : "LOW"
       lines.push(
@@ -770,6 +801,12 @@ export namespace Chain {
       for (const link of c.findingLinks ?? []) {
         lines.push(`  Finding link: ${link.sourceFindingID} --${link.relation}--> ${link.targetFindingID} (relationship recorded; chain impact remains unconfirmed)`)
       }
+      if (c.validation) {
+        lines.push(`  Latest chain validation: ${c.validation.outcome} | combined finding: ${c.validation.combinedFindingID ?? "none"} | record: ${c.validation.id}`)
+      }
+    }
+    if (active.length > 10) {
+      lines.push(`Additional active hypotheses not expanded above: ${active.slice(10).map((c) => c.id + " (" + c.pattern + ")").join(", ")}`)
     }
     return lines.join("\n")
   }
