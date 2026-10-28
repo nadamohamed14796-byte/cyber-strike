@@ -551,7 +551,7 @@ export function Prompt(props: PromptProps) {
       variant: "error",
       message: canRestore
         ? `${operation} response failed. Your draft was restored. Check the session before retrying in case it was already accepted. ${detail}`
-        : `${operation} response failed. Your draft was saved to the prompt stash; use /prompt.stash.pop to recover it. ${detail}`,
+        : `${operation} response failed. Your draft was saved to the prompt stash; choose the Stash pop command to recover it. ${detail}`,
       duration: 8000,
     })
     renderer.requestRender()
