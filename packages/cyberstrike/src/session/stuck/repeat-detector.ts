@@ -1,4 +1,5 @@
-// Cross-turn identical-call detector (loop-termination Layer 2b).
+// Cross-turn identical-call and read-only polling detectors (loop-termination Layer 2b).
+import { isProgressTool, READ_ONLY_TOOLS, toolSig } from "./signals"
 //
 // The within-turn duplicate suppressor (prompt.ts resolveTools) and the doom_loop
 // check (processor.ts) both operate on a SINGLE generation, so they miss a loop
@@ -55,5 +56,34 @@ export class RepeatDetector {
   reset(): void {
     this.counts.clear()
     this.nudged = false
+  }
+}
+
+
+/**
+ * Count exact read/status calls separately from ordinary work. A brief poll is normal;
+ * repeated identical polling without a meaningful recon/testing step is not progress.
+ * Any real progress resets the streak, so normal workflows can revisit status tools.
+ */
+export class ReadOnlyRepeatDetector {
+  private readonly detector: RepeatDetector
+
+  constructor(limit: number = 8) {
+    this.detector = new RepeatDetector(limit)
+  }
+
+  observe(toolCalls: { tool: string; input?: unknown }[]): RepeatVerdict {
+    if (toolCalls.some((call) => isProgressTool(call.tool))) {
+      this.detector.reset()
+      return "ok"
+    }
+    const signatures = toolCalls
+      .filter((call) => call.input !== undefined && READ_ONLY_TOOLS.has(call.tool))
+      .map((call) => toolSig(call.tool, call.input))
+    return this.detector.observe(signatures)
+  }
+
+  reset(): void {
+    this.detector.reset()
   }
 }
