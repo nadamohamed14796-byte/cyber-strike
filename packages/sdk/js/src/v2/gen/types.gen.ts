@@ -3861,9 +3861,6 @@ export type SessionRequestRetryData = {
      */
     requestID: string
   }
-  query?: {
-    directory?: string
-  }
   url: "/session/{sessionID}/request/{requestID}/retry"
 }
 
