@@ -695,11 +695,15 @@ async function syncTargetNotesMarkdown(workspace: Workspace): Promise<void> {
 
 async function pruneEmptyArtifactDirectories(workspace: Workspace): Promise<void> {
   for (const directory of TARGET_DIRECTORIES) {
-    if ((INITIAL_TARGET_DIRECTORIES as readonly string[]).includes(directory)) continue
     const candidate = path.join(workspace.workspacePath, directory)
     try {
       const info = await fs.lstat(candidate)
-      if (!info.isDirectory() || info.isSymbolicLink()) continue
+      // Keep the old symlink/non-directory protection even though these folders
+      // are now lazy-created. Some specialized tools write through their own APIs.
+      if (info.isSymbolicLink() || !info.isDirectory()) {
+        throw new Error("Unsafe target workspace artifact directory: " + candidate)
+      }
+      if ((INITIAL_TARGET_DIRECTORIES as readonly string[]).includes(directory)) continue
       // Remove only empty legacy placeholders. Any folder containing user evidence
       // remains intact; subsequent writes recreate a needed folder safely.
       await fs.rmdir(candidate)
