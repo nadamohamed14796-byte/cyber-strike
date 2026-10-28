@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mergeTodoSnapshot } from "../../src/tool/todo"
 import type { Todo } from "../../src/session/todo"
+import { trimTodoHistory } from "../../src/session/todo"
 
 const item = (content: string, status: string, priority = "medium"): Todo.Info => ({
   content,
@@ -54,4 +55,26 @@ describe("todo snapshot reconciliation", () => {
     expect(result.todos).toEqual([item("New task", "pending", "high")])
     expect(result.preserved).toEqual([])
   })
+})
+
+test("completed recon checklist entries survive todo history trimming", () => {
+  const reconPhases = [
+    "scope_validation",
+    "workspace_setup",
+    "asset_discovery",
+    "live_hosts_ports",
+    "url_collection",
+    "javascript_analysis",
+    "parameter_discovery",
+    "directory_fuzzing",
+    "endpoint_inventory",
+    "reporting",
+  ]
+  const recon = reconPhases.map((phase) => item("[recon:" + phase + "] done", "completed", "high"))
+  const general = Array.from({ length: 8 }, (_, index) => item("Old task " + index, "completed"))
+  const trimmed = trimTodoHistory([...recon, ...general, item("Current task", "in_progress", "high")])
+
+  expect(trimmed.filter((todo) => /^\\[recon:[a-z_]+\\]/.test(todo.content))).toHaveLength(reconPhases.length)
+  expect(trimmed.filter((todo) => todo.status === "completed" && !/^\\[recon:[a-z_]+\\]/.test(todo.content))).toHaveLength(5)
+  expect(trimmed[0]).toEqual(item("Current task", "in_progress", "high"))
 })
