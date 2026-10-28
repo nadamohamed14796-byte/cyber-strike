@@ -370,7 +370,7 @@ test("skill search normalizes slugs and indexes routing metadata", async () => {
           .toContain("attack-javascript-analysis")
         expect(SkillIndex.byTag("source maps").map((entry) => entry.name))
           .toContain("attack-javascript-analysis")
-        expect(SkillIndex.byTechStack("JavaScript").map((entry) => entry.name))
+        expect(SkillIndex.byTechStack(["JavaScript"]).map((entry) => entry.name))
           .toContain("attack-javascript-analysis")
         expect(SkillIndex.resolveReference("api-gateway")).toBe("api-gateway")
         expect(SkillIndex.resolveReference("api gateway")).toBeUndefined()
