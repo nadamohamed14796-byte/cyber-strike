@@ -4,7 +4,7 @@ description: "Assess registration, email/phone verification, change-email, resen
 category: "identity"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags: [- account-lifecycle, email-verification, registration, change-email, account-recovery, unverified-account, identity]
+tags: [account-lifecycle, email-verification, registration, change-email, account-recovery, unverified-account, identity]
 tech_stack:
   - web
   - rest-api
