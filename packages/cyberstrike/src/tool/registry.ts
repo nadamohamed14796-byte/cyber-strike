@@ -224,6 +224,7 @@ export namespace ToolRegistry {
       GmailTool,
       // Methodology Engine Tools — intelligence, coverage, chain detection
       AddIntelTool,
+      ChainLinkTool,
       UpdateVrtCheckTool,
       RecordCoverageNoteTool,
       GetCoverageNotesTool,
