@@ -102,7 +102,7 @@ test("user-confirmed exact scope without an external policy URL passes the recon
         const legacy = JSON.parse(await fs.readFile(runPath, "utf-8"))
         delete legacy.phases.scope_validation.scopeValidationTarget
         delete legacy.phases.scope_validation.scopeFingerprint
-        await TargetMemory.writeWorkspaceFile(root.workspace, path.join("runs", path.basename(runPath)), JSON.stringify(legacy, null, 2) + "\n")
+        await TargetMemory.writeWorkspaceFile(root.workspace, "runs/" + path.basename(runPath), JSON.stringify(legacy, null, 2) + "\n")
 
         const resumed = await tool.execute({ action: "status", target_url: root.workspace.targetURL }, ctx)
         phases = resumed.metadata.phases as Record<string, { status: string; scopeValidationTarget?: string; scopeFingerprint?: string }>
