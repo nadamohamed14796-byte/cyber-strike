@@ -483,6 +483,44 @@ export namespace Request {
     return matches(legacyRows)
   }
 
+  /**
+   * Explicitly requeue a failed captured-request analysis.
+   *
+   * The status check and transition happen in one transaction so duplicate retry
+   * requests cannot enqueue the same failed row twice. Successful and in-flight
+   * requests remain untouched.
+   */
+  export function retryFailed(sessionID: string, requestID: string): Info | undefined {
+    const row = Database.transaction((db) => {
+      const current = db
+        .select()
+        .from(RequestTable)
+        .where(and(eq(RequestTable.id, requestID), eq(RequestTable.session_id, sessionID)))
+        .get()
+      if (!current || current.status !== "failed") return undefined
+
+      db.update(RequestTable)
+        .set({ status: "queued", time_updated: Date.now() })
+        .where(
+          and(
+            eq(RequestTable.id, requestID),
+            eq(RequestTable.session_id, sessionID),
+            eq(RequestTable.status, "failed"),
+          ),
+        )
+        .run()
+
+      return db
+        .select()
+        .from(RequestTable)
+        .where(and(eq(RequestTable.id, requestID), eq(RequestTable.session_id, sessionID)))
+        .get()
+    })
+    if (!row || row.status !== "queued") return undefined
+    Bus.publish(Event.Updated, { sessionID, requests: get(sessionID) })
+    return rowToInfo(row)
+  }
+
   export function updateStatus(input: { id: string; status: z.infer<typeof Status> }) {
     const now = Date.now()
     const row = Database.use((db) => {
