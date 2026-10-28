@@ -170,7 +170,7 @@ export function CapturedRequestAnalysisPanel() {
           }}
           class="absolute right-4 bottom-32 z-[80] rounded-lg border border-border-base bg-background-base px-4 py-2 text-12-medium text-text-base shadow-xl hover:bg-surface-raised-base"
         >
-          {selected()?.status === "analyzing" ? "View live request analysis" : "View last request analysis"}
+          {displayStatus() === "analyzing" ? "View live request analysis" : "View last request analysis"}
         </button>
       </Show>
       <Show when={selected() && open()}>
