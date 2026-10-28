@@ -73,6 +73,14 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://192.0.3.17/", entries)).toEqual([])
   })
 
+  test("does not reuse stale authorization when a mutable list changes in place", () => {
+    const entries = ["old.example"]
+    expect(matchingScopeItems("https://old.example/", entries)).toEqual(["old.example"])
+    entries[0] = "new.example"
+    expect(matchingScopeItems("https://old.example/", entries)).toEqual([])
+    expect(matchingScopeItems("https://new.example/", entries)).toEqual(["new.example"])
+  })
+
   test("recompiles a replacement list rather than reusing an old index", () => {
     const first = ["old.example"]
     expect(matchingScopeItems("https://old.example/", first)).toEqual(["old.example"])
