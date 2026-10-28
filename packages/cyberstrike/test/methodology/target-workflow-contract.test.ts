@@ -26,7 +26,7 @@ test("target workflow defines autonomous recon handoffs, one workspace, and evid
   expect(contract).toContain("Never delete captured JavaScript/source-map bodies")
   expect(contract).toContain("Use `handoff` when a meaningful alternative has failed or progress has stalled")
   expect(contract).toContain("The state becomes **partial**")
-  expect(contract).toContain("Only the safety gates in section 2 block normal transitions")
+  expect(contract).toContain("`pending`, `running`, `blocked`, and `failed` work must be finished or explicitly handed off")
 })
 
 test("a selected missing CLI must be installed and verified before choosing a fallback", () => {
