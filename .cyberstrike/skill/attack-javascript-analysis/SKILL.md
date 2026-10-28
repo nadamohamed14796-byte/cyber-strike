@@ -62,7 +62,13 @@ Treat output as candidate metadata. Redact token-like values before persisting, 
 Prioritize routes that connect to privileged actions, tenant/object identifiers, file transfers, authentication flows, remote URL fetches, billing/export operations, and hidden API versions. A useful chain is JavaScript clue → correlated live request → missing server-side control → controlled proof → impact. If the live request cannot be observed or safely tested, keep it as an unconfirmed lead.
 
 ## Output contract
-Save an endpoint/parameter inventory with asset, file hash, source, method, route template, parameters, headers, auth signals, role/tenant hints, sink/source, live-request correlation, confidence, redaction, and next skill. Keep one endpoint record with multiple parameter observations rather than duplicating the endpoint itself.
+Keep the workspace organized around two canonical human-readable outputs and reuse the existing evidence folders; do not create another report copy for each asset.
+
+1. `javascript-analysis.md` is the main report. Put a compact coverage/status summary first, then order sections as: asset URLs/statuses and hashes; local source files and source-map coverage; function/call-site inventory; API/request candidates; application workflows/frameworks/SDKs/integrations; roles/permissions/tenant/feature flags; security-review leads across relevant classes; secret fingerprints (never raw values); and exact gaps, unresolved URLs, and resume actions.
+2. `endpoints.txt` is the canonical endpoint inventory. Use one identity per normalized origin + HTTP method + path template. Merge query/body/path parameter names, headers, auth/cookie signals, source file/hash/line, and captured request IDs into that row. Query-string value differences must never create duplicate endpoint rows.
+3. `javascript/asset-manifest.json` is the per-URL source of truth for downloaded, reused, failed, skipped, and pending assets. Existing graph JSON, captured-source indexes, and source-map evidence stay in their current `javascript/` and `endpoints/` locations. Do not make per-file Markdown reports or duplicate inventories.
+4. Keep every useful application-intelligence lead even when it does not match a known vulnerability class; label static results as candidates and link them to file/line/hash. Never print raw secrets, token values, cookie values, or sensitive query values.
+5. Report collection and analysis coverage honestly. Only claim exhaustive coverage when the tool result explicitly reports both `collection_complete=true` and `analysis_complete=true`. Failed, skipped, pending, out-of-scope, truncated, and unresolved source maps remain visible as gaps; do not hide them behind a single “complete” label.
 
 ## False positives
 - Bundled third-party code or dead code is mistaken for the target's application logic.
