@@ -34,7 +34,7 @@ describe("Truncate", () => {
     })
 
     test("handles very large line-heavy output without splitting it into an array", async () => {
-      const content = "entry\\n".repeat(100_000)
+      const content = "entry\n".repeat(100_000)
       const result = await Truncate.output(content, { maxLines: 100, maxBytes: 1024 })
 
       expect(result.truncated).toBe(true)
