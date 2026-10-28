@@ -226,6 +226,7 @@ export namespace ToolRegistry {
       // Methodology Engine Tools — intelligence, coverage, chain detection
       AddIntelTool,
       ChainLinkTool,
+      ValidateChainTool,
       UpdateVrtCheckTool,
       RecordCoverageNoteTool,
       GetCoverageNotesTool,
