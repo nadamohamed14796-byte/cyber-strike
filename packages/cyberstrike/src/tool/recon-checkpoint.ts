@@ -420,12 +420,12 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           return { title: "Recon checkpoint rejected", output: "Phase " + phase + " is " + record.status + ", not running. Call begin first; the manifest was not changed.", metadata: { saved: false, reason: "phase_not_running", phase, status: record.status } }
         }
         if ((params.action === "block" || params.action === "fail" || params.action === "unavailable" || params.action === "defer" || params.action === "handoff") && !params.reason?.trim()) {
-          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, unavailable, or deferred.", metadata: { saved: false, reason: "reason_required" } }
+          return { title: "Recon checkpoint rejected", output: "A reason is required to mark a phase blocked, failed, unavailable, deferred, or handed off as partial.", metadata: { saved: false, reason: "reason_required" } }
         }
         let status: ReconPhaseStatus = params.action === "complete" ? "complete" : params.action === "handoff" ? "partial" : params.action === "block" ? "blocked" : params.action === "fail" ? "failed" : params.action === "defer" ? "deferred" : "unavailable"
         let handoffReason: string | undefined
         if ((status === "complete" || status === "partial") && !params.summary?.trim()) {
-          return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete.", metadata: { saved: false, reason: "summary_required" } }
+          return { title: "Recon checkpoint rejected", output: "A verified summary is required before a phase can be marked complete or handed off as partial.", metadata: { saved: false, reason: "summary_required" } }
         }
         if (status === "complete" || status === "partial") {
           const unresolved = unresolvedReconPrerequisites(phase, run.phases)
@@ -705,22 +705,32 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           try {
             const rootInfo = await fs.lstat(scratchRoot)
             if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
-              return { title: "Recon checklist not complete", output: "Cannot complete " + phase + ": the scratch output directory is not a safe workspace-local directory. Inspect and preserve its contents before proceeding.", metadata: { saved: false, reason: "unsafe_phase_scratch_directory", phase } }
-            }
-            const phaseInfo = await fs.lstat(scratchPhase)
-            if (!phaseInfo.isDirectory() || phaseInfo.isSymbolicLink()) {
-              return { title: "Recon checklist not complete", output: "Cannot complete " + phase + ": the phase scratch path is not a regular directory. Inspect it without following symlinks.", metadata: { saved: false, reason: "unsafe_phase_scratch_path", phase } }
-            }
-            const leftovers = await fs.readdir(scratchPhase)
-            if (leftovers.length > 0) {
-              // Do not trap the run on cleanup. Preserve scratch data and make the
-              // handoff explicitly partial so later independent phases can proceed.
               status = "partial"
-              handoffReason = "Canonical artifacts were verified, but runs/tmp/" + phase + "/ still contains " + leftovers.length + " item(s). They were preserved to avoid evidence loss; reconcile on resume before claiming full coverage."
+              handoffReason = "The runs/tmp scratch root is not a safe workspace-local directory. It was not followed or changed; inspect it before claiming full coverage."
+            } else {
+              try {
+                const phaseInfo = await fs.lstat(scratchPhase)
+                if (!phaseInfo.isDirectory() || phaseInfo.isSymbolicLink()) {
+                  status = "partial"
+                  handoffReason = "The phase scratch path is not a safe regular directory. It was preserved and not followed; inspect it before claiming full coverage."
+                } else {
+                  const leftovers = await fs.readdir(scratchPhase)
+                  if (leftovers.length > 0) {
+                    status = "partial"
+                    handoffReason = "Canonical artifacts were verified, but runs/tmp/" + phase + "/ still contains " + leftovers.length + " item(s). They were preserved to avoid evidence loss; reconcile on resume before claiming full coverage."
+                  }
+                }
+              } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+                  status = "partial"
+                  handoffReason = "The phase scratch path could not be verified safely (" + (error instanceof Error ? error.message : String(error)) + "). It was preserved; inspect it before claiming full coverage."
+                }
+              }
             }
           } catch (error) {
             if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-              return { title: "Recon checklist not complete", output: "Cannot verify phase scratch cleanup: " + (error instanceof Error ? error.message : String(error)), metadata: { saved: false, reason: "phase_scratch_check_failed", phase } }
+              status = "partial"
+              handoffReason = "The scratch root could not be verified safely (" + (error instanceof Error ? error.message : String(error)) + "). It was preserved; inspect it before claiming full coverage."
             }
           }
         }
