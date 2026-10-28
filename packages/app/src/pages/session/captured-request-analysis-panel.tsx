@@ -131,10 +131,15 @@ export function CapturedRequestAnalysisPanel() {
       setRequestLoadError("")
       setRetryNotice("")
       setRetryError("")
-      void sdk.client.session.request({ sessionID }).then((result) => {
+      // Keep the request row in the shared sync store. request.updated events
+      // refresh its status from queued → processing → processed/failed, so the
+      // panel does not stay stuck on the optimistic "queued" state after retry.
+      void sync.session.request(sessionID).then(() => {
         if (generation !== requestLoadGeneration) return
-        const rows = (result.data ?? []) as unknown as RequestRow[]
-        setRequest(rows.find((item) => item.id === requestID))
+        const rows = (sync.data.request[sessionID] ?? []) as unknown as RequestRow[]
+        const row = rows.find((item) => item.id === requestID)
+        if (row) setRequest(row)
+        else setRequestLoadError("Captured request is not present in the current session.")
       }).catch((error: unknown) => {
         if (generation !== requestLoadGeneration) return
         setRequestLoadError(error instanceof Error ? error.message : String(error))
@@ -144,6 +149,18 @@ export function CapturedRequestAnalysisPanel() {
       })
     }),
   )
+
+  // Request rows are refreshed by request.updated events. Re-read the
+  // selected row whenever the shared request inventory changes.
+  createEffect(() => {
+    if (!open()) return
+    const sessionID = parentID()
+    const requestID = selected()?.requestID
+    if (!sessionID || !requestID) return
+    const rows = (sync.data.request[sessionID] ?? []) as unknown as RequestRow[]
+    const row = rows.find((item) => item.id === requestID)
+    if (row) setRequest(row)
+  })
 
   const displayStatus = (): AnalysisStatus => {
     const persistedStatus = request()?.id === selected()?.requestID ? request()?.status : undefined
