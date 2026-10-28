@@ -125,6 +125,17 @@ test("endpoint inventory cannot be bypassed with unavailable status", () => {
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("endpoint_inventory")
 })
 
+test("parameter fuzzing is opt-in and requires a complete endpoint inventory", () => {
+  const state = records("complete")
+  state.parameter_fuzzing = { status: "deferred", reason: "Active testing not requested" }
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state).allowed).toBe(false)
+  state.parameter_fuzzing = { status: "running" }
+  state.endpoint_inventory = { status: "unavailable", reason: "Inventory incomplete" }
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state).allowed).toBe(false)
+  state.endpoint_inventory = { status: "complete" }
+  expect(reconPhaseExecutionDecision("parameter_fuzzing", state).allowed).toBe(true)
+})
+
 test("a fully resolved inventory allows the vulnerability phase", () => {
   const state = records("complete")
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
