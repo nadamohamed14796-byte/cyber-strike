@@ -51,6 +51,22 @@ jobs:
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'skill/SKILL_GUIDE.md'
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'install.sh'
 
+      - name: Smoke-test artifact installer
+        run: |
+          bash -n packages/cyberstrike/script/install-linux-artifact.sh
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          mkdir -p "$TMP_DIR/archive"
+          tar -xzf cyberstrike-linux-x64.tar.gz -C "$TMP_DIR/archive"
+          HOME="$TMP_DIR/home" \
+            XDG_DATA_HOME="$TMP_DIR/share" \
+            CYBERSTRIKE_INSTALL_BIN_DIR="$TMP_DIR/bin" \
+            bash "$TMP_DIR/archive/install.sh"
+          test -x "$TMP_DIR/bin/cyberstrike"
+          test -f "$TMP_DIR/share/cyberstrike/bin/hackbrowser-worker.js"
+          test -f "$TMP_DIR/share/cyberstrike/data/scripts/wayback_endpoints.py"
+          test -f "$TMP_DIR/share/cyberstrike/skill/SKILL_GUIDE.md"
+
       - name: Upload runnable Linux x64 build
         uses: actions/upload-artifact@v6
         with:
