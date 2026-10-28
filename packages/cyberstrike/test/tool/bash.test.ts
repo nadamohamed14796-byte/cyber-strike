@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
 import { BashTool, findWrappedScanner, katanaScopeBlockReason, passiveResearchLookup, reconScannerInvocationKey, scannerLaunchedByWrapper, scannerRequestScopeBlockReason, scannerTargets, parseScopedPortSpec } from "../../src/tool/bash"
-import type { TargetScope } from "../../src/target"
+import { TargetMemory, type TargetScope } from "../../src/target"
 import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import type { PermissionNext } from "../../src/permission/next"
@@ -21,6 +21,32 @@ const ctx = {
 const projectRoot = path.join(__dirname, "../..")
 
 describe("tool.bash", () => {
+  test("rejects a wrong port against persisted typed API scope before spawning curl", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        await TargetMemory.configureScope("https://program-policy.example.test", {
+          include: ["API: api.scope-regression.invalid:8443"],
+          authorizationSource: "Typed API port regression fixture",
+          authorizationReference: "https://program-policy.example.test/policy",
+        })
+        const bash = await BashTool.init()
+        let message = ""
+        try {
+          await bash.execute({
+            command: "curl -q --connect-timeout 1 https://api.scope-regression.invalid:9443/",
+            description: "Exercise wrong-port scope rejection",
+          }, ctx)
+        } catch (error) {
+          message = error instanceof Error ? error.message : String(error)
+        }
+        expect(message).toContain("persisted scope rejected the target/port")
+        expect(message).toContain("No command was started.")
+      },
+    })
+  })
+
   test("rejects unsafe curl invocation before spawning the command and gives a bounded correction", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
