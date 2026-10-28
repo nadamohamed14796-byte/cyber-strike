@@ -1226,7 +1226,7 @@ test("correlates scoped descendant JavaScript from a policy-only root workspace"
         response: {
           status: 200,
           headers: { "content-type": "application/javascript" },
-          body: 'fetch("/api/profile")',
+          body: 'const operation = "mutation UpdateBillingPlan { updatePlan { id } }"; navigator.serviceWorker.register("/service-worker.js"); fetch("/api/profile")',
         },
       })
       expect(jsRequest).toBeDefined()
@@ -1237,6 +1237,12 @@ test("correlates scoped descendant JavaScript from a policy-only root workspace"
       })
       expect(result.graph.javascriptAssets.some((asset) => asset.url === assetURL + "/assets/app.js")).toBe(true)
       expect(result.graph.endpointCandidates.some((endpoint) => endpoint.path === "/api/profile")).toBe(true)
+      expect(result.graph.javascriptAnalysis.applicationHints?.some((item) =>
+        item.kind === "graphql-operation" && item.value === "UpdateBillingPlan",
+      )).toBe(true)
+      expect(result.graph.javascriptAnalysis.applicationHints?.some((item) =>
+        item.kind === "service-worker",
+      )).toBe(true)
     },
   })
 })
