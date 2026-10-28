@@ -153,3 +153,66 @@ test("scope manifest changes invalidate resumable recon checkpoints even when th
     },
   })
 })
+
+
+test("resume fingerprints an asset's full inherited scope chain, not only the program root", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://program-chain.example.test"
+      const assetURL = "https://api.scope-chain.example.net"
+      const root = await TargetMemory.configureScope(targetURL, {
+        include: ["*.scope-chain.example.net"],
+        authorizationSource: "Root scope chain fixture",
+        authorizationReference: "https://program-chain.example.test/policy",
+      })
+      const attached = await TargetMemory.attachAsset(root.workspace.targetURL, assetURL, "api")
+      await TargetMemory.configureScope(attached.asset.targetURL, {
+        include: ["api.scope-chain.example.net"],
+        authorizationSource: "Child API scope fixture",
+        authorizationReference: "https://api.scope-chain.example.net/security",
+      })
+
+      const tool = await ReconCheckpointTool.init()
+      const ctx = {
+        sessionID: "ses_recon_scope_chain_fingerprint",
+        messageID: "msg_recon_scope_chain_fingerprint",
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => undefined,
+        ask: async () => {},
+      } as never
+      const execute = (action: "status" | "begin" | "complete", phase?: "scope_validation" | "workspace_setup", summary?: string) =>
+        tool.execute({
+          action,
+          target_url: root.workspace.targetURL,
+          phase,
+          summary,
+          scope_validation_target: assetURL + "/",
+        }, ctx)
+
+      const before = await TargetMemory.checkURLScope(assetURL + "/")
+      expect(before.allowed).toBe(true)
+      expect(before.workspace?.id).toBe(attached.asset.id)
+      expect((await execute("begin", "scope_validation")).metadata.saved).toBe(true)
+      expect((await execute("complete", "scope_validation", "Effective child and parent scope verified.")).metadata.saved).toBe(true)
+      expect((await execute("begin", "workspace_setup")).metadata.saved).toBe(true)
+      expect((await execute("complete", "workspace_setup", "Workspace integrity verified.")).metadata.saved).toBe(true)
+
+      await TargetMemory.configureScope(attached.asset.targetURL, {
+        include: ["api.scope-chain.example.net", "*.api.scope-chain.example.net"],
+        authorizationSource: "Child API scope fixture",
+        authorizationReference: "https://api.scope-chain.example.net/security",
+      })
+      expect((await TargetMemory.checkURLScope(assetURL + "/")).allowed).toBe(true)
+      const status = await execute("status")
+      expect(status.metadata.saved).toBe(true)
+      const phases = status.metadata.phases as Record<string, { status: string; reason?: string }>
+      expect(phases.scope_validation.status).toBe("pending")
+      expect(phases.scope_validation.reason).toContain("scope or exclusions changed")
+      expect(phases.workspace_setup.status).toBe("pending")
+    },
+  })
+})
