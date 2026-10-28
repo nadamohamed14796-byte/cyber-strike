@@ -1285,6 +1285,66 @@ export const SessionRoutes = lazy(() =>
         return c.json(list)
       },
     )
+    .post(
+      "/:sessionID/request/:requestID/retry",
+      describeRoute({
+        summary: "Retry failed captured-request analysis",
+        description:
+          "Requeue one previously failed captured-request analysis. Only failed requests may be retried; duplicate calls cannot enqueue the same row twice.",
+        operationId: "session.request.retry",
+        responses: {
+          202: {
+            description: "Request analysis queued",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ requestID: z.string(), status: z.literal("queued") })),
+              },
+            },
+          },
+          409: { description: "Request is not failed or its status changed before retry" },
+          ...errors(400, 404),
+        },
+      }),
+      validator(
+        "param",
+        z.object({
+          sessionID: z.string().meta({ description: "Session ID" }),
+          requestID: z.string().meta({ description: "Captured request ID" }),
+        }),
+      ),
+      async (c) => {
+        const { sessionID, requestID } = c.req.valid("param")
+        const existing = Request.get(sessionID).find((item) => item.id === requestID)
+        if (!existing) {
+          c.status(404)
+          return c.json({ error: "Captured request not found" })
+        }
+        if (existing.status !== "failed") {
+          c.status(409)
+          return c.json({ error: `Only failed requests can be retried; current status is ${existing.status}` })
+        }
+
+        const req = Request.retryFailed(sessionID, requestID)
+        if (!req) {
+          c.status(409)
+          return c.json({ error: "Request status changed before retry; refresh the request list and try again" })
+        }
+
+        IngestQueue.enqueue(
+          sessionID,
+          () =>
+            analyzeCapturedRequest({
+              sessionID,
+              req,
+              buildPrompt: () => buildPersistedRequestPrompt(sessionID, req),
+            }),
+          sessionID,
+        )
+
+        c.status(202)
+        return c.json({ requestID: req.id, status: "queued" as const })
+      },
+    )
     .get(
       "/:sessionID/observations",
       describeRoute({
