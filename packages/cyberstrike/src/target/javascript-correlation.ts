@@ -1453,12 +1453,40 @@ function renderCanonicalJavaScriptAnalysis(
   const pendingAssets = manifestAssets.filter((item) => item.status === "pending")
   const inventoryGaps = graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:"))
   const localFiles = graph.sourceFiles
+  const bySourceLine = <T extends { sourceFile: string; line: number }>(a: T, b: T) =>
+    a.sourceFile.localeCompare(b.sourceFile) || a.line - b.line
+  const functions = [...graph.javascriptAnalysis.functions].sort((a, b) =>
+    bySourceLine(a, b) || a.name.localeCompare(b.name),
+  )
+  const requestCandidates = [...graph.javascriptAnalysis.requestCandidates].sort((a, b) =>
+    a.sourceFile.localeCompare(b.sourceFile) || a.sourceLine - b.sourceLine ||
+    (a.method ?? "UNKNOWN").localeCompare(b.method ?? "UNKNOWN") || a.urlTemplate.localeCompare(b.urlTemplate),
+  )
+  const roleHints = [...graph.javascriptAnalysis.roleHints].sort((a, b) =>
+    a.kind.localeCompare(b.kind) || bySourceLine(a, b) || a.value.localeCompare(b.value),
+  )
+  const applicationHints = [...(graph.javascriptAnalysis.applicationHints ?? [])].sort((a, b) =>
+    a.kind.localeCompare(b.kind) || bySourceLine(a, b) || a.value.localeCompare(b.value),
+  )
+  const riskSignals = [...graph.javascriptAnalysis.riskSignals].sort((a, b) =>
+    a.kind.localeCompare(b.kind) || a.sourceFile.localeCompare(b.sourceFile) || a.line - b.line ||
+    (a.functionName ?? "").localeCompare(b.functionName ?? ""),
+  )
+  const secretCandidates = [...graph.javascriptAnalysis.secretCandidates].sort((a, b) =>
+    a.kind.localeCompare(b.kind) || a.sourceFile.localeCompare(b.sourceFile) || a.line - b.line,
+  )
+  const hasRecordedGaps = inventoryGaps.length > 0 || Boolean(manifest?.pendingURLs?.length) ||
+    pendingAssets.length > 0 || failedAssets.length > 0 || skippedAssets.length > 0 ||
+    incompleteMaps.length > 0 || Boolean(manifestWarning)
   const lines = [
     JAVASCRIPT_ANALYSIS_BEGIN,
     "# JavaScript Analysis Summary",
     "",
     "- Target: " + safeSummaryURL(graph.targetURL),
     "- Generated: " + graph.createdAt,
+    "- Coverage assessment: " + (hasRecordedGaps
+      ? "INCOMPLETE / REVIEW REQUIRED — see the explicit gap sections below"
+      : "No known gaps recorded; verify collection_complete=true and analysis_complete=true in the ingestion result"),
     "- Correlation snapshots combined: " + graphCount,
     "- Unique JavaScript/source-map URLs: " + assets.size,
     "- Asset statuses: downloaded=" + downloadedAssets.length + ", reused/cache-hit=" + reusedAssets.length +
@@ -1471,12 +1499,12 @@ function renderCanonicalJavaScriptAnalysis(
     "- Embedded source entries analyzed: " + localFiles.filter((file) => Boolean(file.sourceMapSource)).length,
     "- Static endpoint candidates (method-aware): " + graph.endpointCandidates.length,
     "- Endpoint candidates overlapping captured traffic: " + graph.endpointCandidates.filter((item) => item.observedInTraffic).length,
-    "- JavaScript function candidates: " + graph.javascriptAnalysis.functions.length,
-    "- Structured request candidates: " + graph.javascriptAnalysis.requestCandidates.length,
-    "- Secret-like assignments (fingerprints only): " + graph.javascriptAnalysis.secretCandidates.length,
-    "- Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
-    "- Application/integration hints: " + (graph.javascriptAnalysis.applicationHints ?? []).length,
-    "- Static risk-sink candidates: " + graph.javascriptAnalysis.riskSignals.length,
+    "- JavaScript function candidates: " + functions.length,
+    "- Structured request candidates: " + requestCandidates.length,
+    "- Secret-like assignments (fingerprints only): " + secretCandidates.length,
+    "- Role/feature hints: " + roleHints.length,
+    "- Application/integration hints: " + applicationHints.length,
+    "- Static risk-sink candidates: " + riskSignals.length,
     "- Captured requests correlated: " + graph.requests.length,
     "- Response evidence records: " + graph.evidence.length,
     "- Failed asset fetches: " + failedAssets.length,
@@ -1513,13 +1541,13 @@ function renderCanonicalJavaScriptAnalysis(
     ...(skippedAssets.length ? ["", "## Skipped asset fetches", ...skippedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — skipped; inspect the manifest status/error locally.")] : []),
     "",
         "## Function and call-site inventory",
-        ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) =>
+        ...(functions.length ? functions.map((fn) =>
           "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
           safeSummaryText(fn.sourceFile) + ":" + fn.line,
         ) : ["- No named function candidates were extracted."]),
         "",
     "## API and request intelligence",
-    ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((item) =>
+    ...(requestCandidates.length ? requestCandidates.map((item) =>
       "- " + (item.method ?? "UNKNOWN") + " " + safeSummaryText(item.urlTemplate) +
       " — function: " + (item.sourceFunction ?? "unknown") +
       " — source: " + item.sourceFile + ":" + item.sourceLine +
@@ -1531,31 +1559,31 @@ function renderCanonicalJavaScriptAnalysis(
     "",
 
     "## Roles, permissions, tenants and feature flags",
-    ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) =>
+    ...(roleHints.length ? roleHints.map((item) =>
       "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.value) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line,
     ) : ["- No role/feature hints matched the static heuristics."]),
     "",
     "## Application features and integrations (candidate intelligence)",
-    ...((graph.javascriptAnalysis.applicationHints ?? []).length
-      ? (graph.javascriptAnalysis.applicationHints ?? []).map((item) =>
+    ...(applicationHints.length
+      ? applicationHints.map((item) =>
           "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.value) + " — " +
           safeSummaryText(item.sourceFile) + ":" + item.line + " — candidate only",
         )
       : ["- No application/integration hints matched the current static rules."]),
     "",
     "## Security review leads (not confirmed findings)",
-    ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) =>
+    ...(riskSignals.length ? riskSignals.map((item) =>
       "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line + " — function: " +
       safeSummaryText(item.functionName ?? "unknown") + " — candidate only",
     ) : ["- No configured static risk patterns matched."]),
     "",
     "## Secret-like candidates (fingerprints only; never raw values)",
-    ...(graph.javascriptAnalysis.secretCandidates.length ? graph.javascriptAnalysis.secretCandidates.map((item) =>
+    ...(secretCandidates.length ? secretCandidates.map((item) =>
       "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line +
       " — fingerprint sha256:" + item.fingerprint + " — candidate only",
     ) : ["- No secret-like assignments matched the static heuristics."]),
     "",
-    ...(graph.javascriptAnalysis.riskSignals.length ? graph.javascriptAnalysis.riskSignals.map((item) =>
+    ...(riskSignals.length ? riskSignals.map((item) =>
       "- " + item.kind + " — " + item.sourceFile + ":" + item.line + " — function: " +
       (item.functionName ?? "unknown") + " — candidate only",
     ) : ["- No configured static sink patterns matched."]),
