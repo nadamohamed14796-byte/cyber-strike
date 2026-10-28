@@ -238,7 +238,7 @@ test("recon can reach reporting while vulnerability testing is explicitly deferr
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
 })
 
-test("reopening deferred vulnerability testing clears stale downstream reports", () => {
+test("reopening a phase marks downstream outputs stale without losing their evidence links", () => {
   const state = records("complete")
   state.reporting = {
     status: "complete",
@@ -250,7 +250,15 @@ test("reopening deferred vulnerability testing clears stale downstream reports",
   }
   const reason = "Regenerate this downstream checkpoint after vulnerability_testing was explicitly reopened."
   expect(invalidateReconDownstreamPhases("vulnerability_testing", state, reason)).toEqual(["reporting"])
-  expect(state.reporting).toEqual({ status: "pending", reason })
+  expect(state.reporting).toEqual({
+    status: "pending",
+    startedAt: undefined,
+    finishedAt: undefined,
+    summary: "Old pre-testing report",
+    counts: { endpoints: 12 },
+    artifacts: ["reports/recon-final.md"],
+    reason,
+  })
 })
 
 test("active parameter fuzzing can be deferred so recon-only reporting can finish", () => {
