@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { EmptyContinuationDetector, ReadOnlyRepeatDetector, RepeatDetector } from "../../../src/session/stuck/repeat-detector"
+import { EmptyContinuationDetector, FailedToolStreakDetector, ReadOnlyRepeatDetector, RepeatDetector } from "../../../src/session/stuck/repeat-detector"
 
 describe("RepeatDetector — cross-turn identical-call loop", () => {
   test("same signature reaching the limit across steps → nudge, then abort", () => {
@@ -114,5 +114,30 @@ describe("EmptyContinuationDetector — continuing turns without tool calls", ()
     expect(detector.observe(0)).toBe("nudge")
     detector.reset()
     expect(detector.observe(0)).toBe("ok")
+  })
+})
+
+
+describe("FailedToolStreakDetector — distinct failed calls without progress", () => {
+  test("nudges after a bounded streak of failed work calls even when arguments differ", () => {
+    const detector = new FailedToolStreakDetector(3)
+    expect(detector.observe([{ tool: "bash", input: { command: "bad-a" }, succeeded: false }])).toBe("ok")
+    expect(detector.observe([{ tool: "bash", input: { command: "bad-b" }, succeeded: false }])).toBe("ok")
+    expect(detector.observe([{ tool: "bash", input: { command: "bad-c" }, succeeded: false }])).toBe("nudge")
+  })
+
+  test("successful work resets the failed-call streak", () => {
+    const detector = new FailedToolStreakDetector(3)
+    detector.observe([{ tool: "bash", succeeded: false }])
+    detector.observe([{ tool: "bash", succeeded: false }])
+    expect(detector.observe([{ tool: "bash", succeeded: true }])).toBe("ok")
+    expect(detector.observe([{ tool: "bash", succeeded: false }])).toBe("ok")
+    expect(detector.observe([{ tool: "bash", succeeded: false }])).toBe("ok")
+  })
+
+  test("read-only and context calls do not count as failed target-work attempts", () => {
+    const detector = new FailedToolStreakDetector(2)
+    expect(detector.observe([{ tool: "methodology_status", succeeded: false }])).toBe("ok")
+    expect(detector.observe([{ tool: "memory_read", succeeded: false }])).toBe("ok")
   })
 })
