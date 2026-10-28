@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Instance } from "../../src/project/instance"
@@ -414,3 +415,83 @@ test("processes more than 300 distinct JavaScript URLs without a fixed worklist 
   }
 }, 60_000)
 
+
+
+test("reruns JavaScript correlation from saved local assets when the URL queue is empty", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const target = "https://resume-js.example.test"
+      const configured = await TargetMemory.configureScope(target, {
+        include: ["resume-js.example.test"],
+        authorizationSource: "Local JavaScript resume regression fixture",
+        authorizationReference: "https://example.test/security-policy",
+      })
+      const canonicalTarget = configured.workspace.targetURL
+      const session = await Session.create({})
+      Request.add({
+        sessionID: session.id,
+        method: "GET",
+        normalizedPath: "/",
+        keyHash: "ingest-javascript-resume-root",
+        origin: canonicalTarget,
+        scheme: "https",
+        host: "resume-js.example.test",
+        pageUrl: canonicalTarget + "/",
+        response: {
+          status: 200,
+          headers: { "content-type": "text/html" },
+          body: '<html><script src="/assets/cached.js"></script></html>',
+        },
+      })
+
+      const javascriptRoot = path.join(configured.workspace.workspacePath, "javascript")
+      const assetsDir = path.join(javascriptRoot, "assets")
+      await fs.mkdir(assetsDir, { recursive: true })
+      const url = canonicalTarget + "/assets/cached.js"
+      const body = 'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }'
+      const contentHash = createHash("sha256").update(body).digest("hex")
+      const localPath = path.join(assetsDir, contentHash + ".js")
+      await fs.writeFile(localPath, body, "utf8")
+      const manifestPath = path.join(javascriptRoot, "asset-manifest.json")
+      await fs.writeFile(manifestPath, JSON.stringify({
+        schemaVersion: 1,
+        updatedAt: new Date().toISOString(),
+        assets: [{
+          url,
+          finalURL: url,
+          source: "unit-test",
+          sources: ["unit-test"],
+          status: "downloaded",
+          contentHash,
+          localPath,
+          contentType: "application/javascript",
+          bytes: Buffer.byteLength(body),
+          fetchedAt: new Date().toISOString(),
+        }],
+      }, null, 2) + "\n", "utf8")
+
+      const tool = await IngestJavaScriptURLsTool.init()
+      const result = await tool.execute({
+        target_url: canonicalTarget,
+        urls: [],
+        source: "unit-test-resume",
+        force_refresh: false,
+      }, toolContext(session.id))
+
+      const metadata = result.metadata as Record<string, unknown>
+      expect(metadata.queued_urls).toBe(0)
+      expect(metadata.collection_complete).toBe(true)
+      expect(metadata.correlation_saved).toBe(true)
+      expect(metadata.analyzed_source_records).toBeGreaterThan(0)
+      expect(metadata.analysis_complete).toBe(true)
+      expect(result.output).toContain("JavaScript correlation snapshot:")
+      expect(result.output).toContain("Analyzed source records:")
+      const summary = await fs.readFile(path.join(configured.workspace.workspacePath, "javascript-analysis.md"), "utf8")
+      expect(summary).toContain("/api/profiles/")
+
+      await Session.remove(session.id)
+    },
+  })
+}, 30_000)
