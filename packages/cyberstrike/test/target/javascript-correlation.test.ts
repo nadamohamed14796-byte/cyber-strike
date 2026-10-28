@@ -1094,7 +1094,7 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
           file: "app.js",
           sources: ["src/profile.ts", "src/render.ts"],
           sourcesContent: [
-            'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }',
+            'export async function loadProfile(profileId) { return fetch("/api/profiles/" + profileId) }\nexport async function verifyEmailToken(token) { return fetch("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ token }) }) }\nconst verifyButton = <button onClick={verifyEmailToken}>Verify</button>',
             'export function renderProfile(value) { document.body.innerHTML = value }\nconst api_key = "' + rawSecret + '";',
           ],
           names: [],
@@ -1154,7 +1154,16 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         expect(result.graph.javascriptAssets.map((asset) => asset.url)).toContain(bundleURL)
         expect(mapReference).toMatchObject({ status: "analyzed", url: sourceMapURL })
         expect(mappedProfile?.analysis?.functions.some((fn) => fn.name === "loadProfile")).toBe(true)
+        expect(mappedProfile?.analysis?.functions.some((fn) =>
+          fn.name === "verifyEmailToken" && fn.callSites?.some((site) => site.kind === "ui-event-binding"),
+        )).toBe(true)
         expect(mappedProfile?.analysis?.requests.some((request) => request.path.startsWith("/api/profiles/") && request.pathParameters.length > 0)).toBe(true)
+        expect(result.graph.javascriptAnalysis.workflowSignals?.some((item) =>
+          item.kind === "email-verification-flow" && item.functionName === "verifyEmailToken" && item.sourceFile === "src/profile.ts",
+        )).toBe(true)
+        expect(result.graph.javascriptAnalysis.requestCandidates.some((item) =>
+          item.sourceFunction === "verifyEmailToken" && item.method === "POST" && item.path === "/api/auth/email/verify" && item.bodyParameters.includes("token"),
+        )).toBe(true)
         expect(mappedRender?.analysis?.riskSignals.some((signal) => signal.kind === "dom-html-sink")).toBe(true)
         expect(profileCandidate?.observedRequestIDs).toContain(apiRequest!.id)
         expect(observedEndpoint?.observedInTraffic).toBe(true)
@@ -1171,6 +1180,11 @@ test("end-to-end correlation persists map-derived endpoints and links them to ca
         expect(canonicalSummary).toContain("SHA-256")
         expect(canonicalSummary).toContain("## Source-map status")
         expect(canonicalSummary).toContain("## Function and call-site inventory")
+        expect(canonicalSummary).toContain("## Feature and behavior trace")
+        expect(canonicalSummary).toContain("email-verification-flow")
+        expect(canonicalSummary).toContain("verifyEmailToken")
+        expect(canonicalSummary).toContain("/api/auth/email/verify")
+        expect(canonicalSummary).toContain("ui-event-binding")
         expect(canonicalSummary).toContain("## API and request intelligence")
         expect(canonicalSummary).toContain("## Application features and integrations")
         expect(canonicalSummary).toContain("## Security review leads")
