@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ReadOnlyRepeatDetector, RepeatDetector } from "../../../src/session/stuck/repeat-detector"
+import { EmptyContinuationDetector, ReadOnlyRepeatDetector, RepeatDetector } from "../../../src/session/stuck/repeat-detector"
 
 describe("RepeatDetector — cross-turn identical-call loop", () => {
   test("same signature reaching the limit across steps → nudge, then abort", () => {
@@ -93,5 +93,26 @@ describe("ReadOnlyRepeatDetector — polling without progress", () => {
     expect(detector.observe([{ tool: "read", input: { filePath: "a.ts" } }])).toBe("ok")
     expect(detector.observe([{ tool: "read", input: { filePath: "b.ts" } }])).toBe("ok")
     expect(detector.observe([{ tool: "read", input: { filePath: "c.ts" } }])).toBe("ok")
+  })
+})
+
+
+describe("EmptyContinuationDetector — continuing turns without tool calls", () => {
+  test("nudges after repeated empty continuations and aborts if the pattern continues", () => {
+    const detector = new EmptyContinuationDetector(3)
+    expect(detector.observe(0)).toBe("ok")
+    expect(detector.observe(0)).toBe("ok")
+    expect(detector.observe(0)).toBe("nudge")
+    expect(detector.observe(0)).toBe("abort")
+  })
+
+  test("a tool-call turn resets the empty-continuation streak and latch", () => {
+    const detector = new EmptyContinuationDetector(2)
+    expect(detector.observe(0)).toBe("ok")
+    expect(detector.observe(1)).toBe("ok")
+    expect(detector.observe(0)).toBe("ok")
+    expect(detector.observe(0)).toBe("nudge")
+    detector.reset()
+    expect(detector.observe(0)).toBe("ok")
   })
 })
