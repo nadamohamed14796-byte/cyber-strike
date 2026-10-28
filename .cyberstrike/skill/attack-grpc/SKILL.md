@@ -1,15 +1,10 @@
 ---
 name: attack-grpc
 description: "Assess gRPC service exposure, authentication, authorization, reflection, and message validation using scoped test clients and synthetic requests."
-category: "web-application"
+category: "api-security"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - grpc
-  - protobuf
-  - api
-  - authorization
-  - schema
+tags: [grpc, protobuf, api, authorization, schema, protobuf-reflection, rpc, api-security, service-discovery]
 tech_stack:
   - grpc
   - protobuf
