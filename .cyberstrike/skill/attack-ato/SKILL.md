@@ -4,7 +4,7 @@ description: "Assess account-takeover paths by validating each authentication, r
 category: "identity"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags: [- ato, account-takeover, ato, account-recovery, password-reset, authentication, identity]
+tags: [ato, account-takeover, account-recovery, password-reset, authentication, identity]
 tech_stack:
   - web
   - rest-api
