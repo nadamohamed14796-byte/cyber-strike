@@ -122,7 +122,7 @@ export function reconcileReconTodoChecklist(
   const visibleOptional = new Set<ReconPhase>([...includeOptional, ...previousByPhase.keys()])
   const checklist = RECON_TODO_CHECKLIST
     .filter((item) => !item.optional || visibleOptional.has(item.phase))
-    .map((item) => {
+    .map((item, index) => {
       const phaseStatus = phases[item.phase].status
       const status = phaseStatus === "complete"
         ? "completed"
@@ -132,7 +132,7 @@ export function reconcileReconTodoChecklist(
             ? "in_progress"
             : "pending"
       return {
-        content: item.content,
+        content: item.content.replace(/^(\\[recon:[a-z_]+\\])\\s*/, "$1 " + (index + 1) + ". "),
         status: item.phase === currentPhase && phaseStatus === "running" ? "in_progress" : status,
         priority: item.priority,
       }
