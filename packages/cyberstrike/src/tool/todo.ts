@@ -97,11 +97,12 @@ export const TodoReadTool = Tool.define("todoread", {
 
     const todos = await Todo.get(ctx.sessionID)
     const active = todos.filter((x) => x.status === "pending" || x.status === "in_progress")
-    const doneCount = todos.length - active.length
+    const visible = todos.filter((x) => x.status === "pending" || x.status === "in_progress" || /^\\[recon:[a-z_]+\\]/.test(x.content.trim()))
+    const doneCount = todos.length - visible.length
     const output =
       (doneCount > 0
-        ? JSON.stringify(active, null, 2) + `\n\n(${doneCount} completed/cancelled items hidden)`
-        : JSON.stringify(active, null, 2)) +
+        ? JSON.stringify(visible, null, 2) + `\n\n(${doneCount} other completed/cancelled items hidden)`
+        : JSON.stringify(visible, null, 2)) +
       "\n\n" +
       nextTodoHint(todos)
     return {
