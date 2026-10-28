@@ -2,8 +2,6 @@ import { expect, test } from "bun:test"
 import { Database as BunDatabase } from "bun:sqlite"
 import { readFileSync } from "node:fs"
 
-const MIGRATION = "20261028211500_chain-finding-links"
-
 function migrationSQL() {
   return readFileSync(
     new URL("../../migration/20261028211500_chain-finding-links/migration.sql", import.meta.url),
@@ -37,6 +35,9 @@ test("chain finding link migration enforces real foreign keys and idempotent dir
       "INSERT INTO chain_finding_link (id, session_id, chain_candidate_id, source_vulnerability_id, target_vulnerability_id, relation, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     insert.run("cfl-1", "ses-test", "chn-test", "vul-a", "vul-b", "enables", 1, 1)
+    expect(() =>
+      insert.run("cfl-duplicate", "ses-test", "chn-test", "vul-a", "vul-b", "enables", 1, 1),
+    ).toThrow()
     expect(
       (sqlite.prepare("SELECT count(*) AS count FROM chain_finding_link WHERE chain_candidate_id = ?").get("chn-test") as { count: number }).count,
     ).toBe(1)
