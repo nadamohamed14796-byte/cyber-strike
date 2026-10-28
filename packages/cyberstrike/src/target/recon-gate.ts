@@ -190,6 +190,22 @@ export function unresolvedReconPrerequisites(
  * active parameter fuzzing and vulnerability testing require their explicit
  * checkpoint to be active after scope, workspace, and endpoint inventory are complete.
  */
+export function reconPhaseStartDecision(
+  phase: ReconPhase,
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+): { allowed: boolean; reason: string; unresolved: ReconPhase[] } {
+  const unresolved = unresolvedReconPrerequisites(phase, phases)
+  if (unresolved.length > 0) {
+    return {
+      allowed: false,
+      reason: "Checklist is waiting for earlier phase(s) to be resolved: " +
+        unresolved.map((item) => item + "=" + phases[item].status).join(", "),
+      unresolved,
+    }
+  }
+  return { allowed: true, reason: "all required prior checklist items are resolved", unresolved: [] }
+}
+
 export function reconPhaseExecutionDecision(
   requiredPhase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
