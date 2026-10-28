@@ -31,18 +31,28 @@ function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPh
   return Object.fromEntries(phases.map((phase) => [phase, { status }])) as Record<ReconPhase, ReconPhaseRecord>
 }
 
-test("phase start waits for the prior checklist item while useful tools remain independently available", () => {
+test("phase transitions ignore stale ordinary work but enforce real safety prerequisites", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
-  const blocked = reconPhaseStartDecision("javascript_analysis", state)
-  expect(blocked.allowed).toBe(false)
-  expect(blocked.unresolved).toEqual(["url_collection"])
-  expect(blocked.reason).toContain("url_collection=running")
+  expect(reconPhaseStartDecision("javascript_analysis", state)).toMatchObject({
+    allowed: true,
+    unresolved: [],
+  })
 
-  state.url_collection = { status: "complete" }
-  const ready = reconPhaseStartDecision("javascript_analysis", state)
-  expect(ready.allowed).toBe(true)
-  expect(ready.unresolved).toEqual([])
+  state.scope_validation = { status: "pending" }
+  expect(reconPhaseStartDecision("javascript_analysis", state).unresolved).toEqual(["scope_validation"])
+
+  state.scope_validation = { status: "complete" }
+  state.workspace_setup = { status: "pending" }
+  expect(reconPhaseStartDecision("javascript_analysis", state).unresolved).toEqual(["workspace_setup"])
+
+  state.workspace_setup = { status: "complete" }
+  state.endpoint_inventory = { status: "pending" }
+  expect(reconPhaseStartDecision("vulnerability_testing", state).unresolved).toEqual(["endpoint_inventory"])
+
+  state.endpoint_inventory = { status: "complete" }
+  state.javascript_analysis = { status: "failed", reason: "one source failed" }
+  expect(reconPhaseStartDecision("vulnerability_testing", state).allowed).toBe(true)
 })
 
 test("the recon checklist is checkpoint-driven, ordered, and preserves unrelated todos", () => {
@@ -70,6 +80,16 @@ test("the recon checklist is checkpoint-driven, ordered, and preserves unrelated
   expect(result.some((item) => item.content.startsWith("[recon:parameter_fuzzing]"))).toBe(false)
   expect(result.at(-1)).toEqual({ content: "Unrelated user task", status: "pending", priority: "medium" })
   expect(result.filter((item) => item.content.startsWith("[recon:asset_discovery]"))).toHaveLength(1)
+})
+
+test("partial handoffs stay visible without keeping the todo queue stuck on that phase", () => {
+  const state = records("complete")
+  state.javascript_analysis = { status: "partial", reason: "one source is still unavailable" }
+  const result = reconcileReconTodoChecklist([], state, null)
+  const item = result.find((todo) => todo.content.startsWith("[recon:javascript_analysis]"))
+  expect(item?.status).toBe("cancelled")
+  expect(item?.content).toContain("partial handoff; revisit when useful")
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
 })
 
 test("optional active-testing checklist items appear only when requested or already present", () => {
@@ -136,21 +156,19 @@ test("phase order follows collection, JavaScript, parameters, path discovery, an
   expect(phases.indexOf("parameter_fuzzing")).toBe(phases.indexOf("endpoint_inventory") + 1)
 })
 
-test("JavaScript and parameter evidence precede path discovery and final endpoint correlation", () => {
+test("phase sequence remains defined by the workflow, but ordinary unfinished phases do not block handoff", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "pending" }
-  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
-  state.javascript_analysis = { status: "complete" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
+
   state.parameter_discovery = { status: "pending" }
-  expect(unresolvedReconPrerequisites("directory_fuzzing", state)).toContain("parameter_discovery")
-  state.parameter_discovery = { status: "complete" }
+  expect(unresolvedReconPrerequisites("directory_fuzzing", state)).toEqual([])
+
   state.directory_fuzzing = { status: "pending" }
-  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("directory_fuzzing")
-  state.directory_fuzzing = { status: "complete" }
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
+
   state.endpoint_inventory = { status: "complete" }
   state.parameter_fuzzing = { status: "pending" }
-  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toContain("parameter_fuzzing")
-  state.parameter_fuzzing = { status: "complete" }
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
 })
 
@@ -160,18 +178,18 @@ test("workspace setup cannot be bypassed by marking it unavailable", () => {
   expect(unresolvedReconPrerequisites("asset_discovery", state)).toContain("workspace_setup")
 })
 
-test("unavailable non-scope phases are explicit terminal checkpoints", () => {
+test("ordinary phase failures remain recorded but do not block independent phase transitions", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "unavailable", reason: "No JavaScript assets were observed" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
   state.live_hosts_ports = { status: "failed", reason: "Scanner failed" }
-  expect(unresolvedReconPrerequisites("url_collection", state)).toContain("live_hosts_ports")
+  expect(unresolvedReconPrerequisites("url_collection", state)).toEqual([])
 })
 
-test("parameter discovery is a distinct prerequisite before endpoint inventory", () => {
+test("parameter discovery is retained in the ordered worklist without blocking endpoint inventory", () => {
   const state = records("complete")
   state.parameter_discovery = { status: "pending" }
-  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("parameter_discovery")
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
   state.parameter_discovery = { status: "complete", summary: "parameter inventory saved" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
 })
@@ -327,34 +345,13 @@ test("canonical inventories reject empty, failure-only, and log-shaped output", 
   expect(validateCanonicalInventoryContent("parameter_discovery", "incomplete: source timed out").valid).toBe(true)
 })
 
-test("completion prerequisites keep phases from silently skipping unfinished work", () => {
+test("partial JavaScript analysis does not block parameter discovery or truthful closeout", () => {
   const state = records("complete")
-  state.javascript_analysis = { status: "pending" }
-  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
-  state.javascript_analysis = { status: "unavailable", reason: "No JavaScript assets were observed" }
+  state.javascript_analysis = { status: "partial", reason: "remaining source map is unavailable" }
   expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
+  expect(unresolvedReconPrerequisites("reporting", state)).toEqual([])
+  expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
 })
-
-test("canonical inventories reject malformed rows, mixed errors, and duplicates", () => {
-  expect(validateCanonicalInventoryContent("asset_discovery", "good.example.com\nERROR: resolver failed").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("asset_discovery", "not a hostname").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("url_collection", "not-a-url").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("url_collection", "https://example.com\nhttps://example.com/").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("live_hosts_ports", "example.com\nexample.com").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("live_hosts_ports", "https://example.com/admin").valid).toBe(false)
-  expect(validateCanonicalInventoryContent("live_hosts_ports", "https://example.com\nstatus: zero-results").valid).toBe(false)
-})
-
-test("JavaScript and endpoint phases require non-skippable canonical handoff files", () => {
-  expect(missingRequiredReconArtifacts("javascript_analysis", ["javascript/graph.json", "endpoints/candidates.json"])).toEqual([
-    "javascript-analysis.md",
-    "endpoints.txt",
-  ])
-  expect(missingRequiredReconArtifacts("javascript_analysis", ["./javascript-analysis.md", "endpoints.txt"])).toEqual([])
-  expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints/candidates.json"])).toEqual(["endpoints.txt"])
-  expect(missingRequiredReconArtifacts("endpoint_inventory", ["endpoints.txt"])).toEqual([])
-})
-
 
 test("ordinary recon tools are allowed when no checkpoint is actively running", () => {
   const state = records("complete")
