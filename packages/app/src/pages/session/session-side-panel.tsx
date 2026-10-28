@@ -747,7 +747,8 @@ const webSections: { id: WebSection; label: string }[] = [
 
 const endpointStatusColor = (status: string) => {
   if (status === "processed") return "bg-icon-success-base"
-  if (status === "processing") return "bg-icon-warning-base"
+  if (status === "failed") return "bg-icon-danger-base"
+  if (status === "processing" || status === "queued") return "bg-icon-warning-base"
   return "bg-surface-inset-base"
 }
 
@@ -772,6 +773,10 @@ function WebContextPanelList() {
   // Per-endpoint expand state (by request id) + fetched observed-value trees (by key_hash).
   const [expandedEp, setExpandedEp] = createSignal<Record<string, boolean>>({})
   const [obsTree, setObsTree] = createSignal<Record<string, ObsTree>>({})
+  const [retryingRequestID, setRetryingRequestID] = createSignal<string>()
+  const [retryQueued, setRetryQueued] = createSignal<Record<string, boolean>>({})
+  const [retryNotices, setRetryNotices] = createSignal<Record<string, string>>({})
+  const [retryErrors, setRetryErrors] = createSignal<Record<string, string>>({})
 
   const sessionID = () => params.id ?? ""
   const credLabel = (id: string | null) =>
@@ -794,6 +799,50 @@ function WebContextPanelList() {
       }
     }
   }
+
+  const retryCapturedRequest = async (requestID: string) => {
+    const id = sessionID()
+    if (!id || retryingRequestID() === requestID) return
+    setRetryingRequestID(requestID)
+    setRetryErrors((previous) => ({ ...previous, [requestID]: "" }))
+    setRetryNotices((previous) => ({ ...previous, [requestID]: "" }))
+    try {
+      const result = await sdk.client.session.requestRetry({ sessionID: id, requestID })
+      if (result.error) throw new Error(JSON.stringify(result.error))
+      setRetryQueued((previous) => ({ ...previous, [requestID]: true }))
+      setRetryNotices((previous) => ({
+        ...previous,
+        [requestID]: "Retry queued; analysis will start when this request reaches the front of the queue.",
+      }))
+      void sync.session.request(id)
+    } catch (error) {
+      setRetryErrors((previous) => ({
+        ...previous,
+        [requestID]: error instanceof Error ? error.message : String(error),
+      }))
+    } finally {
+      setRetryingRequestID(undefined)
+    }
+  }
+
+  // A retry can be offered again if the new run reaches a terminal state.
+  createEffect(() => {
+    const rows = sync.data.request[sessionID()] ?? []
+    const cleared = new Set<string>()
+    for (const row of rows) {
+      if (!retryQueued()[row.id]) continue
+      if (row.status === "queued" || row.status === "processing" || row.status === "processed") {
+        cleared.add(row.id)
+      }
+    }
+    if (cleared.size > 0) {
+      setRetryQueued((previous) => {
+        const next = { ...previous }
+        for (const id of cleared) delete next[id]
+        return next
+      })
+    }
+  })
 
   // Fetch web context for active session
   createEffect(() => {
@@ -879,7 +928,26 @@ function WebContextPanelList() {
                     <Show when={v.operation as string | undefined}>
                       <span class="text-12-regular text-text-muted shrink-0">· {v.operation as string}</span>
                     </Show>
+                    <Show when={v.status === "failed" && !retryQueued()[v.id as string]}>
+                      <button
+                        type="button"
+                        disabled={retryingRequestID() === (v.id as string)}
+                        class="ml-auto shrink-0 rounded border border-border-base px-1.5 py-0.5 text-10-medium hover:bg-surface-raised-base disabled:opacity-50"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void retryCapturedRequest(v.id as string)
+                        }}
+                      >
+                        {retryingRequestID() === (v.id as string) ? "Retrying…" : "Retry"}
+                      </button>
+                    </Show>
                   </div>
+                  <Show when={retryNotices()[v.id as string]}>
+                    <span class="pl-5 text-10-regular text-text-weak">{retryNotices()[v.id as string]}</span>
+                  </Show>
+                  <Show when={retryErrors()[v.id as string]}>
+                    <span role="alert" class="pl-5 text-10-regular text-icon-danger-base">Retry failed: {retryErrors()[v.id as string]}</span>
+                  </Show>
                   <Show when={expandedEp()[v.id as string]}>
                     <div class="flex flex-col gap-0.5 pl-5">
                       <For each={obsTree()[v.id as string]?.params ?? []}>
