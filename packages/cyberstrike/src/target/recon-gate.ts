@@ -107,7 +107,14 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
         reason: "New required recon phase: " + phase + ". Existing downstream completion must be revalidated.",
       }
     }
-    const earliestMissing = Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
+    // A newly introduced path-discovery phase can discover JavaScript assets that
+    // were not in the earlier URL set. Revalidate JS and everything downstream when
+    // migrating a manifest that has no directory_fuzzing checkpoint.
+    const earliestMissing = Math.min(...missingPhases.map((phase) =>
+      phase === "directory_fuzzing"
+        ? RECON_PHASES.indexOf("javascript_analysis")
+        : RECON_PHASES.indexOf(phase),
+    ))
     for (const phase of RECON_PHASES.slice(earliestMissing + 1)) {
       const previous = phases[phase]
       if (previous && previous.status !== "pending") {
