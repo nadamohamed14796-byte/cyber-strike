@@ -919,7 +919,13 @@ export namespace SessionPrompt {
           : MessageV2.filterExcluded(sessionMessages, lastUser.id),
         model,
       )
-      const preflightEstimate = Token.estimate(JSON.stringify(modelMessages) + system.join(""))
+      // Estimate incrementally: serializing the entire model history into one
+      // giant JSON string creates another full-size copy during long recon sessions.
+      const preflightSize = modelMessages.reduce(
+        (total, message) => total + JSON.stringify(message).length,
+        system.join("").length,
+      )
+      const preflightEstimate = Math.max(0, Math.round(preflightSize / 3.5))
       const preflightLimit = model.limit.input
         ? model.limit.input
         : model.limit.context - ProviderTransform.maxOutputTokens(model)
