@@ -122,6 +122,9 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
     const revalidateFrom = needsPhaseOrderMigration || missingPhases.includes("directory_fuzzing")
       ? RECON_PHASES.indexOf("javascript_analysis")
       : earliestMissing + 1
+    const migrationReason = needsPhaseOrderMigration
+      ? "Re-run required after recon workflow order migration to phaseOrderVersion 2."
+      : "Re-run required after adding earlier recon phase(s): " + missingPhases.join(", ") + "."
     for (const phase of RECON_PHASES.slice(revalidateFrom)) {
       const previous = phases[phase]
       if (previous && previous.status !== "pending") {
@@ -129,7 +132,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
           ...previous,
           status: "pending",
           finishedAt: undefined,
-          reason: "Re-run required after adding earlier recon phase(s): " + missingPhases.join(", ") + ".",
+          reason: migrationReason,
         }
       }
     }
