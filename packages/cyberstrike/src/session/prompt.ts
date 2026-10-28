@@ -1009,6 +1009,17 @@ export namespace SessionPrompt {
         }
       }
 
+      // A forced wrap-up is the detector's recovery attempt: all ordinary tools were
+      // removed for this turn. If the model still does not finish, do not re-enable them
+      // on the next iteration (primary agents may have no step cap). Terminate this run
+      // with an explicit marker rather than falling back into the same loop.
+      if (stuckWrapUp && !modelFinished && !processor.message.error) {
+        processor.message.stuckAborted = true
+        await Session.updateMessage(processor.message)
+        log.warn("forced wrap-up did not finish — terminating repeated-call loop", { sessionID })
+        break
+      }
+
       // Loop-termination Layer 2: inspect every continuing turn, not only native
       // subagents. A primary CyberStrike run can also loop across tool-call turns.
       // Natural text finishes exit cleanly below and must not be classified as stuck.
