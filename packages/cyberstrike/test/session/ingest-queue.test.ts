@@ -426,6 +426,43 @@ describe("Request processing outcome persistence", () => {
   })
 })
 
+describe("Request.retryFailed", () => {
+  test("requeues a failed request once and refuses queued or processed requests", async () => {
+    await withInstance(async () => {
+      const session = await Session.create({ title: "request-retry-failed-test" })
+      const create = (path: string, keyHash: string) => {
+        const request = Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: path,
+          origin: "https://example.test",
+          keyHash,
+        })
+        if (!request) throw new Error(`request fixture was not inserted: ${path}`)
+        return request
+      }
+
+      const failed = create("/retry-failed", "request-retry-failed-key")
+      const queued = create("/retry-queued", "request-retry-queued-key")
+      const processed = create("/retry-processed", "request-retry-processed-key")
+      Request.updateStatus({ id: failed.id, status: "failed" })
+      Request.updateStatus({ id: processed.id, status: "processed" })
+
+      const retried = Request.retryFailed(session.id, failed.id)
+      expect(retried?.status).toBe("queued")
+      expect(Request.get(session.id).find((item) => item.id === failed.id)?.status).toBe("queued")
+
+      // Once requeued, the same retry cannot enqueue the request a second time.
+      expect(Request.retryFailed(session.id, failed.id)).toBeUndefined()
+      expect(Request.retryFailed(session.id, queued.id)).toBeUndefined()
+      expect(Request.retryFailed(session.id, processed.id)).toBeUndefined()
+
+      await Session.remove(session.id)
+    })
+  })
+})
+
+
 
 describe("full JavaScript source persistence", () => {
   test("stores complete .js response while keeping the normal request preview capped", async () => {
