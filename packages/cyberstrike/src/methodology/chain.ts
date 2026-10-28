@@ -34,6 +34,7 @@ export namespace Chain {
     status: "detected" | "testing" | "confirmed" | "disproven"
     confidence: number
     detectedAt: number
+    findingLinks?: FindingLink[]
   }
 
   const OAUTH_REGEX = /\b(oauth|authorize|callback|redirect_uri|token|sso|saml|openid)\b/i
@@ -325,9 +326,16 @@ export namespace Chain {
   }
 
   export function load(sessionID: string): Candidate[] {
-    const rows = Database.use((db) =>
-      db.select().from(ChainCandidateTable).where(eq(ChainCandidateTable.session_id, sessionID)).all(),
-    )
+    const { rows, links } = Database.use((db) => ({
+      rows: db.select().from(ChainCandidateTable).where(eq(ChainCandidateTable.session_id, sessionID)).all(),
+      links: db.select().from(ChainFindingLinkTable).where(eq(ChainFindingLinkTable.session_id, sessionID)).all(),
+    }))
+    const linksByChain = new Map<string, FindingLink[]>()
+    for (const row of links) {
+      const list = linksByChain.get(row.chain_candidate_id) ?? []
+      list.push(toFindingLink(row))
+      linksByChain.set(row.chain_candidate_id, list)
+    }
     return rows.map((r) => ({
       id: r.id,
       pattern: r.pattern as Pattern,
@@ -340,6 +348,7 @@ export namespace Chain {
       status: r.status as Candidate["status"],
       confidence: r.confidence,
       detectedAt: r.detected_at ?? r.time_created,
+      findingLinks: linksByChain.get(r.id) ?? [],
     }))
   }
 
@@ -470,11 +479,14 @@ export namespace Chain {
     for (const c of active.slice(0, 10)) {
       const confLabel = c.confidence >= 80 ? "HIGH" : c.confidence >= 60 ? "MED" : "LOW"
       lines.push(
-        `[${confLabel}-${c.confidence}%] ${c.pattern.toUpperCase()}: "${c.entryTitles[0]}"${c.entryTitles[1] && c.entryTitles[1] !== c.entryTitles[0] ? ` + "${c.entryTitles[1]}"` : ""} -> ${c.expectedImpact}`,
+        `[${confLabel}-${c.confidence}%] chain_id=${c.id} | ${c.pattern.toUpperCase()}: "${c.entryTitles[0]}"${c.entryTitles[1] && c.entryTitles[1] !== c.entryTitles[0] ? ` + "${c.entryTitles[1]}"` : ""} -> ${c.expectedImpact}`,
       )
       lines.push(`  Expected impact (unproven until tested): ${c.expectedImpact} | Candidate severity: ${c.severity}`)
       lines.push(`  Next test: ${c.testingPlan}`)
       lines.push(`  Entries: ${c.entryIDs.join(", ")} | Assets: ${c.assets.join(", ")}`)
+      for (const link of c.findingLinks ?? []) {
+        lines.push(`  Finding link: ${link.sourceFindingID} --${link.relation}--> ${link.targetFindingID} (relationship recorded; chain impact remains unconfirmed)`)
+      }
     }
     return lines.join("\n")
   }
