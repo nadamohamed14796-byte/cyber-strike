@@ -90,16 +90,16 @@ async function findAuthorizedScopeStart(workspace: Workspace, scope: TargetScope
 }
 
 export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly string[]>> = {
-  asset_discovery: ["assets"],
-  live_hosts_ports: ["recon"],
-  url_collection: ["urls"],
-  directory_fuzzing: ["directories"],
-  parameter_discovery: ["parameters"],
-  parameter_fuzzing: ["parameters"],
-  // correlate_javascript atomically writes a source graph, endpoint candidates, and a Tester Survey.
-  javascript_analysis: ["javascript", "endpoints", "testing"],
-  endpoint_inventory: ["endpoints"],
-  vulnerability_testing: ["testing", "findings", "evidence"],
+  asset_discovery: ["assets", "recon"],
+  live_hosts_ports: ["recon", "scans"],
+  url_collection: ["recon", "urls"],
+  directory_fuzzing: ["recon", "directories"],
+  parameter_discovery: ["recon", "parameters"],
+  parameter_fuzzing: ["recon", "parameters"],
+  // Keep old paths valid on resumed workspaces; new tester surveys go under findings/.
+  javascript_analysis: ["javascript", "endpoints", "findings", "testing"],
+  endpoint_inventory: ["endpoints", "recon"],
+  vulnerability_testing: ["findings", "testing", "evidence"],
   reporting: ["reports"],
 }
 
