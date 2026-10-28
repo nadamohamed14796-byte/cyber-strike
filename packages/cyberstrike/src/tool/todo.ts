@@ -97,7 +97,7 @@ export const TodoReadTool = Tool.define("todoread", {
 
     const todos = await Todo.get(ctx.sessionID)
     const active = todos.filter((x) => x.status === "pending" || x.status === "in_progress")
-    const visible = todos.filter((x) => x.status === "pending" || x.status === "in_progress" || /^\\[recon:[a-z_]+\\]/.test(x.content.trim()))
+    const visible = todos.filter((x) => x.status === "pending" || x.status === "in_progress" || /^\[recon:[a-z_]+\]/.test(x.content.trim()))
     const doneCount = todos.length - visible.length
     const output =
       (doneCount > 0
