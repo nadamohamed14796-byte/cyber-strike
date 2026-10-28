@@ -80,11 +80,33 @@ export namespace SessionSummary {
       messageID: z.string(),
     }),
     async (input) => {
-      const all = await Session.messages({ sessionID: input.sessionID })
-      await Promise.all([
-        summarizeSession({ sessionID: input.sessionID, messages: all }),
-        summarizeMessage({ messageID: input.messageID, messages: all }),
+      let messages: MessageV2.WithParts[]
+      try {
+        messages = await Session.messages({ sessionID: input.sessionID })
+      } catch (error) {
+        log.warn("failed to load messages for background summary", {
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return
+      }
+
+      // Summary generation is deliberately fire-and-forget at its call sites.
+      // A failed optional title-generation LLM call must not become an unhandled
+      // rejection that leaks into unrelated requests/tests or cancels diff storage.
+      const results = await Promise.allSettled([
+        summarizeSession({ sessionID: input.sessionID, messages }),
+        summarizeMessage({ messageID: input.messageID, messages }),
       ])
+      for (const [index, result] of results.entries()) {
+        if (result.status !== "rejected") continue
+        log.warn(index === 0 ? "background session diff summary failed" : "background message title summary failed", {
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        })
+      }
     },
   )
 
