@@ -4,14 +4,7 @@ description: "Assess unsafe object deserialization by tracing untrusted serializ
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - deserialization
-  - serialization
-  - rce
-  - java
-  - dotnet
-  - python
-  - php
+tags: [deserialization, serialization, rce, java, dotnet, python, php, insecure-deserialization, object-deserialization, gadget-chain, type-confusion, code-execution]
 tech_stack:
   - java
   - dotnet
