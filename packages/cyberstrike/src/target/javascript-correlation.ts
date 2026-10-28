@@ -955,7 +955,7 @@ export async function inventoryJavaScriptFiles(
         pendingDirectories.push(fullPath)
         continue
       }
-      if (!entry.isFile() || !/\.(?:m?js|cjs|map|html?|xhtml)$/i.test(entry.name)) continue
+      if (!entry.isFile() || !/\.(?:m?js|cjs|m?ts|cts|tsx|jsx|map|html?|xhtml)$/i.test(entry.name)) continue
       const workspaceRelativePath = path.relative(path.dirname(root), fullPath).split(path.sep).join("/")
 
       try {
