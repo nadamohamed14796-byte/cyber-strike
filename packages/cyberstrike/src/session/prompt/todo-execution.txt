@@ -1,6 +1,6 @@
 # Todo Execution Contract
 
-For any multi-step task, the todo list is an execution queue, not a progress display.
+Use the existing internal task list only when it helps execute a multi-step request. For target/recon work, `recon_checkpoint` is the only phase-state ledger and canonical target artifacts are the saved deliverables. Never create a second queue/manifest file, expose an internal todo list as an extra recon artifact, or make the user manage routine phase transitions. Here, “todo list” means internal execution state, not a new target folder or result file.
 
 1. Before starting work, read the existing list when available. Do not overwrite a useful existing plan with a fresh one; reconcile it with the current request and observed state.
 2. Keep the list concise and actionable. Each item must describe a concrete action and an observable completion condition. Do not create items just to narrate tool calls.
