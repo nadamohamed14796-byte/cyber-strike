@@ -24,10 +24,19 @@ export namespace LazyToolRegistry {
     id: string
     name: string
     summary: string
+    description: string
     keywords: string[]
     category: string
     source: "mcp" | "plugin" | "builtin"
     mcpServer?: string
+  }
+
+  export interface ToolSearchMatch {
+    tool: LazyTool
+    score: number
+    coverage: number
+    matchedTerms: string[]
+    reasons: string[]
   }
 
   export interface LoadedTool {
@@ -131,11 +140,13 @@ export namespace LazyToolRegistry {
     const next = new Map<string, LazyTool>()
     for (const mcpTool of definitions) {
       const id = MCP.toolID(serverName, mcpTool.name)
-      const keywords = extractKeywords(mcpTool.name, mcpTool.description || "")
+      const description = mcpTool.description || mcpTool.name
+      const keywords = extractKeywords(mcpTool.name, description)
       next.set(id, {
         id,
         name: mcpTool.name,
-        summary: (mcpTool.description || mcpTool.name).slice(0, 100),
+        summary: description.slice(0, 100),
+        description,
         keywords,
         category: categorize(keywords),
         source: "mcp",
@@ -152,6 +163,7 @@ export namespace LazyToolRegistry {
       const unchanged = updated &&
         existing.name === updated.name &&
         existing.summary === updated.summary &&
+        existing.description === updated.description &&
         existing.category === updated.category &&
         existing.keywords.length === updated.keywords.length &&
         existing.keywords.every((keyword, index) => keyword === updated.keywords[index])
@@ -168,49 +180,67 @@ export namespace LazyToolRegistry {
   }
 
   export function search(query: string, limit = 10): LazyTool[] {
-    const queryLower = query.trim().toLowerCase()
-    if (!queryLower || !Number.isFinite(limit) || limit <= 0) return []
-    const queryWords = queryLower.split(/\s+/)
-
-    const scored: Array<{ tool: LazyTool; score: number }> = []
-
-    for (const tool of lazyTools.values()) {
-      let score = 0
-
-      if (tool.name.toLowerCase() === queryLower) {
-        score += 100
-      }
-
-      if (tool.name.toLowerCase().includes(queryLower)) {
-        score += 50
-      }
-
-      if (tool.summary.toLowerCase().includes(queryLower)) {
-        score += 30
-      }
-
-      for (const word of queryWords) {
-        for (const keyword of tool.keywords) {
-          if (keyword.includes(word) || word.includes(keyword)) {
-            score += 20
-          }
-        }
-      }
-
-      if (tool.category.toLowerCase().includes(queryLower)) {
-        score += 25
-      }
-
-      if (score > 0) {
-        scored.push({ tool, score })
-      }
-    }
-
-    scored.sort((a, b) => b.score - a.score)
-
-    return scored.slice(0, limit).map((s) => s.tool)
+    return searchDetailed(query, limit).map((match) => match.tool)
   }
 
+  /** Rank by exact capability coverage; weak substring matches cannot qualify a tool alone. */
+  export function searchDetailed(query: string, limit = 10): ToolSearchMatch[] {
+    if (!query.trim() || !Number.isFinite(limit) || limit <= 0) return []
+    const queryTokens = [...new Set(normalizeSearchTokens(query))]
+    if (queryTokens.length === 0) return []
+    const documents = [...lazyTools.values()].map((tool) => {
+      const nameTokens = new Set(normalizeSearchTokens(tool.name))
+      const descriptionTokens = new Set(normalizeSearchTokens(tool.description))
+      const categoryTokens = new Set(normalizeSearchTokens(tool.category))
+      const allTokens = new Set([...nameTokens, ...descriptionTokens, ...categoryTokens])
+      return { tool, nameTokens, descriptionTokens, categoryTokens, allTokens }
+    })
+    const frequency = new Map<string, number>()
+    for (const document of documents) {
+      for (const token of document.allTokens) frequency.set(token, (frequency.get(token) ?? 0) + 1)
+    }
+    const queryPhrase = queryTokens.join(" ")
+    const matches: ToolSearchMatch[] = []
+    for (const document of documents) {
+      let score = 0
+      let exactMatches = 0
+      const matchedTerms: string[] = []
+      const reasons: string[] = []
+      for (const token of queryTokens) {
+        const count = frequency.get(token) ?? 0
+        if (count === 0) continue
+        const rarity = 1 + Math.log((documents.length + 1) / (count + 1))
+        if (document.nameTokens.has(token)) {
+          score += 12 * rarity
+          exactMatches++
+          matchedTerms.push(token)
+          reasons.push('"' + token + '" appears in the tool name')
+        } else if (document.descriptionTokens.has(token)) {
+          score += 4 * rarity
+          exactMatches++
+          matchedTerms.push(token)
+          reasons.push('"' + token + '" appears in the tool description')
+        } else if (document.categoryTokens.has(token)) {
+          score += 1.5 * rarity
+          exactMatches++
+          matchedTerms.push(token)
+          reasons.push('"' + token + '" matches the tool category')
+        } else if (token.length >= 5 && [...document.allTokens].some((candidate) => candidate.length >= 5 && (candidate.startsWith(token) || token.startsWith(candidate)))) {
+          score += 0.5 * rarity
+        }
+      }
+      if (exactMatches === 0) continue
+      const coverage = exactMatches / queryTokens.length
+      score += coverage * 8
+      const namePhrase = normalizeSearchTokens(document.tool.name).join(" ")
+      const descriptionPhrase = normalizeSearchTokens(document.tool.description).join(" ")
+      if (queryPhrase && namePhrase.includes(queryPhrase)) score += 20
+      else if (queryPhrase && descriptionPhrase.includes(queryPhrase)) score += 7
+      matches.push({ tool: document.tool, score, coverage, matchedTerms, reasons })
+    }
+    matches.sort((a, b) => b.score - a.score || b.coverage - a.coverage || Number(isLoaded(b.tool.id)) - Number(isLoaded(a.tool.id)) || a.tool.name.localeCompare(b.tool.name))
+    return matches.slice(0, Math.floor(limit))
+  }
   export async function load(toolIds: string[]): Promise<LoadedTool[]> {
     const newlyLoaded: LoadedTool[] = []
 
@@ -318,6 +348,31 @@ export namespace LazyToolRegistry {
     return lines.join("\n")
   }
 
+  const SEARCH_STOP_WORDS = new Set([
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+    "will", "would", "could", "should", "may", "might", "must", "shall", "can", "need", "to", "of", "in", "for", "on",
+    "with", "at", "by", "from", "as", "into", "through", "during", "before", "after", "above", "below", "between", "under",
+    "again", "further", "then", "once", "and", "but", "or", "nor", "so", "yet", "this", "that", "these", "those",
+    "use", "using", "used", "tool", "tools", "available", "support", "supports", "provide", "provides", "help", "helps",
+    "return", "returns", "result", "results", "description", "current",
+  ])
+  const SEARCH_TOKEN_ALIASES: Record<string, string> = {
+    js: "javascript", ecmascript: "javascript", analysis: "analyze", analyzing: "analyze", analyzed: "analyze",
+    discovery: "discover", discovering: "discover", discovered: "discover", enumeration: "enumerate", enumerating: "enumerate",
+    enumerated: "enumerate", collection: "collect", collecting: "collect", collected: "collect", crawling: "crawl",
+    crawler: "crawl", crawlers: "crawl", verification: "verify", verifying: "verify", verified: "verify",
+    validation: "validate", validating: "validate", validated: "validate", correlation: "correlate", correlating: "correlate",
+    testing: "test", tests: "test", fuzzing: "fuzz", installation: "install", installing: "install", extraction: "extract", extracting: "extract",
+  }
+  function normalizeSearchTokens(value: string): string[] {
+    return value.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean).map((word) => {
+      let token = SEARCH_TOKEN_ALIASES[word] ?? word
+      if (token.endsWith("ies") && token.length > 4) token = token.slice(0, -3) + "y"
+      else if (token.endsWith("es") && token.length > 5 && /(?:ches|shes|sses|xes|zes)$/.test(token)) token = token.slice(0, -2)
+      else if (token.endsWith("s") && token.length > 4 && !/(ss|us|is)$/.test(token)) token = token.slice(0, -1)
+      return SEARCH_TOKEN_ALIASES[token] ?? token
+    }).filter((token) => token.length > 1 && !SEARCH_STOP_WORDS.has(token))
+  }
   function extractKeywords(name: string, description: string): string[] {
     const text = `${name} ${description}`.toLowerCase()
 
