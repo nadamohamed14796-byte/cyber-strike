@@ -55,7 +55,25 @@ export namespace SessionCompaction {
   // goes backwards through parts until there are 40_000 tokens worth of tool
   // calls. then erases output of previous tool calls. idea is to throw away old
   // tool calls that are no longer relevant.
-  export async function prune(input: { sessionID: string }) {
+  // A session may resume while an earlier prompt turn is finishing. Serialize
+  // pruning per session so overlapping runs do not load and rewrite the same large
+  // message history concurrently.
+  const pruning = new Map<string, Promise<void>>()
+
+  export async function prune(input: { sessionID: string }): Promise<void> {
+    const active = pruning.get(input.sessionID)
+    if (active) return active
+
+    const operation = pruneSession(input)
+    pruning.set(input.sessionID, operation)
+    try {
+      await operation
+    } finally {
+      if (pruning.get(input.sessionID) === operation) pruning.delete(input.sessionID)
+    }
+  }
+
+  async function pruneSession(input: { sessionID: string }): Promise<void> {
     const config = await Config.get()
     if (config.compaction?.prune === false) return
     log.info("pruning")
