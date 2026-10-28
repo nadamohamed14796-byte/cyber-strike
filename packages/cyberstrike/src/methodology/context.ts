@@ -139,7 +139,19 @@ export function rankSkillsForPhase(
   entries: SkillIndex.Entry[],
   limit = 10,
   observedTechStack: string[] = [],
-): Array<{ name: string; description: string; query: string; score: number }> {
+): Array<{
+  name: string
+  description: string
+  query: string
+  score: number
+  category?: string
+  owasp_id?: string
+  tags: string[]
+  tech_stack: string[]
+  cwe_ids: string[]
+  chains_with: string[]
+  prerequisites: string[]
+}> {
   const queries = skillQueriesForPhase(phaseId)
   const observedTechnologies = observedTechStack.map(normalizeSkillText).filter(Boolean)
   const phase = Phase.get(phaseId)
@@ -230,6 +242,13 @@ export function rankSkillsForPhase(
     description: entry.description,
     query,
     score,
+    category: entry.category,
+    owasp_id: entry.owasp_id,
+    tags: entry.tags,
+    tech_stack: entry.tech_stack,
+    cwe_ids: entry.cwe_ids,
+    chains_with: entry.chains_with,
+    prerequisites: entry.prerequisites,
   }))
 }
 
@@ -283,8 +302,16 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     } else {
       lines.push("", "Phase-specific candidates (ranked by phase tags and skill metadata):")
       for (const match of selected) {
-        lines.push(`- ${match.name} — ${match.description.slice(0, 180)}${match.description.length > 180 ? "…" : ""} (matched: ${match.query}; relevance: ${match.score})`)
+        lines.push(`- **${match.name}** — ${match.description.slice(0, 180)}${match.description.length > 180 ? "…" : ""}`)
+        lines.push(`  Routing: category=${match.category ?? "unspecified"}; tags=${match.tags.join(", ") || "none"}; tech_stack=${match.tech_stack.join(", ") || "none"}; CWE=${match.cwe_ids.join(", ") || "none"}; OWASP=${match.owasp_id ?? "none"}`)
+        const resolvedChains = SkillIndex.chainsFrom(match.name).map((item) => item.target)
+        lines.push(`  Prerequisites: ${match.prerequisites.join("; ") || "none declared"}`)
+        lines.push(`  chains_with: ${match.chains_with.join(", ") || "none declared"}${resolvedChains.length ? `; resolved local skills: ${resolvedChains.join(", ")}` : ""}`)
+        lines.push(`  Selection: matched ${match.query}; relevance ${match.score}. Load with skill(action="load", name="${match.name}") only when its procedure fits the current evidence gap.`)
       }
+      lines.push(
+        "Use tags/category/CWE/technology to select the precise skill. Treat chains_with as conditional follow-up guidance: load a linked skill only when the observed evidence supports that next step; it is not an automatic severity increase or proof of a vulnerability.",
+      )
 
     }
   } catch {
