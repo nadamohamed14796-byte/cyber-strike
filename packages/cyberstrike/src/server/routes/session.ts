@@ -465,20 +465,14 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 if (!proxyAgent || proxyAgent.mode === "primary") {
                   throw new Error(`Captured-request subagent is unavailable: ${agentName}`)
                 }
-                // A mere task rule is not enough: PermissionNext is ordered and later
-                // rules (including user overrides) decide whether this exact child can run.
-                // Fail visibly instead of letting a request appear processed when the
-                // required proxy-analyzer delegation is disabled or awaiting approval.
-                const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
-                if (taskPermission !== "allow") {
-                  throw new Error(
-                    `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
-                  )
-                }
                 const configuredAgentModel = proxyAgent.model
                   ? { providerID: proxyAgent.model.providerID, modelID: proxyAgent.model.modelID }
                   : undefined
                 const model = body.model ?? configuredAgentModel ?? (await SessionPrompt.lastModel(sessionID))
+
+                // Create the visible per-request status before checking delegation permissions.
+                // A blocked analyzer must still show up in the parent's live analysis panel,
+                // with the exact permission reason recorded as a failed request.
                 liveNotice = await IngestSummary.createLiveNotice({
                   sessionID,
                   agent: proxyAgent.name,
@@ -492,6 +486,14 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                       : normalized.normalizedPath,
                   },
                 })
+
+                // Respect ordered user permission overrides, but never fail silently.
+                const taskPermission = proxyAnalyzerTaskPermission(proxyAgent.permission)
+                if (taskPermission !== "allow") {
+                  throw new Error(
+                    `Automatic captured-request analysis is blocked: proxy-agent task permission for proxy-analyzer resolves to "${taskPermission}". Set task -> proxy-analyzer to allow in CyberStrike permissions, then retry this request.`,
+                  )
+                }
                 const config = await Config.get()
                 const hasTaskPermission = taskPermission === "allow"
                 const childSession = await Session.create({
