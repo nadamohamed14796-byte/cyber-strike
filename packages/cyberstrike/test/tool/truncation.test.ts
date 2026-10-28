@@ -33,6 +33,16 @@ describe("Truncate", () => {
       expect(result.content).toContain("...90 lines truncated...")
     })
 
+    test("handles very large line-heavy output without splitting it into an array", async () => {
+      const content = "entry\\n".repeat(100_000)
+      const result = await Truncate.output(content, { maxLines: 100, maxBytes: 1024 })
+
+      expect(result.truncated).toBe(true)
+      expect(result.content).toContain("entry")
+      expect(result.content).toContain("lines truncated...")
+      if (result.truncated) await fs.unlink(result.outputPath).catch(() => {})
+    })
+
     test("truncates by byte count", async () => {
       const content = "a".repeat(1000)
       const result = await Truncate.output(content, { maxBytes: 100 })
