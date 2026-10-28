@@ -38,6 +38,7 @@ const INITIAL_TARGET_DIRECTORIES = ["scope", "assets", "runs"] as const
 // Re-check known paths on every open, but never race a normal artifact write by
 // repeatedly deleting an empty directory that another tool just created.
 const prunedArtifactDirectoryWorkspaces = new Set<string>()
+const pendingArtifactDirectoryPrunes = new Map<string, Promise<void>>()
 
 export const USER_CONFIRMED_SCOPE_SOURCE = "User-confirmed in conversation"
 
@@ -718,14 +719,37 @@ async function pruneEmptyArtifactDirectories(workspace: Workspace, removeEmptyPl
   }
 }
 
+async function ensureArtifactDirectories(workspace: Workspace): Promise<void> {
+  const key = workspace.id
+  const pending = pendingArtifactDirectoryPrunes.get(key)
+  if (pending) {
+    await pending
+    // Another concurrent workspace open already performed any cleanup; still
+    // verify paths, but never delete folders after that open can begin writing.
+    await pruneEmptyArtifactDirectories(workspace, false)
+    return
+  }
+
+  const removeEmptyPlaceholders = !prunedArtifactDirectoryWorkspaces.has(key)
+  const operation = pruneEmptyArtifactDirectories(workspace, removeEmptyPlaceholders)
+  pendingArtifactDirectoryPrunes.set(key, operation)
+  try {
+    await operation
+    prunedArtifactDirectoryWorkspaces.add(key)
+  } finally {
+    if (pendingArtifactDirectoryPrunes.get(key) === operation) {
+      pendingArtifactDirectoryPrunes.delete(key)
+    }
+  }
+}
+
 async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Promise<void> {
   const root = projectRoot()
   workspace.workspacePath = await ensureSafeDirectoryPath(root, workspace.relativePath)
   for (const directory of INITIAL_TARGET_DIRECTORIES) {
     await ensureSafeDirectoryPath(root, path.join(workspace.relativePath, directory))
   }
-  await pruneEmptyArtifactDirectories(workspace, !prunedArtifactDirectoryWorkspaces.has(workspace.id))
-  prunedArtifactDirectoryWorkspaces.add(workspace.id)
+  await ensureArtifactDirectories(workspace)
   // target.json is retained for compatibility; workspace.json is the canonical
   // manifest consumed by the target workflow and carries stable identity fields.
   await createIfMissing(
