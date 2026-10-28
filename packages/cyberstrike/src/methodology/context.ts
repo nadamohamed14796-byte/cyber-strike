@@ -258,7 +258,7 @@ async function formatPhaseSkillGuidance(phaseId: Phase.Id, sessionID: string): P
     ...(isReconPhase ? [
       "## Recon Workflow",
       "Follow packages/cyberstrike/src/command/template/recon.txt for the workflow and methodology/recon.ts plus recon_checkpoint for resumable phase state.",
-      "The phase matrix defines canonical outputs; TOOLING_CATALOG is the shared, non-exhaustive tool reference. Neither is a tool allowlist. At every checkpoint, select any suitable available registered tool, verified CLI, or API based on the current evidence gap, capability, saved results, and policy. Preflight a CLI once per runtime/version, and never let stale phase state block useful recon.",
+      "The Target Workflow Contract is the single authority for scope, tool selection/installation, recovery, and continuous execution. The phase matrix defines canonical outputs; TOOLING_CATALOG is a reference, not a tool assignment. If a selected CLI is missing, install and verify that exact tool before considering a fallback. Reuse verified work and do not let stale phase state block useful recon.",
       "Reuse verified work, save canonical artifacts with useful provenance, and distinguish empty results from failures or blocked sources. Prioritize collecting and analyzing JavaScript URLs and source maps as inert text, then merge deduplicated endpoint evidence. Preserve request-level scope enforcement and keep vulnerability testing opt-in.",
       "",
     ] : []),

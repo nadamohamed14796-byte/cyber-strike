@@ -20,8 +20,13 @@ export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) 
   return { todos: [...next, ...preserved], preserved }
 }
 
-function nextTodo(todos: Todo.Info[]) {
+export function nextTodo(todos: Todo.Info[]) {
   const active = todos.filter((todo) => todo.status === "pending" || todo.status === "in_progress")
+  const recon = active.filter((todo) => /^\[recon:[a-z_]+\]/.test(todo.content.trim()))
+  const inProgressRecon = recon.find((todo) => todo.status === "in_progress")
+  if (inProgressRecon) return inProgressRecon
+  const nextRecon = recon.find((todo) => todo.status === "pending")
+  if (nextRecon) return nextRecon
   const inProgress = active.find((todo) => todo.status === "in_progress")
   if (inProgress) return inProgress
   const rank: Record<string, number> = { high: 0, medium: 1, low: 2 }
@@ -97,11 +102,12 @@ export const TodoReadTool = Tool.define("todoread", {
 
     const todos = await Todo.get(ctx.sessionID)
     const active = todos.filter((x) => x.status === "pending" || x.status === "in_progress")
-    const doneCount = todos.length - active.length
+    const visible = todos.filter((x) => x.status === "pending" || x.status === "in_progress" || /^\[recon:[a-z_]+\]/.test(x.content.trim()))
+    const doneCount = todos.length - visible.length
     const output =
       (doneCount > 0
-        ? JSON.stringify(active, null, 2) + `\n\n(${doneCount} completed/cancelled items hidden)`
-        : JSON.stringify(active, null, 2)) +
+        ? JSON.stringify(visible, null, 2) + `\n\n(${doneCount} other completed/cancelled items hidden)`
+        : JSON.stringify(visible, null, 2)) +
       "\n\n" +
       nextTodoHint(todos)
     return {

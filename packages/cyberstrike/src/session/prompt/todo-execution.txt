@@ -1,6 +1,6 @@
 # Todo Execution Contract
 
-For any multi-step task, the todo list is an execution queue, not a progress display.
+For recon, the Target Workflow Contract owns phase order, hard gates, retries, and partial handoffs; `recon_checkpoint` is the phase-state source of truth and automatically maintains the numbered `[recon:phase_id]` checklist. Do not use `todowrite` to mark recon phases or create a second queue. A partial handoff is not completion: its reason, artifacts, and resume point stay in the checkpoint, while the UI moves on so the run does not stall. For all other multi-step tasks, use the normal todo workflow below.
 
 1. Before starting work, read the existing list when available. Do not overwrite a useful existing plan with a fresh one; reconcile it with the current request and observed state.
 2. Keep the list concise and actionable. Each item must describe a concrete action and an observable completion condition. Do not create items just to narrate tool calls.

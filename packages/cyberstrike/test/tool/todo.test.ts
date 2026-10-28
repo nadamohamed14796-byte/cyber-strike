@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { mergeTodoSnapshot } from "../../src/tool/todo"
-import type { Todo } from "../../src/session/todo"
+import { mergeTodoSnapshot, nextTodo } from "../../src/tool/todo"
+import { Todo } from "../../src/session/todo"
 
 const item = (content: string, status: string, priority = "medium"): Todo.Info => ({
   content,
@@ -54,4 +54,40 @@ describe("todo snapshot reconciliation", () => {
     expect(result.todos).toEqual([item("New task", "pending", "high")])
     expect(result.preserved).toEqual([])
   })
+})
+
+test("the next action follows the recon checklist ahead of unrelated todo priorities", () => {
+  const todos = [
+    item("[recon:scope_validation] 1. Scope", "completed", "high"),
+    item("[recon:workspace_setup] 2. Workspace", "pending", "high"),
+    item("[recon:asset_discovery] 3. Assets", "pending", "high"),
+    item("Unrelated urgent task", "in_progress", "high"),
+  ]
+
+  expect(nextTodo(todos)?.content).toBe("[recon:workspace_setup] 2. Workspace")
+
+  todos[1] = item("[recon:workspace_setup] 2. Workspace", "in_progress", "high")
+  expect(nextTodo(todos)?.content).toBe("[recon:workspace_setup] 2. Workspace")
+})
+
+test("completed recon checklist entries survive todo history trimming", () => {
+  const reconPhases = [
+    "scope_validation",
+    "workspace_setup",
+    "asset_discovery",
+    "live_hosts_ports",
+    "url_collection",
+    "javascript_analysis",
+    "parameter_discovery",
+    "directory_fuzzing",
+    "endpoint_inventory",
+    "reporting",
+  ]
+  const recon = reconPhases.map((phase) => item("[recon:" + phase + "] done", "completed", "high"))
+  const general = Array.from({ length: 8 }, (_, index) => item("Old task " + index, "completed"))
+  const trimmed = Todo.trimTodoHistory([...recon, ...general, item("Current task", "in_progress", "high")])
+
+  expect(trimmed.filter((todo) => /^\[recon:[a-z_]+\]/.test(todo.content))).toHaveLength(reconPhases.length)
+  expect(trimmed.filter((todo) => todo.status === "completed" && !/^\[recon:[a-z_]+\]/.test(todo.content))).toHaveLength(5)
+  expect(trimmed[0]).toEqual(item("Current task", "in_progress", "high"))
 })

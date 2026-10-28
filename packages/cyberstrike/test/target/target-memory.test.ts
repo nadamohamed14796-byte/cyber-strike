@@ -743,6 +743,41 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
   })
 })
 
+test("a saved wildcard authorizes the apex and nested API hosts even when an API workspace predates scope setup", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      // Simulate a host workspace created before its program/root wildcard is imported.
+      const oldApiWorkspace = await TargetMemory.ensure("https://api.example.net")
+      expect(oldApiWorkspace.parentTargetID).toBeNull()
+
+      const configured = await TargetMemory.configureScope("https://hackerone.com/programs/example-program", {
+        include: ["*.example.net"],
+        exclude: ["*.admin.example.net"],
+        authorizationSource: "Wildcard inheritance regression fixture",
+        authorizationReference: "https://hackerone.com/programs/example-program",
+      })
+
+      const apiWorkspace = await TargetMemory.get("https://api.example.net")
+      expect(apiWorkspace?.parentTargetID).toBe(configured.workspace.id)
+
+      for (const url of [
+        "https://example.net/",
+        "https://api.example.net/v1/users",
+        "https://v2.api.example.net/v1/users",
+      ]) {
+        const decision = await TargetMemory.checkURLScope(url)
+        expect(decision.allowed).toBe(true)
+      }
+
+      expect((await TargetMemory.checkURLScope("https://admin.example.net/")).allowed).toBe(false)
+      expect((await TargetMemory.checkURLScope("https://v2.admin.example.net/")).allowed).toBe(false)
+      expect((await TargetMemory.checkURLScope("https://notexample.net/")).allowed).toBe(false)
+    },
+  })
+})
+
 test("user-confirmed scope without a policy URL must be exactly one asset, not a wildcard or CIDR", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({

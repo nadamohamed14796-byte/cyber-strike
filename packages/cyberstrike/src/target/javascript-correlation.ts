@@ -8,7 +8,7 @@ import { Session } from "../session"
 import { SessionTable, RequestTable, RequestJavaScriptCaptureTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
-import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal, type JavaScriptApplicationHint } from "./javascript-analysis"
+import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal, type JavaScriptApplicationHint, type JavaScriptWorkflowSignal } from "./javascript-analysis"
 
 /**
  * SQLite builds have a finite bind-parameter budget. Split IN lists into safe
@@ -1071,6 +1071,7 @@ export interface JavaScriptCorrelationGraph {
     roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
     riskSignals: Array<JavaScriptRiskSignal & { sourceFile: string }>
     applicationHints?: Array<JavaScriptApplicationHint & { sourceFile: string }>
+    workflowSignals?: Array<JavaScriptWorkflowSignal & { sourceFile: string }>
   }
   endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
@@ -1399,18 +1400,30 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
   }
   const mergeRecords = <T>(lists: T[][], key: (item: T) => string): T[] => uniqueValues(lists.flat(), key)
   const functions = mergeRecords(graphs.map((g) => g.javascriptAnalysis.functions), (item) => [item.sourceFile, item.line, item.name].join("\0"))
+    .map((fn) => ({
+      ...fn,
+      callSites: uniqueValues(
+        graphs.flatMap((graph) => graph.javascriptAnalysis.functions
+          .filter((candidate) => candidate.sourceFile === fn.sourceFile && candidate.line === fn.line && candidate.name === fn.name)
+          .flatMap((candidate) => candidate.callSites ?? [])),
+        (site) => site.line + "\0" + site.kind,
+      ).sort((a, b) => a.line - b.line || a.kind.localeCompare(b.kind)),
+    }))
   const requestCandidates = mergeRecords(graphs.map((g) => g.javascriptAnalysis.requestCandidates), (item) => [item.sourceFile, item.sourceLine, item.method ?? "", item.urlTemplate].join("\0"))
   const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\0"))
   const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
   const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\0"))
   const applicationHints = mergeRecords(graphs.map((g) => g.javascriptAnalysis.applicationHints ?? []), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
+  const workflowSignals = mergeRecords(graphs.map((g) => g.javascriptAnalysis.workflowSignals ?? []), (item) =>
+    [item.sourceFile, item.line, item.kind, item.value, item.functionName ?? ""].join("\0"),
+  )
   const uniqueObjects = <T>(items: T[], key: (item: T) => string) => uniqueValues(items, key)
   return {
     ...latest,
     javascriptAssets: [...assets.values()].sort((a, b) => a.url.localeCompare(b.url)),
     sourceFiles: [...sourceFiles.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath) || a.sha256.localeCompare(b.sha256)),
     sourceMapReferences: [...sourceMaps.values()].sort((a, b) => a.url.localeCompare(b.url)),
-    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints },
+    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints, workflowSignals },
     endpointCandidates: mergeCanonicalJavaScriptEndpoints(graphs),
     evidence: uniqueObjects(graphs.flatMap((g) => g.evidence), (x) => x.id),
     requests: uniqueObjects(graphs.flatMap((g) => g.requests), (x) => x.id),
@@ -1420,6 +1433,75 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
     edges: uniqueObjects(graphs.flatMap((g) => g.edges), (x) => [x.from, x.to, x.relation, x.evidence].join("\0")),
     notes: [...new Set(graphs.flatMap((g) => g.notes))],
   }
+}
+
+function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): string[] {
+  const signals = [...(graph.javascriptAnalysis.workflowSignals ?? [])].sort((a, b) =>
+    a.sourceFile.localeCompare(b.sourceFile) || a.line - b.line || a.kind.localeCompare(b.kind),
+  )
+  const functions = graph.javascriptAnalysis.functions
+  const requests = graph.javascriptAnalysis.requestCandidates
+  const sourceFiles = graph.sourceFiles
+  const byFunction = new Map<string, {
+    sourceFile: string
+    functionName: string | null
+    declaration?: JavaScriptCorrelationGraph["javascriptAnalysis"]["functions"][number]
+    signals: typeof signals
+  }>()
+  for (const signal of signals) {
+    const key = signal.sourceFile + "\\0" + (signal.functionName ?? "(top-level)")
+    const current = byFunction.get(key) ?? {
+      sourceFile: signal.sourceFile,
+      functionName: signal.functionName,
+      declaration: signal.functionName
+        ? functions.find((fn) => fn.sourceFile === signal.sourceFile && fn.name === signal.functionName)
+        : undefined,
+      signals: [],
+    }
+    current.signals.push(signal)
+    byFunction.set(key, current)
+  }
+  if (!byFunction.size) return ["- No email-verification, recovery, token, SQL-statement, or data-layer-operation markers matched current static rules."]
+  return [...byFunction.values()].map((group) => {
+    const functionRequests = group.functionName
+      ? requests.filter((request) => request.sourceFile === group.sourceFile && request.sourceFunction === group.functionName)
+      : []
+    const callSites = group.declaration?.callSites ?? []
+    const signalText = group.signals.map((signal) =>
+      safeSummaryText(signal.kind) + ":" + safeSummaryText(signal.value) + "@" + signal.line,
+    ).join(", ")
+    const parameterText = group.declaration
+      ? group.declaration.parameters.map(safeSummaryText).join(", ")
+      : ""
+    const definition = group.declaration
+      ? group.declaration.name + "(" + parameterText + ")@" + group.sourceFile + ":" + group.declaration.line
+      : "(no enclosing function identified)"
+    const calls = functionRequests.length
+      ? functionRequests.map((request) =>
+          (request.method ?? "UNKNOWN") + " " + safeSummaryText(request.urlTemplate) +
+          " [path:" + request.pathParameters.join(",") +
+          "; query:" + request.queryParameters.join(",") +
+          "; body:" + request.bodyParameters.join(",") +
+          "; headers:" + request.headerNames.join(",") +
+          "; captured request IDs:" + (request.observedRequestIDs.join(",") || "not matched") + "]",
+        ).join(" | ")
+      : "no request call attributed to this function"
+    const entries = callSites.length
+      ? callSites.map((site) => site.kind + "@" + site.line + (site.callerFunctionName ? " in " + safeSummaryText(site.callerFunctionName) : " at module/component scope")).join(", ")
+      : "no UI/event/callback reference matched"
+    const sourceRecord = sourceFiles.find((file) => file.relativePath === group.sourceFile)
+    const sourceLocation = sourceRecord?.sourceURL
+      ? safeSummaryURL(sourceRecord.sourceURL) + " → " + safeSummaryText(group.sourceFile)
+      : safeSummaryText(group.sourceFile)
+    const mappedSource = sourceRecord?.sourceMapSource ? " — original source: " + safeSummaryText(sourceRecord.sourceMapSource) : ""
+    const sourceRequests = sourceRecord?.sourceRequestIDs ?? (sourceRecord?.sourceRequestID ? [sourceRecord.sourceRequestID] : [])
+    return "- " + sourceLocation + mappedSource + (sourceRequests.length ? " — asset captured in request(s): " + sourceRequests.join(", ") : "") +
+      " — signals: " + signalText +
+      " — function: " + definition +
+      " — call/reference sites: " + entries +
+      " — same-function requests: " + calls +
+      " — confidence: candidate; a static handler reference is a navigation clue, not proof of a user click or successful server operation."
+  })
 }
 
 function renderCanonicalJavaScriptAnalysis(
@@ -1505,6 +1587,7 @@ function renderCanonicalJavaScriptAnalysis(
     "- Role/feature hints: " + roleHints.length,
     "- Application/integration hints: " + applicationHints.length,
     "- Static risk-sink candidates: " + riskSignals.length,
+    "- Business/token/data-operation flow signals: " + (graph.javascriptAnalysis.workflowSignals ?? []).length,
     "- Captured requests correlated: " + graph.requests.length,
     "- Response evidence records: " + graph.evidence.length,
     "- Failed asset fetches: " + failedAssets.length,
@@ -1524,8 +1607,11 @@ function renderCanonicalJavaScriptAnalysis(
     "",
     "## Local source files/content versions",
     ...(localFiles.length ? localFiles.map((file) =>
-      "- " + file.relativePath + " — SHA-256: " + file.sha256 + " — " + file.bytes +
+      "- " + file.relativePath +
+      (file.sourceMapSource ? " — mapped source: " + safeSummaryText(file.sourceMapSource) : "") +
+      " — SHA-256: " + file.sha256 + " — " + file.bytes +
       " bytes — endpoint literals: " + file.endpointLiterals.length +
+      (file.sourceURL ? " — asset URL: " + safeSummaryURL(file.sourceURL) : "") +
       (file.sourceRequestIDs?.length ? " — captured request IDs: " + file.sourceRequestIDs.join(", ") : "") +
       (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : ""),
     ) : ["- No local source files were analyzed."]),
@@ -1541,10 +1627,15 @@ function renderCanonicalJavaScriptAnalysis(
     ...(skippedAssets.length ? ["", "## Skipped asset fetches", ...skippedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — skipped; inspect the manifest status/error locally.")] : []),
     "",
         "## Function and call-site inventory",
-        ...(functions.length ? functions.map((fn) =>
-          "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
-          safeSummaryText(fn.sourceFile) + ":" + fn.line,
-        ) : ["- No named function candidates were extracted."]),
+        ...(functions.length ? functions.map((fn) => {
+          const sourceAsset = localFiles.find((file) => file.relativePath === fn.sourceFile)
+          const callSites = fn.callSites ?? []
+          return "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
+            safeSummaryText(fn.sourceFile) + ":" + fn.line +
+            (sourceAsset?.sourceMapSource ? " — mapped source: " + safeSummaryText(sourceAsset.sourceMapSource) : "") +
+            (sourceAsset?.sourceURL ? " — asset URL: " + safeSummaryURL(sourceAsset.sourceURL) : "") +
+            (callSites.length ? " — candidate references: " + callSites.map((site) => site.kind + "@" + site.line + (site.callerFunctionName ? " in " + safeSummaryText(site.callerFunctionName) : " at module/component scope")).join(", ") : " — no UI/event/callback references matched")
+        }) : ["- No named function candidates were extracted."]),
         "",
     "## API and request intelligence",
     ...(requestCandidates.length ? requestCandidates.map((item) =>
@@ -1558,6 +1649,9 @@ function renderCanonicalJavaScriptAnalysis(
     ) : ["- No structured request-call candidates were extracted."]),
     "",
 
+    "## Feature and behavior trace (static candidates; use these to locate code and correlate UI actions)",
+    ...renderJavaScriptWorkflowTrace(graph),
+    "",
     "## Roles, permissions, tenants and feature flags",
     ...(roleHints.length ? roleHints.map((item) =>
       "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.value) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line,
@@ -2479,6 +2573,7 @@ export namespace JavaScriptCorrelation {
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         applicationHints: mergedSourceFiles.flatMap((file) => (file.analysis?.applicationHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
+        workflowSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.workflowSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
       },
       endpointCandidates: [],
       evidence: relevantRequests
