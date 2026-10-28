@@ -32,6 +32,7 @@ export interface JavaScriptSecretCandidate {
   confidence: "candidate"
 }
 export interface JavaScriptRoleHint { kind: string; value: string; line: number }
+export interface JavaScriptApplicationHint { kind: string; value: string; line: number; confidence: "candidate" }
 export interface JavaScriptRiskSignal {
   id: string
   kind: string
