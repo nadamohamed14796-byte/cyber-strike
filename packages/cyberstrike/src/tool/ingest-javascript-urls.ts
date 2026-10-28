@@ -150,6 +150,35 @@ function isHTMLResponse(body: string, contentType: string, url: string): boolean
     /\.x?html?$/i.test(new URL(url).pathname) && /^\s*(?:<!doctype\s+html|<html\b|<head\b|<body\b)/i.test(body.slice(0, 4096))
 }
 
+/** Detect reusable local JavaScript evidence without following symlinks. */
+async function hasLocalJavaScriptInputs(root: string): Promise<boolean> {
+  const pending = [root]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const directory = pending.pop()!
+    if (visited.has(directory)) continue
+    visited.add(directory)
+    let entries: import("node:fs").Dirent[]
+    try {
+      entries = await fs.readdir(directory, { withFileTypes: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue
+      throw error
+    }
+    for (const entry of entries) {
+      // Do not follow symlinked directories or files outside the target workspace.
+      if (entry.isSymbolicLink()) continue
+      const fullPath = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        pending.push(fullPath)
+        continue
+      }
+      if (entry.isFile() && /\.(?:js|mjs|cjs|map|html?|xhtml)$/i.test(entry.name)) return true
+    }
+  }
+  return false
+}
+
 export function extractJavaScriptImportURLs(body: string, assetURL: string): string[] {
   const output = new Set<string>()
   const patterns = [
@@ -343,6 +372,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     const invalidCount = params.urls.filter((url) => !normalizeURL(url)).length
     const inputURLs = [...new Set(params.urls.map(normalizeURL).filter((value): value is string => Boolean(value)))]
+    const localJavaScriptInputsAtStart = inputURLs.length === 0 ? await hasLocalJavaScriptInputs(root) : false
     const queuedURLs = new Set(inputURLs)
     const sourceByURL = new Map<string, Set<string>>()
     const addSource = (url: string, source: string) => {
@@ -392,7 +422,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         inputURLs.push(url)
       }
     }
-    if (inputURLs.length === 0) {
+    if (inputURLs.length === 0 && !localJavaScriptInputsAtStart) {
       const downloadedExisting = manifest.assets.filter((record) => record.status === "downloaded").length
       const reusedExisting = manifest.assets.filter((record) => record.status === "reused").length
       const failedExisting = manifest.assets.filter((record) => record.status === "failed").length
@@ -692,7 +722,10 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
 
     let analysisSummary = ctx.abort.aborted ? "Correlation not run because ingestion was interrupted; pending assets are saved for resume." : "Analysis not run."
     let analysisError: string | undefined
-    if (!ctx.abort.aborted && downloaded + reused > 0) {
+    let analyzedSourceRecords = 0
+    const localJavaScriptInputs = await hasLocalJavaScriptInputs(root)
+    const shouldRunCorrelation = !ctx.abort.aborted && (downloaded + reused > 0 || localJavaScriptInputs)
+    if (shouldRunCorrelation) {
       ctx.metadata({
         title: "Correlating JavaScript and captured requests",
         metadata: {
@@ -704,11 +737,12 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       })
       try {
         const result = await JavaScriptCorrelation.build({ sessionID: ctx.sessionID, targetURL: params.target_url })
+        analyzedSourceRecords = result.graph.sourceFiles.length
         analysisSummary = [
           "JavaScript correlation snapshot: " + result.graphPath,
           "Endpoint inventory: " + result.endpointPath,
           "Unique endpoint candidates: " + result.graph.endpointCandidates.length,
-          "Unique source records: " + result.graph.sourceFiles.length,
+          "Unique source records: " + analyzedSourceRecords,
           "Source-map references: " + (result.graph.sourceMapReferences ?? []).length,
         ].join("\n")
       } catch (error) {
@@ -730,21 +764,24 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const manifestReconciled = worklistMissingRecords === 0 && worklistPending === 0 && worklistRetryable === 0
     const collectionComplete =
       !ctx.abort.aborted &&
+      (manifest.assets.length > 0 || allQueuedURLs.length > 0) &&
       manifestReconciled &&
       invalidCount === 0 &&
       globalPending === 0 &&
       globalRetryable === 0 &&
       worklistAvailable === allQueuedURLs.length &&
       finalManifestAssets.every((record) => record.status === "downloaded" || record.status === "reused")
-    const correlationSaved = !ctx.abort.aborted && !analysisError && (downloaded + reused > 0)
-    const completeAnalysis = collectionComplete && correlationSaved
+    const correlationSaved = shouldRunCorrelation && !ctx.abort.aborted && !analysisError
+    const completeAnalysis = collectionComplete && correlationSaved && analyzedSourceRecords > 0
     const resultTitle = ctx.abort.aborted
       ? "JavaScript ingestion interrupted — pending work saved"
       : analysisError || !manifestReconciled || globalPending > 0 || globalRetryable > 0
         ? "JavaScript ingestion incomplete — resumable work remains"
         : !collectionComplete
           ? "JavaScript ingestion finished with asset gaps"
-          : "JavaScript URL ingestion complete"
+          : !completeAnalysis
+            ? "JavaScript evidence saved — no analyzable source records confirmed"
+            : "JavaScript URL ingestion complete"
 
     return {
       title: resultTitle,
@@ -769,7 +806,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Newly downloaded bytes: " + downloadedBytes,
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
-        "Correlation status: " + (analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : correlationSaved ? (completeAnalysis ? "ran and saved a full-coverage snapshot" : "ran and saved a partial snapshot; collection still has coverage gaps") : "not run because no asset was downloaded or reused"),
+        "Correlation status: " + (analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : correlationSaved ? (completeAnalysis ? "ran and saved a full-coverage snapshot" : !collectionComplete ? "ran and saved a partial snapshot; collection still has coverage gaps" : "ran but no analyzable source records were confirmed") : "not run because no local or newly collected asset was available"),
+        "Analyzed source records: " + analyzedSourceRecords,
         analysisSummary,
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => displayURL(record.url) + " — " + record.status + ": " + redactURLs(record.error ?? "")),
       ].join("\n"),
@@ -798,6 +836,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         downloaded_bytes: downloadedBytes,
         received_bytes: receivedBytes,
         analysis_error: analysisError,
+        analyzed_source_records: analyzedSourceRecords,
         analysis_complete: completeAnalysis,
         interrupted: ctx.abort.aborted,
       },

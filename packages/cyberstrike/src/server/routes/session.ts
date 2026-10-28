@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { Hono } from "hono"
 import { stream } from "hono/streaming"
 import { describeRoute, validator, resolver } from "hono-openapi"
@@ -599,77 +600,41 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   after: IngestSummary.snapshot(sessionID),
                 })
 
-                // Persist a target-local evidence artifact for every captured request.
-                // This private artifact preserves the exact captured request for reproduction;
-                // shared/exported evidence must be separately redacted before leaving the workspace.
+                // Keep one durable note per endpoint, not one JSON file and one growing note
+                // for every captured request. The canonical request store already owns the
+                // captured request row; duplicating it under requests/<id>.json made workspaces
+                // balloon without adding evidence. The note contains no raw headers/cookies/body.
                 if (normalized.origin) {
                   try {
                     const observedURL = new URL(normalized.normalizedPath, normalized.origin)
                     const scopeDecision = await TargetMemory.checkURLScope(observedURL.href)
                     if (scopeDecision.allowed && scopeDecision.workspace) {
-                      const queryNames = [...new Set([...observedURL.searchParams.keys()])].sort()
-                      const requestArtifact = "requests/" + req.id.replace(/[^a-zA-Z0-9_-]/g, "_") + ".json"
-                      try {
-                        await TargetMemory.writeWorkspaceFile(scopeDecision.workspace, requestArtifact, JSON.stringify({
-                          schemaVersion: 1,
-                          requestID: req.id,
-                          analysisSessionID,
-                          capturedAt: new Date().toISOString(),
-                          targetURL: scopeDecision.workspace.targetURL,
-                          request: {
-                            method: normalized.method,
-                            origin: observedURL.origin,
-                            path: observedURL.pathname,
-                            queryParameterNames: queryNames,
-                            rawRequest: truncatedRawRequest,
-                          },
-                          response: {
-                            status: req.response_status ?? null,
-                            contentType: req.response_content_type ?? null,
-                            size: req.response_size ?? null,
-                            redactedPreview: safeCorrelationResponsePreview({
-                              id: req.id,
-                              normalizedPath: normalized.normalizedPath,
-                              responseContentType: req.response_content_type,
-                              processedResponse: req.processed_response,
-                            }),
-                          },
-                          evidencePolicy: "Private target-local original preserving exact request values for authorized reproduction. Create a separate redacted copy before sharing, reporting publicly, or sending to an external service.",
-                        }, null, 2) + "\n")
-                      } catch (error) {
-                        log.warn("request artifact persistence failed", {
-                          sessionID,
-                          analysisSessionID,
-                          requestID: req.id,
-                          targetID: scopeDecision.workspace.id,
-                          error: error instanceof Error ? error.message : String(error),
-                        })
-                      }
+                      const endpointPath = normalized.normalizedPath.split("?")[0] || observedURL.pathname
+                      const endpointIdentityHash = createHash("sha256")
+                        .update([observedURL.origin, normalized.method.toUpperCase(), endpointPath].join("\\0"))
+                        .digest("hex")
+                        .slice(0, 32)
+                      const endpointIdentity = "extension-endpoint:" + endpointIdentityHash
                       const requestNoteContent = [
-                        "# Captured Request Observation",
+                        "# Captured Endpoint Observation",
                         "",
-                        "- Request ID: " + req.id,
-                        "- Child analysis session: " + analysisSessionID,
                         "- Method: " + normalized.method,
                         "- Origin: " + observedURL.origin,
-                        "- Path: " + observedURL.pathname,
-                        "- Query parameter names: " + (queryNames.length ? queryNames.join(", ") : "none"),
-                        "- Response status: " + (req.response_status ?? "unknown"),
-                        "- Response content type: " + (req.response_content_type ?? "unknown"),
-                        "- Response size: " + (req.response_size ?? "unknown"),
+                        "- Normalized path: " + endpointPath,
+                        "- Evidence source: the session's canonical captured-request store; use the Request ID from the request inventory/detail tools to inspect the individual observation.",
                         "",
-                        "Interpretation: observed request/response metadata only; this is not a vulnerability finding and does not prove an access-control or input-validation flaw. Unknowns: authorization context, expected behavior, response semantics, and security impact unless the child analysis establishes them.\n" +
-                        "Next analysis: inspect the private target-local request artifact (it retains exact captured request values) and canonical request by ID; correlate the exact origin/method/path with the endpoint inventory and JavaScript candidates; compare an authorized baseline/control where appropriate; record concrete evidence and a negative result if behavior is expected. Never infer impact from status code, missing headers, parameter presence, or unusual response alone. Do not share the raw artifact; create a separately redacted copy first.\n" +
-                        "The full captured request/response remains in the request store under the Request ID. Private target-local request artifact (contains exact request values): " + requestArtifact + ". The child session contains the per-request analysis and should link relevant endpoint, JavaScript, asset, and prior recon evidence.",
+                        "Interpretation: this is observed traffic, not a vulnerability finding. A route, parameter, status code, or client-side string alone does not establish unexpected behavior or security impact.",
+                        "Next analysis: correlate this method/path with the target's canonical endpoint inventory and JavaScript source candidates; inspect authentication/role context and concrete request/response evidence from the request store; compare an authorized baseline/control when appropriate. Preserve meaningful negative results and do not duplicate raw headers, cookies, tokens, or bodies into notes.",
                       ].join("\n")
                       await TargetMemory.addNote(scopeDecision.workspace.targetURL, {
                         kind: "evidence",
-                        title: ("Captured request " + normalized.method + " " + normalized.normalizedPath.split("?")[0]).slice(0, 180),
+                        title: ("Captured endpoint " + normalized.method + " " + endpointPath).slice(0, 180),
                         content: requestNoteContent,
-                        source: "extension-request:" + req.id,
-                        sourceURL: observedURL.origin + observedURL.pathname,
+                        source: endpointIdentity,
+                        sourceURL: observedURL.origin + endpointPath,
+                        identityKey: endpointIdentity,
                         status: "observed",
-                        tags: ["extension-request", "request-observation", normalized.method.toLowerCase()],
+                        tags: ["extension-request", "endpoint-observation", normalized.method.toLowerCase()],
                         upsertByIdentity: true,
                       })
                     } else {
