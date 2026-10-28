@@ -258,7 +258,14 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           if (!persistedScope || persistedScope.status !== "configured" || persistedScope.scopeItems.length === 0) {
             invalidationReason = "The persisted authorization scope is missing or unconfigured."
           } else {
-            if (!validatedTarget) {
+            // A legacy checkpoint without a fingerprint can be migrated silently only
+            // when its saved scope predates (or matches) the checkpoint. If the policy
+            // was edited afterwards, revalidate once rather than assuming it is unchanged.
+            if (!savedFingerprint && scopeValidation.finishedAt && persistedScope.configuredAt &&
+                Date.parse(persistedScope.configuredAt) > Date.parse(scopeValidation.finishedAt)) {
+              invalidationReason = "The persisted authorization scope was updated after this legacy checkpoint; validate the current saved scope once before resuming."
+            }
+            if (!invalidationReason && !validatedTarget) {
               const recovered = await findAuthorizedScopeStart(workspace, persistedScope)
               if (recovered) validatedTarget = recovered.target
               else invalidationReason = "The saved checkpoint has no starting asset and no concrete authorized URL could be recovered from the persisted scope."
