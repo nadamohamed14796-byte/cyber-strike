@@ -2667,7 +2667,7 @@ export namespace JavaScriptCorrelation {
       }
     }
     graph.notes.push("Local JavaScript files are hashed and scanned only for static URL/path literals; source code is never copied into the graph.")
-    graph.notes.push("Static endpoint candidates are saved separately under endpoints/; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
+    graph.notes.push("Static endpoint candidates and source correlations are recorded alongside recon support artifacts; observedInTraffic means a path overlap was seen, not that a specific script executed it.")
     graph.notes.push("No JavaScript source was downloaded or executed by this correlation operation.")
     graph.notes.push("Host-only JavaScript-to-request edges are candidate relationships, not proof the script caused or called the endpoint.")
     graph.notes.push("Response previews are length-limited and redacted heuristically; derived JavaScript artifacts retain secret fingerprints and source locations only, never raw candidate values. Captured request/source bodies remain in the existing private capture store for on-demand evidence inspection.")
