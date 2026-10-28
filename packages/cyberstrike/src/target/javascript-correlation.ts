@@ -903,8 +903,19 @@ export function correlateStaticJavaScriptEndpoints(
   return [...candidates.values()]
 }
 
+export interface JavaScriptInventoryIssue {
+  relativePath: string
+  stage: "directory-read" | "file-processing"
+  code: string
+}
+
 /** Inventory local JavaScript and source-map files; never follow symlinks or execute their contents. */
-export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map<string, JavaScriptSourceAnalysis>, sourceBaseURL?: string): Promise<JavaScriptSourceFile[]> {
+export async function inventoryJavaScriptFiles(
+  root: string,
+  analysisCache?: Map<string, JavaScriptSourceAnalysis>,
+  sourceBaseURL?: string,
+  issues: JavaScriptInventoryIssue[] = [],
+): Promise<JavaScriptSourceFile[]> {
   const output: JavaScriptSourceFile[] = []
   let rootInfo
   try {
@@ -928,8 +939,14 @@ export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map
     try {
       entries = await fs.readdir(directory, { withFileTypes: true })
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue
-      throw error
+      const code = (error as NodeJS.ErrnoException).code ?? "UNKNOWN"
+      issues.push({
+        relativePath: path.relative(path.dirname(root), directory).split(path.sep).join("/") || ".",
+        stage: "directory-read",
+        code: String(code),
+      })
+      // Continue with sibling directories instead of losing all other discovered sources.
+      continue
     }
     for (const entry of entries) {
       const fullPath = path.join(directory, entry.name)
@@ -939,10 +956,11 @@ export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map
         continue
       }
       if (!entry.isFile() || !/\.(?:m?js|cjs|map|html?|xhtml)$/i.test(entry.name)) continue
-      const content = await fs.readFile(fullPath, "utf-8")
-      const digest = createHash("sha256").update(content).digest("hex")
-      const sourceBytes = Buffer.byteLength(content, "utf-8")
-      const workspaceRelativePath = path.relative(path.dirname(root), fullPath).split(path.sep).join("/")
+
+      try {
+        const content = await fs.readFile(fullPath, "utf-8")
+        const digest = createHash("sha256").update(content).digest("hex")
+        const sourceBytes = Buffer.byteLength(content, "utf-8")
       if (/\.(?:html?|xhtml)$/i.test(entry.name)) {
         const inlineScripts = extractInlineHTMLScripts(content)
         inlineScripts.forEach((script, index) => {
@@ -1008,6 +1026,16 @@ export async function inventoryJavaScriptFiles(root: string, analysisCache?: Map
           inline: true,
           analysisCache,
         }))
+      }
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? "UNKNOWN"
+        issues.push({
+          relativePath: workspaceRelativePath,
+          stage: "file-processing",
+          code: String(code),
+        })
+        // An unreadable or malformed asset is an explicit coverage gap, not a reason
+        // to discard all successfully analyzed siblings in a large JavaScript batch.
       }
     }
   }
@@ -1427,6 +1455,7 @@ function renderCanonicalJavaScriptAnalysis(
     "- Correlation snapshots combined: " + graphCount,
     "- Unique JavaScript/source-map URLs: " + assets.size,
     "- Local source files/content versions: " + localFiles.length,
+    "- Local JavaScript inventory gaps: " + graph.notes.filter((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:")).length,
     "- Source-map references: " + sourceMapReferences.length,
     "- Source maps analyzed completely: " + sourceMapReferences.filter((item) => item.status === "analyzed").length,
     "- Source maps unresolved/incomplete: " + incompleteMaps.length,
@@ -1503,6 +1532,9 @@ function renderCanonicalJavaScriptAnalysis(
     "## Coverage gaps and correlation notes",
     ...(incompleteMaps.length ? incompleteMaps.map((item) => "- SOURCE MAP GAP: " + safeSummaryURL(item.url) + " — " + item.status + " — " + safeSummaryText(item.note)) : []),
     ...(graph.notes.length ? graph.notes.map((note) => "- " + safeSummaryText(note)) : ["- No additional correlation notes."]),
+    ...(graph.notes.some((note) => note.startsWith("JAVASCRIPT INVENTORY GAP:"))
+      ? ["- NOT COMPLETE: one or more local JavaScript files/directories could not be fully read or analyzed; the exact gaps are listed above."]
+      : []),
     ...(manifest?.pendingURLs?.length ? ["- NOT COMPLETE: pending URL ingestion must be resumed."] : []),
     ...(failedAssets.length ? ["- NOT COMPLETE: one or more asset URLs failed to fetch."] : []),
     ...(skippedAssets.length ? ["- NOT COMPLETE: one or more asset URLs were skipped."] : []),
@@ -1850,7 +1882,15 @@ export namespace JavaScriptCorrelation {
 
     // An explicit asset URL must narrow source analysis, and must have been observed
     // and pass the same persisted scope/hierarchy gate as captured traffic.
-    const sourceFiles = explicitJS ? [] : await inventoryJavaScriptFiles(path.join(workspace.workspacePath, "javascript"), analysisCache, normalizedTarget.targetURL)
+    const inventoryIssues: JavaScriptInventoryIssue[] = []
+    const sourceFiles = explicitJS
+      ? []
+      : await inventoryJavaScriptFiles(
+          path.join(workspace.workspacePath, "javascript"),
+          analysisCache,
+          normalizedTarget.targetURL,
+          inventoryIssues,
+        )
 
     const projectID = Instance.project.id
     const sessionIDsSet = new Set<string>([rootSessionID])
@@ -2445,7 +2485,9 @@ export namespace JavaScriptCorrelation {
         targetID: finding.target_id ?? null,
       })),
       edges: [],
-      notes: [],
+      notes: inventoryIssues.map((issue) =>
+        `JAVASCRIPT INVENTORY GAP: ${issue.relativePath} — ${issue.stage} failed (error ${issue.code}); this item was not completely analyzed. Fix the file/directory access and rerun JavaScript correlation.`,
+      ),
     }
 
     const assetBasenames = new Map(graph.javascriptAssets.map((asset) => [path.posix.basename(new URL(asset.url).pathname).toLowerCase(), asset.url]))
