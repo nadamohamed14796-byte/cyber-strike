@@ -715,7 +715,7 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
     directory: tmp.path,
     async fn() {
       const configured = await TargetMemory.configureScope("https://hackerone.com/programs/example-program", {
-        include: ["example.com", "*.example.net"],
+        include: ["example.com", "*.example.net", "API: api.example.org:8443"],
         exclude: ["admin.example.com"],
         authorizationSource: "Program policy scope regression fixture",
         authorizationReference: "https://hackerone.com/programs/example-program",
@@ -725,6 +725,8 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
       const excluded = await TargetMemory.checkURLScope("https://admin.example.com/")
       const unrelated = await TargetMemory.checkURLScope("https://not-listed.example.org/")
       const unlistedPort = await TargetMemory.checkURLScope("https://example.com:8443/")
+      const typedAPIWithPort = await TargetMemory.checkURLScope("https://api.example.org:8443/")
+      const typedAPIWrongPort = await TargetMemory.checkURLScope("https://api.example.org:9443/")
 
       expect(apex.allowed).toBe(true)
       expect(apex.workspace?.id).toBe(configured.workspace.id)
@@ -734,6 +736,9 @@ test("program-root policy workspaces authorize unrelated explicitly scoped domai
       expect(excluded.reason).toContain("exclusion")
       expect(unrelated.allowed).toBe(false)
       expect(unlistedPort.allowed).toBe(false)
+      expect(typedAPIWithPort.allowed).toBe(true)
+      expect(typedAPIWithPort.workspace?.id).toBe(configured.workspace.id)
+      expect(typedAPIWrongPort.allowed).toBe(false)
     },
   })
 })
