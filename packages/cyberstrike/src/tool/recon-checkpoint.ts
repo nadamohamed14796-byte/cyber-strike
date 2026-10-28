@@ -14,6 +14,7 @@ import {
   reconScopeFingerprint,
   reconPhaseStartDecision,
   type ReconPhase,
+  type ReconPhaseRecord,
   type ReconPhaseStatus,
   type ReconRunManifest as ReconRun,
 } from "../target/recon-gate"
