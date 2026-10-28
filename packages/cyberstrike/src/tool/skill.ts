@@ -19,16 +19,22 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
   const description = [
     "Manage and load specialized security skills with context-efficient lazy loading.",
     "",
+    "WHEN TO USE:",
+    "  - At phase entry, inspect the ranked phase candidates and load the relevant specialist before doing its detailed procedure.",
+    "  - When new technology/framework, endpoint type, CWE, vulnerability signal, or evidence gap appears, search by its exact name, tags, category, tech stack, or CWE and load the best matching skill.",
+    "  - After a material finding, use suggest/chain to discover conditional follow-up skills; load a chain partner only when its prerequisite/evidence branch is applicable.",
+    "  - A search result, outline, or chain suggestion is NOT loaded content. Only action=load loads the full skill. Confirm the returned <skill_content> before claiming it is loaded.",
+    "",
     "Actions:",
     "  load    - Load a skill into context (requires skill name)",
-    "  outline - Preview a skill description and section headings without loading its full content",
+    "  outline - Preview skill purpose, routing metadata and section headings without loading its full content",
     "  unload  - Remove a skill from context to free tokens",
-    "  search  - Search skills by keyword, tech stack, CWE, or category",
-    "  chain   - Analyze current findings for kill chain opportunities",
-    "  suggest - Get next-step skill suggestions based on findings",
+    "  search  - Search normalized keywords, tags, categories, technologies, CWE IDs, prerequisites and chain partners",
+    "  chain   - Analyze current findings for kill-chain opportunities",
+    "  suggest - Get next-step skill suggestions from findings, including prerequisite ordering",
     "  list    - Show a page of available skills or currently loaded skills",
     "",
-    'Thousands of skills available. Use "search" to narrow the catalog; list/search support limit and offset pagination.',
+    'Use "search" to narrow the catalog; list/search support limit and offset pagination. Never load every skill or treat chains_with as automatic testing authorization.'
   ].join("\n")
 
   const parameters = z.object({
@@ -191,10 +197,28 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           output: [
             "## Search Results (showing " + (offset + 1) + "-" + nextOffset + " of " + totalCount + ")",
             "",
-            ...results.map((r) =>
-              "- **" + r.name + "** [" + (r.verified ?? "unverified") + "] — " + r.description +
-              (r.tech_stack.length ? " (" + r.tech_stack.join(", ") + ")" : ""),
-            ),
+            ...results.flatMap((r) => {
+              const visibleChains = SkillIndex.chainsFrom(r.name)
+                .map((item) => item.target)
+                .filter((name) => accessibleNames.has(name))
+              const visiblePrerequisites = SkillIndex.prerequisitesFor(r.name).flatMap((reference) => {
+                const resolved = SkillIndex.resolveReference(reference)
+                if (resolved) return accessibleNames.has(resolved) ? [resolved] : []
+                // Human-readable prerequisites are conditions, not skill links.
+                // Omit unresolved slug-like references rather than presenting broken targets.
+                return /\\s/.test(reference.trim()) ? [reference] : []
+              })
+              return [
+                "- **" + r.name + "** [" + (r.verified ?? "unverified") + "] — " + r.description,
+                "  Routing: category=" + (r.category ?? "unspecified") +
+                  "; tags=" + (r.tags.join(", ") || "none") +
+                  "; tech_stack=" + (r.tech_stack.join(", ") || "none") +
+                  "; CWE=" + (r.cwe_ids.join(", ") || "none") +
+                  "; OWASP=" + (r.owasp_id ?? "none"),
+                "  chains_with: " + (visibleChains.join(", ") || "no accessible local chain partner"),
+                "  prerequisites: " + (visiblePrerequisites.join("; ") || "none resolved"),
+              ]
+            }),
             ...(hasMore ? ["", "More results remain. Repeat the same search filters with offset=" + nextOffset + " and limit=" + limit + ", or refine the query."] : []),
           ].join("\n"),
           metadata: { offset, next_offset: hasMore ? nextOffset : null, total: totalCount } as { name?: string; dir?: string; offset: number; next_offset: number | null; total: number },
@@ -272,6 +296,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             `## Skill outline: ${skill.name}`,
             `Description: ${skill.description}`,
             `Verification: ${skill.verified ?? "unverified"}`,
+            `Category: ${skill.category ?? "unspecified"}`,
+            `Tags: ${skill.tags?.join(", ") || "none declared"}`,
+            `Technologies: ${skill.tech_stack?.join(", ") || "none declared"}`,
+            `CWE IDs: ${skill.cwe_ids?.join(", ") || "none declared"}`,
+            `OWASP ID: ${skill.owasp_id ?? "none"}`,
+            `chains_with: ${skill.chains_with?.join(", ") || "none declared"}`,
+            `prerequisites: ${skill.prerequisites?.join("; ") || "none declared"}`,
             "",
             "Preview only — full skill content has NOT been loaded into context.",
             "",
