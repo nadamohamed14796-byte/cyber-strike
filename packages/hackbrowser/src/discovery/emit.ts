@@ -65,6 +65,10 @@ export async function emitEndpoints(
       const ok = await sendIngest(toCapturedRequest(endpoint), serverUrl, sessionID, credentialId)
       if (ok) sent++
     } catch (err) {
+      // A failed delivery must not remain marked as seen: a later discovery pass
+      // should be able to retry it. Keep the pre-await add to suppress concurrent
+      // duplicate sends, then release the key only when this attempt fails.
+      seen?.delete(key)
       log.warn("endpoint ingest failed", { endpoint: key, err: String(err) })
     }
   }
