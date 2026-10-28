@@ -35,6 +35,8 @@ type AssetRecord = {
   bytes?: number
   fetchedAt?: string
   error?: string
+  /** Network/HTTP/body-read attempts for this URL; force_refresh starts a new series. */
+  attempts?: number
 }
 
 type Manifest = {
@@ -113,6 +115,18 @@ export function shouldFetchAsset(
 ): boolean {
   if (forceRefresh || !record) return true
   return record.status !== "skipped" && (record.status !== "failed" || record.retryable === true)
+}
+
+/** Retry transient collection failures once per run; permanent statuses never loop. */
+export function shouldRetryJavaScriptAsset(input:
+  | { kind: "network"; attempt: number }
+  | { kind: "http"; attempt: number; status: number }
+  | { kind: "read"; attempt: number; error: string },
+): boolean {
+  if (input.attempt >= 2) return false
+  if (input.kind === "network") return true
+  if (input.kind === "http") return input.status === 408 || input.status === 429 || input.status >= 500
+  return !input.error.includes("response exceeds the " + MAX_ASSET_BYTES + " byte asset limit")
 }
 
 function displayURL(input: string): string {
@@ -358,6 +372,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           ...prior,
           url,
           retryable: undefined,
+          attempts: forceRefresh ? 0 : (prior?.attempts ?? 0),
           source: mergeAssetSourceLabel(sources),
           sources,
           status: "pending",
@@ -403,6 +418,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let skipped = 0
     let failed = 0
     let terminalNotRetried = 0
+    const automaticRetryScheduled = new Set<string>()
 
     for (let index = 0; index < inputURLs.length; index++) {
       if (ctx.abort.aborted) {
@@ -467,7 +483,9 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         }
         const prior = byURL.get(url)
         const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const retryable = result.error.startsWith("fetch failed:")
+        const attempts = (prior?.attempts ?? 0) + 1
+        const retryable = result.error.startsWith("fetch failed:") &&
+          shouldRetryJavaScriptAsset({ kind: "network", attempt: attempts })
         const record: AssetRecord = {
           ...prior,
           url,
@@ -475,19 +493,26 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           sources,
           status: "failed",
           retryable,
+          attempts,
           pendingRefresh: retryable && prior?.pendingRefresh ? true : undefined,
           error: result.error,
           fetchedAt: new Date().toISOString(),
         }
         records.push(record); byURL.set(url, record); failed++
+        if (retryable && !automaticRetryScheduled.has(url)) {
+          automaticRetryScheduled.add(url)
+          inputURLs.push(url)
+        }
         await saveProgress()
         continue
       }
       const { response, finalURL } = result
       if (!response.ok) {
+        await response.body?.cancel().catch(() => {})
         const prior = byURL.get(url)
         const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const retryable = response.status === 408 || response.status === 429 || response.status >= 500
+        const attempts = (prior?.attempts ?? 0) + 1
+        const retryable = shouldRetryJavaScriptAsset({ kind: "http", status: response.status, attempt: attempts })
         const record: AssetRecord = {
           ...prior,
           url,
@@ -496,11 +521,16 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           sources,
           status: "failed",
           retryable,
+          attempts,
           pendingRefresh: retryable && prior?.pendingRefresh ? true : undefined,
           error: "HTTP " + response.status,
           fetchedAt: new Date().toISOString(),
         }
         records.push(record); byURL.set(url, record); failed++
+        if (retryable && !automaticRetryScheduled.has(url)) {
+          automaticRetryScheduled.add(url)
+          inputURLs.push(url)
+        }
         await saveProgress()
         continue
       }
@@ -554,7 +584,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const readError = redactURLs(error instanceof Error ? error.message : String(error))
         const prior = byURL.get(url)
         const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const retryable = !readError.includes("response exceeds the " + MAX_ASSET_BYTES + " byte asset limit")
+        const attempts = (prior?.attempts ?? 0) + 1
+        const retryable = shouldRetryJavaScriptAsset({ kind: "read", error: readError, attempt: attempts })
         const record: AssetRecord = {
           ...prior,
           url,
@@ -563,12 +594,17 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           sources,
           status: "failed",
           retryable,
+          attempts,
           pendingRefresh: retryable && prior?.pendingRefresh ? true : undefined,
           contentType,
           error: readError,
           fetchedAt: new Date().toISOString(),
         }
         records.push(record); byURL.set(url, record); failed++
+        if (retryable && !automaticRetryScheduled.has(url)) {
+          automaticRetryScheduled.add(url)
+          inputURLs.push(url)
+        }
         await saveProgress()
         continue
       }
@@ -681,7 +717,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       ? "JavaScript ingestion interrupted — pending work saved"
       : analysisError || !manifestReconciled || globalPending > 0 || globalRetryable > 0
         ? "JavaScript ingestion incomplete — resumable work remains"
-        : failed > 0 || skipped > 0
+        : finalManifestAssets.some((record) => record.status === "failed" || record.status === "skipped")
           ? "JavaScript ingestion finished with asset gaps"
           : "JavaScript URL ingestion complete"
 
