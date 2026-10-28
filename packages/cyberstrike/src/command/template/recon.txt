@@ -2,7 +2,7 @@
 
 # CyberStrike Recon
 
-Run reconnaissance end-to-end. Do the work, save and verify the results, and report only evidence-backed outcomes. Shared scope, workspace, tool-installation, recovery, and closeout rules live in the Target Workflow Contract; do not duplicate them here. Use RECON_PHASE_TOOL_MATRIX.md as the canonical phase/output reference and recon_checkpoint only for resumable state.
+Run reconnaissance end-to-end. Do the work, save and verify the results, and report only evidence-backed outcomes. Shared scope, workspace, tool-installation, recovery, and closeout rules live in the Target Workflow Contract; do not duplicate them here. Use RECON_PHASE_TOOL_MATRIX.md as the canonical phase/output reference and recon_checkpoint only for resumable state. The checkpoint synchronizes the ordered recon checklist in the todo UI automatically; never mark a phase complete manually.
 
 ## Execution order
 
@@ -16,6 +16,8 @@ Run reconnaissance end-to-end. Do the work, save and verify the results, and rep
 8. **Final endpoint inventory:** merge URL, JavaScript/source-map, API-contract, and captured-request evidence into endpoints.txt. Use one identity per origin + method + normalized path template; merge parameters, headers/auth context, source file/line/hash, provenance, and captured request IDs into that row. Query-string value variants do not create duplicate endpoints.
 9. **Active tests:** parameter fuzzing and vulnerability testing remain deferred unless explicitly requested. When requested, require the persisted scope and completed endpoint inventory, use controlled low-impact baselines/negative controls, and follow the existing finding-validation and triage workflow.
 10. **Reporting:** update and verify reports/recon-final.md from canonical artifacts and the saved checkpoint. Report truthful counts, coverage gaps, source/tool failures, unresolved items, and the precise resume point.
+
+Before moving to the next phase, verify the canonical artifact and its counts, then call `recon_checkpoint complete`. If the checkpoint rejects the transition, resume its first unresolved phase instead of skipping ahead. Merge all tool results for a data type into the same canonical inventory; use only disposable `runs/tmp/<phase>/` outputs when a CLI requires files. Delete redundant temporary outputs only after verifying that every useful row and provenance detail is represented elsewhere; retain unique captures, JS/source-map bodies, request/response evidence, and the only copy of any error or source observation. The checkpoint, not the model's memory of the todo list, is authoritative.
 
 ## Completion contract
 
