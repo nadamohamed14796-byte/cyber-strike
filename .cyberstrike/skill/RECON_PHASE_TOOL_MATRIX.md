@@ -25,7 +25,9 @@ The practical order is asset discovery → live hosts → URL/candidate classifi
 
 `recon_checkpoint` synchronizes the short `[recon:phase_id]` todo UI checklist from the persisted phase manifest. Only the first unresolved checkpoint may start; a rejected transition points back to the item to resume. This is a phase-transition rule, not a restriction on ordinary tools that can help finish an unfinished item.
 
-Before completing a phase, merge all useful source results into the one canonical inventory for that data type, verify the accepted/deduplicated counts and provenance, and ensure `runs/tmp/<phase>/` contains no disposable outputs. The checkpoint rejects completion while such scratch files remain. Keep unique raw evidence and source/error provenance in their permanent evidence locations; do not delete it to satisfy cleanup.\n\n## Source and phase status
+Before completing a phase, merge all useful source results into the one canonical inventory for that data type, verify the accepted/deduplicated counts and provenance, and ensure `runs/tmp/<phase>/` contains no disposable outputs. The checkpoint rejects completion while such scratch files remain. Keep unique raw evidence and source/error provenance in their permanent evidence locations; do not delete it to satisfy cleanup.
+
+## Source and phase status
 
 Source failures and stale phase state must not block ordinary recon. Verify the canonical inventory and continue from available evidence.
 
