@@ -9,8 +9,8 @@ import { IngestJavaScriptURLsTool } from "../../src/tool/ingest-javascript-urls"
 import { tmpdir } from "../fixture/fixture"
 
 const MiB = 1024 * 1024
-const ASSET_LIMIT = 32 * MiB
-const INVOCATION_LIMIT = 64 * MiB
+const ASSET_SIZE = 22 * MiB
+const FORMER_AGGREGATE_LIMIT = 64 * MiB
 
 function fixedSizeBody(size: number) {
   let remaining = size
@@ -39,7 +39,7 @@ function toolContext(sessionID: string) {
   } as never
 }
 
-test("enforces the aggregate response-body budget while streaming and preserves remaining URLs as pending", async () => {
+test("processes the complete JavaScript worklist beyond the former 64 MiB aggregate budget", async () => {
   await using tmp = await tmpdir()
   const requested: string[] = []
   const server = Bun.serve({
@@ -48,13 +48,13 @@ test("enforces the aggregate response-body budget while streaming and preserves 
     fetch(request) {
       const pathname = new URL(request.url).pathname
       requested.push(pathname)
-      if (pathname === "/assets/one.js" || pathname === "/assets/two.js") {
-        return new Response(fixedSizeBody(ASSET_LIMIT), {
+      if (["/assets/one.js", "/assets/two.js", "/assets/three.js"].includes(pathname)) {
+        return new Response(fixedSizeBody(ASSET_SIZE), {
           status: 200,
-          headers: { "content-type": "text/plain" },
+          headers: { "content-type": "application/javascript" },
         })
       }
-      return new Response("should not be fetched", { status: 200, headers: { "content-type": "text/plain" } })
+      return new Response("not found", { status: 404, headers: { "content-type": "text/plain" } })
     },
   })
 
@@ -97,32 +97,26 @@ test("enforces the aggregate response-body budget while streaming and preserves 
           force_refresh: false,
         }, toolContext(session.id))
 
-        expect(INVOCATION_LIMIT).toBe(ASSET_LIMIT * 2)
-        expect(requested).toEqual(["/assets/one.js", "/assets/two.js"])
-        expect((result.metadata as Record<string, unknown>).received_bytes).toBe(INVOCATION_LIMIT)
+        expect(ASSET_SIZE * 3).toBeGreaterThan(FORMER_AGGREGATE_LIMIT)
+        expect(requested).toEqual(["/assets/one.js", "/assets/two.js", "/assets/three.js"])
+        const metadata = result.metadata as Record<string, unknown>
+        expect(metadata.received_bytes).toBe(ASSET_SIZE * 3)
+        expect(metadata.queued_urls).toBe(3)
+        expect(metadata.worklist_settled).toBe(3)
+        expect(metadata.worklist_available).toBe(3)
+        expect(metadata.worklist_pending).toBe(0)
+        expect(metadata.worklist_retryable_failures).toBe(0)
+        expect(metadata.worklist_missing_manifest_records).toBe(0)
+        expect(metadata.manifest_reconciled).toBe(true)
+        expect(metadata.collection_complete).toBe(true)
 
         const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
           assets: Array<{ url: string; status: string; error?: string }>
         }
         const statusFor = (url: string) => manifest.assets.find((item) => item.url === url)
-        expect(statusFor(urls[0])?.status).toBe("skipped")
-        expect(statusFor(urls[1])?.status).toBe("skipped")
-        expect(statusFor(urls[2])?.status).toBe("pending")
-
-        // The next invocation can resume the persisted pending URL without re-supplying
-        // the original list. Completed/skipped assets must not be fetched again.
-        const resumed = await tool.execute({
-          target_url: canonicalTarget,
-          urls: [],
-          source: "unit-test-resume",
-          force_refresh: false,
-        }, toolContext(session.id))
-        expect((resumed.metadata as Record<string, unknown>).pending_assets).toBe(0)
-        expect(requested).toEqual(["/assets/one.js", "/assets/two.js", "/assets/three.js"])
-        const resumedManifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
-          assets: Array<{ url: string; status: string }>
-        }
-        expect(resumedManifest.assets.find((item) => item.url === urls[2])?.status).toBe("skipped")
+        expect(statusFor(urls[0])?.status).toBe("downloaded")
+        expect(statusFor(urls[1])?.status).toBe("reused")
+        expect(statusFor(urls[2])?.status).toBe("reused")
       },
     })
   } finally {
