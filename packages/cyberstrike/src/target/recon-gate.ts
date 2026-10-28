@@ -161,27 +161,47 @@ export function invalidateReconDownstreamPhases(
 }
 
 /**
- * Only genuine safety/dependency requirements block phase transitions.
- * Ordinary recon phases may hand off partial progress and continue; the manifest
- * preserves unfinished work so the orchestrator can revisit it without looping.
+ * Preserve the planned phase order without trapping the run: ordinary earlier
+ * phases resolve as complete, partial, unavailable, or deferred. Failed/blocked
+ * work must be retried once with a material change or explicitly handed off.
+ * Scope, workspace, and the endpoint inventory for active testing remain hard gates.
  */
 export function unresolvedReconPrerequisites(
   phase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
 ): ReconPhase[] {
-  const required: ReconPhase[] = []
+  const index = RECON_PHASES.indexOf(phase)
+  const earlier = RECON_PHASES.slice(0, index)
+  const unresolved: ReconPhase[] = []
+
   if (phase !== "scope_validation" && phases.scope_validation.status !== "complete") {
-    required.push("scope_validation")
+    unresolved.push("scope_validation")
   }
   if (phase !== "scope_validation" && phase !== "workspace_setup" &&
       phases.workspace_setup.status !== "complete") {
-    required.push("workspace_setup")
+    unresolved.push("workspace_setup")
   }
-  if ((phase === "parameter_fuzzing" || phase === "vulnerability_testing") &&
-      phases.endpoint_inventory.status !== "complete") {
-    required.push("endpoint_inventory")
+
+  for (const prior of earlier) {
+    if (prior === "scope_validation" || prior === "workspace_setup") continue
+    // Optional active tests are not prerequisites for a recon-only report. A
+    // started/failed test still needs an explicit outcome before the report.
+    if (phase === "reporting" &&
+        (prior === "parameter_fuzzing" || prior === "vulnerability_testing") &&
+        phases[prior].status === "pending") continue
+    // A user may request vulnerability testing without separately requesting
+    // parameter fuzzing; pending means it was not part of this run.
+    if (phase === "vulnerability_testing" && prior === "parameter_fuzzing" &&
+        phases[prior].status === "pending") continue
+    if ((phase === "parameter_fuzzing" || phase === "vulnerability_testing") &&
+        prior === "endpoint_inventory") {
+      if (phases.endpoint_inventory.status !== "complete") unresolved.push("endpoint_inventory")
+      continue
+    }
+    if (!terminal(phases[prior].status)) unresolved.push(prior)
   }
-  return required
+
+  return [...new Set(unresolved)]
 }
 
 /** Pure execution decision used by the runtime gate and unit tests.
@@ -205,7 +225,7 @@ export function reconPhaseStartDecision(
       unresolved,
     }
   }
-  return { allowed: true, reason: "hard safety prerequisites passed; unfinished recon work can be handed off and revisited", unresolved: [] }
+  return { allowed: true, reason: "earlier phases are verified or explicitly handed off; hard safety prerequisites passed", unresolved: [] }
 }
 
 export function reconPhaseExecutionDecision(
