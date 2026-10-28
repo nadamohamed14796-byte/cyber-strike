@@ -1,8 +1,29 @@
 import z from "zod"
 import { Tool } from "./tool"
 import path from "path"
+import fs from "node:fs/promises"
 
-const EBPF_DIR = path.resolve(import.meta.dir, "../../data/ebpf")
+async function resolveEBPFDir(): Promise<{ directory: string; searched: string[] }> {
+  const executablePath = await fs.realpath(process.execPath).catch(() => process.execPath)
+  const home = process.env.HOME ?? process.env.USERPROFILE
+  const xdgDataHome = process.env.XDG_DATA_HOME || (home ? path.join(home, ".local", "share") : undefined)
+  const candidates = [
+    path.join(path.dirname(executablePath), "data", "ebpf"),
+    path.join(path.dirname(process.execPath), "data", "ebpf"),
+    path.resolve(import.meta.dir, "../../data/ebpf"),
+    path.resolve(import.meta.dir, "data/ebpf"),
+    ...(xdgDataHome ? [path.join(xdgDataHome, "cyberstrike", "data", "ebpf")] : []),
+  ]
+  const searched = [...new Set(candidates)]
+  for (const candidate of searched) {
+    try {
+      if ((await fs.stat(candidate)).isDirectory()) return { directory: candidate, searched }
+    } catch {
+      // Try the next supported layout.
+    }
+  }
+  return { directory: searched[0]!, searched }
+}
 
 const AVAILABLE_PROGRAMS: Record<string, { description: string; args: string }> = {
   pam_sniff: {
@@ -167,7 +188,8 @@ export const EbpfTool = Tool.define("ebpf", {
     timeout_seconds: z.number().optional().default(120).describe("Maximum execution time in seconds (default: 120)"),
   }),
   async execute(params) {
-    const scriptPath = path.join(EBPF_DIR, `${params.program}.py`)
+    const ebpf = await resolveEBPFDir()
+    const scriptPath = path.join(ebpf.directory, `${params.program}.py`)
     const file = Bun.file(scriptPath)
     if (!(await file.exists())) {
       return {

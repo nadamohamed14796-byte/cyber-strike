@@ -38,16 +38,20 @@ jobs:
           test -x "$BIN_DIR/cyberstrike"
           test -f "$BIN_DIR/hackbrowser-worker.js"
           test -f "$BIN_DIR/data/scripts/wayback_endpoints.py"
+          test -f "$BIN_DIR/data/ebpf/cleanup.py"
+          test -f "$BIN_DIR/data/ebpf/dep_scan.py"
           test -f ".cyberstrike/skill/SKILL_GUIDE.md"
           test -f "packages/cyberstrike/script/install-linux-artifact.sh"
           cp -a .cyberstrike/skill "$BIN_DIR/skill"
           install -m 0755 packages/cyberstrike/script/install-linux-artifact.sh "$BIN_DIR/install.sh"
-          tar -czf cyberstrike-linux-x64.tar.gz -C "$BIN_DIR" cyberstrike hackbrowser-worker.js data/scripts skill install.sh
+          tar -czf cyberstrike-linux-x64.tar.gz -C "$BIN_DIR" cyberstrike hackbrowser-worker.js data/scripts data/ebpf skill install.sh
 
       - name: Verify Linux x64 archive contents
         run: |
           tar -tzf cyberstrike-linux-x64.tar.gz
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'data/scripts/wayback_endpoints.py'
+          tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'data/ebpf/cleanup.py'
+          tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'data/ebpf/dep_scan.py'
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'skill/SKILL_GUIDE.md'
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'install.sh'
 
@@ -65,6 +69,8 @@ jobs:
           test -x "$TMP_DIR/bin/cyberstrike"
           test -f "$TMP_DIR/share/cyberstrike/bin/hackbrowser-worker.js"
           test -f "$TMP_DIR/share/cyberstrike/data/scripts/wayback_endpoints.py"
+          test -f "$TMP_DIR/share/cyberstrike/data/ebpf/cleanup.py"
+          test -f "$TMP_DIR/share/cyberstrike/data/ebpf/dep_scan.py"
           test -f "$TMP_DIR/share/cyberstrike/skill/SKILL_GUIDE.md"
 
       - name: Upload runnable Linux x64 build

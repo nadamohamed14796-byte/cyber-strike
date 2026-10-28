@@ -300,6 +300,27 @@ for (const key of Object.keys(binaries)) {
 }
 console.log("Python helper scripts copied and verified in all platform bin/ directories")
 
+ 
+// Bundle eBPF Python programs beside the executable too. Like attack_script,
+// the eBPF runner executes these files as subprocesses; they are not Bun imports.
+const ebpfSource = path.join(dir, "data", "ebpf")
+const ebpfInfo = await fs.promises.stat(ebpfSource).catch(() => undefined)
+if (!ebpfInfo?.isDirectory()) {
+  throw new Error(`Required eBPF programs directory is missing: ${ebpfSource}`)
+}
+for (const key of Object.keys(binaries)) {
+  const ebpfDestination = path.join(dir, "dist", key, "bin", "data", "ebpf")
+  await fs.promises.rm(ebpfDestination, { recursive: true, force: true })
+  await fs.promises.mkdir(path.dirname(ebpfDestination), { recursive: true })
+  await fs.promises.cp(ebpfSource, ebpfDestination, { recursive: true, errorOnExist: true, force: false })
+  for (const program of ["cleanup.py", "dep_scan.py"]) {
+    if (!fs.existsSync(path.join(ebpfDestination, program))) {
+      throw new Error(`Required eBPF program was not bundled for ${key}: ${program}`)
+    }
+  }
+}
+console.log("eBPF Python programs copied and verified in all platform bin/ directories")
+
 if (Script.release) {
   for (const key of Object.keys(binaries)) {
     if (key.includes("linux")) {
