@@ -125,7 +125,7 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
     "When a selected CLI is missing or incompatible, install that exact CLI rather than silently replacing it with a lower-coverage alternative. Use the predefined recipe when catalogued.",
     "For an uncatalogued CLI, first inspect the official upstream installation instructions, then pass official_installs with the exact package-manager method, package identifier, expected executable, official HTTPS source URL, and documented version/help arguments. Do not pass shell commands or guessed package names.",
     "If exact installation fails or prerequisites are unavailable, preserve the real error and report the blocker. Only then may the orchestrator choose a different method and explain the coverage trade-off. Never install every catalog example, and never install tools for passive questions, code review, or informational requests.",
-  ].join("\\n"),
+  ].join("\n"),
   parameters: z.object({
     tools: z.array(z.string().min(1).max(100)).describe(`Exact selected CLI names to check/install. Catalogued recipes: ${Object.keys(TOOL_INSTALL_MAP).join(", ")}.`),
     official_installs: z.array(OfficialInstall).optional().describe("Reviewed upstream install details for exact selected tools missing from the catalog. These describe a package-manager method, never a shell command."),
@@ -156,6 +156,16 @@ export const EnsureToolsTool = Tool.define("ensure_tools", {
         if (official.executable !== name || !upstreamUrlIsSafe(official.source_url)) {
           results.push({ tool: name, installed: false, action: "Rejected install details: executable must match the selected CLI and source_url must be a credential-free HTTPS upstream reference" })
           continue
+        }
+        const existingPath = commandPath(official.executable)
+        if (existingPath.exitCode === 0) {
+          const executablePath = existingPath.stdout.toString().trim()
+          const identity = Bun.spawnSync([executablePath, ...official.verify_args], { timeout: 30_000 })
+          if (identity.exitCode === 0) {
+            const identityOutput = (identity.stdout.toString().trim() || identity.stderr.toString().trim()).slice(0, 240)
+            results.push({ tool: name, installed: true, action: "Already installed and verified " + executablePath + (identityOutput ? " (" + identityOutput + ")" : "") + "; source: " + official.source_url })
+            continue
+          }
         }
         const command = officialInstallArgs(official.method, official.package)
         if (!command) {
