@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mergeTodoSnapshot } from "../../src/tool/todo"
+import { mergeTodoSnapshot, nextTodo } from "../../src/tool/todo"
 import type { Todo } from "../../src/session/todo"
 import { trimTodoHistory } from "../../src/session/todo"
 
@@ -55,6 +55,20 @@ describe("todo snapshot reconciliation", () => {
     expect(result.todos).toEqual([item("New task", "pending", "high")])
     expect(result.preserved).toEqual([])
   })
+})
+
+test("the next action follows the recon checklist ahead of unrelated todo priorities", () => {
+  const todos = [
+    item("[recon:scope_validation] 1. Scope", "completed", "high"),
+    item("[recon:workspace_setup] 2. Workspace", "pending", "high"),
+    item("[recon:asset_discovery] 3. Assets", "pending", "high"),
+    item("Unrelated urgent task", "in_progress", "high"),
+  ]
+
+  expect(nextTodo(todos)?.content).toBe("[recon:workspace_setup] 2. Workspace")
+
+  todos[1] = item("[recon:workspace_setup] 2. Workspace", "in_progress", "high")
+  expect(nextTodo(todos)?.content).toBe("[recon:workspace_setup] 2. Workspace")
 })
 
 test("completed recon checklist entries survive todo history trimming", () => {
