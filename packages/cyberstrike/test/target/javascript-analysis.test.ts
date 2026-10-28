@@ -480,7 +480,7 @@ test("builds actionable email-verification, token, and SQL/data-operation traces
 
   const verify = result.functions.find((item) => item.name === "verifyEmailToken")
   expect(verify?.parameters).toContain("token")
-  expect(verify?.callSites?.some((item) => item.kind === "ui-event-binding" && item.line === 7)).toBe(true)
+  expect(verify?.callSites?.some((item) => item.kind === "ui-event-binding" && item.line === 8)).toBe(true)
   const verifyRequest = result.requests.find((item) => item.sourceFunction === "verifyEmailToken")
   expect(verifyRequest?.method).toBe("POST")
   expect(verifyRequest?.path).toBe("/api/auth/email/verify")
