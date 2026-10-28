@@ -96,6 +96,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         })
       }
       const accessibleSkills = accessibleCache.get(agentKey)!.skills
+      const accessibleNames = new Set(accessibleSkills.map((skill) => skill.name))
+      const escapeXmlAttribute = (value: string) =>
+        value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
       if (params.action === "list") {
         if (params.loaded) {
@@ -272,6 +275,12 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         if (!accessibleSkills.some((entry) => entry.name === canonicalName)) {
           throw new Error(`Permission denied: skill "${canonicalName}" is not accessible to agent "${ctx.agent ?? "unknown"}".`)
         }
+        const outlineChains = SkillIndex.chainsFrom(skill.name).filter((item) => accessibleNames.has(item.target))
+        const outlinePrerequisites = SkillIndex.prerequisitesFor(skill.name).flatMap((reference) => {
+          const resolved = SkillIndex.resolveReference(reference)
+          if (resolved) return accessibleNames.has(resolved) ? [resolved] : []
+          return /\\s/.test(reference.trim()) ? [reference] : []
+        })
         const headings = skill.content
           .split(/\r?\n/)
           .filter((line) => /^\s{0,3}#{1,4}\s+/.test(line))
@@ -301,8 +310,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
             `Technologies: ${skill.tech_stack?.join(", ") || "none declared"}`,
             `CWE IDs: ${skill.cwe_ids?.join(", ") || "none declared"}`,
             `OWASP ID: ${skill.owasp_id ?? "none"}`,
-            `chains_with: ${skill.chains_with?.join(", ") || "none declared"}`,
-            `prerequisites: ${skill.prerequisites?.join("; ") || "none declared"}`,
+            `chains_with (resolved and accessible): ${outlineChains.map((item) => item.target).join(", ") || "none"}${(skill.chains_with?.length ?? 0) > outlineChains.length ? " (some declared references are unresolved or unavailable and were omitted)" : ""}`,
+            `prerequisites (resolved/conditions): ${outlinePrerequisites.join("; ") || "none"}${(skill.prerequisites?.length ?? 0) > outlinePrerequisites.length ? " (some declared references are unresolved or unavailable and were omitted)" : ""}`,
             "",
             "Preview only — full skill content has NOT been loaded into context.",
             "",
@@ -377,29 +386,49 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           return "<file-list-unavailable>Skill content loaded; companion-file listing failed.</file-list-unavailable>"
         })
 
-      const chains = SkillIndex.chainsFrom(skill.name)
+      const declaredChainCount = skill.chains_with?.length ?? 0
+      const chains = SkillIndex.chainsFrom(skill.name).filter((item) => accessibleNames.has(item.target))
       const chainInfo =
-        chains.length > 0
+        chains.length > 0 || declaredChainCount > chains.length
           ? [
               "",
               "<kill_chain_links>",
-              ...chains.map((c) => `  <chain target="${c.target}"${c.boost ? ` boost="${c.boost}"` : ""} />`),
+              ...chains.map((c) => `  <chain target="${escapeXmlAttribute(c.target)}"${c.boost ? ` boost="${escapeXmlAttribute(c.boost)}"` : ""} />`),
+              ...(declaredChainCount > chains.length
+                ? ["  Some declared chain references were unresolved or unavailable under current permissions and were omitted."]
+                : []),
               "</kill_chain_links>",
             ].join("\n")
           : ""
 
       const rawPrerequisites = SkillIndex.prerequisitesFor(skill.name)
+      let omittedPrerequisiteCount = 0
+      const prerequisiteLines = rawPrerequisites.flatMap((reference) => {
+        const resolved = SkillIndex.resolveReference(reference)
+        if (resolved) {
+          if (!accessibleNames.has(resolved)) {
+            omittedPrerequisiteCount++
+            return []
+          }
+          const loaded = SkillContext.isLoaded(resolved)
+          return [`  <prerequisite skill="${escapeXmlAttribute(resolved)}" status="${loaded ? "loaded" : "not-loaded"}" />`]
+        }
+        // Human-readable prerequisites are real-world conditions, not skill links.
+        if (/\\s/.test(reference.trim())) {
+          return [`  <prerequisite condition="${escapeXmlAttribute(reference)}" status="verify-independently" />`]
+        }
+        omittedPrerequisiteCount++
+        return []
+      })
       const prerequisiteInfo =
         rawPrerequisites.length > 0
           ? [
               "",
               "<prerequisites>",
-              ...rawPrerequisites.map((reference) => {
-                const resolved = SkillIndex.resolveReference(reference)
-                if (!resolved) return `  <prerequisite reference="${reference}" status="unresolved-catalog-reference" />`
-                const loaded = SkillContext.isLoaded(resolved)
-                return `  <prerequisite skill="${resolved}" status="${loaded ? "loaded" : "not-loaded"}" />`
-              }),
+              ...prerequisiteLines,
+              ...(omittedPrerequisiteCount > 0
+                ? [`  ${omittedPrerequisiteCount} declared prerequisite reference(s) were unresolved or unavailable under current permissions and were omitted.`]
+                : []),
               "  Verify real-world prerequisites independently; loading a prerequisite skill is not proof that access, credentials, or target conditions exist.",
               "</prerequisites>",
             ].join("\n")
@@ -410,6 +439,8 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
         output: [
           `<skill_content name="${skill.name}" verified="${skill.verified ?? "unverified"}">`,
           `# Skill: ${skill.name}`,
+          "",
+          `Routing metadata: category=${skill.category ?? "unspecified"}; tags=${skill.tags?.join(", ") || "none declared"}; tech_stack=${skill.tech_stack?.join(", ") || "none declared"}; CWE=${skill.cwe_ids?.join(", ") || "none"}; OWASP=${skill.owasp_id ?? "none"}`,
           "",
           skill.content.trim(),
           "",
