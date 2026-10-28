@@ -849,7 +849,7 @@ export namespace SessionPrompt {
         const lines = [
           "# MCP Tools",
           `You have ${mcpLazyStats.available} tools available from MCP servers. These tools are NOT yet in your context.`,
-          "At each checkpoint, first reuse suitable tools already loaded or verified. Use `tool_search` only when the current objective has a real capability gap; retry with synonyms or a broader limit if results are thin, then use `load_tools` for matching IDs. Do not repeat unchanged searches or delay ordinary work for discovery. Tool-category examples are hints, not assignments.",
+          "At a checkpoint, identify the exact missing evidence and expected artifact. Reuse a loaded/verified tool only if its schema fits. If the capability is missing or uncertain, call `tool_search` with a task-specific capability query; if results are thin, make one materially different query, not an unchanged repeat. Search results are a ranked shortlist, not a tool allowlist or proof of suitability. Use `load_tools` for a small set of plausible IDs to reveal their full schemas, inspect real inputs/outputs and side effects, then invoke only the best-fit tools. After each run, inspect output/errors and compare with the artifact before choosing the next action. Add tools only for distinct coverage, corroboration, or recovery; never run a list of candidates just because it exists.",
           "",
           "Available servers:",
         ]
