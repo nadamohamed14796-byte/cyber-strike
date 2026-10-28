@@ -28,9 +28,10 @@ export namespace SkillIndex {
     techIndex: Map<string, Set<string>>
     cweIndex: Map<string, Set<string>>
     categoryIndex: Map<string, Set<string>>
-    // Keep canonical names separate from aliases so a shared tag/tech stack
-    // cannot make a real skill name ambiguous.
+    // Keep exact canonical names separate from normalized names and aliases so
+    // a shared tag/tech stack cannot make an exact skill name ambiguous.
     nameIndex: Map<string, Set<string>>
+    normalizedNameIndex: Map<string, Set<string>>
     referenceIndex: Map<string, Set<string>>
   }
   const states = new Map<string, IndexState>()
@@ -42,6 +43,7 @@ export namespace SkillIndex {
     cweIndex: new Map(),
     categoryIndex: new Map(),
     nameIndex: new Map(),
+    normalizedNameIndex: new Map(),
     referenceIndex: new Map(),
   })
   const current = () => states.get(Instance.directory) ?? emptyState()
@@ -59,10 +61,15 @@ export namespace SkillIndex {
     // Canonical names have priority over aliases shared by multiple skills.
     // Keep this index separate so a popular tech-stack tag (for example "aws")
     // cannot make a real skill named "aws" unresolvable.
-    const nameKey = normalizeSearchText(entry.name)
-    if (nameKey) {
-      if (!state.nameIndex.has(nameKey)) state.nameIndex.set(nameKey, new Set())
-      state.nameIndex.get(nameKey)!.add(entry.name)
+    const exactNameKey = entry.name.trim().toLowerCase()
+    if (exactNameKey) {
+      if (!state.nameIndex.has(exactNameKey)) state.nameIndex.set(exactNameKey, new Set())
+      state.nameIndex.get(exactNameKey)!.add(entry.name)
+    }
+    const normalizedNameKey = normalizeSearchText(entry.name)
+    if (normalizedNameKey) {
+      if (!state.normalizedNameIndex.has(normalizedNameKey)) state.normalizedNameIndex.set(normalizedNameKey, new Set())
+      state.normalizedNameIndex.get(normalizedNameKey)!.add(entry.name)
     }
     // Technique aliases are explicit IDs, never fuzzy substring/prefix matches.
     addReference(state, entry.name, entry.name)
@@ -81,10 +88,19 @@ export namespace SkillIndex {
   }
 
   function resolveInState(reference: string, state: IndexState): string | undefined {
+    const exactName = reference.trim().toLowerCase()
+    if (!exactName) return undefined
+
+    // A literal canonical name always wins even if its normalized spelling
+    // collides with another slug (for example, hyphen vs underscore).
+    const exactCanonicalNames = state.nameIndex.get(exactName)
+    if (exactCanonicalNames?.size) {
+      return exactCanonicalNames.size === 1 ? exactCanonicalNames.values().next().value : undefined
+    }
+
     const normalized = normalizeSearchText(reference)
     if (!normalized) return undefined
-
-    const canonicalNames = state.nameIndex.get(normalized)
+    const canonicalNames = state.normalizedNameIndex.get(normalized)
     if (canonicalNames?.size) {
       return canonicalNames.size === 1 ? canonicalNames.values().next().value : undefined
     }
