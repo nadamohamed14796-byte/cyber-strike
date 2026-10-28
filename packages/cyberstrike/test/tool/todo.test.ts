@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { mergeTodoSnapshot, nextTodo } from "../../src/tool/todo"
-import type { Todo } from "../../src/session/todo"
-import { trimTodoHistory } from "../../src/session/todo"
+import { Todo } from "../../src/session/todo"
 
 const item = (content: string, status: string, priority = "medium"): Todo.Info => ({
   content,
@@ -86,7 +85,7 @@ test("completed recon checklist entries survive todo history trimming", () => {
   ]
   const recon = reconPhases.map((phase) => item("[recon:" + phase + "] done", "completed", "high"))
   const general = Array.from({ length: 8 }, (_, index) => item("Old task " + index, "completed"))
-  const trimmed = trimTodoHistory([...recon, ...general, item("Current task", "in_progress", "high")])
+  const trimmed = Todo.trimTodoHistory([...recon, ...general, item("Current task", "in_progress", "high")])
 
   expect(trimmed.filter((todo) => /^\[recon:[a-z_]+\]/.test(todo.content))).toHaveLength(reconPhases.length)
   expect(trimmed.filter((todo) => todo.status === "completed" && !/^\[recon:[a-z_]+\]/.test(todo.content))).toHaveLength(5)
