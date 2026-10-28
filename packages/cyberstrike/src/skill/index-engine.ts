@@ -125,11 +125,14 @@ export namespace SkillIndex {
 
   function indexEntry(entry: Entry, state: IndexState) {
     for (const tag of entry.tags) {
-      if (!state.tagIndex.has(tag.toLowerCase())) state.tagIndex.set(tag.toLowerCase(), new Set())
-      state.tagIndex.get(tag.toLowerCase())!.add(entry.name)
+      const key = normalizeSearchText(tag)
+      if (!key) continue
+      if (!state.tagIndex.has(key)) state.tagIndex.set(key, new Set())
+      state.tagIndex.get(key)!.add(entry.name)
     }
     for (const tech of entry.tech_stack) {
-      const key = tech.toLowerCase()
+      const key = normalizeSearchText(tech)
+      if (!key) continue
       if (!state.techIndex.has(key)) state.techIndex.set(key, new Set())
       state.techIndex.get(key)!.add(entry.name)
     }
@@ -139,9 +142,11 @@ export namespace SkillIndex {
       state.cweIndex.get(key)!.add(entry.name)
     }
     if (entry.category) {
-      const key = entry.category.toLowerCase()
-      if (!state.categoryIndex.has(key)) state.categoryIndex.set(key, new Set())
-      state.categoryIndex.get(key)!.add(entry.name)
+      const key = normalizeSearchText(entry.category)
+      if (key) {
+        if (!state.categoryIndex.has(key)) state.categoryIndex.set(key, new Set())
+        state.categoryIndex.get(key)!.add(entry.name)
+      }
     }
     indexReferences(entry, state)
   }
@@ -283,7 +288,7 @@ export namespace SkillIndex {
     const state = current()
     const names = new Set<string>()
     for (const tech of stack) {
-      const set = state.techIndex.get(tech.toLowerCase())
+      const set = state.techIndex.get(normalizeSearchText(tech))
       if (set) for (const name of set) names.add(name)
     }
     const results = Array.from(names)
@@ -306,7 +311,7 @@ export namespace SkillIndex {
 
   export function byCategory(cat: string, limit = 50): Entry[] {
     const state = current()
-    const set = state.categoryIndex.get(cat.toLowerCase())
+    const set = state.categoryIndex.get(normalizeSearchText(cat))
     if (!set) return []
     return Array.from(set)
       .map((n) => state.entries.get(n)!)
@@ -317,7 +322,7 @@ export namespace SkillIndex {
 
   export function byTag(tag: string, limit = 50): Entry[] {
     const state = current()
-    const set = state.tagIndex.get(tag.toLowerCase())
+    const set = state.tagIndex.get(normalizeSearchText(tag))
     if (!set) return []
     return Array.from(set)
       .map((n) => state.entries.get(n)!)
