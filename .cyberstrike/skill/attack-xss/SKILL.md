@@ -169,6 +169,42 @@ For every candidate, record: endpoint and method, input location, baseline, mark
 
 Never use keylogging, credential or token collection, cookie/storage reads, external beacons, cryptomining, or payloads intended to execute in uninvolved users' browsers. A safe proof should demonstrate only the minimum required behavior on a controlled page/account. Do not claim account takeover from a theoretical chain; any related weakness requires its own authorized, independently verified evidence.
 
+
+## Advanced parser-differential checks from practical labs
+
+Apply these checks only after identifying a reachable input-to-rendering path. They are hypothesis prompts, not a payload checklist; prefer a local fixture or tester-owned account and avoid broad automated mutation.
+
+### 1. Separate each parser and transformation layer
+
+- Record the exact value at each observable stage: submitted input, server-side stored/returned value, client-side decoded value, and final DOM node. Do not assume that the browser, HTML parser, JavaScript parser, URL parser, and framework sanitizer interpret the same representation identically.
+- Distinguish HTML entity encoding, URL percent-encoding, JavaScript string escaping, Unicode escape processing, and application-specific decoding. Test an alternate representation only when the evidence shows that specific decoding step occurs; do not spray encodings blindly.
+- For URL-valued fields, assess parsing and scheme/host allowlisting rather than only searching for a literal prefix. Record whether normalization occurs before or after validation. A validation bypass candidate is not XSS unless a browser-reachable script-capable sink is demonstrated.
+- If input appears inside an HTML comment, script/style block, quoted attribute, or serialized JSON, first map the surrounding syntax and escaping rules. A delimiter appearing in the response is not proof that it can escape its context.
+- Treat case changes, removed delimiters, and parser repair as observations about a particular implementation, not as portable bypasses. JavaScript identifiers and HTML attribute names have different case-handling rules; confirm behavior in the actual browser and framework.
+
+### 2. Use a harmless proof and debug syntax failures
+
+- Start with a unique text marker; then use a harmless observable effect such as a console message or a visible change confined to a disposable tester-owned page, when active proof is authorized. Do not use alert as the only success criterion: browser settings, automation, extensions, and dialog suppression can distort results.
+- If a candidate does not execute, inspect the final DOM, browser console, network requests, and the exact rendered source. Check syntax errors, missing prerequisites, blocked resources, CSP/Trusted Types enforcement, and whether the relevant function or component is actually invoked before changing the hypothesis.
+- Keep a known-good control and change one syntax/context variable at a time. Do not infer a filter bypass from a response difference, or infer safety from one blocked payload. Preserve the failed attempt and its explanation in the hypothesis ledger.
+- Compare a clean browser profile and, where relevant, another supported browser only to resolve a specific browser-dependent observation. Exclude extension-injected code and stale service-worker/cache behavior from the proof.
+
+### 3. Review external script loading and CSP without bypassing controls
+
+- If an input can influence a script URL or resource attribute, inspect the final parsed URL, allowed schemes/origins, redirect behavior, response content type, and whether the resource is actually loaded. Use only a resource you control or a local fixture; never host a payload for delivery to unrelated users.
+- Read the effective Content-Security-Policy response headers and relevant meta policy. Record which directive explains a blocked execution or resource. CSP is defense in depth: its presence does not prove safety, and its absence alone does not prove XSS.
+- Consider JSONP, callback parameters, and framework-specific raw-rendering features only when the application actually uses them and the candidate is reachable. Verify the real data flow and policy rather than assuming a technology/version is vulnerable from a banner or dependency name.
+
+### 4. Keep chained impact as a separate test
+
+- XSS, CSRF, open redirect, session handling, and account-setting changes are distinct claims. Chain to another skill only after the prerequisite is independently observed and authorized.
+- Never use XSS proof to read or transmit cookies, tokens, local/session storage, page contents, or private account data. Do not demonstrate impact by changing a real user's email, password, recovery settings, or other account state. If a CSRF relationship is relevant, validate it separately with a harmless, reversible action on a tester-owned account and document the server-side state-change and intent-validation behavior.
+- Do not infer administrator compromise from a script running in a test account. Report the demonstrated origin, affected role, required user interaction, persistence, and limitations; any higher-impact chain requires separate safe evidence.
+
+### 5. Add a regression test for the root cause
+
+For each confirmed issue, propose a regression case that exercises the same input field, HTTP method/content type, storage path, rendering route, and browser context. Assert that user-controlled data remains data (text or a safely parsed value), that unsafe schemes/markup are rejected by policy, and that the intended feature still works. Prefer context-aware output encoding, safe DOM APIs, maintained HTML sanitization, and structured serialization over denylisting individual characters or function names.
+
 ## References
 
 - [uphiago/recon-skills — hunt-xss](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-xss)
