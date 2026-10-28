@@ -54,7 +54,7 @@ import { ResearchContext, promptResearchSignals } from "@/learning/research-cont
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
-import { toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
+import { toolSig, READ_ONLY_TOOLS, isProgressTool } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
 import { RepeatDetector } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
@@ -338,16 +338,14 @@ export namespace SessionPrompt {
     // 1st-strike nudge from one step into the next (strip tools + wrap-up prompt).
     const stuckDetector = new StuckDetector({ ...DEFAULT_STUCK_CONFIG })
     let forceWrapUpNext = false
-    // Loop-termination Layer 2b — CROSS-TURN identical-call guard. The within-turn
-    // suppressor (resolveTools `sigCounts`) and the doom_loop check (processor) both
-    // see only ONE generation, so a weak model that re-emits the SAME (tool,args)
-    // once per turn across many turns evades both (observed: qwen re-emitting an
-    // identical record_coverage_note ~26× → failure-to-terminate). Count each
-    // signature over the whole prompt run, including primary and subagent agents; a
-    // byte-identical repeat past the limit forces wrap-up (nudge) then aborts
-    // (backstop). Different args never collide
-    // because toolSig includes the args, so legitimate probing is unaffected.
+    // Loop-termination Layer 2b — cross-turn identical-call guard. The within-turn
+    // suppressor and doom_loop check see only one generation, so identical calls can
+    // otherwise repeat across turns. This applies to primary and subagent runs.
     const repeatDetector = new RepeatDetector(3)
+    // Repeated read-only polling needs a separate, higher threshold: occasional status
+    // reads are normal, but the same read/status call over and over without real
+    // recon/testing progress is still a stall. Progress resets this detector below.
+    const readOnlyRepeatDetector = new RepeatDetector(8)
     while (true) {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
@@ -1072,7 +1070,23 @@ export namespace SessionPrompt {
         } else if (repeatVerdict === "abort" && !processor.message.stuckAborted) {
           processor.message.stuckAborted = true
           await Session.updateMessage(processor.message)
-          log.warn("cross-turn repeat abort — terminating subagent", { sessionID })
+          log.warn("cross-turn repeat abort — terminating repeated-call loop", { sessionID })
+          break
+        }
+
+        const madeProgress = toolCalls.some((call) => isProgressTool(call.tool))
+        if (madeProgress) readOnlyRepeatDetector.reset()
+        const readOnlySigs = madeProgress ? [] : toolCalls
+          .filter((call) => call.input !== undefined && READ_ONLY_TOOLS.has(call.tool))
+          .map((call) => toolSig(call.tool, call.input))
+        const readOnlyVerdict = readOnlyRepeatDetector.observe(readOnlySigs)
+        if (readOnlyVerdict === "nudge") {
+          forceWrapUpNext = true
+          log.warn("repeated read-only calls without progress — forcing wrap-up", { sessionID })
+        } else if (readOnlyVerdict === "abort" && !processor.message.stuckAborted) {
+          processor.message.stuckAborted = true
+          await Session.updateMessage(processor.message)
+          log.warn("read-only polling loop did not terminate", { sessionID })
           break
         }
       }
