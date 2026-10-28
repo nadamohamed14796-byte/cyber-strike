@@ -455,6 +455,9 @@ test("builds actionable email-verification, token, and SQL/data-operation traces
     '  return fetch("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ token }) })',
     '}',
     'const verifyButton = <button onClick={verifyEmailToken}>Verify</button>',
+    'function runEmailVerification(token) {',
+    '  return verifyEmailToken(token)',
+    '}',
     'function findAccount(accountId) {',
     '  return db.$queryRaw("SELECT id FROM accounts WHERE id = ?")',
     '}',
@@ -481,6 +484,7 @@ test("builds actionable email-verification, token, and SQL/data-operation traces
   const verify = result.functions.find((item) => item.name === "verifyEmailToken")
   expect(verify?.parameters).toContain("token")
   expect(verify?.callSites?.some((item) => item.kind === "ui-event-binding" && item.line === 8)).toBe(true)
+  expect(verify?.callSites?.some((item) => item.kind === "direct-call" && item.callerFunctionName === "runEmailVerification")).toBe(true)
   const verifyRequest = result.requests.find((item) => item.sourceFunction === "verifyEmailToken")
   expect(verifyRequest?.method).toBe("POST")
   expect(verifyRequest?.path).toBe("/api/auth/email/verify")
