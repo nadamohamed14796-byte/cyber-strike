@@ -512,6 +512,32 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const id = "js-risk:" + createHash("sha256").update(rule.kind + ":" + line + ":" + (functionName ?? "")).digest("hex").slice(0, 16)
     riskSignals.set(id, { id, kind: rule.kind, line, functionName, confidence: "candidate" })
       }
+  // A state-changing request with an explicit browser credential/cookie signal
+  // deserves CSRF review. This is only a candidate: static code cannot prove the
+  // server's cookie policy, token validation, Origin/Referer checks, or impact.
+  for (const request of requests) {
+    const method = request.method?.toUpperCase()
+    if (!method || !["POST", "PUT", "PATCH", "DELETE"].includes(method)) continue
+    const mayUseBrowserCredentials = request.cookieSignals.some((signal) =>
+      signal === "credentialed-request-may-send-cookies" ||
+      signal === "cookie-header-signal" ||
+      signal === "document-cookie-access",
+    )
+    if (!mayUseBrowserCredentials) continue
+    const kind = "csrf-review-state-changing-cookie-request"
+    const id = "js-risk:" + createHash("sha256")
+      .update(kind + ":" + request.sourceLine + ":" + (request.sourceFunction ?? "") + ":" + request.urlTemplate)
+      .digest("hex")
+      .slice(0, 16)
+    riskSignals.set(id, {
+      id,
+      kind,
+      line: request.sourceLine,
+      functionName: request.sourceFunction,
+      confidence: "candidate",
+    })
+  }
+
   for (const match of source.matchAll(rolePattern)) {
     const value = match[1]!, lower = value.toLowerCase()
     const kind = /admin|superuser/.test(lower) ? "admin-role-hint" : /role|permission/.test(lower) ? "authorization-hint"
@@ -527,6 +553,7 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
       "Secret-like values are never retained; only fingerprints, source locations, and candidate status are emitted.",
       "Static sink signals are triage candidates, can be false positives in comments/vendor code, and do not prove taint or exploitability.",
+      "CSRF review candidates require a state-changing request plus a static browser credential/cookie signal; they do not prove the server lacks anti-CSRF controls.",
       "Function attribution uses lexical body spans; minified or complex TypeScript syntax may remain unattributed.",
     ],
   }
