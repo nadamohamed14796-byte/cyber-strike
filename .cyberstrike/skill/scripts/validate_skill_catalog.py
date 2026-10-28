@@ -174,29 +174,58 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
     direct_names = {path.name for path in direct_skills}
     custom_count = 0
 
-    for directory in direct_skills:
-        path = directory / "SKILL.md"
+    checked_files = 0
+    missing_routing_metadata = 0
+    root_resolved = root.resolve()
+
+    for path in all_files:
+        checked_files += 1
+        is_direct_skill = path.parent.parent.resolve() == root_resolved
+        if is_direct_skill:
+            custom_count += 1
         text = path.read_text(encoding="utf-8", errors="replace")
         meta = frontmatter(text)
-        custom_count += 1
         label = path.relative_to(root).as_posix()
         if meta is None:
-            errors.append(f"{label}: missing or malformed YAML frontmatter")
+            message = f"{label}: missing or malformed YAML frontmatter"
+            (errors if is_direct_skill else warnings).append(message)
             continue
 
         name = scalar(meta, "name")
         description = scalar(meta, "description")
         if not name:
-            errors.append(f"{label}: required name field is missing")
-        elif name != directory.name:
+            message = f"{label}: required name field is missing"
+            (errors if is_direct_skill else warnings).append(message)
+        elif is_direct_skill and name != path.parent.name:
             errors.append(
-                f"{label}: name '{name}' does not match directory '{directory.name}'"
+                f"{label}: name '{name}' does not match directory '{path.parent.name}'"
             )
         if not description:
-            errors.append(f"{label}: required description field is missing")
+            message = f"{label}: required description field is missing"
+            (errors if is_direct_skill else warnings).append(message)
+
+        # Operational playbooks need routing metadata so the agent can discover
+        # them by technique, asset, and phase—not only by an exact display name.
+        normalized_name = (name or path.parent.name).strip().lower()
+        operational = (
+            normalized_name.startswith(("attack-", "recon-", "wstg-"))
+            or "owasp_wstg" in path.as_posix().lower()
+        )
+        if operational:
+            absent = []
+            if not scalar(meta, "category"):
+                absent.append("category")
+            if not yaml_list(meta, "tags"):
+                absent.append("tags")
+            if absent:
+                missing_routing_metadata += 1
+                warnings.append(
+                    f"{label}: actionable skill is missing routing metadata: {', '.join(absent)}"
+                )
 
         if HYPOTHESIS_CAP.search(text):
-            errors.append(f"{label}: arbitrary fixed hypothesis ceiling found")
+            message = f"{label}: arbitrary fixed hypothesis ceiling found"
+            (errors if is_direct_skill else warnings).append(message)
 
         for field in ("chains_with", "prerequisites"):
             for target in yaml_list(meta, field):
@@ -211,13 +240,15 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
             message = f"{label}: duplicate skill name '{name}' also appears at {paths}"
             (errors if strict_links else warnings).append(message)
 
-        if not re.search(r"^##\s+.+", text, re.MULTILINE):
+        if not re.search(r"^##\\s+.+", text, re.MULTILINE):
             warnings.append(f"{label}: no markdown level-2 section headings")
 
     summary = {
         "skill_root": root.as_posix(),
         "all_skill_markdown_files": len(all_files),
-        "direct_skill_directories": custom_count,
+        "checked_skill_files": checked_files,
+        "direct_skill_directories": len(direct_skills),
+        "actionable_skills_missing_routing_metadata": missing_routing_metadata,
         "unique_names_with_frontmatter": len(all_names),
         "duplicate_names": duplicate_names,
         "errors": len(errors),
