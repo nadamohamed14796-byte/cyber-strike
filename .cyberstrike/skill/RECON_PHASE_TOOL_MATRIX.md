@@ -1,8 +1,8 @@
 # Recon Phase Matrix: State, Artifacts, and Completion
 
-This matrix defines phase objectives, dependencies, canonical outputs, and completion checks—not tool assignments or runtime state. The workflow lives in `packages/cyberstrike/src/command/template/recon.txt`; `recon_checkpoint` owns resumable progress and runtime transitions; `.cyberstrike/skill/TOOLING_CATALOG.md` is the shared, non-exhaustive tool/helper reference; specialist skills own technique-specific procedures.
+This matrix defines phase-specific objectives, canonical artifacts, evidence requirements, and optional tool examples only. The Target Workflow Contract at `packages/cyberstrike/src/agent/prompt/methodology/target-workflow.txt` is the single authority for orchestration, scope, retries, partial handoffs, evidence retention, and closeout. The recon command at `packages/cyberstrike/src/command/template/recon.txt` provides the concise phase sequence; `.cyberstrike/skill/TOOLING_CATALOG.md` is the shared, non-exhaustive tool/helper reference; specialist skills own technique-specific procedures. This matrix is not a tool allowlist.
 
-The practical order is asset discovery → live hosts → URL/candidate classification → JavaScript analysis → parameter discovery → directory/path discovery → final endpoint inventory → opt-in active tests → report. At every checkpoint, choose any suitable available tool based on the evidence gap, capability, saved results, runtime, and policy. This matrix is not a tool allowlist, and stale phase state must not block useful ordinary recon. Preserve request-level scope enforcement and the explicit opt-in for vulnerability testing. Bare filenames below are canonical root inventories unless an output area is named; subdirectories hold necessary raw/structured evidence, not duplicate normalized inventories. If this guidance conflicts with runtime validation, follow the runtime contract and reconcile the documentation.
+The intended order is asset discovery → live hosts → URL/candidate classification → JavaScript/source-map analysis → parameter discovery → permitted path discovery → final endpoint inventory → optional active tests → report. Keep the canonical artifacts below, and use subdirectories only for useful raw/structured evidence rather than duplicate normalized inventories. Preserve request-level scope checks and explicit opt-in for active testing.
 
 ## Phase matrix
 
@@ -23,12 +23,12 @@ The practical order is asset discovery → live hosts → URL/candidate classifi
 
 ## Phase checklist and cleanup gate
 
-`recon_checkpoint` synchronizes the short `[recon:phase_id]` todo UI checklist from the persisted phase manifest. Only the first unresolved checkpoint may start; a rejected transition points back to the item to resume. This is a phase-transition rule, not a restriction on ordinary tools that can help finish an unfinished item.
+`recon_checkpoint` synchronizes the compact numbered `[recon:phase_id]` todo list from the saved manifest. Scope validation and workspace setup are hard prerequisites; active testing additionally requires explicit user opt-in and a completed endpoint inventory. Ordinary phase transitions must not stall because an earlier passive phase has a stale or partial status.
 
-Before completing a phase, merge all useful source results into the one canonical inventory for that data type, verify the accepted/deduplicated counts and provenance, and ensure `runs/tmp/<phase>/` contains no disposable outputs. The checkpoint rejects completion while such scratch files remain. Keep unique raw evidence and source/error provenance in their permanent evidence locations; do not delete it to satisfy cleanup.
+The central workflow contract defines how to use the `handoff` action, retry without loops, verify canonical outputs, and preserve scratch/evidence. A partial phase remains labelled partial in the manifest and can be reopened when new evidence or a materially better method appears.
 
 ## Source and phase status
 
 Source failures and stale phase state must not block ordinary recon. Verify the canonical inventory and continue from available evidence.
 
-When a capability is missing, select a suitable available alternative if one closes the same evidence gap. Phase/checkpoint state must never block ordinary tool execution or tool selection: run any suitable available tool at any recon phase, then record its evidence under the appropriate phase and reconcile progress afterward. Record a precise unavailable/blocked reason only when the capability is genuinely unavailable or a concrete runtime, authorization, scope, or policy check rejects that action. Never invent results, weaken scope enforcement, or report a missing source as successful.
+Use the Target Workflow Contract for tool-selection, recovery, and status rules. The entries in this matrix describe evidence needs, not mandatory binaries. A missing source does not invalidate results from other sources; a tool failure or partial handoff must retain its reason and resume point. Never invent results or weaken scope enforcement.
