@@ -175,6 +175,33 @@ describe("target asset hierarchy", () => {
     })
   })
 
+  test("a trailing-dot hostname cannot bypass the exact asset workspace scope", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const root = await TargetMemory.configureScope("https://example.org", {
+          include: ["example.org", "*.example.org"],
+          authorizationSource: "Trailing-dot scope regression fixture",
+          authorizationReference: "https://example.org/security",
+        })
+        const child = await TargetMemory.configureScope("https://api.example.org", {
+          include: ["URL: api.example.org/public"],
+          authorizationSource: "Narrow API scope fixture",
+          authorizationReference: "https://api.example.org/security",
+        })
+        expect(child.workspace.parentTargetID).toBe(root.workspace.id)
+
+        const inPath = await TargetMemory.checkURLScope("https://api.example.org./public/users")
+        const outsidePath = await TargetMemory.checkURLScope("https://api.example.org./private")
+        expect(inPath.allowed).toBe(true)
+        expect(inPath.workspace?.id).toBe(child.workspace.id)
+        expect(outsidePath.allowed).toBe(false)
+        expect(outsidePath.workspace?.id).toBe(child.workspace.id)
+      },
+    })
+  })
+
   test("supports nested subdomains only when every parent scope authorizes the origin", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
