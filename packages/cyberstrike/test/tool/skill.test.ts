@@ -127,7 +127,7 @@ describe("tool.skill", () => {
     }
   })
 
-  test("description shows skill count", async () => {
+  test("description explains available skills and search", async () => {
     await using tmp = await tmpdir({
       git: true,
       init: async (dir) => {
