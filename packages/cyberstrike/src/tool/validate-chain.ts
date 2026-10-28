@@ -31,6 +31,8 @@ export const ValidateChainTool = Tool.define("validate_chain", {
         finding_not_found: "The combined finding ID does not refer to a finding in the current session.",
         finding_not_approved: "The combined finding must have status approved before the chain can be confirmed.",
         finding_validation_required: "The combined finding's latest validate_finding verdict must be confirmed before the chain can be confirmed.",
+        linked_finding_not_approved: "Every explicitly linked hop must be approved before the chain can be confirmed.",
+        linked_finding_validation_required: "Every explicitly linked hop must have a latest confirmed validate_finding verdict before the chain can be confirmed.",
       }
       return {
         title: "Chain validation blocked",
