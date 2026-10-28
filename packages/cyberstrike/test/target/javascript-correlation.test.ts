@@ -248,6 +248,26 @@ test("inventories inline JavaScript in local HTML files without executing it", a
   }
 })
 
+test("inventories TypeScript and JSX source files alongside JavaScript bundles", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-js-ts-inventory-"))
+  try {
+    await fs.writeFile(path.join(root, "client.ts"), 'export const loadProfile = () => fetch("/api/profile")', "utf8")
+    await fs.writeFile(path.join(root, "widget.tsx"), 'export const Widget = () => <div>{fetch("/api/widget")}</div>', "utf8")
+    await fs.writeFile(path.join(root, "router.jsx"), 'export function Router() { return fetch("/api/router") }', "utf8")
+    await fs.writeFile(path.join(root, "notes.txt"), 'fetch("/api/not-javascript")', "utf8")
+
+    const sources = await inventoryJavaScriptFiles(root)
+    const basenames = sources.map((source) => source.basename)
+    expect(basenames).toEqual(expect.arrayContaining(["client.ts", "widget.tsx", "router.jsx"]))
+    expect(basenames).not.toContain("notes.txt")
+    expect(sources.flatMap((source) => source.endpointLiterals)).toEqual(
+      expect.arrayContaining(["/api/profile", "/api/widget", "/api/router"]),
+    )
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
 test("reuses analysis for the same JavaScript content hash", async () => {
   const { extractCapturedJavaScriptSources } = await import("../../src/target/javascript-correlation")
   const cache = new Map<string, any>()
