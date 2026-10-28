@@ -37,6 +37,8 @@ export type ReconPhaseRecord = {
 
 export type ReconRunManifest = {
   schemaVersion: 1
+  /** Version of the ordered recon lifecycle. Missing means a pre-adaptive workflow manifest. */
+  phaseOrderVersion?: 2
   targetURL: string
   targetID: string
   sessionID: string
@@ -73,7 +75,7 @@ export function reconRunID(targetID: string): string {
 export function initialReconRun(targetURL: string, targetID: string, sessionID: string): ReconRunManifest {
   const phases = Object.fromEntries(RECON_PHASES.map((phase) => [phase, { status: "pending" as const }])) as Record<ReconPhase, ReconPhaseRecord>
   const now = new Date().toISOString()
-  return { schemaVersion: 1, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
+  return { schemaVersion: 1, phaseOrderVersion: 2, targetURL, targetID, sessionID, createdAt: now, updatedAt: now, currentPhase: null, phases }
 }
 
 export function parseReconRun(raw: string, workspaceID: string, targetURL: string): ReconRunManifest {
@@ -100,7 +102,8 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   if (!phases) throw new Error("Recon run manifest has no phase records; refusing to overwrite it.")
 
   const missingPhases = introducedPhases.filter((phase) => !Object.prototype.hasOwnProperty.call(phases, phase))
-  if (missingPhases.length) {
+  const needsPhaseOrderMigration = parsed.phaseOrderVersion !== 2
+  if (missingPhases.length || needsPhaseOrderMigration) {
     for (const phase of missingPhases) {
       phases[phase] = {
         status: "pending",
@@ -110,10 +113,13 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
     // A newly introduced path-discovery phase can discover JavaScript assets that
     // were not in the earlier URL set. Revalidate JS and everything downstream when
     // migrating a manifest that has no directory_fuzzing checkpoint.
-    const earliestMissing = Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
-    // If directory discovery is new, re-run JavaScript analysis too: the new path
-    // inventory may expose script bundles that were absent from the old URL set.
-    const revalidateFrom = missingPhases.includes("directory_fuzzing")
+    const earliestMissing = missingPhases.length
+      ? Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
+      : RECON_PHASES.length
+    // A changed lifecycle invalidates JS and every later phase, but preserves verified
+    // discovery inventories. A newly added directory phase also invalidates JS because
+    // its results can reveal additional bundles that were not in the old URL set.
+    const revalidateFrom = needsPhaseOrderMigration || missingPhases.includes("directory_fuzzing")
       ? RECON_PHASES.indexOf("javascript_analysis")
       : earliestMissing + 1
     for (const phase of RECON_PHASES.slice(revalidateFrom)) {
@@ -127,7 +133,9 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
         }
       }
     }
+    parsed.phaseOrderVersion = 2
   }
+  parsed.phaseOrderVersion = 2
   parsed.phases = phases as Record<ReconPhase, ReconPhaseRecord>
   return parsed
 }
