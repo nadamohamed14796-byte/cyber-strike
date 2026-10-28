@@ -335,6 +335,10 @@ test("processes more than 300 distinct JavaScript URLs without a fixed worklist 
       const pathname = new URL(request.url).pathname
       requested.push(pathname)
       if (/^\/assets\/bundle-\d+\.js$/.test(pathname)) {
+        if (pathname === "/assets/bundle-304.js") {
+          // Valid minimal JavaScript served with a misleading MIME type.
+          return new Response("void 0;", { status: 200, headers: { "content-type": "text/plain" } })
+        }
         return new Response('fetch("/api/profile"); const featureFlag = "account_export";', {
           status: 200,
           headers: { "content-type": "application/javascript" },
