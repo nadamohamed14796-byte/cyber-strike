@@ -448,8 +448,18 @@ describe("Request.retryFailed", () => {
       Request.updateStatus({ id: failed.id, status: "failed" })
       Request.updateStatus({ id: processed.id, status: "processed" })
 
+      expect(Request.findByKeyHash(session.id, "request-retry-failed-key")).toMatchObject({
+        id: failed.id,
+        status: "failed",
+      })
+      expect(Request.findByKeyHash(session.id, "missing-key")).toBeUndefined()
+
       const retried = Request.retryFailed(session.id, failed.id)
       expect(retried?.status).toBe("queued")
+      expect(Request.findByKeyHash(session.id, "request-retry-failed-key")).toMatchObject({
+        id: failed.id,
+        status: "queued",
+      })
       expect(Request.get(session.id).find((item) => item.id === failed.id)?.status).toBe("queued")
 
       // Once requeued, the same retry cannot enqueue the request a second time.
