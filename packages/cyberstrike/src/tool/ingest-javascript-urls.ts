@@ -158,7 +158,7 @@ async function hasLocalJavaScriptInputs(root: string): Promise<boolean> {
     const directory = pending.pop()!
     if (visited.has(directory)) continue
     visited.add(directory)
-    let entries: Awaited<ReturnType<typeof fs.readdir>>
+    let entries: import("node:fs").Dirent[]
     try {
       entries = await fs.readdir(directory, { withFileTypes: true })
     } catch (error) {
