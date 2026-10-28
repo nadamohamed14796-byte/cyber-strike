@@ -317,6 +317,8 @@ describe("Extension ingest transcript visibility", () => {
       const session = await Session.create({ title: "extension-ingest-visibility-test" })
       await IngestSummary.notice(session.id, "Extension request queued for independent analysis: GET /profile")
       await IngestSummary.notice(session.id, "Extension request analysis completed: GET /profile")
+      await IngestSummary.notice(session.id, "Extension request already known (deduplicated): GET /profile — credential/cookie observation was retained; LLM work was not duplicated.")
+      await IngestSummary.notice(session.id, "Extension request received again: GET /profile — previous analysis had failed and was requeued.")
       await IngestSummary.notice(session.id, "Extension request rejected before analysis: invalid HTTP request format")
 
       const messages = await Session.messages({ sessionID: session.id })
@@ -326,6 +328,9 @@ describe("Extension ingest transcript visibility", () => {
 
       expect(text).not.toContain("Extension request queued for independent analysis: GET /profile")
       expect(text).not.toContain("Extension request analysis completed: GET /profile")
+      expect(text).not.toContain("Extension request already known (deduplicated): GET /profile")
+      expect(text).not.toContain("credential/cookie observation was retained")
+      expect(text).not.toContain("Extension request received again: GET /profile")
       expect(text).toContain("Extension request rejected before analysis: invalid HTTP request format")
       await Session.remove(session.id)
     })
