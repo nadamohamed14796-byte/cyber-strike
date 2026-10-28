@@ -422,3 +422,26 @@ test("considers implicit same-origin cookie context for CSRF review but honors f
     signal.kind === "csrf-review-state-changing-cookie-request" && signal.line === logout?.sourceLine,
   )).toBe(false)
 })
+
+test("collects broad application-intelligence hints beyond vulnerability patterns", () => {
+  const source = [
+    'const operation = "mutation UpdateBillingPlan { updatePlan { id } }"',
+    'const apiBase = import.meta.env.VITE_API_BASE',
+    'const socket = new WebSocket("wss://events.example.test/socket")',
+    'navigator.serviceWorker.register("/service-worker.js")',
+    'localStorage.setItem("workspace", currentWorkspace)',
+    'const report = Sentry.captureException(error)',
+    'async function exportInvoice(invoiceId) { return fetch("/api/invoices/" + invoiceId + "/export") }',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const hints = result.applicationHints ?? []
+  expect(hints.some((item) => item.kind === "graphql-operation" && item.value === "UpdateBillingPlan")).toBe(true)
+  expect(hints.some((item) => item.kind === "environment-config" && item.value === "VITE_API_BASE")).toBe(true)
+  expect(hints.some((item) => item.kind === "websocket-client")).toBe(true)
+  expect(hints.some((item) => item.kind === "service-worker")).toBe(true)
+  expect(hints.some((item) => item.kind === "browser-persistence")).toBe(true)
+  expect(hints.some((item) => item.kind === "telemetry-monitoring-sdk")).toBe(true)
+  expect(hints.some((item) => item.kind === "business-workflow" && item.value.toLowerCase() === "export")).toBe(true)
+  expect(hints.every((item) => item.confidence === "candidate")).toBe(true)
+})
+
