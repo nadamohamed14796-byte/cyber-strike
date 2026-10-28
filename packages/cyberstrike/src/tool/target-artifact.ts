@@ -30,7 +30,7 @@ const AREA_DIRECTORY: Record<(typeof AREAS)[number], string | null> = {
   findings: "findings",
   evidence: "findings",
   reports: "reports",
-  scans: "recon",
+  scans: "findings",
   runs: "runs",
   logs: "recon",
   sessions: "recon",
