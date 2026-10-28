@@ -583,6 +583,7 @@ function defaultWorkspaceReadme(workspace: Workspace): string {
     "## Safety and source of truth",
     "",
     "- Workspace existence does not grant authorization. Active testing requires an explicitly configured, current, program-authorized scope in `scope/scope.json`; active requests must also pass saved exclusions.",
+    "- Preserve exact discovered values in this private, target-local evidence store when they are relevant evidence or needed for reproduction; mark them as candidates until independently validated.",
     "- Preserve source URL, timestamp, run/session ID, and evidence references.",
     "- Keep observations, hypotheses, validated findings, and reports distinct. A note is not proof.",
     "- SQLite is authoritative for target identity and target notes; this README and `notes.md` are human-readable companions.",
