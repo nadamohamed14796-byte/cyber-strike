@@ -4,12 +4,7 @@ description: "Assess multi-factor authentication enrollment, challenge, recovery
 category: "identity"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - mfa
-  - 2fa
-  - authentication
-  - recovery
-  - identity
+tags: [- mfa, multi-factor-authentication, two-factor-authentication, otp, recovery-code, authentication, identity]
 tech_stack:
   - web
   - mobile
