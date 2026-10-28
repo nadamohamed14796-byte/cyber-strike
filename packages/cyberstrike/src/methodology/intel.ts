@@ -91,9 +91,44 @@ export namespace Intel {
       status?: EntryStatus
     }
   }): Entry & { duplicate: boolean; vrtChecksCreated: number } {
-    // Dedup check
+    // Deduplication must not silently discard newly observed evidence.
+    // Merge useful fields into the existing record and return the persisted row.
     const existing = findDuplicate(input.sessionID, input.data.type, input.data.title, input.data.asset, input.data.detail)
-    if (existing) return { ...existing, duplicate: true, vrtChecksCreated: 0 }
+    if (existing) {
+      const mergedDetail = mergeEvidence(existing.detail, input.data.detail)
+      const mergedTags = [...new Set([...existing.tags, ...(input.data.tags ?? [])])]
+      const mergedRelated = [...new Set([...existing.relatedEntries, ...(input.data.relatedEntries ?? [])])]
+      const confidenceRank: Record<Confidence, number> = { low: 0, medium: 1, high: 2, confirmed: 3 }
+      const incomingConfidence = input.data.confidenceLevel
+      const currentConfidence = existing.confidenceLevel ?? "low"
+      const confidenceLevel =
+        incomingConfidence && confidenceRank[incomingConfidence] > confidenceRank[currentConfidence]
+          ? incomingConfidence
+          : currentConfidence
+      const severityRank: Record<string, number> = { info: 0, low: 1, medium: 2, high: 3, critical: 4 }
+      const incomingSeverity = input.data.severity
+      const currentSeverity = existing.severity
+      const severity =
+        incomingSeverity && (!currentSeverity || (severityRank[incomingSeverity] ?? -1) > (severityRank[currentSeverity] ?? -1))
+          ? incomingSeverity
+          : currentSeverity
+      Database.use((db) => {
+        const values: Record<string, unknown> = { time_updated: Date.now() }
+        if (mergedDetail !== existing.detail) values.detail = mergedDetail ?? null
+        if (mergedTags.length !== existing.tags.length) values.tags = mergedTags
+        if (mergedRelated.length !== existing.relatedEntries.length) values.related_entries = mergedRelated
+        if (confidenceLevel !== existing.confidenceLevel) values.confidence_level = confidenceLevel
+        if (severity !== existing.severity) values.severity = severity ?? null
+        if (input.data.chainPotential && input.data.chainPotential !== existing.chainPotential)
+          values.chain_potential = input.data.chainPotential
+        db.update(IntelEntryTable)
+          .set(values as any)
+          .where(and(eq(IntelEntryTable.id, existing.id), eq(IntelEntryTable.session_id, input.sessionID)))
+          .run()
+      })
+      const persisted = get(input.sessionID).find((entry) => entry.id === existing.id) ?? existing
+      return { ...persisted, duplicate: true, vrtChecksCreated: 0 }
+    }
 
     const id = Identifier.ascending("intel_entry")
     const now = Date.now()
@@ -227,6 +262,16 @@ export namespace Intel {
     return get(sessionID).filter((e) => e.asset.toLowerCase().trim() === normalized)
   }
 
+  function mergeEvidence(existing?: string, incoming?: string): string | undefined {
+    const oldValue = existing?.trim()
+    const newValue = incoming?.trim()
+    if (!newValue) return oldValue || undefined
+    if (!oldValue) return newValue
+    if (oldValue === newValue || oldValue.includes(newValue)) return oldValue
+    if (newValue.includes(oldValue)) return newValue
+    return `${oldValue}\n\nAdditional evidence:\n${newValue}`
+  }
+
   function findDuplicate(sessionID: string, type: Type, title: string, asset: string, detail?: string): Entry | undefined {
     const normalized = title.toLowerCase().trim()
     const normalizedAsset = asset.toLowerCase().trim()
@@ -234,12 +279,12 @@ export namespace Intel {
       value?.match(/(?:fingerprint(?:\s+sha256)?|sha256)\s*[:=]\s*(?:sha256:)?([a-f0-9]{20,64})/i)?.[1]?.toLowerCase()
     const incomingFingerprint = fingerprint(detail)
     return get(sessionID).find((entry) => {
-      if (entry.asset.toLowerCase().trim() !== normalizedAsset) return false
+      if (entry.asset.toLowerCase().trim() !== normalizedAsset || entry.type !== type) return false
       if (entry.title.toLowerCase().trim() === normalized) return true
       // Different titles can describe the same exposed client-side key. A stable,
       // redacted fingerprint plus the same asset and intel type is a stronger identity
       // signal than title text, without merging unrelated findings by vague wording.
-      if (entry.type !== type || !incomingFingerprint) return false
+      if (!incomingFingerprint) return false
       return fingerprint(entry.detail) === incomingFingerprint
     })
   }
