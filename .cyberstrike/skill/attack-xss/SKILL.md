@@ -130,6 +130,45 @@ Track each attempt as hypothesis, one variable changed, baseline/control, observ
 
 Stop on scope ambiguity, unexpected user data, state changes, service degradation, secret exposure or prohibited behavior. Clean disposable test state and revoke temporary sessions/tokens where possible. Return scope proof, baseline, hypothesis, attempts used, impact, negative controls, verdict/confidence, sanitized evidence and cleanup status. Start a chained skill only when its trigger has been independently observed.
 
+## Efficient discovery and context-led verification
+
+Use this workflow to find more meaningful candidates without spending the whole run mutating one parameter. It supplements the phases above; scope, program rules, and the safety limits remain authoritative.
+
+### A. Build a compact input inventory first
+
+- Start from observed application workflows, then inventory query/path parameters, form fields (including POST bodies), JSON keys, headers that the application actually consumes, profile/display fields, search and filter controls, Markdown/rich-text editors, upload metadata, and client-side route state.
+- Review collected JavaScript for undocumented routes, parameter names, API versions, and data passed into renderers. Treat extracted strings as leads, not proof; connect each candidate to a reachable route and input.
+- Include delayed rendering paths such as history/activity views, notifications, exports, receipts, admin review screens, and desktop/webview rendering only when those features are in scope and can be tested with controlled accounts.
+- Save a single deduplicated candidate record per endpoint + input location. Track alternate values and contexts as attempts under that record rather than creating duplicate findings for every parameter value.
+
+### B. Use a low-noise discovery pass, then specialize
+
+1. Capture a baseline and submit a unique inert marker to one input at a time. The marker should be recognizable and non-executable.
+2. Search the raw response and rendered DOM for the marker; note whether it is absent, encoded, reflected as text, parsed as markup, or transformed by client code.
+3. For fields that are reused across the app, record where the same marker appears later and which controlled role can see it. This helps find delayed/stored rendering without assuming that a field is cross-user.
+4. Once a meaningful sink/context is identified, test only the relevant context with a harmless proof on a tester-controlled page/account if active testing is authorized. Avoid pasting large generic polyglots into every field; they create noise, may trigger unrelated behavior, and obscure which parser/context caused the result.
+5. Batch only independent, low-impact discovery requests when the target tolerates them. Keep state-changing and browser-confirmation checks deliberate and sequential.
+
+### C. Distinguish request and rendering paths
+
+- **GET-reflected:** input arrives in the URL/request and is reflected in the response or subsequent rendering.
+- **POST-reflected:** input arrives in a form or request body. Reproduce the actual method, content type, encoding, and body fields; a GET-only crawler can miss this path. Do not assume a response is vulnerable just because the submitted value returns.
+- **Stored/delayed:** content is saved and rendered in a later view or by a different role. Use only disposable content and tester-controlled accounts; document the audience boundary.
+- **DOM-based:** fragments such as URL hashes normally are not sent to the server, so inspect client-side source-to-sink flows. Trace the value from location/message/storage/API source through decoding and transformations to the final sink.
+- **HTML injection versus XSS:** parsed harmless markup proves an HTML interpretation issue, not JavaScript execution. Report the actual demonstrated behavior and do not upgrade the severity without separate evidence.
+
+### D. Identify the exact parser context
+
+Record whether the value lands in HTML text, a quoted/unquoted attribute, a URL, JavaScript/JSON, CSS, a template expression, an HTML comment, Markdown/rich text, or a DOM sink. Compare the server response with the browser-parsed DOM because browser repair and client-side rendering can change the final structure. Test one context boundary at a time and retain a relevant negative control.
+
+Encoding and filtering are different behaviors: encoding should preserve the value as data in its intended context; a filter may reject or remove input. A WAF block or a changed response is not evidence that the application sink is safe or vulnerable. Do not treat WAF evasion as the objective; first identify the transformation and the final browser context. Use alternate encodings only when they answer a specific, authorized hypothesis, and keep the proof inert or self-contained.
+
+### E. Efficient hypothesis ledger and handoff
+
+For every candidate, record: endpoint and method, input location, baseline, marker, request encoding, raw-response location, final DOM/context, transformations, persistence/audience, negative control, browser and origin, observed result, confidence, cleanup, and next hypothesis. Change one meaningful variable per attempt; merge cosmetic variants and exact retries. Continue while a distinct test could change the verdict, but stop when proof is sufficient, useful branches are exhausted, or safety/scope requires stopping.
+
+Never use keylogging, credential or token collection, cookie/storage reads, external beacons, cryptomining, or payloads intended to execute in uninvolved users' browsers. A safe proof should demonstrate only the minimum required behavior on a controlled page/account. Do not claim account takeover from a theoretical chain; any related weakness requires its own authorized, independently verified evidence.
+
 ## References
 
 - [uphiago/recon-skills — hunt-xss](https://github.com/uphiago/recon-skills/tree/main/redteam/hunt-xss)
