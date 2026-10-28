@@ -1,5 +1,7 @@
-import { Database, eq } from "../storage/db"
+import { Database, and, eq, inArray } from "../storage/db"
 import { ChainCandidateTable } from "./methodology.sql"
+import { ChainFindingLinkTable, type ChainFindingRelation } from "./chain-finding-link.sql"
+import { VulnerabilityTable } from "../session/session.sql"
 import { Identifier } from "../id/id"
 import { Intel } from "./intel"
 
@@ -275,32 +277,49 @@ export namespace Chain {
     const existingMap = new Map(existing.map((c) => [`${c.pattern}:${[...c.entryIDs].sort().join("+")}`, c]))
 
     Database.use((db) => {
-      // Clear old chains for this session
-      db.delete(ChainCandidateTable).where(eq(ChainCandidateTable.session_id, sessionID)).run()
-
+      // Update candidates in place so FK-linked finding relationships survive re-detection.
+      const activeKeys = new Set<string>()
       const now = Date.now()
       for (const chain of chains) {
         const key = `${chain.pattern}:${[...chain.entryIDs].sort().join("+")}`
+        activeKeys.add(key)
         const prev = existingMap.get(key)
+        const values = {
+          pattern: chain.pattern,
+          entry_ids: chain.entryIDs as any,
+          entry_titles: chain.entryTitles as any,
+          assets: chain.assets as any,
+          expected_impact: chain.expectedImpact,
+          severity: chain.severity,
+          testing_plan: chain.testingPlan,
+          confidence: chain.confidence,
+          detected_at: chain.detectedAt,
+        }
+        if (prev) {
+          db.update(ChainCandidateTable)
+            .set({ ...values, status: prev.status ?? chain.status, time_updated: now })
+            .where(eq(ChainCandidateTable.id, prev.id))
+            .run()
+        } else {
+          db.insert(ChainCandidateTable)
+            .values({
+              id: chain.id,
+              session_id: sessionID,
+              ...values,
+              status: chain.status,
+              time_created: now,
+              time_updated: now,
+            })
+            .run()
+        }
+      }
 
-        db.insert(ChainCandidateTable)
-          .values({
-            id: prev?.id ?? chain.id,
-            session_id: sessionID,
-            pattern: chain.pattern,
-            entry_ids: chain.entryIDs as any,
-            entry_titles: chain.entryTitles as any,
-            assets: chain.assets as any,
-            expected_impact: chain.expectedImpact,
-            severity: chain.severity,
-            testing_plan: chain.testingPlan,
-            status: prev?.status ?? chain.status,
-            confidence: chain.confidence,
-            detected_at: chain.detectedAt,
-            time_created: now,
-            time_updated: now,
-          })
-          .run()
+      // Remove only hypotheses that disappeared; linked edges cascade with that candidate.
+      for (const prev of existing) {
+        const key = `${prev.pattern}:${[...prev.entryIDs].sort().join("+")}`
+        if (!activeKeys.has(key)) {
+          db.delete(ChainCandidateTable).where(eq(ChainCandidateTable.id, prev.id)).run()
+        }
       }
     })
   }
@@ -328,6 +347,117 @@ export namespace Chain {
     const chains = detect(sessionID)
     save(sessionID, chains)
     return chains
+  }
+
+  export interface FindingLink {
+    id: string
+    chainID: string
+    sourceFindingID: string
+    targetFindingID: string
+    relation: ChainFindingRelation
+    createdAt: number
+    updatedAt: number
+  }
+
+  export type LinkFindingResult =
+    | { ok: true; created: boolean; link: FindingLink }
+    | { ok: false; reason: "chain_not_found" | "finding_not_found" | "inactive_finding" | "self_link" }
+
+  /**
+   * Persist an explicit directed edge between two findings and one chain candidate.
+   * Every referenced row must belong to the same session; this relationship does not
+   * alter finding triage or chain status.
+   */
+  export function linkFindings(input: {
+    sessionID: string
+    chainID: string
+    sourceFindingID: string
+    targetFindingID: string
+    relation: ChainFindingRelation
+  }): LinkFindingResult {
+    if (input.sourceFindingID === input.targetFindingID) return { ok: false, reason: "self_link" }
+
+    return Database.transaction((db) => {
+      const chain = db
+        .select({ id: ChainCandidateTable.id })
+        .from(ChainCandidateTable)
+        .where(and(
+          eq(ChainCandidateTable.id, input.chainID),
+          eq(ChainCandidateTable.session_id, input.sessionID),
+        ))
+        .get()
+      if (!chain) return { ok: false, reason: "chain_not_found" } as const
+
+      const findings = db
+        .select({ id: VulnerabilityTable.id, status: VulnerabilityTable.status })
+        .from(VulnerabilityTable)
+        .where(and(
+          eq(VulnerabilityTable.session_id, input.sessionID),
+          inArray(VulnerabilityTable.id, [input.sourceFindingID, input.targetFindingID]),
+        ))
+        .all()
+      if (findings.length !== 2) return { ok: false, reason: "finding_not_found" } as const
+      if (findings.some((finding) => finding.status === "duplicate" || finding.status === "false_positive")) {
+        return { ok: false, reason: "inactive_finding" } as const
+      }
+
+      const conditions = and(
+        eq(ChainFindingLinkTable.chain_candidate_id, input.chainID),
+        eq(ChainFindingLinkTable.source_vulnerability_id, input.sourceFindingID),
+        eq(ChainFindingLinkTable.target_vulnerability_id, input.targetFindingID),
+        eq(ChainFindingLinkTable.relation, input.relation),
+      )
+      const existingLink = db.select().from(ChainFindingLinkTable).where(conditions).get()
+      if (existingLink) {
+        return { ok: true, created: false, link: toFindingLink(existingLink) } as const
+      }
+
+      const now = Date.now()
+      const id = Identifier.ascending("chain_finding_link")
+      db.insert(ChainFindingLinkTable)
+        .values({
+          id,
+          session_id: input.sessionID,
+          chain_candidate_id: input.chainID,
+          source_vulnerability_id: input.sourceFindingID,
+          target_vulnerability_id: input.targetFindingID,
+          relation: input.relation,
+          time_created: now,
+          time_updated: now,
+        })
+        .onConflictDoNothing()
+        .run()
+
+      const saved = db.select().from(ChainFindingLinkTable).where(conditions).get()
+      if (!saved) throw new Error("Chain finding link insert did not persist after conflict handling.")
+      return { ok: true, created: saved.id === id, link: toFindingLink(saved) } as const
+    })
+  }
+
+  export function findingLinks(sessionID: string, chainID: string): FindingLink[] {
+    return Database.use((db) =>
+      db
+        .select()
+        .from(ChainFindingLinkTable)
+        .where(and(
+          eq(ChainFindingLinkTable.session_id, sessionID),
+          eq(ChainFindingLinkTable.chain_candidate_id, chainID),
+        ))
+        .all()
+        .map(toFindingLink),
+    )
+  }
+
+  function toFindingLink(row: typeof ChainFindingLinkTable.$inferSelect): FindingLink {
+    return {
+      id: row.id,
+      chainID: row.chain_candidate_id,
+      sourceFindingID: row.source_vulnerability_id,
+      targetFindingID: row.target_vulnerability_id,
+      relation: row.relation,
+      createdAt: row.time_created,
+      updatedAt: row.time_updated,
+    }
   }
 
   // --- Prompt Formatting ---
