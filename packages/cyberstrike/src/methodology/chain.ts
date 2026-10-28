@@ -605,7 +605,8 @@ export namespace Chain {
     | {
         ok: false
         reason: "chain_not_found" | "chain_terminal" | "evidence_required" |
-          "combined_finding_required" | "finding_not_found" | "finding_not_approved" | "finding_validation_required"
+          "combined_finding_required" | "finding_not_found" | "finding_not_approved" | "finding_validation_required" |
+          "linked_finding_not_approved" | "linked_finding_validation_required"
       }
 
   /**
