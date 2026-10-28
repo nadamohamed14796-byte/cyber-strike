@@ -3,6 +3,18 @@ import { Chain } from "../methodology/chain"
 import { Session } from "../session"
 import { Tool } from "./tool"
 
+type ValidateChainMetadata = {
+  recorded: boolean
+  reason: string
+  chainID: string
+  outcome: "confirmed" | "disproven" | "inconclusive"
+  combinedFindingID: string | null
+}
+
+function validateChainMetadata(value: ValidateChainMetadata): ValidateChainMetadata {
+  return value
+}
+
 export const ValidateChainTool = Tool.define("validate_chain", {
   description:
     "Record the result of testing a stored chain hypothesis. Use confirmed only after the combined attack path and impact were actually demonstrated, then create/report the combined vulnerability and complete validate_finding plus triage_vulnerability (approved) for that combined finding. Supply its ID as combined_finding_id. A confirmed verdict is blocked unless that finding's latest durable validation is confirmed and its triage status is approved. Use disproven only with concrete contradictory evidence; use inconclusive when evidence is insufficient. This tool records validation evidence; it does not run tests, create findings, approve findings, or bypass scope/policy controls.",
@@ -37,7 +49,13 @@ export const ValidateChainTool = Tool.define("validate_chain", {
       return {
         title: "Chain validation blocked",
         output: reasons[result.reason],
-        metadata: { recorded: false, reason: result.reason, chainID: params.chain_id, outcome: params.outcome },
+        metadata: validateChainMetadata({
+          recorded: false,
+          reason: result.reason,
+          chainID: params.chain_id,
+          outcome: params.outcome,
+          combinedFindingID: null,
+        }),
       }
     }
 
@@ -48,12 +66,13 @@ export const ValidateChainTool = Tool.define("validate_chain", {
         : result.outcome === "disproven"
           ? `Recorded disproven chain ${result.chainID}. Individual findings remain unchanged; this verdict applies only to the combined-impact hypothesis.`
           : `Recorded inconclusive evidence for chain ${result.chainID}. It remains in testing and is not counted as a confirmed finding.`,
-      metadata: {
+      metadata: validateChainMetadata({
         recorded: true,
+        reason: "none",
         chainID: result.chainID,
         outcome: result.outcome,
-        combinedFindingID: result.combinedFindingID,
-      },
+        combinedFindingID: result.combinedFindingID ?? null,
+      }),
     }
   },
 })
