@@ -41,6 +41,7 @@ export const ChainLinkTool = Tool.define("chain_link", {
         finding_not_found: "Both finding IDs must refer to findings in the current session.",
         inactive_finding: "Duplicate and false-positive findings cannot be linked into a chain.",
         self_link: "A finding cannot be linked to itself.",
+        chain_terminal: "This chain is already confirmed or disproven and cannot accept new links.",
       }[result.reason]
       return {
         title: "Chain link not created",
