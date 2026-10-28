@@ -20,6 +20,7 @@ export namespace Chain {
     | "xss_csrf"
     | "ssti_rce"
     | "race_condition_business"
+    | "information_amplification"
     | "custom"
 
   export interface Candidate {
@@ -114,6 +115,97 @@ export namespace Chain {
     const credentials = entries.filter((e) => e.type === "credential")
     const endpoints = entries.filter((e) => e.type === "endpoint")
     const services = entries.filter((e) => e.type === "configuration" || e.type === "infrastructure")
+
+    // Informational observations are useful as chain inputs even when each one is only INFO/LOW.
+    // This creates a hypothesis for targeted validation; it never upgrades or approves a finding.
+    const infoSignals = entries.filter((entry) => entry.severity === "info" || entry.severity === "low")
+    const signalText = (entry: Intel.Entry) =>
+      `${entry.type} ${entry.title} ${entry.detail ?? ""} ${entry.tags.join(" ")}`.toLowerCase()
+    const hasInternalContext = (entry: Intel.Entry) =>
+      entry.type === "configuration" ||
+      entry.type === "infrastructure" ||
+      /internal|private[- ]?(?:host|network|api|service)|localhost|127\\.0\\.0\\.1|10\\.\\d+\\.\\d+\\.\\d+|192\\.168\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|staging|admin[- ]?host|environment variable|deployment config/.test(signalText(entry))
+    const hasRouteSurface = (entry: Intel.Entry) =>
+      entry.type === "endpoint" ||
+      entry.type === "api_schema" ||
+      /openapi|swagger|graphql|rest api|route list|source map|sourcemap|api path|endpoint|websocket|rpc method/.test(signalText(entry))
+    const hasIdentityContext = (entry: Intel.Entry) =>
+      entry.type === "authentication_flow" ||
+      entry.type === "business_rule" ||
+      /tenant|organization|workspace|role|permission|authorization|access control|account owner|ownership|user id|object id|session boundary/.test(signalText(entry))
+    const hasSensitiveDataContext = (entry: Intel.Entry) =>
+      entry.type === "sensitive_data" ||
+      /personal data|sensitive data|customer record|email address|phone number|invoice|payment details|account data|user profile|private record/.test(signalText(entry))
+    const hasDebugContext = (entry: Intel.Entry) =>
+      /stack trace|stacktrace|backtrace|debug output|debug mode|verbose error|exception trace|source path|absolute path|framework version|runtime version/.test(signalText(entry))
+
+    const infoChainRules: Array<{
+      matches: (a: Intel.Entry, b: Intel.Entry) => boolean
+      impact: string
+      severity: string
+      plan: (a: Intel.Entry, b: Intel.Entry) => string
+      confidence: number
+    }> = [
+      {
+        matches: (a, b) =>
+          (hasInternalContext(a) && hasRouteSurface(b)) ||
+          (hasInternalContext(b) && hasRouteSurface(a)),
+        impact: "POTENTIAL_INTERNAL_API_OR_SERVICE_EXPOSURE",
+        severity: "high",
+        plan: (a, b) =>
+          `Correlate informational observations "${a.title}" and "${b.title}" to determine whether a disclosed internal service/route is actually reachable and exposes a security boundary. Use only in-scope endpoints and an authorized test identity; do not treat names or paths alone as impact.`,
+        confidence: 40,
+      },
+      {
+        matches: (a, b) =>
+          (hasIdentityContext(a) && hasSensitiveDataContext(b)) ||
+          (hasIdentityContext(b) && hasSensitiveDataContext(a)),
+        impact: "POTENTIAL_CROSS_TENANT_OR_PRIVATE_DATA_ACCESS",
+        severity: "high",
+        plan: (a, b) =>
+          `Using the approved test accounts and non-sensitive test records, verify whether "${a.title}" plus "${b.title}" reveals a real ownership/authorization gap. Compare owner and non-owner access with a baseline and negative control; do not infer IDOR or cross-tenant access from metadata alone.`,
+        confidence: 45,
+      },
+      {
+        matches: (a, b) =>
+          (hasDebugContext(a) && (hasInternalContext(b) || hasSensitiveDataContext(b))) ||
+          (hasDebugContext(b) && (hasInternalContext(a) || hasSensitiveDataContext(a))),
+        impact: "POTENTIAL_SENSITIVE_CONTEXT_OR_ARCHITECTURE_DISCLOSURE",
+        severity: "medium",
+        plan: (a, b) =>
+          `Check whether "${a.title}" and "${b.title}" jointly reveal non-public paths, deployment details, or sensitive context beyond what is intentionally public. Redact data and validate reachability/impact without accessing unrelated records.`,
+        confidence: 35,
+      },
+      {
+        matches: (a, b) =>
+          (hasRouteSurface(a) && hasSensitiveDataContext(b)) ||
+          (hasRouteSurface(b) && hasSensitiveDataContext(a)),
+        impact: "POTENTIAL_SENSITIVE_DATA_API_SURFACE",
+        severity: "medium",
+        plan: (a, b) =>
+          `Map "${a.title}" to "${b.title}" and verify, using an approved test identity and synthetic/test data, whether the route actually returns information beyond the caller's permissions. A schema, route, or data label by itself is not a vulnerability.`,
+        confidence: 35,
+      },
+    ]
+
+    for (let i = 0; i < infoSignals.length; i++) {
+      const a = infoSignals[i]!
+      for (let j = i + 1; j < infoSignals.length; j++) {
+        const b = infoSignals[j]!
+        if (!sameAssetOrRelated(a, b)) continue
+        const rule = infoChainRules.find((item) => item.matches(a, b))
+        if (!rule) continue
+        addChain(
+          "information_amplification",
+          a,
+          b,
+          rule.impact,
+          rule.severity,
+          rule.plan(a, b),
+          rule.confidence,
+        )
+      }
+    }
 
     // 1. credential_endpoint: Credential + API endpoint = ATO
     for (const cred of credentials) {
