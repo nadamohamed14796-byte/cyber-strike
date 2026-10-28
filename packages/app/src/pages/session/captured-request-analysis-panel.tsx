@@ -134,7 +134,7 @@ export function CapturedRequestAnalysisPanel() {
       // Keep the request row in the shared sync store. request.updated events
       // refresh its status from queued → processing → processed/failed, so the
       // panel does not stay stuck on the optimistic "queued" state after retry.
-      void sync.session.request(sessionID).then(() => {
+      void sync.session.request(sessionID)?.then(() => {
         if (generation !== requestLoadGeneration) return
         const rows = (sync.data.request[sessionID] ?? []) as unknown as RequestRow[]
         const row = rows.find((item) => item.id === requestID)
