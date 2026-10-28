@@ -54,9 +54,9 @@ import { ResearchContext, promptResearchSignals } from "@/learning/research-cont
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
-import { toolSig, READ_ONLY_TOOLS, isProgressTool } from "./stuck/signals"
+import { toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
-import { RepeatDetector } from "./stuck/repeat-detector"
+import { RepeatDetector, ReadOnlyRepeatDetector } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
@@ -345,7 +345,7 @@ export namespace SessionPrompt {
     // Repeated read-only polling needs a separate, higher threshold: occasional status
     // reads are normal, but the same read/status call over and over without real
     // recon/testing progress is still a stall. Progress resets this detector below.
-    const readOnlyRepeatDetector = new RepeatDetector(8)
+    const readOnlyRepeatDetector = new ReadOnlyRepeatDetector(8)
     while (true) {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
@@ -1074,12 +1074,7 @@ export namespace SessionPrompt {
           break
         }
 
-        const madeProgress = toolCalls.some((call) => isProgressTool(call.tool))
-        if (madeProgress) readOnlyRepeatDetector.reset()
-        const readOnlySigs = madeProgress ? [] : toolCalls
-          .filter((call) => call.input !== undefined && READ_ONLY_TOOLS.has(call.tool))
-          .map((call) => toolSig(call.tool, call.input))
-        const readOnlyVerdict = readOnlyRepeatDetector.observe(readOnlySigs)
+        const readOnlyVerdict = readOnlyRepeatDetector.observe(toolCalls)
         if (readOnlyVerdict === "nudge") {
           forceWrapUpNext = true
           log.warn("repeated read-only calls without progress — forcing wrap-up", { sessionID })
