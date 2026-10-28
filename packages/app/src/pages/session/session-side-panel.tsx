@@ -830,9 +830,10 @@ function WebContextPanelList() {
     const rows = sync.data.request[sessionID()] ?? []
     const cleared = new Set<string>()
     for (const row of rows) {
-      if (!retryQueued()[row.id]) continue
+      const requestID = row.id
+      if (typeof requestID !== "string" || !retryQueued()[requestID]) continue
       if (row.status === "queued" || row.status === "processing" || row.status === "processed") {
-        cleared.add(row.id)
+        cleared.add(requestID)
       }
     }
     if (cleared.size > 0) {
