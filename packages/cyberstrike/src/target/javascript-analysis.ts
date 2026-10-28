@@ -1,9 +1,24 @@
 import { createHash } from "node:crypto"
 
+export interface JavaScriptCallSiteCandidate {
+  line: number
+  kind: "ui-event-binding" | "dom-event-listener" | "callback-reference" | "direct-call"
+  confidence: "candidate"
+}
+
 export interface JavaScriptFunctionCandidate {
   name: string
   line: number
   parameters: string[]
+  /** Candidate locations that call or reference this function; not proof of a browser interaction. */
+  callSites?: JavaScriptCallSiteCandidate[]
+}
+export interface JavaScriptWorkflowSignal {
+  kind: string
+  value: string
+  line: number
+  functionName: string | null
+  confidence: "candidate"
 }
 export interface JavaScriptRequestCandidate {
   id: string
@@ -48,6 +63,8 @@ export interface JavaScriptSourceAnalysis {
   riskSignals: JavaScriptRiskSignal[]
   /** Broad product, protocol, integration, and configuration clues independent of vulnerability classes. */
   applicationHints?: JavaScriptApplicationHint[]
+  /** Security-relevant business/token/data-layer flow markers with enclosing-function attribution. */
+  workflowSignals?: JavaScriptWorkflowSignal[]
   notes: string[]
 }
 
@@ -374,6 +391,43 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
   functions.sort((a, b) => a.line - b.line)
   const functionRanges = staticFunctionRanges(source, functions, functionOffsets)
 
+  // Resolve function references into line-only call-site candidates. Store no source
+  // excerpts, and label them as candidates because regex-based analysis is not an AST.
+  for (const fn of functions) {
+    const pattern = new RegExp("\\\\b" + escapeRegexLiteral(fn.name) + "\\\\b", "g")
+    const declarationOffset = functionOffsets.get(fn.line + ":" + fn.name)
+    const sites = new Map<string, JavaScriptCallSiteCandidate>()
+    for (const match of source.matchAll(pattern)) {
+      const index = match.index ?? 0
+      if (declarationOffset !== undefined && index >= declarationOffset && index <= declarationOffset + fn.name.length + 12) continue
+      const left = source.slice(Math.max(0, index - 140), index)
+      const right = source.slice(index + fn.name.length, Math.min(source.length, index + fn.name.length + 40))
+      let kind: JavaScriptCallSiteCandidate["kind"] | undefined
+      if (/\\b(?:onClick|onSubmit|onChange|onBlur|onKeyDown|onKeyUp|onPress|onVerify|onComplete|onSuccess)\\s*=\\s*\\{\\s*$/i.test(left)) {
+        kind = "ui-event-binding"
+      } else if (/\\b(?:addEventListener|removeEventListener)\\s*\\(\\s*[^,]+,\\s*$/i.test(left) && /^\\s*[,)]/.test(right)) {
+        kind = "dom-event-listener"
+      } else if (/\\b(?:then|catch|finally|useEffect|useCallback|useMemo|map|filter|forEach|some|every|reduce)\\s*\\(\\s*$/i.test(left) || /^\\s*[,)]/.test(right) && /[,({]\\s*$/.test(left)) {
+        kind = "callback-reference"
+      } else if (/^\\s*\\(/.test(right)) {
+        kind = "direct-call"
+      }
+      if (!kind) {
+        // Template event bindings are common in Vue/Angular templates embedded in JS/HTML.
+        const lineStart = source.lastIndexOf("\\n", index - 1) + 1
+        const lineEndIndex = source.indexOf("\\n", index)
+        const lineText = source.slice(lineStart, lineEndIndex < 0 ? source.length : lineEndIndex)
+        if (new RegExp("(?:@(?:click|submit|change|keyup|keydown)|v-on:(?:click|submit|change)|ng-(?:click|submit))\\\\s*=\\\\s*[\\\"']\\\\s*" + escapeRegexLiteral(fn.name) + "\\\\b", "i").test(lineText)) {
+          kind = "ui-event-binding"
+        }
+      }
+      if (!kind) continue
+      const line = lineNumber(lineStarts, index)
+      sites.set(line + ":" + kind, { line, kind, confidence: "candidate" })
+    }
+    fn.callSites = [...sites.values()].sort((a, b) => a.line - b.line || a.kind.localeCompare(b.kind))
+  }
+
   const requests: JavaScriptRequestCandidate[] = []
   const callPattern = /\b(fetch|axios\.(?:get|post|put|patch|delete|head|options|request)|[A-Za-z_$][\w$]*\.(?:get|post|put|patch|delete|head|options|request|open))\s*\(/gi
   const requestCallSpans = [...source.matchAll(callPattern)].map((call) => {
@@ -589,9 +643,47 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       applicationHints.set(item.kind + ":" + item.value + ":" + item.line, item)
     }
   }
+  // Preserve business/authentication workflows and data-operation vocabulary as
+  // structured leads, not findings. Values are rule labels/names only; no source text
+  // or token values are retained in this inventory.
+  const workflowSignals = new Map<string, JavaScriptWorkflowSignal>()
+  const workflowRules: Array<{ kind: string; pattern: RegExp; capture?: number }> = [
+    { kind: "email-verification-flow", pattern: /\\b(?:verifyEmail|verify_email|emailVerification|email_verification|verificationCode|verificationToken|emailToken|confirmEmail|confirm_email|sendVerificationEmail|resendVerification|magicLink|activationToken|emailVerified|email_verified)\\b/gi },
+    { kind: "account-recovery-flow", pattern: /\\b(?:forgotPassword|forgot_password|passwordReset|password_reset|resetPassword|reset_password|recoveryCode|recoveryToken|resetToken)\\b/gi },
+    { kind: "one-time-code-or-mfa-flow", pattern: /\\b(?:\\bOTP\\b|oneTimePassword|one_time_password|verificationCode|securityCode|TOTP|MFA|WebAuthn|passkeyChallenge)\\b/gi },
+    { kind: "token-creation-or-signing", pattern: /\\b(?:jwt\\s*\\.\\s*sign|signJwt|createJwt|generateJwt|createToken|generateToken|mintToken|issueToken|signToken|createHmac|crypto\\s*\\.\\s*subtle\\s*\\.\\s*sign)\\b/gi },
+    { kind: "token-decode-or-parse", pattern: /\\b(?:jwt\\s*\\.\\s*decode|decodeJwt|decodeToken|parseJwt|atob|base64url|Buffer\\s*\\.\\s*from)\\b/gi },
+    { kind: "token-verification-or-validation", pattern: /\\b(?:jwt\\s*\\.\\s*verify|verifyJwt|verifyToken|validateToken|validateJwt|crypto\\s*\\.\\s*subtle\\s*\\.\\s*verify)\\b/gi },
+    { kind: "token-expiry-or-lifetime", pattern: /\\b(?:expiresIn|expiresAt|expiry|expiration|tokenTtl|tokenTTL|clockTolerance|notBefore|issuedAt|\\bexp\\b|\\bnbf\\b|\\biat\\b)\\b/gi },
+    { kind: "sql-statement-candidate", pattern: /\\b(SELECT|INSERT\\s+INTO|UPDATE\\s+[A-Za-z_][\\w.]*\\s+SET|DELETE\\s+FROM)\\b/gi, capture: 1 },
+    { kind: "data-layer-operation-candidate", pattern: /\\b(\\$queryRaw|\\$executeRaw|query|execute|prepare|findUnique|findMany|findFirst|createMany|updateMany|deleteMany|select|insert|update|delete)\\s*\\(/gi, capture: 1 },
+    { kind: "email-delivery-flow", pattern: /\\b(?:sendEmail|sendMail|sendVerification|resendVerification|mailer|emailService|emailProvider|emailTemplate)\\b/gi },
+  ]
+  for (const rule of workflowRules) {
+    for (const match of source.matchAll(rule.pattern)) {
+      const rawValue = (rule.capture ? match[rule.capture] : match[0])?.trim()
+      if (!rawValue || rawValue.length > 100) continue
+      const index = match.index ?? 0
+      const containingFunction = functionRanges
+        .filter((range) => range.start <= index && index <= range.end)
+        .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
+      const item: JavaScriptWorkflowSignal = {
+        kind: rule.kind,
+        value: rule.kind === "sql-statement-candidate" ? rawValue.toUpperCase().split(/\\s+/)[0]!
+          : rule.kind === "data-layer-operation-candidate" ? rawValue
+          : rawValue,
+        line: lineNumber(lineStarts, index),
+        functionName: containingFunction?.name ?? null,
+        confidence: "candidate",
+      }
+      workflowSignals.set(item.kind + ":" + item.value.toLowerCase() + ":" + item.line + ":" + (item.functionName ?? ""), item)
+    }
+  }
+
   return {
     functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
     applicationHints: [...applicationHints.values()],
+    workflowSignals: [...workflowSignals.values()],
     notes: [
       "Static heuristics only; dynamic strings, destructured parameters and minified bundles may be missed.",
       "No static auth/cookie signal does not prove an endpoint is unauthenticated; inspect captured requests and server behavior.",
