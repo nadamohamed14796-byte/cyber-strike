@@ -575,7 +575,6 @@ function defaultWorkspaceReadme(workspace: Workspace): string {
     "| `runs/` | Resume checkpoint and run index |",
     "| `recon/` | Raw/source-specific recon outputs, endpoint sidecars, requests, and concise tool logs |",
     "| `javascript/` | Collected JavaScript/source maps, asset manifest, and JS correlation data |",
-    
     "| `findings/` | Scan snapshots, tester surveys, validation evidence, and finding records |",
     "| `reports/` | Final recon/security reports |",
     "",
@@ -868,7 +867,6 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
         "| `runs/` | Resume checkpoint and run index |",
         "| `recon/` | Raw/source-specific recon outputs, endpoint sidecars, requests, and concise tool logs |",
         "| `javascript/` | Collected JavaScript/source maps, asset manifest, and JS correlation data |",
-        
         "| `findings/` | Scan snapshots, tester surveys, validation evidence, and finding records |",
         "| `reports/` | Final recon/security reports |",
         "",
