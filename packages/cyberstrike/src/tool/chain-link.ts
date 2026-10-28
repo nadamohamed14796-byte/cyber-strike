@@ -20,7 +20,7 @@ function toolMetadata(value: ChainLinkToolMetadata): ChainLinkToolMetadata {
 
 export const ChainLinkTool = Tool.define("chain_link", {
   description:
-    "Record a directed relationship between two existing vulnerability findings under a detected chain candidate. Use the actual IDs returned by report_vulnerability and the chain candidate ID shown by methodology_status. Relations mean: depends_on (source depends on target), enables (source enables target), or contributes_to (source contributes to target). This records evidence organization only: it does not validate/approve either finding or confirm the chain. Findings must belong to the current session; duplicate and false-positive findings cannot be linked.",
+    "Record a directed relationship between two existing vulnerability findings under a chain hypothesis. Use the actual IDs returned by report_vulnerability and the chain candidate ID shown by methodology_status. Relations mean: depends_on (source depends on target), enables (source enables target), or contributes_to (source contributes to target). This records evidence organization only: it does not validate/approve either finding or confirm the chain. Findings must belong to the current session; duplicate and false-positive findings cannot be linked.",
   parameters: z.object({
     chain_id: z.string().trim().min(1).describe("Existing chain_candidate ID from the current session"),
     source_finding_id: z.string().trim().min(1).describe("Source vulnerability ID from report_vulnerability"),
