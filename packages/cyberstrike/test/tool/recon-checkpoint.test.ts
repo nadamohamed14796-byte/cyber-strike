@@ -416,6 +416,15 @@ test("vulnerability-testing tools remain blocked outside the explicit testing ch
   expect(decision.reason).toContain("Vulnerability testing is opt-in")
 })
 
+test("active-testing tools reject an earlier failed phase until it is handed off", () => {
+  const state = records("complete")
+  state.vulnerability_testing = { status: "running" }
+  state.javascript_analysis = { status: "failed", reason: "source map parser failed" }
+  expect(reconPhaseExecutionDecision("vulnerability_testing", state).allowed).toBe(false)
+  state.javascript_analysis = { status: "partial", reason: "saved evidence and resume point" }
+  expect(reconPhaseExecutionDecision("vulnerability_testing", state).allowed).toBe(true)
+})
+
 test("vulnerability-testing tools require an explicit testing checkpoint and completed handoff", () => {
   const state = records("complete")
   state.vulnerability_testing = { status: "running" }
