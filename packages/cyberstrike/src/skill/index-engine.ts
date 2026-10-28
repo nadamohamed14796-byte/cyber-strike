@@ -49,7 +49,7 @@ export namespace SkillIndex {
   const TECHNIQUE_ID = /^t\d{4}(?:\.\d{3})?$/i
 
   function addReference(state: IndexState, reference: string | undefined, skillName: string) {
-    const key = reference?.trim().toLowerCase()
+    const key = reference ? normalizeSearchText(reference) : ""
     if (!key) return
     if (!state.referenceIndex.has(key)) state.referenceIndex.set(key, new Set())
     state.referenceIndex.get(key)!.add(skillName)
@@ -59,7 +59,7 @@ export namespace SkillIndex {
     // Canonical names have priority over aliases shared by multiple skills.
     // Keep this index separate so a popular tech-stack tag (for example "aws")
     // cannot make a real skill named "aws" unresolvable.
-    const nameKey = entry.name.trim().toLowerCase()
+    const nameKey = normalizeSearchText(entry.name)
     if (nameKey) {
       if (!state.nameIndex.has(nameKey)) state.nameIndex.set(nameKey, new Set())
       state.nameIndex.get(nameKey)!.add(entry.name)
@@ -81,7 +81,7 @@ export namespace SkillIndex {
   }
 
   function resolveInState(reference: string, state: IndexState): string | undefined {
-    const normalized = reference.trim().toLowerCase()
+    const normalized = normalizeSearchText(reference)
     if (!normalized) return undefined
 
     const canonicalNames = state.nameIndex.get(normalized)
@@ -102,7 +102,7 @@ export namespace SkillIndex {
     // with "attack-" while the canonical skill is named without that prefix.
     // Resolve only when the remaining full name is an exact unique skill name;
     // never perform substring or token similarity matching.
-    if (normalized.startsWith("attack-")) return resolveExact(normalized.slice("attack-".length))
+    if (normalized.startsWith("attack ")) return resolveExact(normalized.slice("attack ".length))
     return undefined
   }
 
