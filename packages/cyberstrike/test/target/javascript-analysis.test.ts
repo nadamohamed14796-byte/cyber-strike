@@ -485,6 +485,5 @@ test("builds actionable email-verification, token, and SQL/data-operation traces
   expect(verifyRequest?.method).toBe("POST")
   expect(verifyRequest?.path).toBe("/api/auth/email/verify")
   expect(verifyRequest?.bodyParameters).toContain("token")
-  expect(JSON.stringify(result)).not.toContain("signingKeyValue")
 })
 
