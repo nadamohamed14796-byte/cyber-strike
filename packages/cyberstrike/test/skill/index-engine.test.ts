@@ -347,6 +347,8 @@ test("skill search normalizes slugs and indexes routing metadata", async () => {
     )
     await addSkill("attack-xss", "category: input-validation\ntags: [xss, javascript]")
     await addSkill("attack-web-recon", "category: recon\ntags: [web, endpoints]")
+    await addSkill("api-gateway", "category: infrastructure\ntags: [gateway]")
+    await addSkill("api_gateway", "category: infrastructure\ntags: [gateway]")
 
     await Instance.provide({
       directory: tmp.path,
@@ -370,6 +372,8 @@ test("skill search normalizes slugs and indexes routing metadata", async () => {
           .toContain("attack-javascript-analysis")
         expect(SkillIndex.byTechStack("JavaScript").map((entry) => entry.name))
           .toContain("attack-javascript-analysis")
+        expect(SkillIndex.resolveReference("api-gateway")).toBe("api-gateway")
+        expect(SkillIndex.resolveReference("api gateway")).toBeUndefined()
       },
     })
   } finally {
