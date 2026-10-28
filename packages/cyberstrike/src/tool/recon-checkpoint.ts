@@ -97,7 +97,7 @@ export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly str
   parameter_discovery: ["recon", "parameters"],
   parameter_fuzzing: ["recon", "parameters"],
   // Keep old paths valid on resumed workspaces; new tester surveys go under findings/.
-  javascript_analysis: ["javascript", "endpoints", "findings", "testing"],
+  javascript_analysis: ["javascript", "recon", "findings", "endpoints", "testing"],
   endpoint_inventory: ["endpoints", "recon"],
   vulnerability_testing: ["findings", "testing", "evidence"],
   reporting: ["reports"],
