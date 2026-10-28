@@ -177,8 +177,9 @@ test("legacy manifests migrate to require parameter discovery and revalidate dow
 
 test("JavaScript correlation artifacts can be checkpointed in the compact target folders", () => {
   const areas = RECON_PHASE_ARTIFACT_AREAS.javascript_analysis
-  expect(areas).toEqual(["javascript", "endpoints", "findings", "testing"])
+  expect(areas).toEqual(["javascript", "recon", "findings", "endpoints", "testing"])
   expect(areas?.some((area) => "javascript/example-graph.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "recon/endpoints-candidates.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "endpoints/example-candidates.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "findings/tester-survey-example.json".startsWith(area + "/"))).toBe(true)
   // Legacy workspaces remain resumable while new surveys use findings/.
