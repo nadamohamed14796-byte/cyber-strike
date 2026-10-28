@@ -956,6 +956,7 @@ export async function inventoryJavaScriptFiles(
         continue
       }
       if (!entry.isFile() || !/\.(?:m?js|cjs|map|html?|xhtml)$/i.test(entry.name)) continue
+      const workspaceRelativePath = path.relative(path.dirname(root), fullPath).split(path.sep).join("/")
 
       try {
         const content = await fs.readFile(fullPath, "utf-8")
