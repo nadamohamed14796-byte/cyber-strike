@@ -4,12 +4,7 @@ description: "Validate cross-site request forgery by checking whether a browser 
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - csrf
-  - cookies
-  - browser
-  - web
-  - state-change
+tags: [- csrf, cross-site-request-forgery, state-changing-request, anti-csrf-token, origin-validation, browser]
 tech_stack:
   - web
   - html
