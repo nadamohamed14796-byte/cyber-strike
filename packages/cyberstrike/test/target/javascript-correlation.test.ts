@@ -128,6 +128,22 @@ test("persists secret fingerprints and source locations without raw values", asy
   expect(serialized).toContain("Secret-like values are never retained")
 })
 
+test("does not cap individual URL length or provenance metadata length", async () => {
+  const { IngestJavaScriptURLsTool, mergeAssetSourceLabel } = await import("../../src/tool/ingest-javascript-urls")
+  const tool = await IngestJavaScriptURLsTool.init()
+  const longPath = "a".repeat(9_000)
+  const url = "https://app.example.com/" + longPath + ".js"
+  const longSource = "collector-" + "x".repeat(500)
+  const parsed = tool.parameters.parse({
+    target_url: "https://app.example.com",
+    urls: [url],
+    source: longSource,
+  })
+  expect(parsed.urls[0]).toBe(url)
+  expect(parsed.source).toBe(longSource)
+  expect(mergeAssetSourceLabel(["source-" + "a".repeat(300), "crawler", "user-supplied"])).toContain("source-" + "a".repeat(300))
+})
+
 test("accepts a 1000-URL JavaScript worklist without truncation", async () => {
   const { IngestJavaScriptURLsTool } = await import("../../src/tool/ingest-javascript-urls")
   const tool = await IngestJavaScriptURLsTool.init()
@@ -148,8 +164,8 @@ test("retries only transient JavaScript asset failures and bounds automatic retr
   expect(shouldRetryJavaScriptAsset({ kind: "http", status: 429, attempt: 1 })).toBe(true)
   expect(shouldRetryJavaScriptAsset({ kind: "http", status: 404, attempt: 1 })).toBe(false)
   expect(shouldRetryJavaScriptAsset({ kind: "http", status: 503, attempt: 2 })).toBe(false)
-  expect(shouldRetryJavaScriptAsset({ kind: "read", error: "response exceeds the 33554432 byte asset limit", attempt: 1 })).toBe(false)
-  expect(shouldRetryJavaScriptAsset({ kind: "read", error: "connection reset", attempt: 1 })).toBe(true)
+  expect(shouldRetryJavaScriptAsset({ kind: "read", attempt: 1 })).toBe(true)
+  expect(shouldRetryJavaScriptAsset({ kind: "read", attempt: 2 })).toBe(false)
 })
 
 test("rejects malformed JavaScript manifests instead of silently resetting resumable state", async () => {
