@@ -6,7 +6,7 @@ import { Instance } from "../../src/project/instance"
 import { TargetMemory } from "../../src/target"
 import { TargetArtifactTool } from "../../src/tool/target-artifact"
 
-test("target_artifact writes canonical root inventories and still protects generated manifests", async () => {
+test("target_artifact keeps canonical inventories and supporting files in compact locations", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
