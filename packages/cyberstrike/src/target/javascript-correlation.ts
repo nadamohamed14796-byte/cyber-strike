@@ -8,7 +8,7 @@ import { Session } from "../session"
 import { SessionTable, RequestTable, RequestJavaScriptCaptureTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
-import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal } from "./javascript-analysis"
+import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal, type JavaScriptApplicationHint } from "./javascript-analysis"
 
 /**
  * SQLite builds have a finite bind-parameter budget. Split IN lists into safe
@@ -354,7 +354,7 @@ export function collectExplicitJavaScriptSourceMapURLs(
 }
 
 function emptyJavaScriptSourceAnalysis(notes: string[]): JavaScriptSourceAnalysis {
-  return { functions: [], requests: [], secretCandidates: [], roleHints: [], riskSignals: [], notes }
+  return { functions: [], requests: [], secretCandidates: [], roleHints: [], riskSignals: [], applicationHints: [], notes }
 }
 
 function sourceMapSourceBasename(sourceName: string, index: number): string {
@@ -1070,6 +1070,7 @@ export interface JavaScriptCorrelationGraph {
     secretCandidates: Array<JavaScriptSecretCandidate & { sourceFile: string }>
     roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
     riskSignals: Array<JavaScriptRiskSignal & { sourceFile: string }>
+    applicationHints: Array<JavaScriptApplicationHint & { sourceFile: string }>
   }
   endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
@@ -1402,13 +1403,14 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
   const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\0"))
   const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
   const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\0"))
+  const applicationHints = mergeRecords(graphs.map((g) => g.javascriptAnalysis.applicationHints ?? []), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
   const uniqueObjects = <T>(items: T[], key: (item: T) => string) => uniqueValues(items, key)
   return {
     ...latest,
     javascriptAssets: [...assets.values()].sort((a, b) => a.url.localeCompare(b.url)),
     sourceFiles: [...sourceFiles.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath) || a.sha256.localeCompare(b.sha256)),
     sourceMapReferences: [...sourceMaps.values()].sort((a, b) => a.url.localeCompare(b.url)),
-    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks },
+    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints },
     endpointCandidates: mergeCanonicalJavaScriptEndpoints(graphs),
     evidence: uniqueObjects(graphs.flatMap((g) => g.evidence), (x) => x.id),
     requests: uniqueObjects(graphs.flatMap((g) => g.requests), (x) => x.id),
@@ -2419,6 +2421,7 @@ export namespace JavaScriptCorrelation {
         secretCandidates: persistedSourceFiles.flatMap((file) => (file.analysis?.secretCandidates ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
+        applicationHints: mergedSourceFiles.flatMap((file) => (file.analysis?.applicationHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
       },
       endpointCandidates: [],
       evidence: relevantRequests
