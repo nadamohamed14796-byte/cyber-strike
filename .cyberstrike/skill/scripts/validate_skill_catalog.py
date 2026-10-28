@@ -240,7 +240,7 @@ def scan(root: Path, strict_links: bool = False) -> dict[str, Any]:
             message = f"{label}: duplicate skill name '{name}' also appears at {paths}"
             (errors if strict_links else warnings).append(message)
 
-        if not re.search(r"^##\\s+.+", text, re.MULTILINE):
+        if not re.search(r"^##\s+.+", text, re.MULTILINE):
             warnings.append(f"{label}: no markdown level-2 section headings")
 
     summary = {
