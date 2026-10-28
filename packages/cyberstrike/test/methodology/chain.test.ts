@@ -247,6 +247,53 @@ describe("Chain — Format", () => {
     expect(result).toContain("Chain")
     expect(result).toContain("CREDENTIAL_ENDPOINT")
   })
+
+  test("formatForPrompt separates evidence-backed terminal chains from legacy status strings", () => {
+    const common: Omit<Chain.Candidate, "id" | "status" | "validation"> = {
+      pattern: "information_amplification",
+      entryIDs: ["info-a", "info-b"],
+      entryTitles: ["Internal configuration", "API schema"],
+      assets: ["example.com"],
+      expectedImpact: "POTENTIAL_INTERNAL_API_OR_SERVICE_EXPOSURE",
+      severity: "high",
+      testingPlan: "Validate actual reachability and impact",
+      confidence: 40,
+      detectedAt: Date.now(),
+    }
+    const result = Chain.formatForPrompt([
+      {
+        ...common,
+        id: "confirmed-chain",
+        status: "confirmed",
+        validation: {
+          id: "cvn-confirmed",
+          outcome: "confirmed",
+          combinedFindingID: "vul-combined",
+          evidence: "Combined impact evidence was observed with controls.",
+          validatedBy: "test",
+          validatedAt: 100,
+        },
+      },
+      { ...common, id: "legacy-confirmed", status: "confirmed" },
+      {
+        ...common,
+        id: "disproven-chain",
+        status: "disproven",
+        validation: {
+          id: "cvn-disproven",
+          outcome: "disproven",
+          evidence: "A negative control disproved the combined impact.",
+          validatedBy: "test",
+          validatedAt: 200,
+        },
+      },
+    ])
+
+    expect(result).toContain("1 evidence-backed confirmed")
+    expect(result).toContain("Combined finding: vul-combined")
+    expect(result).toContain("CONFIRMED STATUS — VALIDATION RECORD MISSING")
+    expect(result).toContain("[DISPROVEN] chain_id=disproven-chain")
+  })
 })
 
 describe("Chain — Safety and confidence", () => {
