@@ -16,6 +16,10 @@ test("target workflow defines autonomous recon handoffs, one workspace, and evid
   expect(contract).toContain("subdomains.txt, live-hosts.txt, urls.txt, parameters.txt, endpoints.txt")
   expect(contract).toContain("reports/recon-final.md")
   expect(contract).toContain("Generate or update reports/recon-final.md")
+  expect(contract).toContain("automatically synchronizes a compact ordered `[recon:phase_id]` checklist")
+  expect(contract).toContain("runs/tmp/<phase>/")
+  expect(contract).toContain("within 55 minutes")
+  expect(contract).toContain("do not delete captured JavaScript/source-map bodies")
 })
 
 test("a selected missing CLI must be installed and verified before choosing a fallback", () => {
