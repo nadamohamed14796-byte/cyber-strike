@@ -134,7 +134,7 @@ export class FailedToolStreakDetector {
     if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError("limit must be a positive safe integer")
   }
 
-  observe(toolCalls: { tool: string; succeeded?: boolean }[]): RepeatVerdict {
+  observe(toolCalls: { tool: string; input?: unknown; succeeded?: boolean }[]): RepeatVerdict {
     if (toolCalls.some((call) => call.succeeded === true && isProgressTool(call.tool))) {
       this.reset()
       return "ok"
