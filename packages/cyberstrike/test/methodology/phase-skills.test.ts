@@ -323,6 +323,32 @@ describe("Methodology phase skill routing", () => {
     expect(ranked.some((skill) => skill.name === "tampered-idor-skill")).toBe(false)
   })
 
+  test("phase-ranked skills retain the metadata needed for precise loading and chaining", () => {
+    const skill: SkillIndex.Entry = {
+      name: "attack-javascript-analysis",
+      description: "Analyze authorized JavaScript and source maps",
+      category: "recon",
+      owasp_id: "WSTG-CLNT-01",
+      tags: ["javascript", "source-maps", "endpoints"],
+      tech_stack: ["browser", "javascript"],
+      cwe_ids: ["CWE-79"],
+      chains_with: ["attack-dom-xss"],
+      prerequisites: ["attack-web-recon"],
+      severity_boost: {},
+    }
+    const ranked = rankSkillsForPhase("active_recon", [skill], 1)
+    expect(ranked).toContainEqual(expect.objectContaining({
+      name: "attack-javascript-analysis",
+      category: "recon",
+      owasp_id: "WSTG-CLNT-01",
+      tags: ["javascript", "source-maps", "endpoints"],
+      tech_stack: ["browser", "javascript"],
+      cwe_ids: ["CWE-79"],
+      chains_with: ["attack-dom-xss"],
+      prerequisites: ["attack-web-recon"],
+    }))
+  })
+
   test("empty tech_stack metadata does not gain a false match for every observed technology", () => {
     const makeSkill = (overrides: Partial<SkillIndex.Entry>): SkillIndex.Entry => ({
       name: "unrelated-skill",
