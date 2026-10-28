@@ -256,12 +256,12 @@ export function reconPhaseExecutionDecision(
         : phaseLabel + " is opt-in; explicitly begin " + phaseLabel + " only after endpoint_inventory is complete and the user has requested active testing.",
     }
   }
-  if (phases.scope_validation.status !== "complete" ||
-      phases.workspace_setup.status !== "complete" ||
-      phases.endpoint_inventory.status !== "complete") {
+  const unresolved = unresolvedReconPrerequisites(requiredPhase, phases)
+  if (unresolved.length > 0) {
     return {
       allowed: false,
-      reason: phaseLabel + " requires completed scope validation, workspace setup, and endpoint inventory.",
+      reason: phaseLabel + " requires earlier phases to be completed or explicitly handed off: " +
+        unresolved.map((item) => item + "=" + phases[item].status).join(", "),
     }
   }
   return { allowed: true, reason: "explicit " + phaseLabel + " checkpoint and prerequisites passed" }
