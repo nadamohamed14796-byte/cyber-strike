@@ -200,7 +200,7 @@ test("automatically retries one transient JavaScript HTTP failure in the same in
 }, 30_000)
 
 
-test("merges source-map provenance from every bundle while keeping the display label bounded", async () => {
+test("retains every source-map provenance label from every bundle without truncation", async () => {
   await using tmp = await tmpdir()
   const requests: string[] = []
   const javascript = 'const route = "/api/profile";\nfetch(route);\n//# sourceMappingURL=/shared.js.map\n'
@@ -269,7 +269,8 @@ test("merges source-map provenance from every bundle while keeping the display l
           expect(mapRecord?.sources).toContain("sourceMappingURL from " + canonicalTarget + "/" + name)
         }
         expect(mapRecord?.sources).toHaveLength(4)
-        expect(mapRecord?.source.length).toBeLessThanOrEqual(120)
+        expect(mapRecord?.source.split(" | ").sort()).toEqual([...mapRecord!.sources!].sort())
+        expect(mapRecord?.source.length).toBeGreaterThan(120)
       },
     })
   } finally {
