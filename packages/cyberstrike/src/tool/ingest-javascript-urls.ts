@@ -665,23 +665,49 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
 
+    const finalManifestAssets = [...byURL.values()]
+    const allQueuedURLs = [...queuedURLs]
+    const worklistRecords = allQueuedURLs.map((url) => byURL.get(url))
+    const worklistMissingRecords = worklistRecords.filter((record) => !record).length
+    const worklistPending = worklistRecords.filter((record) => record?.status === "pending").length
+    const worklistRetryable = worklistRecords.filter((record) => record?.status === "failed" && record.retryable === true).length
+    const worklistSettled = allQueuedURLs.length - worklistMissingRecords - worklistPending - worklistRetryable
+    const worklistAvailable = worklistRecords.filter((record) => record?.status === "downloaded" || record?.status === "reused").length
+    const globalPending = finalManifestAssets.filter((record) => record.status === "pending").length
+    const globalRetryable = finalManifestAssets.filter((record) => record.status === "failed" && record.retryable === true).length
+    const manifestReconciled = worklistMissingRecords === 0 && worklistPending === 0 && worklistRetryable === 0
+    const completeAnalysis = !ctx.abort.aborted && !analysisError && (downloaded + reused > 0)
+    const resultTitle = ctx.abort.aborted
+      ? "JavaScript ingestion interrupted — pending work saved"
+      : analysisError || !manifestReconciled || globalPending > 0 || globalRetryable > 0
+        ? "JavaScript ingestion incomplete — resumable work remains"
+        : failed > 0 || skipped > 0
+          ? "JavaScript ingestion finished with asset gaps"
+          : "JavaScript URL ingestion complete"
+
     return {
-      title: ctx.abort.aborted ? "JavaScript ingestion interrupted — pending work saved" : "JavaScript URL ingestion complete",
+      title: resultTitle,
       output: [
         "Workspace: " + workspace.workspacePath,
-        "Input URLs: " + params.urls.length,
-        "Unique URLs handled (supplied, resumed, and discovered): " + inputURLs.length,
-        "Pending assets left for resume: " + [...byURL.values()].filter((record) => record.status === "pending").length,
-        "Retryable failures retained for the next run: " + [...byURL.values()].filter((record) => record.retryable === true).length,
-        "Permanent failures/skips not retried: " + terminalNotRetried,
+        "Input URL rows: " + params.urls.length,
+        "Unique valid URLs supplied: " + new Set(params.urls.map(normalizeURL).filter(Boolean)).size,
+        "Unique URLs in complete worklist (supplied, resumed, and discovered): " + allQueuedURLs.length,
+        "Worklist records settled with an explicit terminal status: " + worklistSettled + "/" + allQueuedURLs.length,
+        "Worklist records with downloaded/reused content: " + worklistAvailable + "/" + allQueuedURLs.length,
+        "Worklist records still pending: " + worklistPending,
+        "Worklist retryable failures: " + worklistRetryable,
+        "Worklist URLs without manifest records: " + worklistMissingRecords,
+        "Manifest reconciliation: " + (manifestReconciled ? "all queued URLs have recorded statuses; no pending/retryable work in this invocation" : "INCOMPLETE — inspect pending/retryable/missing counts and resume automatically"),
         "Invalid URLs rejected: " + invalidCount,
-        "Downloaded new content versions: " + downloaded,
-        "Reused URL/content records: " + reused,
-        "Skipped responses: " + skipped,
-        "Failed URLs: " + failed,
+        "Downloaded new content versions in this invocation: " + downloaded,
+        "Reused URL/content records in this invocation: " + reused,
+        "Skipped responses in this invocation: " + skipped,
+        "Failed fetch attempts in this invocation: " + failed,
+        "Permanent failures/skips not retried in this invocation: " + terminalNotRetried,
         "Newly downloaded bytes: " + downloadedBytes,
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
+        "Correlation status: " + (completeAnalysis ? "ran after ingestion and saved a snapshot" : analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : "not run because no asset was downloaded or reused"),
         analysisSummary,
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => displayURL(record.url) + " — " + record.status + ": " + redactURLs(record.error ?? "")),
       ].join("\n"),
@@ -689,10 +715,16 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         manifest_path: manifestPath,
         workspace: workspace.workspacePath,
         input_urls: params.urls.length,
-        valid_unique_urls: inputURLs.length,
-        queued_urls: inputURLs.length,
-        pending_assets: [...byURL.values()].filter((record) => record.status === "pending").length,
-        retryable_failures: [...byURL.values()].filter((record) => record.retryable === true).length,
+        valid_unique_urls: new Set(params.urls.map(normalizeURL).filter(Boolean)).size,
+        queued_urls: allQueuedURLs.length,
+        worklist_settled: worklistSettled,
+        worklist_available: worklistAvailable,
+        worklist_pending: worklistPending,
+        worklist_retryable_failures: worklistRetryable,
+        worklist_missing_manifest_records: worklistMissingRecords,
+        manifest_reconciled: manifestReconciled,
+        pending_assets: globalPending,
+        retryable_failures: globalRetryable,
         permanent_failures_not_retried: terminalNotRetried,
         invalid_urls: invalidCount,
         downloaded,
@@ -702,6 +734,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         downloaded_bytes: downloadedBytes,
         received_bytes: receivedBytes,
         analysis_error: analysisError,
+        analysis_complete: completeAnalysis,
         interrupted: ctx.abort.aborted,
       },
     }
