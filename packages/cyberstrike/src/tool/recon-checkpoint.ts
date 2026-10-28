@@ -2,7 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
 import { Session } from "../session"
-import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE } from "../target"
+import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE, type TargetScope, type Workspace } from "../target"
 import {
   RECON_PHASES as PHASES,
   invalidateReconDownstreamPhases,
@@ -22,6 +22,33 @@ export type { ReconPhase, ReconPhaseRecord, ReconPhaseStatus } from "../target/r
 
 function terminal(status: ReconPhaseStatus): boolean {
   return status === "complete" || status === "unavailable" || status === "deferred"
+}
+
+/** Load the effective authorization chain for a selected workspace, rejecting broken or cross-root ancestry. */
+async function scopeFingerprintForWorkspace(start: Workspace, expectedRootID: string): Promise<string> {
+  const byID = new Map(TargetMemory.list().map((item) => [item.id, item]))
+  const visited = new Set<string>()
+  const scopes: TargetScope[] = []
+  let current: Workspace | undefined = start
+  let foundExpectedRoot = false
+  while (current) {
+    if (visited.has(current.id)) throw new Error("target workspace ancestry contains a cycle; scope validation cannot be trusted")
+    visited.add(current.id)
+    if (current.id === expectedRootID) foundExpectedRoot = true
+    const scope = await TargetMemory.getScope(current.targetURL)
+    if (!scope || scope.status !== "configured" || scope.scopeItems.length === 0) {
+      throw new Error("workspace " + current.targetURL + " has no configured persisted scope")
+    }
+    scopes.push(scope)
+    if (!current.parentTargetID) break
+    const parent = byID.get(current.parentTargetID)
+    if (!parent) throw new Error("parent target workspace is missing; refusing to weaken inherited scope")
+    current = parent
+  }
+  if (!foundExpectedRoot || current?.id !== expectedRootID) {
+    throw new Error("the starting asset resolves to a different canonical program workspace; re-check it under the current root")
+  }
+  return reconScopeFingerprint(scopes)
 }
 
 export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly string[]>> = {
@@ -188,30 +215,23 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         const validatedTarget = run.phases.scope_validation.scopeValidationTarget
         const savedFingerprint = run.phases.scope_validation.scopeFingerprint
         let invalidationReason: string | undefined
-        try {
-          const currentScope = await TargetMemory.getScope(workspace.targetURL)
-          if (!currentScope || currentScope.status !== "configured" || currentScope.scopeItems.length === 0) {
-            invalidationReason = "The persisted authorization scope is no longer configured; revalidate scope before resuming."
-          } else if (!savedFingerprint) {
-            invalidationReason = "The saved scope_validation checkpoint predates scope fingerprinting; revalidate it once before resuming."
-          } else if (reconScopeFingerprint(currentScope) !== savedFingerprint) {
-            invalidationReason = "The persisted authorization scope or exclusions changed since this recon run was validated; revalidate scope and downstream phases."
-          }
-        } catch (error) {
-          invalidationReason = "The persisted authorization scope could not be revalidated: " +
-            (error instanceof Error ? error.message : String(error))
-        }
-        if (!invalidationReason && !validatedTarget) {
+        if (!validatedTarget) {
           invalidationReason = "The saved scope_validation checkpoint has no recorded starting asset; scope must be checked again."
-        }
-        if (!invalidationReason && validatedTarget) {
+        } else {
           try {
             const decision = await TargetMemory.checkURLScope(validatedTarget)
             if (!decision.allowed || !decision.workspace) {
               invalidationReason = "The previously validated starting asset no longer passes persisted scope: " + decision.reason
+            } else {
+              const currentFingerprint = await scopeFingerprintForWorkspace(decision.workspace, workspace.id)
+              if (!savedFingerprint) {
+                invalidationReason = "The saved scope_validation checkpoint predates scope fingerprinting; revalidate it once before resuming."
+              } else if (currentFingerprint !== savedFingerprint) {
+                invalidationReason = "The persisted authorization scope or exclusions changed since this recon run was validated; revalidate scope and downstream phases."
+              }
             }
           } catch (error) {
-            invalidationReason = "The previously validated starting asset could not be revalidated: " +
+            invalidationReason = "The previously validated starting asset's authorization chain could not be revalidated: " +
               (error instanceof Error ? error.message : String(error))
           }
         }
@@ -360,7 +380,15 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           if (!targetDecision.allowed || !targetDecision.workspace) {
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the starting asset is not authorized by the persisted manifest: " + targetDecision.reason, metadata: { saved: false, reason: "scope_validation_target_out_of_scope", target: parsedValidationTarget.href } }
           }
-          validatedScopeFingerprint = reconScopeFingerprint(scope)
+          try {
+            validatedScopeFingerprint = await scopeFingerprintForWorkspace(targetDecision.workspace, workspace.id)
+          } catch (error) {
+            return {
+              title: "Scope validation rejected",
+              output: "Cannot complete scope_validation because the starting asset's effective authorization chain is invalid: " + (error instanceof Error ? error.message : String(error)),
+              metadata: { saved: false, reason: "scope_validation_workspace_mismatch" },
+            }
+          }
         }
         if (status === "complete" && phase === "workspace_setup") {
           for (const relative of ["target.json", "workspace.json", "notes.md", "scope/scope.json"]) {
