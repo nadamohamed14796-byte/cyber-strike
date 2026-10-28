@@ -29,10 +29,14 @@ describe("Phase-critical skill pinning", () => {
       directory: path.resolve(import.meta.dir, "../.."),
       fn: async () => {
         const catalog = await Skill.all()
-        const available = new Set(catalog.map((skill) => skill.name.trim().toLowerCase()))
+        const byName = new Map(catalog.map((skill) => [skill.name.trim().toLowerCase(), skill]))
         for (const [phaseID, required] of Object.entries(PHASE_REQUIRED_SKILLS) as Array<[Phase.Id, string[]]>) {
           for (const name of required) {
-            expect(available.has(name.toLowerCase()), phaseID + " requires loadable skill " + name).toBe(true)
+            const skill = byName.get(name.toLowerCase())
+            expect(skill, phaseID + " requires loadable skill " + name).toBeDefined()
+            expect(skill!.description.trim(), phaseID + " requires a usable description for " + name).not.toBe("")
+            expect(skill!.category?.trim(), phaseID + " requires a routing category for " + name).toBeTruthy()
+            expect(skill!.tags?.length, phaseID + " requires searchable tags for " + name).toBeGreaterThan(0)
           }
         }
       },
