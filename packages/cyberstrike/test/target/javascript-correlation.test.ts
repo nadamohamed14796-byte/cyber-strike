@@ -128,15 +128,28 @@ test("persists secret fingerprints and source locations without raw values", asy
   expect(serialized).toContain("Secret-like values are never retained")
 })
 
-test("accepts JavaScript ingestion batches larger than 500 URLs", async () => {
+test("accepts a 1000-URL JavaScript worklist without truncation", async () => {
   const { IngestJavaScriptURLsTool } = await import("../../src/tool/ingest-javascript-urls")
   const tool = await IngestJavaScriptURLsTool.init()
-  const urls = Array.from({ length: 501 }, (_, index) => "https://app.example.com/assets/" + index + ".js")
+  const urls = Array.from({ length: 1000 }, (_, index) => "https://app.example.com/assets/" + index + ".js")
   const parsed = tool.parameters.parse({
     target_url: "https://app.example.com",
     urls,
   })
-  expect(parsed.urls).toHaveLength(501)
+  expect(parsed.urls).toHaveLength(1000)
+  expect(new Set(parsed.urls).size).toBe(1000)
+})
+
+test("retries only transient JavaScript asset failures and bounds automatic retries", async () => {
+  const { shouldRetryJavaScriptAsset } = await import("../../src/tool/ingest-javascript-urls")
+  expect(shouldRetryJavaScriptAsset({ kind: "network", attempt: 1 })).toBe(true)
+  expect(shouldRetryJavaScriptAsset({ kind: "network", attempt: 2 })).toBe(false)
+  expect(shouldRetryJavaScriptAsset({ kind: "http", status: 503, attempt: 1 })).toBe(true)
+  expect(shouldRetryJavaScriptAsset({ kind: "http", status: 429, attempt: 1 })).toBe(true)
+  expect(shouldRetryJavaScriptAsset({ kind: "http", status: 404, attempt: 1 })).toBe(false)
+  expect(shouldRetryJavaScriptAsset({ kind: "http", status: 503, attempt: 2 })).toBe(false)
+  expect(shouldRetryJavaScriptAsset({ kind: "read", error: "response exceeds the 33554432 byte asset limit", attempt: 1 })).toBe(false)
+  expect(shouldRetryJavaScriptAsset({ kind: "read", error: "connection reset", attempt: 1 })).toBe(true)
 })
 
 test("rejects malformed JavaScript manifests instead of silently resetting resumable state", async () => {
