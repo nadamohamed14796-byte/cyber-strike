@@ -186,6 +186,7 @@ test("old workflow checkpoints preserve discovery but reopen JavaScript and down
 
   const migrated = parseReconRun(JSON.stringify(old), "target-root-1", "https://example.com")
   expect(migrated.phaseOrderVersion).toBe(2)
+  expect(migrated.currentPhase).toBe("javascript_analysis")
   expect(migrated.phases.asset_discovery.status).toBe("complete")
   expect(migrated.phases.live_hosts_ports.status).toBe("complete")
   expect(migrated.phases.url_collection.status).toBe("complete")
