@@ -56,7 +56,7 @@ import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
 import { toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
-import { EmptyContinuationDetector, RepeatDetector, ReadOnlyRepeatDetector } from "./stuck/repeat-detector"
+import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, ReadOnlyRepeatDetector } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
@@ -347,6 +347,7 @@ export namespace SessionPrompt {
     // recon/testing progress is still a stall. Progress resets this detector below.
     const readOnlyRepeatDetector = new ReadOnlyRepeatDetector(8)
     const emptyContinuationDetector = new EmptyContinuationDetector(3)
+    const failedToolStreakDetector = new FailedToolStreakDetector(4)
     while (true) {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
@@ -1080,6 +1081,17 @@ export namespace SessionPrompt {
         // is normal, not a loop — counting it would kill legitimate pipeline drivers.
         // Status-writes (record_coverage_note/update_vrt_check) are NOT read-only and
         // DO count here — a byte-identical re-write is exactly the loop we target.
+        const failedVerdict = failedToolStreakDetector.observe(toolCalls)
+        if (failedVerdict === "nudge") {
+          forceWrapUpNext = true
+          log.warn("consecutive failed tool attempts without progress — forcing wrap-up", { sessionID })
+        } else if (failedVerdict === "abort" && !processor.message.stuckAborted) {
+          processor.message.stuckAborted = true
+          await Session.updateMessage(processor.message)
+          log.warn("failed tool-attempt streak continued after nudge — terminating", { sessionID })
+          break
+        }
+
         const repeatSigs = toolCalls
           .filter((c) => c.input !== undefined && !READ_ONLY_TOOLS.has(c.tool))
           .map((c) => toolSig(c.tool, c.input))
