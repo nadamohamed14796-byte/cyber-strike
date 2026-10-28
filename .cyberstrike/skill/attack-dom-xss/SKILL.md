@@ -4,12 +4,7 @@ description: "Trace attacker-controlled browser sources into unsafe DOM sinks an
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - dom-xss
-  - javascript
-  - spa
-  - sources-sinks
-  - client-side
+tags: [- dom-xss, dom-xss, client-side, source-to-sink, javascript, browser, unsafe-sink, cross-site-scripting]
 tech_stack:
   - javascript
   - web
