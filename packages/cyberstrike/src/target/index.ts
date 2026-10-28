@@ -1749,7 +1749,10 @@ export namespace TargetMemory {
       // ports. Require an explicit host:port or URL-with-port scope entry.
       if (isRootScopeContainer && candidate.port) {
         const explicitPortScope = matchedIncludeItems.some((item) => {
-          const raw = item.replace(/^(?:url|domain|wildcard)[ \t]*:[ \t]*/i, "").trim()
+          // Strip the same web-asset type labels accepted by checkMatch. In
+          // particular, "API: host:port" is a valid typed scope entry; leaving
+          // "API:" in front made the subsequent port parse reject a valid grant.
+          const raw = item.replace(/^(?:url|domain|wildcard|api|ip address|cidr)[ \t]*:[ \t]*/i, "").trim()
           if (/^[^/:]+:\d{1,5}$/.test(raw)) return true
           try {
             const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw)
