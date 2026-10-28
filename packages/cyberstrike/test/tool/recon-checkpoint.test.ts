@@ -170,6 +170,34 @@ test("active parameter fuzzing can be deferred so recon-only reporting can finis
   expect(unresolvedReconPrerequisites("vulnerability_testing", state)).toEqual([])
 })
 
+test("old workflow checkpoints preserve discovery but reopen JavaScript and downstream phases", () => {
+  const old = initialReconRun("https://example.com", "target-root-1", "session-1")
+  delete old.phaseOrderVersion
+  old.phases.asset_discovery = { status: "complete", artifacts: ["subdomains.txt"] }
+  old.phases.live_hosts_ports = { status: "complete", artifacts: ["live-hosts.txt"] }
+  old.phases.url_collection = { status: "complete", artifacts: ["urls.txt"] }
+  old.phases.javascript_analysis = { status: "complete", artifacts: ["javascript-analysis.md", "endpoints.txt"] }
+  old.phases.parameter_discovery = { status: "complete", artifacts: ["parameters.txt"] }
+  old.phases.directory_fuzzing = { status: "complete", artifacts: ["directories/path-discovery.md"] }
+  old.phases.endpoint_inventory = { status: "complete", artifacts: ["endpoints.txt"] }
+  old.phases.parameter_fuzzing = { status: "deferred", reason: "Old recon-only run" }
+  old.phases.vulnerability_testing = { status: "deferred", reason: "Old recon-only run" }
+  old.phases.reporting = { status: "complete", artifacts: ["reports/recon-final.md"] }
+
+  const migrated = parseReconRun(JSON.stringify(old), "target-root-1", "https://example.com")
+  expect(migrated.phaseOrderVersion).toBe(2)
+  expect(migrated.phases.asset_discovery.status).toBe("complete")
+  expect(migrated.phases.live_hosts_ports.status).toBe("complete")
+  expect(migrated.phases.url_collection.status).toBe("complete")
+  expect(migrated.phases.javascript_analysis.status).toBe("pending")
+  expect(migrated.phases.parameter_discovery.status).toBe("pending")
+  expect(migrated.phases.directory_fuzzing.status).toBe("pending")
+  expect(migrated.phases.endpoint_inventory.status).toBe("pending")
+  expect(migrated.phases.parameter_fuzzing.status).toBe("pending")
+  expect(migrated.phases.vulnerability_testing.status).toBe("pending")
+  expect(migrated.phases.reporting.status).toBe("pending")
+})
+
 test("deferred is accepted as a persisted checkpoint status", () => {
   const run = initialReconRun("https://example.com", "target-root-1", "session-1")
   run.phases.vulnerability_testing = { status: "deferred", reason: "Recon-only handoff" }
