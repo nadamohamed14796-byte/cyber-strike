@@ -178,6 +178,8 @@ import type {
   SessionQueueStatusResponses,
   SessionRequestErrors,
   SessionRequestResponses,
+  SessionRequestRetryErrors,
+  SessionRequestRetryResponses,
   SessionRevertErrors,
   SessionRevertResponses,
   SessionShareErrors,
@@ -1517,6 +1519,42 @@ export class Session extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<SessionRequestResponses, SessionRequestErrors, ThrowOnError>({
       url: "/session/{sessionID}/request",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Retry failed captured-request analysis
+   *
+   * Requeue a failed captured request. Only requests in failed state can be retried.
+   */
+  public requestRetry<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      requestID: string
+      directory?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "requestID" },
+            { in: "query", key: "directory" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionRequestRetryResponses,
+      SessionRequestRetryErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/request/{requestID}/retry",
       ...options,
       ...params,
     })
