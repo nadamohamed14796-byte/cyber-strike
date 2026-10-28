@@ -87,3 +87,35 @@ export class ReadOnlyRepeatDetector {
     this.detector.reset()
   }
 }
+
+
+/**
+ * Detect a provider/agent loop that keeps yielding a continuing turn without any
+ * tool calls. There are no (tool,args) signatures to count in this case, so it needs
+ * a separate bounded guard. Any actual tool-call turn resets the streak.
+ */
+export class EmptyContinuationDetector {
+  private streak = 0
+  private nudged = false
+
+  constructor(private readonly limit: number = 3) {
+    if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError("limit must be a positive safe integer")
+  }
+
+  observe(toolCallCount: number): RepeatVerdict {
+    if (toolCallCount > 0) {
+      this.reset()
+      return "ok"
+    }
+    this.streak++
+    if (this.streak < this.limit) return "ok"
+    if (this.nudged) return "abort"
+    this.nudged = true
+    return "nudge"
+  }
+
+  reset(): void {
+    this.streak = 0
+    this.nudged = false
+  }
+}
