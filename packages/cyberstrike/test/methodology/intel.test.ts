@@ -93,12 +93,19 @@ describe("Intel — CRUD", () => {
             asset: "api.example.com",
             source: "web-application",
             confidenceLevel: "confirmed",
-            tags: [],
+            tags: ["new-observation"],
           },
         })
 
-        // Second add should return the same entry (dedup)
+        // Second add should return the same entry (dedup), but must not
+        // discard newly observed evidence or stronger metadata.
         expect(second.id).toBe(first.id)
+        expect(second.duplicate).toBe(true)
+        expect(second.detail).toContain("User listing endpoint")
+        expect(second.detail).toContain("Updated detail")
+        expect(second.severity).toBe("high")
+        expect(second.tags).toContain("new-observation")
+        expect(Intel.get(session.id).find((entry) => entry.id === first.id)?.detail).toContain("Updated detail")
 
         await Session.remove(session.id)
       },
@@ -150,6 +157,36 @@ describe("Intel — CRUD", () => {
           },
         })
         expect(differentFingerprint.id).not.toBe(first.id)
+        await Session.remove(session.id)
+      },
+    })
+  })
+
+  test("same title on the same asset but a different intel type is not discarded", async () => {
+    await Instance.provide({
+      directory: projectRoot,
+      fn: async () => {
+        const session = await Session.create({})
+        const endpoint = Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "endpoint",
+            title: "admin.example.com",
+            asset: "example.com",
+            detail: "Observed as an endpoint",
+          },
+        })
+        const subdomain = Intel.add({
+          sessionID: session.id,
+          data: {
+            type: "subdomain",
+            title: "admin.example.com",
+            asset: "example.com",
+            detail: "Observed as a subdomain",
+          },
+        })
+        expect(subdomain.id).not.toBe(endpoint.id)
+        expect(Intel.get(session.id).map((entry) => entry.type).sort()).toEqual(["endpoint", "subdomain"])
         await Session.remove(session.id)
       },
     })
