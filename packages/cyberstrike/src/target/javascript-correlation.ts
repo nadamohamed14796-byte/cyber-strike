@@ -1070,7 +1070,7 @@ export interface JavaScriptCorrelationGraph {
     secretCandidates: Array<JavaScriptSecretCandidate & { sourceFile: string }>
     roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
     riskSignals: Array<JavaScriptRiskSignal & { sourceFile: string }>
-    applicationHints: Array<JavaScriptApplicationHint & { sourceFile: string }>
+    applicationHints?: Array<JavaScriptApplicationHint & { sourceFile: string }>
   }
   endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
