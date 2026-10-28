@@ -1,7 +1,7 @@
 ---
 name: attack-graphql
 description: "Assess GraphQL schema exposure, object and field authorization, mutation controls, batching, and query resource limits"
-category: "web-application"
+category: "api-security"
 version: "1.1.0"
 author: "CyberStrike contributors; consolidated with upstream attribution"
 tags: [graphql, api, authorization, introspection, query-cost]
