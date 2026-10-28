@@ -370,7 +370,7 @@ export namespace SkillIndex {
           if (field === "chains_with" && isExternalAttackTechniqueId(reference)) continue
           if (field === "prerequisites" && isPrerequisiteStatement(reference)) continue
 
-          const candidates = state.referenceIndex.get(reference.trim().toLowerCase())
+          const candidates = state.referenceIndex.get(normalizeSearchText(reference))
           problems.push({
             skill: entry.name,
             field,
