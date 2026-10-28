@@ -559,28 +559,34 @@ function defaultWorkspaceReadme(workspace: Workspace): string {
     "- Workspace ID: " + workspace.id,
     "- Schema: 2",
     "",
-    "## Safety and provenance",
+    "## What belongs here",
     "",
-    "- Treat `workspace.json` and SQLite target metadata as identity references; do not infer authorization from the existence of this workspace.",
-    "- Active testing requires an explicitly configured, current, program-authorized scope in `scope/scope.json`.",
-    "- Preserve source URL, timestamp, run/session ID, and evidence references for generated artifacts.",
-    "- Keep observations, hypotheses, validated findings, and reports separate. A note is not proof.",
-    "- Preserve exact discovered values in this private, target-local evidence store when they are relevant evidence or needed for reproduction; mark them as candidates until independently validated.",
+    "- Keep all evidence and outputs for this target inside this folder.",
+    "- Reuse the saved scope and run checkpoint; do not create one workspace per discovered host.",
+    "- The root contains target metadata, notes, and the canonical inventory files: `subdomains.txt`, `live-hosts.txt`, `urls.txt`, `parameters.txt`, `javascript-analysis.md`, and `endpoints.txt`.",
+    "- The full report is saved under `reports/`; raw outputs and detailed records stay in the relevant compact folder below.",
     "",
-    "## Layout",
+    "## Folder layout",
     "",
-    "| Directory | Purpose |",
+    "| Path | Purpose |",
     "| --- | --- |",
-    "| `scope/` | Saved authorization manifest and scope-source copy |",
+    "| `scope/` | Saved authorization manifest and imported scope list |",
     "| `assets/` | Consolidated discovered-asset registry |",
-    "| `runs/` | Run index and resumable checkpoints |",
+    "| `runs/` | Resume checkpoint and run index |",
+    "| `recon/` | Live-host checks, URLs, parameters, directories, requests, scans, and tool logs |",
+    "| `javascript/` | Collected JavaScript/source maps and correlation graphs |",
+    "| `endpoints/` | Structured endpoint inventory and source correlations |",
+    "| `findings/` | Tester surveys, validation evidence, and finding records |",
+    "| `reports/` | Final recon/security reports |",
     "",
-    "Other artifact directories (such as `recon/`, `urls/`, `javascript/`, `endpoints/`, `testing/`, `findings/`, `evidence/`, and `reports/`) are created only when their first artifact is saved. Keep one canonical inventory per type; do not create empty placeholder folders.",
+    "Only `scope/`, `assets/`, and `runs/` are created at startup. The other folders appear when their first artifact is saved. Legacy area names are mapped into these folders rather than creating a new folder for every workflow phase.",
     "",
-    "## Source of truth",
+    "## Safety and source of truth",
     "",
-    "- SQLite is authoritative for target identity and target notes.",
-    "- This README and `notes.md` are human-readable companions.",
+    "- Workspace existence does not grant authorization. Active requests and testing must pass the current saved scope and exclusions.",
+    "- Preserve source URL, timestamp, run/session ID, and evidence references.",
+    "- Keep observations, hypotheses, validated findings, and reports distinct. A note is not proof.",
+    "- SQLite is authoritative for target identity and target notes; this README and `notes.md` are human-readable companions.",
     "- Global writeups and methodology belong in the separate research knowledge store.",
     "",
   ].join("\n")
@@ -833,18 +839,44 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
   // Migrate the previous generated secret policy without overwriting human-authored README content.
   const legacyEvidencePolicy = "- Do not store passwords, cookies, bearer tokens, API keys, or other secrets."
   let currentReadme = await fs.readFile(readmePath, "utf-8")
-  // Existing workspaces may still describe every artifact directory as a startup folder.
-  // Add one explanatory note while preserving the rest of any operator-authored README.
-  if (currentReadme.includes("## Layout") &&
-      !currentReadme.includes("created only when their first artifact is saved.") &&
-      !currentReadme.includes("Artifact folders are created on demand")) {
-    const updatedReadme = currentReadme.replace(
-      "## Layout\n",
-      "## Layout\n\nArtifact folders are created on demand; only `scope/`, `assets/`, and `runs/` are required at startup. The paths in the table below describe where outputs go when saved.\n",
-    )
-    if (updatedReadme !== currentReadme) {
-      await TargetMemory.writeWorkspaceFile(workspace, "README.md", updatedReadme)
-      currentReadme = updatedReadme
+  // Migrate the generated layout section only when it still matches our known
+  // machine-generated format. Preserve custom/operator-authored README content.
+  const layoutStart = currentReadme.indexOf("## Layout")
+  const sourceOfTruthStart = currentReadme.indexOf("## Source of truth", layoutStart + 1)
+  if (layoutStart >= 0 && sourceOfTruthStart > layoutStart) {
+    const oldLayoutSection = currentReadme.slice(layoutStart, sourceOfTruthStart).trimEnd()
+    const layoutLines = oldLayoutSection.split("\n")
+    const looksGenerated = oldLayoutSection.includes("| Directory | Purpose |") &&
+      oldLayoutSection.includes("| `scope/` |") &&
+      oldLayoutSection.includes("| `assets/` |") &&
+      oldLayoutSection.includes("| `runs/` |") &&
+      layoutLines.every((line) =>
+        !line.trim() || line.startsWith("|") ||
+        line.startsWith("## Layout") ||
+        line.startsWith("Other artifact directories (") ||
+        line.startsWith("Artifact folders are created on demand;") ||
+        line.startsWith("Only `scope/`, `assets/`, and `runs/` are created at startup.")
+      )
+    if (looksGenerated) {
+      const compactLayout = [
+        "## Layout",
+        "",
+        "| Path | Purpose |",
+        "| --- | --- |",
+        "| `scope/` | Saved authorization manifest and imported scope list |",
+        "| `assets/` | Consolidated discovered-asset registry |",
+        "| `runs/` | Resume checkpoint and run index |",
+        "| `recon/` | Live-host checks, URLs, parameters, directories, requests, scans, and tool logs |",
+        "| `javascript/` | Collected JavaScript/source maps and correlation graphs |",
+        "| `endpoints/` | Structured endpoint inventory and source correlations |",
+        "| `findings/` | Tester surveys, validation evidence, and finding records |",
+        "| `reports/` | Final recon/security reports |",
+        "",
+        "Only `scope/`, `assets/`, and `runs/` are created at startup. Other folders appear when the first artifact is saved. Legacy area names map into these folders rather than creating a folder for every workflow phase.",
+        "",
+      ].join("\n")
+      currentReadme = currentReadme.slice(0, layoutStart) + compactLayout + currentReadme.slice(sourceOfTruthStart)
+      await TargetMemory.writeWorkspaceFile(workspace, "README.md", currentReadme)
     }
   }
   if (currentReadme.includes(legacyEvidencePolicy)) {
