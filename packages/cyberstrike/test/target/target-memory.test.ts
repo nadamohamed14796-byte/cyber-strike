@@ -44,10 +44,14 @@ describe("target memory normalization", () => {
       directory: tmp.path,
       fn: async () => {
         const target = await TargetMemory.ensure("https://example.com")
-        expect(await fs.stat(path.join(target.workspacePath, "javascript"))).toBeTruthy()
-        expect(await fs.stat(path.join(target.workspacePath, "scope"))).toBeTruthy()
-        expect(await fs.stat(path.join(target.workspacePath, "recon"))).toBeTruthy()
-        expect(await fs.stat(path.join(target.workspacePath, "runs"))).toBeTruthy()
+        for (const directory of ["scope", "assets", "runs"]) {
+          expect((await fs.stat(path.join(target.workspacePath, directory))).isDirectory()).toBe(true)
+        }
+        await expect(fs.stat(path.join(target.workspacePath, "javascript"))).rejects.toThrow()
+        await expect(fs.stat(path.join(target.workspacePath, "recon"))).rejects.toThrow()
+        await TargetMemory.writeWorkspaceFile(target, "javascript/analysis.md", "ok\n")
+        expect((await fs.stat(path.join(target.workspacePath, "javascript"))).isDirectory()).toBe(true)
+        expect(await fs.readFile(path.join(target.workspacePath, "javascript", "analysis.md"), "utf-8")).toBe("ok\n")
         expect(await fs.readFile(path.join(target.workspacePath, "target.json"), "utf-8")).toContain("example.com")
         const manifest = JSON.parse(await fs.readFile(path.join(target.workspacePath, "workspace.json"), "utf-8"))
         expect(manifest.workspaceID).toBe(target.id)
