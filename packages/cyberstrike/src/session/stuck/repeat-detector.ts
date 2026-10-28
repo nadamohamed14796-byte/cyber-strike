@@ -16,6 +16,41 @@ import { isProgressTool, READ_ONLY_TOOLS, toolSig } from "./signals"
 
 export type RepeatVerdict = "ok" | "nudge" | "abort"
 
+/**
+ * Normalize tool-result metadata before feeding no-progress detectors.
+ * Some tools report failures through metadata.exit, others use exitCode or
+ * purpose-specific flags. Do not treat exitCode=1 as universally fatal:
+ * tools such as grep use it to mean "no matches", which is a valid result.
+ */
+export function toolCallSucceeded(input: {
+  status: string
+  tool: string
+  metadata?: Record<string, unknown> | null
+}): boolean {
+  if (input.status !== "completed") return false
+
+  const metadata = input.metadata ?? {}
+  if (typeof metadata.exit === "number" && metadata.exit !== 0) return false
+  if (typeof metadata.exitCode === "number") {
+    // -1 is used by several tools as a pre-execution/missing-script failure.
+    if (metadata.exitCode < 0) return false
+    // These tools surface the subprocess status directly, so any non-zero code
+    // means the requested operation did not complete successfully.
+    if ((input.tool === "attack_script" || input.tool === "ebpf") && metadata.exitCode !== 0) return false
+  }
+  if (metadata.saved === false || metadata.error === true) return false
+  if (typeof metadata.error === "string" && metadata.error.trim().length > 0) return false
+  if (metadata.success === false || metadata.ok === false || metadata.failed === true) return false
+
+  // Handle standardized boolean error markers such as validation_error,
+  // correlation_error, operation_failed, and request_blocked without hardcoding
+  // every tool's metadata schema.
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value === true && /(?:error|failed|blocked)$/i.test(key)) return false
+  }
+  return true
+}
+
 export class RepeatDetector {
   private readonly counts = new Map<string, number>()
   private nudged = false
