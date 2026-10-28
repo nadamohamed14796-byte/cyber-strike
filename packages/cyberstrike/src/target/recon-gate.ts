@@ -110,12 +110,13 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
     // A newly introduced path-discovery phase can discover JavaScript assets that
     // were not in the earlier URL set. Revalidate JS and everything downstream when
     // migrating a manifest that has no directory_fuzzing checkpoint.
-    const earliestMissing = Math.min(...missingPhases.map((phase) =>
-      phase === "directory_fuzzing"
-        ? RECON_PHASES.indexOf("javascript_analysis")
-        : RECON_PHASES.indexOf(phase),
-    ))
-    for (const phase of RECON_PHASES.slice(earliestMissing + 1)) {
+    const earliestMissing = Math.min(...missingPhases.map((phase) => RECON_PHASES.indexOf(phase)))
+    // If directory discovery is new, re-run JavaScript analysis too: the new path
+    // inventory may expose script bundles that were absent from the old URL set.
+    const revalidateFrom = missingPhases.includes("directory_fuzzing")
+      ? RECON_PHASES.indexOf("javascript_analysis")
+      : earliestMissing + 1
+    for (const phase of RECON_PHASES.slice(revalidateFrom)) {
       const previous = phases[phase]
       if (previous && previous.status !== "pending") {
         phases[phase] = {
@@ -155,7 +156,7 @@ export function unresolvedReconPrerequisites(
   const earlier = RECON_PHASES.slice(0, RECON_PHASES.indexOf(phase))
   const unresolved = earlier.filter((item) =>
     item === "scope_validation" || item === "workspace_setup" ||
-    (phase === "vulnerability_testing" && item === "endpoint_inventory")
+    ((phase === "parameter_fuzzing" || phase === "vulnerability_testing") && item === "endpoint_inventory")
       ? phases[item].status !== "complete"
       : !terminal(phases[item].status),
   )
@@ -170,8 +171,8 @@ export function unresolvedReconPrerequisites(
  * The checkpoint owns workflow order and prerequisites, not a phase-to-tool
  * allowlist. The phase inferred from a CLI name or tool wrapper is advisory.
  * Normal recon/support tools may contribute to the single active checkpoint;
- * actions classified as vulnerability testing still require that explicit
- * checkpoint to be active after endpoint inventory is complete.
+ * active parameter fuzzing and vulnerability testing require their explicit
+ * checkpoint to be active after scope, workspace, and endpoint inventory are complete.
  */
 export function reconPhaseExecutionDecision(
   requiredPhase: ReconPhase,
@@ -180,18 +181,18 @@ export function reconPhaseExecutionDecision(
   // The checkpoint tracks progress; it must not restrict ordinary recon tools to
   // a preassigned phase or block useful collection because a prior phase is stale.
   // Authorization is still enforced by reconPhaseGate and each request-level tool.
-  if (requiredPhase !== "vulnerability_testing") {
+  if (requiredPhase !== "parameter_fuzzing" && requiredPhase !== "vulnerability_testing") {
     return {
       allowed: true,
       reason: "ordinary reconnaissance tools are not restricted by checkpoint phase or prerequisite status",
     }
   }
 
-  // Vulnerability testing remains explicitly opt-in and must follow endpoint inventory.
-  if (phases.vulnerability_testing.status !== "running") {
+  // Active parameter fuzzing and vulnerability testing are opt-in and must follow the endpoint inventory.
+  if (phases[requiredPhase].status !== "running") {
     return {
       allowed: false,
-      reason: "Vulnerability testing is opt-in; explicitly begin vulnerability_testing only after endpoint_inventory is complete and the user has requested targeted testing.",
+      reason: requiredPhase + " is opt-in; explicitly begin " + requiredPhase + " only after endpoint_inventory is complete and the user has requested active testing.",
     }
   }
   if (phases.scope_validation.status !== "complete" ||
@@ -199,10 +200,10 @@ export function reconPhaseExecutionDecision(
       phases.endpoint_inventory.status !== "complete") {
     return {
       allowed: false,
-      reason: "Vulnerability testing requires completed scope validation, workspace setup, and endpoint inventory.",
+      reason: requiredPhase + " requires completed scope validation, workspace setup, and endpoint inventory.",
     }
   }
-  return { allowed: true, reason: "explicit vulnerability-testing checkpoint and prerequisites passed" }
+  return { allowed: true, reason: "explicit " + requiredPhase + " checkpoint and prerequisites passed" }
 }
 
 /** Checkpoint gate for explicit vulnerability-testing tools.
@@ -225,10 +226,9 @@ export async function reconPhaseGate(
   }
   const manifestPath = path.join(root.workspacePath, "runs", "recon-" + reconRunID(root.id) + ".json")
 
-  // Request-level scope checks happen in each caller before this gate. Do not
-  // require a phase manifest for ordinary recon collectors such as subfinder,
-  // crt.sh lookups, URL collection, and passive fingerprinting.
-  if (requiredPhase !== "vulnerability_testing") {
+  // Request-level scope checks happen in each caller before this gate. Ordinary
+  // recon collectors do not need a phase manifest; active testing phases do.
+  if (requiredPhase !== "parameter_fuzzing" && requiredPhase !== "vulnerability_testing") {
     return {
       allowed: true,
       reason: "ordinary recon tools are not blocked by checkpoint status; request-level scope checks remain required",
@@ -253,10 +253,10 @@ export async function reconPhaseGate(
       manifestPath,
     }
   }
-  if (requiredPhase === "vulnerability_testing" && run.phases.vulnerability_testing.status !== "running") {
+  if ((requiredPhase === "parameter_fuzzing" || requiredPhase === "vulnerability_testing") && run.phases[requiredPhase].status !== "running") {
     return {
       allowed: false,
-      reason: "Vulnerability testing is opt-in. The recon handoff leaves this phase deferred; explicitly begin vulnerability_testing only after the user requests targeted testing.",
+      reason: requiredPhase + " is opt-in. The recon handoff leaves active-testing phases deferred; explicitly begin " + requiredPhase + " only after the user requests active testing.",
       manifestPath,
     }
   }
