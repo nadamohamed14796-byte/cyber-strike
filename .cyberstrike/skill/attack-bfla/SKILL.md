@@ -4,7 +4,7 @@ description: "Assess broken function-level authorization by comparing role-to-op
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags: [- bfla, function-level-authorization, role-boundary, api, access-control, authorization]
+tags: [bfla, function-level-authorization, role-boundary, api, access-control, authorization]
 tech_stack:
   - web
   - rest-api
