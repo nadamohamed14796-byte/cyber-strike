@@ -4,13 +4,7 @@ description: "Authorized IDOR/BOLA testing — object-level authorization, cross
 category: "web-application"
 version: "1.1.0"
 author: "cyberstrike-official"
-tags:
-  - idor
-  - bola
-  - bac
-  - access-control
-  - web
-  - api-security
+tags: [- idor, object-level-authorization, bola, tenant-isolation, access-control, api, authorization]
 tech_stack:
   - web
   - rest
