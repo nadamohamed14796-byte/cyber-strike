@@ -32,18 +32,24 @@ jobs:
       - name: Build monorepo
         run: bun turbo build
 
-      - name: Package Linux x64 executable
+      - name: Prepare portable Linux x64 package
         run: |
           BIN_DIR="packages/cyberstrike/dist/cyberstrike-linux-x64/bin"
           test -x "$BIN_DIR/cyberstrike"
           test -f "$BIN_DIR/hackbrowser-worker.js"
           test -f "$BIN_DIR/data/scripts/wayback_endpoints.py"
-          tar -czf cyberstrike-linux-x64.tar.gz -C "$BIN_DIR" cyberstrike hackbrowser-worker.js data/scripts
+          test -f ".cyberstrike/skill/SKILL_GUIDE.md"
+          test -f "packages/cyberstrike/script/install-linux-artifact.sh"
+          cp -a .cyberstrike/skill "$BIN_DIR/skill"
+          install -m 0755 packages/cyberstrike/script/install-linux-artifact.sh "$BIN_DIR/install.sh"
+          tar -czf cyberstrike-linux-x64.tar.gz -C "$BIN_DIR" cyberstrike hackbrowser-worker.js data/scripts skill install.sh
 
       - name: Verify Linux x64 archive contents
         run: |
           tar -tzf cyberstrike-linux-x64.tar.gz
           tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'data/scripts/wayback_endpoints.py'
+          tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'skill/SKILL_GUIDE.md'
+          tar -tzf cyberstrike-linux-x64.tar.gz | grep -Fx 'install.sh'
 
       - name: Upload runnable Linux x64 build
         uses: actions/upload-artifact@v6
