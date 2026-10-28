@@ -2335,6 +2335,13 @@
       "description": "Requeue one previously failed captured-request analysis. Only failed requests may be retried; duplicate calls cannot enqueue the same row twice.",
       "parameters": [
         {
+          "in": "query",
+          "name": "directory",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
           "in": "path",
           "name": "sessionID",
           "schema": {
