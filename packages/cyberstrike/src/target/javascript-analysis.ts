@@ -676,16 +676,21 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       const rawValue = (rule.capture ? match[rule.capture] : match[0])?.trim()
       if (!rawValue || rawValue.length > 100) continue
       const index = match.index ?? 0
+      const line = lineNumber(lineStarts, index)
       const containingFunction = functionRanges
         .filter((range) => range.start <= index && index <= range.end)
         .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
+      // A marker may be the function's own name in its declaration header, which is
+      // intentionally outside the lexical body span. Attribute that case to the
+      // declared function on the same line instead of mislabelling it top-level.
+      const declaredFunction = functions.find((fn) => fn.line === line && fn.name === rawValue)
       const item: JavaScriptWorkflowSignal = {
         kind: rule.kind,
         value: rule.kind === "sql-statement-candidate" ? rawValue.toUpperCase().split(/\s+/)[0]!
           : rule.kind === "data-layer-operation-candidate" ? rawValue
           : rawValue,
-        line: lineNumber(lineStarts, index),
-        functionName: containingFunction?.name ?? null,
+        line,
+        functionName: containingFunction?.name ?? declaredFunction?.name ?? null,
         confidence: "candidate",
       }
       workflowSignals.set(item.kind + ":" + item.value.toLowerCase() + ":" + item.line + ":" + (item.functionName ?? ""), item)
