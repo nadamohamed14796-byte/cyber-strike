@@ -56,7 +56,7 @@ import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
 import { toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
-import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, ReadOnlyRepeatDetector } from "./stuck/repeat-detector"
+import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, ReadOnlyRepeatDetector, toolCallSucceeded } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
@@ -1031,10 +1031,11 @@ export namespace SessionPrompt {
             tool: p.tool,
             input: p.state.status !== "pending" ? p.state.input : undefined,
             // A failed or rejected tool call must not reset no-progress detection.
-            succeeded: p.state.status === "completed" &&
-              (p.state.metadata.exit === undefined || p.state.metadata.exit === 0) &&
-              p.state.metadata.saved !== false &&
-              p.state.metadata.error !== true,
+            succeeded: toolCallSucceeded({
+              status: p.state.status,
+              tool: p.tool,
+              metadata: p.state.metadata,
+            }),
           }))
 
         const emptyVerdict = emptyContinuationDetector.observe(toolCalls.length)
