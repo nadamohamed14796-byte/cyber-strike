@@ -1,5 +1,5 @@
 import { Log } from "../log.ts"
-import { sendIngest } from "../ingest.ts"
+import { IngestDeliveryError, sendIngest } from "../ingest.ts"
 import type { CapturedRequest } from "../types.ts"
 import type { Endpoint } from "./detector.ts"
 
@@ -65,10 +65,10 @@ export async function emitEndpoints(
       const ok = await sendIngest(toCapturedRequest(endpoint), serverUrl, sessionID, credentialId)
       if (ok) sent++
     } catch (err) {
-      // A failed delivery must not remain marked as seen: a later discovery pass
-      // should be able to retry it. Keep the pre-await add to suppress concurrent
-      // duplicate sends, then release the key only when this attempt fails.
-      seen?.delete(key)
+      // Release transient failures so a later discovery pass can retry them.
+      // Keep permanent HTTP rejections marked as seen to avoid repeatedly sending
+      // the same invalid payload on every discovery pass.
+      if (!(err instanceof IngestDeliveryError) || err.retryable) seen?.delete(key)
       log.warn("endpoint ingest failed", { endpoint: key, err: String(err) })
     }
   }
