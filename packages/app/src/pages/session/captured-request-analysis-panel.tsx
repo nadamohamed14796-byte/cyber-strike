@@ -47,6 +47,9 @@ export function CapturedRequestAnalysisPanel() {
   const [request, setRequest] = createSignal<RequestRow>()
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({})
   const [requestLoadError, setRequestLoadError] = createSignal("")
+  const [retryingRequest, setRetryingRequest] = createSignal(false)
+  const [retryNotice, setRetryNotice] = createSignal("")
+  const [retryError, setRetryError] = createSignal("")
   let seenKey: string | undefined
   let requestLoadGeneration = 0
 
@@ -126,6 +129,8 @@ export function CapturedRequestAnalysisPanel() {
       const generation = ++requestLoadGeneration
       setRequest(undefined)
       setRequestLoadError("")
+      setRetryNotice("")
+      setRetryError("")
       void sdk.client.session.request({ sessionID }).then((result) => {
         if (generation !== requestLoadGeneration) return
         const rows = (result.data ?? []) as unknown as RequestRow[]
@@ -184,6 +189,35 @@ export function CapturedRequestAnalysisPanel() {
               <p class="mt-1 text-10-regular text-text-weaker">Request ID: {selected()?.requestID}</p>
             </div>
             <div class="flex shrink-0 items-center gap-2">
+              <Show when={selected()?.status === "failed" && request()?.status === "failed"}>
+                <button
+                  type="button"
+                  disabled={retryingRequest()}
+                  class="rounded-md border border-border-base px-2 py-1 text-11-medium hover:bg-surface-raised-base disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={async () => {
+                    const sessionID = parentID()
+                    const requestID = selected()?.requestID
+                    if (!sessionID || !requestID || retryingRequest()) return
+                    setRetryingRequest(true)
+                    setRetryNotice("")
+                    setRetryError("")
+                    try {
+                      const result = await sdk.client.session.requestRetry({ sessionID, requestID })
+                      if (result.error) {
+                        throw new Error(JSON.stringify(result.error))
+                      }
+                      setRequest((previous) => previous ? { ...previous, status: "queued" } : previous)
+                      setRetryNotice("Retry queued. Analysis will restart when this request reaches the front of the queue.")
+                    } catch (error) {
+                      setRetryError(error instanceof Error ? error.message : String(error))
+                    } finally {
+                      setRetryingRequest(false)
+                    }
+                  }}
+                >
+                  {retryingRequest() ? "Queueing retry…" : "Retry analysis"}
+                </button>
+              </Show>
               <button
                 type="button"
                 disabled={!analysisSessionID()}
@@ -309,6 +343,12 @@ export function CapturedRequestAnalysisPanel() {
                 <h3 class="text-11-semibold uppercase tracking-wide text-text-weaker">Live agent activity</h3>
                 <span class="text-10-regular text-text-weaker">{childUserMessages().length} turn(s)</span>
               </div>
+              <Show when={retryNotice()}>
+                <p role="status" class="mb-2 rounded-lg border border-border-weak-base p-2 text-11-regular text-text-base">{retryNotice()}</p>
+              </Show>
+              <Show when={retryError()}>
+                <p role="alert" class="mb-2 rounded-lg border border-border-weak-base p-2 text-11-regular text-icon-danger-base">Could not retry analysis: {retryError()}</p>
+              </Show>
               <Show
                 when={childUserMessages().length > 0}
                 fallback={
