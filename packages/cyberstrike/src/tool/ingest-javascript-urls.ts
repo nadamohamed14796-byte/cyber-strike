@@ -712,12 +712,21 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     const globalPending = finalManifestAssets.filter((record) => record.status === "pending").length
     const globalRetryable = finalManifestAssets.filter((record) => record.status === "failed" && record.retryable === true).length
     const manifestReconciled = worklistMissingRecords === 0 && worklistPending === 0 && worklistRetryable === 0
-    const completeAnalysis = !ctx.abort.aborted && !analysisError && (downloaded + reused > 0)
+    const collectionComplete =
+      !ctx.abort.aborted &&
+      manifestReconciled &&
+      invalidCount === 0 &&
+      globalPending === 0 &&
+      globalRetryable === 0 &&
+      worklistAvailable === allQueuedURLs.length &&
+      finalManifestAssets.every((record) => record.status === "downloaded" || record.status === "reused")
+    const correlationSaved = !ctx.abort.aborted && !analysisError && (downloaded + reused > 0)
+    const completeAnalysis = collectionComplete && correlationSaved
     const resultTitle = ctx.abort.aborted
       ? "JavaScript ingestion interrupted — pending work saved"
       : analysisError || !manifestReconciled || globalPending > 0 || globalRetryable > 0
         ? "JavaScript ingestion incomplete — resumable work remains"
-        : finalManifestAssets.some((record) => record.status === "failed" || record.status === "skipped")
+        : !collectionComplete
           ? "JavaScript ingestion finished with asset gaps"
           : "JavaScript URL ingestion complete"
 
@@ -734,6 +743,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Worklist retryable failures: " + worklistRetryable,
         "Worklist URLs without manifest records: " + worklistMissingRecords,
         "Manifest reconciliation: " + (manifestReconciled ? "all queued URLs have recorded statuses; no pending/retryable work in this invocation" : "INCOMPLETE — inspect pending/retryable/missing counts and resume automatically"),
+        "Collection coverage: " + (collectionComplete ? "COMPLETE — every listed asset has downloaded/reused content and no manifest gaps" : "INCOMPLETE — inspect invalid, failed, skipped, pending, retryable, or missing records"),
         "Invalid URLs rejected: " + invalidCount,
         "Downloaded new content versions in this invocation: " + downloaded,
         "Reused URL/content records in this invocation: " + reused,
@@ -743,7 +753,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Newly downloaded bytes: " + downloadedBytes,
         "Total response bytes received: " + receivedBytes,
         "Manifest: " + manifestPath,
-        "Correlation status: " + (completeAnalysis ? "ran after ingestion and saved a snapshot" : analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : "not run because no asset was downloaded or reused"),
+        "Correlation status: " + (analysisError ? "FAILED — " + analysisError : ctx.abort.aborted ? "not run because the tool was interrupted" : correlationSaved ? (completeAnalysis ? "ran and saved a full-coverage snapshot" : "ran and saved a partial snapshot; collection still has coverage gaps") : "not run because no asset was downloaded or reused"),
         analysisSummary,
         ...records.filter((record) => record.status === "failed" || record.status === "skipped").map((record) => displayURL(record.url) + " — " + record.status + ": " + redactURLs(record.error ?? "")),
       ].join("\n"),
@@ -759,6 +769,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         worklist_retryable_failures: worklistRetryable,
         worklist_missing_manifest_records: worklistMissingRecords,
         manifest_reconciled: manifestReconciled,
+        collection_complete: collectionComplete,
+        correlation_saved: correlationSaved,
         pending_assets: globalPending,
         retryable_failures: globalRetryable,
         permanent_failures_not_retried: terminalNotRetried,
