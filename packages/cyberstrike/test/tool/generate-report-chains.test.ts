@@ -72,7 +72,7 @@ test("generate_report exposes INFO-to-INFO chain hypotheses and their linked fin
         const tool = await GenerateReportTool.init()
         const result = await tool.execute({ include_sections: ["chains"] }, toolContext(session.id))
         expect(result.output).toContain("Chain Hypotheses")
-        expect(result.output).toContain("not counted as confirmed findings")
+        expect(result.output).toContain("a hypothesis, not a confirmed vulnerability")
         expect(result.output).toContain("information_amplification")
         expect(result.output).toContain("POTENTIAL_INTERNAL_API_OR_SERVICE_EXPOSURE")
         expect(result.output).toContain(source.id)
