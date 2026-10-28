@@ -58,6 +58,18 @@ test("target_artifact writes canonical root inventories and still protects gener
         expect(await fs.readFile(compactURLPath, "utf-8")).toBe("https://example.com/account\n")
         await expect(fs.stat(path.join(workspace.workspacePath, "urls"))).rejects.toThrow()
 
+        const endpointDetails = await tool.execute({
+          target_url: target,
+          area: "endpoints",
+          filename: "correlations.json",
+          content: '{"candidate_count":1}',
+        }, ctx)
+        const compactEndpointPath = path.join(workspace.workspacePath, "recon", "endpoints-correlations.json")
+        expect(endpointDetails.metadata.saved).toBe(true)
+        expect(endpointDetails.metadata.path).toBe(compactEndpointPath)
+        expect(await fs.readFile(compactEndpointPath, "utf-8")).toBe('{"candidate_count":1}')
+        await expect(fs.stat(path.join(workspace.workspacePath, "endpoints"))).rejects.toThrow()
+
         const evidence = await tool.execute({
           target_url: target,
           area: "evidence",
