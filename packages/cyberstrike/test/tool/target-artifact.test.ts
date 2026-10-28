@@ -45,6 +45,30 @@ test("target_artifact writes canonical root inventories and still protects gener
         }, ctx)
         expect(reserved.metadata.saved).toBe(false)
         expect(reserved.metadata.reason).toBe("reserved_file")
+
+        const urls = await tool.execute({
+          target_url: target,
+          area: "urls",
+          filename: "collected.txt",
+          content: "https://example.com/account\n",
+        }, ctx)
+        const compactURLPath = path.join(workspace.workspacePath, "recon", "urls-collected.txt")
+        expect(urls.metadata.saved).toBe(true)
+        expect(urls.metadata.path).toBe(compactURLPath)
+        expect(await fs.readFile(compactURLPath, "utf-8")).toBe("https://example.com/account\n")
+        await expect(fs.stat(path.join(workspace.workspacePath, "urls"))).rejects.toThrow()
+
+        const evidence = await tool.execute({
+          target_url: target,
+          area: "evidence",
+          filename: "request.json",
+          content: '{"status":200}',
+        }, ctx)
+        const compactEvidencePath = path.join(workspace.workspacePath, "findings", "evidence-request.json")
+        expect(evidence.metadata.saved).toBe(true)
+        expect(evidence.metadata.path).toBe(compactEvidencePath)
+        expect(await fs.readFile(compactEvidencePath, "utf-8")).toBe('{"status":200}')
+        await expect(fs.stat(path.join(workspace.workspacePath, "evidence"))).rejects.toThrow()
       } finally {
         await Instance.dispose()
       }
