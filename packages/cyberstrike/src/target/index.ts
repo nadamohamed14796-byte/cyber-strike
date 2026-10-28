@@ -1708,12 +1708,17 @@ export namespace TargetMemory {
     }> = []
     for (const workspace of list()) {
       const base = new URL(workspace.targetURL)
+      const baseHostname = base.hostname.toLowerCase().replace(/\.$/, "")
+      const candidateHostname = candidate.hostname.toLowerCase().replace(/\.$/, "")
       const basePath = base.pathname.replace(/\/+$/, "") || "/"
       const candidatePath = candidate.pathname.replace(/\/+$/, "") || "/"
       const pathMatches = basePath === "/" || candidatePath === basePath || candidatePath.startsWith(basePath + "/")
-      const exactHost = base.hostname === candidate.hostname
+      // DNS treats a terminal dot as the absolute form of the same hostname.
+      // Normalize it for workspace selection too; otherwise a dotted host can skip
+      // its exact asset workspace and fall back to a broader program scope.
+      const exactHost = baseHostname === candidateHostname
       const isDNSDescendant = !exactHost && basePath === "/" &&
-        candidate.hostname.endsWith("." + base.hostname)
+        candidateHostname.endsWith("." + baseHostname)
       // A root workspace may be a program/policy container (for example a
       // HackerOne program URL) whose persisted scope lists unrelated domains.
       // Only for those unrelated entries do the saved scope rules replace the
@@ -1766,7 +1771,7 @@ export namespace TargetMemory {
       // Exact-host workspaces always take precedence, including when unconfigured:
       // a different workspace must not authorize around a missing exact-host scope.
       if (!exactHost && !hasScopeMatch) continue
-      const domainScore = exactHost ? 10_000 : candidate.hostname.endsWith("." + base.hostname) ? base.hostname.length : 0
+      const domainScore = exactHost ? 10_000 : candidateHostname.endsWith("." + baseHostname) ? baseHostname.length : 0
       candidates.push({
         workspace,
         scope: scope ?? undefined,
