@@ -6,16 +6,15 @@ import { TargetMemory } from "../target"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
-const MAX_ASSET_BYTES = 32 * 1024 * 1024
-// Process the entire eligible URL worklist in one invocation. Memory stays bounded
-// by reading one response at a time and enforcing MAX_ASSET_BYTES per response.
+// Redirects are bounded to prevent unending redirect loops; URL/worklist count
+// and asset body size are intentionally not capped.
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
   target_url: z.string().min(1).describe("Existing canonical root target URL whose saved scope governs every fetch."),
-  urls: z.array(z.string().trim().min(1).max(8192)).default([])
+  urls: z.array(z.string().trim().min(1)).default([])
     .describe("Optional JavaScript asset or HTML page URLs from the URL collector, crawler, HTML links, source-map references, URL inventory, or user input. HTML pages are parsed for inline scripts and external script src URLs. Pass actual HTTP(S) URLs, not local file paths. Leave empty to resume pending/retryable URLs saved in the existing target manifest."),
-  source: z.string().trim().min(1).max(120).default("unspecified")
+  source: z.string().trim().min(1).default("unspecified")
     .describe("Provenance for this batch, e.g. collector, crawler, user-supplied, HTML, source-map, or urls.txt."),
   force_refresh: z.boolean().default(false)
     .describe("False reuses an already downloaded URL and its content hash. True re-fetches existing URLs to check for changed content."),
@@ -68,15 +67,10 @@ export function mergeAssetSources(...values: Array<string | string[] | undefined
   return [...merged].sort()
 }
 
-// The complete provenance remains in sources[]. Keep the display label bounded.
+// Keep complete provenance in the display label as well as sources[]; never
+// truncate the metadata that explains where a source asset was discovered.
 export function mergeAssetSourceLabel(sources: string[]): string {
-  const selected: string[] = []
-  for (const source of [...sources].sort()) {
-    const candidate = [...selected, source].join(" | ")
-    if (candidate.length <= 120) selected.push(source)
-    if (selected.join(" | ").length >= 120) break
-  }
-  return selected.length ? selected.join(" | ") : (sources[0]?.slice(0, 120) || "unspecified")
+  return [...new Set(sources.map((source) => source.trim()).filter(Boolean))].sort().join(" | ") || "unspecified"
 }
 
 export function parseAssetManifest(input: string): Manifest {
@@ -121,12 +115,12 @@ export function shouldFetchAsset(
 export function shouldRetryJavaScriptAsset(input:
   | { kind: "network"; attempt: number }
   | { kind: "http"; attempt: number; status: number }
-  | { kind: "read"; attempt: number; error: string },
+  | { kind: "read"; attempt: number },
 ): boolean {
   if (input.attempt >= 2) return false
   if (input.kind === "network") return true
   if (input.kind === "http") return input.status === 408 || input.status === 429 || input.status >= 500
-  return !input.error.includes("response exceeds the " + MAX_ASSET_BYTES + " byte asset limit")
+  return true
 }
 
 function displayURL(input: string): string {
@@ -207,14 +201,14 @@ function looksLikeJavaScript(body: string, contentType: string, url: string): bo
       return parsed.version === 3 && Array.isArray(parsed.sources) && typeof parsed.mappings === "string"
     } catch { return false }
   }
-  // Some CDNs omit or mislabel Content-Type. Accept text only when the response
-  // has clear JavaScript syntax and does not look like an HTML error page.
-  const sample = body.slice(0, 4096).trimStart()
+  // Some CDNs omit or mislabel Content-Type. Inspect the full response so syntax
+  // after a large license banner or generated comment is not silently ignored.
+  const sample = body.trimStart()
   if (/^(?:<!doctype\s+html|<html\b)/i.test(sample)) return false
   return /(?:\b(?:function|const|let|var|import|export|class)\b|\b(?:fetch|axios)\s*\(|=>|sourceMappingURL)/.test(sample)
 }
 
-async function readBounded(response: Response, limit: number): Promise<Uint8Array> {
+async function readCompleteResponse(response: Response): Promise<Uint8Array> {
   if (!response.body) return new Uint8Array()
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -224,10 +218,6 @@ async function readBounded(response: Response, limit: number): Promise<Uint8Arra
       const { done, value } = await reader.read()
       if (done) break
       size += value.byteLength
-      if (size > limit) {
-        await reader.cancel("JavaScript asset exceeded the configured size limit")
-        throw new Error("response exceeds the " + limit + " byte asset limit")
-      }
       chunks.push(value)
     }
   } finally {
@@ -273,7 +263,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
     "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Pass new URLs when available; `urls: []` resumes eligible pending/retryable work from the existing asset manifest without requiring the original URL list.",
-    "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. Each response is streamed one at a time and limited to 32 MiB; there is no arbitrary aggregate 64 MiB or 30-file cutoff. The invocation processes the full dynamic worklist (including discovered imports and source maps), writing progress and manifest updates as it goes. Cancellation leaves unfinished URLs pending for resume.",
+    "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. The complete response body is downloaded and processed regardless of URL-list length or file size; no URL-count, batch, aggregate-byte, per-file-byte, URL-string-length, or provenance-string-length cap is imposed. The invocation processes the full dynamic worklist (including discovered imports and source maps), writing progress and manifest updates as it goes. Cancellation leaves unfinished URLs pending for resume.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports plus source-map references are discovered from each downloaded bundle and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
@@ -579,33 +569,12 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         continue
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase()
-      const declaredLength = Number(response.headers.get("content-length") ?? "0")
-      if (Number.isFinite(declaredLength) && declaredLength > MAX_ASSET_BYTES) {
-        const prior = byURL.get(url)
-        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const record: AssetRecord = {
-          ...prior,
-          url,
-          finalURL,
-          source: mergeAssetSourceLabel(sources),
-          sources,
-          status: "skipped",
-          retryable: undefined,
-          pendingRefresh: undefined,
-          contentType,
-          error: "declared response size exceeds the asset limit",
-          fetchedAt: new Date().toISOString(),
-        }
-        records.push(record); byURL.set(url, record); skipped++
-        await saveProgress()
-        continue
-      }
       let bytes: Uint8Array
       ctx.metadata({
         title: "Reading JavaScript response — " + activeAsset,
         metadata: { stage: "reading_response", active_asset: activeAsset, processed: index, queued: queuedURLs.size, content_type: contentType },
       })
-      try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
+      try { bytes = await readCompleteResponse(response) }
       catch (error) {
         if (ctx.abort.aborted) {
           const prior = byURL.get(url)
@@ -629,7 +598,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         const prior = byURL.get(url)
         const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
         const attempts = (prior?.attempts ?? 0) + 1
-        const retryable = shouldRetryJavaScriptAsset({ kind: "read", error: readError, attempt: attempts })
+        const retryable = shouldRetryJavaScriptAsset({ kind: "read", attempt: attempts })
         const record: AssetRecord = {
           ...prior,
           url,
