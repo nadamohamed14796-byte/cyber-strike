@@ -357,7 +357,7 @@ export namespace LazyToolRegistry {
     "return", "returns", "result", "results", "description", "current",
   ])
   const SEARCH_TOKEN_ALIASES: Record<string, string> = {
-    js: "javascript", ecmascript: "javascript", analysis: "analyze", analyzing: "analyze", analyzed: "analyze",
+    js: "javascript", maps: "map", ecmascript: "javascript", analysis: "analyze", analyzing: "analyze", analyzed: "analyze",
     discovery: "discover", discovering: "discover", discovered: "discover", enumeration: "enumerate", enumerating: "enumerate",
     enumerated: "enumerate", collection: "collect", collecting: "collect", collected: "collect", crawling: "crawl",
     crawler: "crawl", crawlers: "crawl", verification: "verify", verifying: "verify", verified: "verify",
@@ -365,7 +365,7 @@ export namespace LazyToolRegistry {
     testing: "test", tests: "test", fuzzing: "fuzz", installation: "install", installing: "install", extraction: "extract", extracting: "extract",
   }
   function normalizeSearchTokens(value: string): string[] {
-    return value.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean).map((word) => {
+    return value.replace(/\bjavascript\b/gi, "javascript").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean).map((word) => {
       let token = SEARCH_TOKEN_ALIASES[word] ?? word
       if (token.endsWith("ies") && token.length > 4) token = token.slice(0, -3) + "y"
       else if (token.endsWith("es") && token.length > 5 && /(?:ches|shes|sses|xes|zes)$/.test(token)) token = token.slice(0, -2)
