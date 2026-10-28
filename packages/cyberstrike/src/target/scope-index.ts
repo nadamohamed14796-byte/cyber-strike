@@ -14,8 +14,13 @@ const compiledScopeItemsCache = new WeakMap<string[], CompiledScopeItems>()
 
 /** Compile large scope manifests once; common exact-host checks then use O(1) set lookups. */
 function compileScopeItems(items: string[]): CompiledScopeItems {
-  const cached = compiledScopeItemsCache.get(items)
-  if (cached) return cached
+  // Only cache immutable manifests. This function is also exported for general
+  // callers and tests that may reuse a mutable array; identity-only caching would
+  // otherwise keep authorizing entries removed from that array.
+  if (Object.isFrozen(items)) {
+    const cached = compiledScopeItemsCache.get(items)
+    if (cached) return cached
+  }
   const exactHosts = new Set<string>()
   const wildcardDomains = new Set<string>()
   const cidrs: string[] = []
@@ -33,7 +38,7 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
     else exactHosts.add(item.toLowerCase().replace(/\.$/, ""))
   }
   const compiled = { exactHosts, wildcardDomains, cidrs, urlPatterns, hostPorts, typedEntries, wildcardPatterns }
-  compiledScopeItemsCache.set(items, compiled)
+  if (Object.isFrozen(items)) compiledScopeItemsCache.set(items, compiled)
   return compiled
 }
 
