@@ -22,7 +22,7 @@ export function mergeTodoSnapshot(previous: Todo.Info[], incoming: Todo.Info[]) 
 
 export function nextTodo(todos: Todo.Info[]) {
   const active = todos.filter((todo) => todo.status === "pending" || todo.status === "in_progress")
-  const recon = active.filter((todo) => /^\\[recon:[a-z_]+\\]/.test(todo.content.trim()))
+  const recon = active.filter((todo) => /^\[recon:[a-z_]+\]/.test(todo.content.trim()))
   const inProgressRecon = recon.find((todo) => todo.status === "in_progress")
   if (inProgressRecon) return inProgressRecon
   const nextRecon = recon.find((todo) => todo.status === "pending")
