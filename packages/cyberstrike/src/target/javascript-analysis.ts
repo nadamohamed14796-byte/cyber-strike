@@ -47,7 +47,7 @@ export interface JavaScriptSourceAnalysis {
   roleHints: JavaScriptRoleHint[]
   riskSignals: JavaScriptRiskSignal[]
   /** Broad product, protocol, integration, and configuration clues independent of vulnerability classes. */
-  applicationHints: JavaScriptApplicationHint[]
+  applicationHints?: JavaScriptApplicationHint[]
   notes: string[]
 }
 
