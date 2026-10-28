@@ -27,14 +27,18 @@ export namespace Todo {
   const MAX_COMPLETED = 5
   const isReconChecklistItem = (todo: Info) => /^\[recon:[a-z_]+\]/.test(todo.content.trim())
 
-  export function update(input: { sessionID: string; todos: Info[] }) {
-    // Retain the whole compact recon checklist so completed steps remain visible
-    // while the workflow runs. General completed todos still use the normal short history.
-    const active = input.todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
-    const done = input.todos.filter((t) => t.status === "completed" || t.status === "cancelled")
+  export function trimTodoHistory(todos: Info[]): Info[] {
+    // Retain the whole compact recon checklist so completed steps remain visible.
+    // General completed todos still use the normal short history.
+    const active = todos.filter((t) => t.status !== "completed" && t.status !== "cancelled")
+    const done = todos.filter((t) => t.status === "completed" || t.status === "cancelled")
     const reconDone = done.filter(isReconChecklistItem)
     const otherDone = done.filter((t) => !isReconChecklistItem(t))
-    const trimmed = [...active, ...reconDone, ...otherDone.slice(-MAX_COMPLETED)]
+    return [...active, ...reconDone, ...otherDone.slice(-MAX_COMPLETED)]
+  }
+
+  export function update(input: { sessionID: string; todos: Info[] }) {
+    const trimmed = trimTodoHistory(input.todos)
 
     Database.transaction((db) => {
       db.delete(TodoTable).where(eq(TodoTable.session_id, input.sessionID)).run()
