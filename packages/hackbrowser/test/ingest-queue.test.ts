@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { drainCaptureQueue, permanentlyRejectedCaptureCount } from "../src/capture-queue.ts"
+import { drainCaptureQueue, permanentlyRejectedCaptureCount, permanentlyRejectedCaptureDetails } from "../src/capture-queue.ts"
 import { IngestDeliveryError } from "../src/ingest.ts"
 import type { CapturedRequest } from "../src/types.ts"
 
@@ -82,15 +82,15 @@ describe("drainCaptureQueue", () => {
     expect(delivered).toEqual(["/first", "/second"])
   })
 
-  test("drops and reports a permanent HTTP rejection without blocking later captures", async () => {
-    const queue = [capture("/bad"), capture("/good")]
+  test("reports redacted details for a permanent HTTP rejection without blocking later captures", async () => {
+    const queue = [capture("/bad?api_key=must-not-appear"), capture("/good")]
     const delivered: string[] = []
 
     const result = await drainCaptureQueue(
       queue,
       async (item) => {
         const path = item.raw.split(" ")[1]!
-        if (path === "/bad") throw new IngestDeliveryError("HTTP 400", false, 400)
+        if (path.startsWith("/bad")) throw new IngestDeliveryError("HTTP 400", false, 400)
         delivered.push(path)
       },
       "test",
@@ -99,6 +99,10 @@ describe("drainCaptureQueue", () => {
     expect(result.pending).toBe(0)
     expect(result.rejected).toBe(1)
     expect(permanentlyRejectedCaptureCount(queue)).toBe(1)
+    expect(permanentlyRejectedCaptureDetails(queue)).toEqual([
+      { request: "GET /bad", status: 400, reason: "HTTP 400" },
+    ])
+    expect(JSON.stringify(permanentlyRejectedCaptureDetails(queue))).not.toContain("must-not-appear")
     expect(delivered).toEqual(["/good"])
     expect(queue).toHaveLength(0)
   })
