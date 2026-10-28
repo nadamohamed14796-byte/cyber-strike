@@ -285,9 +285,9 @@ The shared Target Workflow Contract defines when to continue, reuse saved state,
 ```bash
 WORKSPACE="<exact absolute path returned by target_workspace>"
 # Use only for genuinely asynchronous work; reuse after confirming any previous process has exited.
-mkdir -p "$WORKSPACE/runs" "$WORKSPACE/logs" "$WORKSPACE/scans"
+mkdir -p "$WORKSPACE/runs" "$WORKSPACE/recon"
 SCRIPT="$WORKSPACE/runs/recon.sh"
-LOG="$WORKSPACE/logs/recon.log"
+LOG="$WORKSPACE/recon/recon.log"
 # Normalize outputs into canonical inventories. Save raw files only when they add unique evidence.
 # Reuse one workspace-local scratch path for sequential tools and remove it after normalization.
 nohup bash "$SCRIPT" >"$LOG" 2>&1 &
