@@ -288,6 +288,111 @@ async function removeMigratedLegacyArtifacts(
  * Identical snapshots are represented once with observation timestamps; distinct
  * outputs are retained as separate records. Unknown/corrupt files are never replaced.
  */
+async function readStableWebReconArtifact(
+  filePath: string,
+  workspace: Workspace,
+): Promise<{ artifact: WebReconArtifact; rawContent: string } | undefined> {
+  let info
+  try {
+    info = await fs.lstat(filePath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined
+    throw error
+  }
+  if (info.isSymbolicLink() || !info.isFile()) {
+    throw new Error("Existing web_recon history path is not a regular file: " + filePath)
+  }
+  const rawContent = await fs.readFile(filePath, "utf-8")
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(rawContent)
+  } catch (error) {
+    throw new Error("Existing web_recon history is not valid JSON; it was left untouched: " + filePath + " (" + (error instanceof Error ? error.message : String(error)) + ")")
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Existing web_recon history has an unsupported structure; it was left untouched: " + filePath)
+  }
+  const saved = parsed as Partial<WebReconArtifact>
+  if (
+    saved.schemaVersion !== 1 ||
+    saved.recordType !== "web-recon-results" ||
+    saved.workspaceID !== workspace.id ||
+    saved.canonicalTarget !== workspace.targetURL ||
+    !Array.isArray(saved.observations) ||
+    saved.observations.some((item) =>
+      !item || typeof item !== "object" ||
+      typeof item.fingerprint !== "string" ||
+      typeof item.program !== "string" ||
+      typeof item.requestedTarget !== "string" ||
+      typeof item.firstSeenAt !== "string" ||
+      typeof item.lastSeenAt !== "string" ||
+      !Number.isSafeInteger(item.occurrences) || Number(item.occurrences) < 1 ||
+      !Array.isArray(item.attempts) ||
+      item.attempts.some((attempt) => !attempt || typeof attempt !== "object" || typeof attempt.completedAt !== "string" || typeof attempt.sessionID !== "string" || (attempt.messageID !== undefined && typeof attempt.messageID !== "string")) ||
+      item.occurrences !== item.attempts.length ||
+      !item.result || typeof item.result !== "object"
+    )
+  ) {
+    throw new Error("Existing web_recon history does not match this workspace/schema; it was left untouched: " + filePath)
+  }
+  return { artifact: saved as WebReconArtifact, rawContent }
+}
+
+async function removeMigratedStableWebReconArtifact(
+  workspace: Workspace,
+  savedPath: string,
+  legacy: { path: string; rawContent: string },
+): Promise<void> {
+  let saved: unknown
+  try {
+    saved = JSON.parse(await fs.readFile(savedPath, "utf-8"))
+  } catch {
+    return
+  }
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return
+  const aggregate = saved as Partial<WebReconArtifact>
+  if (
+    aggregate.schemaVersion !== 1 ||
+    aggregate.recordType !== "web-recon-results" ||
+    aggregate.workspaceID !== workspace.id ||
+    aggregate.canonicalTarget !== workspace.targetURL ||
+    !Array.isArray(aggregate.observations)
+  ) return
+
+  const oldArtifact = JSON.parse(legacy.rawContent) as WebReconArtifact
+  const containsAllOldAttempts = oldArtifact.observations.every((oldObservation) => {
+    const current = aggregate.observations!.find((item) => item.fingerprint === oldObservation.fingerprint)
+    return Boolean(current && oldObservation.attempts.every((oldAttempt) =>
+      current.attempts.some((attempt) =>
+        attempt.completedAt === oldAttempt.completedAt &&
+        attempt.sessionID === oldAttempt.sessionID &&
+        (attempt.messageID ?? "") === (oldAttempt.messageID ?? ""),
+      ),
+    ))
+  })
+  if (!containsAllOldAttempts) return
+
+  try {
+    const info = await fs.lstat(legacy.path)
+    if (info.isSymbolicLink() || !info.isFile()) return
+    if (await fs.readFile(legacy.path, "utf-8") !== legacy.rawContent) return
+    await fs.unlink(legacy.path)
+    // Delete the old scans/ placeholder only if it is now empty; leave all other
+    // legacy files and directories untouched.
+    const legacyDirectory = path.dirname(legacy.path)
+    const relativeDirectory = path.relative(workspace.workspacePath, legacyDirectory)
+    if (relativeDirectory === "scans") {
+      const directoryInfo = await fs.lstat(legacyDirectory)
+      if (!directoryInfo.isSymbolicLink() && directoryInfo.isDirectory() && (await fs.readdir(legacyDirectory)).length === 0) {
+        await fs.rmdir(legacyDirectory)
+      }
+    }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw error
+  }
+}
+
 async function persistWebReconResultUnlocked(input: {
   workspace: Workspace
   filename: string
@@ -305,47 +410,20 @@ async function persistWebReconResultUnlocked(input: {
   const legacyDirectory = program === "session_scan" ? "scans" : "recon"
   const legacyFiles = await loadLegacyWebReconArtifacts(workspace, legacyDirectory)
   let artifact: WebReconArtifact | undefined
+  let migratedStableAggregate: { path: string; rawContent: string } | undefined
+  const currentStable = await readStableWebReconArtifact(absolutePath, workspace)
+  artifact = currentStable?.artifact
 
-  try {
-    const info = await fs.lstat(absolutePath)
-    if (info.isSymbolicLink() || !info.isFile()) {
-      throw new Error("Existing web_recon history path is not a regular file: " + filename)
+  // Move the previous aggregate safely on first write after the compact-layout
+  // change. Its observations are merged into the new findings/ path before the
+  // old stable file can be removed.
+  if (!artifact && program === "session_scan") {
+    const legacyStablePath = path.join(workspace.workspacePath, "scans", "session-scan-results.json")
+    const legacyStable = await readStableWebReconArtifact(legacyStablePath, workspace)
+    if (legacyStable) {
+      artifact = legacyStable.artifact
+      migratedStableAggregate = { path: legacyStablePath, rawContent: legacyStable.rawContent }
     }
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(await fs.readFile(absolutePath, "utf-8"))
-    } catch (error) {
-      throw new Error("Existing web_recon history is not valid JSON; it was left untouched: " + filename + " (" + (error instanceof Error ? error.message : String(error)) + ")")
-    }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("Existing web_recon history has an unsupported structure; it was left untouched: " + filename)
-    }
-    const saved = parsed as Partial<WebReconArtifact>
-    if (
-      saved.schemaVersion !== 1 ||
-      saved.recordType !== "web-recon-results" ||
-      saved.workspaceID !== workspace.id ||
-      saved.canonicalTarget !== workspace.targetURL ||
-      !Array.isArray(saved.observations) ||
-      saved.observations.some((item) =>
-        !item || typeof item !== "object" ||
-        typeof item.fingerprint !== "string" ||
-        typeof item.program !== "string" ||
-        typeof item.requestedTarget !== "string" ||
-        typeof item.firstSeenAt !== "string" ||
-        typeof item.lastSeenAt !== "string" ||
-        !Number.isSafeInteger(item.occurrences) || Number(item.occurrences) < 1 ||
-        !Array.isArray(item.attempts) ||
-        item.attempts.some((attempt) => !attempt || typeof attempt !== "object" || typeof attempt.completedAt !== "string" || typeof attempt.sessionID !== "string" || (attempt.messageID !== undefined && typeof attempt.messageID !== "string")) ||
-        item.occurrences !== item.attempts.length ||
-        !item.result || typeof item.result !== "object"
-      )
-    ) {
-      throw new Error("Existing web_recon history does not match this workspace/schema; it was left untouched: " + filename)
-    }
-    artifact = saved as WebReconArtifact
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
   }
 
   if (!artifact) {
@@ -374,6 +452,9 @@ async function persistWebReconResultUnlocked(input: {
   artifact.updatedAt = completedAt
   const savedPath = await TargetMemory.writeWorkspaceFile(workspace, filename, JSON.stringify(artifact, null, 2) + "\n")
   await removeMigratedLegacyArtifacts(workspace, savedPath, legacyFiles)
+  if (migratedStableAggregate) {
+    await removeMigratedStableWebReconArtifact(workspace, savedPath, migratedStableAggregate)
+  }
   return savedPath
 }
 
