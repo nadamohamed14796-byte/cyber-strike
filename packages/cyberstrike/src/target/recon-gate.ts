@@ -46,18 +46,23 @@ export type ReconRunManifest = {
   phases: Record<ReconPhase, ReconPhaseRecord>
 }
 
-/** Stable fingerprint of authorization-relevant scope state; ordering alone is not a change. */
-export function reconScopeFingerprint(scope: Pick<TargetScope,
+type ScopeFingerprintInput = Pick<TargetScope,
   "targetURL" | "status" | "scopeItems" | "excludedItems" | "authorizationSource" | "authorizationReference"
->): string {
-  const canonical = {
+>
+
+/** Stable fingerprint of the effective authorization chain; item ordering alone is not a change. */
+export function reconScopeFingerprint(input: ScopeFingerprintInput | readonly ScopeFingerprintInput[]): string {
+  const scopes: readonly ScopeFingerprintInput[] = Array.isArray(input)
+    ? input as readonly ScopeFingerprintInput[]
+    : [input as ScopeFingerprintInput]
+  const canonical = scopes.map((scope) => ({
     targetURL: scope.targetURL,
     status: scope.status,
     scopeItems: [...scope.scopeItems].sort(),
     excludedItems: [...scope.excludedItems].sort(),
     authorizationSource: scope.authorizationSource,
     authorizationReference: scope.authorizationReference,
-  }
+  }))
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
 
