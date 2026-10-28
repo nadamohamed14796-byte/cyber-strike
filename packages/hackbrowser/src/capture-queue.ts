@@ -23,13 +23,13 @@ const rejectedTotals = new WeakMap<CapturedRequest[], number>()
 const rejectedDetails = new WeakMap<CapturedRequest[], RejectedCaptureDetail[]>()
 
 function safeRequestLabel(captured: CapturedRequest): string {
-  const firstLine = captured.raw.split(/\\r?\\n/, 1)[0]?.trim() ?? ""
-  const match = /^([A-Z]+)\\s+(\\S+)/i.exec(firstLine)
+  const firstLine = captured.raw.split(/\r?\n/, 1)[0]?.trim() ?? ""
+  const match = /^([A-Z]+)\s+(\S+)/i.exec(firstLine)
   if (!match) return "[unparsed captured request]"
   const method = match[1]!.toUpperCase()
   const requestTarget = match[2]!
   try {
-    const url = /^https?:\\/\\//i.test(requestTarget) ? new URL(requestTarget) : undefined
+    const url = /^https?:\/\//i.test(requestTarget) ? new URL(requestTarget) : undefined
     const safeTarget = url ? url.origin + url.pathname : requestTarget.split(/[?#]/, 1)[0]!
     return (method + " " + (safeTarget || "[empty path]")).slice(0, 240)
   } catch {
@@ -39,8 +39,8 @@ function safeRequestLabel(captured: CapturedRequest): string {
 
 function safeErrorReason(error: Error): string {
   return error.message
-    .replace(/https?:\\/\\/[^\\s"'<>]+/gi, "[URL]")
-    .replace(/(authorization|cookie|token|secret|password|api[_-]?key)\\s*[:=]\\s*[^\\s,;]+/gi, "$1=[REDACTED]")
+    .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL]")
+    .replace(/(authorization|cookie|token|secret|password|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "$1=[REDACTED]")
     .slice(0, 240)
 }
 
