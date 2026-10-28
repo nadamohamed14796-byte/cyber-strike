@@ -14,10 +14,10 @@ const log = Log.create({ service: "tool.tool-search" })
 export const ToolSearchTool = Tool.define("tool_search", async () => {
   return {
     description: [
-      "Start from one concrete evidence gap and the output needed to close it; search connected tools by capability, protocol, and observable behavior rather than a fixed phase checklist.",
+      "Start from one concrete evidence gap and the output needed to close it; search connected tools by capability, protocol, and observable behavior rather than a fixed phase checklist. Search is discovery, not a tool allowlist.",
       "Reuse an already-loaded tool only when its documented inputs and outputs fit the current gap. Search when the needed capability is missing or uncertain, not just to generate activity.",
       "Results are ranked by exact tool-name/description matches and query coverage. Match reasons explain the ranking, but rank is not proof that a tool is suitable, installed for the target runtime, safe, or authorized.",
-      "If results are absent or too narrow, make one materially different query using a useful synonym or observable behavior; do not repeat an unchanged query.",
+      "If results are absent or too narrow, retry with useful synonyms, a capability term, protocol, or observable behavior; make the query materially different and do not repeat an unchanged search.",
       "Tool schemas are not included in the shortlist. Load a small set of plausible exact IDs with load_tools, inspect their full schemas, and invoke only the definitions that fit the required inputs and outputs.",
       "After each invocation, inspect actual output and errors before selecting the next tool. Add another tool only for a distinct coverage gap, corroboration, or recovery.",
       "Example query shapes (illustrative only):",
@@ -76,15 +76,7 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
 
 export const LoadToolsTool = Tool.define("load_tools", async () => {
   return {
-    description: [
-      "Load selected connected-tool definitions into context so they can be used.",
-      "Use tool_search to discover candidates, then load only the exact IDs whose documented capabilities fit the current task.",
-      "Do not load or run every candidate. Do not treat tool names, search ranking, or catalog examples as proof of suitability.",
-      "Inspect the loaded schema and use the returned tool definitions; loaded tools will be available in the next turn.",
-      "",
-      "Load additional tools when new evidence creates a new need. Keep context use practical without imposing a fixed number of tools per checkpoint.",
-    ].join("\n"),
-    parameters: z.object({
+    description: [\n      "Load selected connected-tool definitions into context so they can be used.",\n      "Use tool_search to discover candidates, then load only the exact IDs whose documented capabilities fit the current task.",\n      "Do not load or run every candidate. Do not treat tool names, search ranking, or catalog examples as proof of suitability.",\n      "Inspect loaded full schemas and verify real inputs, outputs, and side effects before invocation; the loaded definitions become available in the next turn.",\n      "Load additional tools only when new evidence creates a new need. Keep context use practical without imposing a fixed number of tools per checkpoint.",\n    ].join("\\n"),\n    parameters: z.object({
       tool_ids: z.array(z.string()).describe("Tool IDs to load (from tool_search results)"),
     }),
     async execute(params, _ctx) {
