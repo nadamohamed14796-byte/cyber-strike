@@ -1291,7 +1291,7 @@ export const SessionRoutes = lazy(() =>
         summary: "Retry failed captured-request analysis",
         description:
           "Requeue one previously failed captured-request analysis. Only failed requests may be retried; duplicate calls cannot enqueue the same row twice.",
-        operationId: "session.request.retry",
+        operationId: "session.requestRetry",
         responses: {
           202: {
             description: "Request analysis queued",
