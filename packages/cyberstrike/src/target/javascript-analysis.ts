@@ -556,6 +556,39 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
     const item = { kind, value, line: lineNumber(lineStarts, match.index ?? 0) }
     roles.set(kind + ":" + value + ":" + item.line, item)
       }
+
+  // Broad app intelligence is independent of vulnerability signatures. These
+  // hints record useful product flows, protocols and integrations for later review.
+  const applicationHints = new Map<string, JavaScriptApplicationHint>()
+  const applicationHintRules: Array<{ kind: string; pattern: RegExp; capture?: number }> = [
+    { kind: "graphql-operation", pattern: /\\b(?:query|mutation|subscription)\\s+([A-Za-z_][\\w$]*)/g, capture: 1 },
+    { kind: "graphql-introspection", pattern: /\\b(?:__schema|__type|IntrospectionQuery)\\b/g },
+    { kind: "websocket-client", pattern: /\\bnew\\s+WebSocket\\s*\\(/g },
+    { kind: "service-worker", pattern: /\\bnavigator\\.serviceWorker\\.register\\s*\\(/g },
+    { kind: "environment-config", pattern: /\\b(?:process\\.env|import\\.meta\\.env)\\.([A-Za-z_$][\\w$]*)/g, capture: 1 },
+    { kind: "frontend-framework", pattern: /\\b(?:ReactDOM|React|Vue|Angular|Svelte|Next\\.js|Nuxt|Remix|SolidJS|Astro|Webpack|Vite|Rollup|esbuild|Babel|TypeScript)\\b/gi },
+    { kind: "api-client-or-rpc", pattern: /\\b(?:axios|fetch|XMLHttpRequest|superagent|graphql-request|ApolloClient|urql|RelayEnvironment|tRPC|grpc-web|connectrpc|WebSocket|EventSource)\\b/gi },
+    { kind: "identity-session-flow", pattern: /\\b(?:OAuth2?|OIDC|OpenID|SAML|SSO|WebAuthn|passkeys?|MFA|TOTP|passwordReset|forgotPassword|signIn|signOut|logIn|logOut|login|logout|register|refreshToken|accessToken|session)\\b/gi },
+    { kind: "business-workflow", pattern: /\\b(?:upload|download|export|import|payment|billing|checkout|invoice|refund|payout|subscription|wallet|coupon|discount|order|cart|shipment|webhook|integration|invite|invitation|organization|tenant|workspace|impersonation|moderation)\\b/gi },
+    { kind: "authorization-feature-boundary", pattern: /\\b(?:owner|tenant|organization|workspace|role|permission|isAdmin|adminOnly|superuser|impersonate|featureFlag|feature_flag|debugMode|internalOnly)\\b/gi },
+    { kind: "browser-persistence", pattern: /\\b(?:localStorage|sessionStorage|indexedDB|caches|document\\.cookie)\\b/g },
+    { kind: "cross-context-messaging", pattern: /\\b(?:postMessage|BroadcastChannel|MessageChannel|SharedWorker|ServiceWorker|serviceWorker)\\b/g },
+    { kind: "telemetry-monitoring-sdk", pattern: /\\b(?:Sentry|Datadog|NewRelic|OpenTelemetry|Mixpanel|Segment|PostHog|Amplitude|LogRocket|FullStory|Bugsnag|Honeycomb)\\b/gi },
+    { kind: "crypto-token-library", pattern: /\\b(?:JWT|jsonwebtoken|jose|decodeJwt|verifyJwt|crypto\\.subtle|WebCrypto|createHmac)\\b/gi },
+  ]
+  for (const rule of applicationHintRules) {
+    for (const match of source.matchAll(rule.pattern)) {
+      const value = (rule.capture ? match[rule.capture] : match[0])?.trim()
+      if (!value || value.length > 160) continue
+      const item: JavaScriptApplicationHint = {
+        kind: rule.kind,
+        value,
+        line: lineNumber(lineStarts, match.index ?? 0),
+        confidence: "candidate",
+      }
+      applicationHints.set(item.kind + ":" + item.value + ":" + item.line, item)
+    }
+  }
   return {
     functions, requests, secretCandidates: [...secrets.values()], roleHints: [...roles.values()], riskSignals: [...riskSignals.values()],
     applicationHints: [...applicationHints.values()],
