@@ -294,11 +294,11 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         // Ordinary recon phases are progress markers, not hard gates. The agent may
         // use any suitable recon capability when useful evidence becomes available.
         // Keep only the explicit testing handoff gated by completed endpoint inventory.
-        if (phase === "vulnerability_testing") {
+        if (phase === "parameter_fuzzing" || phase === "vulnerability_testing") {
           const required = ["scope_validation", "workspace_setup", "endpoint_inventory"] as const
           const unresolved = required.filter((item) => run.phases[item].status !== "complete")
           if (unresolved.length) {
-            return { title: "Testing checkpoint requires endpoint inventory", output: "Begin vulnerability_testing only after scope validation, workspace setup, and endpoint inventory are complete: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "testing_prerequisites_unresolved", unresolved } }
+            return { title: "Active-testing checkpoint requires endpoint inventory", output: "Begin " + phase + " only after scope validation, workspace setup, and endpoint inventory are complete: " + unresolved.map((item) => item + "=" + run.phases[item].status).join(", "), metadata: { saved: false, reason: "testing_prerequisites_unresolved", unresolved } }
           }
         }
         if (disposition === "resume_existing") {
