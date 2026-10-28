@@ -32,6 +32,7 @@ import { useToast } from "../../ui/toast"
 import { useKV } from "../../context/kv"
 import { useTextareaKeybindings } from "../textarea-keybindings"
 import { DialogSkill } from "../dialog-skill"
+import { shouldRestoreFailedSubmission, submissionFailureMessage } from "./submission"
 
 export type PromptProps = {
   sessionID?: string
@@ -478,6 +479,7 @@ export function Prompt(props: PromptProps) {
         if (!store.prompt.input) return
         stash.push({
           input: store.prompt.input,
+          mode: store.mode,
           parts: store.prompt.parts,
         })
         input.extmarks.clear()
@@ -497,6 +499,7 @@ export function Prompt(props: PromptProps) {
         if (entry) {
           input.setText(entry.input)
           setStore("prompt", { input: entry.input, parts: entry.parts })
+          setStore("mode", entry.mode ?? "normal")
           restoreExtmarksFromParts(entry.parts)
           input.gotoBufferEnd()
         }
@@ -514,6 +517,7 @@ export function Prompt(props: PromptProps) {
             onSelect={(entry) => {
               input.setText(entry.input)
               setStore("prompt", { input: entry.input, parts: entry.parts })
+              setStore("mode", entry.mode ?? "normal")
               restoreExtmarksFromParts(entry.parts)
               input.gotoBufferEnd()
             }}
@@ -522,6 +526,36 @@ export function Prompt(props: PromptProps) {
       },
     },
   ])
+
+  function handleSubmissionFailure(operation: string, error: unknown, submitted: PromptInfo, submittedSessionID: string) {
+    const canRestore =
+      !input.isDestroyed &&
+      shouldRestoreFailedSubmission(store.prompt, props.sessionID, submittedSessionID)
+    const detail = submissionFailureMessage(error)
+
+    if (canRestore) {
+      input.setText(submitted.input)
+      setStore("prompt", { input: submitted.input, parts: submitted.parts })
+      setStore("mode", submitted.mode ?? "normal")
+      restoreExtmarksFromParts(submitted.parts)
+      input.gotoBufferEnd()
+    } else {
+      stash.push({
+        input: submitted.input,
+        mode: submitted.mode,
+        parts: submitted.parts,
+      })
+    }
+
+    toast.show({
+      variant: "error",
+      message: canRestore
+        ? `${operation} response failed. Your draft was restored. Check the session before retrying in case it was already accepted. ${detail}`
+        : `${operation} response failed. Your draft was saved to the prompt stash; use /prompt.stash.pop to recover it. ${detail}`,
+      duration: 8000,
+    })
+    renderer.requestRender()
+  }
 
   async function submit() {
     if (props.disabled) return
@@ -565,12 +599,18 @@ export function Prompt(props: PromptProps) {
     // Filter out text parts (pasted content) since they're now expanded inline
     const nonTextParts = store.prompt.parts.filter((part) => part.type !== "text")
 
-    // Capture mode before it gets reset
+    // Capture the exact visible draft before clearing the editor. If the
+    // request rejects, restore it or stash it rather than silently losing it.
     const currentMode = store.mode
+    const submittedPrompt: PromptInfo = {
+      input: store.prompt.input,
+      mode: currentMode,
+      parts: [...store.prompt.parts],
+    }
     const variant = local.model.variant.current()
 
     if (store.mode === "shell") {
-      sdk.client.session.shell({
+      void sdk.client.session.shell({
         sessionID,
         agent: local.agent.current().name,
         model: {
@@ -578,7 +618,7 @@ export function Prompt(props: PromptProps) {
           modelID: selectedModel.modelID,
         },
         command: inputText,
-      })
+      }).catch((error) => handleSubmissionFailure("Shell command", error, submittedPrompt, sessionID))
       setStore("mode", "normal")
     } else if (
       inputText.startsWith("/") &&
@@ -595,7 +635,7 @@ export function Prompt(props: PromptProps) {
       const restOfInput = firstLineEnd === -1 ? "" : inputText.slice(firstLineEnd + 1)
       const args = firstLineArgs.join(" ") + (restOfInput ? "\n" + restOfInput : "")
 
-      sdk.client.session.command({
+      void sdk.client.session.command({
         sessionID,
         command: command.slice(1),
         arguments: args,
@@ -609,9 +649,9 @@ export function Prompt(props: PromptProps) {
             id: Identifier.ascending("part"),
             ...x,
           })),
-      })
+      }).catch((error) => handleSubmissionFailure("Slash command", error, submittedPrompt, sessionID))
     } else {
-      sdk.client.session
+      void sdk.client.session
         .prompt({
           sessionID,
           ...selectedModel,
@@ -631,12 +671,9 @@ export function Prompt(props: PromptProps) {
             })),
           ],
         })
-        .catch(() => {})
+        .catch((error) => handleSubmissionFailure("Prompt", error, submittedPrompt, sessionID))
     }
-    history.append({
-      ...store.prompt,
-      mode: currentMode,
-    })
+    history.append(submittedPrompt)
     input.extmarks.clear()
     setStore("prompt", {
       input: "",
