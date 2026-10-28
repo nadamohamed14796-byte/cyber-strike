@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { shouldRestoreFailedSubmission, submissionFailureMessage } from "../../../../src/cli/cmd/tui/component/prompt/submission"
-import type { PromptInfo } from "../../../../src/cli/cmd/tui/component/prompt/history"
+import { shouldRestoreFailedSubmission, submissionFailureMessage } from "../../../src/cli/cmd/tui/component/prompt/submission"
+import type { PromptInfo } from "../../../src/cli/cmd/tui/component/prompt/history"
 
 const empty: PromptInfo = { input: "", parts: [] }
 const submitted = "session-original"
@@ -20,7 +20,11 @@ describe("failed TUI prompt submission recovery", () => {
   })
 
   test("does not overwrite attachments or pasted content in a newer draft", () => {
-    expect(shouldRestoreFailedSubmission({ input: "", parts: [{ type: "agent", name: "reviewer" } as any] }, submitted, submitted)).toBe(false)
+    const withFile: PromptInfo = {
+      input: "",
+      parts: [{ type: "file", mime: "text/plain", url: "data:text/plain;base64,dGVzdA==" }],
+    }
+    expect(shouldRestoreFailedSubmission(withFile, submitted, submitted)).toBe(false)
   })
 
   test("stashes instead of restoring into a different active session", () => {
