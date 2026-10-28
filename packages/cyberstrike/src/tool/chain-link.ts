@@ -1,7 +1,22 @@
 import z from "zod"
 import { Chain } from "../methodology/chain"
+import type { ChainFindingRelation } from "../methodology/chain-finding-link.sql"
 import { Session } from "../session"
 import { Tool } from "./tool"
+
+type ChainLinkToolMetadata = {
+  linked: boolean
+  created: boolean
+  chainID: string
+  sourceFindingID: string
+  targetFindingID: string
+  relation: ChainFindingRelation
+  reason: string
+}
+
+function toolMetadata(value: ChainLinkToolMetadata): ChainLinkToolMetadata {
+  return value
+}
 
 export const ChainLinkTool = Tool.define("chain_link", {
   description:
@@ -30,7 +45,15 @@ export const ChainLinkTool = Tool.define("chain_link", {
       return {
         title: "Chain link not created",
         output: reason + " No relationship was written.",
-        metadata: { linked: false, reason: result.reason },
+        metadata: toolMetadata({
+          linked: false,
+          created: false,
+          chainID: params.chain_id,
+          sourceFindingID: params.source_finding_id,
+          targetFindingID: params.target_finding_id,
+          relation: params.relation,
+          reason: result.reason,
+        }),
       }
     }
 
@@ -38,14 +61,15 @@ export const ChainLinkTool = Tool.define("chain_link", {
       title: result.created ? "Chain finding relationship saved" : "Chain finding relationship already exists",
       output:
         `Saved ${result.link.sourceFindingID} --${result.link.relation}--> ${result.link.targetFindingID} under chain ${result.link.chainID}. This is a relationship record only; it does not approve findings or mark the chain confirmed.`,
-      metadata: {
+      metadata: toolMetadata({
         linked: true,
         created: result.created,
         chainID: result.link.chainID,
         sourceFindingID: result.link.sourceFindingID,
         targetFindingID: result.link.targetFindingID,
         relation: result.link.relation,
-      },
+        reason: "none",
+      }),
     }
   },
 })
