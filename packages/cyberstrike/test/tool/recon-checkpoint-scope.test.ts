@@ -95,3 +95,61 @@ test("user-confirmed exact scope without an external policy URL passes the recon
     },
   })
 })
+
+
+test("scope manifest changes invalidate resumable recon checkpoints even when the starting asset remains allowed", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    async fn() {
+      const targetURL = "https://program-fingerprint.example.test"
+      const startingAsset = "https://api.fingerprint-scope.example.net/"
+      const authorizationSource = "Scope fingerprint regression fixture"
+      const authorizationReference = "https://program-fingerprint.example.test/policy"
+      const root = await TargetMemory.configureScope(targetURL, {
+        include: ["api.fingerprint-scope.example.net"],
+        authorizationSource,
+        authorizationReference,
+      })
+      const tool = await ReconCheckpointTool.init()
+      const ctx = {
+        sessionID: "ses_recon_scope_fingerprint",
+        messageID: "msg_recon_scope_fingerprint",
+        agent: "cyberstrike",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: () => undefined,
+        ask: async () => {},
+      } as never
+      const execute = (action: "status" | "begin" | "complete", phase?: "scope_validation" | "workspace_setup", summary?: string) =>
+        tool.execute({
+          action,
+          target_url: root.workspace.targetURL,
+          phase,
+          summary,
+          scope_validation_target: startingAsset,
+        }, ctx)
+
+      expect((await execute("begin", "scope_validation")).metadata.saved).toBe(true)
+      expect((await execute("complete", "scope_validation", "Persisted scope and starting asset verified.")).metadata.saved).toBe(true)
+      expect((await execute("begin", "workspace_setup")).metadata.saved).toBe(true)
+      expect((await execute("complete", "workspace_setup", "Workspace integrity verified.")).metadata.saved).toBe(true)
+      expect((await TargetMemory.checkURLScope(startingAsset)).allowed).toBe(true)
+
+      await TargetMemory.configureScope(targetURL, {
+        include: ["api.fingerprint-scope.example.net", "new-api.fingerprint-scope.example.net"],
+        authorizationSource,
+        authorizationReference,
+      })
+      // The old starting asset still passes, so only a comparison of the persisted
+      // scope fingerprint can detect that prior phases need revalidation.
+      expect((await TargetMemory.checkURLScope(startingAsset)).allowed).toBe(true)
+      const status = await execute("status")
+      expect(status.metadata.saved).toBe(true)
+      const phases = status.metadata.phases as Record<string, { status: string; reason?: string }>
+      expect(phases.scope_validation.status).toBe("pending")
+      expect(phases.scope_validation.reason).toContain("scope or exclusions changed")
+      expect(phases.workspace_setup.status).toBe("pending")
+    },
+  })
+})
