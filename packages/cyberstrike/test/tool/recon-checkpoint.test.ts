@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision, reconScopeFingerprint } from "../../src/target/recon-gate"
+import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision, reconPhaseStartDecision, reconScopeFingerprint } from "../../src/target/recon-gate"
 import {
   reconRunID,
   reconBeginDisposition,
@@ -7,6 +7,7 @@ import {
   missingRequiredReconArtifacts,
   validateCanonicalInventoryContent,
   unresolvedReconPrerequisites,
+  reconcileReconTodoChecklist,
   type ReconPhase,
   type ReconPhaseRecord,
 } from "../../src/tool/recon-checkpoint"
@@ -29,6 +30,62 @@ const phases: ReconPhase[] = [
 function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPhase, ReconPhaseRecord> {
   return Object.fromEntries(phases.map((phase) => [phase, { status }])) as Record<ReconPhase, ReconPhaseRecord>
 }
+
+test("phase start waits for the prior checklist item while useful tools remain independently available", () => {
+  const state = records("complete")
+  state.url_collection = { status: "running" }
+  const blocked = reconPhaseStartDecision("javascript_analysis", state)
+  expect(blocked.allowed).toBe(false)
+  expect(blocked.unresolved).toEqual(["url_collection"])
+  expect(blocked.reason).toContain("url_collection=running")
+
+  state.url_collection = { status: "complete" }
+  const ready = reconPhaseStartDecision("javascript_analysis", state)
+  expect(ready.allowed).toBe(true)
+  expect(ready.unresolved).toEqual([])
+})
+
+test("the recon checklist is checkpoint-driven, ordered, and preserves unrelated todos", () => {
+  const state = records("pending")
+  state.scope_validation = { status: "complete" }
+  state.workspace_setup = { status: "complete" }
+  state.asset_discovery = { status: "complete" }
+  state.live_hosts_ports = { status: "running" }
+
+  const result = reconcileReconTodoChecklist([
+    { content: "Unrelated user task", status: "pending", priority: "medium" },
+    { content: "[recon:asset_discovery] old wording", status: "pending", priority: "low" },
+    { content: "[recon:javascript_analysis] old wording", status: "in_progress", priority: "low" },
+  ], state, "live_hosts_ports")
+
+  expect(result[0]).toEqual({
+    content: "[recon:scope_validation] Verify saved scope and exclusions",
+    status: "completed",
+    priority: "high",
+  })
+  expect(result.find((item) => item.content.startsWith("[recon:workspace_setup]") )?.status).toBe("completed")
+  expect(result.find((item) => item.content.startsWith("[recon:asset_discovery]") )?.status).toBe("completed")
+  expect(result.find((item) => item.content.startsWith("[recon:live_hosts_ports]") )?.status).toBe("in_progress")
+  expect(result.find((item) => item.content.startsWith("[recon:javascript_analysis]") )?.status).toBe("pending")
+  expect(result.some((item) => item.content.startsWith("[recon:parameter_fuzzing]"))).toBe(false)
+  expect(result.at(-1)).toEqual({ content: "Unrelated user task", status: "pending", priority: "medium" })
+  expect(result.filter((item) => item.content.startsWith("[recon:asset_discovery]"))).toHaveLength(1)
+})
+
+test("optional active-testing checklist items appear only when requested or already present", () => {
+  const state = records("pending")
+  const defaultList = reconcileReconTodoChecklist([], state, null)
+  expect(defaultList.some((item) => item.content.startsWith("[recon:vulnerability_testing]"))).toBe(false)
+
+  const requested = reconcileReconTodoChecklist([], state, "vulnerability_testing", ["vulnerability_testing"])
+  expect(requested.some((item) => item.content.startsWith("[recon:vulnerability_testing]"))).toBe(true)
+  expect(requested.some((item) => item.content.startsWith("[recon:parameter_fuzzing]"))).toBe(false)
+
+  const kept = reconcileReconTodoChecklist([
+    { content: "[recon:parameter_fuzzing] existing", status: "completed", priority: "low" },
+  ], state, null)
+  expect(kept.find((item) => item.content.startsWith("[recon:parameter_fuzzing]"))?.status).toBe("pending")
+})
 
 test("recon run identity is stable across session resumes", () => {
   expect(reconRunID("target-root-1")).toBe(reconRunID("target-root-1"))
