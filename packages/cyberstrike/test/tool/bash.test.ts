@@ -21,6 +21,29 @@ const ctx = {
 const projectRoot = path.join(__dirname, "../..")
 
 describe("tool.bash", () => {
+  test("rejects unsafe curl invocation before spawning the command and gives a bounded correction", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        const bash = await BashTool.init()
+        let message = ""
+        try {
+          await bash.execute({
+            command: "curl https://scope-regression.example.test/",
+            description: "Exercise curl preflight rejection",
+          }, ctx)
+        } catch (error) {
+          message = error instanceof Error ? error.message : String(error)
+        }
+        expect(message).toContain("curl may load ~/.curlrc")
+        expect(message).toContain("Put -q (or --disable) first")
+        expect(message).toContain("No network request was started.")
+      },
+    })
+  })
+
+
   test("basic", async () => {
     await Instance.provide({
       directory: projectRoot,
