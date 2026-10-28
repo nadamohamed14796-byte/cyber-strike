@@ -3,6 +3,8 @@ import { createHash } from "node:crypto"
 export interface JavaScriptCallSiteCandidate {
   line: number
   kind: "ui-event-binding" | "dom-event-listener" | "callback-reference" | "direct-call"
+  /** Enclosing caller when the reference occurs inside a statically identified function. */
+  callerFunctionName?: string | null
   confidence: "candidate"
 }
 
@@ -425,7 +427,15 @@ export function analyzeJavaScriptSource(input: string): JavaScriptSourceAnalysis
       }
       if (!kind) continue
       const line = lineNumber(lineStarts, index)
-      sites.set(line + ":" + kind, { line, kind, confidence: "candidate" })
+      const caller = functionRanges
+        .filter((range) => range.start <= index && index <= range.end && range.name !== fn.name)
+        .sort((a, b) => (a.end - a.start) - (b.end - b.start))[0]
+      sites.set(line + ":" + kind, {
+        line,
+        kind,
+        callerFunctionName: caller?.name ?? null,
+        confidence: "candidate",
+      })
     }
     fn.callSites = [...sites.values()].sort((a, b) => a.line - b.line || a.kind.localeCompare(b.kind))
   }
