@@ -6,17 +6,21 @@ const contract = readFileSync(
   "utf-8",
 )
 
-test("target workflow defines the full resumable lifecycle and a reportable-finding stop goal", () => {
-  expect(contract).toContain("End-to-end engagement lifecycle")
-  expect(contract).toContain("reuse the current session")
-  expect(contract).toContain("five distinct, validated, reportable findings")
-  expect(contract).toContain("INFO/LOW intel, scanner alerts, chain hypotheses")
-  expect(contract).toContain("Generate and verify the final report")
-  expect(contract).toContain("Preserve the session and workspace")
+test("target workflow defines autonomous recon handoffs, one workspace, and evidence-based closeout", () => {
+  expect(contract).toContain("Run end-to-end without making the user drive each phase")
+  expect(contract).toContain("do not stop to ask the user to say")
+  expect(contract).toContain("One authoritative scope decision")
+  expect(contract).toContain("A leading wildcard such as *.example.com authorizes example.com and all subdomains")
+  expect(contract).toContain("Exclusions always override inclusions")
+  expect(contract).toContain("One canonical workspace and output set")
+  expect(contract).toContain("subdomains.txt, live-hosts.txt, urls.txt, parameters.txt, endpoints.txt")
+  expect(contract).toContain("reports/recon-final.md")
+  expect(contract).toContain("Generate or update reports/recon-final.md")
 })
 
-test("missing tools are installed by exact name and are not silently substituted", () => {
-  expect(contract).toContain("call `ensure_tools` with that exact tool name")
-  expect(contract).toContain("Do not spend time hunting for a substitute")
-  expect(contract).toContain("mark that method blocked")
+test("a selected missing CLI must be installed and verified before choosing a fallback", () => {
+  expect(contract).toContain("call ensure_tools for that exact CLI")
+  expect(contract).toContain("Do not silently replace a selected tool")
+  expect(contract).toContain("Only after the exact install is genuinely blocked or fails")
+  expect(contract).toContain("documented version/help check")
 })
