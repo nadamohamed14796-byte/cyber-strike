@@ -447,6 +447,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
   const source = `${normalized.method} ${normalized.normalizedPath}`
   const truncatedRawRequest = req.raw_request ?? `${req.method} ${req.normalized_path} HTTP/1.1`
   let childSessionID: string | undefined
+  let failureReason: string | undefined
               // A request becomes processed only after agent processing and summary
               // persistence both complete. Failed work stays visible and is not auto-replayed.
               let finalStatus: "processed" | "failed" = "failed"
@@ -567,6 +568,14 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                 const agentStuck = agentInfo.role === "assistant" && Boolean(agentInfo.stuckAborted)
                 const agentCapped = agentInfo.role === "assistant" && Boolean(agentInfo.stepCapped)
                 const agentIncomplete = Boolean(agentError) || agentStuck || agentCapped
+                if (agentIncomplete) {
+                  failureReason = agentError
+                    ? (typeof agentError === "string" ? agentError : JSON.stringify(agentError))
+                    : agentStuck
+                      ? "Agent run was aborted as stuck before completing."
+                      : "Agent reached its step cap before completing."
+                  failureReason = failureReason.slice(0, 500)
+                }
                 await IngestSummary.write({
                   // Keep completion chatter in the request child session, not the active parent transcript.
                   sessionID: analysisSessionID,
@@ -729,6 +738,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   finalStatus = "processed"
                 }
               } catch (error) {
+                failureReason = (error instanceof Error ? error.message : String(error)).slice(0, 500)
                 // If agent lookup itself fails, still create the same request panel when
                 // a parent/request model is available so the final failed state is visible.
                 if (!liveNotice) {
@@ -765,7 +775,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                     live: liveNotice,
                     completed: true,
                     status: finalStatus,
-                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
+                    text: `## Captured request — ${finalStatus === "processed" ? "ANALYSIS COMPLETE" : "ANALYSIS FAILED"}\nRequest: ${requestLabel}\nRequest ID: ${req.id}\nAgent: proxy-agent\nSubagent session: ${childSessionID ?? "not created"}${failureReason ? `\nFailure reason: ${failureReason}` : ""}\n\n### Latest agent output\n${latestAgentText || "(no assistant text was emitted)"}`,
                   }).catch((error) => log.warn("live ingest final transcript update failed", { sessionID, requestID: req.id, error: String(error) }))
                 }
                 log.info("captured request subagent finished", {
