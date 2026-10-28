@@ -846,7 +846,7 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
   if (layoutStart >= 0 && sourceOfTruthStart > layoutStart) {
     const oldLayoutSection = currentReadme.slice(layoutStart, sourceOfTruthStart).trimEnd()
     const layoutLines = oldLayoutSection.split("\n")
-    const looksGenerated = oldLayoutSection.includes("| Directory | Purpose |") &&
+    const looksGenerated = (oldLayoutSection.includes("| Directory | Purpose |") || oldLayoutSection.includes("| Path | Purpose |")) &&
       oldLayoutSection.includes("| `scope/` |") &&
       oldLayoutSection.includes("| `assets/` |") &&
       oldLayoutSection.includes("| `runs/` |") &&
