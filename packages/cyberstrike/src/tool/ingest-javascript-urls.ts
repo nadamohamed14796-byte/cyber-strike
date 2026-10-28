@@ -7,8 +7,8 @@ import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../
 import { Tool } from "./tool"
 
 const MAX_ASSET_BYTES = 32 * 1024 * 1024
-// Bound aggregate response-body bytes per invocation. Pending URLs remain in the manifest for resume.
-const MAX_BATCH_BYTES = 64 * 1024 * 1024
+// Process the entire eligible URL worklist in one invocation. Memory stays bounded
+// by reading one response at a time and enforcing MAX_ASSET_BYTES per response.
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
@@ -259,7 +259,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
   description: [
     "Fetch, save, deduplicate, and analyze JavaScript asset URLs supplied by any source.",
     "Input may come from the URL collector, crawlers, HTML page URLs, extracted script src links, relative/absolute ES module imports, dynamic imports, source-map references, urls.txt, another tool, or links manually supplied by the user. HTML pages are saved as inert local artifacts, inline scripts are analyzed, and external script src URLs are added to this same queue. Pass new URLs when available; `urls: []` resumes eligible pending/retryable work from the existing asset manifest without requiring the original URL list.",
-    "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. Each response is limited to 32 MiB and total response bodies are limited to 64 MiB per invocation while streaming; work deferred by the batch budget remains pending for the next invocation.",
+    "Each URL is checked against the persisted target scope before fetching, and every redirect is checked again. Requests are GET-only, do not execute downloaded JavaScript, and never send credentials from the current browser/session. Each response is streamed one at a time and limited to 32 MiB; there is no arbitrary aggregate 64 MiB or 30-file cutoff. The invocation processes the full dynamic worklist (including discovered imports and source maps), writing progress and manifest updates as it goes. Cancellation leaves unfinished URLs pending for resume.",
     "Downloads are stored under the existing target workspace's javascript/assets directory. JavaScript, source maps, and HTML containers are stored as inert files; local correlation extracts inline scripts from HTML and analyzes them without execution. javascript/asset-manifest.json records URL provenance, final URL, status, SHA-256, local path, content type, size, and errors. Pending URLs are persisted before processing and automatically resumed on the next call for the same target after interruption. Relative/absolute ES module and dynamic imports plus source-map references are discovered from each downloaded bundle and added to the same queue. Each asset result is checkpointed in small batches; newly discovered script, module, and source-map URLs are persisted immediately. The tool updates its existing progress metadata for the currently active asset and correlation stage without generating a separate chat message for every queued URL. Repeated URLs reuse the existing local artifact by default; identical content from different URLs shares one content-addressed file while preserving each URL/source record. Use force_refresh when intentionally refreshing cached assets or retrying a permanent failure/skip after confirming the target or response has changed; it never overrides scope checks.",
     "After downloading, invoke the existing JavaScript correlation pipeline so local files are analyzed along with captured response bodies. Analysis extracts endpoint, parameter, auth/header/cookie, role/feature, secret-fingerprint, source-map, and risky-sink candidates. It does not execute code or automatically run vulnerability probes.",
     "Only already initialized target workspaces with a valid configured scope can fetch. URLs outside scope or redirects outside scope are rejected; a user-supplied URL is input, not authorization.",
@@ -409,12 +409,6 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await saveProgress(true)
         break
       }
-      // Do not fetch another response once this invocation's aggregate body budget is exhausted.
-      // All remaining eligible URLs were marked pending above, so the next invocation resumes them.
-      if (receivedBytes >= MAX_BATCH_BYTES) {
-        await saveProgress(true)
-        break
-      }
       const url = inputURLs[index]!
       const parsedURL = new URL(url)
       const activeAsset = parsedURL.origin + parsedURL.pathname
@@ -532,61 +526,13 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         await saveProgress()
         continue
       }
-      const batchRemaining = MAX_BATCH_BYTES - receivedBytes
-      if (batchRemaining <= 0 || (Number.isFinite(declaredLength) && declaredLength > batchRemaining)) {
-        // Do not classify a response as permanently skipped just because this invocation ran
-        // out of aggregate budget. It must remain pending so a later invocation can fetch it.
-        await response.body?.cancel("JavaScript batch byte budget exhausted").catch(() => {})
-        const prior = byURL.get(url)
-        const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-        const record: AssetRecord = {
-          ...prior,
-          url,
-          finalURL,
-          source: mergeAssetSourceLabel(sources),
-          sources,
-          status: "pending",
-          retryable: undefined,
-          ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : { pendingRefresh: undefined }),
-          contentType,
-          error: "per-invocation byte budget reached; pending for resume",
-        }
-        records.push(record)
-        byURL.set(url, record)
-        await saveProgress(true)
-        break
-      }
       let bytes: Uint8Array
       ctx.metadata({
         title: "Reading JavaScript response — " + activeAsset,
         metadata: { stage: "reading_response", active_asset: activeAsset, processed: index, queued: inputURLs.length, content_type: contentType },
       })
-      try { bytes = await readBounded(response, Math.min(MAX_ASSET_BYTES, batchRemaining)) }
+      try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
       catch (error) {
-        const batchBudgetExceeded =
-          batchRemaining < MAX_ASSET_BYTES &&
-          error instanceof Error &&
-          error.message === "response exceeds the " + batchRemaining + " byte asset limit"
-        if (batchBudgetExceeded && !ctx.abort.aborted) {
-          const prior = byURL.get(url)
-          const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-          const record: AssetRecord = {
-            ...prior,
-            url,
-            finalURL,
-            source: mergeAssetSourceLabel(sources),
-            sources,
-            status: "pending",
-            retryable: undefined,
-            ...(forceRefresh || prior?.pendingRefresh ? { pendingRefresh: true } : { pendingRefresh: undefined }),
-            contentType,
-            error: "per-invocation byte budget reached while reading response; pending for resume",
-          }
-          records.push(record)
-          byURL.set(url, record)
-          await saveProgress(true)
-          break
-        }
         if (ctx.abort.aborted) {
           const prior = byURL.get(url)
           const sources = mergeAssetSources(prior?.sources, prior?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
