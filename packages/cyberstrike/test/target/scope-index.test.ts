@@ -2,6 +2,14 @@ import { describe, expect, test } from "bun:test"
 import { matchingScopeItems } from "../../src/target/scope-index"
 
 describe("matchingScopeItems", () => {
+  test("trims entries before indexing exact hosts, wildcards, and typed URL scopes", () => {
+    const entries = ["  example.com  ", "  *.api.example.com  ", " API: api.example.net/v1 "]
+    expect(matchingScopeItems("https://example.com/", entries)).toEqual(["example.com"])
+    expect(matchingScopeItems("https://v1.api.example.com/", entries)).toEqual(["*.api.example.com"])
+    expect(matchingScopeItems("https://api.example.net/v1/users", entries)).toEqual(["API: api.example.net/v1"])
+    expect(matchingScopeItems("https://api.example.net/private", entries)).toEqual([])
+  })
+
   test("matches a listed exact host but does not treat it as a wildcard", () => {
     const entries = ["att.com", "login.att.com"]
     expect(matchingScopeItems("https://att.com/login", entries)).toEqual(["att.com"])
