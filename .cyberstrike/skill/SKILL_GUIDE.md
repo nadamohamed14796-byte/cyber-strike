@@ -236,6 +236,14 @@ Level 1 or Level 2, and assessment status (Automated/Manual).
 
 Apply this gate when editing an existing skill, not only when creating a new one. Preserve its current directory, filename, loader conventions, useful examples, and established section order unless a concrete defect requires a change.
 
+### Routing metadata (required for actionable skills)
+- Every actionable `attack-*`, `recon-*`, WSTG, API, or framework-specific skill must declare a meaningful `category` and searchable `tags`. Use the vocabulary already present in the runtime catalog; do not invent a new category for an existing concept.
+- Use specific, user-visible tags for the technique, asset/surface, and evidence type (for example `javascript`, `source-maps`, `authorization`, `graphql`). Avoid only-generic tags such as `security` or `testing`, and avoid relying on the display name alone for discovery.
+- Add `tech_stack`, `cwe_ids`, and `owasp_id` when the technology or standard mapping is genuinely applicable. Do not guess mappings merely to fill a field.
+- `chains_with` must contain exact local skill names/aliases that the runtime index can resolve. Add only a conditional next step justified by a plausible evidence relationship; never encode an automatic escalation or severity increase.
+- `prerequisites` must clearly distinguish local prerequisite skills from real-world preconditions. Use canonical skill names for local playbooks, and explicit human-readable conditions for authorization, credentials, environment, or test-account requirements.
+- Keep the title, category, tags, prerequisite, and chain relationship consistent with the body headings and procedure. If a playbook changes scope or technique, update its routing metadata and regression checks in the same change.
+
 ### Before editing
 - Read the complete target SKILL.md and its frontmatter.
 - Inspect every local name in chains_with, prerequisites, severity_boost, and relative links. Confirm the referenced directory/file exists in this repository; external research URLs must remain clearly external.
