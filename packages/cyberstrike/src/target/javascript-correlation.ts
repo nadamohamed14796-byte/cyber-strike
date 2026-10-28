@@ -1922,7 +1922,8 @@ export namespace JavaScriptCorrelation {
     const digest = createHash("sha256").update(JSON.stringify([workspace.targetURL, snapshotSelector])).digest("hex").slice(0, 12)
     const graphFilename = filenameHost + "-" + digest + ".json"
     const endpointFilename = graphFilename
-    const testerSurveyRelativePath = path.posix.join("testing", "tester-survey-" + digest + ".json")
+    const testerSurveyRelativePath = path.posix.join("findings", "tester-survey-" + digest + ".json")
+    const legacyTesterSurveyRelativePath = path.posix.join("testing", "tester-survey-" + digest + ".json")
     const analysisCache = new Map<string, JavaScriptSourceAnalysis>()
     const previousGraphPath = path.join(workspace.workspacePath, "javascript", graphFilename)
     try {
@@ -2672,18 +2673,21 @@ export namespace JavaScriptCorrelation {
     graph.notes.push("Response previews are length-limited and redacted heuristically; derived JavaScript artifacts retain secret fingerprints and source locations only, never raw candidate values. Captured request/source bodies remain in the existing private capture store for on-demand evidence inspection.")
     graph.notes.push("This graph only correlates observations already stored in the current session tree; missing edges do not prove that a relationship does not exist.")
 
-    const testerSurveyAbsolutePath = path.join(workspace.workspacePath, testerSurveyRelativePath)
     let previousTesterCases: JavaScriptTesterCase[] = []
-    try {
-      const info = await fs.lstat(testerSurveyAbsolutePath)
-      if (info.isFile() && !info.isSymbolicLink()) {
-        const oldSurvey = JSON.parse(await fs.readFile(testerSurveyAbsolutePath, "utf-8"))
+    for (const surveyRelativePath of [testerSurveyRelativePath, legacyTesterSurveyRelativePath]) {
+      const surveyAbsolutePath = path.join(workspace.workspacePath, surveyRelativePath)
+      try {
+        const info = await fs.lstat(surveyAbsolutePath)
+        if (!info.isFile() || info.isSymbolicLink()) continue
+        const oldSurvey = JSON.parse(await fs.readFile(surveyAbsolutePath, "utf-8"))
         if (oldSurvey?.schemaVersion === 1 && oldSurvey.targetURL === workspace.targetURL && Array.isArray(oldSurvey.cases)) {
           previousTesterCases = oldSurvey.cases as JavaScriptTesterCase[]
+          break
         }
+      } catch {
+        // Missing or invalid prior survey only disables state reuse; try a legacy path,
+        // then create the current survey from the available evidence.
       }
-    } catch {
-      // Missing or invalid prior survey only disables state reuse; fresh analysis still proceeds.
     }
     const testerCases = createJavaScriptTesterCases(graph.javascriptAnalysis.requestCandidates, graph.endpointCandidates, previousTesterCases)
     const testerSurvey = {
