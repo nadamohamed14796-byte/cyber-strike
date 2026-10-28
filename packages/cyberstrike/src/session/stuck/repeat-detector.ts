@@ -72,8 +72,8 @@ export class ReadOnlyRepeatDetector {
     this.detector = new RepeatDetector(limit)
   }
 
-  observe(toolCalls: { tool: string; input?: unknown }[]): RepeatVerdict {
-    if (toolCalls.some((call) => isProgressTool(call.tool))) {
+  observe(toolCalls: { tool: string; input?: unknown; succeeded?: boolean }[]): RepeatVerdict {
+    if (toolCalls.some((call) => call.succeeded === true && isProgressTool(call.tool))) {
       this.detector.reset()
       return "ok"
     }
