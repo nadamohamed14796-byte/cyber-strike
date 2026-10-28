@@ -23,7 +23,7 @@ The intended order is asset discovery → live hosts → URL/candidate classific
 
 ## Phase checklist and cleanup gate
 
-`recon_checkpoint` synchronizes the compact numbered `[recon:phase_id]` todo list from the saved manifest. Scope validation and workspace setup are hard prerequisites; active testing additionally requires explicit user opt-in and a completed endpoint inventory. Ordinary phase transitions must not stall because an earlier passive phase has a stale or partial status.
+`recon_checkpoint` synchronizes the compact numbered `[recon:phase_id]` todo list from the saved manifest. Scope validation and workspace setup are hard prerequisites; active testing additionally requires explicit user opt-in and a completed endpoint inventory. Preserve phase order: earlier required phases must be complete or explicitly handed off as partial/unavailable/deferred. Pending, running, blocked, or failed phases must be fixed or handed off—not silently skipped. Ordinary recon tools remain available to finish the current phase.
 
 The central workflow contract defines how to use the `handoff` action, retry without loops, verify canonical outputs, and preserve scratch/evidence. A partial phase remains labelled partial in the manifest and can be reopened when new evidence or a materially better method appears.
 
