@@ -2696,7 +2696,7 @@ export namespace JavaScriptCorrelation {
       ...(graph.javascriptAnalysis.roleHints.length ? graph.javascriptAnalysis.roleHints.map((item) => "- " + item.kind + " — " + item.value + " — " + item.sourceFile + ":" + item.line) : ["No role/feature hints matched the static heuristics."]),
       "",
       "## Application and integration intelligence (candidate hints, not vulnerability verdicts)",
-      ...((graph.javascriptAnalysis.applicationHints ?? []).length ? graph.javascriptAnalysis.applicationHints.map((item) => "- " + item.kind + " — " + item.value + " — " + item.sourceFile + ":" + item.line + " — candidate only") : ["No application-intelligence hints matched the current static rules."]),
+      ...((graph.javascriptAnalysis.applicationHints ?? []).length ? (graph.javascriptAnalysis.applicationHints ?? []).map((item) => "- " + item.kind + " — " + item.value + " — " + item.sourceFile + ":" + item.line + " — candidate only") : ["No application-intelligence hints matched the current static rules."]),
       "",
       "## JavaScript assets",
       ...(urlList ? [urlList] : ["No JavaScript asset matched the current stored Intel. Provide --javascript-url or record an asset with add_intel first."]),
