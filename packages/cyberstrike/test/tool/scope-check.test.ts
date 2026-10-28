@@ -145,6 +145,30 @@ describe("scope_check uses persisted target scope when a workspace is supplied",
     )
   }
 
+  test("uses the authoritative root policy for typed API host-port scope", async () => {
+    await using tmp = await tmpdir()
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const root = await TargetMemory.configureScope("https://program-policy.example.test", {
+          include: ["API: api.example.org:8443"],
+          authorizationSource: "Typed API port regression fixture",
+          authorizationReference: "https://program-policy.example.test/policy",
+        })
+
+        const allowed = await execute("api.example.org:8443", root.workspace.targetURL)
+        expect(allowed.metadata.inScope).toBe(true)
+        expect(allowed.metadata.authorizationVerified).toBe(true)
+        expect(allowed.output).toContain("In scope: YES")
+
+        const wrongPort = await execute("api.example.org:9443", root.workspace.targetURL)
+        expect(wrongPort.metadata.inScope).toBe(false)
+        expect(wrongPort.metadata.authorizationVerified).toBe(false)
+        expect(wrongPort.output).toContain("In scope: NO")
+      },
+    })
+  })
+
   test("fails closed for unconfigured scope and honors exclusions over inclusions", async () => {
     await using tmp = await tmpdir()
     await Instance.provide({
