@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision } from "../../src/target/recon-gate"
+import { initialReconRun, invalidateReconDownstreamPhases, parseReconRun, reconPhaseExecutionDecision, reconScopeFingerprint } from "../../src/target/recon-gate"
 import {
   reconRunID,
   reconBeginDisposition,
@@ -319,4 +319,29 @@ test("ordinary recon remains available when checkpoint state is missing or pendi
   expect(reconPhaseExecutionDecision("url_collection", state).allowed).toBe(true)
   expect(reconPhaseExecutionDecision("javascript_analysis", state).allowed).toBe(true)
   expect(reconPhaseExecutionDecision("vulnerability_testing", state).allowed).toBe(false)
+})
+
+
+test("scope fingerprint ignores item ordering but changes with effective authorization data", () => {
+  const base = {
+    targetURL: "https://program.example.test",
+    status: "configured" as const,
+    scopeItems: ["api.example.net", "*.example.net"],
+    excludedItems: ["admin.example.net"],
+    authorizationSource: "Unit test policy",
+    authorizationReference: "https://program.example.test/policy",
+  }
+  expect(reconScopeFingerprint(base)).toBe(reconScopeFingerprint({
+    ...base,
+    scopeItems: [...base.scopeItems].reverse(),
+    excludedItems: [...base.excludedItems].reverse(),
+  }))
+  expect(reconScopeFingerprint(base)).not.toBe(reconScopeFingerprint({
+    ...base,
+    excludedItems: [...base.excludedItems, "private.example.net"],
+  }))
+  expect(reconScopeFingerprint(base)).not.toBe(reconScopeFingerprint({
+    ...base,
+    authorizationReference: "https://program.example.test/updated-policy",
+  }))
 })
