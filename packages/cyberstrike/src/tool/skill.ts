@@ -206,7 +206,7 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
                 if (resolved) return accessibleNames.has(resolved) ? [resolved] : []
                 // Human-readable prerequisites are conditions, not skill links.
                 // Omit unresolved slug-like references rather than presenting broken targets.
-                return /\\s/.test(reference.trim()) ? [reference] : []
+                return /\s/.test(reference.trim()) ? [reference] : []
               })
               return [
                 "- **" + r.name + "** [" + (r.verified ?? "unverified") + "] — " + r.description,
