@@ -148,10 +148,6 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   return parsed
 }
 
-function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
-}
-
 /** Reset downstream checkpoints when a previously deferred phase is explicitly reopened. */
 export function invalidateReconDownstreamPhases(
   phase: ReconPhase,
