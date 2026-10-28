@@ -8,7 +8,7 @@ import { Session } from "../session"
 import { SessionTable, RequestTable, RequestJavaScriptCaptureTable, RequestObservationTable, WebFunctionTable, VulnerabilityTable } from "../session/session.sql"
 import { IntelEntryTable } from "../methodology/methodology.sql"
 import { TargetMemory } from "./index"
-import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal, type JavaScriptApplicationHint } from "./javascript-analysis"
+import { analyzeJavaScriptSource, normalizeJavaScriptEndpointPath, type JavaScriptSourceAnalysis, type JavaScriptRequestCandidate, type JavaScriptFunctionCandidate, type JavaScriptSecretCandidate, type JavaScriptRoleHint, type JavaScriptRiskSignal, type JavaScriptApplicationHint, type JavaScriptWorkflowSignal } from "./javascript-analysis"
 
 /**
  * SQLite builds have a finite bind-parameter budget. Split IN lists into safe
@@ -1071,6 +1071,7 @@ export interface JavaScriptCorrelationGraph {
     roleHints: Array<JavaScriptRoleHint & { sourceFile: string }>
     riskSignals: Array<JavaScriptRiskSignal & { sourceFile: string }>
     applicationHints?: Array<JavaScriptApplicationHint & { sourceFile: string }>
+    workflowSignals?: Array<JavaScriptWorkflowSignal & { sourceFile: string }>
   }
   endpointCandidates: JavaScriptEndpointCandidate[]
   evidence: Array<{
@@ -1422,6 +1423,67 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
   }
 }
 
+function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): string[] {
+  const signals = [...(graph.javascriptAnalysis.workflowSignals ?? [])].sort((a, b) =>
+    a.sourceFile.localeCompare(b.sourceFile) || a.line - b.line || a.kind.localeCompare(b.kind),
+  )
+  const functions = graph.javascriptAnalysis.functions
+  const requests = graph.javascriptAnalysis.requestCandidates
+  const byFunction = new Map<string, {
+    sourceFile: string
+    functionName: string | null
+    declaration?: JavaScriptCorrelationGraph["javascriptAnalysis"]["functions"][number]
+    signals: typeof signals
+  }>()
+  for (const signal of signals) {
+    const key = signal.sourceFile + "\\0" + (signal.functionName ?? "(top-level)")
+    const current = byFunction.get(key) ?? {
+      sourceFile: signal.sourceFile,
+      functionName: signal.functionName,
+      declaration: signal.functionName
+        ? functions.find((fn) => fn.sourceFile === signal.sourceFile && fn.name === signal.functionName)
+        : undefined,
+      signals: [],
+    }
+    current.signals.push(signal)
+    byFunction.set(key, current)
+  }
+  if (!byFunction.size) return ["- No email-verification, recovery, token, SQL-statement, or data-layer-operation markers matched current static rules."]
+  return [...byFunction.values()].map((group) => {
+    const functionRequests = group.functionName
+      ? requests.filter((request) => request.sourceFile === group.sourceFile && request.sourceFunction === group.functionName)
+      : []
+    const callSites = group.declaration?.callSites ?? []
+    const signalText = group.signals.map((signal) =>
+      safeSummaryText(signal.kind) + ":" + safeSummaryText(signal.value) + "@" + signal.line,
+    ).join(", ")
+    const parameterText = group.declaration
+      ? group.declaration.parameters.map(safeSummaryText).join(", ")
+      : ""
+    const definition = group.declaration
+      ? group.declaration.name + "(" + parameterText + ")@" + group.sourceFile + ":" + group.declaration.line
+      : "(no enclosing function identified)"
+    const calls = functionRequests.length
+      ? functionRequests.map((request) =>
+          (request.method ?? "UNKNOWN") + " " + safeSummaryText(request.urlTemplate) +
+          " [path:" + request.pathParameters.join(",") +
+          "; query:" + request.queryParameters.join(",") +
+          "; body:" + request.bodyParameters.join(",") +
+          "; headers:" + request.headerNames.join(",") +
+          "; request IDs:" + (request.observedRequestIDs.join(",") || "not matched") + "]",
+        ).join(" | ")
+      : "no request call attributed to this function"
+    const entries = callSites.length
+      ? callSites.map((site) => site.kind + "@" + site.line).join(", ")
+      : "no UI/event/callback reference matched"
+    return "- " + safeSummaryText(group.sourceFile) + " — signals: " + signalText +
+      " — function: " + definition +
+      " — call/reference sites: " + entries +
+      " — same-function requests: " + calls +
+      " — confidence: candidate; verify the call path in browser captures before testing."
+  })
+}
+
 function renderCanonicalJavaScriptAnalysis(
   graph: JavaScriptCorrelationGraph,
   manifest?: CanonicalAssetManifest,
@@ -1505,6 +1567,7 @@ function renderCanonicalJavaScriptAnalysis(
     "- Role/feature hints: " + roleHints.length,
     "- Application/integration hints: " + applicationHints.length,
     "- Static risk-sink candidates: " + riskSignals.length,
+    "- Business/token/data-operation flow signals: " + (graph.javascriptAnalysis.workflowSignals ?? []).length,
     "- Captured requests correlated: " + graph.requests.length,
     "- Response evidence records: " + graph.evidence.length,
     "- Failed asset fetches: " + failedAssets.length,
@@ -1558,6 +1621,9 @@ function renderCanonicalJavaScriptAnalysis(
     ) : ["- No structured request-call candidates were extracted."]),
     "",
 
+    "## Feature and behavior trace (static candidates; use these to locate code and correlate UI actions)",
+    ...renderJavaScriptWorkflowTrace(graph),
+    "",
     "## Roles, permissions, tenants and feature flags",
     ...(roleHints.length ? roleHints.map((item) =>
       "- " + safeSummaryText(item.kind) + " — " + safeSummaryText(item.value) + " — " + safeSummaryText(item.sourceFile) + ":" + item.line,
@@ -2479,6 +2545,7 @@ export namespace JavaScriptCorrelation {
         roleHints: mergedSourceFiles.flatMap((file) => (file.analysis?.roleHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         riskSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.riskSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
         applicationHints: mergedSourceFiles.flatMap((file) => (file.analysis?.applicationHints ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
+        workflowSignals: mergedSourceFiles.flatMap((file) => (file.analysis?.workflowSignals ?? []).map((item) => ({ ...item, sourceFile: file.relativePath }))),
       },
       endpointCandidates: [],
       evidence: relevantRequests
