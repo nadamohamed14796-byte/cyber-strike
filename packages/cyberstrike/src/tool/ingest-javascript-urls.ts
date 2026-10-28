@@ -400,12 +400,56 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
     }
     if (inputURLs.length === 0) {
+      const downloadedExisting = manifest.assets.filter((record) => record.status === "downloaded").length
+      const reusedExisting = manifest.assets.filter((record) => record.status === "reused").length
+      const failedExisting = manifest.assets.filter((record) => record.status === "failed").length
+      const skippedExisting = manifest.assets.filter((record) => record.status === "skipped").length
+      const pendingExisting = manifest.assets.filter((record) => record.status === "pending").length
+      const retryableExisting = manifest.assets.filter((record) => record.status === "failed" && record.retryable === true).length
+      const existingCoverageComplete =
+        manifest.assets.length > 0 &&
+        invalidCount === 0 &&
+        manifest.assets.every((record) => record.status === "downloaded" || record.status === "reused")
       return {
-        title: "JavaScript ingestion has no work to resume",
-        output: invalidCount
-          ? "No valid HTTP(S) URLs were supplied, and the target manifest has no pending or retryable assets to resume."
-          : "No URLs were supplied and the target manifest has no pending or retryable assets to resume.",
-        metadata: { error: "no_urls_or_pending_queue", manifest_path: manifestPath, workspace: workspace.workspacePath, invalid_urls: invalidCount },
+        title: existingCoverageComplete
+          ? "JavaScript manifest is settled — no new URLs to fetch"
+          : "JavaScript ingestion has no resumable work — existing coverage gaps remain",
+        output: [
+          invalidCount
+            ? "No valid HTTP(S) URLs were supplied, and the target manifest has no pending or retryable assets to resume."
+            : "No URLs were supplied and the target manifest has no pending or retryable assets to resume.",
+          "Manifest: " + manifestPath,
+          "Existing manifest entries: " + manifest.assets.length,
+          "Downloaded: " + downloadedExisting,
+          "Reused: " + reusedExisting,
+          "Failed: " + failedExisting,
+          "Skipped: " + skippedExisting,
+          "Pending: " + pendingExisting,
+          "Retryable failures: " + retryableExisting,
+          "Collection coverage: " + (existingCoverageComplete ? "complete" : "incomplete — inspect failed/skipped/invalid statuses before reporting full coverage"),
+        ].join("\n"),
+        metadata: {
+          error: "no_urls_or_pending_queue",
+          manifest_path: manifestPath,
+          workspace: workspace.workspacePath,
+          invalid_urls: invalidCount,
+          queued_urls: 0,
+          worklist_settled: 0,
+          worklist_available: 0,
+          worklist_pending: pendingExisting,
+          worklist_retryable_failures: retryableExisting,
+          worklist_missing_manifest_records: 0,
+          manifest_reconciled: pendingExisting === 0 && retryableExisting === 0,
+          collection_complete: existingCoverageComplete,
+          correlation_saved: false,
+          analysis_complete: false,
+          downloaded: 0,
+          reused: 0,
+          failed: 0,
+          skipped: 0,
+          pending_assets: pendingExisting,
+          retryable_failures: retryableExisting,
+        },
       }
     }
     for (const url of inputURLs) markPending(url, params.force_refresh)
@@ -434,7 +478,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
           stage: "checking_cache",
           active_asset: activeAsset,
           processed: index,
-          queued: inputURLs.length,
+          queued: queuedURLs.size,
           target_url: displayURL(params.target_url),
         },
       })
@@ -448,7 +492,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       if (!forceRefresh && prior?.contentHash && prior.localPath && await Bun.file(prior.localPath).exists()) {
         ctx.metadata({
           title: "Reusing JavaScript asset — " + activeAsset,
-          metadata: { stage: "cache_hit", active_asset: activeAsset, processed: index, queued: inputURLs.length, target_url: displayURL(params.target_url) },
+          metadata: { stage: "cache_hit", active_asset: activeAsset, processed: index, queued: queuedURLs.size, target_url: displayURL(params.target_url) },
         })
         const sources = mergeAssetSources(prior.sources, prior.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
         const record: AssetRecord = { ...prior, source: mergeAssetSourceLabel(sources), sources, status: "reused" }
@@ -460,7 +504,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       }
       ctx.metadata({
         title: "Fetching JavaScript asset — " + activeAsset,
-        metadata: { stage: "fetching", active_asset: activeAsset, processed: index, queued: inputURLs.length, target_url: displayURL(params.target_url) },
+        metadata: { stage: "fetching", active_asset: activeAsset, processed: index, queued: queuedURLs.size, target_url: displayURL(params.target_url) },
       })
       const result = await fetchScoped(url, ctx.abort)
       if ("error" in result) {
@@ -559,7 +603,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
       let bytes: Uint8Array
       ctx.metadata({
         title: "Reading JavaScript response — " + activeAsset,
-        metadata: { stage: "reading_response", active_asset: activeAsset, processed: index, queued: inputURLs.length, content_type: contentType },
+        metadata: { stage: "reading_response", active_asset: activeAsset, processed: index, queued: queuedURLs.size, content_type: contentType },
       })
       try { bytes = await readBounded(response, MAX_ASSET_BYTES) }
       catch (error) {
@@ -682,7 +726,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         metadata: {
           stage: "correlation",
           processed: inputURLs.length,
-          queued: inputURLs.length,
+          queued: queuedURLs.size,
           target_url: displayURL(params.target_url),
         },
       })
