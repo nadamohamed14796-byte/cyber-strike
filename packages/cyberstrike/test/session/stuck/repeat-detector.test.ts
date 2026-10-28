@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { RepeatDetector } from "../../../src/session/stuck/repeat-detector"
+import { ReadOnlyRepeatDetector, RepeatDetector } from "../../../src/session/stuck/repeat-detector"
 
 describe("RepeatDetector — cross-turn identical-call loop", () => {
   test("same signature reaching the limit across steps → nudge, then abort", () => {
@@ -53,5 +53,34 @@ describe("RepeatDetector — cross-turn identical-call loop", () => {
     expect(d.observe(["a"])).toBe("ok")
     expect(d.observe(["a"])).toBe("nudge")
     expect(d.observe(["a"])).toBe("abort")
+  })
+})
+
+
+describe("ReadOnlyRepeatDetector — polling without progress", () => {
+  test("nudges only after repeated identical reads without intervening progress", () => {
+    const detector = new ReadOnlyRepeatDetector(3)
+    const poll = [{ tool: "methodology_status", input: {} }]
+    expect(detector.observe(poll)).toBe("ok")
+    expect(detector.observe(poll)).toBe("ok")
+    expect(detector.observe(poll)).toBe("nudge")
+  })
+
+  test("a meaningful work step resets repeated-poll detection", () => {
+    const detector = new ReadOnlyRepeatDetector(3)
+    const poll = [{ tool: "methodology_status", input: {} }]
+    detector.observe(poll)
+    detector.observe(poll)
+    expect(detector.observe([{ tool: "bash", input: { command: "verify-results" } }])).toBe("ok")
+    expect(detector.observe(poll)).toBe("ok")
+    expect(detector.observe(poll)).toBe("ok")
+    expect(detector.observe(poll)).toBe("nudge")
+  })
+
+  test("different read-only arguments do not collide", () => {
+    const detector = new ReadOnlyRepeatDetector(3)
+    expect(detector.observe([{ tool: "read", input: { filePath: "a.ts" } }])).toBe("ok")
+    expect(detector.observe([{ tool: "read", input: { filePath: "b.ts" } }])).toBe("ok")
+    expect(detector.observe([{ tool: "read", input: { filePath: "c.ts" } }])).toBe("ok")
   })
 })
