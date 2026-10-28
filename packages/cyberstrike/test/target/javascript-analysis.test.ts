@@ -372,3 +372,34 @@ test("extracts request metadata from dollar-prefixed JavaScript identifiers", ()
   expect(request.bodyParameters).toContain("displayName")
   expect(request.bodyParameters).toContain("active")
 })
+
+
+test("flags credentialed state-changing requests as CSRF review candidates, not findings", () => {
+  const source = [
+    "async function updateEmail(email) {",
+    '  return fetch("/api/profile/email", {',
+    '    method: "POST",',
+    '    credentials: "include",',
+    '    headers: { "Content-Type": "application/json" },',
+    '    body: JSON.stringify({ email })',
+    "  })",
+    "}",
+    'fetch("/api/profile", { credentials: "include" })',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const post = result.requests.find((request) => request.path === "/api/profile/email")
+  const get = result.requests.find((request) => request.path === "/api/profile")
+
+  expect(post?.method).toBe("POST")
+  expect(post?.sourceFunction).toBe("updateEmail")
+  expect(post?.bodyParameters).toContain("email")
+  expect(post?.cookieSignals).toContain("credentialed-request-may-send-cookies")
+  expect(result.riskSignals.some((signal) =>
+    signal.kind === "csrf-review-state-changing-cookie-request" && signal.functionName === "updateEmail",
+  )).toBe(true)
+  expect(result.riskSignals.some((signal) =>
+    signal.kind === "csrf-review-state-changing-cookie-request" && signal.line === get?.sourceLine,
+  )).toBe(false)
+  expect(result.riskSignals.every((signal) => signal.confidence === "candidate")).toBe(true)
+  expect(result.notes.some((note) => note.includes("do not prove the server lacks anti-CSRF controls"))).toBe(true)
+})
