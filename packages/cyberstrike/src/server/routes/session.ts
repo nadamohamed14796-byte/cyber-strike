@@ -1889,8 +1889,30 @@ export const SessionRoutes = lazy(() =>
           }
 
           if (isDuplicate) {
-            // Do not re-enqueue the duplicate request, but preserve and correlate a
-            // changed JavaScript body associated with this same request identity.
+            // Structural dedup must not permanently suppress a request whose previous
+            // analysis failed. Retry that persisted row exactly once; active/completed
+            // requests remain deduplicated so high-volume traffic does not spam the LLM.
+            const existingRequest = normalized.keyHash
+              ? Request.findByKeyHash(sessionID, normalized.keyHash)
+              : undefined
+            const retriedRequest = existingRequest?.status === "failed"
+              ? Request.retryFailed(sessionID, existingRequest.id)
+              : undefined
+            if (retriedRequest) {
+              IngestQueue.enqueue(
+                sessionID,
+                () => analyzeCapturedRequest({
+                  sessionID,
+                  req: retriedRequest,
+                  model: body.model,
+                  buildPrompt: () => buildPersistedRequestPrompt(sessionID, retriedRequest),
+                }),
+                sessionID,
+              )
+            }
+
+            // Even without an analysis retry, preserve a changed JavaScript body
+            // and per-credential observations for this known endpoint identity.
             const javascriptCapture = Request.captureJavaScriptSource({
               sessionID,
               method: normalized.method,
@@ -1906,22 +1928,35 @@ export const SessionRoutes = lazy(() =>
               port: normalized.port,
               pageUrl: body.page_url,
             })
-            recordObservation(javascriptCapture?.requestID)
+            recordObservation(retriedRequest?.id ?? existingRequest?.id ?? javascriptCapture?.requestID)
             await refreshJavaScriptCorrelation(javascriptCapture, false, isSourceMapResponse(undefined, normalized.normalizedPath))
-            log.info("duplicate request skipped", {
+            log.info(retriedRequest ? "failed duplicate request requeued for analysis" : "duplicate request skipped", {
               sessionID,
+              requestID: retriedRequest?.id ?? existingRequest?.id ?? javascriptCapture?.requestID ?? null,
+              previousStatus: existingRequest?.status ?? null,
+              status: retriedRequest?.status ?? existingRequest?.status ?? "unknown",
               method: normalized.method,
               path: normalized.normalizedPath,
               javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
             })
-            await IngestSummary.notice(
-              sessionID,
-              `Extension request already known (deduplicated): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — request analysis was not queued again; new credential observations and JavaScript response versions were retained.`,
-            ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
+            if (retriedRequest) {
+              await IngestSummary.notice(
+                sessionID,
+                `Extension request received again: ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — previous analysis had failed, so request ${retriedRequest.id} was requeued automatically.`,
+              ).catch((error) => log.warn("parent retry notice failed", { sessionID, error: String(error) }))
+            } else {
+              await IngestSummary.notice(
+                sessionID,
+                `Extension request already known (deduplicated): ${normalized.method} ${normalized.normalizedPath.split("?")[0]} — active/completed analysis was not duplicated; new credential observations and JavaScript response versions were retained.`,
+              ).catch((error) => log.warn("parent ingest notice failed", { sessionID, error: String(error) }))
+            }
             c.status(202)
             return c.json({
               sessionID,
-              skipped: true,
+              skipped: !retriedRequest,
+              retried: Boolean(retriedRequest),
+              requestID: retriedRequest?.id ?? existingRequest?.id,
+              status: retriedRequest?.status ?? existingRequest?.status,
               javascriptSourceVersionCaptured: javascriptCapture?.captured ?? false,
             })
           }
