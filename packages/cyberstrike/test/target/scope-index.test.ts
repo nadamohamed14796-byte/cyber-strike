@@ -91,8 +91,11 @@ describe("matchingScopeItems", () => {
   })
 
   test("supports large lists and reuses the compiled index for repeated checks", () => {
-    const entries = Array.from({ length: 100_000 }, (_, index) => "host-" + index + ".att.com")
-    entries.push("wanted.att.com")
+    // Persisted scope manifests are frozen, which permits safe compiled-index reuse.
+    const entries = Object.freeze([
+      ...Array.from({ length: 100_000 }, (_, index) => "host-" + index + ".att.com"),
+      "wanted.att.com",
+    ])
     expect(matchingScopeItems("https://wanted.att.com/", entries)).toEqual(["wanted.att.com"])
     expect(matchingScopeItems("https://missing.att.com/", entries)).toEqual([])
   })
