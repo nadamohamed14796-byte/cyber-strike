@@ -668,6 +668,23 @@ export namespace Chain {
           return { ok: false, reason: "finding_validation_required" } as const
         }
         combinedFindingID = finding.id
+        const linkRows = db.select().from(ChainFindingLinkTable).where(and(
+          eq(ChainFindingLinkTable.session_id, input.sessionID),
+          eq(ChainFindingLinkTable.chain_candidate_id, input.chainID),
+        )).all()
+        const ids = [...new Set(linkRows.flatMap((row) => [row.source_vulnerability_id, row.target_vulnerability_id]))]
+        for (const linkedID of ids) {
+          const linked = db.select({ status: VulnerabilityTable.status }).from(VulnerabilityTable).where(and(
+            eq(VulnerabilityTable.id, linkedID),
+            eq(VulnerabilityTable.session_id, input.sessionID),
+          )).get()
+          if (!linked || linked.status !== "approved") return { ok: false, reason: "linked_finding_not_approved" } as const
+          const verdict = db.select({ verdict: FindingValidationTable.verdict }).from(FindingValidationTable).where(and(
+            eq(FindingValidationTable.session_id, input.sessionID),
+            eq(FindingValidationTable.vulnerability_id, linkedID),
+          )).orderBy(desc(FindingValidationTable.time_created)).limit(1).get()
+          if (verdict?.verdict !== "confirmed") return { ok: false, reason: "linked_finding_validation_required" } as const
+        }
       }
 
       const now = Date.now()
