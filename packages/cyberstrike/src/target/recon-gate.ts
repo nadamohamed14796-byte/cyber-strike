@@ -19,7 +19,7 @@ export const RECON_PHASES = [
 ] as const
 
 export type ReconPhase = typeof RECON_PHASES[number]
-export type ReconPhaseStatus = "pending" | "running" | "complete" | "blocked" | "failed" | "unavailable" | "deferred"
+export type ReconPhaseStatus = "pending" | "running" | "complete" | "partial" | "blocked" | "failed" | "unavailable" | "deferred"
 
 export type ReconPhaseRecord = {
   status: ReconPhaseStatus
@@ -82,7 +82,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
   const parsed = JSON.parse(raw) as ReconRunManifest
   const phases = parsed?.phases as Partial<Record<ReconPhase, ReconPhaseRecord>> | undefined
   const validStatus = (record: ReconPhaseRecord | undefined) =>
-    !!record && ["pending", "running", "complete", "blocked", "failed", "unavailable", "deferred"].includes(record.status)
+    !!record && ["pending", "running", "complete", "partial", "blocked", "failed", "unavailable", "deferred"].includes(record.status)
   // Three phases were added as explicit checkpoints. Older manifests are migrated
   // in memory, and downstream completion is invalidated from the earliest missing phase.
   const introducedPhases = ["directory_fuzzing", "parameter_discovery", "parameter_fuzzing"] as const
@@ -149,7 +149,7 @@ export function parseReconRun(raw: string, workspaceID: string, targetURL: strin
 }
 
 function terminal(status: ReconPhaseStatus): boolean {
-  return status === "complete" || status === "unavailable" || status === "deferred"
+  return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
 }
 
 /** Reset downstream checkpoints when a previously deferred phase is explicitly reopened. */
@@ -164,22 +164,28 @@ export function invalidateReconDownstreamPhases(
   return downstream
 }
 
-/** Pure prerequisite check shared by the runtime gate and unit tests. */
+/**
+ * Only genuine safety/dependency requirements block phase transitions.
+ * Ordinary recon phases may hand off partial progress and continue; the manifest
+ * preserves unfinished work so the orchestrator can revisit it without looping.
+ */
 export function unresolvedReconPrerequisites(
   phase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
 ): ReconPhase[] {
-  const earlier = RECON_PHASES.slice(0, RECON_PHASES.indexOf(phase))
-  const unresolved = earlier.filter((item) =>
-    item === "scope_validation" || item === "workspace_setup" ||
-    ((phase === "parameter_fuzzing" || phase === "vulnerability_testing") && item === "endpoint_inventory")
-      ? phases[item].status !== "complete"
-      : !terminal(phases[item].status),
-  )
-  if (phase !== "scope_validation" && phase !== "workspace_setup" && phases.scope_validation.status !== "complete" && !unresolved.includes("scope_validation")) {
-    unresolved.unshift("scope_validation")
+  const required: ReconPhase[] = []
+  if (phase !== "scope_validation" && phases.scope_validation.status !== "complete") {
+    required.push("scope_validation")
   }
-  return unresolved
+  if (phase !== "scope_validation" && phase !== "workspace_setup" &&
+      phases.workspace_setup.status !== "complete") {
+    required.push("workspace_setup")
+  }
+  if ((phase === "parameter_fuzzing" || phase === "vulnerability_testing") &&
+      phases.endpoint_inventory.status !== "complete") {
+    required.push("endpoint_inventory")
+  }
+  return required
 }
 
 /** Pure execution decision used by the runtime gate and unit tests.
@@ -203,7 +209,7 @@ export function reconPhaseStartDecision(
       unresolved,
     }
   }
-  return { allowed: true, reason: "all required prior checklist items are resolved", unresolved: [] }
+  return { allowed: true, reason: "hard safety prerequisites passed; unfinished recon work can be handed off and revisited", unresolved: [] }
 }
 
 export function reconPhaseExecutionDecision(
