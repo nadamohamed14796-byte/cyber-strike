@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import z from "zod"
 import { Session } from "../session"
+import { Todo } from "../session/todo"
 import { TargetMemory, USER_CONFIRMED_SCOPE_SOURCE, type TargetScope, type Workspace } from "../target"
 import {
   RECON_PHASES as PHASES,
@@ -11,6 +12,7 @@ import {
   parseReconRun as parseRun,
   reconRunID,
   reconScopeFingerprint,
+  reconPhaseStartDecision,
   type ReconPhase,
   type ReconPhaseStatus,
   type ReconRunManifest as ReconRun,
@@ -81,6 +83,73 @@ export const RECON_PHASE_REQUIRED_FLAT_ARTIFACTS: Partial<Record<ReconPhase, rea
 export function missingRequiredReconArtifacts(phase: ReconPhase, reportedPaths: readonly string[]): string[] {
   const normalized = new Set(reportedPaths.map((item) => item.replace(/\\/g, "/").replace(/^\.\/+/, "")))
   return [...(RECON_PHASE_REQUIRED_FLAT_ARTIFACTS[phase] ?? [])].filter((required) => !normalized.has(required))
+}
+
+const RECON_TODO_CHECKLIST: Array<{ phase: ReconPhase; content: string; priority: string; optional?: boolean }> = [
+  { phase: "scope_validation", content: "[recon:scope_validation] Verify saved scope and exclusions", priority: "high" },
+  { phase: "workspace_setup", content: "[recon:workspace_setup] Reuse and verify the canonical workspace", priority: "high" },
+  { phase: "asset_discovery", content: "[recon:asset_discovery] Collect and merge in-scope assets", priority: "high" },
+  { phase: "live_hosts_ports", content: "[recon:live_hosts_ports] Validate live hosts and permitted services", priority: "high" },
+  { phase: "url_collection", content: "[recon:url_collection] Collect and merge URLs", priority: "high" },
+  { phase: "javascript_analysis", content: "[recon:javascript_analysis] Collect and analyze all JavaScript and source maps", priority: "high" },
+  { phase: "parameter_discovery", content: "[recon:parameter_discovery] Merge parameter evidence", priority: "medium" },
+  { phase: "directory_fuzzing", content: "[recon:directory_fuzzing] Discover permitted paths and merge new URLs", priority: "medium" },
+  { phase: "endpoint_inventory", content: "[recon:endpoint_inventory] Verify one merged endpoint inventory", priority: "high" },
+  { phase: "parameter_fuzzing", content: "[recon:parameter_fuzzing] Run explicitly requested parameter tests", priority: "low", optional: true },
+  { phase: "vulnerability_testing", content: "[recon:vulnerability_testing] Validate requested vulnerability hypotheses", priority: "low", optional: true },
+  { phase: "reporting", content: "[recon:reporting] Verify the final report and remaining gaps", priority: "high" },
+]
+
+/** Derive the compact UI checklist from persisted checkpoint state instead of model memory. */
+export function reconcileReconTodoChecklist(
+  previous: Todo.Info[],
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+  currentPhase: ReconPhase | null,
+  includeOptional: readonly ReconPhase[] = [],
+): Todo.Info[] {
+  const known = new Set(RECON_TODO_CHECKLIST.map((item) => item.phase))
+  const previousByPhase = new Map<ReconPhase, Todo.Info>()
+  for (const todo of previous) {
+    const match = /^\\[recon:([a-z_]+)\\]/.exec(todo.content.trim())
+    if (!match || !known.has(match[1] as ReconPhase)) continue
+    const phase = match[1] as ReconPhase
+    if (!previousByPhase.has(phase)) previousByPhase.set(phase, todo)
+  }
+  const other = previous.filter((todo) => {
+    const match = /^\\[recon:([a-z_]+)\\]/.exec(todo.content.trim())
+    return !match || !known.has(match[1] as ReconPhase)
+  })
+  const visibleOptional = new Set<ReconPhase>([...includeOptional, ...previousByPhase.keys()])
+  const checklist = RECON_TODO_CHECKLIST
+    .filter((item) => !item.optional || visibleOptional.has(item.phase))
+    .map((item) => {
+      const phaseStatus = phases[item.phase].status
+      const status = phaseStatus === "complete"
+        ? "completed"
+        : phaseStatus === "deferred" || phaseStatus === "unavailable"
+          ? "cancelled"
+          : phaseStatus === "running" || phaseStatus === "blocked" || phaseStatus === "failed"
+            ? "in_progress"
+            : "pending"
+      return {
+        content: item.content,
+        status: item.phase === currentPhase && phaseStatus === "running" ? "in_progress" : status,
+        priority: item.priority,
+      }
+    })
+  return [...checklist, ...other]
+}
+
+function syncReconTodoChecklist(
+  sessionID: string,
+  phases: Record<ReconPhase, ReconPhaseRecord>,
+  currentPhase: ReconPhase | null,
+  includeOptional: readonly ReconPhase[] = [],
+): void {
+  Todo.update({
+    sessionID,
+    todos: reconcileReconTodoChecklist(Todo.get(sessionID), phases, currentPhase, includeOptional),
+  })
 }
 
 const CANONICAL_INVENTORY_PHASES = new Set<ReconPhase>([
@@ -249,6 +318,21 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
         }
       }
 
+      const includeOptional = params.phase && params.action !== "defer" &&
+        (params.phase === "parameter_fuzzing" || params.phase === "vulnerability_testing")
+        ? [params.phase]
+        : []
+      let todoSyncError: string | undefined
+      const syncTodo = () => {
+        try {
+          syncReconTodoChecklist(sessionID, run.phases, run.currentPhase, includeOptional)
+          todoSyncError = undefined
+        } catch (error) {
+          todoSyncError = error instanceof Error ? error.message : String(error)
+        }
+      }
+      syncTodo()
+
       if (params.action === "status") {
         const lines = PHASES.map((phase) => {
           const record = run.phases[phase]
@@ -257,7 +341,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             (record.reason ? " (reason: " + record.reason + ")" : "") +
             (record.artifacts?.length ? " [artifacts: " + record.artifacts.join(", ") + "]" : "")
         })
-        return { title: "Recon run status", output: ["Target: " + run.targetURL, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...lines].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, manifest: absolutePath, current_phase: run.currentPhase, phases: run.phases } }
+        return { title: todoSyncError ? "Recon run status — checklist sync failed" : "Recon run status", output: ["Target: " + run.targetURL, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...lines].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, manifest: absolutePath, current_phase: run.currentPhase, phases: run.phases, todo_synced: !todoSyncError, todo_sync_error: todoSyncError } }
       }
 
       if (!params.phase) return { title: "Recon checkpoint rejected", output: "phase is required for this action.", metadata: { saved: false, reason: "phase_required" } }
@@ -291,9 +375,17 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             return { title: "Recon phase blocked by persisted scope", output: "Cannot begin " + phase + " because the canonical program workspace has no configured, non-empty authorization scope. Configure and review the official scope before continuing.", metadata: { saved: false, reason: "persisted_scope_unconfigured" } }
           }
         }
-        // Ordinary recon phases are progress markers, not hard gates. The agent may
-        // use any suitable recon capability when useful evidence becomes available.
-        // Keep only the explicit testing handoff gated by completed endpoint inventory.
+        const startDecision = reconPhaseStartDecision(phase, run.phases)
+        if (!startDecision.allowed) {
+          return {
+            title: "Recon checklist waiting for an earlier phase",
+            output: "Cannot start " + phase + " yet. Finish the first unresolved checklist item(s): " +
+              startDecision.unresolved.map((item) => item + "=" + run.phases[item].status).join(", ") +
+              ". Resume those phases and verify their artifacts first. This gate controls phase transitions only; ordinary recon tools can still be used to complete the unfinished work.",
+            metadata: { saved: false, reason: "phase_prerequisites_unresolved", phase, unresolved: startDecision.unresolved },
+          }
+        }
+        // Ordinary recon tools remain available regardless of phase; only checklist transitions are gated.
         if (phase === "parameter_fuzzing" || phase === "vulnerability_testing") {
           const required = ["scope_validation", "workspace_setup", "endpoint_inventory"] as const
           const unresolved = required.filter((item) => run.phases[item].status !== "complete")
@@ -612,8 +704,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       if (existing >= 0) index.runs[existing] = entry
       else index.runs.push(entry)
       await TargetMemory.writeWorkspaceFile(workspace, "runs/index.json", JSON.stringify(index, null, 2) + "\n")
+      syncTodo()
 
-      return { title: "Recon checkpoint saved", output: ["Target: " + workspace.targetURL, "Phase: " + phase, "Status: " + run.phases[phase].status, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), ...(run.phases[phase].artifacts?.length ? ["Artifacts: " + run.phases[phase].artifacts.join(", ")] : []), ...(run.phases[phase].reason ? ["Reason: " + run.phases[phase].reason] : [])].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, phase, status: run.phases[phase].status, manifest: absolutePath, current_phase: run.currentPhase } }
+      return { title: todoSyncError ? "Recon checkpoint saved — checklist sync failed" : "Recon checkpoint saved", output: ["Target: " + workspace.targetURL, "Phase: " + phase, "Status: " + run.phases[phase].status, "Manifest: " + absolutePath, "Current phase: " + (run.currentPhase ?? "none"), "Checklist: " + (todoSyncError ? "sync failed — " + todoSyncError : "synchronized from checkpoint"), ...(run.phases[phase].artifacts?.length ? ["Artifacts: " + run.phases[phase].artifacts.join(", ")] : []), ...(run.phases[phase].reason ? ["Reason: " + run.phases[phase].reason] : [])].join("\n"), metadata: { saved: true, target_id: workspace.id, run_id: runID, phase, status: run.phases[phase].status, manifest: absolutePath, current_phase: run.currentPhase, todo_synced: !todoSyncError, todo_sync_error: todoSyncError } }
     } catch (error) {
       return { title: "Recon checkpoint failed", output: error instanceof Error ? error.message : String(error), metadata: { saved: false, error: true } }
     }
