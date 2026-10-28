@@ -56,7 +56,7 @@ import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
 import { toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
-import { RepeatDetector, ReadOnlyRepeatDetector } from "./stuck/repeat-detector"
+import { EmptyContinuationDetector, RepeatDetector, ReadOnlyRepeatDetector } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
 import TARGET_WORKSPACE_WORKFLOW_PROMPT from "../agent/prompt/methodology/target-workflow.txt"
 import TODO_EXECUTION_PROMPT from "./prompt/todo-execution.txt"
@@ -346,6 +346,7 @@ export namespace SessionPrompt {
     // reads are normal, but the same read/status call over and over without real
     // recon/testing progress is still a stall. Progress resets this detector below.
     const readOnlyRepeatDetector = new ReadOnlyRepeatDetector(8)
+    const emptyContinuationDetector = new EmptyContinuationDetector(3)
     while (true) {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
@@ -1034,6 +1035,17 @@ export namespace SessionPrompt {
               p.state.metadata.saved !== false &&
               p.state.metadata.error !== true,
           }))
+
+        const emptyVerdict = emptyContinuationDetector.observe(toolCalls.length)
+        if (emptyVerdict === "nudge") {
+          forceWrapUpNext = true
+          log.warn("continuing turns without tool calls — forcing wrap-up", { sessionID })
+        } else if (emptyVerdict === "abort" && !processor.message.stuckAborted) {
+          processor.message.stuckAborted = true
+          await Session.updateMessage(processor.message)
+          log.warn("agent continued without tool calls after nudge — terminating", { sessionID })
+          break
+        }
 
         // The coarse no-progress heuristic is limited to native subagents; it was
         // disabled after measured false positives. Identical-call detection below is
