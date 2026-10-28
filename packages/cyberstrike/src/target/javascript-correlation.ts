@@ -1493,8 +1493,9 @@ function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): strin
     const sourceLocation = sourceRecord?.sourceURL
       ? safeSummaryURL(sourceRecord.sourceURL) + " → " + safeSummaryText(group.sourceFile)
       : safeSummaryText(group.sourceFile)
+    const mappedSource = sourceRecord?.sourceMapSource ? " — original source: " + safeSummaryText(sourceRecord.sourceMapSource) : ""
     const sourceRequests = sourceRecord?.sourceRequestIDs ?? (sourceRecord?.sourceRequestID ? [sourceRecord.sourceRequestID] : [])
-    return "- " + sourceLocation + (sourceRequests.length ? " — asset captured in request(s): " + sourceRequests.join(", ") : "") +
+    return "- " + sourceLocation + mappedSource + (sourceRequests.length ? " — asset captured in request(s): " + sourceRequests.join(", ") : "") +
       " — signals: " + signalText +
       " — function: " + definition +
       " — call/reference sites: " + entries +
