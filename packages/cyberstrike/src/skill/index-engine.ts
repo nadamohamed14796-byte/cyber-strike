@@ -213,7 +213,7 @@ export namespace SkillIndex {
       .toLocaleLowerCase("en-US")
       .replace(/[_/.-]+/g, " ")
       .replace(/[^a-z0-9 ]+/g, " ")
-      .replace(/\\s+/g, " ")
+      .replace(/\s+/g, " ")
       .trim()
   }
 
