@@ -33,7 +33,7 @@ const TargetInitCommand = cmd({
         if (target.parentTargetID) console.log("Parent workspace ID: " + target.parentTargetID)
         console.log("Notes: " + path.join(target.workspacePath, "notes.md"))
         console.log("Workspace integrity: metadata, scope manifest, and notes verified")
-        console.log("Created or verified target directories: scope, assets, recon, urls, requests, javascript, endpoints, testing, findings, evidence, reports, scans, runs, logs, sessions, research")
+        console.log("Core workspace directories: scope/, assets/, runs/. Artifact directories are created on demand.")
       },
     })
   },
