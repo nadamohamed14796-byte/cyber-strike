@@ -33,6 +33,8 @@ const TARGET_DIRECTORIES = [
   "research",
 ] as const
 
+const INITIAL_TARGET_DIRECTORIES = ["scope", "assets", "runs"] as const
+
 export const USER_CONFIRMED_SCOPE_SOURCE = "User-confirmed in conversation"
 
 export type TargetNoteKind =
@@ -564,22 +566,11 @@ function defaultWorkspaceReadme(workspace: Workspace): string {
     "",
     "| Directory | Purpose |",
     "| --- | --- |",
-    "| `scope/` | Explicit authorization and scope boundaries |",
-    "| `assets/` | Stable asset registry and provenance |",
-    "| `recon/` | Recon outputs |",
-    "| `urls/` | Discovered URLs |",
-    "| `requests/` | Request/response references and correlation metadata |",
-    "| `javascript/` | JS assets and analysis/correlation output |",
-    "| `endpoints/` | Endpoint inventory |",
-    "| `testing/` | Test cases and validation attempts |",
-    "| `findings/` | Finding records and lifecycle state |",
-    "| `evidence/` | Evidence artifacts and indexes |",
-    "| `reports/` | Report drafts and exports |",
-    "| `scans/` | Scan manifests and outputs |",
-    "| `runs/` | Resumable run manifests |",
-    "| `logs/` | Target-local logs |",
-    "| `sessions/` | Session references and resumable context |",
-    "| `research/` | Target-specific research observations (not global methodology) |",
+    "| `scope/` | Saved authorization manifest and scope-source copy |",
+    "| `assets/` | Consolidated discovered-asset registry |",
+    "| `runs/` | Run index and resumable checkpoints |",
+    "",
+    "Other artifact directories (such as `recon/`, `urls/`, `javascript/`, `endpoints/`, `testing/`, `findings/`, `evidence/`, and `reports/`) are created only when their first artifact is saved. Keep one canonical inventory per type; do not create empty placeholder folders.",
     "",
     "## Source of truth",
     "",
@@ -702,12 +693,30 @@ async function syncTargetNotesMarkdown(workspace: Workspace): Promise<void> {
   })
 }
 
+async function pruneEmptyArtifactDirectories(workspace: Workspace): Promise<void> {
+  for (const directory of TARGET_DIRECTORIES) {
+    if ((INITIAL_TARGET_DIRECTORIES as readonly string[]).includes(directory)) continue
+    const candidate = path.join(workspace.workspacePath, directory)
+    try {
+      const info = await fs.lstat(candidate)
+      if (!info.isDirectory() || info.isSymbolicLink()) continue
+      // Remove only empty legacy placeholders. Any folder containing user evidence
+      // remains intact; subsequent writes recreate a needed folder safely.
+      await fs.rmdir(candidate)
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw error
+    }
+  }
+}
+
 async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Promise<void> {
   const root = projectRoot()
   workspace.workspacePath = await ensureSafeDirectoryPath(root, workspace.relativePath)
-  for (const directory of TARGET_DIRECTORIES) {
+  for (const directory of INITIAL_TARGET_DIRECTORIES) {
     await ensureSafeDirectoryPath(root, path.join(workspace.relativePath, directory))
   }
+  await pruneEmptyArtifactDirectories(workspace)
   // target.json is retained for compatibility; workspace.json is the canonical
   // manifest consumed by the target workflow and carries stable identity fields.
   await createIfMissing(
