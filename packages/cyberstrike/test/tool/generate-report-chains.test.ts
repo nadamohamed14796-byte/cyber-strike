@@ -77,7 +77,7 @@ test("generate_report exposes INFO-to-INFO chain hypotheses and their linked fin
         expect(result.output).toContain("POTENTIAL_INTERNAL_API_OR_SERVICE_EXPOSURE")
         expect(result.output).toContain(source.id)
         expect(result.output).toContain(target.id)
-        expect(result.output).toContain("Explicit finding link; combined impact still requires validation")
+        expect(result.output).toContain("Explicit finding link; each hop and combined impact require validation")
       } finally {
         await Session.remove(session.id)
       }
