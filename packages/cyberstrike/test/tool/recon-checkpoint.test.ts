@@ -31,16 +31,18 @@ function records(status: ReconPhaseRecord["status"] = "pending"): Record<ReconPh
   return Object.fromEntries(phases.map((phase) => [phase, { status }])) as Record<ReconPhase, ReconPhaseRecord>
 }
 
-test("phase transitions ignore stale ordinary work but enforce real safety prerequisites", () => {
+test("phase transitions require a resolved earlier phase, but partial handoff unlocks progress", () => {
   const state = records("complete")
   state.url_collection = { status: "running" }
-  expect(reconPhaseStartDecision("javascript_analysis", state)).toMatchObject({
-    allowed: true,
-    unresolved: [],
-  })
+  const waiting = reconPhaseStartDecision("javascript_analysis", state)
+  expect(waiting.allowed).toBe(false)
+  expect(waiting.unresolved).toEqual(["url_collection"])
+
+  state.url_collection = { status: "partial", reason: "one collector timed out after alternate source was tried" }
+  expect(reconPhaseStartDecision("javascript_analysis", state).allowed).toBe(true)
 
   state.scope_validation = { status: "pending" }
-  expect(reconPhaseStartDecision("javascript_analysis", state).unresolved).toEqual(["scope_validation"])
+  expect(reconPhaseStartDecision("javascript_analysis", state).unresolved).toContain("scope_validation")
 
   state.scope_validation = { status: "complete" }
   state.workspace_setup = { status: "pending" }
@@ -48,10 +50,12 @@ test("phase transitions ignore stale ordinary work but enforce real safety prere
 
   state.workspace_setup = { status: "complete" }
   state.endpoint_inventory = { status: "pending" }
-  expect(reconPhaseStartDecision("vulnerability_testing", state).unresolved).toEqual(["endpoint_inventory"])
+  expect(reconPhaseStartDecision("vulnerability_testing", state).unresolved).toContain("endpoint_inventory")
 
   state.endpoint_inventory = { status: "complete" }
   state.javascript_analysis = { status: "failed", reason: "one source failed" }
+  expect(reconPhaseStartDecision("vulnerability_testing", state).unresolved).toContain("javascript_analysis")
+  state.javascript_analysis = { status: "partial", reason: "saved evidence and resume point" }
   expect(reconPhaseStartDecision("vulnerability_testing", state).allowed).toBe(true)
 })
 
@@ -157,15 +161,21 @@ test("phase order follows collection, JavaScript, parameters, path discovery, an
   expect(phases.indexOf("parameter_fuzzing")).toBe(phases.indexOf("endpoint_inventory") + 1)
 })
 
-test("phase sequence remains defined by the workflow, but ordinary unfinished phases do not block handoff", () => {
+test("unfinished phases remain required until completed or explicitly handed off", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "pending" }
+  expect(unresolvedReconPrerequisites("parameter_discovery", state)).toContain("javascript_analysis")
+  state.javascript_analysis = { status: "partial", reason: "source map still pending" }
   expect(unresolvedReconPrerequisites("parameter_discovery", state)).toEqual([])
 
   state.parameter_discovery = { status: "pending" }
+  expect(unresolvedReconPrerequisites("directory_fuzzing", state)).toContain("parameter_discovery")
+  state.parameter_discovery = { status: "partial", reason: "one parameter tool unavailable" }
   expect(unresolvedReconPrerequisites("directory_fuzzing", state)).toEqual([])
 
-  state.directory_fuzzing = { status: "pending" }
+  state.directory_fuzzing = { status: "running" }
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("directory_fuzzing")
+  state.directory_fuzzing = { status: "partial", reason: "wordlist branch timed out" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
 
   state.endpoint_inventory = { status: "complete" }
@@ -179,19 +189,23 @@ test("workspace setup cannot be bypassed by marking it unavailable", () => {
   expect(unresolvedReconPrerequisites("asset_discovery", state)).toContain("workspace_setup")
 })
 
-test("ordinary phase failures remain recorded but do not block independent phase transitions", () => {
+test("failed phases need an explicit handoff before later checkpoints start", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "unavailable", reason: "No JavaScript assets were observed" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
   state.live_hosts_ports = { status: "failed", reason: "Scanner failed" }
+  expect(unresolvedReconPrerequisites("url_collection", state)).toContain("live_hosts_ports")
+  state.live_hosts_ports = { status: "partial", reason: "alternate source was tried" }
   expect(unresolvedReconPrerequisites("url_collection", state)).toEqual([])
 })
 
-test("parameter discovery is retained in the ordered worklist without blocking endpoint inventory", () => {
+test("parameter discovery must be resolved or handed off before endpoint inventory", () => {
   const state = records("complete")
   state.parameter_discovery = { status: "pending" }
-  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toContain("parameter_discovery")
   state.parameter_discovery = { status: "complete", summary: "parameter inventory saved" }
+  expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
+  state.parameter_discovery = { status: "partial", reason: "secondary source unavailable" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
 })
 
