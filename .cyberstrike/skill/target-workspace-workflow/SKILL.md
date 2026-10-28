@@ -23,7 +23,7 @@ The shared Target Workflow Contract is the authority for authorization semantics
 
 Use the Target Workflow Contract for scope inheritance, tool selection/installation, and end-to-end sequencing. This skill owns only workspace setup and persistence. Do not create a separate output per tool or target.
 
-Use `python3 .cyberstrike/skill/scripts/tool_preflight.py --help` only to inspect the helper; if unavailable, verify the selected executable with `command -v` plus its documented version/help check. If the selected CLI is missing, use `ensure_tools` for that exact CLI and verify installation before choosing another method.
+Resolve `tool_preflight.py` from the installed skill/catalog root and invoke it by absolute path; do not assume the target workspace is the repository root. If the helper is unavailable, verify the selected executable with `command -v` plus its documented version/help check. If the selected CLI is missing, use `ensure_tools` for that exact CLI and verify installation before choosing another method.
 
 Official resources: https://owasp.org/www-project-web-security-testing-guide/ and the selected tool's official upstream documentation.
 
