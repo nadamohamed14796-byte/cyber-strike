@@ -94,6 +94,31 @@ Every SKILL.md starts with YAML frontmatter between `---` markers.
 
 ---
 
+## Runtime Routing Categories
+
+Use the existing catalog vocabulary below where it fits. Legacy/imported categories may remain when they are meaningful, but do not invent near-duplicates such as `api-security`, `api_security`, and `API security` for the same concept.
+
+| Category | Use for |
+| --- | --- |
+| `recon` | Asset discovery, subdomains, services, crawling, endpoints, JavaScript, and passive/active footprinting |
+| `web-application` | General web vulnerability assessment and cross-cutting application behavior |
+| `api-security` | API contracts, REST/GraphQL/gRPC, schema exposure, object/property authorization, and API-specific abuse controls |
+| `client-side` | Browser behavior, JavaScript sources/sinks, DOM XSS, storage, origin, and client trust boundaries |
+| `identity` | Authentication, account lifecycle, SSO, credentials, MFA, and session identity |
+| `authorization` | Object/function/tenant access controls and privilege boundaries |
+| `input-validation` | Injection, parsing, deserialization, file handling, and validation boundaries |
+| `business-logic` | Multi-step workflows, race conditions, state transitions, quotas, and abuse cases |
+| `infrastructure` | Network/service exposure, operating systems, hosts, and platform configuration |
+| `cloud` | Cloud identity, services, storage, metadata, network and control-plane security |
+| `post-exploitation` | Host/identity post-compromise checks; use only when the assessment explicitly authorizes that activity |
+| `methodology` | Scope, workflow, workspaces, orchestration, and assessment process |
+| `bug-bounty-methodology` | Bug-bounty-specific prioritization, evidence handling, reportability and triage |
+| `reporting` | Finding write-up, severity calibration, remediation, and report validation |
+| `process` | General evidence hygiene, record keeping, or reusable process controls |
+| `compliance` | Policy/control-framework checks such as CIS or NIST |
+
+Keep `category` broad and stable; use `tags` for precise technique, surface, protocol, framework, evidence type, and common search aliases. Add `tech_stack` for technologies, `cwe_ids`/ `owasp_id` for justified mappings, and `chains_with` for evidence-conditional follow-up playbooks.
+
 ## Content Structure
 
 ### For Offensive/Pentest Skills (OWASP)
