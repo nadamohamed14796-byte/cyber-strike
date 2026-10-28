@@ -8,7 +8,7 @@ const contract = readFileSync(
 
 test("target workflow defines autonomous recon handoffs, one workspace, and evidence-based closeout", () => {
   expect(contract).toContain("Run end-to-end without making the user drive each phase")
-  expect(contract).toContain("do not stop to ask the user to say")
+  expect(contract).toContain("Do not ask the user to say")
   expect(contract).toContain("One authoritative scope decision")
   expect(contract).toContain("A leading wildcard such as *.example.com authorizes example.com and all subdomains")
   expect(contract).toContain("Exclusions always override inclusions")
@@ -24,7 +24,7 @@ test("target workflow defines autonomous recon handoffs, one workspace, and evid
   expect(contract).toContain("runs/tmp/<phase>/")
   expect(contract).toContain("within 55 minutes")
   expect(contract).toContain("Never delete captured JavaScript/source-map bodies")
-  expect(contract).toContain("Use `handoff` when a meaningful alternative has failed or progress has stalled")
+  expect(contract).toContain("Use `handoff` after a meaningful alternative fails or progress has stalled")
   expect(contract).toContain("The state becomes **partial**")
   expect(contract).toContain("`pending`, `running`, `blocked`, and `failed` work must be finished or explicitly handed off")
 })
