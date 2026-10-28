@@ -171,7 +171,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
   description: [
     "Tracks the canonical recon run, phase status, prerequisites, and artifact checks; it is not a tool allowlist. Ordinary recon tools may run whenever useful, even if an earlier phase record is stale or missing. If a phase is already running, resume it.",
     "Use status to recover progress and begin/complete/block/fail/unavailable/defer to record outcomes. Follow prerequisites for checkpoint transitions, but do not use phase state to restrict ordinary tool selection. For directory/parameter work, save useful wordlists, settings, and results. Record JavaScript correlation artifacts and verify the exact reports/recon-final.md path before reporting completion.",
-    "A normal recon run completes verified endpoint inventory and reporting, while vulnerability_testing stays deferred unless the user explicitly requests testing. Testing requires completed endpoint_inventory; refresh the report after testing. Never launch scanners/session_scan automatically.",
+    "A normal recon run completes verified endpoint inventory and reporting. parameter_fuzzing and vulnerability_testing are active testing phases; defer them unless the user explicitly requests active testing. Vulnerability testing requires completed endpoint_inventory; refresh the report after testing. Never launch scanners/session_scan automatically.",
     "Scope and workspace setup remain required. For new, changed, or unresolved scope, call scope_check once for the actual starting asset, with target_url selecting the canonical root workspace and scope_validation_target set to that exact asset URL. Reuse a valid saved decision on resume; active-request tools independently enforce scope.",
   ].join("\n"),
   parameters: Parameters,
@@ -263,8 +263,8 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       if (!params.phase) return { title: "Recon checkpoint rejected", output: "phase is required for this action.", metadata: { saved: false, reason: "phase_required" } }
       const phase = params.phase
       const record = run.phases[phase]
-      if (params.action === "defer" && phase !== "vulnerability_testing") {
-        return { title: "Recon checkpoint rejected", output: "Only the optional vulnerability_testing phase may be deferred. Scope validation, workspace setup, discovery, JavaScript analysis, endpoint inventory, and reporting must not be deferred.", metadata: { saved: false, reason: "phase_not_deferable", phase } }
+      if (params.action === "defer" && phase !== "vulnerability_testing" && phase !== "parameter_fuzzing") {
+        return { title: "Recon checkpoint rejected", output: "Only the optional active-testing phases parameter_fuzzing and vulnerability_testing may be deferred. Scope validation, workspace setup, passive discovery, JavaScript analysis, endpoint inventory, and reporting must not be deferred.", metadata: { saved: false, reason: "phase_not_deferable", phase } }
       }
 
       if (params.action === "begin") {
