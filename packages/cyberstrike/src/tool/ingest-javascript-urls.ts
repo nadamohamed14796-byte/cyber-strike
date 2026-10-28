@@ -204,11 +204,11 @@ function looksLikeJavaScript(body: string, contentType: string, url: string): bo
   // Some CDNs omit or mislabel Content-Type. Inspect the full response so syntax
   // after a large license banner or generated comment is not silently ignored.
   const sample = body.trimStart()
-  if (/^(?:<!doctype\\s+html|<html\\b)/i.test(sample)) return false
+  if (/^(?:<!doctype\s+html|<html\b)/i.test(sample)) return false
   // A script extension remains a strong asset hint even when a CDN serves it as
   // text/plain or a minified bundle does not match the lightweight syntax sniff.
-  if (/\\.(?:m?js|cjs)$/i.test(new URL(url).pathname)) return true
-  return /(?:\\b(?:function|const|let|var|import|export|class|return|throw|async|await)\\b|\\b(?:fetch|axios|window|document|globalThis|self|define|require|exports|module)\\s*[.(=]|=>|!function\\s*\\(|sourceMappingURL)/.test(sample)
+  if (/\.(?:m?js|cjs)$/i.test(new URL(url).pathname)) return true
+  return /(?:\b(?:function|const|let|var|import|export|class|return|throw|async|await)\b|\b(?:fetch|axios|window|document|globalThis|self|define|require|exports|module)\s*[.(=]|=>|!function\s*\(|sourceMappingURL)/.test(sample)
 }
 
 async function readCompleteResponse(response: Response): Promise<Uint8Array> {
