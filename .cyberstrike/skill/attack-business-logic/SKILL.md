@@ -4,12 +4,7 @@ description: "Validate business-rule and workflow flaws using documented invaria
 category: "business-logic"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - business-logic
-  - workflow
-  - payments
-  - state-machine
-  - authorization
+tags: [business-logic, workflow, payments, state-machine, authorization, workflow-abuse, state-transition, pricing, cart, quota]
 tech_stack:
   - web
   - rest-api
