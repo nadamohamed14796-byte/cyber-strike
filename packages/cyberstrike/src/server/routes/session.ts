@@ -1301,7 +1301,14 @@ export const SessionRoutes = lazy(() =>
               },
             },
           },
-          409: { description: "Request is not failed or its status changed before retry" },
+          409: {
+            description: "Request is not failed or its status changed before retry",
+            content: {
+              "application/json": {
+                schema: resolver(z.object({ error: z.string() })),
+              },
+            },
+          },
           ...errors(400, 404),
         },
       }),
