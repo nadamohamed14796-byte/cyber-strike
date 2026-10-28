@@ -30,9 +30,8 @@ function safeRequestLabel(captured: CapturedRequest): string {
   const requestTarget = match[2]!
   try {
     const url = /^https?:\\/\\//i.test(requestTarget) ? new URL(requestTarget) : undefined
-    return (url ? url.origin + url.pathname : requestTarget.split(/[?#]/, 1)[0]!) 
-      ? (method + " " + (url ? url.origin + url.pathname : requestTarget.split(/[?#]/, 1)[0]!)).slice(0, 240)
-      : (method + " [empty path]")
+    const safeTarget = url ? url.origin + url.pathname : requestTarget.split(/[?#]/, 1)[0]!
+    return (method + " " + (safeTarget || "[empty path]")).slice(0, 240)
   } catch {
     return (method + " " + requestTarget.split(/[?#]/, 1)[0]!).slice(0, 240)
   }
