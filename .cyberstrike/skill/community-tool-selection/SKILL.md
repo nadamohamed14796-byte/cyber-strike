@@ -9,6 +9,8 @@ tags:
   - cli-tooling
   - recon
   - bug-bounty
+  - tool-preflight
+  - research
 prerequisites:
   - recon-methodology
 ---
