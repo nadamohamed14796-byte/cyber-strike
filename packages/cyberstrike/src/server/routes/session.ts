@@ -1324,7 +1324,7 @@ export const SessionRoutes = lazy(() =>
         const existing = Request.get(sessionID).find((item) => item.id === requestID)
         if (!existing) {
           c.status(404)
-          return c.json({ error: "Captured request not found" })
+          return c.json({ name: "NotFoundError" as const, data: { message: "Captured request not found" } })
         }
         if (existing.status !== "failed") {
           c.status(409)
