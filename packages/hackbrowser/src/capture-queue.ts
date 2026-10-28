@@ -11,12 +11,48 @@ export type CaptureDrainResult = {
   rejected: number
 }
 
+export type RejectedCaptureDetail = {
+  /** Method and query-free path only; never retain raw headers or bodies in the diagnostic ledger. */
+  request: string
+  status: number | null
+  reason: string
+}
+
 const activeDrains = new WeakMap<CapturedRequest[], Promise<CaptureDrainResult>>()
 const rejectedTotals = new WeakMap<CapturedRequest[], number>()
+const rejectedDetails = new WeakMap<CapturedRequest[], RejectedCaptureDetail[]>()
+
+function safeRequestLabel(captured: CapturedRequest): string {
+  const firstLine = captured.raw.split(/\\r?\\n/, 1)[0]?.trim() ?? ""
+  const match = /^([A-Z]+)\\s+(\\S+)/i.exec(firstLine)
+  if (!match) return "[unparsed captured request]"
+  const method = match[1]!.toUpperCase()
+  const requestTarget = match[2]!
+  try {
+    const url = /^https?:\\/\\//i.test(requestTarget) ? new URL(requestTarget) : undefined
+    return (url ? url.origin + url.pathname : requestTarget.split(/[?#]/, 1)[0]!) 
+      ? (method + " " + (url ? url.origin + url.pathname : requestTarget.split(/[?#]/, 1)[0]!)).slice(0, 240)
+      : (method + " [empty path]")
+  } catch {
+    return (method + " " + requestTarget.split(/[?#]/, 1)[0]!).slice(0, 240)
+  }
+}
+
+function safeErrorReason(error: Error): string {
+  return error.message
+    .replace(/https?:\\/\\/[^\\s"'<>]+/gi, "[URL]")
+    .replace(/(authorization|cookie|token|secret|password|api[_-]?key)\\s*[:=]\\s*[^\\s,;]+/gi, "$1=[REDACTED]")
+    .slice(0, 240)
+}
 
 /** Number of permanent backend rejections observed for this queue over its lifetime. */
 export function permanentlyRejectedCaptureCount(queue: CapturedRequest[]): number {
   return rejectedTotals.get(queue) ?? 0
+}
+
+/** Recent, redacted diagnostics for permanently rejected captures in this live queue. */
+export function permanentlyRejectedCaptureDetails(queue: CapturedRequest[]): RejectedCaptureDetail[] {
+  return (rejectedDetails.get(queue) ?? []).map((item) => ({ ...item }))
 }
 
 /**
@@ -60,11 +96,21 @@ export async function drainCaptureQueue(
           queue.shift()
           rejected++
           rejectedTotals.set(queue, (rejectedTotals.get(queue) ?? 0) + 1)
+          const detail: RejectedCaptureDetail = {
+            request: safeRequestLabel(captured),
+            status: error.status ?? null,
+            reason: safeErrorReason(error),
+          }
+          const recent = rejectedDetails.get(queue) ?? []
+          recent.push(detail)
+          if (recent.length > 20) recent.splice(0, recent.length - 20)
+          rejectedDetails.set(queue, recent)
           log.error("captured request was permanently rejected; continuing with later requests", {
             queue: label,
-            status: error.status ?? null,
+            request: detail.request,
+            status: detail.status,
             pending: queue.length,
-            error: error.message,
+            error: detail.reason,
           })
           continue
         }
