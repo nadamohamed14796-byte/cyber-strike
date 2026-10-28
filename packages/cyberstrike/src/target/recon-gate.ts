@@ -1,7 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 import { createHash } from "node:crypto"
-import { TargetMemory, type Workspace } from "./index"
+import { TargetMemory, type TargetScope, type Workspace } from "./index"
 
 export const RECON_PHASES = [
   "scope_validation",
@@ -31,6 +31,8 @@ export type ReconPhaseRecord = {
   artifacts?: string[]
   /** Exact starting asset whose persisted scope check justified this checkpoint. */
   scopeValidationTarget?: string
+  /** Fingerprint of the authorization rules that were validated for this run. */
+  scopeFingerprint?: string
 }
 
 export type ReconRunManifest = {
@@ -42,6 +44,21 @@ export type ReconRunManifest = {
   updatedAt: string
   currentPhase: ReconPhase | null
   phases: Record<ReconPhase, ReconPhaseRecord>
+}
+
+/** Stable fingerprint of authorization-relevant scope state; ordering alone is not a change. */
+export function reconScopeFingerprint(scope: Pick<TargetScope,
+  "targetURL" | "status" | "scopeItems" | "excludedItems" | "authorizationSource" | "authorizationReference"
+>): string {
+  const canonical = {
+    targetURL: scope.targetURL,
+    status: scope.status,
+    scopeItems: [...scope.scopeItems].sort(),
+    excludedItems: [...scope.excludedItems].sort(),
+    authorizationSource: scope.authorizationSource,
+    authorizationReference: scope.authorizationReference,
+  }
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
 
 export function reconRunID(targetID: string): string {
