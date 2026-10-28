@@ -28,7 +28,8 @@ function compileScopeItems(items: readonly string[]): CompiledScopeItems {
   const hostPorts: string[] = []
   const typedEntries: string[] = []
   const wildcardPatterns: string[] = []
-  for (const item of items) {
+  for (const entry of items) {
+    const item = entry.trim()
     if (/^(?:domain|wildcard|url|cidr|ip address|api|ai model|smart contracts?|source code|executable|hardware(?:\/iot)?|ios(?:: app store|: testflight|: \.ipa)?|android(?: play store|: \.apk)?|windows: microsoft store|aws account|azure account|aws cloud config|azure cloud config|other(?: asset)?)[ \t]*:/i.test(item)) typedEntries.push(item)
     else if (/^https?:\/\//i.test(item)) urlPatterns.push(item)
     else if (/^\d+(?:\.\d+){3}\/.+$/.test(item) || (item.includes("/") && item.includes(":"))) cidrs.push(item)
