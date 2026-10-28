@@ -9,11 +9,11 @@ type CompiledScopeItems = {
   typedEntries: string[]
   wildcardPatterns: string[]
 }
-const compiledScopeItemsCache = new WeakMap<string[], CompiledScopeItems>()
+const compiledScopeItemsCache = new WeakMap<readonly string[], CompiledScopeItems>()
 
 
 /** Compile large scope manifests once; common exact-host checks then use O(1) set lookups. */
-function compileScopeItems(items: string[]): CompiledScopeItems {
+function compileScopeItems(items: readonly string[]): CompiledScopeItems {
   // Only cache immutable manifests. This function is also exported for general
   // callers and tests that may reuse a mutable array; identity-only caching would
   // otherwise keep authorizing entries removed from that array.
@@ -43,7 +43,7 @@ function compileScopeItems(items: string[]): CompiledScopeItems {
 }
 
 /** Return only the entries that match this URL without scanning every host in a large file. */
-export function matchingScopeItems(candidate: URL | string, items: string[]): string[] {
+export function matchingScopeItems(candidate: URL | string, items: readonly string[]): string[] {
   const url = typeof candidate === "string" ? new URL(candidate) : candidate
   const index = compileScopeItems(items)
   const hostname = url.hostname.toLowerCase().replace(/\.$/, "")
