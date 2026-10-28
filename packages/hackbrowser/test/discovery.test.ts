@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test"
 import { makeMatcher } from "../src/scope.ts"
 import { toScopedPages } from "../src/discovery/url.ts"
+import { emitEndpoints } from "../src/discovery/emit.ts"
 
 const inScope = makeMatcher(["*.example.com"])
 const base = "https://app.example.com/dash/#/home"
@@ -28,9 +29,7 @@ test("toScopedPages skips non-http(s) and malformed values", () => {
 })
 
 
-import { emitEndpoints } from "../src/discovery/emit.ts"
-
- test("failed discovered endpoint delivery is eligible for a later retry", async () => {
+test("failed discovered endpoint delivery is eligible for a later retry", async () => {
   const originalFetch = globalThis.fetch
   const seen = new Set<string>()
   let attempts = 0
