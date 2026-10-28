@@ -37,7 +37,7 @@ describe("Phase-critical skill pinning", () => {
             expect(skill!.description.trim(), phaseID + " requires a usable description for " + name).not.toBe("")
             expect(skill!.category?.trim(), phaseID + " requires a routing category for " + name).toBeTruthy()
             expect(skill!.tags?.length, phaseID + " requires searchable tags for " + name).toBeGreaterThan(0)
-            expect(skill!.content, phaseID + " requires readable section headings for " + name).toMatch(/^##\\s+.+/m)
+            expect(skill!.content, phaseID + " requires readable section headings for " + name).toMatch(/^##\s+.+/m)
           }
         }
       },
