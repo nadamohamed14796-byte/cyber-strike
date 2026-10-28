@@ -1502,12 +1502,6 @@ function renderCanonicalJavaScriptAnalysis(
       (file.sourceMapStatus ? " — source-map status: " + file.sourceMapStatus : ""),
     ) : ["- No local source files were analyzed."]),
     "",
-    "## Function and call-site inventory",
-    ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) =>
-      "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
-      safeSummaryText(fn.sourceFile) + ":" + fn.line,
-    ) : ["- No named function candidates were extracted."]),
-    "",
     "## Source-map status",
     ...(sourceMapReferences.length ? sourceMapReferences.map((item) =>
       "- " + safeSummaryURL(item.url) + " — " + item.status +
@@ -1518,6 +1512,12 @@ function renderCanonicalJavaScriptAnalysis(
     ...(failedAssets.length ? ["", "## Failed asset fetches", ...failedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — failed; inspect the manifest error field locally.")] : []),
     ...(skippedAssets.length ? ["", "## Skipped asset fetches", ...skippedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — skipped; inspect the manifest status/error locally.")] : []),
     "",
+        "## Function and call-site inventory",
+        ...(graph.javascriptAnalysis.functions.length ? graph.javascriptAnalysis.functions.map((fn) =>
+          "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
+          safeSummaryText(fn.sourceFile) + ":" + fn.line,
+        ) : ["- No named function candidates were extracted."]),
+        "",
     "## API and request intelligence",
     ...(graph.javascriptAnalysis.requestCandidates.length ? graph.javascriptAnalysis.requestCandidates.map((item) =>
       "- " + (item.method ?? "UNKNOWN") + " " + safeSummaryText(item.urlTemplate) +
