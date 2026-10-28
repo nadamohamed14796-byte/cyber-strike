@@ -1487,7 +1487,7 @@ function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): strin
         ).join(" | ")
       : "no request call attributed to this function"
     const entries = callSites.length
-      ? callSites.map((site) => site.kind + "@" + site.line).join(", ")
+      ? callSites.map((site) => site.kind + "@" + site.line + (site.callerFunctionName ? " in " + safeSummaryText(site.callerFunctionName) : " at module/component scope")).join(", ")
       : "no UI/event/callback reference matched"
     const sourceRecord = sourceFiles.find((file) => file.relativePath === group.sourceFile)
     const sourceLocation = sourceRecord?.sourceURL
@@ -1633,7 +1633,7 @@ function renderCanonicalJavaScriptAnalysis(
             safeSummaryText(fn.sourceFile) + ":" + fn.line +
             (sourceAsset?.sourceMapSource ? " — mapped source: " + safeSummaryText(sourceAsset.sourceMapSource) : "") +
             (sourceAsset?.sourceURL ? " — asset URL: " + safeSummaryURL(sourceAsset.sourceURL) : "") +
-            (callSites.length ? " — candidate references: " + callSites.map((site) => site.kind + "@" + site.line).join(", ") : " — no UI/event/callback references matched")
+            (callSites.length ? " — candidate references: " + callSites.map((site) => site.kind + "@" + site.line + (site.callerFunctionName ? " in " + safeSummaryText(site.callerFunctionName) : " at module/component scope")).join(", ") : " — no UI/event/callback references matched")
         }) : ["- No named function candidates were extracted."]),
         "",
     "## API and request intelligence",
