@@ -34,3 +34,4 @@ export {
   ValidationViolationTable,
   VerificationAttemptTable,
 } from "../methodology/methodology.sql"
+export { ChainFindingLinkTable } from "../methodology/chain-finding-link.sql"
