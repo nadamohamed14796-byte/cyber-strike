@@ -1,6 +1,8 @@
-import { Database, and, eq, inArray } from "../storage/db"
+import { Database, and, desc, eq, inArray, or } from "../storage/db"
 import { ChainCandidateTable } from "./methodology.sql"
 import { ChainFindingLinkTable, type ChainFindingRelation } from "./chain-finding-link.sql"
+import { ChainValidationTable, type ChainValidationOutcome } from "./chain-validation.sql"
+import { FindingValidationTable } from "./finding-validation.sql"
 import { VulnerabilityTable } from "../session/session.sql"
 import { Identifier } from "../id/id"
 import { Intel } from "./intel"
@@ -36,6 +38,16 @@ export namespace Chain {
     confidence: number
     detectedAt: number
     findingLinks?: FindingLink[]
+    validation?: ValidationRecord
+  }
+
+  export interface ValidationRecord {
+    id: string
+    outcome: ChainValidationOutcome
+    combinedFindingID?: string
+    evidence: string
+    validatedBy: string
+    validatedAt: number
   }
 
   const OAUTH_REGEX = /\b(oauth|authorize|callback|redirect_uri|token|sso|saml|openid)\b/i
@@ -418,15 +430,33 @@ export namespace Chain {
   }
 
   export function load(sessionID: string): Candidate[] {
-    const { rows, links } = Database.use((db) => ({
+    const { rows, links, validations } = Database.use((db) => ({
       rows: db.select().from(ChainCandidateTable).where(eq(ChainCandidateTable.session_id, sessionID)).all(),
       links: db.select().from(ChainFindingLinkTable).where(eq(ChainFindingLinkTable.session_id, sessionID)).all(),
+      validations: db
+        .select()
+        .from(ChainValidationTable)
+        .where(eq(ChainValidationTable.session_id, sessionID))
+        .orderBy(desc(ChainValidationTable.time_created))
+        .all(),
     }))
     const linksByChain = new Map<string, FindingLink[]>()
     for (const row of links) {
       const list = linksByChain.get(row.chain_candidate_id) ?? []
       list.push(toFindingLink(row))
       linksByChain.set(row.chain_candidate_id, list)
+    }
+    const validationByChain = new Map<string, ValidationRecord>()
+    for (const row of validations) {
+      if (validationByChain.has(row.chain_candidate_id)) continue
+      validationByChain.set(row.chain_candidate_id, {
+        id: row.id,
+        outcome: row.outcome as ChainValidationOutcome,
+        combinedFindingID: row.combined_vulnerability_id ?? undefined,
+        evidence: row.evidence,
+        validatedBy: row.validated_by,
+        validatedAt: row.time_created,
+      })
     }
     return rows.map((r) => ({
       id: r.id,
@@ -441,6 +471,7 @@ export namespace Chain {
       confidence: r.confidence,
       detectedAt: r.detected_at ?? r.time_created,
       findingLinks: linksByChain.get(r.id) ?? [],
+      validation: validationByChain.get(r.id),
     }))
   }
 
@@ -462,12 +493,12 @@ export namespace Chain {
 
   export type LinkFindingResult =
     | { ok: true; created: boolean; link: FindingLink }
-    | { ok: false; reason: "chain_not_found" | "finding_not_found" | "inactive_finding" | "self_link" }
+    | { ok: false; reason: "chain_not_found" | "finding_not_found" | "inactive_finding" | "self_link" | "chain_terminal" }
 
   /**
    * Persist an explicit directed edge between two findings and one chain candidate.
-   * Every referenced row must belong to the same session; this relationship does not
-   * alter finding triage or chain status.
+   * Every referenced row must belong to the same session. A persisted edge starts
+   * targeted validation but never confirms combined impact or approves a finding.
    */
   export function linkFindings(input: {
     sessionID: string
@@ -480,7 +511,7 @@ export namespace Chain {
 
     return Database.transaction((db) => {
       const chain = db
-        .select({ id: ChainCandidateTable.id })
+        .select({ id: ChainCandidateTable.id, status: ChainCandidateTable.status })
         .from(ChainCandidateTable)
         .where(and(
           eq(ChainCandidateTable.id, input.chainID),
@@ -488,6 +519,9 @@ export namespace Chain {
         ))
         .get()
       if (!chain) return { ok: false, reason: "chain_not_found" } as const
+      if (chain.status === "confirmed" || chain.status === "disproven") {
+        return { ok: false, reason: "chain_terminal" } as const
+      }
 
       const findings = db
         .select({ id: VulnerabilityTable.id, status: VulnerabilityTable.status })
@@ -510,6 +544,7 @@ export namespace Chain {
       )
       const existingLink = db.select().from(ChainFindingLinkTable).where(conditions).get()
       if (existingLink) {
+        markCandidateTesting(db, input.sessionID, input.chainID)
         return { ok: true, created: false, link: toFindingLink(existingLink) } as const
       }
 
@@ -531,7 +566,143 @@ export namespace Chain {
 
       const saved = db.select().from(ChainFindingLinkTable).where(conditions).get()
       if (!saved) throw new Error("Chain finding link insert did not persist after conflict handling.")
+      markCandidateTesting(db, input.sessionID, input.chainID)
       return { ok: true, created: saved.id === id, link: toFindingLink(saved) } as const
+    })
+  }
+
+  function markCandidateTesting(db: Database.TxOrDb, sessionID: string, chainID: string) {
+    db.update(ChainCandidateTable)
+      .set({ status: "testing", time_updated: Date.now() })
+      .where(and(
+        eq(ChainCandidateTable.id, chainID),
+        eq(ChainCandidateTable.session_id, sessionID),
+        eq(ChainCandidateTable.status, "detected"),
+      ))
+      .run()
+  }
+
+  /** Move linked candidates into testing when an individual finding is approved. */
+  export function onFindingApproved(sessionID: string, findingID: string): void {
+    Database.transaction((db) => {
+      const links = db
+        .select({ chainID: ChainFindingLinkTable.chain_candidate_id })
+        .from(ChainFindingLinkTable)
+        .where(and(
+          eq(ChainFindingLinkTable.session_id, sessionID),
+          or(
+            eq(ChainFindingLinkTable.source_vulnerability_id, findingID),
+            eq(ChainFindingLinkTable.target_vulnerability_id, findingID),
+          ),
+        ))
+        .all()
+      for (const link of links) markCandidateTesting(db, sessionID, link.chainID)
+    })
+  }
+
+  export type ValidateChainResult =
+    | { ok: true; outcome: ChainValidationOutcome; chainID: string; combinedFindingID?: string }
+    | {
+        ok: false
+        reason: "chain_not_found" | "chain_terminal" | "evidence_required" |
+          "combined_finding_required" | "finding_not_found" | "finding_not_approved" | "finding_validation_required"
+      }
+
+  /**
+   * Persist the combined-impact verdict. "confirmed" is gated on an approved combined
+   * vulnerability whose latest independent finding-validation verdict is confirmed.
+   */
+  export function recordValidation(input: {
+    sessionID: string
+    chainID: string
+    outcome: ChainValidationOutcome
+    evidence: string
+    validatedBy: string
+    combinedFindingID?: string
+  }): ValidateChainResult {
+    const evidence = input.evidence.trim()
+    if (evidence.length < 40) return { ok: false, reason: "evidence_required" }
+    if (input.outcome === "confirmed" && !input.combinedFindingID) {
+      return { ok: false, reason: "combined_finding_required" }
+    }
+
+    return Database.transaction((db) => {
+      const chain = db
+        .select({ id: ChainCandidateTable.id, status: ChainCandidateTable.status })
+        .from(ChainCandidateTable)
+        .where(and(
+          eq(ChainCandidateTable.id, input.chainID),
+          eq(ChainCandidateTable.session_id, input.sessionID),
+        ))
+        .get()
+      if (!chain) return { ok: false, reason: "chain_not_found" } as const
+      if (chain.status === "confirmed" || chain.status === "disproven") {
+        return { ok: false, reason: "chain_terminal" } as const
+      }
+
+      let combinedFindingID: string | undefined
+      if (input.outcome === "confirmed") {
+        const finding = db
+          .select({ id: VulnerabilityTable.id, status: VulnerabilityTable.status })
+          .from(VulnerabilityTable)
+          .where(and(
+            eq(VulnerabilityTable.id, input.combinedFindingID!),
+            eq(VulnerabilityTable.session_id, input.sessionID),
+          ))
+          .get()
+        if (!finding) return { ok: false, reason: "finding_not_found" } as const
+        if (finding.status !== "approved") return { ok: false, reason: "finding_not_approved" } as const
+
+        const validation = db
+          .select({ verdict: FindingValidationTable.verdict })
+          .from(FindingValidationTable)
+          .where(and(
+            eq(FindingValidationTable.session_id, input.sessionID),
+            eq(FindingValidationTable.vulnerability_id, finding.id),
+          ))
+          .orderBy(desc(FindingValidationTable.time_created))
+          .limit(1)
+          .get()
+        if (validation?.verdict !== "confirmed") {
+          return { ok: false, reason: "finding_validation_required" } as const
+        }
+        combinedFindingID = finding.id
+      }
+
+      const now = Date.now()
+      db.insert(ChainValidationTable)
+        .values({
+          id: Identifier.ascending("chain_validation"),
+          session_id: input.sessionID,
+          chain_candidate_id: input.chainID,
+          outcome: input.outcome,
+          combined_vulnerability_id: combinedFindingID ?? null,
+          evidence,
+          validated_by: input.validatedBy.trim() || "unknown",
+          time_created: now,
+          time_updated: now,
+        })
+        .run()
+
+      const status = input.outcome === "confirmed"
+        ? "confirmed"
+        : input.outcome === "disproven"
+          ? "disproven"
+          : "testing"
+      db.update(ChainCandidateTable)
+        .set({ status, time_updated: now })
+        .where(and(
+          eq(ChainCandidateTable.id, input.chainID),
+          eq(ChainCandidateTable.session_id, input.sessionID),
+        ))
+        .run()
+
+      return {
+        ok: true,
+        outcome: input.outcome,
+        chainID: input.chainID,
+        combinedFindingID,
+      } as const
     })
   }
 
