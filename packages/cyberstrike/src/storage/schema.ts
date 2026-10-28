@@ -35,3 +35,4 @@ export {
   VerificationAttemptTable,
 } from "../methodology/methodology.sql"
 export { ChainFindingLinkTable } from "../methodology/chain-finding-link.sql"
+export { ChainValidationTable } from "../methodology/chain-validation.sql"
