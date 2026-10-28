@@ -1623,10 +1623,14 @@ function renderCanonicalJavaScriptAnalysis(
     ...(skippedAssets.length ? ["", "## Skipped asset fetches", ...skippedAssets.map((asset) => "- " + safeSummaryURL(asset.url) + " — skipped; inspect the manifest status/error locally.")] : []),
     "",
         "## Function and call-site inventory",
-        ...(functions.length ? functions.map((fn) =>
-          "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
-          safeSummaryText(fn.sourceFile) + ":" + fn.line,
-        ) : ["- No named function candidates were extracted."]),
+        ...(functions.length ? functions.map((fn) => {
+          const sourceAsset = localFiles.find((file) => file.relativePath === fn.sourceFile)
+          const callSites = fn.callSites ?? []
+          return "- " + safeSummaryText(fn.name) + "(" + fn.parameters.map(safeSummaryText).join(", ") + ") — " +
+            safeSummaryText(fn.sourceFile) + ":" + fn.line +
+            (sourceAsset?.sourceURL ? " — asset URL: " + safeSummaryURL(sourceAsset.sourceURL) : "") +
+            (callSites.length ? " — candidate references: " + callSites.map((site) => site.kind + "@" + site.line).join(", ") : " — no UI/event/callback references matched")
+        }) : ["- No named function candidates were extracted."]),
         "",
     "## API and request intelligence",
     ...(requestCandidates.length ? requestCandidates.map((item) =>
