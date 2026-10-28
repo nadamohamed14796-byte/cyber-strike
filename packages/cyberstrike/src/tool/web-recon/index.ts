@@ -611,7 +611,7 @@ export const WebReconTool = Tool.define("web_recon", {
     let finalOutput = output
     if (targetWorkspace && (program === "session_scan" || params.target)) {
       const completedAt = new Date().toISOString()
-      const filename = program === "session_scan" ? "recon/session-scan-results.json" : "recon/web-recon-results.json"
+      const filename = program === "session_scan" ? "findings/session-scan-results.json" : "recon/web-recon-results.json"
       const requestedTarget = params.target ?? "session_scan: authorized origins from the current session"
       try {
         // Preserve distinct result snapshots and attempt provenance in one stable
