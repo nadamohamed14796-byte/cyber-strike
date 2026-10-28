@@ -401,5 +401,24 @@ test("flags credentialed state-changing requests as CSRF review candidates, not 
     signal.kind === "csrf-review-state-changing-cookie-request" && signal.line === get?.sourceLine,
   )).toBe(false)
   expect(result.riskSignals.every((signal) => signal.confidence === "candidate")).toBe(true)
+  expect(get?.method).toBe("GET")
   expect(result.notes.some((note) => note.includes("do not prove the server lacks anti-CSRF controls"))).toBe(true)
+})
+
+test("considers implicit same-origin cookie context for CSRF review but honors fetch credentials omit", () => {
+  const source = [
+    'fetch("/api/account/email", { method: "POST", body: JSON.stringify({ email }) })',
+    'fetch("/api/account/logout", { method: "POST", credentials: "omit" })',
+  ].join("\n")
+  const result = analyzeJavaScriptSource(source)
+  const update = result.requests.find((request) => request.path === "/api/account/email")
+  const logout = result.requests.find((request) => request.path === "/api/account/logout")
+  expect(update?.cookieSignals).toContain("relative-route-may-use-same-origin-cookies")
+  expect(result.riskSignals.some((signal) =>
+    signal.kind === "csrf-review-state-changing-cookie-request" && signal.line === update?.sourceLine,
+  )).toBe(true)
+  expect(logout?.cookieSignals).not.toContain("relative-route-may-use-same-origin-cookies")
+  expect(result.riskSignals.some((signal) =>
+    signal.kind === "csrf-review-state-changing-cookie-request" && signal.line === logout?.sourceLine,
+  )).toBe(false)
 })
