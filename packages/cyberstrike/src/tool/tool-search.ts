@@ -41,11 +41,11 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
         ...results.map((match, index) => {
           const candidate = match.tool
           const loaded = LazyToolRegistry.isLoaded(candidate.id) ? " [LOADED]" : ""
-          return String(index + 1) + ". **" + candidate.name + "**" + loaded + "\\n   ID: \\`" + candidate.id + "\\`\\n   Relevance: " + match.score.toFixed(1) + "; exact query coverage: " + Math.round(match.coverage * 100) + "%\\n   Matched terms: " + match.matchedTerms.join(", ") + "\\n   Why: " + match.reasons.join("; ") + "\\n   " + candidate.summary + "\\n   Category: " + candidate.category
+          return String(index + 1) + ". **" + candidate.name + "**" + loaded + "\n   ID: " + candidate.id + "\n   Relevance: " + match.score.toFixed(1) + "; exact query coverage: " + Math.round(match.coverage * 100) + "%\n   Matched terms: " + match.matchedTerms.join(", ") + "\n   Why: " + match.reasons.join("; ") + "\n   " + candidate.summary + "\n   Category: " + candidate.category
         }),
         "",
         "Load only a small shortlist with load_tools, inspect each full schema, and invoke only tools whose real inputs/outputs fit the evidence gap.",
-      ].join("\\n")
+      ].join("\n")
       const stats = LazyToolRegistry.stats()
 
       return {
