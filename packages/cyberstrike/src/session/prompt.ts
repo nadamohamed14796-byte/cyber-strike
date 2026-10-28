@@ -1034,7 +1034,7 @@ export namespace SessionPrompt {
             succeeded: toolCallSucceeded({
               status: p.state.status,
               tool: p.tool,
-              metadata: p.state.metadata,
+              metadata: p.state.status === "completed" ? p.state.metadata : undefined,
             }),
           }))
 
