@@ -27,9 +27,12 @@ test("chain finding link migration enforces foreign keys and rejects duplicate d
     }
 
     sqlite.prepare("INSERT INTO session (id) VALUES (?)").run("ses-test")
+    sqlite.prepare("INSERT INTO session (id) VALUES (?)").run("ses-other")
     sqlite.prepare("INSERT INTO chain_candidate (id, session_id) VALUES (?, ?)").run("chn-test", "ses-test")
+    sqlite.prepare("INSERT INTO chain_candidate (id, session_id) VALUES (?, ?)").run("chn-other", "ses-other")
     sqlite.prepare("INSERT INTO vulnerability (id, session_id) VALUES (?, ?)").run("vul-a", "ses-test")
     sqlite.prepare("INSERT INTO vulnerability (id, session_id) VALUES (?, ?)").run("vul-b", "ses-test")
+    sqlite.prepare("INSERT INTO vulnerability (id, session_id) VALUES (?, ?)").run("vul-c", "ses-other")
 
     const insert = sqlite.prepare(
       "INSERT INTO chain_finding_link (id, session_id, chain_candidate_id, source_vulnerability_id, target_vulnerability_id, relation, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -47,6 +50,12 @@ test("chain finding link migration enforces foreign keys and rejects duplicate d
     ).toThrow()
     expect(() =>
       insert.run("cfl-3", "ses-test", "chn-test", "vul-missing", "vul-b", "enables", 3, 3),
+    ).toThrow()
+    expect(() =>
+      insert.run("cfl-cross-vulnerability-session", "ses-test", "chn-test", "vul-a", "vul-c", "enables", 3, 3),
+    ).toThrow()
+    expect(() =>
+      insert.run("cfl-cross-chain-session", "ses-test", "chn-other", "vul-a", "vul-b", "enables", 3, 3),
     ).toThrow()
     expect(() =>
       insert.run("cfl-4", "ses-test", "chn-test", "vul-a", "vul-a", "depends_on", 4, 4),
