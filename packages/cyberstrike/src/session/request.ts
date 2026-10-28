@@ -484,6 +484,20 @@ export namespace Request {
   }
 
   /**
+   * Find the persisted request owning the current structural dedup key.
+   * This is a single indexed lookup and avoids loading all historical requests
+   * just to recover the state of a repeated browser capture.
+   */
+  export function findByKeyHash(sessionID: string, keyHash: string): Info | undefined {
+    const row = Database.use((db) =>
+      db.select().from(RequestTable)
+        .where(and(eq(RequestTable.session_id, sessionID), eq(RequestTable.key_hash, keyHash)))
+        .get(),
+    )
+    return row ? rowToInfo(row) : undefined
+  }
+
+  /**
    * Explicitly requeue a failed captured-request analysis.
    *
    * The status check and transition happen in one transaction so duplicate retry
