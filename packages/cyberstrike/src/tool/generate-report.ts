@@ -529,7 +529,7 @@ function formatMethodologySection(state: Methodology.State, targetScoped = false
 
 function formatChains(chains: Chain.Candidate[]): string {
   const active = chains.filter((c) => c.status !== "disproven")
-  if (active.length === 0) return "## Chain Hypotheses\\n\\nNo chain opportunities detected."
+  if (active.length === 0) return "## Chain Hypotheses\n\nNo chain opportunities detected."
 
   const sorted = [...active].sort((a, b) => {
     const statusOrder = { confirmed: 0, testing: 1, detected: 2 } as Record<string, number>
@@ -559,7 +559,7 @@ function formatChains(chains: Chain.Candidate[]): string {
     }
   }
 
-  return lines.join("\\n")
+  return lines.join("\n")
 }
 
 function formatAttackSurface(intel: Intel.Entry[], requests: Request.Info[], assets: string[]): string {
