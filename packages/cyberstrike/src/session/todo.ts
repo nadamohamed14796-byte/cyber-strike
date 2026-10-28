@@ -25,7 +25,7 @@ export namespace Todo {
   }
 
   const MAX_COMPLETED = 5
-  const isReconChecklistItem = (todo: Info) => /^\\[recon:[a-z_]+\\]/.test(todo.content.trim())
+  const isReconChecklistItem = (todo: Info) => /^\[recon:[a-z_]+\]/.test(todo.content.trim())
 
   export function update(input: { sessionID: string; todos: Info[] }) {
     // Retain the whole compact recon checklist so completed steps remain visible
