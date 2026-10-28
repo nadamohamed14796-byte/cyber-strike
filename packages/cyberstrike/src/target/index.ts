@@ -803,7 +803,21 @@ async function prepareWorkspace(workspace: Workspace, reconcileNotes = true): Pr
   await createIfMissing(readmePath, defaultWorkspaceReadme(workspace))
   // Migrate the previous generated secret policy without overwriting human-authored README content.
   const legacyEvidencePolicy = "- Do not store passwords, cookies, bearer tokens, API keys, or other secrets."
-  const currentReadme = await fs.readFile(readmePath, "utf-8")
+  let currentReadme = await fs.readFile(readmePath, "utf-8")
+  // Existing workspaces may still describe every artifact directory as a startup folder.
+  // Add one explanatory note while preserving the rest of any operator-authored README.
+  if (currentReadme.includes("## Layout") &&
+      !currentReadme.includes("created only when their first artifact is saved.") &&
+      !currentReadme.includes("Artifact folders are created on demand")) {
+    const updatedReadme = currentReadme.replace(
+      "## Layout\n",
+      "## Layout\n\nArtifact folders are created on demand; only `scope/`, `assets/`, and `runs/` are required at startup. The paths in the table below describe where outputs go when saved.\n",
+    )
+    if (updatedReadme !== currentReadme) {
+      await TargetMemory.writeWorkspaceFile(workspace, "README.md", updatedReadme)
+      currentReadme = updatedReadme
+    }
+  }
   if (currentReadme.includes(legacyEvidencePolicy)) {
     await TargetMemory.writeWorkspaceFile(
       workspace,
