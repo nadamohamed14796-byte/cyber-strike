@@ -14,11 +14,12 @@ const log = Log.create({ service: "tool.tool-search" })
 export const ToolSearchTool = Tool.define("tool_search", async () => {
   return {
     description: [
-      "Discover available connected tools by the current task, active checkpoint, evidence gap, asset type, protocol, or observed technology.",
-      "Search afresh when entering a new checkpoint or when new evidence changes the needed capability; reuse already-loaded tool definitions when the need has not changed.",
-      "Search is discovery, not a tool allowlist. Results are ranked candidates, not a requirement to use any particular tool.",
-      "If results are missing or too narrow, retry with distinct synonyms, the capability name, protocol, or observable behavior. Increase limit when comparing more candidates.",
-      "Inspect the selected tool's real schema and capabilities, then load relevant exact IDs with load_tools before invocation.",
+      "Start from one concrete evidence gap and the output needed to close it; search connected tools by capability, protocol, and observable behavior rather than a fixed phase checklist.",
+      "Reuse an already-loaded tool only when its documented inputs and outputs fit the current gap. Search when the needed capability is missing or uncertain, not just to generate activity.",
+      "Results are ranked by exact tool-name/description matches and query coverage. Match reasons explain the ranking, but rank is not proof that a tool is suitable, installed for the target runtime, safe, or authorized.",
+      "If results are absent or too narrow, make one materially different query using a useful synonym or observable behavior; do not repeat an unchanged query.",
+      "Tool schemas are not included in the shortlist. Load a small set of plausible exact IDs with load_tools, inspect their full schemas, and invoke only the definitions that fit the required inputs and outputs.",
+      "After each invocation, inspect actual output and errors before selecting the next tool. Add another tool only for a distinct coverage gap, corroboration, or recovery.",
       "Example query shapes (illustrative only):",
       '- "<active checkpoint> <missing evidence>"',
       '- "<observed protocol or technology> enumeration"',
@@ -33,8 +34,18 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
 
       log.info("searching tools", { query, limit })
 
-      const results = LazyToolRegistry.search(query, limit)
-      const output = LazyToolRegistry.formatSearchResults(results)
+      const results = LazyToolRegistry.searchDetailed(query, limit)
+      const output = results.length === 0 ? "No matching tools found for the supplied capability terms." : [
+        "Ranked " + results.length + " candidate tool(s). Ranking is a shortlist, not proof of suitability:",
+        "",
+        ...results.map((match, index) => {
+          const candidate = match.tool
+          const loaded = LazyToolRegistry.isLoaded(candidate.id) ? " [LOADED]" : ""
+          return String(index + 1) + ". **" + candidate.name + "**" + loaded + "\\n   ID: \\`" + candidate.id + "\\`\\n   Relevance: " + match.score.toFixed(1) + "; exact query coverage: " + Math.round(match.coverage * 100) + "%\\n   Matched terms: " + match.matchedTerms.join(", ") + "\\n   Why: " + match.reasons.join("; ") + "\\n   " + candidate.summary + "\\n   Category: " + candidate.category
+        }),
+        "",
+        "Load only a small shortlist with load_tools, inspect each full schema, and invoke only tools whose real inputs/outputs fit the evidence gap.",
+      ].join("\\n")
       const stats = LazyToolRegistry.stats()
 
       return {
@@ -48,7 +59,15 @@ export const ToolSearchTool = Tool.define("tool_search", async () => {
         metadata: {
           query,
           resultCount: results.length,
-          toolIds: results.map((t) => t.id),
+          toolIds: results.map((match) => match.tool.id),
+          matches: results.map((match) => ({
+            id: match.tool.id,
+            name: match.tool.name,
+            score: Math.round(match.score * 10) / 10,
+            coverage: Math.round(match.coverage * 100),
+            matchedTerms: match.matchedTerms,
+            reasons: match.reasons,
+          })),
         },
       }
     },
