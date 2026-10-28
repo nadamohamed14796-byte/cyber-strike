@@ -10,7 +10,7 @@ const CorrelateJavaScriptParameters = z.object({
 export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptParameters, Tool.Metadata>("correlate_javascript", {
   description: [
     "Correlate already-captured JavaScript asset information with stored endpoints, requests/responses, request observations, web functions, and findings.",
-    "Call this after hackbrowser has delivered JavaScript response captures and before detailed endpoint testing. It extracts function and request candidates, parameters, header/auth/cookie signals, secret-like fingerprints and source locations (never raw values), role hints, source-map results, and a pending verification plan into a private target-local attack-surface snapshot. All matches remain unverified candidates.",
+    "Call this after JavaScript collection and before detailed endpoint testing. It extracts function definitions and likely UI/event/callback reference lines, maps business/authentication/token/data-layer clues to enclosing functions, correlates request calls with methods/routes/parameters and captured request IDs, and records header/auth/cookie signals, source-map results, and a review plan. Values remain redacted and all static associations remain unverified candidates.",
     "This performs no network requests and does not execute JavaScript. It reads only the current session and descendant-agent data, then persists a private target-local correlation snapshot and notes. Source-map files already captured in the session are parsed as data; embedded source code is analyzed in memory and is not persisted.",
     "Pass the authorized target URL. Optionally pass a JavaScript file URL to narrow source analysis to that captured file and only its directly referenced source maps; otherwise it considers captured JavaScript/source-map responses and JavaScript-like Intel assets associated with the target's session/workspace. The authoritative persisted scope and workspace-relationship checks decide which assets are eligible, including assets served from a separately hosted CDN.",
     "Same-host matches are labelled candidate relationships, not proof that a script issued a request. Foreign-key relationships from web_function/request_observation to a captured request are direct relationships.",
@@ -47,6 +47,8 @@ export const CorrelateJavaScriptTool = Tool.define<typeof CorrelateJavaScriptPar
           "Embedded source entries analyzed: " + graph.sourceFiles.filter((file) => Boolean(file.sourceMapSource)).length,
           ...(graph.sourceMapReferences ?? []).map((item) => "Source map " + item.url + " — " + item.status + " — " + item.note),
           "Function candidates: " + graph.javascriptAnalysis.functions.length,
+          "Function UI/event/callback reference sites: " + graph.javascriptAnalysis.functions.reduce((sum, fn) => sum + (fn.callSites?.length ?? 0), 0),
+          "Business/auth/token/data-layer trace signals: " + (graph.javascriptAnalysis.workflowSignals ?? []).length,
           "Structured request candidates: " + graph.javascriptAnalysis.requestCandidates.length,
           "Secret-like assignments (fingerprints only; candidates only): " + graph.javascriptAnalysis.secretCandidates.length,
           "Role/feature hints: " + graph.javascriptAnalysis.roleHints.length,
