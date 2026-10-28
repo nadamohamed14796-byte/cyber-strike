@@ -124,7 +124,7 @@ export namespace Chain {
     const hasInternalContext = (entry: Intel.Entry) =>
       entry.type === "configuration" ||
       entry.type === "infrastructure" ||
-      /internal|private[- ]?(?:host|network|api|service)|localhost|127\.0\.0\.1|10\.\\d+\.\\d+\.\\d+|192\.168\.|172\.(?:1[6-9]|2\\d|3[01])\.|staging|admin[- ]?host|environment variable|deployment config/.test(signalText(entry))
+      /internal|private[- ]?(?:host|network|api|service)|localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|staging|admin[- ]?host|environment variable|deployment config/.test(signalText(entry))
     const hasRouteSurface = (entry: Intel.Entry) =>
       entry.type === "endpoint" ||
       entry.type === "api_schema" ||
