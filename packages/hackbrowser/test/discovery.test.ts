@@ -26,3 +26,32 @@ test("toScopedPages skips non-http(s) and malformed values", () => {
   const out = toScopedPages(["mailto:a@b.c", "javascript:void(0)", "", "http://"], base, inScope)
   expect(out).toEqual([])
 })
+
+
+import { emitEndpoints } from "../src/discovery/emit.ts"
+
+ test("failed discovered endpoint delivery is eligible for a later retry", async () => {
+  const originalFetch = globalThis.fetch
+  const seen = new Set<string>()
+  let attempts = 0
+  globalThis.fetch = (async () => {
+    attempts++
+    if (attempts === 1) return new Response("temporary outage", { status: 503 })
+    return new Response(JSON.stringify({ sessionID: "session-test" }), {
+      status: 202,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  const endpoint = { method: "GET", url: "https://app.example.com/api/profile", source: "test-detector" }
+  try {
+    expect(await emitEndpoints([endpoint], "http://127.0.0.1:4096", "session-test", undefined, seen)).toBe(0)
+    expect(seen.has("GET https://app.example.com/api/profile")).toBe(false)
+
+    expect(await emitEndpoints([endpoint], "http://127.0.0.1:4096", "session-test", undefined, seen)).toBe(1)
+    expect(attempts).toBe(2)
+    expect(seen.has("GET https://app.example.com/api/profile")).toBe(true)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
