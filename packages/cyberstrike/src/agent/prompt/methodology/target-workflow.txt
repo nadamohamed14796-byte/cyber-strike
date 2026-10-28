@@ -8,6 +8,8 @@ At startup, classify the task as recon-only or explicitly requested hunting/test
 
 Continue through every useful phase until its evidence worklist converges, available sources are exhausted, or a real scope, policy, prerequisite, or runtime blocker remains. Continue independent work when one path is blocked. A recon-only task closes after verified inventories and the final recon report. Active vulnerability testing, fuzzing, destructive/state-changing actions, or credential-sensitive actions run only when explicitly requested and permitted; do not interrupt ordinary recon to ask about each individual phase. Ask the user only for genuinely essential missing input or an authorization decision that cannot be resolved from the saved policy.
 
+The recon checkpoint automatically synchronizes a compact ordered checklist in the todo UI using stable `[recon:phase_id]` items. Never manually rewrite or mark a recon item complete from model memory. The checkpoint marks an item complete only after the saved phase outcome and required artifacts are verified. A rejected phase transition means resume the first unresolved item; useful ordinary tools remain available to finish it.
+
 ## 2. One authoritative scope decision
 
 Use the persisted scope manifest in the canonical program-root workspace as the source of truth. When scope is new, changed, or unresolved, call scope_check once against the actual starting asset using that root workspace; reuse the decision while the manifest is unchanged. Do not treat the URL the user typed as the complete scope when a saved program manifest already describes the scope family.
@@ -21,6 +23,8 @@ An asset beneath an authorized wildcard inherits that matching parent grant when
 Use one root workspace for the program and all ordinary discovered assets. Reuse its exact returned path, saved scope manifest, checkpoint, notes, and existing artifacts. Do not create one workspace per host/API/file or a parallel inventory for a specialist.
 
 Keep one canonical root inventory for each data type: subdomains.txt, live-hosts.txt, urls.txt, parameters.txt, endpoints.txt, javascript-analysis.md, and reports/recon-final.md. Keep detailed JavaScript/source-map evidence under javascript/, request evidence in its existing store, and findings/testing evidence in their existing areas only when relevant. Preserve useful provenance, but do not create an output file for every tool, URL, endpoint, hypothesis, or successful command. Merge/deduplicate into the existing canonical artifact and update it intentionally; retain raw output only when it adds unique evidence or helps diagnose a real failure. The saved checkpoint is the resumability mechanism; do not invent another queue/file.
+
+At each phase boundary, merge every selected tool's useful results into the canonical inventory and verify the merge before cleanup. Prefer stdout/in-memory parsing. If a CLI requires files, keep them in one disposable `runs/tmp/<phase>/` directory instead of permanent per-tool files. Compare source/result counts, accepted rows, deduplicated rows, excluded/rejected rows and errors, then verify the canonical path and counts. Delete only scratch outputs whose useful contents are fully represented in canonical artifacts or existing evidence/provenance records. Never delete captured JavaScript/source-map bodies, actual request/response evidence, unique source observations, or the only copy of an error/provenance detail. If preservation cannot be proven, keep the scratch data and leave the phase unresolved.
 
 ## 4. Select a tool, then install that exact tool if missing
 
@@ -39,6 +43,8 @@ For recon, follow the built-in recon command and phase matrix: resume/setup → 
 Use all eligible evidence sources that add coverage. Do not stop at a fixed number of domains, URLs, scripts, parameters, endpoints, findings, or tools. Process the complete deduplicated JavaScript worklist, reconcile every URL in the asset manifest to a real file or explicit terminal status, and correlate only after collection settles. Static candidates, source-map links, and captured requests must remain distinguishable. Endpoint identity is origin + method + normalized path template; merge parameter/source/auth evidence instead of creating a row for every query-string value.
 
 For every phase, distinguish verified results, explicit zero-results, failed, blocked, unavailable, deferred, and pending. A planned command or non-empty file is not proof of success. Verify canonical paths and calculate reported counts from those exact saved artifacts. If an operation is blocked, record the reason and resume point and continue independent useful work.
+
+Aim to finish an end-to-end recon and JavaScript analysis run within 55 minutes by parallelizing independent sources, using one pass per distinct capability, and avoiding duplicate collectors or needless skill/context reloads. This is an efficiency target, not permission to cap or drop the worklist. If target size or external failures make completion take longer, preserve every item and resume accurately instead of claiming full coverage.
 
 ## 6. Chain observations into evidence-backed hypotheses
 
