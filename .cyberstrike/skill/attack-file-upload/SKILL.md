@@ -4,12 +4,7 @@ description: "Validate upload authorization, content validation, storage isolati
 category: "web-application"
 version: "1.0.0"
 author: "cyberstrike-official"
-tags:
-  - file-upload
-  - content-type
-  - storage
-  - web
-  - validation
+tags: [file-upload, content-type, storage, web, validation, upload-validation, file-signature, image-processing, path-traversal, stored-content]
 tech_stack:
   - web
   - api
