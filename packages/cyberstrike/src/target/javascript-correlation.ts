@@ -1400,18 +1400,30 @@ function mergeGraphSnapshots(graphs: JavaScriptCorrelationGraph[]): JavaScriptCo
   }
   const mergeRecords = <T>(lists: T[][], key: (item: T) => string): T[] => uniqueValues(lists.flat(), key)
   const functions = mergeRecords(graphs.map((g) => g.javascriptAnalysis.functions), (item) => [item.sourceFile, item.line, item.name].join("\0"))
+    .map((fn) => ({
+      ...fn,
+      callSites: uniqueValues(
+        graphs.flatMap((graph) => graph.javascriptAnalysis.functions
+          .filter((candidate) => candidate.sourceFile === fn.sourceFile && candidate.line === fn.line && candidate.name === fn.name)
+          .flatMap((candidate) => candidate.callSites ?? [])),
+        (site) => site.line + "\0" + site.kind,
+      ).sort((a, b) => a.line - b.line || a.kind.localeCompare(b.kind)),
+    }))
   const requestCandidates = mergeRecords(graphs.map((g) => g.javascriptAnalysis.requestCandidates), (item) => [item.sourceFile, item.sourceLine, item.method ?? "", item.urlTemplate].join("\0"))
   const secrets = mergeRecords(graphs.map((g) => g.javascriptAnalysis.secretCandidates), (item) => [item.sourceFile, item.line, item.kind, item.fingerprint].join("\0"))
   const roles = mergeRecords(graphs.map((g) => g.javascriptAnalysis.roleHints), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
   const risks = mergeRecords(graphs.map((g) => g.javascriptAnalysis.riskSignals), (item) => [item.sourceFile, item.line, item.kind, item.functionName ?? ""].join("\0"))
   const applicationHints = mergeRecords(graphs.map((g) => g.javascriptAnalysis.applicationHints ?? []), (item) => [item.sourceFile, item.line, item.kind, item.value].join("\0"))
+  const workflowSignals = mergeRecords(graphs.map((g) => g.javascriptAnalysis.workflowSignals ?? []), (item) =>
+    [item.sourceFile, item.line, item.kind, item.value, item.functionName ?? ""].join("\0"),
+  )
   const uniqueObjects = <T>(items: T[], key: (item: T) => string) => uniqueValues(items, key)
   return {
     ...latest,
     javascriptAssets: [...assets.values()].sort((a, b) => a.url.localeCompare(b.url)),
     sourceFiles: [...sourceFiles.values()].sort((a, b) => a.relativePath.localeCompare(b.relativePath) || a.sha256.localeCompare(b.sha256)),
     sourceMapReferences: [...sourceMaps.values()].sort((a, b) => a.url.localeCompare(b.url)),
-    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints },
+    javascriptAnalysis: { ...latest.javascriptAnalysis, functions, requestCandidates, secretCandidates: secrets, roleHints: roles, riskSignals: risks, applicationHints, workflowSignals },
     endpointCandidates: mergeCanonicalJavaScriptEndpoints(graphs),
     evidence: uniqueObjects(graphs.flatMap((g) => g.evidence), (x) => x.id),
     requests: uniqueObjects(graphs.flatMap((g) => g.requests), (x) => x.id),
@@ -1429,6 +1441,7 @@ function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): strin
   )
   const functions = graph.javascriptAnalysis.functions
   const requests = graph.javascriptAnalysis.requestCandidates
+  const sourceFiles = graph.sourceFiles
   const byFunction = new Map<string, {
     sourceFile: string
     functionName: string | null
@@ -1470,17 +1483,23 @@ function renderJavaScriptWorkflowTrace(graph: JavaScriptCorrelationGraph): strin
           "; query:" + request.queryParameters.join(",") +
           "; body:" + request.bodyParameters.join(",") +
           "; headers:" + request.headerNames.join(",") +
-          "; request IDs:" + (request.observedRequestIDs.join(",") || "not matched") + "]",
+          "; captured request IDs:" + (request.observedRequestIDs.join(",") || "not matched") + "]",
         ).join(" | ")
       : "no request call attributed to this function"
     const entries = callSites.length
       ? callSites.map((site) => site.kind + "@" + site.line).join(", ")
       : "no UI/event/callback reference matched"
-    return "- " + safeSummaryText(group.sourceFile) + " — signals: " + signalText +
+    const sourceRecord = sourceFiles.find((file) => file.relativePath === group.sourceFile)
+    const sourceLocation = sourceRecord?.sourceURL
+      ? safeSummaryURL(sourceRecord.sourceURL) + " → " + safeSummaryText(group.sourceFile)
+      : safeSummaryText(group.sourceFile)
+    const sourceRequests = sourceRecord?.sourceRequestIDs ?? (sourceRecord?.sourceRequestID ? [sourceRecord.sourceRequestID] : [])
+    return "- " + sourceLocation + (sourceRequests.length ? " — asset captured in request(s): " + sourceRequests.join(", ") : "") +
+      " — signals: " + signalText +
       " — function: " + definition +
       " — call/reference sites: " + entries +
       " — same-function requests: " + calls +
-      " — confidence: candidate; verify the call path in browser captures before testing."
+      " — confidence: candidate; a static handler reference is a navigation clue, not proof of a user click or successful server operation."
   })
 }
 
