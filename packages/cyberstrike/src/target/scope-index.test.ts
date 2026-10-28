@@ -9,6 +9,13 @@ describe("matchingScopeItems", () => {
     expect(matchingScopeItems("https://login.att.com/", entries)).toEqual(["login.att.com"])
   })
 
+  test("normalizes case and trailing dots for exact hosts and wildcard domains", () => {
+    const entries = ["EXAMPLE.COM.", "*.API.EXAMPLE.COM."]
+    expect(matchingScopeItems("https://example.com/", entries)).toEqual(["example.com"])
+    expect(matchingScopeItems("https://v1.api.example.com/", entries)).toEqual(["*.api.example.com"])
+    expect(matchingScopeItems("https://notexample.com/", entries)).toEqual([])
+  })
+
   test("matches explicit wildcards on the apex and subdomains, including nested wildcard rules", () => {
     const entries = ["*.att.com", "*.api.att.com"]
     expect(matchingScopeItems("https://att.com/", entries)).toEqual(["*.att.com"])
