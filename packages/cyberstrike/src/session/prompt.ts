@@ -1008,33 +1008,37 @@ export namespace SessionPrompt {
         }
       }
 
-      // Loop-termination Layer 2: feed the stuck-detector this step's tool calls, but
-      // ONLY when the model is CONTINUING (made tool calls). A natural text finish exits
-      // cleanly below and must NOT be reclassified as stuck. Native subagents only.
-      if (!modelFinished && agent.mode === "subagent" && agent.native === true) {
+      // Loop-termination Layer 2: inspect every continuing turn, not only native
+      // subagents. A primary CyberStrike run can also loop across tool-call turns.
+      // Natural text finishes exit cleanly below and must not be classified as stuck.
+      if (!modelFinished) {
         const stepParts = await MessageV2.parts(processor.message.id)
         const toolCalls = stepParts
           .filter((p) => p.type === "tool")
           .map((p) => ({ tool: p.tool, input: p.state.status !== "pending" ? p.state.input : undefined }))
-        // Monologue rule (Layer 2) — DISABLED by default (over-fires; see stuck-detector.ts).
-        // Left wired so it can be re-enabled with a properly scoped config later.
-        const verdict = stuckDetector.observe({ toolCalls })
-        if (verdict.kind === "nudge") {
-          forceWrapUpNext = true
-          log.warn("stuck-detector nudge — forcing wrap-up next turn", {
-            reason: verdict.reason,
-            detail: verdict.detail,
-            sessionID,
-          })
-        } else if (verdict.kind === "abort") {
-          processor.message.stuckAborted = true
-          await Session.updateMessage(processor.message)
-          log.warn("stuck-detector abort — terminating subagent", {
-            reason: verdict.reason,
-            detail: verdict.detail,
-            sessionID,
-          })
-          break
+
+        // The coarse no-progress heuristic is limited to native subagents; it was
+        // disabled after measured false positives. Identical-call detection below is
+        // precise and applies to primary and subagent runs alike.
+        if (agent.mode === "subagent" && agent.native === true) {
+          const verdict = stuckDetector.observe({ toolCalls })
+          if (verdict.kind === "nudge") {
+            forceWrapUpNext = true
+            log.warn("stuck-detector nudge — forcing wrap-up next turn", {
+              reason: verdict.reason,
+              detail: verdict.detail,
+              sessionID,
+            })
+          } else if (verdict.kind === "abort") {
+            processor.message.stuckAborted = true
+            await Session.updateMessage(processor.message)
+            log.warn("stuck-detector abort — terminating subagent", {
+              reason: verdict.reason,
+              detail: verdict.detail,
+              sessionID,
+            })
+            break
+          }
         }
 
         // Layer 2b: cross-turn identical-call loop (the doom_loop's cross-turn twin).
