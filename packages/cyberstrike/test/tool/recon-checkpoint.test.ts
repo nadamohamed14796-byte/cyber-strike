@@ -59,7 +59,7 @@ test("the recon checklist is checkpoint-driven, ordered, and preserves unrelated
   ], state, "live_hosts_ports")
 
   expect(result[0]).toEqual({
-    content: "[recon:scope_validation] Verify saved scope and exclusions",
+    content: "[recon:scope_validation] 1. Verify saved scope and exclusions",
     status: "completed",
     priority: "high",
   })
