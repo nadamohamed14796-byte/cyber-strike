@@ -166,6 +166,10 @@ export function invalidateReconDownstreamPhases(
  * work must be retried once with a material change or explicitly handed off.
  * Scope, workspace, and the endpoint inventory for active testing remain hard gates.
  */
+function terminal(status: ReconPhaseStatus): boolean {
+  return status === "complete" || status === "partial" || status === "unavailable" || status === "deferred"
+}
+
 export function unresolvedReconPrerequisites(
   phase: ReconPhase,
   phases: Record<ReconPhase, ReconPhaseRecord>,
