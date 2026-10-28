@@ -324,3 +324,89 @@ test("does not overwrite a malformed JavaScript asset manifest", async () => {
     server.stop(true)
   }
 }, 10_000)
+
+test("processes more than 300 distinct JavaScript URLs without a fixed worklist cap", async () => {
+  await using tmp = await tmpdir()
+  const requested: string[] = []
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch(request) {
+      const pathname = new URL(request.url).pathname
+      requested.push(pathname)
+      if (/^\/assets\/bundle-\d+\.js$/.test(pathname)) {
+        return new Response('fetch("/api/profile"); const featureFlag = "account_export";', {
+          status: 200,
+          headers: { "content-type": "application/javascript" },
+        })
+      }
+      return new Response("not found", { status: 404 })
+    },
+  })
+
+  try {
+    await Instance.provide({
+      directory: tmp.path,
+      async fn() {
+        const target = "http://127.0.0.1:" + server.port
+        const configured = await TargetMemory.configureScope(target, {
+          include: [target],
+          authorizationSource: "Local JavaScript worklist-size test fixture",
+          authorizationReference: "https://example.test/security-policy",
+        })
+        const canonicalTarget = configured.workspace.targetURL
+        const session = await Session.create({})
+        Request.add({
+          sessionID: session.id,
+          method: "GET",
+          normalizedPath: "/",
+          keyHash: "ingest-javascript-worklist-size-root",
+          origin: canonicalTarget,
+          scheme: "http",
+          host: "127.0.0.1",
+          pageUrl: canonicalTarget + "/",
+          response: {
+            status: 200,
+            headers: { "content-type": "text/html" },
+            body: "<html><body>local test fixture</body></html>",
+          },
+        })
+
+        const urls = Array.from({ length: 305 }, (_, index) =>
+          canonicalTarget + "/assets/bundle-" + index + ".js",
+        )
+        const tool = await IngestJavaScriptURLsTool.init()
+        const result = await tool.execute({
+          target_url: canonicalTarget,
+          urls,
+          source: "unit-test-worklist-size",
+          force_refresh: false,
+        }, toolContext(session.id))
+
+        const metadata = result.metadata as Record<string, unknown>
+        expect(requested).toHaveLength(urls.length)
+        expect(new Set(requested).size).toBe(urls.length)
+        expect(metadata.queued_urls).toBe(urls.length)
+        expect(metadata.worklist_settled).toBe(urls.length)
+        expect(metadata.worklist_available).toBe(urls.length)
+        expect(metadata.worklist_pending).toBe(0)
+        expect(metadata.worklist_retryable_failures).toBe(0)
+        expect(metadata.worklist_missing_manifest_records).toBe(0)
+        expect(metadata.manifest_reconciled).toBe(true)
+        expect(metadata.collection_complete).toBe(true)
+        expect(metadata.analysis_complete).toBe(true)
+
+        const manifestPath = path.join(configured.workspace.workspacePath, "javascript", "asset-manifest.json")
+        const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+          assets: Array<{ url: string; status: string }>
+        }
+        expect(manifest.assets).toHaveLength(urls.length)
+        expect(manifest.assets.every((asset) => asset.status === "downloaded" || asset.status === "reused")).toBe(true)
+        await Session.remove(session.id)
+      },
+    })
+  } finally {
+    server.stop(true)
+  }
+}, 60_000)
+
