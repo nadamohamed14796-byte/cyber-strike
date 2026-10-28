@@ -145,8 +145,15 @@ export function CapturedRequestAnalysisPanel() {
     }),
   )
 
+  const displayStatus = (): AnalysisStatus => {
+    const persistedStatus = request()?.id === selected()?.requestID ? request()?.status : undefined
+    if (persistedStatus === "queued" || persistedStatus === "processing") return "analyzing"
+    if (persistedStatus === "processed" || persistedStatus === "failed") return persistedStatus
+    return selected()?.status ?? "analyzing"
+  }
+
   const statusLabel = () => {
-    const status = selected()?.status
+    const status = displayStatus()
     if (status === "processed") return "COMPLETE"
     if (status === "failed") return "FAILED"
     return "ANALYZING"
@@ -177,9 +184,9 @@ export function CapturedRequestAnalysisPanel() {
                 <span
                   class="inline-block size-2 rounded-full"
                   classList={{
-                    "bg-icon-success-base": selected()?.status === "processed",
-                    "bg-icon-danger-base": selected()?.status === "failed",
-                    "bg-icon-warning-base": selected()?.status === "analyzing",
+                    "bg-icon-success-base": displayStatus() === "processed",
+                    "bg-icon-danger-base": displayStatus() === "failed",
+                    "bg-icon-warning-base": displayStatus() === "analyzing",
                   }}
                 />
                 <h2 class="text-14-semibold text-text-strong">Captured request analysis</h2>
@@ -354,7 +361,7 @@ export function CapturedRequestAnalysisPanel() {
                 fallback={
                   <div class="rounded-lg border border-border-weak-base p-4 text-12-regular text-text-weak">
                     <Show
-                      when={selected()?.status === "failed" && !analysisSessionID()}
+                      when={displayStatus() === "failed" && !analysisSessionID()}
                       fallback="The analysis session has started. Waiting for the first visible agent step…"
                     >
                       The agent session could not be created. This request was marked failed before analysis tools started.
@@ -388,10 +395,10 @@ export function CapturedRequestAnalysisPanel() {
                   </For>
                 </div>
               </Show>
-              <Show when={selected()?.status === "processed" || selected()?.status === "failed"}>
+              <Show when={displayStatus() === "processed" || displayStatus() === "failed"}>
                 <div class="mt-3 rounded-lg border border-border-weak-base p-3 text-12-regular text-text-base">
-                  Analysis {selected()?.status === "processed" ? "completed" : "failed"}.
-                  <Show when={selected()?.status === "failed"}>
+                  Analysis {displayStatus() === "processed" ? "completed" : "failed"}.
+                  <Show when={displayStatus() === "failed"}>
                     <p class="mt-1 text-text-weak">
                       {analysisSessionID()
                         ? "Open the full session to inspect the final error or incomplete step."
