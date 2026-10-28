@@ -10,6 +10,7 @@ import {
   initialReconRun as initialRun,
   parseReconRun as parseRun,
   reconRunID,
+  reconScopeFingerprint,
   type ReconPhase,
   type ReconPhaseStatus,
   type ReconRunManifest as ReconRun,
@@ -185,10 +186,25 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       // this checkpoint or allowing any later phase to proceed.
       if (run.phases.scope_validation.status === "complete") {
         const validatedTarget = run.phases.scope_validation.scopeValidationTarget
+        const savedFingerprint = run.phases.scope_validation.scopeFingerprint
         let invalidationReason: string | undefined
-        if (!validatedTarget) {
+        try {
+          const currentScope = await TargetMemory.getScope(workspace.targetURL)
+          if (!currentScope || currentScope.status !== "configured" || currentScope.scopeItems.length === 0) {
+            invalidationReason = "The persisted authorization scope is no longer configured; revalidate scope before resuming."
+          } else if (!savedFingerprint) {
+            invalidationReason = "The saved scope_validation checkpoint predates scope fingerprinting; revalidate it once before resuming."
+          } else if (reconScopeFingerprint(currentScope) !== savedFingerprint) {
+            invalidationReason = "The persisted authorization scope or exclusions changed since this recon run was validated; revalidate scope and downstream phases."
+          }
+        } catch (error) {
+          invalidationReason = "The persisted authorization scope could not be revalidated: " +
+            (error instanceof Error ? error.message : String(error))
+        }
+        if (!invalidationReason && !validatedTarget) {
           invalidationReason = "The saved scope_validation checkpoint has no recorded starting asset; scope must be checked again."
-        } else {
+        }
+        if (!invalidationReason && validatedTarget) {
           try {
             const decision = await TargetMemory.checkURLScope(validatedTarget)
             if (!decision.allowed || !decision.workspace) {
@@ -302,6 +318,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             }
           }
         }
+        let validatedScopeFingerprint: string | undefined
         if (status === "complete" && phase === "scope_validation") {
           // Scope validation proves the official policy is saved on the canonical
           // program workspace. The root URL itself need not be in scope: the program
@@ -343,6 +360,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           if (!targetDecision.allowed || !targetDecision.workspace) {
             return { title: "Scope validation rejected", output: "Cannot complete scope_validation: the starting asset is not authorized by the persisted manifest: " + targetDecision.reason, metadata: { saved: false, reason: "scope_validation_target_out_of_scope", target: parsedValidationTarget.href } }
           }
+          validatedScopeFingerprint = reconScopeFingerprint(scope)
         }
         if (status === "complete" && phase === "workspace_setup") {
           for (const relative of ["target.json", "workspace.json", "notes.md", "scope/scope.json"]) {
@@ -542,6 +560,9 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
           scopeValidationTarget: phase === "scope_validation" && status === "complete"
             ? params.scope_validation_target?.trim()
             : record.scopeValidationTarget,
+          scopeFingerprint: phase === "scope_validation" && status === "complete"
+            ? validatedScopeFingerprint
+            : record.scopeFingerprint,
         }
         run.currentPhase = null
       }
