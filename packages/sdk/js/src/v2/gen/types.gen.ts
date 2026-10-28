@@ -3849,6 +3849,55 @@ export type SessionRequestResponses = {
 
 export type SessionRequestResponse = SessionRequestResponses[keyof SessionRequestResponses]
 
+export type SessionRequestRetryData = {
+  body?: never
+  path: {
+    /**
+     * Session ID
+     */
+    sessionID: string
+    /**
+     * Captured request ID
+     */
+    requestID: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{sessionID}/request/{requestID}/retry"
+}
+
+export type SessionRequestRetryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * Not found
+   */
+  404: NotFoundError
+  /**
+   * Request is not failed or its status changed before retry
+   */
+  409: {
+    error: string
+  }
+}
+
+export type SessionRequestRetryError = SessionRequestRetryErrors[keyof SessionRequestRetryErrors]
+
+export type SessionRequestRetryResponses = {
+  /**
+   * Request analysis queued
+   */
+  202: {
+    requestID: string
+    status: "queued"
+  }
+}
+
+export type SessionRequestRetryResponse = SessionRequestRetryResponses[keyof SessionRequestRetryResponses]
+
 export type SessionObservationsData = {
   body?: never
   path: {
