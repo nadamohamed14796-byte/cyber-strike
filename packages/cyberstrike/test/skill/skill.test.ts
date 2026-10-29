@@ -160,6 +160,62 @@ Just some content without YAML frontmatter.
   })
 })
 
+test("project-local CyberStrike skills outrank same-name global-home skills", async () => {
+  await using tmp = await tmpdir({
+    git: true,
+    init: async (dir) => {
+      const globalSkill = path.join(dir, ".cyberstrike", "skill", "precedence-skill")
+      const projectDir = path.join(dir, "cyberstrike-test-project")
+      const projectSkill = path.join(projectDir, ".cyberstrike", "skill", "precedence-skill")
+
+      await Bun.write(
+        path.join(globalSkill, "SKILL.md"),
+        `---
+name: precedence-skill
+description: Global copy that must not override a project skill.
+---
+
+# Global Copy
+
+GLOBAL_VERSION_MARKER
+`,
+      )
+      await Bun.write(
+        path.join(projectSkill, "SKILL.md"),
+        `---
+name: precedence-skill
+description: Project copy has higher precedence.
+---
+
+# Project Copy
+
+PROJECT_VERSION_MARKER
+`,
+      )
+    },
+  })
+
+  const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+  process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+  try {
+    await Instance.provide({
+      directory: path.join(tmp.path, "cyberstrike-test-project"),
+      fn: async () => {
+        const skill = await Skill.get("precedence-skill")
+        expect(skill).toBeDefined()
+        expect(skill!.content).toContain("PROJECT_VERSION_MARKER")
+        expect(skill!.content).not.toContain("GLOBAL_VERSION_MARKER")
+        expect(skill!.location).toContain(
+          path.join("cyberstrike-test-project", ".cyberstrike", "skill", "precedence-skill", "SKILL.md"),
+        )
+      },
+    })
+  } finally {
+    if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+    else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+  }
+})
+
 test("discovers skills from .claude/skills/ directory", async () => {
   await using tmp = await tmpdir({
     git: true,
