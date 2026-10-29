@@ -296,7 +296,7 @@ export function scannerTargets(command: string[], commandText: string): string[]
   // an upstream seed URL as proof of the downstream command's actual stdin
   // targets; parse this argv and literal producers below.
   if (!commandText.includes("|")) {
-    for (const match of commandText.matchAll(/https?:\\/\\/[^\\s"'<>`]+/gi)) {
+    for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>`]+/gi)) {
       addNormalizedTarget(candidates, match[0])
     }
   }
