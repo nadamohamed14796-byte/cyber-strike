@@ -2,12 +2,18 @@
 name: playbooks
 description: "On-demand router for the 19 src-hunter bug-bounty vulnerability playbooks; use observed target signals to select and read the exact methodology before testing."
 category: input-validation
-version: "1.0.0"
+version: "1.0.1"
 author: "nadamohamed14796-byte/src-hunter"
+chains_with:
+  - payloader
+  - hackerone-disclosed-reports
 tags:
   - src-hunter
   - bug-bounty
   - security-testing
+  - payload-reference
+  - hackerone
+  - disclosed-reports
   - authorization
   - idor
   - sqli
@@ -66,6 +72,12 @@ All paths below are relative to this skill's Base directory.
 | Intranet/lateral movement/post-exploitation | `intranet-postexp/00-index.md` — only when the program explicitly authorizes this activity; otherwise do not run these steps |
 
 The global routing reference is `00-index.md`. If a route points to a sub-index, use that sub-index's mapping rather than guessing a child filename. In particular, XSS, RCE, SSRF/cache/Host, REST/API, logic, OAuth/SAML/JWT, file-upload, path-traversal and LLM topics may have dedicated child files.
+
+## Conditional companion references — load only when needed
+
+- **Concrete payload reference:** If the selected playbook does not contain a suitable candidate for the observed input/context, or a specific payload category is needed to close an evidence gap, load the `payloader` skill. Read its `index.md` and then only the matching category file using that skill's returned Base directory and `<skill_files>`. Do not load all payload categories or execute lists wholesale.
+- **Historical HackerOne context:** If a comparable disclosed case would help formulate or falsify a root-cause/impact hypothesis, load `hackerone-disclosed-reports`, read its `index.md`, then read only the relevant weakness file. Historical findings are examples, not evidence or authorization for the current target.
+- A skill search result, index entry, filename, or chain suggestion does not count as reading the content. Confirm the returned `<skill_content>` and explicitly read the exact companion file required for the current question. Do not load companion skills merely because they are available.
 
 ## How to apply the reference
 
