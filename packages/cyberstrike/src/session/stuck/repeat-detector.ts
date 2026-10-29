@@ -60,27 +60,33 @@ export class RepeatDetector {
 
   /**
    * Feed the signatures of one completed step's tool calls. Each exact signature gets
-   * its own recovery opportunity: "nudge" when it first reaches the limit so tools
-   * remain available; "abort" only when that same signature repeats after recovery.
-   * A different tool/argument signature gets its own chance to change strategy.
+   * its own recovery opportunity. A repeated signature requests terminal wrap-up only
+   * when the recovery step adds no new signature; a distinct action in the same step
+   * gets another chance to change strategy instead of aborting the whole task.
    */
   observe(signatures: string[]): RepeatVerdict {
+    const current = new Set(signatures)
+    const previouslyNudged = new Set(this.nudgedSignatures)
     let verdict: RepeatVerdict = "ok"
+    let repeatedAfterRecovery = false
+    let hasNewAlternative = false
     // Count each distinct signature at most ONCE per step: this detector measures
     // CROSS-turn repetition, so a within-turn burst of k identical calls (already
     // handled by the resolveTools suppressor) must advance the counter by 1, not k.
-    for (const sig of new Set(signatures)) {
+    for (const sig of current) {
+      if (!previouslyNudged.has(sig)) hasNewAlternative = true
       const n = (this.counts.get(sig) ?? 0) + 1
       this.counts.set(sig, n)
       if (n >= this.limit) {
-        if (this.nudgedSignatures.has(sig)) {
-          verdict = "abort"
+        if (previouslyNudged.has(sig)) {
+          repeatedAfterRecovery = true
         } else {
           this.nudgedSignatures.add(sig)
           if (verdict !== "abort") verdict = "nudge"
         }
       }
     }
+    if (repeatedAfterRecovery) return hasNewAlternative ? "nudge" : "abort"
     return verdict
   }
 
