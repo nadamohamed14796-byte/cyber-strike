@@ -182,11 +182,26 @@ export namespace Truncate {
 
     const id = Identifier.ascending("tool")
     const filepath = path.join(DIR, id)
-    await Bun.write(Bun.file(filepath), text)
+    const saved = boundedStoredOutput(text)
+    await serializeStorage(async () => {
+      await fs.mkdir(DIR, { recursive: true })
+      await cleanupUnlocked()
+      const existing = (await listOutputFiles()).sort((a, b) => a.createdAt - b.createdAt || a.name.localeCompare(b.name))
+      let totalBytes = existing.reduce((sum, file) => sum + file.size, 0)
+      while (totalBytes + Buffer.byteLength(saved.content, "utf-8") > MAX_TOTAL_OUTPUT_BYTES && existing.length > 0) {
+        const oldest = existing.shift()!
+        await fs.unlink(oldest.filepath).catch(() => {})
+        totalBytes -= oldest.size
+      }
+      await Bun.write(Bun.file(filepath), saved.content)
+    })
 
+    const savedNote = saved.truncated
+      ? ` The saved artifact was capped at ${MAX_OUTPUT_FILE_BYTES} bytes (original: ${saved.originalBytes} bytes); its beginning and end were retained.`
+      : ""
     const hint = hasTaskTool(agent)
-      ? `The tool call succeeded but the output was truncated. Full output saved to: ${filepath}\nUse the Task tool to have explore agent process this file with Grep and Read (with offset/limit). Do NOT read the full file yourself - delegate to save context.`
-      : `The tool call succeeded but the output was truncated. Full output saved to: ${filepath}\nUse Grep to search the full content or Read with offset/limit to view specific sections.`
+      ? `The tool call succeeded but the output was truncated.${savedNote} Saved output: ${filepath}\nUse the Task tool to have explore agent process this file with Grep and Read (with offset/limit). Do NOT read the full file yourself - delegate to save context.`
+      : `The tool call succeeded but the output was truncated.${savedNote} Saved output: ${filepath}\nUse Grep to search the saved content or Read with offset/limit to view specific sections.`
     const message =
       direction === "head"
         ? `${preview}\n\n...${removed} ${unit} truncated...\n\n${hint}`
