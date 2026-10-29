@@ -51,7 +51,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
   // Filter agents by permissions if agent provided
   const caller = ctx?.agent
   const accessibleAgents = caller
-    ? agents.filter((a) => PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
+    ? agents.filter((a) => a.name === "impact-hunter" || PermissionNext.evaluate("task", a.name, caller.permission).action !== "deny")
     : agents
 
   const description = DESCRIPTION.replace(
@@ -66,8 +66,15 @@ export const TaskTool = Tool.define("task", async (ctx) => {
     async execute(params: z.infer<typeof parameters>, ctx) {
       const config = await Config.get()
 
-      // Skip permission check when user explicitly invoked via @ or command subtask
-      if (!ctx.extra?.bypassAgentCheck) {
+      // Impact Hunter is a designated internal escalation path. Any subagent may
+      // hand off an evidence-backed finding to it in background mode without
+      // gaining general task-spawning privileges. Scope and request tools remain
+      // enforced inside Impact Hunter.
+      const impactHandoff = params.subagent_type === "impact-hunter" && params.background === true && caller !== "impact-hunter"
+
+      // Skip permission check when user explicitly invoked via @ or command subtask,
+      // or for the narrowly-scoped internal Impact Hunter handoff above.
+      if (!ctx.extra?.bypassAgentCheck && !impactHandoff) {
         // Dispatch lane guard (Phase 4): the orchestrator must route each test to
         // the specialist whose lane owns it. Bounce a confidently mis-routed
         // proxy-tester dispatch (e.g. a rate-limiting task sent to business-logic)
