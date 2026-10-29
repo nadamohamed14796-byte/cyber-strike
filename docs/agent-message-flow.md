@@ -17,6 +17,7 @@ This document describes the maintained source-of-truth path for message delivery
 2. A model turn with neither non-empty text nor any tool call is an error, not a successful empty reply.
 3. The prompt loop's step cap is enforced in code: on the wrap-up step, remove regular tools so the model must finish; keep only `StructuredOutput` when structured mode requires it.
 4. Repeated identical tool + argument signatures are detected by the shared `toolSig` helper. The within-turn guard, processor permission check, and cross-turn detector have distinct jobs. Do not treat different arguments as duplicate calls, and do not enable the generic no-progress monologue detector by default without tests proving it will not flag normal coordination.
+5. The first repeated-call, repeated-read, empty-continuation, or failed-work streak schedules a recovery turn with tools still available and an explicit recovery prompt. If the same pattern persists after recovery, the loop guard schedules a terminal wrap-up and marks the assistant message as incomplete; `task` must propagate that status instead of crediting the child as clean. Meaningful successful work resets the relevant no-progress detectors.
 
 ## Validation checklist
 
