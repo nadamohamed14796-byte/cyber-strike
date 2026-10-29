@@ -160,7 +160,8 @@ export class EmptyContinuationDetector {
  */
 export class FailedToolStreakDetector {
   private streak = 0
-  private nudged = false
+  private readonly signatures = new Set<string>()
+  private recoveryRequired = false
 
   constructor(private readonly limit: number = 4) {
     if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError("limit must be a positive safe integer")
@@ -171,16 +172,32 @@ export class FailedToolStreakDetector {
       this.reset()
       return "ok"
     }
-    if (!toolCalls.some((call) => call.succeeded === false && isProgressTool(call.tool))) return "ok"
+    const failed = toolCalls.filter((call) => call.succeeded === false && isProgressTool(call.tool))
+    if (!failed.length) return "ok"
+
+    const current = new Set(failed.map((call) => toolSig(call.tool, call.input)))
+    if (this.recoveryRequired) {
+      // Only terminate when recovery repeats the same failed call pattern. A genuinely
+      // different tool/argument signature gets a fresh chance to make progress.
+      const alternatives = [...current].filter((signature) => !this.signatures.has(signature))
+      if (!alternatives.length) return "abort"
+      this.streak = 1
+      this.signatures.clear()
+      for (const signature of alternatives) this.signatures.add(signature)
+      this.recoveryRequired = false
+      return "ok"
+    }
+
     this.streak++
+    for (const signature of current) this.signatures.add(signature)
     if (this.streak < this.limit) return "ok"
-    if (this.nudged) return "abort"
-    this.nudged = true
+    this.recoveryRequired = true
     return "nudge"
   }
 
   reset(): void {
     this.streak = 0
-    this.nudged = false
+    this.signatures.clear()
+    this.recoveryRequired = false
   }
 }
