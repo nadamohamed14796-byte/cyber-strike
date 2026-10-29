@@ -57,6 +57,14 @@ Use only after the user explicitly requests targeted testing and the endpoint in
 - Standalone programs include `tech_detect`, `header_audit`, `sensitive_files`, `cors_check`, `method_check`, `open_redirect`, `sitemap_scan`, `robots_scan`, `openapi_scan`, and `graphql_probe`. `full_recon` runs the broader suite and must not be used as a default shortcut.
 - The targeted-testing section below owns the testing decision process. The canonical `/recon` workflow owns discovery order, workspace/authorization setup, crawling, checkpoints, and the final recon report; do not restate or create a second recon workflow here.
 
+## Mandatory on-demand SRC-Hunter payloader use
+
+Only after targeted testing is explicitly requested, and only when captured traffic/code/behavior supports a concrete hypothesis, consult the existing payload reference before designing a probe:
+1. Load `src-hunter-payloader-web` using the exact name returned by `skill(action="search")`. Read the selected category Markdown file from the returned Base directory and exact `<skill_files>` path; read the file content, not just its name or index row.
+2. Use the category routing table to select one relevant file and derive a minimal, non-destructive test with clear preconditions, expected signal, baseline and negative control. Do not load the entire catalog or run every payload in a file.
+3. If the overall category map or WAF reference is needed, load `payloader` and read `index.md`/ `waf-bypass.md` through its runtime paths. WAF variations are appropriate only when program rules permit a safe test; never use them to defeat scope, authorization, monitoring, rate limits, or explicit restrictions.
+4. Record the exact file path read with the evidence. A payload is a hypothesis—not proof. Prefer inert markers, read-only checks, test-owned fixtures, and minimal-impact comparison. Never execute data theft/exfiltration, credential or cookie theft, persistence/webshell, destructive, real-payment, or service-disruption examples. If no matching local file can be read, record the precise blocker and do not pretend the library was consulted.
+
 ## Targeted Testing Workflow — explicit opt-in only
 
 **Request-intent routing (mandatory):**
