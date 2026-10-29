@@ -17,7 +17,12 @@ import { Observation } from "../session/observation"
 import { renderAccessContextLines, resolveVisitedBy } from "../server/routes/session"
 import { Truncate } from "./truncation"
 import { dispatchScopeViolation, dispatchOffLaneMessage } from "./vuln-scope"
-import { assertTaskResumeScope, isInternalImpactHandoff, selectTaskRequestContext } from "./task-resume"
+import {
+  assertTaskResumeScope,
+  isInternalImpactHandoff,
+  requestIDFromPromptText,
+  selectTaskRequestContext,
+} from "./task-resume"
 
 // Per-field byte cap for raw request/response prepended into a subagent prompt.
 // Raised 16KB→48KB: validation showed weak models (o4-mini) do NOT follow the
@@ -41,15 +46,8 @@ async function requestIDFromSession(sessionID: string): Promise<string | undefin
       .filter((part) => part.type === "text")
       .map((part) => part.text)
       .join("\n")
-    for (const heading of ["## Request Task Identity", "## Current request"]) {
-      const start = text.indexOf(heading)
-      if (start < 0) continue
-      const remainder = text.slice(start)
-      const nextHeading = remainder.indexOf("\n## ", heading.length)
-      const section = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading)
-      const match = section.match(/^\s*-\s*(?:Request ID|request_id):\s*([^\r\n]+)\s*$/im)
-      if (match?.[1]) return match[1].trim()
-    }
+    const requestID = requestIDFromPromptText(text)
+    if (requestID) return requestID
   }
   return undefined
 }
