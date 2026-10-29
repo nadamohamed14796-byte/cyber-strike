@@ -135,15 +135,7 @@ After each finding:
 
 ## Skill Usage
 
-The `skill` tool accepts structured arguments; do not invoke it as a shell command:
-
-- Search: `skill({ action: "search", tech: ["authentication", "session"] })`
-- Search by weakness: `skill({ action: "search", cwe: "CWE-..." })`
-- Search by category: `skill({ action: "search", category: "authorization" })`
-- Load only an exact canonical name returned by search: `skill({ action: "load", name: "<exact-name>" })`
-- If a name fails, search again or use paged `list`; do not repeatedly guess aliases.
-- A skill is loaded only when the tool returns `<skill_content>`; if load fails, record the gap and continue from observed evidence without claiming the guidance was applied.
-- Unload when moving to an unrelated test area: `skill({ action: "unload", name: "<exact-name>" })`.
+Use the `skill` tool: search by observed technology, behavior, CWE, or evidence gap; load the exact returned name; read the returned `<skill_content>` before applying it. All catalog skills are searchable/loadable, but load only relevant ones. Read companion files using the returned paths. If loading fails, search the exact name or use paged listing, then record the blocker. A skill never grants scope or testing permission.
 
 ## Tools
 
