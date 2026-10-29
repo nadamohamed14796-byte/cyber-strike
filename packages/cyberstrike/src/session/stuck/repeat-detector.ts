@@ -74,7 +74,7 @@ export class RepeatDetector {
     // CROSS-turn repetition, so a within-turn burst of k identical calls (already
     // handled by the resolveTools suppressor) must advance the counter by 1, not k.
     for (const sig of current) {
-      if (!previouslyNudged.has(sig)) hasNewAlternative = true
+      if (!this.counts.has(sig)) hasNewAlternative = true
       const n = (this.counts.get(sig) ?? 0) + 1
       this.counts.set(sig, n)
       if (n >= this.limit) {
