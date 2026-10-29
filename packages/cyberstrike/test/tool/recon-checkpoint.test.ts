@@ -177,16 +177,24 @@ test("legacy manifests migrate to require parameter discovery and revalidate dow
 })
 
 
-test("JavaScript correlation artifacts can be checkpointed in the compact target folders", () => {
+test("JavaScript correlation uses canonical folders while preserving saved legacy paths", () => {
   const areas = RECON_PHASE_ARTIFACT_AREAS.javascript_analysis
-  expect(areas).toEqual(["javascript", "recon", "findings", "endpoints", "testing"])
+  expect(areas).toEqual(["javascript", "recon", "findings", "testing"])
   expect(areas?.some((area) => "javascript/example-graph.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "recon/endpoints-candidates.json".startsWith(area + "/"))).toBe(true)
-  expect(areas?.some((area) => "endpoints/example-candidates.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "endpoints/example-candidates.json".startsWith(area + "/"))).toBe(false)
   expect(areas?.some((area) => "findings/tester-survey-example.json".startsWith(area + "/"))).toBe(true)
-  // Legacy workspaces remain resumable while new surveys use findings/.
+  // The validator retains old endpoints/ only if the exact path is already recorded.
   expect(areas?.some((area) => "testing/tester-survey-example.json".startsWith(area + "/"))).toBe(true)
   expect(areas?.some((area) => "reports/example.md".startsWith(area + "/"))).toBe(false)
+})
+
+test("endpoint inventory uses recon/ for new artifacts", () => {
+  const areas = RECON_PHASE_ARTIFACT_AREAS.endpoint_inventory
+  expect(areas).toEqual(["recon"])
+  expect(areas?.some((area) => "recon/endpoints-candidates.json".startsWith(area + "/"))).toBe(true)
+  expect(areas?.some((area) => "endpoints/example-candidates.json".startsWith(area + "/"))).toBe(false)
+  expect(areas?.some((area) => "reports/random.md".startsWith(area + "/"))).toBe(false)
 })
 
 test("vulnerability testing artifacts must be saved under findings/ while legacy paths remain readable", () => {
