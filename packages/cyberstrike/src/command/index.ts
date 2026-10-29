@@ -165,7 +165,8 @@ export namespace Command {
         description: skill.description,
         source: "skill",
         get template() {
-          return skill.content
+          // Skill bodies are resolved only when the command is actually invoked.
+          return Skill.get(skill.name).then((loaded) => loaded?.content ?? "")
         },
         hints: [],
       }
