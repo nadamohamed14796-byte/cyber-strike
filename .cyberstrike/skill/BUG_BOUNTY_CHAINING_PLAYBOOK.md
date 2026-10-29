@@ -78,3 +78,28 @@ Use .cyberstrike/skill/attack-finding-correlation/SKILL.md as the shared integra
 The loop is: **observe → correlate → select one evidence-backed handoff → validate with controls → merge result → recompute next handoff**. Do not fan out to every related skill by default. Keep each candidate edge tied to an observed signal and prerequisite; record blocked, inconclusive, and not-run states distinctly. Merge repeated observations and same-root-cause instances without discarding method, auth context, tenant/object boundary, parameter location, API version, evidence provenance, or materially different impact.
 
 The correlation layer must never turn a possible chain into confirmed impact or increase severity just because more links were hypothesized. Confirm each necessary link independently, preserve contradictory evidence, and group sibling routes under one finding when root cause, remediation, and impact are materially the same. Reopen prior rejected leads only when new evidence changes the tested boundary or invalidates the previous explanation.
+
+## SRC-Hunter-derived control-gap routing
+
+Use the source-hunter playbooks as a decision aid, not as a new mandatory pipeline or a source of automatic severity. CyberStrike's existing scope decision remains authoritative, and a target already scoped in the session should not be repeatedly re-confirmed unless a proposed hop changes the asset or permission basis.
+
+### Route from observed behavior
+- REST/API request or JavaScript endpoint: map method, route, parameter/body fields, caller identity, and response evidence; then choose the relevant BOLA/IDOR, function authorization, property authorization, authentication, or business-logic check.
+- Sensitive mutation (POST/PUT/PATCH/DELETE): identify the expected ownership, role, state-transition, and server-controlled-field rules. Test with controlled accounts/objects and one changed variable.
+- Login, recovery, OAuth, JWT, or MFA signal: test token/identity binding, redirect/issuer/audience constraints, replay/expiry, or session transition only where the observed flow supports it.
+- URL-consuming server feature: first establish evidence that the server performs a fetch; then use a controlled destination to evaluate URL/destination validation. Do not infer SSRF from a user-supplied URL field alone.
+- Upload, download, preview, or file path: establish storage and access behavior using a harmless canary; do not attempt webshells, overwrite files, or extract sensitive files.
+- Cache/host/CORS/GraphQL/WebSocket/rate or race signal: select a dedicated check only when the relevant protocol or behavior is observed; avoid broad probing or load generation.
+
+### Required control comparison
+For every proposed chain edge, record:
+1. baseline behavior under the expected valid context;
+2. controlled negative case (wrong owner/role, missing permission, or safe invalid state);
+3. the one variable changed in the candidate request;
+4. actual response plus authoritative state/data evidence, if applicable;
+5. the secure invariant that was violated, or the evidence that disproves the hypothesis.
+
+A 200 response, reflected input, static route, token-shaped string, or scanner label is not sufficient by itself. Do not assume that a control is absent because the client UI exposes a field or hides a route.
+
+### Chain stop and deduplication
+Only follow one evidence-backed next hop at a time. Recheck scope and prerequisites for every new asset or trust boundary without re-prompting for unchanged scope. Keep unverified links as hypotheses; do not inflate severity based on a hypothetical terminal impact. Merge observations with the same root cause while retaining distinct method, identity/tenant, field, endpoint/version, evidence provenance, and materially different impact. Never discard contradictory or negative evidence.
