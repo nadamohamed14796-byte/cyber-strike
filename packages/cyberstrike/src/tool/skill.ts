@@ -60,11 +60,14 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
       let catalog = Skill.state()
       let skills = await Skill.all()
       let stableCatalog = false
-      while (!stableCatalog) {
+      for (let attempt = 0; attempt < 5 && !stableCatalog; attempt++) {
         await SkillIndex.ensureBuilt()
         catalog = Skill.state()
         skills = await Skill.all()
-        if (Skill.state() === catalog) stableCatalog = true
+        stableCatalog = Skill.state() === catalog
+      }
+      if (!stableCatalog) {
+        throw new Error("Skill catalog changed repeatedly while resolving accessible skills; retry the skill operation.")
       }
 
       const agentKey = `${Instance.directory}\0${ctx.agent ?? ""}`
