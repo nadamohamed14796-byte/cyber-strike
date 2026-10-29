@@ -138,6 +138,46 @@ test("returns default native agents when no config", async () => {
   })
 })
 
+test("Impact Hunter is a terminal investigator with evidence tools but no default task spawning", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const agent = await Agent.get("impact-hunter")
+      expect(agent).toBeDefined()
+      expect(agent?.mode).toBe("subagent")
+      expect(agent?.hidden).toBe(true)
+      expect(evalPerm(agent, "task")).toBe("deny")
+      for (const tool of [
+        "web_get_session_context",
+        "web_get_detail",
+        "web_get_request_detail",
+        "web_get_vulnerabilities",
+        "web_get_vuln_detail",
+        "correlate_javascript",
+        "validate_finding",
+        "verification_attempt",
+        "false_positive_memory",
+        "report_vulnerability",
+        "triage_vulnerability",
+        "research_knowledge",
+        "target_note",
+        "add_intel",
+        "get_coverage_notes",
+        "methodology_status",
+        "scope_check",
+        "web_write_role",
+        "web_write_object",
+        "web_write_object_value",
+        "web_write_function",
+        "web_update_credential_claims",
+      ]) {
+        expect(evalPerm(agent, tool)).toBe("allow")
+      }
+    },
+  })
+})
+
 test("cyberstrike agent has correct default properties", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
