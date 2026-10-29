@@ -1936,7 +1936,7 @@ export const SessionRoutes = lazy(() =>
               captureVisitedBy: body.page_visited_by,
             })
             const base = buildPromptWithCredentialContext(
-              truncatedRawRequest,
+              body.text,
               credentialID,
               req.processed_response,
               {
