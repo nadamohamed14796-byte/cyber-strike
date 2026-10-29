@@ -24,6 +24,6 @@ The industry playbooks are read-only references for hypothesis selection, not an
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://owasp.org/www-project-application-security-verification-standard/
 - https://github.com/nadamohamed14796-byte/src-hunter
-- Shared capability examples and preflight guidance: `.cyberstrike/skill/TOOLING_CATALOG.md`.
+- Shared capability examples and preflight guidance: the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>` (read it using that skill's returned `Base directory`; do not resolve against the target workspace).
 
 Use the smallest relevant reference. If the target's industry is uncertain or outside the approved scope, do not apply a vertical playbook by assumption.

@@ -21,6 +21,6 @@ This skill indexes tool references; it does not install or register a server. Re
 ### Official resources
 - https://github.com/vmoranv/jshookmcp
 - https://github.com/nadamohamed14796-byte/src-hunter
-- Shared capability/preflight catalog: `.cyberstrike/skill/TOOLING_CATALOG.md`.
+- Shared capability/preflight catalog: the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>` (read it using that skill's returned `Base directory`; do not resolve against the target workspace).
 
 Only use actions and assets allowed by the saved scope and program policy; the presence of a tool reference is not authorization.

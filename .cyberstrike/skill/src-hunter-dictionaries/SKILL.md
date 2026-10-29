@@ -23,6 +23,6 @@ These dictionaries support matching observed fingerprints and tightly scoped con
 ### Official resources
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/nadamohamed14796-byte/src-hunter
-- Shared tool availability/preflight guidance: `.cyberstrike/skill/TOOLING_CATALOG.md`.
+- Shared tool availability/preflight guidance: the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>` (read it using that skill's returned `Base directory`; do not resolve against the target workspace).
 
 Use verified observations and version evidence, not fingerprints or listed defaults alone, to support a finding.

@@ -22,6 +22,6 @@ Use this reference only when a candidate finding is supported by current-target 
 - https://www.hackerone.com/
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/nadamohamed14796-byte/src-hunter
-- Shared local tooling/preflight guidance: `.cyberstrike/skill/TOOLING_CATALOG.md`.
+- Shared local tooling/preflight guidance: the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>` (read it using that skill's returned `Base directory`; do not resolve against the target workspace).
 
 The program's required submission format and saved evidence take precedence over this generic template.

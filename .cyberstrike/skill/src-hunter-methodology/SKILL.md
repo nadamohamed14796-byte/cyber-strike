@@ -26,6 +26,6 @@ This skill is a reference router, not a tool installer or an authorization check
 ### Official resources
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/nadamohamed14796-byte/src-hunter
-- Shared candidate CLI/helper catalog: `.cyberstrike/skill/TOOLING_CATALOG.md` (reference only; inspect the current runtime schema and installed tools before use).
+- Shared candidate CLI/helper catalog: the `TOOLING_CATALOG.md` companion listed in `community-tool-selection`'s returned `<skill_files>` (read it using that skill's returned `Base directory`; do not resolve against the target workspace) (reference only; inspect the current runtime schema and installed tools before use).
 
 Choose references only to resolve a concrete evidence gap. Tool selection remains dynamic, and the saved scope, policy, and runtime checks always take precedence.
