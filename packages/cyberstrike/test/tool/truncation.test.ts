@@ -102,6 +102,21 @@ describe("Truncate", () => {
       expect(written).toBe(lines)
     })
 
+    test("caps oversized saved artifacts and retains the beginning and end", async () => {
+      const content = "BEGIN_MARKER" + "x".repeat(Truncate.MAX_OUTPUT_FILE_BYTES + 1024) + "END_MARKER"
+      const result = await Truncate.output(content, { maxLines: 1, maxBytes: 32 })
+
+      expect(result.truncated).toBe(true)
+      expect(result.content).toContain("saved artifact was capped")
+      if (!result.truncated) throw new Error("expected truncated")
+      const saved = await Bun.file(result.outputPath).text()
+      expect(Buffer.byteLength(saved, "utf-8")).toBeLessThanOrEqual(Truncate.MAX_OUTPUT_FILE_BYTES)
+      expect(saved).toContain("BEGIN_MARKER")
+      expect(saved).toContain("END_MARKER")
+      expect(saved).toContain("CyberStrike disk safeguard")
+      await fs.unlink(result.outputPath).catch(() => {})
+    })
+
     test("suggests Task tool when agent has task permission", async () => {
       const lines = Array.from({ length: 100 }, (_, i) => `line${i}`).join("\n")
       const agent = { permission: [{ permission: "task", pattern: "*", action: "allow" as const }] }
