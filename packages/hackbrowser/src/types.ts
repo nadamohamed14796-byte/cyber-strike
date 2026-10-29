@@ -360,7 +360,7 @@ export type CSEvent =
     }
   | {
       type: "intelligence"
-      kind: "mark-empty" | "drain" | "stale-prune" | "revisit"
+      kind: "mark-empty" | "drain" | "stale-prune" | "revisit" | "incomplete-exploration"
       url: string
       credential: string
       note?: string
