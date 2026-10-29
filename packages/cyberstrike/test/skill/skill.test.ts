@@ -475,6 +475,7 @@ test("representative skills in the full catalog can be loaded into context", asy
           for (const name of selected) {
             expect(skills.some((skill) => skill.name === name), name + " should exist in the catalog").toBe(true)
             const loaded = await SkillContext.load(name)
+            if (loaded === undefined) throw new Error(name + " failed to load into skill context")
             expect(loaded.trim(), name + " should load non-empty content").not.toBe("")
             expect(SkillContext.isLoaded(name), name + " should be marked loaded").toBe(true)
             expect(SkillContext.unload(name), name + " should unload cleanly").toBe(true)
