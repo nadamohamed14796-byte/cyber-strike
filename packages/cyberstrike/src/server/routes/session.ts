@@ -1682,8 +1682,8 @@ export const SessionRoutes = lazy(() =>
             scheme: body.scheme ?? inferScheme(body.text),
           })
           if (!scopeDecision.allowed) {
-            const firstLine = body.text.split(/\\r?\\n/, 1)[0]?.trim() ?? ""
-            const methodLabel = firstLine.match(/^([A-Z]+)\\s+/i)?.[1]?.toUpperCase() ?? "HTTP"
+            const firstLine = body.text.split(/\r?\n/, 1)[0]?.trim() ?? ""
+            const methodLabel = firstLine.match(/^([A-Z]+)\s+/i)?.[1]?.toUpperCase() ?? "HTTP"
             const pathLabel = scopeDecision.url
               ? (() => {
                   try { return new URL(scopeDecision.url).pathname || "/" } catch { return "(unresolved URL)" }
