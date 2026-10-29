@@ -40,14 +40,14 @@ async function requestIDFromSession(sessionID: string): Promise<string | undefin
     const text = message.parts
       .filter((part) => part.type === "text")
       .map((part) => part.text)
-      .join("\\n")
+      .join("\n")
     for (const heading of ["## Request Task Identity", "## Current request"]) {
       const start = text.indexOf(heading)
       if (start < 0) continue
       const remainder = text.slice(start)
-      const nextHeading = remainder.indexOf("\\n## ", heading.length)
+      const nextHeading = remainder.indexOf("\n## ", heading.length)
       const section = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading)
-      const match = section.match(/^\\s*-\\s*(?:Request ID|request_id):\\s*([^\\r\\n]+)\\s*$/im)
+      const match = section.match(/^\s*-\s*(?:Request ID|request_id):\s*([^\r\n]+)\s*$/im)
       if (match?.[1]) return match[1].trim()
     }
   }
