@@ -66,6 +66,38 @@ const EXPLICIT_TARGET_LIST_FLAGS = new Set([
   "--host-list", "--hosts-file", "--input-file", "--list-file", "--domain-list",
   "--domains-list", "--hostname-list", "--hostnames-file",
 ])
+// Infer list/input options by semantic shape as well as common conventions, so
+// new CLIs do not need executable-name-specific parser branches.
+function normalizedOptionName(value: string): string {
+  const token = stripOuterShellQuotes(value).toLowerCase()
+  return token.includes("=") ? token.slice(0, token.indexOf("=")) : token
+}
+
+function isTargetListFlag(value: string): boolean {
+  const flag = normalizedOptionName(value)
+  if (TARGET_LIST_FLAGS.has(flag)) return true
+  const name = flag.replace(/^-+/, "")
+  if (/(?:wordlist|template|output|outfile|exclude|blacklist|allowlist|blocklist)/.test(name)) return false
+  const targetNoun = /(?:target|targets|domain|domains|host|hosts|hostname|hostnames|scope|input|url|urls|asset|assets)/.test(name)
+  const fileShape = /(?:file|list|path|batch|source|csv|tsv|jsonl?|txt)$/.test(name) ||
+    /(?:file|list|path|batch|source)(?:[-_]|$)/.test(name) ||
+    /^(?:targets|domains|hosts|hostnames|urls|assets)$/.test(name)
+  return targetNoun && fileShape
+}
+
+function isExplicitTargetListFlag(value: string): boolean {
+  const flag = normalizedOptionName(value)
+  if (EXPLICIT_TARGET_LIST_FLAGS.has(flag)) return true
+  if (["-f", "--file", "-i", "--input"].includes(flag)) return false
+  return isTargetListFlag(flag)
+}
+
+function isDirectTargetValue(value: string): boolean {
+  if (isTargetLikeValue(value)) return true
+  const pieces = value.split(",").map((entry) => entry.trim()).filter(Boolean)
+  return pieces.length > 1 && pieces.every((entry) => isTargetLikeValue(entry))
+}
+
 const CLI_OPTIONS_WITH_NON_TARGET_VALUES = new Set([
   "-o", "--o", "--output", "-output", "--output-file", "-out", "-on", "-ox", "-og", "-oa",
   "-w", "--wordlist", "--word-list", "-p", "--ports", "--port", "-port", "--top-ports",
@@ -236,13 +268,13 @@ function hasTargetListInputArgument(args: string[]): boolean {
   for (let i = 0; i < args.length; i++) {
     const raw = stripOuterShellQuotes(args[i]!).toLowerCase()
     const inlineFlag = raw.includes("=") ? raw.slice(0, raw.indexOf("=")) : raw
-    if (!TARGET_LIST_FLAGS.has(inlineFlag)) continue
+    if (!isTargetListFlag(inlineFlag)) continue
     const value = raw.includes("=")
       ? stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
       : stripOuterShellQuotes(args[i + 1] ?? "")
     if (!value || value.startsWith("-")) return true
-    if (isTargetLikeValue(value)) continue
-    if (EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag) ||
+    if (isDirectTargetValue(value)) continue
+    if (isExplicitTargetListFlag(inlineFlag) ||
         /[\\/]/.test(value) ||
         /\.(?:txt|list|csv|tsv|jsonl?|yaml|yml|hosts|urls|lst)$/i.test(value)) {
       return true
@@ -278,7 +310,7 @@ export function scannerTargets(command: string[], commandText: string): string[]
       if (!lower.includes("=")) i++
       continue
     }
-    if (TARGET_LIST_FLAGS.has(flag)) {
+    if (isTargetListFlag(flag)) {
       const next = lower.includes("=") ? token.slice(token.indexOf("=") + 1) : command[i + 1]
       if (next) addNormalizedTarget(candidates, next)
       if (!lower.includes("=")) i++
@@ -757,7 +789,6 @@ export async function readTargetListInputs(
   cwd: string,
 ): Promise<{ present: boolean; targets: string[] }> {
   const files: Array<{ path: string; strict: boolean }> = []
-  const isHostInput = (value: string) => isTargetLikeValue(value)
   const fileLike = (value: string) =>
     /[\\/]/.test(value) ||
     /\.(?:txt|list|csv|tsv|jsonl?|xml|yaml|yml|hosts|urls|lst)$/i.test(value)
@@ -781,7 +812,7 @@ export async function readTargetListInputs(
     // A hostname/URL supplied to an input option is a direct target, not a file.
     // Ambiguous file/input flags are treated as lists only when the value looks
     // like a path, has a list extension, or resolves to an existing file.
-    if (isHostInput(value)) {
+    if (isDirectTargetValue(value)) {
       if (!inline) i++
       continue
     }
