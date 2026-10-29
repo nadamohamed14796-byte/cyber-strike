@@ -23,7 +23,7 @@ Load this skill only when a concrete task has an evidence gap that may benefit f
 
 ## Single source of truth
 
-Use `.cyberstrike/skill/TOOLING_CATALOG.md` for tool candidates by task, helper scripts, official references, availability checks, output expectations, and canonical artifact formats. Do not create or maintain another tool/source list in a skill.
+Use the `TOOLING_CATALOG.md` companion listed in this skill's returned `<skill_files>`; read it using this skill's returned `Base directory` and never resolve it against the target workspace for tool candidates by task, helper scripts, official references, availability checks, output expectations, and canonical artifact formats. Do not create or maintain another tool/source list in a skill.
 
 ## Procedure
 
@@ -46,7 +46,7 @@ Use `.cyberstrike/skill/TOOLING_CATALOG.md` for tool candidates by task, helper 
 
 ## Agent-executable CLI tooling, resources, and helper scripts
 
-Use the canonical `.cyberstrike/skill/TOOLING_CATALOG.md` for the current tool candidates and output contracts. If tool_preflight.py is available under the installed skill/catalog root, resolve its absolute path and run it once per active runtime/version; never assume `.cyberstrike/skill/scripts/` is relative to the target workspace. If it is unavailable, use `command -v` plus the tool's documented version/help check. Review official docs, flags, license, dependencies, permissions, and network behavior before installation or use. Do not install or run every catalog entry.
+Use the canonical the `TOOLING_CATALOG.md` companion listed in this skill's returned `<skill_files>`; read it using this skill's returned `Base directory` and never resolve it against the target workspace for the current tool candidates and output contracts. If tool_preflight.py is available under the installed skill/catalog root, resolve its absolute path and run it once per active runtime/version; never assume `.cyberstrike/skill/scripts/` is relative to the target workspace. If it is unavailable, use `command -v` plus the tool's documented version/help check. Review official docs, flags, license, dependencies, permissions, and network behavior before installation or use. Do not install or run every catalog entry.
 
 Official general references: [Python CLI documentation](https://docs.python.org/3/), [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/), and the [bug bounty tool discovery index](https://github.com/vavkamil/awesome-bugbounty-tools). Prefer each tool's own official project documentation for exact flags and installation details.
 

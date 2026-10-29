@@ -179,6 +179,29 @@
       "category": "developer-tooling"
     },
     {
+      "name": "community-tool-selection",
+      "description": "Choose and verify a fit-for-purpose external tool, API, dataset, or local helper without duplicating the canonical tool catalog.",
+      "verified": "unverified",
+      "category": "information-gathering",
+      "tags": [
+        "--",
+        "tool-selection",
+        "cli-tooling",
+        "recon",
+        "bug-bounty",
+        "tool-preflight"
+      ],
+      "tech_stack": [],
+      "cwe_ids": [],
+      "prerequisites": [
+        "recon-methodology"
+      ],
+      "files": [
+        "SKILL.md",
+        "TOOLING_CATALOG.md"
+      ]
+    },
+    {
       "name": "kerberos-attacks",
       "description": "Assess Kerberos authentication and delegation weaknesses in an explicitly authorized AD lab or engagement",
       "verified": "unverified",
