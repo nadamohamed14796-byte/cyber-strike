@@ -15,6 +15,24 @@ export type TaskRequestContextSelection<T> = {
 }
 
 /**
+ * Recover the exact captured request ID from a session's persisted user prompt.
+ * Read only known identity sections so an unrelated mention of "Request ID"
+ * elsewhere in free-form text cannot bind a nested task to the wrong capture.
+ */
+export function requestIDFromPromptText(text: string): string | undefined {
+  for (const heading of ["## Request Task Identity", "## Current request"]) {
+    const start = text.indexOf(heading)
+    if (start < 0) continue
+    const remainder = text.slice(start)
+    const nextHeading = remainder.indexOf("\n## ", heading.length)
+    const section = nextHeading < 0 ? remainder : remainder.slice(0, nextHeading)
+    const match = section.match(/^\s*-\s*(?:Request ID|request_id):\s*([^\r\n]+)\s*$/im)
+    if (match?.[1]) return match[1].trim()
+  }
+  return undefined
+}
+
+/**
  * Select request context without silently attaching a task to unrelated traffic.
  * An explicit ID is authoritative; otherwise only one in-flight request is safe
  * to infer. Multiple in-flight rows are ambiguous and must be resolved by ID.
