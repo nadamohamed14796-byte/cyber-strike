@@ -232,6 +232,10 @@ describe("Tool-specific target-list input parsing", () => {
       present: false,
       targets: [],
     })
+    await expect(readTargetListInputs(["-i", "example.com/robots.txt"], tmp.path, "waymore")).resolves.toEqual({
+      present: false,
+      targets: [],
+    })
   })
 
   test("does not reinterpret github-subdomains -t credential values as target files", async () => {
