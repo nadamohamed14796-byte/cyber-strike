@@ -162,7 +162,8 @@ describe("Generic scope-aware CLI target discovery", () => {
 
   test("recognizes unregistered network-capable CLIs for scope gating, but not local text processors", () => {
     expect(scannerExecutableIndex(["unlisted-enumerator", "--root-zone", "example.com"])).toBe(0)
-    expect(scannerExecutableIndex(["local-filter", "example.com", "results.txt"])).toBe(0)
+    expect(scannerExecutableIndex(["future-network-cli", "example.com", "results.txt"])).toBe(0)
+    expect(scannerExecutableIndex(["future-network-cli", "--seed-file", "domains.txt"])).toBe(0)
     expect(scannerExecutableIndex(["grep", "example.com", "results.txt"])).toBe(-1)
   })
 
@@ -190,6 +191,10 @@ describe("Generic scope-aware CLI target discovery", () => {
       targets: ["https://example.com", "https://api.example.com"],
     })
     await expect(readTargetListInputs(["-i", "domains.txt"], tmp.path)).resolves.toEqual({
+      present: true,
+      targets: ["https://example.com", "https://api.example.com"],
+    })
+    await expect(readTargetListInputs(["--seed-file", "domains.txt"], tmp.path)).resolves.toEqual({
       present: true,
       targets: ["https://example.com", "https://api.example.com"],
     })
