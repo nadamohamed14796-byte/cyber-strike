@@ -141,11 +141,9 @@ function installSkills() {
   const dataDir = path.join(xdgDataDir(), "cyberstrike")
   const skillDest = path.join(dataDir, "skill")
 
-  // Remove old skills before copying
-  if (fs.existsSync(skillDest)) {
-    fs.rmSync(skillDest, { recursive: true, force: true })
-  }
-
+  // Merge the shipped catalog into the existing directory. Refresh packaged
+  // files and add new entries without deleting user-added skills (including local
+  // WSTG skills) or other references kept under the data directory.
   copyDirSync(skillSrc, skillDest)
   console.log(`Skills installed to ${skillDest}`)
 }
