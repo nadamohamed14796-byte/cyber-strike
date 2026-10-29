@@ -41,3 +41,7 @@ Use `validate_finding` before final classification and `report_vulnerability` on
 ## Stop conditions
 
 Stop when scope, expected field policy, ownership, or rollback is unclear; the only possible test would grant real privileges or cause a financial/destructive effect; or no meaningful safe test remains.
+
+
+## Integrated specialist knowledge
+Treat mass assignment as a server-side field-authorization problem, not simply acceptance of extra JSON properties. Derive candidate fields from observed API schemas, responses, client bundles, and legitimate test-account workflows; compare a normal update with one controlled, non-sensitive test-owned field. Focus on fields that affect role, ownership, tenant, approval, billing, or workflow state only when a safe test fixture exists. Verify persisted server-side state and authorization consequences; do not alter real accounts, privileges, or financial state.
