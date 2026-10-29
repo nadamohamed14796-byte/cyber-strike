@@ -512,7 +512,7 @@ async function analyzeCapturedRequest(input: CapturedRequestAnalysisInput): Prom
                   failureReason = agentError
                     ? (typeof agentError === "string" ? agentError : JSON.stringify(agentError))
                     : agentStuck
-                      ? "Agent run was aborted as stuck before completing."
+                      ? "Agent required a forced wrap-up after repeated no-progress actions; result is incomplete."
                       : "Agent reached its step cap before completing."
                   failureReason = failureReason.slice(0, 500)
                 }
