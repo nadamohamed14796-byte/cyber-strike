@@ -11,6 +11,22 @@ import { tmpdir } from "../fixture/fixture"
 import type { Agent } from "../../src/agent/agent"
 import type { MessageV2 } from "../../src/session/message-v2"
 
+describe("session.llm.canExposeInternalImpactHandoff", () => {
+  test("allows the internal handoff tool for non-Impact-Hunter subagents", () => {
+    expect(LLM.canExposeInternalImpactHandoff({ name: "proxy-tester-injection", mode: "subagent" })).toBe(true)
+    expect(LLM.canExposeInternalImpactHandoff({ name: "proxy-analyzer", mode: "subagent" })).toBe(true)
+  })
+
+  test("does not expose the handoff tool to primary agents or Impact Hunter itself", () => {
+    expect(LLM.canExposeInternalImpactHandoff({ name: "cyberstrike", mode: "primary" })).toBe(false)
+    expect(LLM.canExposeInternalImpactHandoff({ name: "impact-hunter", mode: "subagent" })).toBe(false)
+  })
+
+  test("respects an explicit task-tool disable", () => {
+    expect(LLM.canExposeInternalImpactHandoff({ name: "proxy-tester-injection", mode: "subagent" }, true)).toBe(false)
+  })
+})
+
 describe("session.llm.hasToolCalls", () => {
   test("returns false for empty messages array", () => {
     expect(LLM.hasToolCalls([])).toBe(false)
