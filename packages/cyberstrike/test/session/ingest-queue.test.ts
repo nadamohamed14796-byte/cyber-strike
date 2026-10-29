@@ -6,6 +6,7 @@ import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 import { Session } from "../../src/session"
 import { Request } from "../../src/session/request"
+import { TargetMemory } from "../../src/target"
 import { Server } from "../../src/server/server"
 import { Database, eq } from "../../src/storage/db"
 import { RequestJavaScriptCaptureTable, RequestTable } from "../../src/session/session.sql"
@@ -588,6 +589,11 @@ describe("captured request payload preservation", () => {
       process.env.CYBERSTRIKE_INGEST_DRY_RUN = "true"
       let sessionID: string | undefined
       try {
+        await TargetMemory.configureScope("https://example.test", {
+          include: ["https://example.test"],
+          authorizationSource: "Captured request payload preservation test",
+          userConfirmed: true,
+        })
         const session = await Session.create({ title: "complete-captured-request-test" })
         sessionID = session.id
         const body = JSON.stringify({ marker: "end-of-body-marker", payload: "x".repeat(12 * 1024) })
