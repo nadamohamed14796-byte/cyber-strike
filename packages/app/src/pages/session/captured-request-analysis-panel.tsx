@@ -101,8 +101,11 @@ export function CapturedRequestAnalysisPanel() {
   const childUserMessages = createMemo(() => childMessages().filter((message) => message.role === "user"))
   const childBusy = createMemo(() => {
     const id = analysisSessionID()
-    return !!id && sync.data.session_status[id]?.type === "busy"
+    return !!id && (sync.data.session_status[id]?.type ?? "idle") !== "idle"
   })
+  const replyDisabled = createMemo(
+    () => !analysisSessionID() || childUserMessages().length === 0 || childBusy() || replySending(),
+  )
   const requestParts = createMemo(() => parseRequest(request()?.raw_request))
   const queryParams = createMemo(() => {
     try {
@@ -509,7 +512,7 @@ export function CapturedRequestAnalysisPanel() {
                       }
                     }}
                     rows={2}
-                    disabled={!analysisSessionID() || childBusy() || replySending()}
+                    disabled={replyDisabled()}
                     placeholder="Ask about this request or continue a supported investigation…"
                     class="w-full resize-y rounded-lg border border-border-base bg-background-base px-3 py-2 text-12-regular text-text-base outline-none focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-60"
                   />
@@ -519,7 +522,7 @@ export function CapturedRequestAnalysisPanel() {
                     </p>
                     <button
                       type="submit"
-                      disabled={!replyDraft().trim() || childBusy() || replySending()}
+                      disabled={!replyDraft().trim() || replyDisabled()}
                       class="shrink-0 rounded-md border border-border-base bg-surface-raised-base px-3 py-1.5 text-11-medium text-text-base hover:bg-surface-base disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {replySending() ? "Sending…" : childBusy() ? "Agent working…" : "Send"}
