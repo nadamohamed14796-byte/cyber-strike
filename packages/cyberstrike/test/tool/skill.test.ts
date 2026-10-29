@@ -292,6 +292,8 @@ Use this skill.
         const skillRoot = path.join(dir, ".cyberstrike", "skill")
         const payloaderDir = path.join(skillRoot, "payloader")
         const webDir = path.join(payloaderDir, "by-category", "web")
+        const playbooksDir = path.join(skillRoot, "playbooks")
+        const h1Dir = path.join(skillRoot, "h1-reports", "by-weakness")
 
         await Bun.write(
           path.join(payloaderDir, "SKILL.md"),
@@ -309,6 +311,41 @@ Use this skill.
           ].join("\n"),
         )
         await Bun.write(path.join(payloaderDir, "index.md"), "# Payload index\n")
+
+        await Bun.write(
+          path.join(playbooksDir, "SKILL.md"),
+          [
+            "---",
+            "name: playbooks",
+            "description: Routes evidence-backed bug-bounty hypotheses to local playbook references.",
+            'chains_with: ["payloader", "hackerone-disclosed-reports"]',
+            'tags: ["src-hunter", "playbooks", "bug-bounty"]',
+            "---",
+            "",
+            "# Playbook router",
+            "Read the exact local playbook before designing a test.",
+            "",
+          ].join("\n"),
+        )
+        await Bun.write(path.join(playbooksDir, "00-index.md"), "# Playbook index\n")
+        await Bun.write(path.join(playbooksDir, "sqli.md"), "# SQLi reference\nPLAYBOOK_RUNTIME_READ_MARKER\n")
+
+        await Bun.write(
+          path.join(h1Dir, "SKILL.md"),
+          [
+            "---",
+            "name: hackerone-disclosed-reports",
+            "description: Routes to relevant public disclosed report examples.",
+            'tags: ["hackerone", "disclosed-reports", "bug-bounty"]',
+            "---",
+            "",
+            "# HackerOne reports router",
+            "Read the index and only the relevant weakness file.",
+            "",
+          ].join("\n"),
+        )
+        await Bun.write(path.join(h1Dir, "index.md"), "# H1 report index\n")
+        await Bun.write(path.join(h1Dir, "sql-injection.md"), "# SQL injection case reference\nH1_RUNTIME_READ_MARKER\n")
 
         await Bun.write(
           path.join(webDir, "SKILL.md"),
@@ -369,6 +406,28 @@ Use this skill.
             expect(rootLoaded.title).toBe("Loaded skill: payloader")
             expect(rootLoaded.output).toContain(`<file>${indexPath}</file>`)
             expect(await Bun.file(indexPath).text()).toContain("Payload index")
+
+            const playbooksLoaded = await tool.execute({ action: "load", name: "playbooks" }, ctx)
+            const playbookBase = path.join(tmp.path, ".cyberstrike", "skill", "playbooks")
+            const playbookIndex = path.resolve(playbookBase, "00-index.md")
+            const playbookReference = path.resolve(playbookBase, "sqli.md")
+            expect(playbooksLoaded.title).toBe("Loaded skill: playbooks")
+            expect(playbooksLoaded.output).toContain(\`Base directory for this skill: \${pathToFileURL(playbookBase).href}\`)
+            expect(playbooksLoaded.output).toContain(\`<file>\${playbookIndex}</file>\`)
+            expect(playbooksLoaded.output).toContain(\`<file>\${playbookReference}</file>\`)
+            expect(await Bun.file(playbookIndex).text()).toContain("Playbook index")
+            expect(await Bun.file(playbookReference).text()).toContain("PLAYBOOK_RUNTIME_READ_MARKER")
+
+            const h1Loaded = await tool.execute({ action: "load", name: "hackerone-disclosed-reports" }, ctx)
+            const h1Base = path.join(tmp.path, ".cyberstrike", "skill", "h1-reports", "by-weakness")
+            const h1Index = path.resolve(h1Base, "index.md")
+            const h1Reference = path.resolve(h1Base, "sql-injection.md")
+            expect(h1Loaded.title).toBe("Loaded skill: hackerone-disclosed-reports")
+            expect(h1Loaded.output).toContain(\`Base directory for this skill: \${pathToFileURL(h1Base).href}\`)
+            expect(h1Loaded.output).toContain(\`<file>\${h1Index}</file>\`)
+            expect(h1Loaded.output).toContain(\`<file>\${h1Reference}</file>\`)
+            expect(await Bun.file(h1Index).text()).toContain("H1 report index")
+            expect(await Bun.file(h1Reference).text()).toContain("H1_RUNTIME_READ_MARKER")
           } finally {
             SkillContext.clear()
           }
