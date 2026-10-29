@@ -321,7 +321,7 @@ export namespace Skill {
 
     // Download and load skills from URLs. One unavailable optional source must
     // not reject Skill.state() and make every local skill unavailable.
-    for (const url of config.skills?.urls ?? []) {
+    for (const [urlIndex, url] of (config.skills?.urls ?? []).entries()) {
       try {
         const list = await Discovery.pull(url)
         for (const dir of list) {
@@ -472,7 +472,7 @@ export namespace Skill {
     }
 
     // Downloaded skills from URLs
-    for (const [urlIndex, url] of (config.skills?.urls ?? []).entries()) {
+    for (const url of config.skills?.urls ?? []) {
       const list = await Discovery.pull(url).catch(() => [])
       if (!list) continue
       for (const dir of list) {
