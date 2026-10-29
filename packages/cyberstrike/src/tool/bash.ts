@@ -45,7 +45,7 @@ function isBinaryBuffer(buf: Buffer): boolean {
  * This registry identifies commands to inspect; it is not a phase allowlist.
  */
 const SCANNER_TOOL_NAMES = new Set([
-  "subfinder", "amass", "assetfinder", "sublist3r",
+  "subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains",
   "nmap", "masscan", "naabu", "httpx", "dnsx",
   "katana", "gau", "waybackurls", "hakrawler", "gospider",
   "paramspider", "curl", "wget", "arjun", "x8",
@@ -180,7 +180,7 @@ export function scannerTargets(command: string[], commandText: string): string[]
       }
     }
   }
-  const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r"].includes(scannerName)
+  const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains"].includes(scannerName)
   for (let i = 0; i < command.length; i++) {
     const flag = stripOuterShellQuotes(command[i]!).toLowerCase()
     if (targetFlags.has(flag)) {
