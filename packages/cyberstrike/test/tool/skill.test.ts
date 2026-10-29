@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 import path from "path"
 import fs from "node:fs/promises"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -618,24 +618,33 @@ The skill body must still load.
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          // Prime the skill catalog, then remove only its directory. The cached
-          // SKILL.md remains available while Ripgrep.files must fail on ENOENT.
+          // Prime the metadata catalog, then inject a failure only for the
+          // companion-file subprocess. SKILL.md remains readable so this tests
+          // best-effort enumeration instead of a missing skill source.
           const skillDir = path.join(tmp.path, ".cyberstrike", "skill", "listing-failure-skill")
           expect((await (await import("../../src/skill")).Skill.all()).some((skill) => skill.name === "listing-failure-skill")).toBe(true)
-          await fs.rm(skillDir, { recursive: true, force: true })
 
           const tool = await SkillTool.init()
           const ctx: Tool.Context = {
             ...baseCtx,
             ask: async () => {},
           }
-          const result = await tool.execute({ action: "load", name: "listing-failure-skill" }, ctx)
+          const originalSpawn = Bun.spawn.bind(Bun)
+          const spawnSpy = spyOn(Bun, "spawn").mockImplementation((command, options) => {
+            if (options?.cwd === skillDir) throw new Error("Injected companion-file listing failure")
+            return originalSpawn(command, options)
+          })
+          try {
+            const result = await tool.execute({ action: "load", name: "listing-failure-skill" }, ctx)
 
-          expect(SkillContext.isLoaded("listing-failure-skill")).toBe(true)
-          expect(result.title).toBe("Loaded skill: listing-failure-skill")
-          expect(result.output).toContain("The skill body must still load.")
-          expect(result.output).toContain("<file-list-unavailable>")
-          SkillContext.unload("listing-failure-skill")
+            expect(SkillContext.isLoaded("listing-failure-skill")).toBe(true)
+            expect(result.title).toBe("Loaded skill: listing-failure-skill")
+            expect(result.output).toContain("The skill body must still load.")
+            expect(result.output).toContain("<file-list-unavailable>")
+            SkillContext.unload("listing-failure-skill")
+          } finally {
+            spawnSpy.mockRestore()
+          }
         },
       })
     } finally {
