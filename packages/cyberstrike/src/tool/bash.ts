@@ -887,6 +887,87 @@ export async function readTargetListInputs(
   if (!targets.size) return { present: false, targets: [] }
   return { present: true, targets: [...targets] }
 }
+/**
+ * Prevent generic HTTP clients from following redirects or applying user config/routing
+ * overrides that could issue a second request without a persisted-scope check.
+ */
+export function scannerRequestScopeBlockReason(
+  scannerInput: string,
+  args: string[],
+  launcherPrefix: string[] = [],
+): string | undefined {
+  const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
+  const values = args.map(stripOuterShellQuotes)
+  const prefix = launcherPrefix.map(stripOuterShellQuotes)
+  const hasOption = (options: string[]) => values.some((value) =>
+    options.some((option) => value === option || value.startsWith(option + "=")),
+  )
+  const hasHostOverride = () => {
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i]!
+      let header: string | undefined
+      if (value === "-H" || value.toLowerCase() === "--header") header = values[i + 1]
+      else if (value.toLowerCase().startsWith("--header=")) header = value.slice(value.indexOf("=") + 1)
+      else if (value.startsWith("-H") && value.length > 2) header = value.slice(2)
+      if (header && header.split(":", 1)[0]!.trim().toLowerCase() === "host") return true
+    }
+    return false
+  }
+
+  if (scanner === "curl") {
+    if (values[0] !== "-q" && values[0] !== "--disable") {
+      return "curl may load ~/.curlrc, which can alter redirects, routing, and request behavior. Put -q (or --disable) first so the checked command is the effective command."
+    }
+    const followsRedirect = values.some((value) =>
+      value === "--location" ||
+      value === "--location-trusted" ||
+      value.startsWith("--location=") ||
+      /^-[^-]*L[A-Za-z]*$/.test(value),
+    )
+    if (followsRedirect) {
+      return "curl redirect-follow options can issue a second request outside the persisted scope. Remove -L/--location or use a scope-aware request pipeline that checks every redirect target."
+    }
+    if (hasOption([
+      "--resolve", "--connect-to", "--proxy", "--preproxy", "--proxy-header",
+      "--interface", "--unix-socket", "--abstract-unix-socket", "--config",
+    ]) || values.some((value) => /^-[^-]*x/.test(value) || /^-[^-]*K/.test(value))) {
+      return "curl routing/configuration overrides can change the actual destination or request behavior after the URL scope check. Remove proxy, resolve/connect-to, interface, socket, and explicit config overrides; use a scope-aware request tool if they are essential."
+    }
+    if (hasHostOverride()) {
+      return "Overriding the HTTP Host header can route an in-scope URL to a different virtual host. Remove the Host override and use an explicitly scoped target URL."
+    }
+  }
+
+  if (scanner === "wget") {
+    const configDisabled = prefix.some((value) => value.toLowerCase() === "env") &&
+      prefix.some((value) => value === "WGETRC=/dev/null")
+    if (!configDisabled && process.env.WGETRC !== "/dev/null") {
+      return "wget can load ~/.wgetrc settings that enable recursion or change request behavior. Invoke it as env WGETRC=/dev/null wget --max-redirect=0 ... so the checked command uses no user configuration."
+    }
+    const optionIndexes = values
+      .map((value, index) => ({ value, index }))
+      .filter(({ value }) => value === "--max-redirect" || value.startsWith("--max-redirect="))
+    if (optionIndexes.length !== 1) {
+      return "wget follows redirects by default. Set exactly one explicit --max-redirect=0 so no redirected request can bypass persisted-scope checking."
+    }
+    const option = optionIndexes[0]!
+    const redirectValue = option.value.startsWith("--max-redirect=")
+      ? option.value.slice("--max-redirect=".length)
+      : values[option.index + 1]
+    if (redirectValue !== "0") {
+      return "wget redirect following is blocked for generic shell mode. Set --max-redirect=0, or use a scope-aware request pipeline that checks every redirect target."
+    }
+    if (hasOption(["-i", "--input-file", "--execute", "-e", "--recursive", "--mirror", "--span-hosts", "--page-requisites"]) ||
+      values.some((value) => /^-[^-]*[rHmpe]/.test(value))) {
+      return "wget input-list, configuration-execution, recursive, cross-host, and page-requisite modes can issue unchecked follow-up requests. Use one explicit URL with no recursive/list mode, or use a scope-aware collection pipeline."
+    }
+    if (hasHostOverride()) {
+      return "Overriding the HTTP Host header can route an in-scope URL to a different virtual host. Remove the Host override and use an explicitly scoped target URL."
+    }
+  }
+  return undefined
+}
+
 /** Parse explicit port lists and ranges so persisted scope is checked for every port. */
 export function parseScopedPortSpec(spec: string): number[] | undefined {
   const value = spec.trim()
@@ -904,7 +985,7 @@ export function parseScopedPortSpec(spec: string): number[] | undefined {
 }
 
 async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
-  const scannerIndex = scannerExecutableIndex(command, commandText)
+  const scannerIndex = scannerExecutableIndex(command, script)
   if (scannerIndex < 0) {
     const executableIndex = commandExecutableIndex(command)
     const launchedScanner = executableIndex >= 0 ? await scannerLaunchedByWrapper(command, executableIndex) : undefined
