@@ -96,9 +96,10 @@ export const RECON_PHASE_ARTIFACT_AREAS: Partial<Record<ReconPhase, readonly str
   directory_fuzzing: ["recon", "directories"],
   parameter_discovery: ["recon", "parameters"],
   parameter_fuzzing: ["recon", "parameters"],
-  // Keep old paths valid on resumed workspaces; new tester surveys go under findings/.
-  javascript_analysis: ["javascript", "recon", "findings", "endpoints", "testing"],
-  endpoint_inventory: ["endpoints", "recon"],
+  // New endpoint sidecars live under recon/. Historical endpoints/ artifacts are
+  // accepted only when the exact path was already saved in this phase's checkpoint.
+  javascript_analysis: ["javascript", "recon", "findings", "testing"],
+  endpoint_inventory: ["recon"],
   vulnerability_testing: ["findings", "testing", "evidence"],
   reporting: ["reports"],
 }
@@ -492,6 +493,14 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             }
             const resolvedArtifactPath = relative.split(path.sep).join("/")
             const requiredAreas = RECON_PHASE_ARTIFACT_AREAS[phase]
+            // Preserve a legacy endpoints/ artifact only when the same path is already
+            // recorded for this phase; new outputs must use the canonical recon/ area.
+            const isPreviouslyRecordedLegacyEndpoint = (
+              phase === "javascript_analysis" || phase === "endpoint_inventory"
+            ) && resolvedArtifactPath.startsWith("endpoints/") && (record.artifacts ?? []).some((saved) => {
+              const savedPath = path.isAbsolute(saved) ? path.resolve(saved) : path.resolve(realWorkspace, saved)
+              return path.relative(realWorkspace, savedPath).split(path.sep).join("/") === resolvedArtifactPath
+            })
             const flatArtifacts: Partial<Record<ReconPhase, readonly string[]>> = {
               asset_discovery: ["subdomains.txt"],
               live_hosts_ports: ["live-hosts.txt", "ports.txt"],
@@ -504,7 +513,7 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
             }
             const isFlatArtifact = !resolvedArtifactPath.includes("/") &&
               Boolean(flatArtifacts[phase]?.includes(resolvedArtifactPath))
-            if (requiredAreas && !isFlatArtifact && !requiredAreas.some((area) => resolvedArtifactPath.startsWith(area + "/"))) {
+            if (requiredAreas && !isFlatArtifact && !isPreviouslyRecordedLegacyEndpoint && !requiredAreas.some((area) => resolvedArtifactPath.startsWith(area + "/"))) {
               return { title: "Recon checkpoint rejected", output: "Phase " + phase + " must save its verified output as a top-level canonical file (" + (flatArtifacts[phase]?.join(", ") ?? "none") + ") or under " + requiredAreas.map((area) => area + "/").join(", ") + "; got " + artifact, metadata: { saved: false, reason: "artifact_in_wrong_area", required_areas: requiredAreas, allowed_flat_artifacts: flatArtifacts[phase] ?? [] } }
             }
             let info
