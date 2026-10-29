@@ -629,6 +629,7 @@ export namespace Agent {
         description: DESC_IMPACT_HUNTER.split("\n")[0].trim(),
         mode: "subagent",
         native: true,
+        hidden: true,
         color: "red",
         prompt: PROMPT_IMPACT_HUNTER,
         prependRequestContext: true,
