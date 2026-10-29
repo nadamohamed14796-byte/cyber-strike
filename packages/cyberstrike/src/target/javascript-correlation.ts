@@ -2535,6 +2535,39 @@ export namespace JavaScriptCorrelation {
           } else {
             variants.set("*", { origin: null, host: explicitHost?.toLowerCase() ?? null, matching: [] })
           }
+          const relatedRiskSignals = (file.analysis?.riskSignals ?? []).filter((signal) =>
+            Boolean(item.sourceFunction) && signal.functionName === item.sourceFunction,
+          )
+          const riskSpecificChecks = relatedRiskSignals.map((signal) => {
+            const functionLabel = item.sourceFunction ?? "the associated function"
+            switch (signal.kind) {
+              case "dom-html-sink":
+              case "html-fragment-insertion":
+              case "document-write-sink":
+                return "DOM-XSS review: trace attacker-controlled input to the HTML sink in " + functionLabel + "; verify contextual escaping/sanitization and use only a harmless marker in an authorized test account."
+              case "dynamic-code-execution":
+              case "string-timer-execution":
+                return "Dynamic-code review: trace whether attacker-controlled data reaches code evaluation in " + functionLabel + "; the sink marker alone does not prove code injection."
+              case "navigation-or-redirect-sink":
+                return "Navigation/open-redirect review: trace the URL source in " + functionLabel + " and confirm allowlisting with a controlled destination."
+              case "cross-window-message":
+              case "wildcard-postmessage-origin":
+              case "message-event-handler":
+                return "postMessage trust-boundary review: verify source-origin checks, message schema, and sensitive actions in " + functionLabel + "; a wildcard/source marker alone is not a confirmed issue."
+              case "client-side-token-storage":
+                return "Client-storage review: determine whether the stored value is a private credential and whether a demonstrated script-injection path can read it; public client identifiers are not secrets."
+              case "document-cookie-write":
+                return "Cookie/session review: trace the cookie value and purpose, then verify server-side session protections; a JavaScript cookie write alone does not establish session compromise."
+              case "dynamic-regexp":
+                return "Regular-expression review: establish whether untrusted input controls the pattern or input length, then use bounded, low-impact validation."
+              case "prototype-mutation":
+                return "Prototype-pollution review: trace attacker-controlled keys into the mutation and validate only with a benign property on test-owned data."
+              case "csrf-review-state-changing-cookie-request":
+                return "CSRF review: this state-changing credentialed request has static cookie clues; verify server-side token/origin/Fetch Metadata enforcement with an authorized baseline and negative control."
+              default:
+                return "Review static risk signal " + signal.kind + " in " + functionLabel + "; trace data flow and prove behavior before classifying a vulnerability."
+            }
+          })
           const recommendedChecks = [
             "Baseline replay and response capture",
             ...(item.pathParameters.length ? ["Compare path parameter type/boundary values using controlled test data"] : []),
@@ -2551,7 +2584,8 @@ export namespace JavaScriptCorrelation {
             ...((file.sourceRequestIDs?.length ?? (file.sourceRequestID ? 1 : 0)) > 0
               ? ["Inspect the original captured JavaScript response(s) via request-detail tooling using request ID(s) " + (file.sourceRequestIDs ?? [file.sourceRequestID]).filter(Boolean).join(", ")]
               : []),
-            ...(file.analysis?.riskSignals?.some((signal) => signal.functionName === item.sourceFunction) ? ["Manually review static sink candidates in the associated function and confirm source-to-sink data flow"] : []),
+            ...riskSpecificChecks,
+            ...(relatedRiskSignals.length ? ["Confirm source-to-sink data flow for each linked risk signal; static links remain candidates, not findings."] : []),
             ...(item.authSignals.length || item.cookieSignals.length ? ["Compare authenticated and unauthenticated/session-cookie behavior using controlled accounts"] : ["Determine authentication requirements from captured requests and controlled account tests"]),
             "Check authorization with accounts that own only their own test data",
             "Manually confirm server-side validation; static JavaScript alone is not proof",
@@ -2742,6 +2776,45 @@ export namespace JavaScriptCorrelation {
           relation: "request-candidate-maps-to-endpoint",
           confidence: "candidate",
           evidence: "The structured request call and endpoint share a source file and normalized path; this is static source evidence, not proof of runtime execution.",
+        })
+      }
+    }
+
+    for (const risk of graph.javascriptAnalysis.riskSignals) {
+      const riskNode = "javascript-risk:" + risk.id
+      graph.edges.push({
+        from: "javascript-file:" + risk.sourceFile,
+        to: riskNode,
+        relation: "file-contains-risk-signal",
+        confidence: "candidate",
+        evidence: "Static risk pattern at source line " + risk.line + "; source-to-sink data flow and exploitability remain unverified.",
+      })
+      const matchingFunctions = risk.functionName
+        ? graph.javascriptAnalysis.functions
+            .filter((fn) => fn.sourceFile === risk.sourceFile && fn.name === risk.functionName && fn.line <= risk.line)
+            .sort((a, b) => b.line - a.line)
+        : []
+      const fn = matchingFunctions[0]
+      if (fn) {
+        graph.edges.push({
+          from: "javascript-function:" + risk.sourceFile + ":" + fn.line + ":" + fn.name,
+          to: riskNode,
+          relation: "function-contains-risk-signal",
+          confidence: "candidate",
+          evidence: "The static risk signal was attributed to this function by lexical source ranges; confirm attribution in minified/complex code.",
+        })
+      }
+      for (const candidate of graph.javascriptAnalysis.requestCandidates) {
+        if (!risk.functionName || candidate.sourceFile !== risk.sourceFile || candidate.sourceFunction !== risk.functionName) continue
+        const requestNode = "javascript-request-candidate:" + createHash("sha256")
+          .update([candidate.sourceFile, candidate.sourceLine, candidate.method ?? "", candidate.urlTemplate].join("\\0"))
+          .digest("hex").slice(0, 16)
+        graph.edges.push({
+          from: riskNode,
+          to: requestNode,
+          relation: "risk-signal-shares-function",
+          confidence: "candidate",
+          evidence: "The risk signal and request candidate share a statically inferred function; this suggests a review path but does not prove tainted data reaches the endpoint or sink.",
         })
       }
     }

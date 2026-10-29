@@ -1271,7 +1271,7 @@ test("analyzes scoped workspace-local JavaScript when the target is absent from 
       await fs.mkdir(assetDir, { recursive: true })
       await fs.writeFile(
         path.join(assetDir, "example.js"),
-        'async function loadProfile(userId) { return fetch("/api/users/" + userId) }',
+        'async function loadProfile(userId) { document.querySelector("#out").innerHTML = userId; return fetch("/api/users/" + userId) }',
         "utf8",
       )
       const session = await Session.create({})
@@ -1283,6 +1283,10 @@ test("analyzes scoped workspace-local JavaScript when the target is absent from 
       expect(result.graph.sourceFiles.some((file) => file.basename === "example.js")).toBe(true)
       expect(result.graph.javascriptAnalysis.functions.some((fn) => fn.name === "loadProfile")).toBe(true)
       expect(result.graph.javascriptAnalysis.requestCandidates.some((request) => request.path === "/api/users/{userId}")).toBe(true)
+      expect(result.graph.javascriptAnalysis.riskSignals.some((signal) => signal.kind === "dom-html-sink" && signal.functionName === "loadProfile")).toBe(true)
+      expect(result.graph.edges.some((edge) => edge.relation === "function-contains-risk-signal")).toBe(true)
+      expect(result.graph.edges.some((edge) => edge.relation === "risk-signal-shares-function")).toBe(true)
+      expect(result.graph.edges.some((edge) => edge.relation === "request-candidate-maps-to-endpoint")).toBe(true)
       expect(result.graph.requests).toHaveLength(0)
       expect(result.graph.notes.some((note) => note.startsWith("LOCAL-ONLY CORRELATION:"))).toBe(true)
     },
