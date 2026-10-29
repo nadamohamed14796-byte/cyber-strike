@@ -50,7 +50,7 @@ export namespace Log {
   export const MAX_LOG_FILE_BYTES = 16 * 1024 * 1024
   export const MAX_LOG_FILES = 10
   export const MAX_TOTAL_LOG_BYTES = 128 * 1024 * 1024
-  const LOG_FILE_PATTERN = /^\\d{4}-\\d{2}-\\d{2}T\\d{6}\\.log$/
+  const LOG_FILE_PATTERN = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}[.]log$/
   let logBytesWritten = 0
   let logLimitReached = false
   export function file() {
