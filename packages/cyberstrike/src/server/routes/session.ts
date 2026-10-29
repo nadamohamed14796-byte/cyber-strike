@@ -769,6 +769,7 @@ export function recoverPendingRequests(): void {
             buildPrompt: () => buildPersistedRequestPrompt(request.session_id, resumable),
           }),
         request.session_id,
+        true,
       )
       state.scheduled.add(request.id)
       scheduled++
@@ -1250,6 +1251,7 @@ export const SessionRoutes = lazy(() =>
               buildPrompt: () => buildPersistedRequestPrompt(sessionID, req),
             }),
           sessionID,
+          true,
         )
 
         c.status(202)
@@ -1859,6 +1861,7 @@ export const SessionRoutes = lazy(() =>
                   buildPrompt: () => buildPersistedRequestPrompt(sessionID, retriedRequest),
                 }),
                 sessionID,
+                true,
               )
             }
 
@@ -2044,6 +2047,7 @@ export const SessionRoutes = lazy(() =>
               sessionID,
               () => analyzeCapturedRequest({ sessionID, req, model: body.model, buildPrompt }),
               sessionID,
+              true,
             )
           }
         } else {

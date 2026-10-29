@@ -6,6 +6,7 @@ const log = Log.create({ service: "ingest-queue" })
 
 export namespace IngestQueue {
   type State = {
+    chain: Promise<void>
     paused: boolean
     pending: number
     resumeSignal: Promise<void> | null
@@ -21,6 +22,7 @@ export namespace IngestQueue {
     let s = state()[sessionID]
     if (!s) {
       s = {
+        chain: Promise.resolve(),
         paused: false,
         pending: 0,
         resumeSignal: null,
@@ -107,21 +109,20 @@ export namespace IngestQueue {
   }
 
   /**
-   * Schedule independent request analyses without serializing siblings.
-   * Each request runs in its own child session. Pending counts and pause/resume
-   * are scoped to the parent session, but there is deliberately no fixed
-   * concurrency ceiling here; callers should delegate only distinct useful work.
+   * Schedule work for a session.
+   * - Ordinary text-ingest tasks remain ordered on their session chain.
+   * - Independent captured HTTP requests opt into parallel execution because
+   *   each request is analyzed in its own child session.
+   * There is no fixed concurrency ceiling for explicitly independent work.
    */
-  export function enqueue(sessionID: string, task: () => Promise<unknown>, parentSessionID?: string) {
+  export function enqueue(
+    sessionID: string,
+    task: () => Promise<unknown>,
+    parentSessionID?: string,
+    concurrent = false,
+  ) {
     const ticket = beginTracking(sessionID, parentSessionID)
-    log.info("ingest task enqueued", {
-      sessionID,
-      trackedSessionIDs: ticket.trackedIDs,
-      pending: state()[sessionID]?.pending ?? 0,
-      paused: state()[sessionID]?.paused ?? false,
-    })
-
-    void (async () => {
+    const run = async () => {
       while (ticket.trackedIDs.some((id) => state()[id]?.paused)) {
         log.info("ingest task waiting for queue resume", {
           sessionID,
@@ -133,21 +134,48 @@ export namespace IngestQueue {
         sessionID,
         trackedSessionIDs: ticket.trackedIDs,
         pending: state()[sessionID]?.pending ?? 0,
+        concurrent,
       })
       await task()
-    })()
-      .catch((err) => {
+    }
+
+    const settle = () => {
+      ticket.settle()
+      log.info("ingest task settled", {
+        sessionID,
+        trackedSessionIDs: ticket.trackedIDs,
+        pending: state()[sessionID]?.pending ?? 0,
+        paused: state()[sessionID]?.paused ?? false,
+      })
+    }
+
+    const execute = async () => {
+      try {
+        await run()
+      } catch (err) {
         log.error("ingest prompt failed", { sessionID, error: err })
-      })
-      .finally(() => {
-        ticket.settle()
-        log.info("ingest task settled", {
-          sessionID,
-          trackedSessionIDs: ticket.trackedIDs,
-          pending: state()[sessionID]?.pending ?? 0,
-          paused: state()[sessionID]?.paused ?? false,
-        })
-      })
+      } finally {
+        settle()
+      }
+    }
+
+    log.info("ingest task enqueued", {
+      sessionID,
+      trackedSessionIDs: ticket.trackedIDs,
+      pending: state()[sessionID]?.pending ?? 0,
+      paused: state()[sessionID]?.paused ?? false,
+      concurrent,
+    })
+
+    if (concurrent) {
+      // No queue-chain dependency for independent child-session analyses.
+      void execute()
+      return
+    }
+
+    const s = getOrInit(sessionID)
+    const next = s.chain.then(execute, execute)
+    s.chain = next
   }
 
   export function pause(sessionID: string) {

@@ -59,12 +59,12 @@ describe("IngestQueue.enqueue", () => {
         started.push("a")
         await releaseA.promise
         finished.push("a")
-      })
+      }, undefined, true)
       IngestQueue.enqueue(sid, async () => {
         started.push("b")
         await releaseB.promise
         finished.push("b")
-      })
+      }, undefined, true)
       expect(IngestQueue.pendingCount(sid)).toBe(2)
       await new Promise((r) => setTimeout(r, 10))
       expect(started.sort()).toEqual(["a", "b"])
@@ -76,6 +76,31 @@ describe("IngestQueue.enqueue", () => {
     })
   })
 
+
+  test("keeps ordinary same-session tasks ordered by default", async () => {
+    await withInstance(async () => {
+      const sid = "serial-default"
+      const releaseFirst = defer()
+      const started: string[] = []
+      const finished: string[] = []
+      IngestQueue.enqueue(sid, async () => {
+        started.push("first")
+        await releaseFirst.promise
+        finished.push("first")
+      })
+      IngestQueue.enqueue(sid, async () => {
+        started.push("second")
+        finished.push("second")
+      })
+      await new Promise((r) => setTimeout(r, 10))
+      expect(started).toEqual(["first"])
+      releaseFirst.resolve()
+      await new Promise((r) => setTimeout(r, 15))
+      expect(started).toEqual(["first", "second"])
+      expect(finished).toEqual(["first", "second"])
+      expect(IngestQueue.pendingCount(sid)).toBe(0)
+    })
+  })
   test("tracks intake while normalization is in progress", async () => {
     await withInstance(async () => {
       const sid = "track-intake"
@@ -218,14 +243,14 @@ describe("IngestQueue parent-child controls", () => {
         firstStarted.resolve()
         await releaseFirst.promise
         order.push(childA)
-      }, parent)
+      }, parent, true)
       await firstStarted.promise
 
       IngestQueue.enqueue(parent, async () => {
         secondStarted.resolve()
         await releaseSecond.promise
         order.push(childB)
-      }, parent)
+      }, parent, true)
 
       await secondStarted.promise
       expect(order).toEqual([])
