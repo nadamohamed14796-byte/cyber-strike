@@ -133,6 +133,7 @@ test("returns default native agents when no config", async () => {
       expect(names).toContain("compaction")
       expect(names).toContain("title")
       expect(names).toContain("summary")
+      expect(names).toContain("impact-hunter")
     },
   })
 })
