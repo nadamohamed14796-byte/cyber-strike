@@ -172,6 +172,15 @@ describe("FailedToolStreakDetector — distinct failed calls without progress", 
     expect(detector.observe([{ tool: "bash", input: { command: "bad-b" }, succeeded: false }])).toBe("abort")
   })
 
+  test("repeated new methods also stop after the recovery budget is exhausted", () => {
+    const detector = new FailedToolStreakDetector(2)
+    expect(detector.observe([{ tool: "bash", input: { command: "bad-a" }, succeeded: false }])).toBe("ok")
+    expect(detector.observe([{ tool: "bash", input: { command: "bad-b" }, succeeded: false }])).toBe("nudge")
+    expect(detector.observe([{ tool: "curl", input: { url: "new-method" }, succeeded: false }])).toBe("ok")
+    expect(detector.observe([{ tool: "curl", input: { url: "new-method" }, succeeded: false }])).toBe("nudge")
+    expect(detector.observe([{ tool: "wget", input: { url: "another-method" }, succeeded: false }])).toBe("abort")
+  })
+
   test("read-only and context calls do not count as failed target-work attempts", () => {
     const detector = new FailedToolStreakDetector(2)
     expect(detector.observe([{ tool: "methodology_status", succeeded: false }])).toBe("ok")
