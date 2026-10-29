@@ -3,6 +3,7 @@ import { Truncate } from "../../src/tool/truncation"
 import { Identifier } from "../../src/id/id"
 import fs from "fs/promises"
 import path from "path"
+import os from "node:os"
 
 const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
 
@@ -151,28 +152,30 @@ describe("Truncate", () => {
     const DAY_MS = 24 * 60 * 60 * 1000
     let oldFile: string
     let recentFile: string
+    let cleanupDir: string
 
     afterAll(async () => {
       await fs.unlink(oldFile).catch(() => {})
       await fs.unlink(recentFile).catch(() => {})
+      await fs.rm(cleanupDir, { recursive: true, force: true }).catch(() => {})
     })
 
     test("deletes files older than 7 days and preserves recent files", async () => {
-      await fs.mkdir(Truncate.DIR, { recursive: true })
+      cleanupDir = await fs.mkdtemp(path.join(os.tmpdir(), "cyberstrike-tool-output-cleanup-"))
 
       // Create an old file (10 days ago)
       const oldTimestamp = Date.now() - 10 * DAY_MS
       const oldId = Identifier.create("tool", false, oldTimestamp)
-      oldFile = path.join(Truncate.DIR, oldId)
+      oldFile = path.join(cleanupDir, oldId)
       await Bun.write(Bun.file(oldFile), "old content")
 
       // Create a recent file (3 days ago)
       const recentTimestamp = Date.now() - 3 * DAY_MS
       const recentId = Identifier.create("tool", false, recentTimestamp)
-      recentFile = path.join(Truncate.DIR, recentId)
+      recentFile = path.join(cleanupDir, recentId)
       await Bun.write(Bun.file(recentFile), "recent content")
 
-      await Truncate.cleanup()
+      await Truncate.cleanup(cleanupDir)
 
       // Old file should be deleted
       expect(await Bun.file(oldFile).exists()).toBe(false)
