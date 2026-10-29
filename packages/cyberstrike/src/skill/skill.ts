@@ -91,11 +91,12 @@ export namespace Skill {
 
   export const state = Instance.state(async () => {
     const skills: Record<string, Info> = {}
+    const skillPriorities = new Map<string, number>()
     const dirs = new Set<string>()
 
-    const addSkill = async (match: string) => {
+    const addSkill = async (match: string, sourcePriority = 0) => {
       try {
-        await loadSkill(match)
+        await loadSkill(match, sourcePriority)
       } catch (error) {
         log.error("failed to load skill; continuing with remaining skills", { skill: match, error })
         Bus.publish(Session.Event.Error, {
@@ -106,7 +107,7 @@ export namespace Skill {
       }
     }
 
-    const loadSkill = async (match: string) => {
+    const loadSkill = async (match: string, sourcePriority: number) => {
       const md = await ConfigMarkdown.parse(match).catch((err) => {
         const message = ConfigMarkdown.FrontmatterError.isInstance(err)
           ? err.data.message
@@ -127,16 +128,23 @@ export namespace Skill {
         return
       }
 
-      // Warn on duplicate skill names
-      if (skills[parsed.data.name]) {
+      dirs.add(path.dirname(match))
+
+      // A name can be discovered in several places (bundled, home/global, project,
+      // or configured sources). Keep the highest-precedence source instead of
+      // letting a later bundled/installed scan replace a project-local reference.
+      const existing = skills[parsed.data.name]
+      const existingPriority = skillPriorities.get(parsed.data.name)
+      if (existing) {
         log.debug("duplicate skill name", {
           name: parsed.data.name,
-          existing: skills[parsed.data.name].location,
+          existing: existing.location,
           duplicate: match,
+          existingPriority,
+          duplicatePriority: sourcePriority,
         })
+        if (existingPriority !== undefined && existingPriority > sourcePriority) return
       }
-
-      dirs.add(path.dirname(match))
 
       const raw = md.data as Record<string, unknown>
       const fileContent = await Bun.file(match).text()
@@ -183,9 +191,10 @@ export namespace Skill {
             ? (raw.severity_boost as Record<string, string>)
             : undefined,
       }
+      skillPriorities.set(parsed.data.name, sourcePriority)
     }
 
-    const scanExternal = async (root: string, scope: "global" | "project") => {
+    const scanExternal = async (root: string, scope: "global" | "project", sourcePriority: number) => {
       return Array.fromAsync(
         EXTERNAL_SKILL_GLOB.scan({
           cwd: root,
@@ -195,7 +204,7 @@ export namespace Skill {
           dot: true,
         }),
       )
-        .then((matches) => Promise.all(matches.map(addSkill)))
+        .then((matches) => Promise.all(matches.map((match) => addSkill(match, sourcePriority))))
         .catch((error) => {
           log.error(`failed to scan ${scope} skills`, { dir: root, error })
         })
@@ -207,27 +216,55 @@ export namespace Skill {
       for (const dir of EXTERNAL_DIRS) {
         const root = path.join(Global.Path.home, dir)
         if (!(await Filesystem.isDir(root))) continue
-        await scanExternal(root, "global")
+        await scanExternal(root, "global", 12_000)
       }
 
-      for await (const root of Filesystem.up({
-        targets: EXTERNAL_DIRS,
-        start: Instance.directory,
-        stop: Instance.worktree,
-      })) {
-        await scanExternal(root, "project")
+      const projectExternalRoots = await Array.fromAsync(
+        Filesystem.up({
+          targets: EXTERNAL_DIRS,
+          start: Instance.directory,
+          stop: Instance.worktree,
+        }),
+      )
+      for (const [index, root] of projectExternalRoots.entries()) {
+        // Filesystem.up returns the nearest project first; closer project scopes win.
+        await scanExternal(root, "project", 30_000 + projectExternalRoots.length - index)
       }
     }
 
-    // Scan .cyberstrike/skill/ directories
+    // Scan .cyberstrike/skill/ directories. Project-local directories outrank
+    // home/global copies even though Config.directories() also includes home later.
+    const projectCyberstrikeRoots = !Flag.CYBERSTRIKE_DISABLE_PROJECT_CONFIG
+      ? await Array.fromAsync(
+          Filesystem.up({
+            targets: [".cyberstrike"],
+            start: Instance.directory,
+            stop: Instance.worktree,
+          }),
+        )
+      : []
+    const projectCyberstrikePriority = new Map(
+      projectCyberstrikeRoots.map((dir, index) => [path.resolve(dir), 30_000 + projectCyberstrikeRoots.length - index]),
+    )
+    const homeCyberstrikeRoots = new Set(
+      await Array.fromAsync(
+        Filesystem.up({ targets: [".cyberstrike"], start: Global.Path.home, stop: Global.Path.home }),
+      ),
+    )
     for (const dir of await Config.directories()) {
+      const resolvedDir = path.resolve(dir)
+      const sourcePriority =
+        Flag.CYBERSTRIKE_CONFIG_DIR && resolvedDir === path.resolve(Flag.CYBERSTRIKE_CONFIG_DIR)
+          ? 40_000
+          : (projectCyberstrikePriority.get(resolvedDir) ??
+            (homeCyberstrikeRoots.has(resolvedDir) ? 15_000 : resolvedDir === path.resolve(Global.Path.config) ? 11_000 : 10_000))
       for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
         cwd: dir,
         absolute: true,
         onlyFiles: true,
         followSymlinks: true,
       })) {
-        await addSkill(match)
+        await addSkill(match, sourcePriority)
       }
     }
 
@@ -243,7 +280,7 @@ export namespace Skill {
           onlyFiles: true,
           followSymlinks: true,
         })) {
-          await addSkill(match)
+          await addSkill(match, 0)
         }
       }
 
@@ -258,14 +295,14 @@ export namespace Skill {
           onlyFiles: true,
           followSymlinks: true,
         })) {
-          await addSkill(match)
+          await addSkill(match, -1)
         }
       }
     }
 
     // Scan additional skill paths from config
     const config = await Config.get()
-    for (const skillPath of config.skills?.paths ?? []) {
+    for (const [skillPathIndex, skillPath] of (config.skills?.paths ?? []).entries()) {
       const expanded = skillPath.startsWith("~/") ? path.join(os.homedir(), skillPath.slice(2)) : skillPath
       const resolved = path.isAbsolute(expanded) ? expanded : path.join(Instance.directory, expanded)
       if (!(await Filesystem.isDir(resolved))) {
@@ -278,7 +315,7 @@ export namespace Skill {
         onlyFiles: true,
         followSymlinks: true,
       })) {
-        await addSkill(match)
+        await addSkill(match, 50_000 + skillPathIndex)
       }
     }
 
@@ -295,7 +332,7 @@ export namespace Skill {
             onlyFiles: true,
             followSymlinks: true,
           })) {
-            await addSkill(match)
+            await addSkill(match, 60_000 + urlIndex)
           }
         }
       } catch (error) {
@@ -435,7 +472,7 @@ export namespace Skill {
     }
 
     // Downloaded skills from URLs
-    for (const url of config.skills?.urls ?? []) {
+    for (const [urlIndex, url] of (config.skills?.urls ?? []).entries()) {
       const list = await Discovery.pull(url).catch(() => [])
       if (!list) continue
       for (const dir of list) {
