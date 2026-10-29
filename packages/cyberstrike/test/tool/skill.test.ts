@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import path from "path"
 import fs from "node:fs/promises"
-import { pathToFileURL } from "url"
+import { fileURLToPath, pathToFileURL } from "url"
 import type { PermissionNext } from "../../src/permission/next"
 import type { Tool } from "../../src/tool/tool"
 import { Instance } from "../../src/project/instance"
 import { SkillTool } from "../../src/tool/skill"
+import { ReadTool } from "../../src/tool/read"
 import { SkillContext } from "../../src/skill/context"
 import { SkillIndex } from "../../src/skill/index-engine"
 import { tmpdir } from "../fixture/fixture"
@@ -639,6 +640,61 @@ The skill body must still load.
       })
     } finally {
       process.env.CYBERSTRIKE_TEST_HOME = home
+    }
+  })
+
+  test("curated SRC-Hunter references load through SkillTool and every declared file is readable", async () => {
+    const repoRoot = path.resolve(import.meta.dir, "../../../..")
+    const skillRoot = path.join(repoRoot, ".cyberstrike", "skill")
+    const manifest = JSON.parse(await Bun.file(path.join(skillRoot, "index.json")).text()) as {
+      skills: Array<{ name: string; files?: string[] }>
+    }
+    const entries = manifest.skills.filter((entry) => entry.name.startsWith("src-hunter-"))
+    expect(entries.length).toBeGreaterThanOrEqual(6)
+
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    delete process.env.CYBERSTRIKE_TEST_HOME
+    try {
+      await Instance.provide({
+        directory: repoRoot,
+        fn: async () => {
+          const skillTool = await SkillTool.init()
+          const readTool = await ReadTool.init()
+          const ctx: Tool.Context = { ...baseCtx, agent: "cyberstrike", ask: async () => {} }
+
+          for (const entry of entries) {
+            const loaded = await skillTool.execute({ action: "load", name: entry.name }, ctx)
+            expect(loaded.title).toBe("Loaded skill: " + entry.name)
+            expect(loaded.output).toContain("<skill_content name=\"" + entry.name + "\"")
+            expect(SkillContext.isLoaded(entry.name)).toBe(true)
+
+            const baseMatch = loaded.output.match(/^Base directory for this skill: (file:\/\/[^\r\n]+)/m)
+            expect(baseMatch, entry.name + " must return its runtime Base directory").toBeDefined()
+            const base = path.resolve(fileURLToPath(baseMatch![1]))
+
+            for (const relative of entry.files ?? []) {
+              const filepath = path.resolve(base, relative)
+              expect(
+                filepath === path.join(base, "SKILL.md") || filepath.startsWith(base + path.sep),
+                entry.name + " reference path must remain inside its skill directory",
+              ).toBe(true)
+
+              const read = await readTool.execute({ filePath: filepath }, ctx)
+              expect(read.output, entry.name + " must allow reading " + relative).toContain("<type>file</type>")
+              expect(read.output, entry.name + " reference must contain readable text: " + relative).toContain("<content>")
+              expect(read.output.trim().length).toBeGreaterThan(40)
+
+              if (relative !== "SKILL.md") {
+                expect(loaded.output).toContain("<file>" + filepath + "</file>")
+              }
+            }
+            SkillContext.unload(entry.name)
+          }
+        },
+      })
+    } finally {
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
     }
   })
 
