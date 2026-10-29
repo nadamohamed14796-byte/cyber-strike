@@ -327,13 +327,16 @@ export namespace LLM {
   // Keep the task schema visible to real subagents so they can use the narrowly
   // guarded background Impact Hunter escalation path. TaskTool still enforces all
   // normal dispatch permissions at execution time; Impact Hunter itself cannot recurse.
-  export function canExposeInternalImpactHandoff(agent: Pick<Agent.Info, "name" | "mode">) {
-    return agent.mode === "subagent" && agent.name !== "impact-hunter"
+  export function canExposeInternalImpactHandoff(
+    agent: Pick<Agent.Info, "name" | "mode">,
+    taskExplicitlyDisabled = false,
+  ) {
+    return !taskExplicitlyDisabled && agent.mode === "subagent" && agent.name !== "impact-hunter"
   }
 
   async function resolveTools(input: Pick<StreamInput, "tools" | "agent" | "user">) {
     const disabled = PermissionNext.disabled(Object.keys(input.tools), input.agent.permission)
-    const internalImpactHandoff = canExposeInternalImpactHandoff(input.agent)
+    const internalImpactHandoff = canExposeInternalImpactHandoff(input.agent, input.user.tools?.task === false)
     for (const tool of Object.keys(input.tools)) {
       if (
         input.user.tools?.[tool] === false ||
