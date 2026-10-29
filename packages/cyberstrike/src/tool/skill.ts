@@ -17,7 +17,7 @@ const accessibleCache = new Map<string, { catalog: ReturnType<typeof Skill.state
 export const SkillTool = Tool.define("skill", async (ctx) => {
   // Lazy load skills only when tool is executed
   const description = [
-    "Find and load the right skill from the complete catalog when it helps the current task.",
+    "Find and load the right skill from the skills available in the complete catalog when it helps the current task.",
     "",
     "Simple workflow: search by evidence, technology, or skill name; load the exact returned name; read the returned content before applying it. All catalog skills are searchable and loadable, but load only relevant skills rather than the whole catalog.",
     "",
