@@ -47,6 +47,12 @@ export namespace Log {
   }
 
   let logpath = ""
+  export const MAX_LOG_FILE_BYTES = 16 * 1024 * 1024
+  export const MAX_LOG_FILES = 10
+  export const MAX_TOTAL_LOG_BYTES = 128 * 1024 * 1024
+  const LOG_FILE_PATTERN = /^\\d{4}-\\d{2}-\\d{2}T\\d{6}\\.log$/
+  let logBytesWritten = 0
+  let logLimitReached = false
   export function file() {
     return logpath
   }
@@ -57,7 +63,7 @@ export namespace Log {
 
   export async function init(options: Options) {
     if (options.level) level = options.level
-    cleanup(Global.Path.log)
+    await cleanup(Global.Path.log)
     if (options.print) return
     logpath = path.join(
       Global.Path.log,
@@ -66,25 +72,53 @@ export namespace Log {
     const logfile = Bun.file(logpath)
     await fs.truncate(logpath).catch(() => {})
     const writer = logfile.writer()
-    write = async (msg: any) => {
-      const num = writer.write(msg)
+    logBytesWritten = 0
+    logLimitReached = false
+    write = (msg: any) => {
+      if (logLimitReached) return 0
+      const value = typeof msg === "string" ? msg : String(msg)
+      const incomingBytes = Buffer.byteLength(value, "utf-8")
+      if (logBytesWritten + incomingBytes > MAX_LOG_FILE_BYTES) {
+        const marker = "\\n[CyberStrike log limit reached; later log entries omitted to protect disk space.]\\n"
+        const markerBytes = Buffer.byteLength(marker, "utf-8")
+        if (logBytesWritten + markerBytes <= MAX_LOG_FILE_BYTES) {
+          writer.write(marker)
+          writer.flush()
+          logBytesWritten += markerBytes
+        }
+        logLimitReached = true
+        return value.length
+      }
+      const num = writer.write(value)
       writer.flush()
+      logBytesWritten += incomingBytes
       return num
     }
   }
 
   async function cleanup(dir: string) {
-    const glob = new Bun.Glob("????-??-??T??????.log")
-    const files = await Array.fromAsync(
-      glob.scan({
-        cwd: dir,
-        absolute: true,
-      }),
-    )
-    if (files.length <= 5) return
-
-    const filesToDelete = files.slice(0, -10)
-    await Promise.all(filesToDelete.map((file) => fs.unlink(file).catch(() => {})))
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+    const files: Array<{ path: string; mtimeMs: number; size: number }> = []
+    for (const entry of entries) {
+      if (!entry.isFile() || !LOG_FILE_PATTERN.test(entry.name)) continue
+      const filepath = path.join(dir, entry.name)
+      const info = await fs.stat(filepath).catch(() => undefined)
+      if (!info?.isFile()) continue
+      files.push({ path: filepath, mtimeMs: info.mtimeMs, size: info.size })
+    }
+    files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.path.localeCompare(b.path))
+    let totalBytes = files.reduce((sum, file) => sum + file.size, 0)
+    let kept = 0
+    for (const file of files) {
+      const exceedsCount = kept >= MAX_LOG_FILES
+      const exceedsBytes = totalBytes > MAX_TOTAL_LOG_BYTES
+      if (!exceedsCount && !exceedsBytes) {
+        kept++
+        continue
+      }
+      await fs.unlink(file.path).catch(() => {})
+      totalBytes -= file.size
+    }
   }
 
   function formatError(error: Error, depth = 0): string {
