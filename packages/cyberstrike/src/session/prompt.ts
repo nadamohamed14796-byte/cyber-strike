@@ -1105,7 +1105,8 @@ export namespace SessionPrompt {
           .filter((c) => c.input !== undefined && !READ_ONLY_TOOLS.has(c.tool))
           .map((c) => toolSig(c.tool, c.input))
         const madeProgress = toolCalls.some((call) => call.succeeded === true && isProgressTool(call.tool))
-        const repeatVerdict = madeProgress ? (repeatDetector.reset(), "ok" as const) : repeatDetector.observe(repeatSigs)
+        if (madeProgress) repeatDetector.reset()
+        const repeatVerdict = madeProgress ? "ok" : repeatDetector.observe(repeatSigs)
         if (repeatVerdict === "nudge") {
           forceRecoveryNext = true
           log.warn("cross-turn repeat detected — scheduling a recovery turn", { sessionID })
