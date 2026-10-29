@@ -5,9 +5,6 @@ import type { Endpoint } from "./detector.ts"
 
 const log = Log.create({ service: "hackbrowser:discovery" })
 
-// Cap so a huge spec (hundreds of paths) can't flood the ingest endpoint.
-const MAX_EMIT = 500
-
 /**
  * Build a synthetic CapturedRequest for a DISCOVERED endpoint. No real request
  * was made (Approach B), so `response` is null — the proxy-agents receive it as
@@ -53,12 +50,8 @@ export async function emitEndpoints(
   seen?: Set<string>,
 ): Promise<number> {
   const fresh = seen ? endpoints.filter((e) => !seen.has(`${e.method} ${e.url}`)) : endpoints
-  const batch = fresh.slice(0, MAX_EMIT)
-  if (fresh.length > MAX_EMIT) {
-    log.warn("discovered endpoints truncated for ingest", { total: fresh.length, cap: MAX_EMIT })
-  }
   let sent = 0
-  for (const endpoint of batch) {
+  for (const endpoint of fresh) {
     const key = `${endpoint.method} ${endpoint.url}`
     seen?.add(key) // mark before the await so a concurrent pass can't double-send
     try {
