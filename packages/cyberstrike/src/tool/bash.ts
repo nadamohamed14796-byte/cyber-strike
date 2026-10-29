@@ -728,6 +728,13 @@ export async function readTargetListInputs(
         return false
       }
     }
+    // A bare file name such as domains.txt matches a permissive hostname
+    // suffix regex (.txt is alphabetic). Treat common list/data filenames as
+    // files, but still allow domain paths such as example.com/robots.txt.
+    const hasPath = candidate.includes("/")
+    if (!hasPath && /\.(?:txt|list|csv|json|jsonl|xml|yaml|yml|log|md|html|js|map|pdf)$/i.test(candidate)) {
+      return false
+    }
     return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(candidate) ||
       /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(candidate)
   }
