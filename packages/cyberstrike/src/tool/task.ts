@@ -62,7 +62,13 @@ const parameters = z.object({
   background: z.boolean().describe("Start the subagent in the background and return its task_id immediately; use only when the caller can safely continue without the result.").optional(),
 })
 
-export const TaskTool = Tool.define("task", async (ctx) => {
+type TaskToolMetadata = {
+  sessionId: string
+  model: { modelID: string; providerID: string }
+  outcome: "background" | "clean" | "aborted" | "errored" | "capped" | "stuck"
+}
+
+export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task", async (ctx) => {
   const agents = await Agent.list().then((x) => x.filter((a) => a.mode !== "primary"))
 
   // Filter agents by permissions if agent provided
