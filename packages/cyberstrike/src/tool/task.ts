@@ -144,7 +144,9 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
       const agent = await Agent.get(params.subagent_type)
       if (!agent) throw new Error(`Unknown agent type: ${params.subagent_type} is not a valid agent type`)
 
-      const sessionRequestID = await requestIDFromSession(ctx.sessionID)
+      // Ordinary primary-agent tasks have no session-bound captured request;
+      // avoid scanning the main transcript unless a subagent is delegating.
+      const sessionRequestID = caller?.mode === "subagent" ? await requestIDFromSession(ctx.sessionID) : undefined
       if (sessionRequestID && params.request_id && params.request_id !== sessionRequestID) {
         throw new Error(
           `Request context mismatch: this subagent session is bound to request ${sessionRequestID}, but task request_id ${params.request_id} was supplied. Use the current session's request ID to avoid cross-request context mixing.`,
