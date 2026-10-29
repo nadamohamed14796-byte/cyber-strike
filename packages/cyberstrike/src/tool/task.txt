@@ -59,3 +59,9 @@ Since the user is greeting, use the greeting-responder agent to respond with a f
 </commentary>
 assistant: "I'm going to use the Task tool to launch the with the greeting-responder agent"
 </example>
+
+
+Background execution:
+- Set `background: true` only when the parent can safely continue without waiting for this subagent's final result.
+- The tool returns a task_id immediately; the subagent continues in its linked child session. This response means started, not completed.
+- Preserve the task_id and resume that exact task later when its results are needed. Never start a duplicate just because the background task has not finished.
