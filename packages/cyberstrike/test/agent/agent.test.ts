@@ -163,6 +163,10 @@ test("Impact Hunter is a terminal investigator with evidence tools but no defaul
       expect(agent?.mode).toBe("subagent")
       expect(agent?.hidden).toBe(true)
       expect(evalPerm(agent, "task")).toBe("deny")
+      // Impact Hunter must be able to discover reference skills and read their
+      // companion files; starting the subagent is not enough if either tool is denied.
+      expect(evalPerm(agent, "skill")).toBe("allow")
+      expect(evalPerm(agent, "read")).toBe("allow")
       for (const tool of [
         "web_get_session_context",
         "web_get_detail",
