@@ -12,7 +12,7 @@ import { iife } from "@/util/iife"
 import { Agent } from "../agent/agent"
 import { Instance } from "../project/instance"
 
-const accessibleCache = new Map<string, { catalog: ReturnType<typeof Skill.state>; permissionFingerprint: string; skills: Skill.Info[] }>()
+const accessibleCache = new Map<string, { catalog: ReturnType<typeof Skill.state>; permissionFingerprint: string; skills: Skill.Metadata[] }>()
 
 export const SkillTool = Tool.define("skill", async (ctx) => {
   // Lazy load skills only when tool is executed
