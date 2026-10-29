@@ -1938,6 +1938,7 @@ export namespace JavaScriptCorrelation {
       bytes?: number
       localPath?: string
       contentType?: string
+      assetKind?: "javascript" | "html" | "source-map" | "non-js"
     }
     const ingestedAssetRecords: IngestedAssetRecord[] = []
     let ingestedManifestWarning: string | undefined
