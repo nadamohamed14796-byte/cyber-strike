@@ -164,6 +164,15 @@ export function scannerTargets(command: string[], commandText: string): string[]
     waymore: new Set(["-i", "--input"]),
   }
   const currentToolTargetFlags = toolSpecificTargetFlags[scannerName] ?? new Set<string>()
+  // A flag may be a target selector in one CLI and an output option in another.
+  // findomain uses -u for its output file, so it must override the generic
+  // -u/--url target interpretation used by HTTP-oriented tools.
+  const toolSpecificNonTargetFlags: Record<string, Set<string>> = {
+    findomain: new Set(["-u"]),
+  }
+  const currentToolNonTargetFlags = toolSpecificNonTargetFlags[scannerName] ?? new Set<string>()
+  const isTargetFlag = (flag: string) =>
+    currentToolTargetFlags.has(flag) || (!currentToolNonTargetFlags.has(flag) && targetFlags.has(flag))
   const addTargetValue = (rawValue: string, allowDomainList: boolean) => {
     const value = stripOuterShellQuotes(rawValue).trim()
     if (!value || value.startsWith("-")) return
@@ -190,14 +199,14 @@ export function scannerTargets(command: string[], commandText: string): string[]
   const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains"].includes(scannerName)
   for (let i = 0; i < command.length; i++) {
     const flag = stripOuterShellQuotes(command[i]!).toLowerCase()
-    if (targetFlags.has(flag) || currentToolTargetFlags.has(flag)) {
+    if (isTargetFlag(flag)) {
       const value = command[i + 1]
       if (!value) continue
       addTargetValue(value, allowDomainList && ["-d", "--domain"].includes(flag))
       continue
     }
     const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h|-t|--input|-i)=([^\s].*)$/)
-    if (inline && (targetFlags.has(inline[1]!) || currentToolTargetFlags.has(inline[1]!))) {
+    if (inline && isTargetFlag(inline[1]!)) {
       addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
     }
   }
