@@ -117,17 +117,19 @@ export function Prompt(props: PromptProps) {
     const messages = sync.data.message[props.sessionID]
     if (!messages) return undefined
 
-    // Captured-request live notices are synthetic user-role transcript entries
-    // used to display Extension activity in the parent session. Their agent is
-    // proxy-agent, but they must not change the parent Recon prompt's selected
-    // agent when the user revisits that session. A real Proxy Agent child session
-    // has no requestAnalysis notice metadata on its actual input message.
-    return messages.filter((message) => message.role === "user").filter((message) =>
-      !(sync.data.part[message.id] ?? []).some((part) => {
+    // A captured-request notice is a synthetic user-role transcript entry in
+    // the parent session. It carries agent="proxy-agent" for display, not to
+    // switch the Main Recon prompt to a subagent when the session is reopened.
+    // Real Proxy Agent child sessions must still restore proxy-agent for replies.
+    const isSubagentSession = !!sync.session.get(props.sessionID)?.parentID
+    return messages.filter((message) => message.role === "user").filter((message) => {
+      const messageAgent = local.agent.list().find((agent) => agent.name === message.agent)
+      if (!isSubagentSession && messageAgent?.mode === "subagent") return false
+      return !(sync.data.part[message.id] ?? []).some((part) => {
         const metadata = (part as unknown as { metadata?: { requestAnalysis?: unknown } }).metadata
         return Boolean(metadata?.requestAnalysis)
-      }),
-    ).at(-1)
+      })
+    }).at(-1)
   })
 
   const [store, setStore] = createStore<{
