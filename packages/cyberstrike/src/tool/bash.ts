@@ -78,7 +78,7 @@ function isTargetListFlag(value: string): boolean {
   if (TARGET_LIST_FLAGS.has(flag)) return true
   const name = flag.replace(/^-+/, "")
   if (/(?:wordlist|template|output|outfile|exclude|blacklist|allowlist|blocklist)/.test(name)) return false
-  const targetNoun = /(?:target|targets|domain|domains|host|hosts|hostname|hostnames|scope|input|url|urls|asset|assets)/.test(name)
+  const targetNoun = /(?:target|targets|domain|domains|host|hosts|hostname|hostnames|fqdn|scope|input|url|urls|asset|assets|seed|root)/.test(name)
   const fileShape = /(?:file|list|path|batch|source|csv|tsv|jsonl?|txt)$/.test(name) ||
     /(?:file|list|path|batch|source)(?:[-_]|$)/.test(name) ||
     /^(?:targets|domains|hosts|hostnames|urls|assets)$/.test(name)
