@@ -138,6 +138,21 @@ test("returns default native agents when no config", async () => {
   })
 })
 
+test("direct captured-request analyzer has background Impact Hunter handoff guidance", async () => {
+  await using tmp = await tmpdir()
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const agent = await Agent.get("proxy-analyzer")
+      expect(agent).toBeDefined()
+      expect(agent?.prompt).toContain("## Impact Hunter Handoff")
+      expect(agent?.prompt).toContain("background: true")
+      // The special background handoff is guarded in TaskTool at execution time.
+      expect(evalPerm(agent, "task")).toBe("deny")
+    },
+  })
+})
+
 test("Impact Hunter is a terminal investigator with evidence tools but no default task spawning", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
