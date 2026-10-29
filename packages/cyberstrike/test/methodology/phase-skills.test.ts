@@ -37,7 +37,8 @@ describe("Phase-critical skill pinning", () => {
             expect(skill!.description.trim(), phaseID + " requires a usable description for " + name).not.toBe("")
             expect(skill!.category?.trim(), phaseID + " requires a routing category for " + name).toBeTruthy()
             expect(skill!.tags?.length, phaseID + " requires searchable tags for " + name).toBeGreaterThan(0)
-            expect(skill!.content, phaseID + " requires readable section headings for " + name).toMatch(/^##\s+.+/m)
+            const hydrated = await Skill.get(skill!.name)
+            expect(hydrated?.content, phaseID + " requires readable section headings for " + name).toMatch(/^##\s+.+/m)
           }
         }
       },
@@ -48,7 +49,7 @@ describe("Phase-critical skill pinning", () => {
     await Instance.provide({
       directory: path.resolve(import.meta.dir, "../.."),
       fn: async () => {
-        const skill = (await Skill.all()).find((entry) => entry.name === "attack-triage-validation")
+        const skill = await Skill.get("attack-triage-validation")
         expect(skill, "attack-triage-validation must exist in the runtime catalog").toBeDefined()
         expect(skill!.content).toContain("Counterevidence closure contract")
         expect(skill!.content).toContain("specific control")
@@ -464,7 +465,7 @@ describe("Account lifecycle verification skill routing", () => {
     await Instance.provide({
       directory: path.resolve(import.meta.dir, "../.."),
       fn: async () => {
-        const skill = (await Skill.all()).find((entry) => entry.name === "attack-account-lifecycle-verification")
+        const skill = await Skill.get("attack-account-lifecycle-verification")
         expect(skill, "account lifecycle verification must exist in the runtime catalog").toBeDefined()
         expect(skill!.content).toContain("Email Verification")
         expect(skill!.content).toContain("Token binding and action binding")
