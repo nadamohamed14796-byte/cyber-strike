@@ -386,7 +386,7 @@ export const TaskTool = Tool.define<typeof parameters, TaskToolMetadata>("task",
         ? MessageV2.AbortedError.isInstance(childError)
           ? "aborted"
           : "errored"
-        : childInfo.role === "assistant" && childInfo.stuckAborted
+        : childInfo.role === "assistant" && (childInfo.stuckAborted || childInfo.stuckNudged)
           ? "stuck"
           : childInfo.role === "assistant" && childInfo.stepCapped
             ? "capped"
