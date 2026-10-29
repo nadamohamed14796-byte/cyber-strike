@@ -114,17 +114,17 @@ async function loadVulnAgent(
   const skills = await Promise.all(
     skillNames.map(async (name) => {
       const direct = availableSkills.find((skill) => skill.name.toLocaleLowerCase("en-US") === name.trim().toLocaleLowerCase("en-US"))
-      if (direct) return direct
+      if (direct) return Skill.get(direct.name)
       const canonical = SkillIndex.resolveReference(name)
       const indexed = canonical ? availableSkills.find((skill) => skill.name === canonical) : undefined
-      if (indexed) return indexed
+      if (indexed) return Skill.get(indexed.name)
       // A directory slug is a supported exact alias for catalog entries whose human-
-      // readable frontmatter name differs. This fallback uses the loaded catalog
-      // rather than requiring the search index to have the same revision.
+      // readable frontmatter name differs. Resolve through the lightweight catalog,
+      // then hydrate the selected body instead of retaining every body at startup.
       const aliases = availableSkills.filter((skill) =>
         path.basename(path.dirname(skill.location)).toLocaleLowerCase("en-US") === name.trim().toLocaleLowerCase("en-US"),
       )
-      return aliases.length === 1 ? aliases[0] : undefined
+      return aliases.length === 1 ? Skill.get(aliases[0].name) : undefined
     }),
   )
   const skillBlocks: string[] = []
