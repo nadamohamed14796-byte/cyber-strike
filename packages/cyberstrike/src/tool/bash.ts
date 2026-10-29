@@ -192,6 +192,18 @@ export function scannerTargets(command: string[], commandText: string): string[]
     const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h)=(.+)$/)
     if (inline) addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
   }
+  // assetfinder's documented CLI is `assetfinder [--subs-only] <domain>`:
+  // its root domain is positional, unlike tools that accept -d/--domain. Without
+  // this tool-specific extraction, a valid command reaches the scope gate with
+  // no recognized target and is rejected before execution. Any extracted domain
+  // still passes the persisted scope matcher below.
+  if (scannerName === "assetfinder") {
+    for (const rawArgument of command.slice(1)) {
+      const argument = stripOuterShellQuotes(rawArgument).trim()
+      if (!argument || argument.startsWith("-")) continue
+      addTargetValue(argument, false)
+    }
+  }
   // Port scanners commonly accept the target as a positional final argument
   // (for example: nmap -p 80,443 host.example). Previously only URL/target flags
   // were recognized, so a valid explicit target was rejected as "no targets".
