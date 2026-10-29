@@ -53,6 +53,15 @@ describe("RepeatDetector — cross-turn identical-call loop", () => {
     expect(d.observe(["a"])).toBe("abort")
   })
 
+  test("the same mixed recovery step cannot keep postponing terminal wrap-up", () => {
+    const d = new RepeatDetector(3)
+    d.observe(["a"])
+    d.observe(["a"])
+    expect(d.observe(["a"])).toBe("nudge")
+    expect(d.observe(["a", "b"])).toBe("nudge")
+    expect(d.observe(["a", "b"])).toBe("abort")
+  })
+
   test("empty step is ok", () => {
     const d = new RepeatDetector(3)
     expect(d.observe([])).toBe("ok")
