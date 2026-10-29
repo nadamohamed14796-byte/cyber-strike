@@ -69,7 +69,12 @@ export namespace Truncate {
       const filepath = path.join(DIR, entry.name)
       const info = await fs.stat(filepath).catch(() => undefined)
       if (!info?.isFile()) continue
-      const idTimestamp = Identifier.timestamp(entry.name)
+      let idTimestamp = 0
+      try {
+        idTimestamp = Identifier.timestamp(entry.name)
+      } catch {
+        // Malformed temporary-file names use filesystem time for pruning.
+      }
       files.push({
         name: entry.name,
         filepath,
