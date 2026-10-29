@@ -71,6 +71,19 @@ export namespace Skill {
   const CYBERSTRIKE_SKILL_GLOB = new Bun.Glob("{skill,skills}/**/SKILL.md")
   const SKILL_GLOB = new Bun.Glob("**/SKILL.md")
 
+  /**
+   * Installed CLI archives keep their skill catalog beside the executable.
+   * Prefer that shipped catalog over an older XDG copy only when the source
+   * checkout's built-in catalog is unavailable (the common portable-binary case).
+   */
+  export function runtimeSkillSources(dataDirectory: string, executablePath: string, builtinDirectoryAvailable: boolean) {
+    const sources = [
+      { directory: path.join(dataDirectory, "skill"), priority: -1 },
+      { directory: path.join(path.dirname(executablePath), "skill"), priority: builtinDirectoryAvailable ? -2 : 1 },
+    ]
+    return sources.filter((source, index) => sources.findIndex((candidate) => candidate.directory === source.directory) === index)
+  }
+
   // Keep full catalog loading and permission initialization on the same built-in
   // root. Compiled distributions may inject a catalog path outside import.meta.dir.
   function builtinSkillDirectory(): string {
@@ -274,7 +287,8 @@ export namespace Skill {
     // Skip in test mode to preserve test isolation.
     if (!isCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
-      if (await Filesystem.isDir(builtinDir)) {
+      const builtinDirectoryAvailable = await Filesystem.isDir(builtinDir)
+      if (builtinDirectoryAvailable) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,
           absolute: true,
@@ -285,18 +299,19 @@ export namespace Skill {
         }
       }
 
-      // Installed skills: XDG data dir (npm postinstall copies skills here)
-      // This is the fallback for compiled binaries where import.meta.dir
-      // resolves to bunfs and can't find skills on the filesystem.
-      const installedDir = path.join(Global.Path.data, "skill")
-      if (await Filesystem.isDir(installedDir)) {
+      // Installed catalogs may be supplied by npm postinstall (XDG data dir) or
+      // by a portable release archive (a skill/ sibling of the executable).
+      // When the compile-time source tree is absent, the bundled sibling wins over
+      // an older XDG copy so required workflow skills cannot silently disappear.
+      for (const source of runtimeSkillSources(Global.Path.data, process.execPath, builtinDirectoryAvailable)) {
+        if (!(await Filesystem.isDir(source.directory))) continue
         for await (const match of SKILL_GLOB.scan({
-          cwd: installedDir,
+          cwd: source.directory,
           absolute: true,
           onlyFiles: true,
           followSymlinks: true,
         })) {
-          await addSkill(match, -1)
+          await addSkill(match, source.priority)
         }
       }
     }
@@ -462,7 +477,8 @@ export namespace Skill {
     // Built-in skills
     if (!isCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
-      if (await Filesystem.isDir(builtinDir)) {
+      const builtinDirectoryAvailable = await Filesystem.isDir(builtinDir)
+      if (builtinDirectoryAvailable) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,
           absolute: true,
@@ -473,11 +489,11 @@ export namespace Skill {
         }
       }
 
-      // Installed skills: XDG data dir
-      const installedDir = path.join(Global.Path.data, "skill")
-      if (await Filesystem.isDir(installedDir)) {
+      // Keep lightweight permission discovery aligned with the full skill catalog.
+      for (const source of runtimeSkillSources(Global.Path.data, process.execPath, builtinDirectoryAvailable)) {
+        if (!(await Filesystem.isDir(source.directory))) continue
         for await (const match of SKILL_GLOB.scan({
-          cwd: installedDir,
+          cwd: source.directory,
           absolute: true,
           onlyFiles: true,
           followSymlinks: true,
