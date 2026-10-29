@@ -292,8 +292,13 @@ function hasTargetListInputArgument(args: string[]): boolean {
 export function scannerTargets(command: string[], commandText: string): string[] {
   const candidates = new Set<string>()
 
-  for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>`]+/gi)) {
-    addNormalizedTarget(candidates, match[0])
+  // In a pipeline, commandText contains neighboring commands too. Never borrow
+  // an upstream seed URL as proof of the downstream command's actual stdin
+  // targets; parse this argv and literal producers below.
+  if (!commandText.includes("|")) {
+    for (const match of commandText.matchAll(/https?:\\/\\/[^\\s"'<>`]+/gi)) {
+      addNormalizedTarget(candidates, match[0])
+    }
   }
 
   // Common value-taking options whose values are not the target: output paths,
@@ -338,8 +343,11 @@ export function scannerTargets(command: string[], commandText: string): string[]
   // option so every line can be parsed and scope-checked before execution.
   if (commandText.includes("|")) {
     const pipelineIndex = commandText.lastIndexOf("|")
-    const inputText = commandText.slice(0, pipelineIndex)
-    if (/\b(?:printf|echo)\b/i.test(inputText)) {
+    const inputText = commandText.slice(0, pipelineIndex).trim()
+    // Only a literal producer immediately before the receiving command is
+    // statically enumerable. Never treat an upstream scanner seed as proof of
+    // the dynamic hosts that it may emit.
+    if (/^(?:printf|echo)\b/i.test(inputText)) {
       const hostPattern = /(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s"'<>\x60]*)?/gi
       for (const match of inputText.matchAll(hostPattern)) {
         const value = match[0].replace(/\.$/, "")
