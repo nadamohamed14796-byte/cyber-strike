@@ -7,6 +7,8 @@ tags: [src-hunter, methodology, prioritization, evidence, control-gap]
 
 # SRC-Hunter methodology references
 
+## When to load
+
 Load this skill only when the current evidence gap needs shared testing methodology. Read `00-index.md` first, then the one specific reference needed:
 - `01-attack-priority.md` — prioritize an evidenced hypothesis.
 - `02-bypass-toolkit.md` — consult only for a permitted, low-impact variation after a concrete in-scope request is blocked. Never use it to evade scope, authorization, rate limits, monitoring, or program restrictions.
