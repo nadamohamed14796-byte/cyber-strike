@@ -69,17 +69,13 @@ export namespace Truncate {
       const filepath = path.join(directory, entry.name)
       const info = await fs.stat(filepath).catch(() => undefined)
       if (!info?.isFile()) continue
-      let idTimestamp = 0
-      try {
-        idTimestamp = Identifier.timestamp(entry.name)
-      } catch {
-        // Malformed temporary-file names use filesystem time for pruning.
-      }
+      // The encoded identifier timestamp is cyclic; filesystem mtime is the reliable
+      // epoch timestamp for age-based retention and oldest-first eviction.
       files.push({
         name: entry.name,
         filepath,
         size: info.size,
-        createdAt: Number.isFinite(idTimestamp) && idTimestamp > 0 ? idTimestamp : info.mtimeMs,
+        createdAt: info.mtimeMs,
       })
     }
     return files
