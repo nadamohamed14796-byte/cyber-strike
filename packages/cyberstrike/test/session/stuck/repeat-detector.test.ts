@@ -100,12 +100,14 @@ describe("ReadOnlyRepeatDetector — polling without progress", () => {
 
 
 
-  test("failed tool calls do not reset read-only polling detection", () => {
+  test("a failed work attempt breaks read-only polling detection", () => {
     const detector = new ReadOnlyRepeatDetector(3)
     const poll = [{ tool: "methodology_status", input: {} }]
     detector.observe(poll)
     detector.observe(poll)
     expect(detector.observe([{ tool: "bash", input: { command: "blocked" }, succeeded: false }])).toBe("ok")
+    expect(detector.observe(poll)).toBe("ok")
+    expect(detector.observe(poll)).toBe("ok")
     expect(detector.observe(poll)).toBe("nudge")
   })
 
