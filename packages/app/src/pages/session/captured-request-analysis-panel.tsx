@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from "solid-js"
 import { useNavigate, useParams } from "@solidjs/router"
 import { SessionTurn } from "@cyberstrike-io/ui/session-turn"
+import { Identifier } from "@/utils/id"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 
@@ -50,6 +51,10 @@ export function CapturedRequestAnalysisPanel() {
   const [retryingRequest, setRetryingRequest] = createSignal(false)
   const [retryNotice, setRetryNotice] = createSignal("")
   const [retryError, setRetryError] = createSignal("")
+  const [replyDraft, setReplyDraft] = createSignal("")
+  const [replySending, setReplySending] = createSignal(false)
+  const [replyError, setReplyError] = createSignal("")
+  const [replyNotice, setReplyNotice] = createSignal("")
   let seenKey: string | undefined
   let requestLoadGeneration = 0
 
@@ -94,6 +99,10 @@ export function CapturedRequestAnalysisPanel() {
     return id ? (sync.data.message[id] ?? []) : []
   })
   const childUserMessages = createMemo(() => childMessages().filter((message) => message.role === "user"))
+  const childBusy = createMemo(() => {
+    const id = analysisSessionID()
+    return !!id && sync.data.session_status[id]?.type === "busy"
+  })
   const requestParts = createMemo(() => parseRequest(request()?.raw_request))
   const queryParams = createMemo(() => {
     try {
@@ -121,6 +130,18 @@ export function CapturedRequestAnalysisPanel() {
       if (!visible || !id) return
       void sync.session.sync(id).catch(() => {})
     }),
+  )
+
+  createEffect(
+    on(
+      () => selected()?.requestID,
+      () => {
+        // Never carry a draft from one captured request into another request's session.
+        setReplyDraft("")
+        setReplyError("")
+        setReplyNotice("")
+      },
+    ),
   )
 
   createEffect(
@@ -174,6 +195,48 @@ export function CapturedRequestAnalysisPanel() {
     if (status === "processed") return "COMPLETE"
     if (status === "failed") return "FAILED"
     return "ANALYZING"
+  }
+
+  async function sendReply() {
+    const text = replyDraft().trim()
+    const sessionID = analysisSessionID()
+    const requestID = selected()?.requestID
+    const lastUserMessage = childUserMessages().at(-1)
+    if (!text || !sessionID || !requestID || !lastUserMessage || replySending() || childBusy()) return
+
+    const submittedDraft = replyDraft()
+    setReplyDraft("")
+    setReplyError("")
+    setReplyNotice("")
+    setReplySending(true)
+    try {
+      const result = await sdk.client.session.promptAsync({
+        sessionID,
+        messageID: Identifier.ascending("message"),
+        agent: "proxy-agent",
+        model: lastUserMessage.model,
+        variant: lastUserMessage.variant,
+        parts: [
+          {
+            id: Identifier.ascending("part"),
+            type: "text",
+            text,
+          },
+        ],
+      })
+      if (result.error) throw new Error(JSON.stringify(result.error))
+      await sync.session.sync(sessionID).catch(() => {})
+      if (selected()?.requestID === requestID) {
+        setReplyNotice("Message sent to this request's Proxy Agent session.")
+      }
+    } catch (error) {
+      if (selected()?.requestID === requestID) {
+        setReplyDraft(submittedDraft)
+        setReplyError(error instanceof Error ? error.message : String(error))
+      }
+    } finally {
+      setReplySending(false)
+    }
   }
 
   return (
@@ -418,11 +481,59 @@ export function CapturedRequestAnalysisPanel() {
                   <Show when={displayStatus() === "failed"}>
                     <p class="mt-1 text-text-weak">
                       {analysisSessionID()
-                        ? "Open the full session to inspect the final error or incomplete step."
+                        ? "You can continue in this request's Proxy Agent session or open the full session to inspect the final error."
                         : "The agent session could not start; the request was marked failed before tool execution."}
                     </p>
                   </Show>
                 </div>
+              </Show>
+              <Show when={analysisSessionID()}>
+                <form
+                  class="sticky bottom-0 mt-3 border-t border-border-weak-base bg-background-base pt-3"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void sendReply()
+                  }}
+                >
+                  <label for="proxy-agent-reply" class="mb-1 block text-11-semibold text-text-weak">
+                    Continue with Proxy Agent
+                  </label>
+                  <textarea
+                    id="proxy-agent-reply"
+                    value={replyDraft()}
+                    onInput={(event) => setReplyDraft(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault()
+                        void sendReply()
+                      }
+                    }}
+                    rows={2}
+                    disabled={!analysisSessionID() || childBusy() || replySending()}
+                    placeholder="Ask about this request or continue a supported investigation…"
+                    class="w-full resize-y rounded-lg border border-border-base bg-background-base px-3 py-2 text-12-regular text-text-base outline-none focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  <div class="mt-2 flex items-center justify-between gap-2">
+                    <p class="text-10-regular text-text-weaker">
+                      This stays in the captured request's Proxy Agent session; main Recon continues independently.
+                    </p>
+                    <button
+                      type="submit"
+                      disabled={!replyDraft().trim() || childBusy() || replySending()}
+                      class="shrink-0 rounded-md border border-border-base bg-surface-raised-base px-3 py-1.5 text-11-medium text-text-base hover:bg-surface-base disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {replySending() ? "Sending…" : childBusy() ? "Agent working…" : "Send"}
+                    </button>
+                  </div>
+                  <Show when={replyError()}>
+                    <p role="alert" class="mt-2 text-11-regular text-icon-danger-base">
+                      Could not message Proxy Agent: {replyError()}
+                    </p>
+                  </Show>
+                  <Show when={replyNotice()}>
+                    <p role="status" class="mt-2 text-11-regular text-text-weak">{replyNotice()}</p>
+                  </Show>
+                </form>
               </Show>
             </main>
           </div>
