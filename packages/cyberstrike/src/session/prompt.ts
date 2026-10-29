@@ -54,7 +54,7 @@ import { ResearchContext, promptResearchSignals } from "@/learning/research-cont
 import { AgentPerformance } from "@/methodology/performance"
 import { testerClass } from "@/tool/vuln-scope"
 import { stopHackbrowser } from "@/tool/hackbrowser-launcher"
-import { toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
+import { isProgressTool, toolSig, READ_ONLY_TOOLS } from "./stuck/signals"
 import { StuckDetector, DEFAULT_STUCK_CONFIG } from "./stuck/stuck-detector"
 import { EmptyContinuationDetector, FailedToolStreakDetector, RepeatDetector, ReadOnlyRepeatDetector, toolCallSucceeded } from "./stuck/repeat-detector"
 import STUCK_WRAP_UP from "./prompt/stuck-wrap-up.txt"
@@ -75,6 +75,12 @@ IMPORTANT:
 const STRUCTURED_OUTPUT_SYSTEM_PROMPT = `IMPORTANT: The user has requested structured output. You MUST use the StructuredOutput tool to provide your final response. Do NOT respond with plain text - you MUST call the StructuredOutput tool with your answer formatted according to the schema.`
 
 
+
+const LOOP_RECOVERY_PROMPT = `LOOP RECOVERY — continue the task, do not terminate prematurely.
+
+The recent steps repeated an action or failed to make progress. Inspect the existing tool results and diagnose the cause. Do not repeat the same call with unchanged arguments, poll status without a concrete reason, or rewrite the same status/artifact without new evidence.
+
+Tools remain available for this recovery turn. Choose a materially different next move: correct the actual input/prerequisite, use another suitable method, verify a partial result, or continue the next independent actionable item. Preserve useful results and update the existing queue accurately. Do not ask the user to continue routine work. If no safe alternative remains after this recovery attempt, state the precise blocker and resume point instead of claiming completion.`
 
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
@@ -333,11 +339,11 @@ export namespace SessionPrompt {
 
     let step = 0
     const session = await Session.get(sessionID)
-    // Loop-termination Layer 2: one stuck-detector per subagent run (monologue rule).
-    // Only observed for native subagents (gated below). `forceWrapUpNext` carries a
-    // 1st-strike nudge from one step into the next (strip tools + wrap-up prompt).
+    // A first loop signal gets one recovery turn with tools available. Only a
+    // repeated failure after that recovery triggers a terminal tool-free wrap-up.
     const stuckDetector = new StuckDetector({ ...DEFAULT_STUCK_CONFIG })
     let forceWrapUpNext = false
+    let forceRecoveryNext = false
     // Loop-termination Layer 2b — cross-turn identical-call guard. The within-turn
     // suppressor and doom_loop check see only one generation, so identical calls can
     // otherwise repeat across turns. This applies to primary and subagent runs.
@@ -663,6 +669,8 @@ export namespace SessionPrompt {
       // detector's 1st-strike nudge (Layer 2). Consume the nudge flag here.
       const stuckWrapUp = forceWrapUpNext
       forceWrapUpNext = false
+      const recoveryTurn = forceRecoveryNext
+      forceRecoveryNext = false
       const wrapUp = isLastStep || stuckWrapUp
       msgs = await insertReminders({
         messages: msgs,
@@ -775,6 +783,7 @@ export namespace SessionPrompt {
 
       // Build system prompt, adding structured output instruction if needed
       const system = [...(await SystemPrompt.environment(model)), ...(await InstructionPrompt.system())]
+      if (recoveryTurn) system.push(LOOP_RECOVERY_PROMPT)
       system.push(TODO_EXECUTION_PROMPT)
       const format = lastUser.format ?? { type: "text" }
       if (format.type === "json_schema") {
@@ -1046,13 +1055,11 @@ export namespace SessionPrompt {
 
         const emptyVerdict = emptyContinuationDetector.observe(toolCalls.length)
         if (emptyVerdict === "nudge") {
+          forceRecoveryNext = true
+          log.warn("continuing turns without tool calls — scheduling a recovery turn", { sessionID })
+        } else if (emptyVerdict === "abort" && !forceWrapUpNext) {
           forceWrapUpNext = true
-          log.warn("continuing turns without tool calls — forcing wrap-up", { sessionID })
-        } else if (emptyVerdict === "abort" && !processor.message.stuckAborted) {
-          processor.message.stuckAborted = true
-          await Session.updateMessage(processor.message)
-          log.warn("agent continued without tool calls after nudge — terminating", { sessionID })
-          break
+          log.warn("empty continuation persisted after recovery — scheduling a final wrap-up", { sessionID })
         }
 
         // The coarse no-progress heuristic is limited to native subagents; it was
@@ -1061,28 +1068,26 @@ export namespace SessionPrompt {
         if (agent.mode === "subagent" && agent.native === true) {
           const verdict = stuckDetector.observe({ toolCalls })
           if (verdict.kind === "nudge") {
-            forceWrapUpNext = true
-            log.warn("stuck-detector nudge — forcing wrap-up next turn", {
+            forceRecoveryNext = true
+            log.warn("stuck-detector nudge — scheduling a recovery turn", {
               reason: verdict.reason,
               detail: verdict.detail,
               sessionID,
             })
           } else if (verdict.kind === "abort") {
-            processor.message.stuckAborted = true
-            await Session.updateMessage(processor.message)
-            log.warn("stuck-detector abort — terminating subagent", {
+            forceWrapUpNext = true
+            log.warn("stuck-detector found no progress after recovery — scheduling a final wrap-up", {
               reason: verdict.reason,
               detail: verdict.detail,
               sessionID,
             })
-            break
           }
         }
 
         // Layer 2b: cross-turn identical-call loop (the doom_loop's cross-turn twin).
-        // Byte-identical (tool,args) re-emitted past the limit across turns = a
-        // failure-to-terminate loop. Nudge first (forces a tool-free wrap-up next
-        // turn), abort as backstop if it somehow keeps repeating.
+        // Byte-identical (tool,args) re-emitted across turns = a possible loop. First
+        // allow a recovery turn with tools enabled; a repeat after recovery triggers
+        // a terminal wrap-up as the backstop.
         // Exempt READ_ONLY_TOOLS only: re-polling status/context with identical args
         // (e.g. the orchestrator re-reading web_get_session_context({}) each ingest)
         // is normal, not a loop — counting it would kill legitimate pipeline drivers.
@@ -1090,38 +1095,33 @@ export namespace SessionPrompt {
         // DO count here — a byte-identical re-write is exactly the loop we target.
         const failedVerdict = failedToolStreakDetector.observe(toolCalls)
         if (failedVerdict === "nudge") {
+          forceRecoveryNext = true
+          log.warn("consecutive failed tool attempts without progress — scheduling a recovery turn", { sessionID })
+        } else if (failedVerdict === "abort" && !forceWrapUpNext) {
           forceWrapUpNext = true
-          log.warn("consecutive failed tool attempts without progress — forcing wrap-up", { sessionID })
-        } else if (failedVerdict === "abort" && !processor.message.stuckAborted) {
-          processor.message.stuckAborted = true
-          await Session.updateMessage(processor.message)
-          log.warn("failed tool-attempt streak continued after nudge — terminating", { sessionID })
-          break
+          log.warn("tool failures continued after recovery — scheduling a final wrap-up", { sessionID })
         }
 
         const repeatSigs = toolCalls
           .filter((c) => c.input !== undefined && !READ_ONLY_TOOLS.has(c.tool))
           .map((c) => toolSig(c.tool, c.input))
-        const repeatVerdict = repeatDetector.observe(repeatSigs)
+        const madeProgress = toolCalls.some((call) => call.succeeded === true && isProgressTool(call.tool))
+        const repeatVerdict = madeProgress ? (repeatDetector.reset(), "ok" as const) : repeatDetector.observe(repeatSigs)
         if (repeatVerdict === "nudge") {
+          forceRecoveryNext = true
+          log.warn("cross-turn repeat detected — scheduling a recovery turn", { sessionID })
+        } else if (repeatVerdict === "abort" && !forceWrapUpNext) {
           forceWrapUpNext = true
-          log.warn("cross-turn repeat nudge — forcing wrap-up next turn", { sessionID })
-        } else if (repeatVerdict === "abort" && !processor.message.stuckAborted) {
-          processor.message.stuckAborted = true
-          await Session.updateMessage(processor.message)
-          log.warn("cross-turn repeat abort — terminating repeated-call loop", { sessionID })
-          break
+          log.warn("identical calls continued after recovery — scheduling a final wrap-up", { sessionID })
         }
 
         const readOnlyVerdict = readOnlyRepeatDetector.observe(toolCalls)
         if (readOnlyVerdict === "nudge") {
+          forceRecoveryNext = true
+          log.warn("repeated read-only calls without progress — scheduling a recovery turn", { sessionID })
+        } else if (readOnlyVerdict === "abort" && !forceWrapUpNext) {
           forceWrapUpNext = true
-          log.warn("repeated read-only calls without progress — forcing wrap-up", { sessionID })
-        } else if (readOnlyVerdict === "abort" && !processor.message.stuckAborted) {
-          processor.message.stuckAborted = true
-          await Session.updateMessage(processor.message)
-          log.warn("read-only polling loop did not terminate", { sessionID })
-          break
+          log.warn("read-only polling continued after recovery — scheduling a final wrap-up", { sessionID })
         }
       }
 
