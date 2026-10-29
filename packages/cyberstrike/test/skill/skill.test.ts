@@ -490,3 +490,33 @@ test("representative skills in the full catalog can be loaded into context", asy
     else process.env.CYBERSTRIKE_TEST_HOME = previousTestHome
   }
 }, 60000)
+
+
+test("portable release skill catalog takes precedence when the source checkout is unavailable", () => {
+  const portable = Skill.runtimeSkillSources(
+    "/home/test/.local/share/cyberstrike",
+    "/opt/cyberstrike/bin/cyberstrike",
+    false,
+  )
+  expect(portable).toEqual([
+    { directory: "/home/test/.local/share/cyberstrike/skill", priority: -1 },
+    { directory: "/opt/cyberstrike/bin/skill", priority: 1 },
+  ])
+
+  const sourceCheckout = Skill.runtimeSkillSources(
+    "/home/test/.local/share/cyberstrike",
+    "/opt/cyberstrike/bin/cyberstrike",
+    true,
+  )
+  expect(sourceCheckout[1].priority).toBeLessThan(sourceCheckout[0].priority)
+})
+
+test("skill source discovery does not scan an identical catalog path twice", () => {
+  expect(
+    Skill.runtimeSkillSources(
+      "/opt/cyberstrike/bin",
+      "/opt/cyberstrike/bin/cyberstrike",
+      false,
+    ),
+  ).toEqual([{ directory: "/opt/cyberstrike/bin/skill", priority: -1 }])
+})
