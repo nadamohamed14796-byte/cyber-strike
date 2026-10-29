@@ -18,7 +18,8 @@ test("target workflow defines the full resumable lifecycle without arbitrary fin
 })
 
 test("missing tools use the maintained-tool catalog and are not silently downgraded", () => {
-  expect(contract).toContain("consult `.cyberstrike/skill/TOOLING_CATALOG.md`")
+  expect(contract).toContain("community-tool-selection")
+  expect(contract).toContain("returned `<skill_files>`")
   expect(contract).toContain("Call `ensure_tools` for the selected tool")
   expect(contract).toContain("do not install or execute a legacy command")
   expect(contract).toContain("continue independent work")

@@ -649,8 +649,10 @@ The skill body must still load.
     const manifest = JSON.parse(await Bun.file(path.join(skillRoot, "index.json")).text()) as {
       skills: Array<{ name: string; files?: string[] }>
     }
-    const entries = manifest.skills.filter((entry) => entry.name.startsWith("src-hunter-"))
-    expect(entries.length).toBeGreaterThanOrEqual(6)
+    const entries = manifest.skills.filter((entry) =>
+      entry.name.startsWith("src-hunter-") || entry.name === "community-tool-selection" || entry.name === "recon-methodology",
+    )
+    expect(entries.length).toBeGreaterThanOrEqual(8)
 
     const previousHome = process.env.CYBERSTRIKE_TEST_HOME
     delete process.env.CYBERSTRIKE_TEST_HOME

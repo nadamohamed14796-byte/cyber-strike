@@ -305,7 +305,7 @@ test("community tool selection skill is discovered, searchable, retrievable, and
         expect(loaded).toContain("## Procedure")
         expect(SkillContext.isLoaded("community-tool-selection")).toBe(true)
 
-        const mapPath = path.join(repoRoot, ".cyberstrike", "skill", "TOOLING_CATALOG.md")
+        const mapPath = path.join(repoRoot, ".cyberstrike", "skill", "community-tool-selection", "TOOLING_CATALOG.md")
         const map = await fs.readFile(mapPath, "utf8")
         expect(map).toContain("Amass")
         expect(map).toContain("subfinder")
