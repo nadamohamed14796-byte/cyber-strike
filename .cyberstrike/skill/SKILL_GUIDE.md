@@ -294,6 +294,18 @@ Apply this gate when editing an existing skill, not only when creating a new one
 - Preserve existing valuable content. Add a new section only when it provides a distinct workflow, coverage dimension, validation gate, or evidence requirement.
 - Do not mark a skill as verified or tested unless the relevant checks were actually run.
 
+### Local reference playbooks: mandatory on-demand routing
+
+The reference collections under `.cyberstrike/skill/playbooks/` and `.cyberstrike/skill/h1-reports/by-weakness/` are working knowledge sources, not decorative documentation.
+
+- Before selecting attack hypotheses, consult `.cyberstrike/skill/playbooks/00-index.md`, then open the relevant category index and the specific technique files for the observed surface, protocol, framework, or behavior.
+- Read the relevant file content before using its procedure. An index, filename, search excerpt, or skill name alone is not sufficient evidence that the guidance was understood or applied.
+- Load only the playbooks relevant to the current evidence and phase; do not dump the entire collection into every task. Revisit another playbook when new evidence changes the likely vulnerability class or a chain.
+- During candidate validation, use the playbook to select a reproducible test, expected positive signal, negative control, impact proof, false-positive checks, and safe stop/cleanup conditions. Adapt examples to the authorized target and avoid blindly replaying destructive payloads.
+- When preparing a HackerOne-style report, consult the matching weakness file under `.cyberstrike/skill/h1-reports/by-weakness/` and use it as a reporting reference; do not copy example credentials, tokens, personal data, or target-specific evidence from reference material.
+- Subagents must receive the relevant file paths and the specific sections needed for their task. They must read the files, apply useful guidance, and return the playbook used plus evidence-driven conclusions—not merely report that a reference was found.
+- If a relevant reference cannot be opened or is missing, state that limitation and continue with verified knowledge; never claim the playbook was consulted when it was not.
+
 ### Attack and reconnaissance playbook requirements
 
 For every `attack-*` and `recon-*` skill, quality is measured by a reproducible decision process, not by the number of payloads or paragraphs.
