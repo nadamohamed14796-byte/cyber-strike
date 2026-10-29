@@ -985,7 +985,7 @@ export function parseScopedPortSpec(spec: string): number[] | undefined {
 }
 
 async function assertScannerReconGate(command: string[], commandText: string, cwd: string): Promise<void> {
-  const scannerIndex = scannerExecutableIndex(command, script)
+  const scannerIndex = scannerExecutableIndex(command, commandText)
   if (scannerIndex < 0) {
     const executableIndex = commandExecutableIndex(command)
     const launchedScanner = executableIndex >= 0 ? await scannerLaunchedByWrapper(command, executableIndex) : undefined
@@ -1244,7 +1244,7 @@ export async function findWrappedScannerInvocation(payload: string): Promise<str
     for (const node of tree.rootNode.descendantsOfType("command")) {
       if (!node) continue
       const command = commandTokens(node)
-      const scannerIndex = scannerExecutableIndex(command, commandText)
+      const scannerIndex = scannerExecutableIndex(command, script)
       if (scannerIndex >= 0) return command.slice(scannerIndex)
 
       const executableIndex = commandExecutableIndex(command)
