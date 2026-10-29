@@ -208,7 +208,11 @@ export function scannerTargets(command: string[], commandText: string): string[]
   // still passes the persisted scope matcher below.
   if (scannerName === "assetfinder" || scannerName === "gau") {
     const optionsWithValues = scannerName === "gau"
-      ? new Set(["-o", "--o", "--output", "--blacklist", "--providers", "--from", "--to", "--threads", "--timeout", "--retries"])
+      ? new Set([
+          "-o", "--o", "--output",
+          "-blacklist", "--blacklist", "--config", "--fc", "--from", "--ft", "--mc", "--mt",
+          "--providers", "--proxy", "--retries", "--timeout", "--threads", "--to",
+        ])
       : new Set<string>()
     for (let i = 1; i < command.length; i++) {
       const argument = stripOuterShellQuotes(command[i]!).trim()
