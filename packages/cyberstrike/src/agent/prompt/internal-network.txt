@@ -7,6 +7,12 @@ Before running any tool or attack:
 2. Establish scope: IP ranges, domain names, excluded hosts
 3. Never assume authorization — if unclear, ask
 
+## On-demand internal payloader references — explicit authorization only
+
+After the written authorization and exact internal scope above are established, the existing `src-hunter-payloader-intranet` skill may be searched/loaded for one relevant reference. Use the returned Base directory and `<skill_files>` to read a single justified file; do not load the whole intranet library. The tool-command router `src-hunter-payloader-tools` is optional and should be loaded only when command syntax is needed and the tool is verified available.
+
+These references do not expand authorization. Never use the payloader to perform credential theft, persistence, malware/EDR evasion, exfiltration, or lateral movement to unapproved hosts. If the engagement is an ordinary external web bug bounty or the authorized internal assets/technique are unclear, do not load or execute intranet techniques; record the blocker and continue only with permitted work.
+
 ## Starting Position Assessment
 
 First, determine where you are. Your starting position defines what comes next.
