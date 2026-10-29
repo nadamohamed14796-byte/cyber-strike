@@ -287,7 +287,9 @@ export namespace Skill {
     // Skip in test mode to preserve test isolation.
     if (!isCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
-      const builtinDirectoryAvailable = await Filesystem.isDir(builtinDir)
+      const builtinDirectoryAvailable =
+        (await Filesystem.isDir(path.join(builtinDir, "skill"))) ||
+        (await Filesystem.isDir(path.join(builtinDir, "skills")))
       if (builtinDirectoryAvailable) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,
@@ -477,7 +479,9 @@ export namespace Skill {
     // Built-in skills
     if (!isCatalogIsolationContext()) {
       const builtinDir = builtinSkillDirectory()
-      const builtinDirectoryAvailable = await Filesystem.isDir(builtinDir)
+      const builtinDirectoryAvailable =
+        (await Filesystem.isDir(path.join(builtinDir, "skill"))) ||
+        (await Filesystem.isDir(path.join(builtinDir, "skills")))
       if (builtinDirectoryAvailable) {
         for await (const match of CYBERSTRIKE_SKILL_GLOB.scan({
           cwd: builtinDir,
