@@ -152,7 +152,7 @@ Never store full cookie/token values or large minified lines. When a candidate a
 ### Agent-usable CLI tools
 - `rg`: search collected JavaScript for routes, API hosts, auth checks, source/sink patterns, and feature flags.
 - `jsluice`: extract URL and endpoint candidates from local JavaScript.
-- `LinkFinder` or `xnLinkFinder`: optional endpoint extraction corroboration; deduplicate results against the existing inventory.
+- `xnLinkFinder`: optional endpoint extraction corroboration when it adds distinct coverage; prefer `jsluice`, source-map parsing, and the built-in AST/correlation workflow as the primary path. Treat LinkFinder examples from older WSTG material as legacy, not a default.
 - `node`: parse or analyze local bundles with a purpose-built script; never execute unknown bundles with network/file permissions.
 - Existing helper `python3 .cyberstrike/skill/scripts/js_endpoint_inventory.py ./javascript`: build a local endpoint candidate inventory.
 
@@ -163,7 +163,6 @@ Install Node.js from https://nodejs.org/en/download/ and use each tool's officia
 - https://developer.mozilla.org/en-US/docs/Web/JavaScript
 - https://owasp.org/www-project-web-security-testing-guide/
 - https://github.com/0x240x23elu/JSluice
-- https://github.com/GerbenJavado/LinkFinder
 
 ### Output contract
 Store file path, source URL, content hash, discovered route/method/parameter hints, auth/session clues, line or offset, and confidence. Deduplicate candidates without discarding distinct parameters. Never copy token values, secrets, or whole minified lines into shared notes.
