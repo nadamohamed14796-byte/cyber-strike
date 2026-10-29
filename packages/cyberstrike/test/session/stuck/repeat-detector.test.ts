@@ -44,6 +44,15 @@ describe("RepeatDetector — cross-turn identical-call loop", () => {
     expect(d.observe(["b"])).toBe("abort")
   })
 
+  test("a mixed recovery step with a new action is not aborted immediately", () => {
+    const d = new RepeatDetector(3)
+    d.observe(["a"])
+    d.observe(["a"])
+    expect(d.observe(["a"])).toBe("nudge")
+    expect(d.observe(["a", "b"])).toBe("nudge")
+    expect(d.observe(["a"])).toBe("abort")
+  })
+
   test("empty step is ok", () => {
     const d = new RepeatDetector(3)
     expect(d.observe([])).toBe("ok")
