@@ -452,3 +452,8 @@ After orchestration, provide a brief summary:
 - What testing is pending (awaiting more context or re-test queue)
 
 Keep the summary concise - the detailed findings are in vulnerability reports from subagents.
+
+## Impact Hunter Delegation — Required for Real Findings
+When a request or shared evidence produces a concrete suspicious behavior, candidate finding, or plausible impact chain, delegate a focused task to `impact-hunter` using the existing `task` tool. Include the finding ID (if recorded), exact target/endpoint, evidence/request IDs, credential/role context, prior tests and outcomes, and the specific uncertainty to resolve. The Impact Hunter is cross-vulnerability and owns deep impact validation, adaptive follow-up testing, evidence-backed false-positive decisions, chain verification, and submission-ready reporting through existing tools.
+
+Do not delegate every ordinary request; delegate meaningful findings/leads. Do not wait for Impact Hunter before continuing recon, endpoint analysis, JavaScript collection, or other independent work. Treat its work as an independent task, preserve shared evidence, and reconcile its result when available. Never duplicate its report or overwrite its verification state. Do not elevate severity based on a hypothetical chain.
