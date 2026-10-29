@@ -265,15 +265,18 @@ curl -sL -D - https://target.com/redirect-page
 # Disable "Follow redirects" and examine 3xx response bodies
 ```
 
-### Step 10: Historical Content (Wayback Machine)
+### Step 10: Historical Content and URL Discovery
 
 ```bash
-# Get historical URLs
-waybackurls target.com | grep -iE '\.js$|\.json$|config|admin'
+# Keep archive output in the target's canonical workspace.
+gau --subs target.com > gau-urls.txt
+waymore -i target.com -mode U -oU waymore-urls.txt
 
-# Check archived versions for leaked data
-curl -s "https://web.archive.org/web/2020/https://target.com/app.js"
+# This is local filtering of saved candidates, not a network scan.
+grep -Ei '\.(js|json)(\?|$)|config|admin' gau-urls.txt waymore-urls.txt > candidate-urls.txt
 ```
+
+Before fetching or replaying any candidate, normalize it and validate it against the persisted target scope. Treat archive results as leads, not proof of a live endpoint. Prefer CyberStrike's built-in JavaScript ingestion/correlation flow so acquisition state, response hashes, source maps, and findings remain in the canonical workspace.
 
 ---
 
@@ -286,18 +289,19 @@ curl -s "https://web.archive.org/web/2020/https://target.com/app.js"
 | **curl/wget**   | HTTP client     | `curl -s https://target.com` |
 | **grep**        | Pattern search  | `grep -iE 'api_key\|secret'` |
 | **jq**          | JSON processor  | `jq '.sources' file.map`     |
-| **waybackurls** | Historical URLs | `waybackurls target.com`     |
-| **gau**         | Get All URLs    | `gau target.com`             |
+| **gau**          | URL history aggregator | `gau --subs target.com` |
+| **waymore**      | URL/archived-response discovery | `waymore -i target.com -mode U -oU waymore-urls.txt` |
 
-### Specialized Secret Scanners
+### JavaScript Analysis and Secret Evidence
 
-| Tool             | Description        | Usage                            |
-| ---------------- | ------------------ | -------------------------------- |
-| **truffleHog**   | Git secret scanner | `trufflehog filesystem .`        |
-| **gitleaks**     | Secret detection   | `gitleaks detect --source=.`     |
-| **SecretFinder** | JS secret finder   | `python3 SecretFinder.py -i url` |
-| **LinkFinder**   | Endpoint extractor | `python3 linkfinder.py -i url`   |
-| **JSParser**     | JavaScript parser  | Extracts URLs from JS            |
+| Tool / capability | Purpose | Usage policy |
+| --- | --- | --- |
+| CyberStrike JavaScript ingestion + `attack-javascript-analysis` | Canonical acquisition, source-map parsing, hashes, endpoint and parameter correlation | Preferred path; retain the manifest and source-linked evidence in the target workspace |
+| `jsluice` | Structured endpoint/URL extraction from local JavaScript | Verify the installed release and use its current `--help`; analyze saved, scope-approved files |
+| `xnLinkFinder` | Optional endpoint-extraction corroboration | Use only when it adds distinct coverage; deduplicate against the canonical endpoint inventory |
+| `gitleaks` / `trufflehog` | Secret scanning in authorized local repositories | Use against local source/repository material, not as proof that a string found in public JavaScript is a usable secret |
+
+Treat legacy SecretFinder, LinkFinder, and JSParser examples as historical, not the default workflow. Never execute untrusted JavaScript or source-map content. Record secret candidates as redacted fingerprints and source locations; verify any suspected credential only through safe, explicitly authorized checks.
 
 ### Browser Extensions
 
@@ -396,35 +400,12 @@ grep -rohE 'https?://[^\s"<>'"'"']+' "$OUTPUT_DIR/js/" | sort -u > "$OUTPUT_DIR/
 echo "[+] Scan complete. Results in $OUTPUT_DIR/"
 ```
 
-### SecretFinder Usage
+### Preferred JavaScript Collection and Correlation
 
-```bash
-# Install
-git clone https://github.com/m4ll0k/SecretFinder.git
-cd SecretFinder
-pip3 install -r requirements.txt
-
-# Scan single URL
-python3 SecretFinder.py -i https://target.com/app.js -o cli
-
-# Scan with regex
-python3 SecretFinder.py -i https://target.com/app.js -o cli -r 'api[_-]?key'
-```
-
-### LinkFinder Usage
-
-```bash
-# Install
-git clone https://github.com/GerbenJavado/LinkFinder.git
-cd LinkFinder
-pip3 install -r requirements.txt
-
-# Find endpoints
-python3 linkfinder.py -i https://target.com/app.js -o cli
-
-# Output to file
-python3 linkfinder.py -i https://target.com -d -o results.html
-```
+1. Collect URLs with maintained archive sources (for example, `gau` and `waymore`) into the target-local workspace.
+2. Scope-check every URL before downloading or replaying it. Keep out-of-scope and unresolved URLs as explicit statuses rather than silently dropping them.
+3. Use CyberStrike's `attack-javascript-analysis` skill and built-in ingestion/correlation tools first. The tool manifest is the source of truth for asset hashes, download status, source-map coverage, and source-linked endpoints.
+4. Use `jsluice` or `xnLinkFinder` only as local corroboration after verifying the installed tool's version and current `--help`. Merge findings into the existing endpoint inventory; do not create a duplicate inventory for each extractor.
 
 ### Regex Patterns for Secret Detection
 
@@ -633,9 +614,9 @@ module.exports = {
 
 ### Tools
 
-- [SecretFinder](https://github.com/m4ll0k/SecretFinder)
-- [LinkFinder](https://github.com/GerbenJavado/LinkFinder)
-- [truffleHog](https://github.com/trufflesecurity/trufflehog)
+- [jsluice](https://github.com/0x240x23elu/jsluice)
+- [xnLinkFinder](https://github.com/xnl-h4ck3r/xnLinkFinder)
+- [trufflehog](https://github.com/trufflesecurity/trufflehog)
 - [gitleaks](https://github.com/gitleaks/gitleaks)
 
 ### Additional Resources
