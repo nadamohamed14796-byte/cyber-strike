@@ -67,3 +67,7 @@ Run only relevant comparisons using explicitly authorized test accounts and test
 6. For GraphQL, nested resources, bulk operations, exports and downloads, test the actual resolver/job/object boundary separately; schema visibility alone is not an authorization flaw.
 
 Change one factor per comparison and keep session, CSRF, tenant, and workflow preconditions valid. Do not guess identifiers, enumerate users, spray role fields, or treat a 200 response as success. A confirmed issue requires proof that a protected operation, object, or property was actually exposed or changed beyond the tested identity's permissions. Record the expected policy, controlled comparison, observable outcome, and remaining uncertainty. Reuse existing validation and reporting tools; do not create a second finding/ledger.
+
+
+## Integrated specialist knowledge
+Use a role-and-operation matrix to distinguish horizontal object access from vertical/function-level authorization. Prioritize operations that change trust or workflow state—approval, publishing, role/permission changes, account linking, export, administrative actions—only where captured traffic and the program's rules make them relevant. Check server-side enforcement across UI/API routes, alternate HTTP methods, tenant context, and workflow transitions; a hidden button or privileged-looking endpoint is only a lead. Use test-owned accounts and reversible fixtures, prove both the expected denial and the observed unauthorized capability, and stop before financial, destructive, or external side effects.
