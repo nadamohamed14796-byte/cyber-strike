@@ -328,6 +328,23 @@ export const ReconCheckpointTool = Tool.define<typeof Parameters, Tool.Metadata>
       }
 
       if (params.action === "begin") {
+        // Persisted scope validation and workspace integrity are the only mandatory
+        // foundation gates for starting later checkpoint phases. This protects the
+        // phase ledger without restricting ordinary tool selection outside the ledger.
+        if (phase !== "scope_validation" && phase !== "workspace_setup") {
+          const foundation = (["scope_validation", "workspace_setup"] as const)
+            .filter((item) => run.phases[item].status !== "complete")
+          if (foundation.length) {
+            return {
+              title: "Recon phase prerequisites unresolved",
+              output: "Cannot begin " + phase + " until these foundational checkpoints are complete: " +
+                foundation.map((item) => item + "=" + run.phases[item].status).join(", ") +
+                ". Resolve the rejected checkpoint first; if complete returned summary_required, retry it with a brief evidence-backed summary. Do not advance the phase ledger by starting a dependent phase. This does not prohibit useful independent non-testing tool work.",
+              metadata: { saved: false, reason: "foundation_prerequisites_unresolved", phase, unresolved: foundation },
+            }
+          }
+        }
+
         const disposition = reconBeginDisposition(record.status, phase)
         if (disposition === "already_resolved") {
           return {
