@@ -285,6 +285,97 @@ Use this skill.
     }
   })
 
+  test("discovers and loads nested src-hunter payloader skills with exact runtime reference paths", async () => {
+    await using tmp = await tmpdir({
+      git: true,
+      init: async (dir) => {
+        const skillRoot = path.join(dir, ".cyberstrike", "skill")
+        const payloaderDir = path.join(skillRoot, "payloader")
+        const webDir = path.join(payloaderDir, "by-category", "web")
+
+        await Bun.write(
+          path.join(payloaderDir, "SKILL.md"),
+          [
+            "---",
+            "name: payloader",
+            "description: On-demand payload reference router for src-hunter.",
+            "category: web-security",
+            'tags: ["src-hunter", "payloader", "payload-reference"]',
+            "---",
+            "",
+            "# Payloader router",
+            "Use the returned Base directory and skill_files to read local reference content.",
+            "",
+          ].join("\n"),
+        )
+        await Bun.write(path.join(payloaderDir, "index.md"), "# Payload index\n")
+
+        await Bun.write(
+          path.join(webDir, "SKILL.md"),
+          [
+            "---",
+            "name: src-hunter-payloader-web",
+            "description: Routes evidence-backed web hypotheses to local payload category files.",
+            "category: web-security",
+            'tags: ["src-hunter", "payloader", "payload-reference", "xss", "sqli"]',
+            "---",
+            "",
+            "# Web payload routing",
+            "Read the exact category file before choosing a test.",
+            "",
+          ].join("\n"),
+        )
+        await Bun.write(
+          path.join(webDir, "xss跨站脚本.md"),
+          "# XSS reference\nPAYLOADER_RUNTIME_READ_MARKER\n",
+        )
+      },
+    })
+
+    const previousHome = process.env.CYBERSTRIKE_TEST_HOME
+    process.env.CYBERSTRIKE_TEST_HOME = tmp.path
+    try {
+      await Instance.provide({
+        directory: tmp.path,
+        fn: async () => {
+          const tool = await SkillTool.init()
+          const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
+
+          const search = await tool.execute(
+            { action: "search", query: "src-hunter-payloader-web", limit: 10 },
+            ctx,
+          )
+          expect(search.output).toContain("src-hunter-payloader-web")
+          expect(search.output).toContain("Search Results")
+
+          const loaded = await tool.execute(
+            { action: "load", name: "src-hunter-payloader-web" },
+            ctx,
+          )
+          const webDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader", "by-category", "web")
+          const reference = path.resolve(webDir, "xss跨站脚本.md")
+          expect(loaded.title).toBe("Loaded skill: src-hunter-payloader-web")
+          expect(loaded.output).toContain("Read the exact category file before choosing a test.")
+          expect(loaded.output).toContain(`Base directory for this skill: ${pathToFileURL(webDir).href}`)
+          expect(loaded.output).toContain(`<file>${reference}</file>`)
+          expect(loaded.output).not.toContain("PAYLOADER_RUNTIME_READ_MARKER")
+          expect(SkillContext.isLoaded("src-hunter-payloader-web")).toBe(true)
+
+          const rootLoaded = await tool.execute({ action: "load", name: "payloader" }, ctx)
+          const rootDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader")
+          expect(rootLoaded.output).toContain("Payload index")
+          expect(rootLoaded.output).toContain(
+            `<file>${path.resolve(rootDir, "index.md")}</file>`,
+          )
+        },
+      })
+    } finally {
+      SkillContext.clear()
+      if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
+      else process.env.CYBERSTRIKE_TEST_HOME = previousHome
+    }
+  })
+
   test("execute resolves directory aliases when metadata uses another name", async () => {
     await using tmp = await tmpdir({
       git: true,
