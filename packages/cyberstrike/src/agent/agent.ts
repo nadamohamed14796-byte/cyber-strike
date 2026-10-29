@@ -29,6 +29,8 @@ import PROMPT_WEB_PROXY_AGENT from "./prompt/orchestrator/web-proxy-agent/prompt
 import DESC_WEB_PROXY_AGENT from "./prompt/orchestrator/web-proxy-agent/description.txt"
 import PROMPT_PROXY_ANALYZER from "./prompt/analyzer/proxy-analyzer/prompt.txt"
 import DESC_PROXY_ANALYZER from "./prompt/analyzer/proxy-analyzer/description.txt"
+import PROMPT_IMPACT_HUNTER from "./prompt/impact-hunter/prompt.txt"
+import DESC_IMPACT_HUNTER from "./prompt/impact-hunter/description.txt"
 import PROMPT_PROXY_TESTER_IDOR from "./prompt/vuln/idor/prompt.txt"
 import DESC_PROXY_TESTER_IDOR from "./prompt/vuln/idor/description.txt"
 import PROMPT_PROXY_TESTER_AUTHZ from "./prompt/vuln/authz/prompt.txt"
@@ -617,6 +619,49 @@ export namespace Agent {
             web_write_object_value: "allow",
             web_write_function: "allow",
             web_update_credential_claims: "allow",
+          }),
+          user,
+        ),
+        options: {},
+      },
+      "impact-hunter": {
+        name: "impact-hunter",
+        description: DESC_IMPACT_HUNTER.split("\n")[0].trim(),
+        mode: "subagent",
+        native: true,
+        color: "red",
+        prompt: PROMPT_IMPACT_HUNTER,
+        prependRequestContext: true,
+        permission: PermissionNext.merge(
+          defaults,
+          PermissionNext.fromConfig({
+            "*": "deny",
+            task: "allow",
+            question: "allow",
+            skill: "allow",
+            bash: "allow",
+            read: "allow",
+            glob: "allow",
+            grep: "allow",
+            webfetch: "allow",
+            http_replay: "allow",
+            web_get_session_context: "allow",
+            web_get_detail: "allow",
+            web_get_request_detail: "allow",
+            web_get_vulnerabilities: "allow",
+            web_get_vuln_detail: "allow",
+            correlate_javascript: "allow",
+            validate_finding: "allow",
+            verification_attempt: "allow",
+            false_positive_memory: "allow",
+            report_vulnerability: "allow",
+            triage_vulnerability: "allow",
+            research_knowledge: "allow",
+            target_note: "allow",
+            add_intel: "allow",
+            get_coverage_notes: "allow",
+            methodology_status: "allow",
+            scope_check: "allow",
           }),
           user,
         ),
