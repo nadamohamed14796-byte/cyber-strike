@@ -174,6 +174,14 @@ describe("Generic scope-aware CLI target discovery", () => {
     expect(scannerTargets(["unlisted-collector"], "cat domains.txt | unlisted-collector")).toEqual([])
   })
 
+  test("does not treat an upstream scanner's seed as the downstream command's stdin targets", () => {
+    const pipeline = "subfinder -d example.com --all --recursive | brand-new-prober"
+    expect(scannerTargets(["brand-new-prober"], pipeline)).toEqual([])
+    // The downstream executable is still recognized and the gate fails closed
+    // because its real stdin contents cannot be proven before execution.
+    expect(scannerExecutableIndex(["brand-new-prober"], pipeline)).toBe(0)
+  })
+
   test("validates target-list file inputs generically without needing a tool name", async () => {
     await using tmp = await tmpdir()
     await Bun.write(path.join(tmp.path, "domains.txt"), "example.com\\napi.example.com\\n")
