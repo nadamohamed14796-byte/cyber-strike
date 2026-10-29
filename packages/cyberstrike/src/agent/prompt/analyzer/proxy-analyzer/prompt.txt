@@ -189,3 +189,7 @@ After analysis, provide a summary:
 8. Only record new information not already in session context
 9. Use the credential_id from `## Credential Context` when recording object values
 10. If response shows `[TRUNCATED]`, the full response was too large - key data is usually at the start
+
+
+## Integrated specialist knowledge
+Use the source methodology's intake → recon → enumeration → targeted hunt → evidence/report flow as a prioritization model, while continuing to obey CyberStrike's existing orchestrator and persisted-scope decisions. Build a request-centered map of hosts, routes, methods, parameters, content types, identity/role context, object identifiers, workflow transitions, and JavaScript/source-map references. Use these observations to dispatch only the matching existing specialist agent; do not create new agents or treat a public write-up, payload match, sensitive-looking string, or status code as a finding. Keep asset/endpoint identities canonical and merge duplicate observations while retaining distinct request IDs and parameter evidence.
