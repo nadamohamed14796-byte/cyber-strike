@@ -1,8 +1,9 @@
+import { parseRawRequest } from "./normalize/parser"
 import { TargetMemory } from "../target"
 
 export type CapturedRequestScopeInput = {
-  origin?: string | null
-  normalizedPath: string
+  rawRequest: string
+  scheme: "http" | "https"
 }
 
 export type CapturedRequestScopeDecision = {
@@ -12,35 +13,40 @@ export type CapturedRequestScopeDecision = {
 }
 
 /**
- * Resolve and authorize a captured HTTP request against persisted target scope.
+ * Resolve and authorize the concrete URL in a captured HTTP request against
+ * persisted target scope. Uses the raw request path, not the dedup/template
+ * path, so an ID placeholder can never broaden a path-scoped authorization.
+ *
  * Captures are untrusted input: they must pass this check before persistence,
  * credential registration, or analyzer/subagent dispatch.
  */
 export async function checkCapturedRequestScope(
   request: CapturedRequestScopeInput,
 ): Promise<CapturedRequestScopeDecision> {
-  if (!request.origin) {
-    return {
-      allowed: false,
-      reason: "captured request has no unambiguous origin; cannot verify persisted scope",
-    }
+  let parsed: ReturnType<typeof parseRawRequest>
+  try {
+    parsed = parseRawRequest({ raw: request.rawRequest, scheme: request.scheme })
+  } catch {
+    return { allowed: false, reason: "captured request could not be parsed into a concrete URL" }
   }
 
   let candidate: URL
   try {
-    const origin = new URL(request.origin)
-    if ((origin.protocol !== "http:" && origin.protocol !== "https:") || origin.username || origin.password) {
-      return { allowed: false, reason: "captured request origin is not a credential-free HTTP(S) origin" }
-    }
-    candidate = new URL(request.normalizedPath, origin.origin)
-    if (candidate.origin !== origin.origin) {
-      return { allowed: false, reason: "captured request path changes origin; refusing scope bypass" }
-    }
+    candidate = new URL(parsed.rawPath, parsed.origin)
   } catch {
     return { allowed: false, reason: "captured request URL is invalid" }
   }
 
-  const decision = await TargetMemory.checkURLScope(candidate.href)
+  let decision: Awaited<ReturnType<typeof TargetMemory.checkURLScope>>
+  try {
+    decision = await TargetMemory.checkURLScope(candidate.href)
+  } catch (error) {
+    return {
+      allowed: false,
+      url: candidate.href,
+      reason: "persisted scope check failed closed: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
   return {
     allowed: decision.allowed && Boolean(decision.workspace),
     url: candidate.href,
