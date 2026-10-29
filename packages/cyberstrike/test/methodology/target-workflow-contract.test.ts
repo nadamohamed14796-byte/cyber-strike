@@ -17,10 +17,11 @@ test("target workflow defines the full resumable lifecycle without arbitrary fin
   expect(contract).toContain("Preserve the session and workspace")
 })
 
-test("missing tools are installed by exact name and are not silently substituted", () => {
-  expect(contract).toContain("call `ensure_tools` with that exact tool name")
-  expect(contract).toContain("Do not spend time hunting for a substitute")
-  expect(contract).toContain("mark that method blocked")
+test("missing tools use the maintained-tool catalog and are not silently downgraded", () => {
+  expect(contract).toContain("consult `.cyberstrike/skill/TOOLING_CATALOG.md`")
+  expect(contract).toContain("Call `ensure_tools` for the selected tool")
+  expect(contract).toContain("do not install or execute a legacy command")
+  expect(contract).toContain("continue independent work")
 })
 
 
