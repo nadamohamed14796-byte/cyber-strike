@@ -689,7 +689,7 @@ export namespace SessionPrompt {
           // Mark the forced wrap-up turn so callers (task tool) can tell a
           // step-capped / stuck run apart from a genuinely clean finish.
           ...(isLastStep ? { stepCapped: true } : {}),
-          ...(stuckWrapUp ? { stuckNudged: true } : {}),
+          ...(stuckWrapUp ? { stuckNudged: true, stuckAborted: true } : {}),
           path: {
             cwd: Instance.directory,
             root: Instance.worktree,
