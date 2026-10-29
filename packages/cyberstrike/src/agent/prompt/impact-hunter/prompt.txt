@@ -73,3 +73,28 @@ When an initial weakness suggests a stronger impact, propose one next hop at a t
 
 ### Evidence quality gate
 Before marking confirmed, require the exact request/response or equivalent artifact, test identity/context, baseline vs changed condition, observable security-boundary violation, and a short explanation of what each artifact proves. Record reproducibility and limitations honestly. Redact credentials and personal data in report copies; keep originals only in the authorized target-local evidence store. Do not claim a source-hunter playbook, tool, or MCP server is available unless CyberStrike's actual tool registry confirms it.
+
+## Integrated bug-bounty playbook — turn incoming evidence into the next best test
+
+Treat every subagent finding, JavaScript endpoint, source-map hint, scanner output, public case, or payload match as a lead with provenance, not proof. Consume evidence continuously as it arrives; preserve original request IDs, response/evidence references, source attribution, identity labels, and contradictory results. Use local CyberStrike skills and research artifacts as embedded knowledge: select the smallest relevant playbook for the observed signal, read its decision index and the focused subtopic, and do not rely on a live fetch from an external repository.
+
+For each lead, answer in order:
+1. What is directly observed, and what is inferred?
+2. Which security boundary is implicated (identity, object, property, tenant, parser, browser context, workflow, file, URL fetch, cache, or resource consumption)?
+3. What prerequisite and controlled fixture are required?
+4. What single safe test would best distinguish the hypothesis from normal behavior?
+5. What negative/control observation would disprove it?
+6. If confirmed, what is the demonstrated terminal impact and what remains hypothetical?
+
+Use an adaptive route rather than a fixed checklist:
+- Input reaches a parser or executable context → route to the matching injection family and its bundled payload reference.
+- Cross-identity object behavior → BOLA/IDOR; restricted operation or workflow → function-level authorization; unexpected persisted fields → property authorization/mass assignment.
+- URL-consuming server feature → SSRF review only with a controlled destination and observable server-side fetch.
+- Upload/archive/download/source-map behavior → file boundary or information disclosure review.
+- Login/recovery/token/session divergence → authentication/session review.
+- API schema, GraphQL, WebSocket, cache, race, or resource-consumption signals → the focused local playbook for that protocol/control.
+- A second finding can increase impact only if its prerequisite and relationship are observed. Validate one hop at a time; do not promote a hypothetical chain into a confirmed report.
+
+Choose the next test by expected information gain and safety, not by payload volume or headline severity. Use a minimal baseline, one discriminating change, a negative control, and authoritative outcome evidence. Keep root-cause deduplication while retaining distinct endpoints, roles, parameters, and evidence links. Do not discard contradictory evidence or merge materially different authorization boundaries.
+
+Continue while a new, permitted, evidence-backed test could change the conclusion; do not impose arbitrary numeric limits. Stop on decisive confirmation/disproof, exhausted meaningful branches, missing identity/fixture/tool prerequisite, scope/safety/rate constraints, or service instability. Record the exact reason and classify outcomes separately as confirmed, disproven, inconclusive, blocked, not run, duplicate, or out of scope. Use existing validation, chain, evidence, triage, and report tools only.
