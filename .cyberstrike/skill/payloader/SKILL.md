@@ -25,3 +25,12 @@ This is a routing skill, not a payload to execute. **Search/load this skill when
 - If a reference cannot be opened, say so and do not claim it was consulted or silently substitute a remembered payload.
 
 Source: `nadamohamed14796-byte/src-hunter`, `references/payloader`. Raw JSON exports are omitted because the categorized Markdown files are the readable source of truth. After this skill is loaded, use the returned **Base directory for this skill** and `<skill_files>` list: read `index.md` and the exact relevant reference path shown there. Do not assume a repository-relative `.cyberstrike/` path exists in the installed runtime.
+
+## Agent-executable CLI tooling, resources, and helper scripts
+
+Use the loaded skill's **Base directory** and `<skill_files>` listing to read the exact local Markdown reference. Do not depend on a graphical interface or fetch external content at runtime.
+
+- **Reference availability:** verify the selected file is present in the returned `<skill_files>` list before reading it. If it is missing, record that blocker rather than claiming the reference was consulted.
+- **Read-only environment verification:** `python3 --version` and `git --version`. These commands verify the local helper environment; they do not authorize or execute target payloads.
+- **Source and documentation:** https://github.com/nadamohamed14796-byte/src-hunter and https://github.com/nadamohamed14796-byte/cyber-strike
+- **Install/download guidance:** this corpus is packaged locally with CyberStrike; do not download or install extra exploit tools just to consult a reference. Verify the local file and use only the specific, safe, scope-appropriate test idea.
