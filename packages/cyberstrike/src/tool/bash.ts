@@ -796,14 +796,14 @@ export async function readTargetListInputs(
   for (let i = 0; i < args.length; i++) {
     const raw = stripOuterShellQuotes(args[i]!).toLowerCase()
     const inlineFlag = raw.includes("=") ? raw.slice(0, raw.indexOf("=")) : raw
-    if (!TARGET_LIST_FLAGS.has(inlineFlag)) continue
+    if (!isTargetListFlag(inlineFlag)) continue
 
     const inline = raw.includes("=")
     const value = inline
       ? stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
       : stripOuterShellQuotes(args[i + 1] ?? "")
     if (!value || value.startsWith("-")) {
-      if (EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag)) {
+      if (isExplicitTargetListFlag(inlineFlag)) {
         throw new Error("Target-list mode requires a readable file path after " + inlineFlag + ".")
       }
       continue
@@ -817,13 +817,13 @@ export async function readTargetListInputs(
       continue
     }
     const exists = await pathIsFile(value, cwd)
-    const shouldRead = EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag) ||
+    const shouldRead = isExplicitTargetListFlag(inlineFlag) ||
       fileLike(value) || exists
     if (!shouldRead) {
       if (!inline) i++
       continue
     }
-    files.push({ path: value, strict: EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag) })
+    files.push({ path: value, strict: isExplicitTargetListFlag(inlineFlag) })
     if (!inline) i++
   }
   if (!files.length) return { present: false, targets: [] }
