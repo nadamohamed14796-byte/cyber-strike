@@ -96,12 +96,14 @@ test("workspace setup cannot be bypassed by marking it unavailable", () => {
   expect(unresolvedReconPrerequisites("asset_discovery", state)).toContain("workspace_setup")
 })
 
-test("unavailable non-scope phases are explicit terminal checkpoints", () => {
+test("failed and unavailable non-scope phases do not block independent downstream work", () => {
   const state = records("complete")
   state.javascript_analysis = { status: "unavailable", reason: "No JavaScript assets were observed" }
   expect(unresolvedReconPrerequisites("endpoint_inventory", state)).toEqual([])
   state.live_hosts_ports = { status: "failed", reason: "Scanner failed" }
-  expect(unresolvedReconPrerequisites("url_collection", state)).toContain("live_hosts_ports")
+  expect(unresolvedReconPrerequisites("url_collection", state)).not.toContain("live_hosts_ports")
+  state.live_hosts_ports = { status: "blocked", reason: "Tool unavailable" }
+  expect(unresolvedReconPrerequisites("url_collection", state)).not.toContain("live_hosts_ports")
 })
 
 test("parameter discovery is a distinct prerequisite before endpoint inventory", () => {

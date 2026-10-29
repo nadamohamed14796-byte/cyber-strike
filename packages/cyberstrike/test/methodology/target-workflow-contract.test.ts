@@ -6,10 +6,12 @@ const contract = readFileSync(
   "utf-8",
 )
 
-test("target workflow defines the full resumable lifecycle and a reportable-finding stop goal", () => {
+test("target workflow defines the full resumable lifecycle without arbitrary finding-count caps", () => {
   expect(contract).toContain("End-to-end engagement lifecycle")
   expect(contract).toContain("reuse the current session")
-  expect(contract).toContain("five distinct, validated, reportable findings")
+  expect(contract).toContain("Do not impose arbitrary source/host/URL/result/time caps")
+  expect(contract).toContain("Keep going while a concrete, in-scope step is likely to add or validate a finding")
+  expect(contract).not.toContain("five distinct, validated, reportable findings")
   expect(contract).toContain("INFO/LOW intel, scanner alerts, chain hypotheses")
   expect(contract).toContain("Generate and verify the final report")
   expect(contract).toContain("Preserve the session and workspace")
