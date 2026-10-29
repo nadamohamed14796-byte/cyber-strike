@@ -338,7 +338,8 @@ Use this skill.
       await Instance.provide({
         directory: tmp.path,
         fn: async () => {
-          const tool = await SkillTool.init()
+          try {
+            const tool = await SkillTool.init()
           const ctx: Tool.Context = { ...baseCtx, ask: async () => {} }
 
           const search = await tool.execute(
@@ -364,13 +365,15 @@ Use this skill.
           const rootLoaded = await tool.execute({ action: "load", name: "payloader" }, ctx)
           const rootDir = path.join(tmp.path, ".cyberstrike", "skill", "payloader")
           expect(rootLoaded.output).toContain("Payload index")
-          expect(rootLoaded.output).toContain(
-            `<file>${path.resolve(rootDir, "index.md")}</file>`,
-          )
+            expect(rootLoaded.output).toContain(
+              `<file>${path.resolve(rootDir, "index.md")}</file>`,
+            )
+          } finally {
+            SkillContext.clear()
+          }
         },
       })
     } finally {
-      SkillContext.clear()
       if (previousHome === undefined) delete process.env.CYBERSTRIKE_TEST_HOME
       else process.env.CYBERSTRIKE_TEST_HOME = previousHome
     }
