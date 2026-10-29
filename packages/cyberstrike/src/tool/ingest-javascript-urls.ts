@@ -7,11 +7,9 @@ import { TargetMemory } from "../target"
 import { JavaScriptCorrelation, extractJavaScriptSourceMapReferences } from "../target/javascript-correlation"
 import { Tool } from "./tool"
 
-// Bound work per invocation for reliable checkpoints; the total queue is never capped.
-const MAX_ASSETS_PER_INVOCATION = 25
-
 // Redirects are bounded to prevent unending redirect loops; URL/worklist count
-// and asset body size are intentionally not capped.
+// and asset body size are intentionally not capped. Per-asset checkpoints and
+// interruption resume protect long runs without imposing a file-count limit.
 const MAX_REDIRECTS = 5
 
 const Parameters = z.object({
@@ -505,9 +503,7 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
     let terminalNotRetried = 0
     const automaticRetryScheduled = new Set<string>()
 
-    let processedThisInvocation = 0
-    for (let index = 0; index < inputURLs.length && processedThisInvocation < MAX_ASSETS_PER_INVOCATION; index++) {
-      processedThisInvocation++
+    for (let index = 0; index < inputURLs.length; index++)
       if (ctx.abort.aborted) {
         await saveProgress(true)
         break
@@ -764,7 +760,8 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         byHash.set(contentHash, { url, finalURL, source: assetSource, status: "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() })
       }
       const sources = mergeAssetSources(byURL.get(url)?.sources, byURL.get(url)?.source, [...(sourceByURL.get(url) ?? new Set([params.source]))])
-      const record: AssetRecord = { url, finalURL, source: mergeAssetSourceLabel(sources), sources, status: existingContent ? "reused" : "downloaded", contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
+      const assetKind: NonNullable<AssetRecord["assetKind"]> = isHTML ? "html" : expectedSourceMap ? "source-map" : "javascript"
+      const record: AssetRecord = { url, finalURL, source: mergeAssetSourceLabel(sources), sources, status: existingContent ? "reused" : "downloaded", assetKind, contentHash, localPath, contentType, bytes: bytes.byteLength, fetchedAt: new Date().toISOString() }
       records.push(record)
       byURL.set(url, record)
       if (existingContent) reused++
@@ -875,7 +872,6 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         "Worklist records settled with an explicit terminal status: " + worklistSettled + "/" + allQueuedURLs.length,
         "Worklist records with downloaded/reused content: " + worklistAvailable + "/" + allQueuedURLs.length,
         "Explicitly excluded non-JavaScript resources: " + worklistNonJavaScript,
-        "URLs processed in this invocation: " + processedThisInvocation + " (per-invocation slice: " + MAX_ASSETS_PER_INVOCATION + "; no total URL cap)",
         "Worklist records still pending: " + worklistPending,
         "Worklist retryable failures: " + worklistRetryable,
         "Worklist URLs without manifest records: " + worklistMissingRecords,
@@ -904,10 +900,6 @@ export const IngestJavaScriptURLsTool = Tool.define<typeof Parameters, Tool.Meta
         worklist_settled: worklistSettled,
         worklist_available: worklistAvailable,
         worklist_non_javascript: worklistNonJavaScript,
-        processed_this_invocation: processedThisInvocation,
-        per_invocation_limit: MAX_ASSETS_PER_INVOCATION,
-        invocation_limit_reached: !ctx.abort.aborted && processedThisInvocation >= MAX_ASSETS_PER_INVOCATION &&
-          [...byURL.values()].some((record) => record.status === "pending" || (record.status === "failed" && record.retryable === true)),
         worklist_pending: worklistPending,
         worklist_retryable_failures: worklistRetryable,
         worklist_missing_manifest_records: worklistMissingRecords,

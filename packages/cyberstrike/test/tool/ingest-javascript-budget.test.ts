@@ -498,7 +498,7 @@ test("reruns JavaScript correlation from saved local assets when the URL queue i
 }, 30_000)
 
 
-test("resumes 30 JavaScript assets in bounded invocations, decompresses gzip bundles, and accounts for non-JS URLs", async () => {
+test("processes the complete JavaScript worklist without a file-count cap, decompresses gzip, and accounts for non-JS URLs", async () => {
   await using tmp = await tmpdir()
   const requested: string[] = []
   const server = Bun.serve({
@@ -526,6 +526,12 @@ test("resumes 30 JavaScript assets in bounded invocations, decompresses gzip bun
           status: 200,
           headers: { "content-type": "font/woff2" },
         })
+      }
+      if (pathname === "/page.html") {
+        return new Response(
+          '<html><head><script src="/assets/0.js"></script></head><body><script>function inlineBootstrap() { return fetch("/api/inline") }</script></body></html>',
+          { status: 200, headers: { "content-type": "text/html" } },
+        )
       }
       return new Response("not found", { status: 404, headers: { "content-type": "text/plain" } })
     },
@@ -563,36 +569,25 @@ test("resumes 30 JavaScript assets in bounded invocations, decompresses gzip bun
           ...Array.from({ length: 30 }, (_, index) => canonicalTarget + "/assets/" + index + ".js"),
           canonicalTarget + "/assets/compressed.js.gz",
           canonicalTarget + "/assets/font.woff2",
+          canonicalTarget + "/page.html",
         ]
         const tool = await IngestJavaScriptURLsTool.init()
-        const first = await tool.execute({
+        const result = await tool.execute({
           target_url: canonicalTarget,
           urls,
-          source: "unit-test-bounded-resume",
+          source: "unit-test-no-file-count-cap",
           force_refresh: false,
         }, toolContext(session.id))
-        const firstMeta = first.metadata as Record<string, unknown>
-        expect(firstMeta.queued_urls).toBe(32)
-        expect(firstMeta.processed_this_invocation).toBe(25)
-        expect(firstMeta.invocation_limit_reached).toBe(true)
-        expect(firstMeta.worklist_pending).toBe(7)
-        expect(firstMeta.collection_complete).toBe(false)
-
-        const second = await tool.execute({
-          target_url: canonicalTarget,
-          urls: [],
-          source: "unit-test-bounded-resume",
-          force_refresh: false,
-        }, toolContext(session.id))
-        const secondMeta = second.metadata as Record<string, unknown>
-        expect(secondMeta.worklist_pending).toBe(0)
-        expect(secondMeta.worklist_retryable_failures).toBe(0)
-        expect(secondMeta.worklist_missing_manifest_records).toBe(0)
-        expect(secondMeta.collection_complete).toBe(true)
-        expect(secondMeta.correlation_saved).toBe(true)
-        expect(secondMeta.analysis_complete).toBe(true)
-        expect(secondMeta.worklist_non_javascript).toBe(1)
-        expect(second.output).toContain("Analyzed source records:")
+        const metadata = result.metadata as Record<string, unknown>
+        expect(metadata.queued_urls).toBe(33)
+        expect(metadata.worklist_pending).toBe(0)
+        expect(metadata.worklist_retryable_failures).toBe(0)
+        expect(metadata.worklist_missing_manifest_records).toBe(0)
+        expect(metadata.collection_complete).toBe(true)
+        expect(metadata.correlation_saved).toBe(true)
+        expect(metadata.analysis_complete).toBe(true)
+        expect(metadata.worklist_non_javascript).toBe(1)
+        expect(result.output).toContain("Analyzed source records:")
         expect(requested.filter((pathname) => pathname.startsWith("/assets/"))).toHaveLength(32)
         expect(new Set(requested.filter((pathname) => pathname.startsWith("/assets/"))).size).toBe(32)
 
@@ -607,6 +602,16 @@ test("resumes 30 JavaScript assets in bounded invocations, decompresses gzip bun
         expect(await fs.readFile(gzipRecord!.localPath!, "utf8")).toContain("loadCompressed")
         const fontRecord = manifest.assets.find((asset) => asset.url === canonicalTarget + "/assets/font.woff2")
         expect(fontRecord?.status).toBe("skipped")
+        const htmlRecord = manifest.assets.find((asset) => asset.url === canonicalTarget + "/page.html") as
+          | { status?: string; assetKind?: string }
+          | undefined
+        expect(htmlRecord?.status).toBe("downloaded")
+        expect(htmlRecord?.assetKind).toBe("html")
+        const analysisSummary = await fs.readFile(
+          path.join(configured.workspace.workspacePath, "javascript-analysis.md"),
+          "utf8",
+        )
+        expect(analysisSummary).toContain("/api/inline")
 
         await Session.remove(session.id)
       },

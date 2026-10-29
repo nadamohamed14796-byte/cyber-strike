@@ -2065,6 +2065,12 @@ export namespace JavaScriptCorrelation {
       }
       const url = safeURL(record.finalURL ?? record.url)
       if (!url) continue
+      const htmlRecord = record.assetKind === "html" ||
+        /text\/html|application\/xhtml\+xml/i.test(record.contentType ?? "")
+      const codeRecord = record.assetKind === "javascript" || record.assetKind === "source-map" ||
+        /\.(?:m?js|cjs|map)(?:\.gz)?$/i.test(url.pathname) ||
+        /javascript|ecmascript|source-map/i.test(record.contentType ?? "")
+      if (htmlRecord || !codeRecord) continue
       const assetKey = url.origin + url.pathname
       if (jsCandidates.some((candidate) => candidate.url.origin + candidate.url.pathname === assetKey)) continue
       jsCandidates.push({
