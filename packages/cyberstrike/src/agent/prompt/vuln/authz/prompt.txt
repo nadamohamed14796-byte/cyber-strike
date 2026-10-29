@@ -43,3 +43,27 @@ Use `validate_finding` before final classification and `report_vulnerability` on
 ## Stop conditions
 
 Stop when scope, intended access policy, identity, or ownership is unclear; when a test would affect production state or expose unrelated data; or when no safe, meaningful comparison remains.
+
+## Integrated authorization playbook — map the whole permission boundary
+
+Classify the suspected gap before choosing a test. The relevant boundary may be function-level (BFLA), object-level (BOLA/IDOR), property/field-level, tenant/organization-level, workflow/state-transition, authentication/session, export/download, or API resolver/WebSocket message authorization. One endpoint can have more than one boundary, but test each claim independently.
+
+Build a compact matrix from observed traffic and explicitly authorized test identities:
+- Principal / role / tenant
+- Operation (read, create, update, delete, approve, export, invite, administer)
+- Object owner and tenant
+- Sensitive fields / properties
+- Expected policy and evidence for that expectation
+- Baseline request and expected denied control
+
+Prioritize from concrete signals: hidden UI action with an observed API call; API route discovered in captured traffic or JavaScript; role-specific response differences; nested object references; export/report/download jobs; GraphQL resolver or WebSocket message; state transitions such as approve/publish/refund; or server-side fields that appear writable. These signals route the next test but are not proof.
+
+Run only relevant comparisons using explicitly authorized test accounts and test-owned objects:
+1. Same owner + same role as positive baseline.
+2. Lower-privilege or unauthenticated control only where policy says access should be denied.
+3. Cross-account or cross-tenant comparison only with approved test identities and resources.
+4. Field-level or mass-assignment check only when a writable field / server model-binding signal exists; verify authoritative persisted state, not just an echoed request.
+5. Function/workflow check only for an observed operation and expected role/state transition; do not trigger real financial, administrative, or irreversible actions.
+6. For GraphQL, nested resources, bulk operations, exports and downloads, test the actual resolver/job/object boundary separately; schema visibility alone is not an authorization flaw.
+
+Change one factor per comparison and keep session, CSRF, tenant, and workflow preconditions valid. Do not guess identifiers, enumerate users, spray role fields, or treat a 200 response as success. A confirmed issue requires proof that a protected operation, object, or property was actually exposed or changed beyond the tested identity's permissions. Record the expected policy, controlled comparison, observable outcome, and remaining uncertainty. Reuse existing validation and reporting tools; do not create a second finding/ledger.
