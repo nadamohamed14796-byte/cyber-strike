@@ -41,18 +41,52 @@ function isBinaryBuffer(buf: Buffer): boolean {
 }
 
 /**
- * Known network/recon executables for target-aware request validation.
- * This registry identifies commands to inspect; it is not a phase allowlist.
+ * Generic CLI input metadata. This describes argument shapes, not a list of
+ * supported or preferred tools. Any executable with a concrete target argument
+ * or a recognizable target-list input is routed through the same scope gate.
+ *
+ * Help/version inspection and tool selection remain the planner's responsibility:
+ * the runner must not infer that an unregistered executable is automatically safe.
  */
-const SCANNER_TOOL_NAMES = new Set([
-  "subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains", "findomain",
-  "nmap", "masscan", "naabu", "httpx", "dnsx",
-  "katana", "gau", "waymore", "waybackurls", "hakrawler", "gospider",
-  "paramspider", "curl", "wget", "arjun", "x8",
-  "nuclei", "commix", "ssrfmap", "nosqlmap", "crlfuzz", "git-dumper",
-  "ffuf", "feroxbuster", "gobuster", "dirsearch", "dirb",
-  "nikto", "sqlmap", "dalfox", "wpscan",
+const TARGET_ARGUMENT_FLAGS = new Set([
+  "-u", "--url", "--urls", "--url-list", "-target", "--target", "--target-url",
+  "--target-host", "--target-domain", "-host", "--host", "--hostname", "--hostnames",
+  "-d", "--domain", "--domains", "--domain-name", "-t", "--scope", "--origin",
+  "--input", "-i", "--input-url", "--endpoint", "--base-url",
 ])
+const TARGET_LIST_FLAGS = new Set([
+  "-l", "-list", "--list", "-dl", "-il", "-df", "--domain-file", "-domains",
+  "--domains-file", "-targets", "--targets-file", "--target-list", "--input-list",
+  "--host-list", "--hosts-file", "--input-file", "--list-file", "--domain-list",
+  "--domains-list", "--hostname-list", "--hostnames-file", "-f", "--file", "-i", "--input",
+])
+const EXPLICIT_TARGET_LIST_FLAGS = new Set([
+  "-l", "-list", "--list", "-dl", "-il", "-df", "--domain-file", "-domains",
+  "--domains-file", "-targets", "--targets-file", "--target-list", "--input-list",
+  "--host-list", "--hosts-file", "--input-file", "--list-file", "--domain-list",
+  "--domains-list", "--hostname-list", "--hostnames-file",
+])
+const AMBIGUOUS_TARGET_FILE_FLAGS = new Set(["-f", "--file", "-i", "--input"])
+const CLI_OPTIONS_WITH_NON_TARGET_VALUES = new Set([
+  "-o", "--o", "--output", "-output", "--output-file", "-out", "-on", "-ox", "-og", "-oa",
+  "-w", "--wordlist", "--word-list", "-p", "--ports", "--port", "-port", "--top-ports",
+  "-rate", "--rate", "--min-rate", "--max-rate", "--threads", "-threads", "--timeout",
+  "-timeout", "--retries", "--proxy", "--proxy-url", "--proxy-list", "-x",
+  "-h", "--header", "-H", "--headers", "--user-agent", "-ua", "--cookie",
+  "--api-key", "--token", "--api-token", "--username", "--password", "--config",
+  "--template", "-template", "--format", "-of", "--severity", "--exclude",
+])
+const LOCAL_TEXT_PROCESSORS = new Set([
+  "echo", "printf", "cat", "head", "tail", "sed", "awk", "grep", "egrep", "fgrep",
+  "rg", "sort", "uniq", "tr", "cut", "paste", "wc", "tee", "jq", "yq",
+  "basename", "dirname", "realpath", "pwd", "ls", "stat", "file", "test",
+  "true", "false", "date", "whoami", "id", "envsubst", "column", "fold",
+  "strings", "sha256sum", "md5sum", "xxd", "od", "diff", "cmp",
+  "mkdir", "touch", "cp", "mv", "rm", "chmod", "chown", "ln", "rmdir",
+  "find", "xargs", "parallel",
+])
+const SHELL_LAUNCHERS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish"])
+const COMMAND_WRAPPERS = new Set(["xargs", "parallel", "find", "env"])
 function commandExecutableIndex(command: string[]): number {
   const optionWithValue: Record<string, Set<string>> = {
     sudo: new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-R", "--chroot", "-r", "--role", "-t", "--type", "-T", "--command-timeout", "-U", "--other-user"]),
@@ -114,11 +148,27 @@ function commandExecutableIndex(command: string[]): number {
   return -1
 }
 
-function scannerExecutableIndex(command: string[]): number {
+function scannerExecutableIndex(command: string[], commandText = ""): number {
   const executableIndex = commandExecutableIndex(command)
   if (executableIndex < 0) return -1
   const executable = path.basename(stripOuterShellQuotes(command[executableIndex]!)).toLowerCase()
-  return SCANNER_TOOL_NAMES.has(executable) ? executableIndex : -1
+
+  // Let wrapper handling inspect the real nested executable. Likewise, local
+  // text/file utilities should not be mistaken for network tools merely because
+  // a URL or hostname appears in their input.
+  if (SHELL_LAUNCHERS.has(executable) || COMMAND_WRAPPERS.has(executable) || LOCAL_TEXT_PROCESSORS.has(executable)) {
+    return -1
+  }
+
+  const invocation = command.slice(executableIndex)
+  if (scannerTargets(invocation, commandText).length > 0) return executableIndex
+  if (hasTargetListInputArgument(invocation.slice(1))) return executableIndex
+  // Dynamic stdin hides concrete targets from argv. A non-local executable at
+  // the receiving end of a pipeline must be routed through the gate; if its
+  // targets cannot be proven from literal input or an explicit list, it fails
+  // closed rather than silently executing an unchecked network request.
+  if (commandText.includes("|")) return executableIndex
+  return -1
 }
 
 const SCANNER_OUTPUT_FLAGS = new Set(["-o", "--output", "-output", "--output-file", "-out"])
@@ -145,137 +195,130 @@ export function reconScannerInvocationKey(command: string[]): string | undefined
   return JSON.stringify([command.slice(0, scannerIndex).map(stripOuterShellQuotes), executable, ...normalizedArgs])
 }
 
-export function scannerTargets(command: string[], commandText: string): string[] {
-  const candidates = new Set<string>()
-  const scannerName = path.basename(stripOuterShellQuotes(command[0] ?? "")).toLowerCase()
-  // waybackurls consumes stdin; an arbitrary URL elsewhere in the pipeline is
-  // not proof that it is the hostname actually fed to the collector.
-  if (scannerName !== "waybackurls") {
-    for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>\x60]+/gi)) {
-      const value = match[0].replace(/[),;]+$/, "")
-      candidates.add(value)
+function isTargetLikeValue(rawValue: string): boolean {
+  const value = stripOuterShellQuotes(rawValue).trim().replace(/[),;]+$/, "")
+  if (!value || value.startsWith("-")) return false
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value)
+      return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password
+    } catch {
+      return false
     }
   }
-  const targetFlags = new Set(["-u", "--url", "-target", "--target", "-host", "--host", "-d", "--domain", "-h"])
-  // CLI-specific target flags must never be generalized: for example, -t is a
-  // token flag for github-subdomains but the target flag for findomain.
-  const toolSpecificTargetFlags: Record<string, Set<string>> = {
-    findomain: new Set(["-t", "--target"]),
-    waymore: new Set(["-i", "--input"]),
+  const candidate = value.replace(/^\*\./, "")
+  const hasPath = candidate.includes("/")
+  // Do not treat bare output/list/config filenames as DNS names. A real URL
+  // such as example.com/robots.txt is still a target and is handled separately.
+  if (!hasPath && /\.(?:txt|list|csv|tsv|json|jsonl|xml|yaml|yml|log|md|html|js|map|pdf|dict|lst|hosts|urls)$/i.test(candidate)) {
+    return false
   }
-  const currentToolTargetFlags = toolSpecificTargetFlags[scannerName] ?? new Set<string>()
-  // A flag may be a target selector in one CLI and an output option in another.
-  // findomain uses -u for its output file, so it must override the generic
-  // -u/--url target interpretation used by HTTP-oriented tools.
-  const toolSpecificNonTargetFlags: Record<string, Set<string>> = {
-    findomain: new Set(["-u"]),
-  }
-  const currentToolNonTargetFlags = toolSpecificNonTargetFlags[scannerName] ?? new Set<string>()
-  const isTargetFlag = (flag: string) =>
-    currentToolTargetFlags.has(flag) || (!currentToolNonTargetFlags.has(flag) && targetFlags.has(flag))
-  const addTargetValue = (rawValue: string, allowDomainList: boolean) => {
-    const value = stripOuterShellQuotes(rawValue).trim()
-    if (!value || value.startsWith("-")) return
-    // Subdomain enumerators commonly accept comma-separated roots and inline
-    // domain flags. Authorize each root separately rather than treating the
-    // entire list as one invalid hostname or blocking the tool unnecessarily.
-    const values = allowDomainList ? value.split(",").map((item) => item.trim()).filter(Boolean) : [value]
-    for (let candidate of values) {
-      if (!candidate) continue
-      if (/^https?:\/\//i.test(candidate)) {
-        candidates.add(candidate)
-        continue
-      }
-      // A wildcard in the saved program scope means enumerate its DNS root;
-      // the runtime still checks that concrete root against the persisted scope.
-      candidate = candidate.replace(/^\*\./, "")
-      if (/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(candidate)) {
-        candidates.add("https://" + candidate)
-      } else if (/^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(candidate)) {
-        candidates.add("https://" + candidate)
-      }
-    }
-  }
-  const allowDomainList = ["subfinder", "amass", "assetfinder", "sublist3r", "shosubgo", "github-subdomains"].includes(scannerName)
-  for (let i = 0; i < command.length; i++) {
-    const flag = stripOuterShellQuotes(command[i]!).toLowerCase()
-    if (isTargetFlag(flag)) {
-      const value = command[i + 1]
-      if (!value) continue
-      addTargetValue(value, allowDomainList && ["-d", "--domain"].includes(flag))
-      continue
-    }
-    const inline = flag.match(/^(-u|--url|-target|--target|-host|--host|-d|--domain|-h|-t|--input|-i)=([^\s].*)$/)
-    if (inline && isTargetFlag(inline[1]!)) {
-      addTargetValue(inline[2]!, allowDomainList && ["-d", "--domain"].includes(inline[1]!))
-    }
-  }
-  // assetfinder's documented CLI is `assetfinder [--subs-only] <domain>`:
-  // its root domain is positional, unlike tools that accept -d/--domain. Without
-  // this tool-specific extraction, a valid command reaches the scope gate with
-  // no recognized target and is rejected before execution. Any extracted domain
-  // still passes the persisted scope matcher below.
-  if (scannerName === "assetfinder" || scannerName === "gau") {
-    const optionsWithValues = scannerName === "gau"
-      ? new Set([
-          "-o", "--o", "--output",
-          "-blacklist", "--blacklist", "--config", "--fc", "--from", "--ft", "--mc", "--mt",
-          "--providers", "--proxy", "--retries", "--timeout", "--threads", "--to",
-        ])
-      : new Set<string>()
-    for (let i = 1; i < command.length; i++) {
-      const argument = stripOuterShellQuotes(command[i]!).trim()
-      if (optionsWithValues.has(argument)) {
-        i++
-        continue
-      }
-      if (!argument || argument.startsWith("-")) continue
-      addTargetValue(argument, false)
-    }
-  }
-  // Port scanners commonly accept the target as a positional final argument
-  // (for example: nmap -p 80,443 host.example). Previously only URL/target flags
-  // were recognized, so a valid explicit target was rejected as "no targets".
-  if (["nmap", "masscan", "naabu"].includes(scannerName)) {
-    const optionsWithValues = new Set([
-      "-p", "--ports", "-port", "-iL", "--include-file", "-oN", "-oX",
-      "-oG", "-oA", "--top-ports", "-T", "--min-rate", "--max-rate",
-      "--max-retries", "--host-timeout", "--scan-delay", "--source-port",
-    ])
-    let positionalTarget: string | undefined
-    for (let i = 1; i < command.length; i++) {
-      const token = stripOuterShellQuotes(command[i]!).trim()
-      if (!token) continue
-      if (optionsWithValues.has(token)) {
-        i++
-        continue
-      }
-      if (token.startsWith("-")) continue
-      positionalTarget = token
-    }
-    if (positionalTarget) addTargetValue(positionalTarget, false)
-  }
-  // waybackurls consumes hosts on stdin instead of argv. Permit only literal
-  // hostnames from its immediately enclosing pipeline; every extracted host
-  // still passes the same persisted scope check before the source request starts.
-  if (path.basename(stripOuterShellQuotes(command[0] ?? "")).toLowerCase() === "waybackurls") {
-    const pipelineIndex = commandText.lastIndexOf("|")
-    const inputText = pipelineIndex >= 0 ? commandText.slice(0, pipelineIndex) : ""
-    const hostPattern = /(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/gi
-    const literalProducer = /^\s*(?:printf|echo)\b/i.test(inputText)
-    if (literalProducer) {
-      for (const match of inputText.matchAll(hostPattern)) {
-        const hostname = match[0].toLowerCase().replace(/\.$/, "")
-        // Avoid treating filenames (e.g. domains.txt or hosts.json) as authorized hosts.
-        if (/\.(?:txt|list|csv|json|jsonl|xml|yaml|yml|log|md|html|js|map|pdf)$/i.test(hostname)) continue
-        if (hostname.includes("waybackurls")) continue
-        candidates.add("https://" + hostname)
-      }
-    }
-  }
-  return [...candidates]
+  return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(candidate) ||
+    /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?(?:\/[^\s]*)?$/.test(candidate)
 }
 
+function addNormalizedTarget(candidates: Set<string>, rawValue: string): void {
+  const value = stripOuterShellQuotes(rawValue).trim().replace(/[),;]+$/, "")
+  if (!value || value.startsWith("-")) return
+  if (/^https?:\/\//i.test(value)) {
+    if (isTargetLikeValue(value)) candidates.add(value)
+    return
+  }
+  // Comma-separated hostname lists are common input syntax. Splitting is only
+  // attempted when the item is not a URL, so query-string commas remain intact.
+  for (let candidate of value.split(",")) {
+    candidate = candidate.trim().replace(/^\*\./, "")
+    if (!isTargetLikeValue(candidate)) continue
+    candidates.add("https://" + candidate)
+  }
+}
+
+function hasTargetListInputArgument(args: string[]): boolean {
+  for (let i = 0; i < args.length; i++) {
+    const raw = stripOuterShellQuotes(args[i]!).toLowerCase()
+    const inlineFlag = raw.includes("=") ? raw.slice(0, raw.indexOf("=")) : raw
+    if (!TARGET_LIST_FLAGS.has(inlineFlag)) continue
+    const value = raw.includes("=")
+      ? stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
+      : stripOuterShellQuotes(args[i + 1] ?? "")
+    if (!value || value.startsWith("-")) return true
+    if (isTargetLikeValue(value)) continue
+    if (EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag) ||
+        /[\\/]/.test(value) ||
+        /\.(?:txt|list|csv|tsv|jsonl?|yaml|yml|hosts|urls|lst)$/i.test(value)) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Extract concrete target candidates without requiring a hardcoded executable
+ * name. Positional domains, URLs, generic target options, and literal hostname
+ * producers in pipelines are all parsed using the same rules. Every returned
+ * candidate is still checked against the persisted scope before execution.
+ */
+export function scannerTargets(command: string[], commandText: string): string[] {
+  const candidates = new Set<string>()
+
+  for (const match of commandText.matchAll(/https?:\/\/[^\s"'<>`]+/gi)) {
+    addNormalizedTarget(candidates, match[0])
+  }
+
+  // Common value-taking options whose values are not the target: output paths,
+  // wordlists, ports, rates, proxy settings, headers, credentials, and configs.
+  // Unknown options are not special-cased; domain-like values remain visible to
+  // the generic parser so newly installed CLIs do not need a code change.
+  for (let i = 1; i < command.length; i++) {
+    const token = stripOuterShellQuotes(command[i]!).trim()
+    if (!token) continue
+    const lower = token.toLowerCase()
+    const flag = lower.includes("=") ? lower.slice(0, lower.indexOf("=")) : lower
+
+    if (CLI_OPTIONS_WITH_NON_TARGET_VALUES.has(flag)) {
+      if (!lower.includes("=")) i++
+      continue
+    }
+    if (TARGET_LIST_FLAGS.has(flag)) {
+      const next = lower.includes("=") ? token.slice(token.indexOf("=") + 1) : command[i + 1]
+      if (next) addNormalizedTarget(candidates, next)
+      if (!lower.includes("=")) i++
+      continue
+    }
+    if (TARGET_ARGUMENT_FLAGS.has(flag)) {
+      const next = lower.includes("=") ? token.slice(token.indexOf("=") + 1) : command[i + 1]
+      if (next) addNormalizedTarget(candidates, next)
+      if (!lower.includes("=")) i++
+      continue
+    }
+    if (token.startsWith("-") && lower.includes("=")) {
+      // For unregistered CLIs, an arbitrary option value can still be a target.
+      // Generic validation is safer than treating new option names as trusted.
+      addNormalizedTarget(candidates, token.slice(token.indexOf("=") + 1))
+      continue
+    }
+    if (token.startsWith("-")) continue
+    addNormalizedTarget(candidates, token)
+  }
+
+  // Literal hostnames piped from echo/printf are visible even when the receiving
+  // CLI consumes stdin instead of argv. Never infer authorization from a file
+  // name (for example domains.txt); file-backed inputs must use an explicit list
+  // option so every line can be parsed and scope-checked before execution.
+  if (commandText.includes("|")) {
+    const pipelineIndex = commandText.lastIndexOf("|")
+    const inputText = commandText.slice(0, pipelineIndex)
+    if (/\b(?:printf|echo)\b/i.test(inputText)) {
+      const hostPattern = /(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s"'<>\x60]*)?/gi
+      for (const match of inputText.matchAll(hostPattern)) {
+        const value = match[0].replace(/\.$/, "")
+        if (isTargetLikeValue(value)) addNormalizedTarget(candidates, value)
+      }
+    }
+  }
+
+  return [...candidates]
+}
 function stripOuterShellQuotes(value: string): string {
   const trimmed = value.trim()
   if (trimmed.length >= 2 &&
@@ -702,187 +745,110 @@ function normalizePassiveLookupDomain(value: string | null | undefined): string 
   return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(domain) ? domain : undefined
 }
 
-const TARGET_LIST_FLAGS = new Set(["-l", "-list", "--list", "-dl", "-il", "-df", "--domain-file", "-domains", "--domains-file", "-targets", "--targets-file"])
+async function pathIsFile(file: string, cwd: string): Promise<boolean> {
+  try {
+    return (await fs.stat(path.resolve(cwd, file))).isFile()
+  } catch {
+    return false
+  }
+}
 
 export async function readTargetListInputs(
   args: string[],
   cwd: string,
-  scannerName: string,
 ): Promise<{ present: boolean; targets: string[] }> {
-  const files: string[] = []
-  // Only interpret these flags as files for the matching tool. In particular,
-  // github-subdomains uses -t for a token, while findomain uses -f for a target
-  // file and waymore accepts either a domain or a file in -i/--input.
-  const toolSpecificListFlags: Record<string, Set<string>> = {
-    findomain: new Set(["-f"]),
-    waymore: new Set(["-i", "--input"]),
-  }
-  const specificListFlags = toolSpecificListFlags[scannerName] ?? new Set<string>()
-  const isHostInput = (value: string) => {
-    const candidate = value.trim().replace(/^\*\./, "")
-    if (/^https?:\/\//i.test(candidate)) {
-      try {
-        const parsed = new URL(candidate)
-        return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password
-      } catch {
-        return false
-      }
-    }
-    // A bare file name such as domains.txt matches a permissive hostname
-    // suffix regex (.txt is alphabetic). Treat common list/data filenames as
-    // files, but still allow domain paths such as example.com/robots.txt.
-    const hasPath = candidate.includes("/")
-    if (!hasPath && /\.(?:txt|list|csv|json|jsonl|xml|yaml|yml|log|md|html|js|map|pdf)$/i.test(candidate)) {
-      return false
-    }
-    return /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(candidate) ||
-      /^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(candidate)
-  }
+  const files: Array<{ path: string; strict: boolean }> = []
+  const isHostInput = (value: string) => isTargetLikeValue(value)
+  const fileLike = (value: string) =>
+    /[\\/]/.test(value) ||
+    /\.(?:txt|list|csv|tsv|jsonl?|xml|yaml|yml|hosts|urls|lst)$/i.test(value)
+
   for (let i = 0; i < args.length; i++) {
-    const flag = stripOuterShellQuotes(args[i]!).toLowerCase()
-    const isGenericListFlag = TARGET_LIST_FLAGS.has(flag)
-    const isSpecificListFlag = specificListFlags.has(flag)
-    if (isGenericListFlag || isSpecificListFlag) {
-      const value = args[i + 1] ? stripOuterShellQuotes(args[i + 1]!) : ""
-      // waymore -i/--input accepts a single domain as well as an input file.
-      // Target extraction handles domains; only treat a non-domain argument as
-      // a file, then fail explicitly if it cannot be read.
-      if (isSpecificListFlag && scannerName === "waymore" && isHostInput(value)) {
-        i++
-        continue
+    const raw = stripOuterShellQuotes(args[i]!).toLowerCase()
+    const inlineFlag = raw.includes("=") ? raw.slice(0, raw.indexOf("=")) : raw
+    if (!TARGET_LIST_FLAGS.has(inlineFlag)) continue
+
+    const inline = raw.includes("=")
+    const value = inline
+      ? stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
+      : stripOuterShellQuotes(args[i + 1] ?? "")
+    if (!value || value.startsWith("-")) {
+      if (EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag)) {
+        throw new Error("Target-list mode requires a readable file path after " + inlineFlag + ".")
       }
-      if (!value || value.startsWith("-")) {
-        throw new Error("Target-list mode requires a readable file path after " + flag + ".")
-      }
-      files.push(value)
-      i++
       continue
     }
-    const inline = [...TARGET_LIST_FLAGS, ...specificListFlags].find((item) => flag.startsWith(item + "="))
-    if (inline) {
-      const value = stripOuterShellQuotes(args[i]!.slice(args[i]!.indexOf("=") + 1))
-      if (!value) throw new Error("Target-list mode requires a readable file path after " + inline + ".")
-      if (specificListFlags.has(inline) && scannerName === "waymore" && isHostInput(value)) continue
-      files.push(value)
+
+    // A hostname/URL supplied to an input option is a direct target, not a file.
+    // Ambiguous file/input flags are treated as lists only when the value looks
+    // like a path, has a list extension, or resolves to an existing file.
+    if (isHostInput(value)) {
+      if (!inline) i++
+      continue
     }
+    const exists = await pathIsFile(value, cwd)
+    const shouldRead = EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag) ||
+      fileLike(value) || exists
+    if (!shouldRead) {
+      if (!inline) i++
+      continue
+    }
+    files.push({ path: value, strict: EXPLICIT_TARGET_LIST_FLAGS.has(inlineFlag) })
+    if (!inline) i++
   }
   if (!files.length) return { present: false, targets: [] }
 
   const targets = new Set<string>()
-  for (const file of files) {
+  for (const item of files) {
     let raw: string
     try {
-      raw = await fs.readFile(path.resolve(cwd, file), "utf8")
+      raw = await fs.readFile(path.resolve(cwd, item.path), "utf8")
     } catch (error) {
-      throw new Error("Cannot read target list " + file + ": " + (error instanceof Error ? error.message : String(error)))
+      throw new Error("Cannot read target list " + item.path + ": " + (error instanceof Error ? error.message : String(error)))
     }
+
+    let recognized = 0
     for (const row of raw.split(/\r?\n/)) {
       const line = row.trim()
       if (!line || line.startsWith("#")) continue
-      for (let value of line.split(",").map((item) => item.trim()).filter(Boolean)) {
-        value = value.replace(/^\*\./, "")
+      const values = line.split(",").map((entry) => entry.trim()).filter(Boolean)
+      for (const sourceValue of values) {
+        const value = sourceValue.replace(/^\*\./, "")
         if (/^https?:\/\//i.test(value)) {
           let parsed: URL
-          try { parsed = new URL(value) } catch { throw new Error("Invalid URL in target list " + file + ": " + value) }
+          try {
+            parsed = new URL(value)
+          } catch {
+            if (item.strict) throw new Error("Invalid URL in target list " + item.path + ": " + value)
+            continue
+          }
           if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) {
-            throw new Error("Target list contains a non-HTTP(S) or credentialed URL: " + value)
+            if (item.strict) throw new Error("Target list contains a non-HTTP(S) or credentialed URL: " + value)
+            continue
           }
           targets.add(parsed.href)
+          recognized++
           continue
         }
-        if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:\/[^\s]*)?$/i.test(value) &&
-            !/^(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?$/.test(value)) {
-          throw new Error("Target list contains an invalid hostname or URL: " + value)
+        if (!isTargetLikeValue(value)) {
+          if (item.strict) throw new Error("Target list contains an invalid hostname or URL: " + value)
+          continue
         }
-        targets.add("https://" + value)
+        if (/^\d/.test(value) || value.includes(".")) {
+          targets.add("https://" + value)
+          recognized++
+        }
       }
     }
+
+    if (!recognized && item.strict) {
+      throw new Error("Target list " + item.path + " contains no usable hostnames or URLs.")
+    }
   }
-  if (!targets.size) throw new Error("Target list contains no usable hostnames or URLs.")
+
+  if (!targets.size) return { present: false, targets: [] }
   return { present: true, targets: [...targets] }
 }
-
-/**
- * Prevent generic HTTP clients from following redirects or applying user config/routing
- * overrides that could issue a second request without a persisted-scope check.
- */
-export function scannerRequestScopeBlockReason(
-  scannerInput: string,
-  args: string[],
-  launcherPrefix: string[] = [],
-): string | undefined {
-  const scanner = path.basename(stripOuterShellQuotes(scannerInput)).toLowerCase()
-  const values = args.map(stripOuterShellQuotes)
-  const prefix = launcherPrefix.map(stripOuterShellQuotes)
-  const hasOption = (options: string[]) => values.some((value) =>
-    options.some((option) => value === option || value.startsWith(option + "=")),
-  )
-  const hasHostOverride = () => {
-    for (let i = 0; i < values.length; i++) {
-      const value = values[i]!
-      let header: string | undefined
-      if (value === "-H" || value.toLowerCase() === "--header") header = values[i + 1]
-      else if (value.toLowerCase().startsWith("--header=")) header = value.slice(value.indexOf("=") + 1)
-      else if (value.startsWith("-H") && value.length > 2) header = value.slice(2)
-      if (header && header.split(":", 1)[0]!.trim().toLowerCase() === "host") return true
-    }
-    return false
-  }
-
-  if (scanner === "curl") {
-    if (values[0] !== "-q" && values[0] !== "--disable") {
-      return "curl may load ~/.curlrc, which can alter redirects, routing, and request behavior. Put -q (or --disable) first so the checked command is the effective command."
-    }
-    const followsRedirect = values.some((value) =>
-      value === "--location" ||
-      value === "--location-trusted" ||
-      value.startsWith("--location=") ||
-      /^-[^-]*L[A-Za-z]*$/.test(value),
-    )
-    if (followsRedirect) {
-      return "curl redirect-follow options can issue a second request outside the persisted scope. Remove -L/--location or use a scope-aware request pipeline that checks every redirect target."
-    }
-    if (hasOption([
-      "--resolve", "--connect-to", "--proxy", "--preproxy", "--proxy-header",
-      "--interface", "--unix-socket", "--abstract-unix-socket", "--config",
-    ]) || values.some((value) => /^-[^-]*x/.test(value) || /^-[^-]*K/.test(value))) {
-      return "curl routing/configuration overrides can change the actual destination or request behavior after the URL scope check. Remove proxy, resolve/connect-to, interface, socket, and explicit config overrides; use a scope-aware request tool if they are essential."
-    }
-    if (hasHostOverride()) {
-      return "Overriding the HTTP Host header can route an in-scope URL to a different virtual host. Remove the Host override and use an explicitly scoped target URL."
-    }
-  }
-
-  if (scanner === "wget") {
-    const configDisabled = prefix.some((value) => value.toLowerCase() === "env") &&
-      prefix.some((value) => value === "WGETRC=/dev/null")
-    if (!configDisabled && process.env.WGETRC !== "/dev/null") {
-      return "wget can load ~/.wgetrc settings that enable recursion or change request behavior. Invoke it as env WGETRC=/dev/null wget --max-redirect=0 ... so the checked command uses no user configuration."
-    }
-    const optionIndexes = values
-      .map((value, index) => ({ value, index }))
-      .filter(({ value }) => value === "--max-redirect" || value.startsWith("--max-redirect="))
-    if (optionIndexes.length !== 1) {
-      return "wget follows redirects by default. Set exactly one explicit --max-redirect=0 so no redirected request can bypass persisted-scope checking."
-    }
-    const option = optionIndexes[0]!
-    const redirectValue = option.value.startsWith("--max-redirect=")
-      ? option.value.slice("--max-redirect=".length)
-      : values[option.index + 1]
-    if (redirectValue !== "0") {
-      return "wget redirect following is blocked for generic shell mode. Set --max-redirect=0, or use a scope-aware request pipeline that checks every redirect target."
-    }
-    if (hasOption(["-i", "--input-file", "--execute", "-e", "--recursive", "--mirror", "--span-hosts", "--page-requisites"]) ||
-      values.some((value) => /^-[^-]*[rHmpe]/.test(value))) {
-      return "wget input-list, configuration-execution, recursive, cross-host, and page-requisite modes can issue unchecked follow-up requests. Use one explicit URL with no recursive/list mode, or use a scope-aware collection pipeline."
-    }
-    if (hasHostOverride()) {
-      return "Overriding the HTTP Host header can route an in-scope URL to a different virtual host. Remove the Host override and use an explicitly scoped target URL."
-    }
-  }
-  return undefined
-}
-
 /** Parse explicit port lists and ranges so persisted scope is checked for every port. */
 export function parseScopedPortSpec(spec: string): number[] | undefined {
   const value = spec.trim()
@@ -956,16 +922,18 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   // Target lists are allowed only after every concrete entry is parsed and
   // checked against the persisted scope below; the list itself grants no access.
   let portScanPorts: number[] | undefined
-  if (["nmap", "masscan", "naabu"].includes(scanner)) {
-    const portFlag = args.findIndex((value) => ["-p", "--ports", "-port"].includes(value.toLowerCase()))
-    const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
-    // Port selection belongs to the scanner/operator, not a generic execution
-    // gate. When ports are explicit, validate each one against persisted scope;
-    // when omitted, preserve the scanner's own defaults and still scope-check
-    // the concrete target before the command starts.
-    if (portSpec) {
-      const parsedPorts = parseScopedPortSpec(portSpec)
-      if (parsedPorts) portScanPorts = parsedPorts
+  const portFlag = args.findIndex((value) => ["--ports", "-port"].includes(value.toLowerCase()) || value === "-p")
+  const portSpec = portFlag >= 0 ? args[portFlag + 1] : undefined
+  // A recognized explicit port-list option is enforced regardless of which CLI
+  // implements it. Never let a new scanner evade port policy by being unlisted.
+  if (portSpec && (["--ports", "-port"].includes(args[portFlag]!.toLowerCase()) || /^\d+(?:[-,]\d+)*$/.test(portSpec))) {
+    const parsedPorts = parseScopedPortSpec(portSpec)
+    if (!parsedPorts) {
+      if (["--ports", "-port"].includes(args[portFlag]!.toLowerCase())) {
+        throw new Error("Cannot run " + scanner + ": invalid explicit port specification " + portSpec + ". No command was started.")
+      }
+    } else {
+      portScanPorts = parsedPorts
     }
   }
   // Tool choice is not restricted by a phase allowlist. Request safety and
@@ -973,7 +941,7 @@ async function assertScannerReconGate(command: string[], commandText: string, cw
   let targets = scannerTargets(command.slice(scannerIndex), commandText)
   const listedTargets = ["curl", "wget"].includes(scanner)
     ? { present: false, targets: [] as string[] }
-    : await readTargetListInputs(args, cwd, scanner)
+    : await readTargetListInputs(args, cwd)
   if (listedTargets.present) targets = [...new Set([...targets, ...listedTargets.targets])]
 
   // Public read-only research APIs are contacted as providers, but authorization
