@@ -136,6 +136,35 @@ describe("Scope-aware URL source input extraction", () => {
     expect(scannerTargets(["subfinder", "-d", "*.example.com,example.net", "-silent"], "subfinder -d '*.example.com,example.net' -silent")).toEqual(expect.arrayContaining(["https://example.com", "https://example.net"]))
   })
 
+  test("extracts subfinder target when supported all-source and recursive flags are used", () => {
+    expect(scannerTargets(
+      ["subfinder", "-d", "example.com", "-all", "-recursive", "-silent"],
+      "subfinder -d example.com -all -recursive -silent",
+    )).toContain("https://example.com")
+  })
+
+  test("extracts assetfinder positional domains with and without --subs-only", () => {
+    expect(scannerTargets(
+      ["assetfinder", "--subs-only", "example.com"],
+      "assetfinder --subs-only example.com",
+    )).toEqual(["https://example.com"])
+    expect(scannerTargets(
+      ["assetfinder", "example.com"],
+      "assetfinder example.com",
+    )).toEqual(["https://example.com"])
+  })
+
+  test("extracts domain flags from credential-backed passive enumerators", () => {
+    expect(scannerTargets(
+      ["shosubgo", "-d", "example.com", "-s", "TEST_TOKEN"],
+      "shosubgo -d example.com -s TEST_TOKEN",
+    )).toContain("https://example.com")
+    expect(scannerTargets(
+      ["github-subdomains", "-d", "example.com", "-t", "TEST_TOKEN"],
+      "github-subdomains -d example.com -t TEST_TOKEN",
+    )).toContain("https://example.com")
+  })
+
   test("extracts positional host targets from port scanners", () => {
     expect(scannerTargets(
       ["nmap", "-p", "22,80,443", "ubiquiti.example.com", "--max-retries", "2"],
